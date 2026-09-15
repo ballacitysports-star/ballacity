@@ -56,10 +56,13 @@ import { Route as AdminLegalRouteImport } from './routes/admin.legal'
 import { Route as AdminListingsRouteImport } from './routes/admin.listings'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
+import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blog.how-to-find-pickup-soccer-games'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as GuideIndexRouteImport } from './routes/guide.index'
+import { Route as GuideSportRouteImport } from './routes/guide.$sport'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
@@ -336,6 +339,12 @@ const AdminModerationRoute = AdminModerationRouteImport.update({
   path: '/admin/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogHowToFindPickupSoccerGamesRoute =
+  BlogHowToFindPickupSoccerGamesRouteImport.update({
+    id: '/blog/how-to-find-pickup-soccer-games',
+    path: '/blog/how-to-find-pickup-soccer-games',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
   path: '/checkout/return',
@@ -354,6 +363,16 @@ const DevRouteDoctorRoute = DevRouteDoctorRouteImport.update({
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideIndexRoute = GuideIndexRouteImport.update({
+  id: '/guide/',
+  path: '/guide/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideSportRoute = GuideSportRouteImport.update({
+  id: '/guide/$sport',
+  path: '/guide/$sport',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
@@ -601,10 +620,12 @@ export interface FileRoutesByFullPath {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
+  '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -621,6 +642,7 @@ export interface FileRoutesByFullPath {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/admin/': typeof AdminIndexRoute
+  '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
   '/parent/': typeof ParentIndexRoute
@@ -692,9 +714,11 @@ export interface FileRoutesByTo {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -711,6 +735,7 @@ export interface FileRoutesByTo {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/admin': typeof AdminIndexRoute
+  '/guide': typeof GuideIndexRoute
   '/messages': typeof MessagesIndexRoute
   '/orgs': typeof OrgsIndexRoute
   '/parent': typeof ParentIndexRoute
@@ -784,10 +809,12 @@ export interface FileRoutesById {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
+  '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -804,6 +831,7 @@ export interface FileRoutesById {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/admin/': typeof AdminIndexRoute
+  '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
   '/parent/': typeof ParentIndexRoute
@@ -877,10 +905,12 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
     | '/games/$gameId'
+    | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -897,6 +927,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/admin/'
+    | '/guide/'
     | '/messages/'
     | '/orgs/'
     | '/parent/'
@@ -968,9 +999,11 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -987,6 +1020,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/admin'
+    | '/guide'
     | '/messages'
     | '/orgs'
     | '/parent'
@@ -1059,10 +1093,12 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
     | '/games/$gameId'
+    | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -1079,6 +1115,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/admin/'
+    | '/guide/'
     | '/messages/'
     | '/orgs/'
     | '/parent/'
@@ -1142,10 +1179,12 @@ export interface RootRouteChildren {
   AdminListingsRoute: typeof AdminListingsRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
+  BlogHowToFindPickupSoccerGamesRoute: typeof BlogHowToFindPickupSoccerGamesRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
+  GuideSportRoute: typeof GuideSportRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
@@ -1162,6 +1201,7 @@ export interface RootRouteChildren {
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  GuideIndexRoute: typeof GuideIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   OrgsIndexRoute: typeof OrgsIndexRoute
   ParentIndexRoute: typeof ParentIndexRoute
@@ -1516,6 +1556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminModerationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/how-to-find-pickup-soccer-games': {
+      id: '/blog/how-to-find-pickup-soccer-games'
+      path: '/blog/how-to-find-pickup-soccer-games'
+      fullPath: '/blog/how-to-find-pickup-soccer-games'
+      preLoaderRoute: typeof BlogHowToFindPickupSoccerGamesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/return': {
       id: '/checkout/return'
       path: '/checkout/return'
@@ -1542,6 +1589,20 @@ declare module '@tanstack/react-router' {
       path: '/games/$gameId'
       fullPath: '/games/$gameId'
       preLoaderRoute: typeof GamesGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide/': {
+      id: '/guide/'
+      path: '/guide'
+      fullPath: '/guide/'
+      preLoaderRoute: typeof GuideIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide/$sport': {
+      id: '/guide/$sport'
+      path: '/guide/$sport'
+      fullPath: '/guide/$sport'
+      preLoaderRoute: typeof GuideSportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/': {
@@ -1902,10 +1963,12 @@ const rootRouteChildren: RootRouteChildren = {
   AdminListingsRoute: AdminListingsRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
+  BlogHowToFindPickupSoccerGamesRoute: BlogHowToFindPickupSoccerGamesRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
+  GuideSportRoute: GuideSportRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,
@@ -1922,6 +1985,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
   AdminIndexRoute: AdminIndexRoute,
+  GuideIndexRoute: GuideIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   OrgsIndexRoute: OrgsIndexRoute,
   ParentIndexRoute: ParentIndexRoute,

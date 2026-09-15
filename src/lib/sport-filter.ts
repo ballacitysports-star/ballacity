@@ -60,7 +60,10 @@ export function parseSportSkillMap(
 ): SportSkillMap {
   const out: SportSkillMap = {};
   if (!raw) return out;
-  const entries = raw.split(ENTRY_SEP).map((e) => e.trim()).filter(Boolean);
+  const entries = raw
+    .split(ENTRY_SEP)
+    .map((e) => e.trim())
+    .filter(Boolean);
   const legacy: string[] = [];
   for (const entry of entries) {
     const idx = entry.indexOf(KV_SEP);
@@ -164,13 +167,9 @@ export function matchesSportSkillFilter(
   if (sports.length === 0) {
     const wantedAny = Object.values(skills).flatMap((v) => v.split(/·/).map((t) => t.trim()));
     if (wantedAny.length === 0) return true;
-    return wantedAny.some((w) =>
-      levelMatchesFilter(authorSportLevels, postSports, postSkill, w),
-    );
+    return wantedAny.some((w) => levelMatchesFilter(authorSportLevels, postSports, postSkill, w));
   }
-  const overlap = sports.filter((s) =>
-    postSports.some((p) => p.toLowerCase() === s.toLowerCase()),
-  );
+  const overlap = sports.filter((s) => postSports.some((p) => p.toLowerCase() === s.toLowerCase()));
   if (overlap.length === 0) return false;
   const constrained = overlap.filter((s) => skills[s]);
   if (constrained.length === 0) return true;

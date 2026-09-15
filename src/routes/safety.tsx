@@ -16,7 +16,7 @@ export const Route = createFileRoute("/safety")({
   head: () =>
     pageHead({
       path: "/safety",
-      title: "Safety Center — ballaCity",
+      title: "BallaCity Safety & Community Guidelines",
       description:
         "How to stay safe on ballaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
     }),
@@ -30,7 +30,7 @@ function SafetyCenter() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Safety Center</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           ballaCity helps players find games — hosts organize them. ballaCity does not supervise
           games, inspect venues, referee play, or guarantee anyone's safety. These are the habits
           that keep pickup sports safe.
@@ -74,7 +74,7 @@ function SafetyCenter() {
             points={HOST_RESPONSIBILITY.points}
           />
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
               {LEGAL_REVIEW_LABEL}
             </span>
             These acknowledgments are placeholder drafts and are not a waiver or release of

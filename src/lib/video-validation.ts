@@ -47,7 +47,13 @@ export function validateVideoSize(input: { bytes: number | null | undefined }): 
  * `kind: "source"`, which skips this check.
  */
 export function sniffVideoContainer(bytes: Uint8Array): VideoContainer {
-  if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x1a &&
+    bytes[1] === 0x45 &&
+    bytes[2] === 0xdf &&
+    bytes[3] === 0xa3
+  ) {
     return "webm";
   }
   if (bytes.length >= 12) {

@@ -93,12 +93,19 @@ export function ReelStudio({
 
   return (
     <div className="mt-3 space-y-3">
-      <video ref={videoRef} src={videoUrl} controls className="w-full rounded-lg" />
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        controls
+        playsInline
+        preload="metadata"
+        className="w-full rounded-lg bg-black"
+      />
 
       {segments.length > 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime">
+            <p className="inline-flex items-center gap-1.5 section-eyebrow text-lime">
               <Film className="h-3.5 w-3.5" />
               AI edit · {segments.length} cuts
               {editPlan?.total ? ` · ${editPlan.total}s` : ""}
@@ -145,7 +152,7 @@ export function ReelStudio({
 
       {timeline.length > 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-3">
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime">
+          <p className="inline-flex items-center gap-1.5 section-eyebrow text-lime">
             <ListVideo className="h-3.5 w-3.5" />
             Play-by-play
           </p>
@@ -173,7 +180,7 @@ export function ReelStudio({
           (coaching.notes ?? []).length > 0 ||
           (coaching.drills ?? []).length > 0) && (
           <div className="rounded-xl border border-border bg-background/60 p-3">
-            <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime">
+            <p className="inline-flex items-center gap-1.5 section-eyebrow text-lime">
               <Dumbbell className="h-3.5 w-3.5" />
               Coaching report
             </p>
@@ -211,7 +218,7 @@ export function ReelStudio({
         <div className="rounded-xl border border-border bg-background/60 p-3">
           <button
             onClick={() => setShowTranscript((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime"
+            className="inline-flex items-center gap-1.5 section-eyebrow text-lime"
           >
             <MessageSquareQuote className="h-3.5 w-3.5" />
             {showTranscript ? "Hide transcript" : "Show transcript"}

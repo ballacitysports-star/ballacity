@@ -34,8 +34,6 @@ import {
   usePublishedLegalDocuments,
 } from "@/lib/legal-consent";
 
-
-
 export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead({
@@ -179,7 +177,6 @@ function AuthPage() {
     leave(dest);
   };
 
-
   useEffect(() => {
     if (!loading && user) void goPostAuth(user);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,8 +226,7 @@ function AuthPage() {
           return;
         }
         if (!consentOk) {
-          const message =
-            "Please agree to the Terms of Service and Privacy Policy to continue.";
+          const message = "Please agree to the Terms of Service and Privacy Policy to continue.";
           setErrors((p) => ({ ...p, consent: message }));
           toast.error(message);
           return;
@@ -241,7 +237,6 @@ function AuthPage() {
         stashPendingConsent(currentAcceptances(publishedLegal));
         setPendingAccountType(accountType);
         stashPendingDob(dobCheck.iso);
-
 
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -343,7 +338,6 @@ function AuthPage() {
     });
 
     if (mode === "signup") stashPendingConsent(currentAcceptances(publishedLegal));
-
 
     const providerLabel = provider === "apple" ? "Apple" : "Google";
     if (mode === "signup" && accountType) {
@@ -520,9 +514,7 @@ function AuthPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="font-display text-lg font-bold">
-          {mode === "signin" ? "Sign in" : "Create account"}
-        </h1>
+        <h1 className="bar-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
       </header>
 
       <div className="px-4 mt-6 space-y-5">
@@ -568,7 +560,6 @@ function AuthPage() {
             </button>
           </>
         ) : (
-
           <>
             {mode === "signup" && isGuardianEntry ? (
               <div className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
@@ -596,8 +587,6 @@ function AuthPage() {
             {mode === "signup" ? (
               <LegalConsent value={consent} onChange={setConsent} disabled={busy} />
             ) : null}
-
-
 
             <button
               onClick={() => oauth("google")}
@@ -646,7 +635,7 @@ function AuthPage() {
               </p>
             ) : null}
 
-            <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-3 micro-label text-muted-foreground">
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
             </div>
 
@@ -739,7 +728,11 @@ function AuthPage() {
                     />
                   </div>
                   {errors.dob ? (
-                    <p id="dob-error" role="alert" className="mt-1 text-xs font-semibold text-destructive">
+                    <p
+                      id="dob-error"
+                      role="alert"
+                      className="mt-1 text-xs font-semibold text-destructive"
+                    >
                       {errors.dob}
                     </p>
                   ) : null}
@@ -811,7 +804,6 @@ function AuthPage() {
               </p>
             </form>
 
-
             {mode === "signin" && (
               <button
                 onClick={async () => {
@@ -857,7 +849,6 @@ function AuthPage() {
             </p>
           </>
         )}
-
       </div>
     </div>
   );

@@ -63,11 +63,41 @@ export function scoreListing(v: ListingCompleteness): {
   missing: StrengthItem[];
 } {
   const items: StrengthItem[] = [
-    { id: "name", label: "Add a business name", section: "org-business", weight: 15, done: v.name.trim().length >= 2 },
-    { id: "handle", label: "Pick a handle", section: "org-about", weight: 10, done: v.handle.trim().length >= 3 },
-    { id: "category", label: "Choose a category", section: "org-business", weight: 10, done: !!v.category },
-    { id: "address", label: "Add your address", section: "org-business", weight: 15, done: v.address.trim().length > 4 },
-    { id: "phone", label: "Add a phone number", section: "org-contact", weight: 10, done: v.phone.trim().length >= 7 },
+    {
+      id: "name",
+      label: "Add a business name",
+      section: "org-business",
+      weight: 15,
+      done: v.name.trim().length >= 2,
+    },
+    {
+      id: "handle",
+      label: "Pick a handle",
+      section: "org-about",
+      weight: 10,
+      done: v.handle.trim().length >= 3,
+    },
+    {
+      id: "category",
+      label: "Choose a category",
+      section: "org-business",
+      weight: 10,
+      done: !!v.category,
+    },
+    {
+      id: "address",
+      label: "Add your address",
+      section: "org-business",
+      weight: 15,
+      done: v.address.trim().length > 4,
+    },
+    {
+      id: "phone",
+      label: "Add a phone number",
+      section: "org-contact",
+      weight: 10,
+      done: v.phone.trim().length >= 7,
+    },
     {
       id: "contact",
       label: "Add a website or email",
@@ -75,8 +105,20 @@ export function scoreListing(v: ListingCompleteness): {
       weight: 5,
       done: !!v.website.trim() || !!v.email.trim(),
     },
-    { id: "hours", label: "Set your hours", section: "org-hours", weight: 15, done: hasAnyHours(v.hours) },
-    { id: "amenities", label: "Pick at least 3 amenities", section: "org-amenities", weight: 5, done: v.amenities.length >= 3 },
+    {
+      id: "hours",
+      label: "Set your hours",
+      section: "org-hours",
+      weight: 15,
+      done: hasAnyHours(v.hours),
+    },
+    {
+      id: "amenities",
+      label: "Pick at least 3 amenities",
+      section: "org-amenities",
+      weight: 5,
+      done: v.amenities.length >= 3,
+    },
     { id: "logo", label: "Upload a logo", section: "org-photos", weight: 5, done: !!v.avatarUrl },
     {
       id: "photos",
@@ -85,7 +127,13 @@ export function scoreListing(v: ListingCompleteness): {
       weight: 5,
       done: v.photos.length + (v.coverUrl ? 1 : 0) >= 3,
     },
-    { id: "bio", label: "Describe your gym", section: "org-about", weight: 5, done: v.bio.trim().length >= 40 },
+    {
+      id: "bio",
+      label: "Describe your gym",
+      section: "org-about",
+      weight: 5,
+      done: v.bio.trim().length >= 40,
+    },
   ];
   const total = items.reduce((s, i) => s + i.weight, 0);
   const earned = items.reduce((s, i) => s + (i.done ? i.weight : 0), 0);

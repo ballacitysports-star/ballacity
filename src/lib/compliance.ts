@@ -223,10 +223,7 @@ export type SecurityAreaRow = {
   evidence: string;
 };
 
-export const SECURITY_AREA_META: Record<
-  SecurityArea,
-  { label: string; description: string }
-> = {
+export const SECURITY_AREA_META: Record<SecurityArea, { label: string; description: string }> = {
   rls: {
     label: "Row Level Security",
     description: "Every table in the app schema has RLS on with owner-scoped policies.",

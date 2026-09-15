@@ -68,9 +68,7 @@ function LegalSettingsPage() {
         {showReviewWarning ? <LegalReviewBanner /> : null}
 
         <section className="space-y-2">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Documents
-          </h2>
+          <h2 className="px-1 section-eyebrow text-muted-foreground">Documents</h2>
           {LEGAL_DOCUMENT_LIST.map((doc) => {
             const v = effectiveVersion(doc.type, published);
             return (
@@ -100,9 +98,7 @@ function LegalSettingsPage() {
           </p>
         ) : (
           <section className="space-y-2">
-            <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Your consent status
-            </h2>
+            <h2 className="px-1 section-eyebrow text-muted-foreground">Your consent status</h2>
             {isLoading ? (
               <p className="px-1 text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -153,9 +149,7 @@ function LegalSettingsPage() {
 
             {records.length > 0 ? (
               <div className="rounded-2xl border border-border bg-surface p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  History
-                </p>
+                <p className="mb-2 section-eyebrow text-muted-foreground">History</p>
                 <ul className="space-y-1.5 text-xs text-muted-foreground">
                   {records.map((r) => (
                     <li key={`${r.document_type}-${r.document_version}`}>

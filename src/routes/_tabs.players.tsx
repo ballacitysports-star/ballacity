@@ -147,7 +147,7 @@ export const Route = createFileRoute("/_tabs/players")({
   head: () =>
     pageHead({
       path: "/players",
-      title: "Players near you — ballaCity",
+      title: "Find Local Sports Players & Athletes | BallaCity",
       description:
         "Find available players and teammates nearby by sport, skill tier, and availability.",
       noindex: true,
@@ -712,7 +712,7 @@ function PlayersPage() {
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <h2 className="section-eyebrow text-muted-foreground">
                   {sorted.length} player{sorted.length === 1 ? "" : "s"} available
                 </h2>
                 <SortSummary value={sortBy} options={PLAYER_SORTS} />
@@ -1189,7 +1189,7 @@ function AvailabilityCard({
           { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
         ].map((s) => (
           <div key={s.label}>
-            <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <dt className="micro-label text-muted-foreground">
               {s.label}
             </dt>
             <dd className="truncate text-xs font-semibold">{s.value}</dd>
@@ -1202,9 +1202,7 @@ function AvailabilityCard({
         <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
           {a.author_bio && (
             <section>
-              <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                About
-              </h2>
+              <h2 className="mb-1.5 section-eyebrow text-muted-foreground">About</h2>
               <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap line-clamp-3">
                 {a.author_bio}
               </p>

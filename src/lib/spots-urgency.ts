@@ -18,10 +18,7 @@
  */
 export type SpotsUrgency = "full" | "critical" | "low" | "normal";
 
-export function getSpotsUrgency(
-  spotsLeft: number,
-  maxPlayers?: number,
-): SpotsUrgency {
+export function getSpotsUrgency(spotsLeft: number, maxPlayers?: number): SpotsUrgency {
   if (spotsLeft <= 0) return "full";
   if (spotsLeft <= 3) return "critical";
   if (typeof maxPlayers === "number" && maxPlayers > 0) {

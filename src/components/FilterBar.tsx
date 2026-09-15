@@ -49,7 +49,7 @@ export function FilterBar({
   return (
     <div className="mb-4">
       <div className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
+        <div className="flex min-h-11 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
             value={q}
@@ -58,7 +58,11 @@ export function FilterBar({
             className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {q && (
-            <button onClick={() => onQChange("")} aria-label="Clear search">
+            <button
+              onClick={() => onQChange("")}
+              aria-label="Clear search"
+              className="-mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-background"
+            >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
@@ -89,6 +93,23 @@ export function FilterBar({
           </Link>
         )}
       </div>
+      {/* When filters are on, say so in words next to a way out of them — the
+          badge on the filter button alone left people hunting inside the sheet. */}
+      {activeFilterCount > 0 && onReset && (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className="font-semibold text-lime">
+            {activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"} on
+          </span>
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={resetDisabled}
+            className="font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
       {chips && <div className="mt-3">{chips}</div>}
       <FilterSheet
         open={open}

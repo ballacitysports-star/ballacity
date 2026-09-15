@@ -32,7 +32,13 @@ describe("onboarding guards never loop", () => {
   });
 
   it("stands both gates down on guardian consent, parent center, legal and safety", () => {
-    for (const p of ["/onboarding/child", "/parent", "/parent/child/1", "/safety", "/account/legal"]) {
+    for (const p of [
+      "/onboarding/child",
+      "/parent",
+      "/parent/child/1",
+      "/safety",
+      "/account/legal",
+    ]) {
       expect(gates(p).skipTypeCheck).toBe(true);
     }
   });

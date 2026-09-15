@@ -1,11 +1,5 @@
 import { Clock, Copy } from "lucide-react";
-import {
-  WEEKDAYS,
-  dayHours,
-  formatDayHours,
-  type DayHours,
-  type OrgHours,
-} from "@/lib/org-hours";
+import { WEEKDAYS, dayHours, formatDayHours, type DayHours, type OrgHours } from "@/lib/org-hours";
 
 /**
  * Per-weekday opening hours editor with "closed" / "open 24 hours" toggles
@@ -45,9 +39,7 @@ export function HoursEditor({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() =>
-                    setDay(day, d.closed ? { ranges: [range] } : { closed: true })
-                  }
+                  onClick={() => setDay(day, d.closed ? { ranges: [range] } : { closed: true })}
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                     d.closed
                       ? "bg-coral/15 text-coral"
@@ -58,9 +50,7 @@ export function HoursEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setDay(day, d.open24 ? { ranges: [range] } : { open24: true })
-                  }
+                  onClick={() => setDay(day, d.open24 ? { ranges: [range] } : { open24: true })}
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                     d.open24 ? "bg-lime/15 text-lime" : "border border-border text-muted-foreground"
                   }`}

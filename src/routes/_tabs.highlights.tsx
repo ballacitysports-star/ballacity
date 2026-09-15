@@ -16,13 +16,14 @@ import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { FollowButton } from "@/components/FollowButton";
 import { PostEngagement } from "@/components/PostEngagement";
 import { FlagReelButton } from "@/components/FlagReelButton";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   listHighlightFeed,
   listHighlightFeedSports,
   type HighlightFeedItem,
 } from "@/lib/highlight-feed.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
-
 
 export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
@@ -107,7 +108,6 @@ function HighlightFeedPage() {
       .catch(() => {});
   });
 
-
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore || done) return;
     setLoadingMore(true);
@@ -149,7 +149,7 @@ function HighlightFeedPage() {
           <Link to="/" className="shrink-0 text-muted-foreground" aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="flex-1 truncate text-xl font-black tracking-tight">Highlights</h1>
+          <h1 className="page-title flex-1 truncate">Highlights</h1>
           <Link
             to="/reels"
             search={{ game: "", title: "", upload: "" }}
@@ -160,7 +160,9 @@ function HighlightFeedPage() {
           </Link>
           <button
             type="button"
-            onClick={() => setSort((s) => (s === "newest" ? "oldest" : s === "oldest" ? "sport" : "newest"))}
+            onClick={() =>
+              setSort((s) => (s === "newest" ? "oldest" : s === "oldest" ? "sport" : "newest"))
+            }
             className="shrink-0 text-muted-foreground"
             aria-label={`Sort: ${SORT_LABEL[sort]}`}
             title={`Sort: ${SORT_LABEL[sort]}`}
@@ -180,17 +182,25 @@ function HighlightFeedPage() {
 
       <main className="page-shell-flush">
         {loading ? (
-          <div className="grid place-items-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="grid place-items-center py-16">
+            <LoadingState label="Loading highlights…" />
           </div>
         ) : error ? (
-          <p className="px-4 py-16 text-center text-sm text-muted-foreground">{error}</p>
+          <div className="px-4 py-10">
+            <ErrorState
+              title="Highlights didn’t load"
+              description="Something went wrong while loading highlights. Check your connection and try again."
+              onRetry={() => window.location.reload()}
+            />
+          </div>
         ) : items.length === 0 ? (
           <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border p-8 text-center">
             <Clapperboard className="mx-auto h-6 w-6 text-lime" />
             <p className="mt-2 text-sm font-semibold">No highlights here yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {sport ? "Try another sport, or be the first to post one." : "Be the first to post one."}
+              {sport
+                ? "Try another sport, or be the first to post one."
+                : "Be the first to post one."}
             </p>
             <Link
               to="/reels"
@@ -215,7 +225,9 @@ function HighlightFeedPage() {
           </div>
         )}
         {done && items.length > 0 && (
-          <p className="py-6 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            You&apos;re all caught up.
+          </p>
         )}
       </main>
     </div>
@@ -239,12 +251,14 @@ function StoryRing({
   label: string;
 }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-16 shrink-0 flex-col items-center gap-1">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-16 shrink-0 flex-col items-center gap-1"
+    >
       <span
         className={`grid h-16 w-16 place-items-center rounded-full p-[2px] ${
-          active
-            ? "bg-gradient-to-tr from-lime via-lime/70 to-primary"
-            : "bg-border"
+          active ? "bg-gradient-to-tr from-lime via-lime/70 to-primary" : "bg-border"
         }`}
       >
         <span className="grid h-full w-full place-items-center rounded-full bg-background">
@@ -259,7 +273,6 @@ function StoryRing({
     </button>
   );
 }
-
 
 type SortMode = "newest" | "oldest" | "sport";
 
@@ -409,7 +422,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             View comments
           </button>
         )}
-        <p className="pt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <p className="pt-0.5 micro-label text-muted-foreground">
           {relativeTime(item.createdAt)}
         </p>
         {showComments && (
@@ -421,4 +434,3 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
     </li>
   );
 }
-

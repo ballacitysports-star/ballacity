@@ -73,7 +73,7 @@ export const Route = createFileRoute("/_tabs/create")({
   head: () =>
     pageHead({
       path: "/create",
-      title: "Host a game — ballaCity",
+      title: "Create a Pickup Sports Game | BallaCity",
       description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
       noindex: true,
     }),
@@ -550,7 +550,7 @@ function Create() {
             title="Host as"
             right={
               !selectedAffiliation && affiliations.length > 1 ? (
-                <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+                <span className="rounded-full bg-destructive/15 px-2 py-0.5 micro-label text-destructive">
                   Required
                 </span>
               ) : undefined
@@ -564,7 +564,7 @@ function Create() {
                   </span>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       {affiliationLabel(affiliations[0])}
                     </div>
                   </div>
@@ -592,7 +592,7 @@ function Create() {
                           {(a.name || "?").slice(0, 1).toUpperCase()}
                         </span>
                         <span className="truncate max-w-[10rem]">{a.name}</span>
-                        <span className="text-[10px] uppercase tracking-wider opacity-70">
+                        <span className="micro-label opacity-70">
                           {affiliationShortLabel(a)}
                         </span>
                       </button>
@@ -784,9 +784,7 @@ function Create() {
               </div>
               {price > 0 && (
                 <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Entry fee
-                  </span>
+                  <span className="section-eyebrow text-muted-foreground">Entry fee</span>
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       $
@@ -934,7 +932,7 @@ function Section({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-2 flex items-center gap-1.5 section-eyebrow text-muted-foreground">
         {icon}
         {title}
         {right && <span className="ml-auto">{right}</span>}

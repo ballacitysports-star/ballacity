@@ -110,8 +110,6 @@ async function attachChannel(gameId: string) {
   }
 }
 
-
-
 function detachIfIdle(gameId: string) {
   const set = listeners.get(gameId);
   if (set && set.size > 0) return;

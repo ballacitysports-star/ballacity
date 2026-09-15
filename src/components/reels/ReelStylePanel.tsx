@@ -18,7 +18,7 @@ type Group<T extends string> = {
 function ChipGroup<T extends string>({ title, hint, options, value, onSelect }: Group<T>) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="micro-label text-muted-foreground">
         {title}
       </p>
       <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>

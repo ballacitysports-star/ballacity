@@ -18,8 +18,7 @@ import { TEST_ACCOUNTS } from "./test-fixtures";
 import { resolveOnboardingStatus } from "./onboarding.functions";
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
+const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
 
@@ -58,8 +57,7 @@ describe.skipIf(skipIfNoBackend)("resolveOnboardingStatus (integration)", () => 
       .eq("id", userId)
       .maybeSingle();
 
-    const accountType =
-      (profile as { account_type?: string | null } | null)?.account_type ?? null;
+    const accountType = (profile as { account_type?: string | null } | null)?.account_type ?? null;
 
     // Session claims may or may not surface the provider; only identities
     // returned by the admin API are authoritative. Here we feed the shape

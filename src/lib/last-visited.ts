@@ -8,7 +8,14 @@ import { sanitizeNextPath } from "@/routes/__root";
 export const LAST_VISITED_KEY = "openrun:last-visited";
 
 const SKIP_EXACT = new Set(["/", "/auth", "/reset-password"]);
-const SKIP_PREFIXES = ["/auth/", "/reset-password/", "/api/", "/.well-known/", "/.mcp/", "/.lovable"];
+const SKIP_PREFIXES = [
+  "/auth/",
+  "/reset-password/",
+  "/api/",
+  "/.well-known/",
+  "/.mcp/",
+  "/.lovable",
+];
 
 function isRecordable(pathname: string): boolean {
   if (SKIP_EXACT.has(pathname)) return false;

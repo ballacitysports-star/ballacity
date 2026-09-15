@@ -42,7 +42,10 @@ function parseStorageUrl(url: string): Parsed | null {
   if (!url || url.startsWith("data:") || url.startsWith("blob:")) return null;
   let parsed: URL;
   try {
-    parsed = new URL(url, typeof window === "undefined" ? "http://localhost" : window.location.href);
+    parsed = new URL(
+      url,
+      typeof window === "undefined" ? "http://localhost" : window.location.href,
+    );
   } catch {
     return null;
   }

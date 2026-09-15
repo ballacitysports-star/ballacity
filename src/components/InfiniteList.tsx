@@ -87,7 +87,7 @@ export function InfiniteList<T>({
           >
             Load {nextBatch} more
           </button>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="micro-label text-muted-foreground">
             Showing {visible} of {items.length}
           </span>
         </div>

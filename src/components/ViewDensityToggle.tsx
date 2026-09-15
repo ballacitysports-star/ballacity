@@ -43,7 +43,7 @@ export function ViewDensityToggle({
               role="tab"
               aria-selected={active}
               onClick={() => onViewChange(id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-bold transition-colors ${
                 active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
               }`}
             >
@@ -68,7 +68,7 @@ export function ViewDensityToggle({
                 aria-selected={active}
                 aria-label={`${label} view`}
                 onClick={() => onDensityChange(id)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-colors ${
                   active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
                 }`}
               >

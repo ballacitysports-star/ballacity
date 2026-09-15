@@ -9,7 +9,7 @@ export const Route = createFileRoute("/contact")({
   head: () =>
     pageHead({
       path: "/contact",
-      title: "Contact & Report a Problem — ballaCity",
+      title: "BallaCity Help Center | Sports Community Support",
       description:
         "Reach ballaCity support, report a player, game, message, or highlight, and find out what happens after you send a report.",
     }),
@@ -28,7 +28,7 @@ function ContactPage() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Contact</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Questions about your account, a game, a payment, or something you saw on ballaCity? Start
           here.
         </p>

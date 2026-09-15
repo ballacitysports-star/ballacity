@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
+import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
@@ -158,9 +158,7 @@ function EditProfile() {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
         <h1 className="page-title">Sign in to edit your profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Profile changes are saved to your account.
-        </p>
+        <p className="mt-2 page-subtitle">Profile changes are saved to your account.</p>
         <Link
           to="/auth"
           className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
@@ -326,7 +324,7 @@ function EditProfile() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1 text-center">
-          <h1 className="font-display text-lg font-bold leading-tight">Edit profile</h1>
+          <h1 className="bar-title">Edit profile</h1>
           <SaveStatus {...autosave} variant="pill" className="mt-1" />
         </div>
         <button
@@ -565,41 +563,7 @@ function EditProfile() {
         </Link>
       </Section>
 
-      <Section title="AI Highlight Reels">
-        <Link
-          to="/reels"
-          search={{ game: "", title: "", upload: "" }}
-          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
-            <Video className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm">AI Highlight Reels</div>
-            <div className="text-xs text-muted-foreground">3 free, then $15/mo unlimited</div>
-          </div>
-          <div className="text-lime text-xs font-bold">→</div>
-        </Link>
-      </Section>
 
-      <Section title="ballaCity Pro">
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="rounded-3xl border border-coral/40 bg-coral-gradient p-5 text-white relative overflow-hidden"
-        >
-          <Video className="absolute right-4 top-4 h-16 w-16 opacity-10" />
-          <div className="text-xs font-bold uppercase tracking-wider opacity-80">ballaCity Pro</div>
-          <h3 className="font-display text-xl font-bold mt-1">
-            AI highlight reels, unlimited hosting.
-          </h3>
-          <p className="text-sm opacity-90 mt-1">
-            Cinematic clips from raw gameplay. One-tap export to TikTok & Reels.
-          </p>
-          <button className="mt-3 rounded-full bg-background px-4 py-2 text-sm font-bold text-foreground">
-            Upgrade · $7.99 / mo
-          </button>
-        </motion.div>
-      </Section>
 
       <Section title="Plans & subscriptions">
         <Link

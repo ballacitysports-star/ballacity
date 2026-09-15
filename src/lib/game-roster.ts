@@ -20,7 +20,6 @@ type Row = {
   attended?: boolean | null;
 };
 
-
 type ProfileRow = {
   id: string;
   display_name: string | null;
@@ -61,7 +60,6 @@ function toParticipant(row: Row, profile: ProfileRow | undefined): LiveParticipa
     attended: row.attended ?? null,
   };
 }
-
 
 /**
  * Live participant list for a single game. Fetches confirmed players from
@@ -191,7 +189,6 @@ export function useLiveParticipants(gameId: string | undefined): {
     };
   }, [gameId]);
 
-
   const refetch = useCallback(async () => {
     await reloadRef.current();
   }, []);
@@ -202,4 +199,3 @@ export function useLiveParticipants(gameId: string | undefined): {
 
   return { participants, loading, refetch, removeLocal };
 }
-

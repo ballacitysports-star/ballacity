@@ -82,17 +82,27 @@ describe("nextOccurrence", () => {
 
 describe("slotsHitRange", () => {
   it("matches a weekly window inside the range", () => {
-    expect(slotsHitRange([{ weekday: 0, start: "08:00", end: "10:00" }], "2026-08-01", "2026-08-07")).toBe(true);
+    expect(
+      slotsHitRange([{ weekday: 0, start: "08:00", end: "10:00" }], "2026-08-01", "2026-08-07"),
+    ).toBe(true);
   });
   it("returns false when nothing lands in range", () => {
-    expect(slotsHitRange([{ date: "2026-09-01", start: "08:00", end: "10:00" }], "2026-08-01", "2026-08-07")).toBe(false);
+    expect(
+      slotsHitRange(
+        [{ date: "2026-09-01", start: "08:00", end: "10:00" }],
+        "2026-08-01",
+        "2026-08-07",
+      ),
+    ).toBe(false);
   });
 });
 
 describe("formatting", () => {
   it("formats a slot and a summary", () => {
     expect(formatSlot({ weekday: 6, start: "08:00", end: "11:30" })).toBe("Sat 8 AM–11:30 AM");
-    expect(summarizeSlots([{ date: "2026-08-01", start: "08:00", end: "10:00" }])).toContain("1 date");
+    expect(summarizeSlots([{ date: "2026-08-01", start: "08:00", end: "10:00" }])).toContain(
+      "1 date",
+    );
   });
 });
 

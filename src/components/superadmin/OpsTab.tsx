@@ -179,18 +179,13 @@ export function OpsTab() {
               <SelectItem value="gym">Gyms</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            disabled={title.trim().length < 3}
-            onClick={() => setConfirmBroadcast(true)}
-          >
+          <Button disabled={title.trim().length < 3} onClick={() => setConfirmBroadcast(true)}>
             Send announcement
           </Button>
         </CardContent>
       </Card>
 
       <PushTester />
-
-
 
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
@@ -310,7 +305,7 @@ function Queue({
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="micro-label text-muted-foreground">{title}</div>
       {rows.length === 0 ? (
         <div className="text-muted-foreground">Empty</div>
       ) : (

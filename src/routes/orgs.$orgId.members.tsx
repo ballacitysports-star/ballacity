@@ -209,7 +209,7 @@ function MembersPage() {
 
       <header>
         <h1 className="page-title">Manage members.</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-1 page-subtitle">
           {orgName ? `${orgName} · ` : ""}Invite people, review requests, and set roles.
         </p>
       </header>
@@ -254,7 +254,7 @@ function MembersPage() {
                       {p.display_name || "Unnamed"}
                     </div>
                     {already && (
-                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Already a member
                       </div>
                     )}
@@ -372,7 +372,7 @@ function MembersPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{name}</div>
-                    <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div className="flex items-center gap-1 micro-label text-muted-foreground">
                       {m.role === "admin" && <Shield className="h-3 w-3 text-lime" />}
                       {m.role}
                     </div>

@@ -121,8 +121,8 @@ function PrivacySettingsPage() {
             <p className="text-xs font-medium">Extra protections are on for your account</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Because you&apos;re under 18, your profile stays visible to members only, your
-              location is never shared more precisely than your city, and your birthday and
-              contact details are never public.
+              location is never shared more precisely than your city, and your birthday and contact
+              details are never public.
             </p>
           </div>
         ) : null}
@@ -286,11 +286,10 @@ function PrivacySettingsPage() {
             to="/account/data"
           />
           <SettingsStaticRow>
-
             <div className="space-y-2 text-xs text-muted-foreground">
               <p>
-                <span className="font-semibold text-foreground">Deleted:</span> your profile, photos,
-                bio, birthday, availability, highlight reels, messages, comments, reactions,
+                <span className="font-semibold text-foreground">Deleted:</span> your profile,
+                photos, bio, birthday, availability, highlight reels, messages, comments, reactions,
                 follows, and every sign-in method.
               </p>
               <p>
@@ -302,7 +301,7 @@ function PrivacySettingsPage() {
                 <span className="font-semibold text-foreground">Retained:</span> safety records
                 (reports and blocks filed about your account) and required security logs.
               </p>
-              <p className="text-[11px] uppercase tracking-wide">
+              <p className="micro-label">
                 Legal review required — retention periods are placeholders.
               </p>
             </div>

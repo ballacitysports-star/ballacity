@@ -7,7 +7,11 @@ import { isPublicImageBucket } from "@/lib/image-moderation";
 const REFERENCES: Array<{ table: string; columns: string[]; jsonColumns?: string[] }> = [
   { table: "profiles", columns: ["avatar_url", "cover_url"] },
   { table: "teams", columns: ["avatar", "cover"] },
-  { table: "trainer_orgs", columns: ["avatar", "avatar_url", "cover_url"], jsonColumns: ["photos"] },
+  {
+    table: "trainer_orgs",
+    columns: ["avatar", "avatar_url", "cover_url"],
+    jsonColumns: ["photos"],
+  },
   { table: "hosted_games", columns: ["image"] },
 ];
 

@@ -10,6 +10,10 @@
  */
 
 import { reelStyleDirectives } from "@/lib/reel-style";
+import { DEFAULT_AI_PROVIDER } from "@/lib/ai/config";
+import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
+import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
+import type { AiMessagePart } from "@/lib/ai/provider";
 
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
@@ -47,50 +51,38 @@ export type Reel = {
 export const REEL_WORK_COLUMNS =
   "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs";
 
-async function callLovableAI(prompt: string, system: string, apiKey: string) {
-  return callLovableAIParts([{ type: "text", text: prompt }], system, apiKey);
+async function callLovableAI(prompt: string, system: string, ctx: StepCtx) {
+  return callLovableAIParts([{ type: "text", text: prompt }], system, ctx);
 }
 
-/** Multimodal-capable gateway call that always returns parsed JSON. */
+/**
+ * Multimodal JSON call. Routed through the shared AI service layer so the model
+ * name, retry policy, usage accounting and error mapping are the same for every
+ * feature in the app. Prompts and outputs are unchanged from before the layer.
+ */
 async function callLovableAIParts(
   parts: Array<Record<string, any>>,
   system: string,
-  apiKey: string,
-) {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "manual-worker",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: parts },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (res.status === 429) throw new Error("AI is rate limited — retrying shortly");
-    if (res.status === 402) throw new Error("AI credits exhausted — add credits to continue");
-    throw new Error(`AI gateway ${res.status}: ${body.slice(0, 300)}`);
+  ctx: StepCtx,
+): Promise<any> {
+  const request = { system, prompt: "", parts: parts as AiMessagePart[] };
+  if (ctx.session) {
+    const out = await runAiCall(ctx.session, (provider) => provider.generateStructured(request));
+    return out.data;
   }
-  const data = await res.json();
-  const content = String(data?.choices?.[0]?.message?.content ?? "")
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  if (!content) throw new Error("AI gateway returned no content");
-  return JSON.parse(content);
+  const provider = createLovableGatewayProvider(DEFAULT_AI_PROVIDER);
+  return (await provider.generateStructured(request)).data;
 }
 
 /** Downloads a storage object and returns it as a base64 data URL for the gateway. */
-async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | null> {
+async function frameDataUrl(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
@@ -104,8 +96,14 @@ async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | 
 }
 
 /** Downloads the extracted WAV and returns raw base64 (no data: prefix). */
-async function audioBase64(supabaseAdmin: any, path: string): Promise<string | null> {
+async function audioBase64(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
@@ -118,7 +116,7 @@ async function audioBase64(supabaseAdmin: any, path: string): Promise<string | n
   }
 }
 
-type StepCtx = { supabaseAdmin: any; apiKey: string };
+type StepCtx = { supabaseAdmin: any; apiKey: string; session?: AiSession | null };
 
 const STEP_RUNNERS: Record<
   Step,
@@ -130,7 +128,8 @@ const STEP_RUNNERS: Record<
    * content instead of the filename. Degrades to filename-only when no frames
    * were captured (older uploads, unsupported browsers).
    */
-  analyze: async (reel, _p, { supabaseAdmin, apiKey }) => {
+  analyze: async (reel, _p, ctx) => {
+    const { supabaseAdmin } = ctx;
     // Denser sampling: up to 10 frames, spread across whatever the browser captured.
     const all = reel.frame_paths ?? [];
     const times = reel.frame_times ?? [];
@@ -142,7 +141,7 @@ const STEP_RUNNERS: Record<
 
     const images: { url: string; t: number | null; index: number }[] = [];
     for (const p of picked) {
-      const url = await frameDataUrl(supabaseAdmin, p.path);
+      const url = await frameDataUrl(supabaseAdmin, reel.user_id, p.path);
       if (url) images.push({ url, t: p.t, index: p.index });
     }
     if (images.length === 0) {
@@ -170,7 +169,7 @@ const STEP_RUNNERS: Record<
         '"suggested_clip":{"start_pct":0,"end_pct":100,"why":"one line"},"quality_note":"one line on lighting/shake/framing"}',
         "Use the frame timestamps given in the prompt for `t` (seconds). Max 8 moments. Never invent scores or player names.",
       ].join(" "),
-      apiKey,
+      ctx,
     );
     const frameTime = (frame: number) => {
       const im = images[Math.max(0, Math.min(images.length - 1, frame - 1))];
@@ -211,9 +210,10 @@ const STEP_RUNNERS: Record<
    * Spoken-word captions. The browser extracted a 16 kHz mono WAV at upload
    * time; silent or undecodable clips simply skip this step.
    */
-  transcribe: async (reel, _p, { supabaseAdmin, apiKey }) => {
+  transcribe: async (reel, _p, ctx) => {
+    const { supabaseAdmin } = ctx;
     if (!reel.audio_path) return { transcript: null };
-    const b64 = await audioBase64(supabaseAdmin, reel.audio_path);
+    const b64 = await audioBase64(supabaseAdmin, reel.user_id, reel.audio_path);
     if (!b64) return { transcript: null };
     try {
       const out = await callLovableAIParts(
@@ -229,7 +229,7 @@ const STEP_RUNNERS: Record<
           '{"text":"full transcript or empty string","segments":[{"t":1.2,"text":"..."}]}',
           "`t` is seconds from the clip start. Max 40 segments. If there is no intelligible speech, return an empty text and an empty segments array.",
         ].join(" "),
-        apiKey,
+        ctx,
       );
       const segments = Array.isArray(out.segments)
         ? out.segments
@@ -250,7 +250,7 @@ const STEP_RUNNERS: Record<
   },
 
   /** Play-by-play: timestamped moments the athlete can jump to. */
-  timeline: async (reel, progress, { apiKey }) => {
+  timeline: async (reel, progress, ctx) => {
     const moments = (progress.moments ?? []) as any[];
     if (!progress.analysis?.summary && moments.length === 0) return { timeline: [] };
     const out = await callLovableAI(
@@ -261,7 +261,10 @@ const STEP_RUNNERS: Record<
         progress.analysis?.summary ? `What the footage shows: ${progress.analysis.summary}` : "",
         moments.length
           ? `Detected moments: ${moments
-              .map((m) => `${m.t != null ? `${m.t}s` : `frame ${m.frame}`} — ${m.label}${m.note ? ` (${m.note})` : ""}`)
+              .map(
+                (m) =>
+                  `${m.t != null ? `${m.t}s` : `frame ${m.frame}`} — ${m.label}${m.note ? ` (${m.note})` : ""}`,
+              )
               .join("; ")}`
           : "",
         progress.transcript?.text ? `Spoken audio: ${progress.transcript.text.slice(0, 800)}` : "",
@@ -274,7 +277,7 @@ const STEP_RUNNERS: Record<
         '{"timeline":[{"t":1.5,"label":"short call (max 40 chars)","note":"one short line"}]}',
         "3 to 8 entries, ordered by time, `t` in seconds inside the clip. Only describe what the analysis and audio support — never invent scores, counts, or names.",
       ].join(" "),
-      apiKey,
+      ctx,
     );
     const timeline = Array.isArray(out.timeline)
       ? out.timeline
@@ -291,7 +294,7 @@ const STEP_RUNNERS: Record<
   },
 
   /** Cut list: which segments to keep, in what order, at what pace. */
-  editplan: async (_reel, progress, { apiKey }) => {
+  editplan: async (_reel, progress, ctx) => {
     const duration = Number(progress.duration) || 0;
     const timeline = (progress.timeline ?? []) as any[];
     if (!duration && timeline.length === 0) return { edit_plan: null };
@@ -314,7 +317,7 @@ const STEP_RUNNERS: Record<
         "2 to 5 segments in playback order, each 0.8s or longer, all times inside the clip duration, no overlaps. Keep the total under 25 seconds.",
         reelStyleDirectives(_reel.style_prefs).edit,
       ].join(" "),
-      apiKey,
+      ctx,
     );
     const cap = duration || 600;
     const PACES = ["normal", "slowmo", "hold", "quick"];
@@ -340,13 +343,14 @@ const STEP_RUNNERS: Record<
       edit_plan: {
         segments,
         why: String(out.why ?? "").slice(0, 240),
-        total: Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
+        total:
+          Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
       },
     };
   },
 
   /** Sport-aware coaching report: what looked good, what to fix, drills. */
-  coach: async (_reel, progress, { apiKey }) => {
+  coach: async (_reel, progress, ctx) => {
     if (!progress.analysis?.summary) return { coaching: null };
     const out = await callLovableAI(
       [
@@ -365,7 +369,7 @@ const STEP_RUNNERS: Record<
         '{"strengths":["..."],"notes":["..."],"drills":["..."],"confidence":"one line on how much the footage supports this"}',
         "2 to 3 items per list, each under 140 characters, technique-specific to the sport. If the footage is too short, blurry, or far away to judge technique, say so in `confidence` and keep the notes general instead of inventing detail.",
       ].join(" "),
-      apiKey,
+      ctx,
     );
     const list = (v: unknown) =>
       Array.isArray(v)
@@ -386,7 +390,7 @@ const STEP_RUNNERS: Record<
     return { coaching };
   },
 
-  metadata: async (reel, progress, { apiKey }) => {
+  metadata: async (reel, progress, ctx) => {
     const context = progress.analysis?.summary
       ? `What the footage shows: ${progress.analysis.summary}. Detected sport: ${progress.sport ?? "unknown"}. Key moments: ${(
           progress.moments ?? []
@@ -399,14 +403,14 @@ const STEP_RUNNERS: Record<
       `Respond ONLY with JSON: {"title":"...","caption":"..."}. Title max 60 chars, caption max 200 chars. ${
         reelStyleDirectives(reel.style_prefs).copy
       }`,
-      apiKey,
+      ctx,
     );
     return {
       ai_title: String(out.title ?? "").slice(0, 120),
       ai_caption: String(out.caption ?? "").slice(0, 500),
     };
   },
-  hashtags: async (reel, progress, { apiKey }) => {
+  hashtags: async (reel, progress, ctx) => {
     const out = await callLovableAI(
       `Title: "${progress.ai_title}". Caption: "${progress.ai_caption}". Sport: ${
         progress.sport ?? "unknown"
@@ -414,7 +418,7 @@ const STEP_RUNNERS: Record<
       `Respond ONLY with JSON: {"hashtags":["..."]}. Max 8 hashtags, no leading #. ${
         reelStyleDirectives(reel.style_prefs).vibe
       }`,
-      apiKey,
+      ctx,
     );
     return {
       ai_hashtags: Array.isArray(out.hashtags)
@@ -512,7 +516,127 @@ function snapshot(
   };
 }
 
-export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
+/**
+ * Screens the reel's AI copy and sampled frames before it may become visible.
+ * Blocked copy is dropped, borderline copy and any unsafe or unverifiable
+ * footage keep the reel owner-only (`hidden_at`), and suspected child sexual
+ * abuse material quarantines the reel outright. Fails closed throughout; the
+ * original upload is never deleted.
+ */
+async function screenReelOutput(
+  reel: Reel,
+  progress: Record<string, any>,
+  ctx: StepCtx,
+): Promise<{ quarantined: boolean; hiddenAt: string | null; note: string | null }> {
+  const { supabaseAdmin, session } = ctx;
+  const jobId = session?.jobId ?? null;
+  const { moderateAiFields, checkReelFrameSafety, quarantineForChildSafety } = await import(
+    "@/lib/ai/moderation.server"
+  );
+
+  const hashtags: string[] = Array.isArray(progress.ai_hashtags) ? progress.ai_hashtags : [];
+  const coaching = progress.coaching ?? null;
+  const moderated = await moderateAiFields(supabaseAdmin, {
+    userId: reel.user_id,
+    jobId,
+    table: "highlight_reels",
+    id: reel.id,
+    context: "AI-written highlight reel copy shown publicly",
+    fields: {
+      ai_title: String(progress.ai_title ?? ""),
+      ai_caption: String(progress.ai_caption ?? ""),
+      ai_hashtags: hashtags.join(" "),
+      ai_coaching: coaching
+        ? [...(coaching.strengths ?? []), ...(coaching.notes ?? []), ...(coaching.drills ?? [])].join(
+            " ",
+          )
+        : "",
+    },
+  });
+
+  if (moderated.blocked.includes("ai_title")) progress.ai_title = "";
+  if (moderated.blocked.includes("ai_caption")) progress.ai_caption = "";
+  if (moderated.blocked.includes("ai_hashtags")) progress.ai_hashtags = [];
+  if (moderated.blocked.includes("ai_coaching")) progress.coaching = null;
+
+  // Frame safety on the frames already sampled at upload time.
+  const framePaths = (reel.frame_paths ?? []).slice(0, 3);
+  const frames: string[] = [];
+  for (const path of framePaths) {
+    const url = await frameDataUrl(supabaseAdmin, reel.user_id, path);
+    if (url) frames.push(url);
+  }
+  const safety = await checkReelFrameSafety(supabaseAdmin, {
+    userId: reel.user_id,
+    reelId: reel.id,
+    frames,
+    jobId,
+  });
+
+  if (safety.csam) {
+    await quarantineForChildSafety(supabaseAdmin, {
+      userId: reel.user_id,
+      reelId: reel.id,
+      path: reel.video_path,
+      categories: safety.categories,
+      source: "reel_pipeline_frame_scan",
+    });
+    return { quarantined: true, hiddenAt: new Date().toISOString(), note: null };
+  }
+
+  const holdBack =
+    !safety.safe ||
+    safety.unavailable ||
+    moderated.review.length > 0 ||
+    moderated.blocked.length > 0 ||
+    moderated.unavailable;
+
+  return {
+    quarantined: false,
+    hiddenAt: holdBack ? new Date().toISOString() : null,
+    note: holdBack
+      ? "Your reel is saved and visible to you only while our safety check finishes reviewing it."
+      : null,
+  };
+}
+
+/**
+ * Claims a reel for one processing run.
+ *
+ * The attempt bump is conditional on the attempt count we read, so two
+ * overlapping requests for the same reel (upload trigger + resume/worker
+ * sweep) can never both run the pipeline and double-charge the AI budget.
+ * Returns false when another run already claimed it.
+ */
+export async function claimReel(supabaseAdmin: any, reel: Reel) {
+  const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
+  const startStep = firstStep(reel.processing_step);
+  const startIdx = STEPS.indexOf(startStep);
+  progress._pipeline = snapshot(STEPS.slice(0, startIdx), startStep, reel.attempts + 1);
+
+  const { data } = await supabaseAdmin
+    .from("highlight_reels")
+    .update({
+      attempts: reel.attempts + 1,
+      processing_started_at: new Date().toISOString(),
+      step_progress: progress,
+      last_step_at: new Date().toISOString(),
+      error_message: null,
+    })
+    .eq("id", reel.id)
+    .eq("attempts", reel.attempts)
+    .select("id");
+
+  return (data?.length ?? 0) > 0;
+}
+
+export async function processReel(
+  reel: Reel,
+  supabaseAdmin: any,
+  apiKey: string,
+  session?: AiSession | null,
+  alreadyClaimed = false,
+) {
   const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
   const startStep = firstStep(reel.processing_step);
   const startIdx = STEPS.indexOf(startStep);
@@ -522,16 +646,10 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
 
   progress._pipeline = snapshot(done, startStep, attempt);
 
-  await supabaseAdmin
-    .from("highlight_reels")
-    .update({
-      attempts: attempt,
-      processing_started_at: new Date().toISOString(),
-      step_progress: progress,
-      last_step_at: new Date().toISOString(),
-      error_message: null,
-    })
-    .eq("id", reel.id);
+  if (!alreadyClaimed && !(await claimReel(supabaseAdmin, reel))) {
+    return { id: reel.id, status: "skipped" };
+  }
+
 
   try {
     for (let i = startIdx; i < STEPS.length; i++) {
@@ -543,7 +661,7 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
         .update({ step_progress: progress, last_step_at: new Date().toISOString() })
         .eq("id", reel.id);
 
-      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey });
+      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey, session });
       Object.assign(progress, patch);
       done.push(step);
       progress._pipeline = snapshot(done, STEPS[i + 1] ?? null, attempt);
@@ -559,10 +677,24 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
 
     progress._pipeline = { ...snapshot(done, null, attempt), percent: 100 };
 
+    // Safety screening runs before the reel can become visible to anyone else.
+    const screening = await screenReelOutput(reel, progress, { supabaseAdmin, apiKey, session });
+    if (screening.quarantined) {
+      await supabaseAdmin.from("notifications").insert({
+        user_id: reel.user_id,
+        type: "reel_blocked",
+        title: "Reel held for review",
+        body: "Your reel didn't pass our safety check and is being reviewed.",
+        link: "/reels",
+      });
+      return { id: reel.id, status: "blocked" };
+    }
+
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: "completed",
+        hidden_at: screening.hiddenAt,
         processing_step: "completed",
         step_progress: progress,
 
@@ -589,7 +721,7 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
       user_id: reel.user_id,
       type: "reel_ready",
       title: "Your highlight reel is ready",
-      body: progress.ai_title ? String(progress.ai_title) : reel.title,
+      body: screening.note ?? (progress.ai_title ? String(progress.ai_title) : reel.title),
       link: reel.game_id ? `/reels?game=${reel.game_id}` : "/reels",
     });
 
@@ -658,12 +790,13 @@ export async function runStyleDraft(
   style: Record<string, any>,
   supabaseAdmin: any,
   apiKey: string,
+  session?: AiSession | null,
 ): Promise<ReelStyleDraft> {
   const progress: Record<string, any> = { ...prepareStyleRegen(reel.step_progress).step_progress };
   const styledReel: Reel = { ...reel, style_prefs: style };
 
   for (const step of STYLE_DRAFT_STEPS) {
-    const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey });
+    const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey, session });
     Object.assign(progress, patch);
   }
 

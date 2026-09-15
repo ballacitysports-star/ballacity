@@ -40,7 +40,6 @@ import {
   type CropSizePreset,
 } from "@/components/crop/CropChrome";
 
-
 export type { CropSizePreset, CropQualityPreset };
 
 const DEFAULT_SIZE_PRESETS: CropSizePreset[] = [
@@ -114,7 +113,10 @@ export function ImageEditorDialog({
     let bestDiff = Infinity;
     sizePresets.forEach((p, i) => {
       const d = Math.abs(p.maxSize - outputMaxSize);
-      if (d < bestDiff) { bestDiff = d; best = i; }
+      if (d < bestDiff) {
+        bestDiff = d;
+        best = i;
+      }
     });
     return best;
   })();
@@ -142,9 +144,15 @@ export function ImageEditorDialog({
     setTouched(false);
     let cancelled = false;
     loadNormalizedDataUrl(file)
-      .then((url) => { if (!cancelled) setImgSrc(url); })
-      .catch(() => { if (!cancelled) setImgSrc(null); });
-    return () => { cancelled = true; };
+      .then((url) => {
+        if (!cancelled) setImgSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setImgSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, file]);
 
   useEffect(() => {
@@ -160,7 +168,9 @@ export function ImageEditorDialog({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -188,9 +198,10 @@ export function ImageEditorDialog({
   }, [img, rotation90]);
 
   const gutter = isMobile ? 16 : 24;
-  const cropW = containerSize.w > 0
-    ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
-    : 0;
+  const cropW =
+    containerSize.w > 0
+      ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
+      : 0;
   const cropH = cropW / aspect;
 
   const maxScale = minScale * 8;
@@ -286,7 +297,9 @@ export function ImageEditorDialog({
     ctx.imageSmoothingQuality = "high";
 
     if (filterString) {
-      try { (ctx as any).filter = filterString; } catch {}
+      try {
+        (ctx as any).filter = filterString;
+      } catch {}
     }
 
     // Source rect in the rotated coordinate space
@@ -310,7 +323,10 @@ export function ImageEditorDialog({
     inter.width = rotatedDims.w;
     inter.height = rotatedDims.h;
     const ictx = inter.getContext("2d");
-    if (!ictx) { ctx.restore(); return; }
+    if (!ictx) {
+      ctx.restore();
+      return;
+    }
     ictx.save();
     ictx.translate(inter.width / 2, inter.height / 2);
     ictx.rotate(angle);
@@ -319,11 +335,7 @@ export function ImageEditorDialog({
 
     const scaleX = outW / sW;
     const scaleY = outH / sH;
-    ctx.drawImage(
-      inter,
-      sxRot, syRot, sW, sH,
-      -outW / 2, -outH / 2, sW * scaleX, sH * scaleY,
-    );
+    ctx.drawImage(inter, sxRot, syRot, sW, sH, -outW / 2, -outH / 2, sW * scaleX, sH * scaleY);
     ctx.restore();
 
     const outMime = hasAlpha ? "image/png" : "image/jpeg";
@@ -369,10 +381,9 @@ export function ImageEditorDialog({
         className="relative min-h-0 flex-1 select-none touch-none overflow-hidden overscroll-none"
         style={{
           touchAction: "none",
-          backgroundImage:
-            hasAlpha
-              ? "linear-gradient(45deg,#333 25%,transparent 25%),linear-gradient(-45deg,#333 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#333 75%),linear-gradient(-45deg,transparent 75%,#333 75%)"
-              : undefined,
+          backgroundImage: hasAlpha
+            ? "linear-gradient(45deg,#333 25%,transparent 25%),linear-gradient(-45deg,#333 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#333 75%),linear-gradient(-45deg,transparent 75%,#333 75%)"
+            : undefined,
           backgroundSize: hasAlpha ? "20px 20px" : undefined,
           backgroundPosition: hasAlpha ? "0 0,0 10px,10px -10px,-10px 0px" : undefined,
         }}
@@ -472,7 +483,10 @@ export function ImageEditorDialog({
         {tab === "transform" && (
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2">
-              <IconBtn onClick={() => setRotation90((r) => (r - 90 + 360) % 360)} label="Rotate left">
+              <IconBtn
+                onClick={() => setRotation90((r) => (r - 90 + 360) % 360)}
+                label="Rotate left"
+              >
                 <RotateCcw className="h-5 w-5" />
               </IconBtn>
               <IconBtn onClick={() => setRotation90((r) => (r + 90) % 360)} label="Rotate right">
@@ -486,7 +500,9 @@ export function ImageEditorDialog({
               </IconBtn>
             </div>
             <div className="flex items-center gap-3">
-              <span className="w-16 shrink-0 text-[10px] uppercase tracking-wider opacity-60">Straighten</span>
+              <span className="w-16 shrink-0 micro-label opacity-60">
+                Straighten
+              </span>
               <input
                 type="range"
                 min={-45}
@@ -497,7 +513,9 @@ export function ImageEditorDialog({
                 className="h-8 flex-1 accent-lime"
                 aria-label="Straighten"
               />
-              <span className="w-10 text-right text-[11px] tabular-nums">{straighten.toFixed(0)}°</span>
+              <span className="w-10 text-right text-[11px] tabular-nums">
+                {straighten.toFixed(0)}°
+              </span>
             </div>
           </div>
         )}
@@ -512,7 +530,9 @@ export function ImageEditorDialog({
               ] as [keyof Adjust, string, number, number][]
             ).map(([key, label, min, max]) => (
               <div key={key} className="flex items-center gap-3">
-                <span className="w-20 shrink-0 text-[10px] uppercase tracking-wider opacity-60">{label}</span>
+                <span className="w-20 shrink-0 micro-label opacity-60">
+                  {label}
+                </span>
                 <input
                   type="range"
                   min={min}
@@ -520,9 +540,7 @@ export function ImageEditorDialog({
                   step={0.01}
                   value={adjust[key]}
                   aria-label={label}
-                  onChange={(e) =>
-                    setAdjust((a) => ({ ...a, [key]: parseFloat(e.target.value) }))
-                  }
+                  onChange={(e) => setAdjust((a) => ({ ...a, [key]: parseFloat(e.target.value) }))}
                   className="h-8 flex-1 accent-lime"
                 />
                 <span className="w-10 text-right text-[11px] tabular-nums">
@@ -604,7 +622,6 @@ export function ImageEditorDialog({
           busy={bgRemoving}
         />
       </CropBottomBar>
-
     </div>
   );
 }
@@ -626,7 +643,9 @@ function IconBtn({
       onClick={onClick}
       aria-label={label}
       className={`grid h-11 w-11 place-items-center rounded-full transition ${
-        active ? "bg-lime-gradient text-primary-foreground" : "bg-white/10 text-white hover:bg-white/20"
+        active
+          ? "bg-lime-gradient text-primary-foreground"
+          : "bg-white/10 text-white hover:bg-white/20"
       }`}
     >
       {children}

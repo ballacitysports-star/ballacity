@@ -38,7 +38,8 @@ export const getMyAgeStatus = createServerFn({ method: "GET" })
     const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
     return {
       cohort: asCohort(row?.["cohort"]),
-      ageCategory: typeof row?.["age_category"] === "string" ? (row["age_category"] as string) : "unknown",
+      ageCategory:
+        typeof row?.["age_category"] === "string" ? (row["age_category"] as string) : "unknown",
       reviewRequired: row?.["review_required"] === true,
       status: asStatus(row?.["status"]),
       birthdaySet: row?.["birthday_set"] === true,
@@ -81,7 +82,8 @@ function friendlyDobError(message: string): string {
   const m = message ?? "";
   if (m.includes("DOB_REQUIRED")) return "Enter your date of birth to continue.";
   if (m.includes("DOB_IN_FUTURE")) return "That date is in the future. Enter your real birth date.";
-  if (m.includes("DOB_INVALID")) return "That date of birth isn't valid. Check the month, day and year.";
+  if (m.includes("DOB_INVALID"))
+    return "That date of birth isn't valid. Check the month, day and year.";
   if (m.includes("AUTH_REQUIRED")) return "Sign in again, then add your date of birth.";
   return "We couldn't save your date of birth. Please try again.";
 }

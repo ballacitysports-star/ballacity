@@ -44,27 +44,38 @@ export type HighlightFeedItem = {
 const PAGE_SIZE = 8;
 
 export const listHighlightFeed = createServerFn({ method: "GET" })
-  .inputValidator((input: { cursor?: string | null; sport?: string | null; limit?: number } | undefined) => ({
-    cursor: typeof input?.cursor === "string" && input.cursor ? input.cursor : null,
-    sport: typeof input?.sport === "string" && input.sport ? input.sport : null,
-    limit: Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 20),
-  }))
+  .inputValidator(
+    (input: { cursor?: string | null; sport?: string | null; limit?: number } | undefined) => ({
+      cursor: typeof input?.cursor === "string" && input.cursor ? input.cursor : null,
+      sport: typeof input?.sport === "string" && input.sport ? input.sport : null,
+      limit: Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 20),
+    }),
+  )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { eligibleFeedReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
+      await import("@/lib/reel-visibility.server");
 
-    let q = supabaseAdmin
+    const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
+
+    // Age-cohort gate lives in SQL: children and locked child accounts are
+    // never returned, and 16-17 year olds only for signed-in viewers.
+    const viewerId = await optionalSupabaseUserId();
+    const ids = await eligibleFeedReelIds(supabaseAdmin, {
+      cursor: data.cursor,
+      sport: data.sport,
+      limit: data.limit + 1,
+      includeMembers: viewerId !== null,
+    });
+    if (ids.length === 0) return { items: [] as HighlightFeedItem[], nextCursor: null };
+
+    const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(
         "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,created_at,game_id,game_title",
       )
-      .eq("status", "completed")
-      .is("hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(data.limit + 1);
-    if (data.sport) q = q.eq("ai_sport", data.sport);
-    if (data.cursor) q = q.lt("created_at", data.cursor);
-
-    const { data: rows, error } = await q;
+      .in("id", ids)
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const page = ((rows ?? []) as any[]).slice(0, data.limit);
@@ -94,21 +105,34 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     const avatarById = new Map(((avatars ?? []) as any[]).map((a) => [a.id as string, a]));
     const gameById = new Map(((games ?? []) as any[]).map((g) => [g.id as string, g]));
 
+    const quarantined = await quarantinedMediaPaths(
+      supabaseAdmin,
+      page.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
+    );
+
     const items: HighlightFeedItem[] = await Promise.all(
       page.map(async (r) => {
+        // Only ever sign objects inside the reel owner's own folder, and never
+        // a path quarantined for child safety.
+        const owner = r.user_id as string;
+        const primaryPath = signablePath(
+          ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path),
+          quarantined,
+        );
+        const originalPath = r.playback_path
+          ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
+          : null;
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
+
         const [video, original, thumb] = await Promise.all([
-          supabaseAdmin.storage
-            .from("highlight-videos")
-            .createSignedUrl(r.playback_path ?? r.video_path, 3600),
-          r.playback_path
-            ? supabaseAdmin.storage
-                .from("highlight-videos")
-                .createSignedUrl(r.video_path, 3600)
+          primaryPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
-          r.thumbnail_path
-            ? supabaseAdmin.storage
-                .from("highlight-videos")
-                .createSignedUrl(r.thumbnail_path, 3600)
+          originalPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(originalPath, 3600)
+            : Promise.resolve({ data: null as { signedUrl?: string } | null }),
+          thumbPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(thumbPath, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
         ]);
         const profile = profileById.get(r.user_id as string);
@@ -160,20 +184,25 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     };
   });
 
-/** Distinct sports across the public feed, for the filter chips. */
+/**
+ * Distinct sports across the public feed, for the filter chips. Uses the same
+ * age-cohort audience gate as the feed itself, in SQL.
+ */
 export const listHighlightFeedSports = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("highlight_reels")
-    .select("ai_sport")
-    .eq("status", "completed")
-    .is("hidden_at", null)
-    .not("ai_sport", "is", null)
-    .limit(400);
+  const { optionalSupabaseUserId } = await import("@/lib/reel-visibility.server");
+  const viewerId = await optionalSupabaseUserId();
+
+  const { data, error } = await supabaseAdmin.rpc(
+    "public_reel_feed_sports" as never,
+    {
+      _include_members: viewerId !== null,
+    } as never,
+  );
   if (error) throw new Error(error.message);
   const seen = new Set<string>();
   for (const row of (data ?? []) as any[]) {
-    const s = String(row.ai_sport ?? "").trim();
+    const s = (typeof row === "string" ? row : String(row?.sport ?? row?.ai_sport ?? "")).trim();
     if (s) seen.add(s);
   }
   return Array.from(seen).sort((a, b) => a.localeCompare(b));

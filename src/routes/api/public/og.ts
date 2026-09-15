@@ -32,11 +32,7 @@ const KINDS: Record<string, { label: string; accent: string }> = {
 };
 
 const esc = (s: string) =>
-  s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const clamp = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
@@ -60,12 +56,13 @@ function fallbackSvg(opts: {
     <text x="${width - s(186)}" y="${s(111)}" text-anchor="middle" fill="#0C0F0B" font-family="Arial, sans-serif" font-size="${s(26)}" font-weight="700">${esc(kind.label)}</text>
     <text x="${s(72)}" y="${Math.round(height * 0.55)}" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">${esc(title)}</text>
     ${subtitle ? `<text x="${s(72)}" y="${Math.round(height * 0.68)}" fill="#A7B3A2" font-family="Arial, sans-serif" font-size="${s(34)}">${esc(subtitle)}</text>` : ""}
-    <text x="${width - s(72)}" y="${height - s(72)}" text-anchor="end" fill="#6F7C6B" font-family="Arial, sans-serif" font-size="${s(26)}">open-run-connect.lovable.app</text>
+    <text x="${width - s(72)}" y="${height - s(72)}" text-anchor="end" fill="#6F7C6B" font-family="Arial, sans-serif" font-size="${s(26)}">ballacity.com</text>
   </svg>`;
 }
 
 /** Cache for a day in the browser, a year at the edge; previews are immutable per URL. */
-const CACHE_CONTROL = "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
+const CACHE_CONTROL =
+  "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
 
 /** Bump when the card design changes so old ETags stop matching. */
 const OG_VERSION = "v1";
@@ -142,4 +139,3 @@ export const Route = createFileRoute("/api/public/og")({
     },
   },
 });
-

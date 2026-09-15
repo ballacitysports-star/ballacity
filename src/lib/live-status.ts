@@ -59,7 +59,6 @@ export function useLiveStatus(game: Game): LiveStatus {
   return status;
 }
 
-
 // ---------- Signup gate (blackout window + in-progress lockout) ----------
 
 export const SIGNUP_CUTOFF_PRESETS: { value: number; label: string }[] = [
@@ -209,7 +208,6 @@ function sameGate(a: JoinGate, b: JoinGate): boolean {
   );
 }
 
-
 /** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
 export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
   const spotsLeft = opts.spotsLeft;
@@ -244,5 +242,4 @@ export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
     };
   }, [key, spotsLeft]);
   return gate;
-
 }

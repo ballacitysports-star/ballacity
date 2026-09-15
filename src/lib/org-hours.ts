@@ -167,7 +167,9 @@ export function resolveOpenState(
         status: "open",
         closingSoon,
         until: r.close,
-        label: closingSoon ? `Closes at ${formatTime(r.close)}` : `Open · until ${formatTime(r.close)}`,
+        label: closingSoon
+          ? `Closes at ${formatTime(r.close)}`
+          : `Open · until ${formatTime(r.close)}`,
       };
     }
   }
@@ -184,7 +186,9 @@ export function resolveOpenState(
         status: "open",
         closingSoon,
         until: r.close,
-        label: closingSoon ? `Closes at ${formatTime(r.close)}` : `Open · until ${formatTime(r.close)}`,
+        label: closingSoon
+          ? `Closes at ${formatTime(r.close)}`
+          : `Open · until ${formatTime(r.close)}`,
       };
     }
   }
@@ -206,8 +210,17 @@ export function resolveOpenState(
       if (Number.isNaN(open)) continue;
       if (i === 0 && open <= minutes) continue;
       const when =
-        i === 0 ? `at ${formatTime(r.open)}` : i === 1 ? `tomorrow ${formatTime(r.open)}` : `${WEEKDAYS_SHORT[d]} ${formatTime(r.open)}`;
-      return { status: "closed", closingSoon: false, until: r.open, label: `Closed · opens ${when}` };
+        i === 0
+          ? `at ${formatTime(r.open)}`
+          : i === 1
+            ? `tomorrow ${formatTime(r.open)}`
+            : `${WEEKDAYS_SHORT[d]} ${formatTime(r.open)}`;
+      return {
+        status: "closed",
+        closingSoon: false,
+        until: r.open,
+        label: `Closed · opens ${when}`,
+      };
     }
   }
 

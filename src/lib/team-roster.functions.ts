@@ -21,7 +21,8 @@ export const searchPlayersForTeam = createServerFn({ method: "GET" })
       _user: context.userId,
     });
     if (roleErr) throw new Error(roleErr.message);
-    if (!isManager) throw new Error("Only the team's owner, managers or coaches can invite players.");
+    if (!isManager)
+      throw new Error("Only the team's owner, managers or coaches can invite players.");
 
     // Exclude current members and anyone already holding a pending invite so
     // the picker can't produce a request the database will reject.

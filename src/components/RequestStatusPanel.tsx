@@ -86,8 +86,10 @@ export function RequestStatusPanel({
         setSummary(s);
         onLoaded?.(s);
       })
-      .catch(() =>
-        alive && setSummary({ status: "none", kind: null, game_id: null, updated_at: null, id: null }),
+      .catch(
+        () =>
+          alive &&
+          setSummary({ status: "none", kind: null, game_id: null, updated_at: null, id: null }),
       )
       .finally(() => alive && setLoading(false));
     return () => {
@@ -169,16 +171,13 @@ export function RequestStatusPanel({
         </div>
       </div>
 
-      <AlertDialog
-        open={confirmOpen}
-        onOpenChange={(o) => !cancelling && setConfirmOpen(o)}
-      >
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => !cancelling && setConfirmOpen(o)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this pending {kindLabel}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The other player won't be notified. You can send a new {kindLabel} to
-              them right after.
+              The other player won't be notified. You can send a new {kindLabel} to them right
+              after.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/community-guidelines")({
   head: () =>
     pageHead({
       path: "/community-guidelines",
-      title: "Community Guidelines — ballaCity",
+      title: "Community Guidelines | BallaCity",
       description:
         "The rules for playing on ballaCity: respect other players, post accurate games, play safely, keep payments clean, and upload only clips you own.",
     }),
@@ -27,7 +27,7 @@ function GuidelinesPage() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Community Guidelines</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           ballaCity works when runs are honest, safe, and worth showing up for. These are the
           expectations for every player, host, team, gym, and trainer on the app.
         </p>

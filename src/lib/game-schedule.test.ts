@@ -69,12 +69,13 @@ describe("game-schedule", () => {
     expect(validateSchedule([]).ok).toBe(false);
     expect(validateSchedule([{ date: "2020-01-01", time: "18:00" }]).ok).toBe(false);
     expect(validateSchedule([{ date: "2030-01-01", time: "18:00" }]).ok).toBe(true);
+    expect(validateSchedule([{ date: "2030-01-01", time: "18:00", endTime: "18:00" }]).ok).toBe(
+      false,
+    );
     expect(
-      validateSchedule([{ date: "2030-01-01", time: "18:00", endTime: "18:00" }]).ok,
-    ).toBe(false);
-    expect(
-      validateSchedule(setScheduleAllDay([{ date: "2030-01-01", time: "18:00" }], "2030-01-01", true))
-        .ok,
+      validateSchedule(
+        setScheduleAllDay([{ date: "2030-01-01", time: "18:00" }], "2030-01-01", true),
+      ).ok,
     ).toBe(true);
   });
 
@@ -107,9 +108,7 @@ describe("when range", () => {
 
   it("measures the window, including overnight spans", () => {
     expect(whenRangeDurationMin(base)).toBe(120);
-    expect(
-      whenRangeDurationMin({ ...base, endDate: "2030-05-02", endTime: "01:00" }),
-    ).toBe(420);
+    expect(whenRangeDurationMin({ ...base, endDate: "2030-05-02", endTime: "01:00" })).toBe(420);
   });
 
   it("all-day spans whole days", () => {

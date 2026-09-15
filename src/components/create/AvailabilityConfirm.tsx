@@ -12,14 +12,31 @@ import {
   type Tz,
 } from "@/lib/tz";
 
-type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
-type Override = { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] };
+type Slot = {
+  day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  start: string;
+  end: string;
+  venue?: string;
+};
+type Override = {
+  date: string;
+  closed?: boolean;
+  windows?: { start: string; end: string; venue?: string }[];
+};
 
 const DAY_ORDER: Slot["day"][] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-function pad(n: number) { return String(n).padStart(2, "0"); }
-function addDays(d: Date, n: number) { const c = new Date(d); c.setDate(c.getDate() + n); return c; }
-function dateKey(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+function addDays(d: Date, n: number) {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+}
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 /**
  * Confirmation step: turns the weekly template into a selectable calendar
@@ -117,9 +134,7 @@ export function AvailabilityConfirm({
         </div>
         <div className="mt-1 text-[11px] text-muted-foreground">
           {tz} · {shortNow}
-          {relLabel && (
-            <span className="ml-1 text-foreground/70">({relLabel})</span>
-          )}
+          {relLabel && <span className="ml-1 text-foreground/70">({relLabel})</span>}
         </div>
         <select
           value={tz}
@@ -130,7 +145,9 @@ export function AvailabilityConfirm({
           {TZ_OPTIONS.map((g) => (
             <optgroup key={g.group} label={g.group}>
               {g.zones.map((z) => (
-                <option key={z.value} value={z.value}>{z.label} ({z.value})</option>
+                <option key={z.value} value={z.value}>
+                  {z.label} ({z.value})
+                </option>
               ))}
             </optgroup>
           ))}
@@ -148,7 +165,7 @@ export function AvailabilityConfirm({
           <ChevronLeft className="h-4 w-4" />
         </button>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground font-bold">
             Week {weekOffset + 1} of {weeks}
           </div>
           <div className="text-sm font-bold">{range}</div>
@@ -189,7 +206,11 @@ export function AvailabilityConfirm({
           const closed = !!ov?.closed;
           const active = base.length > 0 && !closed;
           const hasBase = base.length > 0;
-          const label = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+          const label = d.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          });
           // Compute example instant to show viewer-tz preview.
           const preview = base[0]
             ? (() => {
@@ -208,13 +229,15 @@ export function AvailabilityConfirm({
                 !hasBase
                   ? "border-border/40 bg-surface/40 opacity-50"
                   : active
-                  ? "border-lime bg-lime/10"
-                  : "border-coral/40 bg-coral/5"
+                    ? "border-lime bg-lime/10"
+                    : "border-coral/40 bg-coral/5"
               }`}
               aria-pressed={active}
             >
               <div className="min-w-0">
-                <div className={`text-sm font-bold ${active ? "text-lime" : hasBase ? "text-coral" : ""}`}>
+                <div
+                  className={`text-sm font-bold ${active ? "text-lime" : hasBase ? "text-coral" : ""}`}
+                >
                   {label}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
@@ -241,8 +264,9 @@ export function AvailabilityConfirm({
       </div>
 
       <div className="rounded-2xl border border-border bg-surface/60 px-3 py-2.5 text-[11px] text-muted-foreground">
-        <span className="text-foreground font-bold">{totalActive}</span> confirmed session{totalActive === 1 ? "" : "s"} this week.
-        Tap any day to opt out — athletes won't be able to book you then.
+        <span className="text-foreground font-bold">{totalActive}</span> confirmed session
+        {totalActive === 1 ? "" : "s"} this week. Tap any day to opt out — athletes won't be able to
+        book you then.
       </div>
     </div>
   );

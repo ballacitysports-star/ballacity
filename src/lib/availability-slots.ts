@@ -16,9 +16,7 @@ function toMinutes(t: string): number {
  * - End must be strictly after start
  * - Same-day windows must not overlap
  */
-export function validateSlots(
-  slots: Slot[],
-): { index: number; message: string } | null {
+export function validateSlots(slots: Slot[]): { index: number; message: string } | null {
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i];
     if (!TIME_RE.test(s.start) || !TIME_RE.test(s.end)) {
@@ -159,8 +157,10 @@ export function validateRules(
     }
     if (r.until) {
       if (!DATE_RE.test(r.until)) return { index: i, message: "Invalid end date." };
-      if (r.until < r.anchorDate) return { index: i, message: "End date is before the start date." };
-      if (r.until > horizon) return { index: i, message: "End date is beyond the 6-month horizon." };
+      if (r.until < r.anchorDate)
+        return { index: i, message: "End date is before the start date." };
+      if (r.until > horizon)
+        return { index: i, message: "End date is beyond the 6-month horizon." };
     }
     if (r.freq === "weekly" && r.interval !== undefined) {
       if (r.interval < 1 || r.interval > 12) {
@@ -181,5 +181,3 @@ export function validateRules(
   }
   return null;
 }
-
-

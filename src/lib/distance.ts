@@ -22,7 +22,6 @@ export function clampDistanceMi<T extends number | null | undefined>(value: T): 
   return Math.min(MAX_DISTANCE_MI, Math.max(1, value as number)) as T;
 }
 
-
 export function miToKm(mi: number): number {
   return Math.round(mi * KM_PER_MI);
 }
@@ -68,7 +67,6 @@ export function distancePresets(
   });
   return presets;
 }
-
 
 /** Render a kilometer-based value in the viewer's unit. */
 export function formatDistanceFromKm(

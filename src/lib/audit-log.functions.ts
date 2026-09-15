@@ -43,8 +43,14 @@ const filterSchema = z.object({
   targetType: z.string().max(60).optional(),
   actorId: z.string().uuid().optional(),
   /** Inclusive calendar day bounds, YYYY-MM-DD. */
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   limit: z.number().int().min(1).max(200).optional(),
   offset: z.number().int().min(0).optional(),
 });
@@ -147,11 +153,7 @@ export const auditLogFacets = createServerFn({ method: "GET" })
 
 function csvCell(v: unknown) {
   const s =
-    v === null || v === undefined
-      ? ""
-      : typeof v === "object"
-        ? JSON.stringify(v)
-        : String(v);
+    v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
   return `"${s.replace(/"/g, '""')}"`;
 }
 

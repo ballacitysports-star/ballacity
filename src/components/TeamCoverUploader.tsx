@@ -128,7 +128,7 @@ export function TeamCoverUploader({
       </div>
 
       <div>
-        <div className="mb-2 text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+        <div className="mb-2 micro-label text-muted-foreground">
           Or pick a preset
         </div>
         <div className="grid grid-cols-3 gap-2">

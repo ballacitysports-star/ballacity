@@ -6,8 +6,14 @@
  * consistent across the app. New pages should call this instead of hand
  * writing meta arrays.
  */
-export const SITE_URL = "https://open-run-connect.lovable.app";
+export const SITE_URL = "https://ballacity.com";
 export const SITE_NAME = "ballaCity";
+/** The site’s own title and description. Pages either use these verbatim or
+ *  prefix/suffix their own page name onto them, so the wording stays in one place. */
+export const SITE_TITLE = "BallaCity | Find & Join Local Pickup Sports Games";
+export const SITE_DESCRIPTION =
+  "Find and join pickup baseball, basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity and grab your spot fast.";
+
 
 type MetaTag = Record<string, string>;
 
@@ -62,7 +68,6 @@ export function pageHead(input: PageHeadInput) {
   }
   if (noindex) meta.push({ name: "robots", content: "noindex, nofollow" });
 
-
   const head: {
     meta: MetaTag[];
     links?: { rel: string; href: string }[];
@@ -111,7 +116,6 @@ export function ogImageUrl(input: {
   params.set("size", input.size ?? "og");
   return `${SITE_URL}/api/public/og?${params.toString()}`;
 }
-
 
 /** Swap the `size` preset on a generated card URL. */
 export function withOgSize(imageUrl: string, size: OgImageSize) {

@@ -71,7 +71,10 @@ export function PhotoGalleryEditor({
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
         {value.map((url, i) => (
-          <div key={url + i} className="group relative overflow-hidden rounded-xl border border-border">
+          <div
+            key={url + i}
+            className="group relative overflow-hidden rounded-xl border border-border"
+          >
             <ResponsiveImage
               src={url}
               alt={`Gym photo ${i + 1}`}

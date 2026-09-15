@@ -1,15 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { UserCog, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
-import {
-  useMyProfiles,
-  useSwitchProfile,
-  type AccountProfile,
-} from "@/lib/account-profiles";
-import {
-  availabilityGateMessage,
-  type AvailabilityGateReason,
-} from "@/lib/availability-gate";
+import { useMyProfiles, useSwitchProfile, type AccountProfile } from "@/lib/account-profiles";
+import { availabilityGateMessage, type AvailabilityGateReason } from "@/lib/availability-gate";
 
 /**
  * Inline explanation of why the viewer can't post availability yet, with the
@@ -48,8 +41,8 @@ export function AvailabilityRequiredNotice({
           )}
           {reason === "incomplete_profile" && (
             <p className="mt-1 text-muted-foreground">
-              Hosts match players on sport and level, so add at least one favorite sport with a level
-              first.
+              Hosts match players on sport and level, so add at least one favorite sport with a
+              level first.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">

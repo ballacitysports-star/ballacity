@@ -39,9 +39,7 @@ export function PaymentRequiredBanner({
       aria-live="polite"
       data-testid="payment-required-banner"
       className={`rounded-2xl border p-4 flex items-start gap-3 ${
-        isRejected
-          ? "border-destructive/50 bg-destructive/10"
-          : "border-coral/50 bg-coral/10"
+        isRejected ? "border-destructive/50 bg-destructive/10" : "border-coral/50 bg-coral/10"
       }`}
     >
       <div
@@ -62,9 +60,7 @@ export function PaymentRequiredBanner({
         </p>
         <button
           type="button"
-          onClick={() =>
-            navigate({ to: "/games/$gameId/pay", params: { gameId } })
-          }
+          onClick={() => navigate({ to: "/games/$gameId/pay", params: { gameId } })}
           className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold ${
             isRejected
               ? "bg-destructive text-destructive-foreground"

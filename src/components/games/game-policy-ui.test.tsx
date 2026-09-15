@@ -13,9 +13,7 @@ import { defaultGamePolicy, normalizeGamePolicy } from "@/lib/game-policy";
 describe("game policy UI", () => {
   it("edits player limits and waitlist through the shared editor", () => {
     const onChange = vi.fn();
-    render(
-      <GamePolicyFields value={defaultGamePolicy(10)} onChange={onChange} idPrefix="t" />,
-    );
+    render(<GamePolicyFields value={defaultGamePolicy(10)} onChange={onChange} idPrefix="t" />);
     fireEvent.change(screen.getByLabelText("Player limit"), { target: { value: "14" } });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ maxPlayers: 14 }));
 
@@ -27,7 +25,11 @@ describe("game policy UI", () => {
   it("shows critical payment and cancellation info to players without expanding", () => {
     render(
       <GamePolicySummary
-        policy={normalizeGamePolicy({ entryFee: 15, requiresApproval: true, gameRules: "First to 21." })}
+        policy={normalizeGamePolicy({
+          entryFee: 15,
+          requiresApproval: true,
+          gameRules: "First to 21.",
+        })}
       />,
     );
     expect(screen.getByText(/paid directly to the host/i)).toBeTruthy();

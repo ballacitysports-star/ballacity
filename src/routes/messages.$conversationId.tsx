@@ -478,9 +478,9 @@ function Thread() {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {msgs.length === 0 ? (
-          <div className="text-center text-xs text-muted-foreground mt-10">
-            No messages yet. Say hi 👋
-          </div>
+          <p className="mt-10 text-center text-sm text-muted-foreground">
+            No messages yet — say hi 👋
+          </p>
         ) : (
           msgs.map((m) => {
             const mine = m.sender_id === user?.id;
@@ -561,12 +561,15 @@ function Thread() {
 
                     <div
                       onDoubleClick={() => !isDeleted && toggleReaction(m.id, "❤️")}
-                      className={`rounded-2xl px-3 py-2 text-sm space-y-2 ${
+                      // The flattened corner (bottom-right on your own message,
+                      // bottom-left on theirs) means sent and received still read
+                      // apart in high-contrast or greyscale, not by colour alone.
+                      className={`space-y-2 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         isDeleted
                           ? "bg-surface/40 border border-dashed border-border text-muted-foreground italic"
                           : mine
-                            ? "bg-lime-gradient text-primary-foreground"
-                            : "bg-surface border border-border"
+                            ? "rounded-br-md bg-lime-gradient text-primary-foreground"
+                            : "rounded-bl-md bg-surface border border-border"
                       }`}
                     >
                       {isDeleted ? (
@@ -696,6 +699,19 @@ function Thread() {
         onSubmit={submit}
         className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
+        {/* The restriction itself is decided elsewhere and untouched here; this
+            only states it in the composer instead of leaving a greyed-out box
+            with no explanation. */}
+        {!messagingDecision.allowed && (
+          <div
+            role="status"
+            className="mb-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted-foreground"
+          >
+            <span className="font-semibold text-foreground">Messaging is off for now. </span>
+            {messagingDecision.reason || "A parent or guardian must approve this account first."}
+          </div>
+        )}
+
         {replyTo && (
           <div className="mb-2 rounded-xl border-l-2 border-lime bg-surface px-3 py-2 text-xs flex items-start gap-2">
             <div className="flex-1 min-w-0">
@@ -785,7 +801,7 @@ function Thread() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label="Attach file"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface"
           >
             <Paperclip className="h-4 w-4" />
           </button>
@@ -825,7 +841,7 @@ function Thread() {
               (!text.trim() && !pendingFile)
             }
             aria-label="Send"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
           >
             {sending || uploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

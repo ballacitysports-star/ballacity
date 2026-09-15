@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, verifyWebhook } from "@/lib/stripe.server";
+import { tierForPriceId } from "@/lib/monetization/entitlements";
+
+/** Seconds-since-epoch to ISO, tolerating a missing value. */
+function iso(seconds: number | null | undefined): string | null {
+  return seconds ? new Date(seconds * 1000).toISOString() : null;
+}
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -33,8 +39,13 @@ async function handleSubscriptionCreated(subscription: any, env: StripeEnv) {
         product_id: productId,
         price_id: priceId,
         status: subscription.status,
-        current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : null,
-        current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        // The entitlement tier is resolved from the price on the trusted
+        // server side; it is never read from a client or from metadata.
+        tier: tierForPriceId(String(priceId ?? "")),
+        trial_end: iso(subscription.trial_end),
+        canceled_at: iso(subscription.canceled_at),
+        current_period_start: iso(periodStart),
+        current_period_end: iso(periodEnd),
         environment: env,
         updated_at: new Date().toISOString(),
       },
@@ -56,8 +67,11 @@ async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
       status: subscription.status,
       product_id: productId,
       price_id: priceId,
-      current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : null,
-      current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+      tier: tierForPriceId(String(priceId ?? "")),
+      trial_end: iso(subscription.trial_end),
+      canceled_at: iso(subscription.canceled_at),
+      current_period_start: iso(periodStart),
+      current_period_end: iso(periodEnd),
       cancel_at_period_end: subscription.cancel_at_period_end || false,
       updated_at: new Date().toISOString(),
     })
@@ -68,7 +82,11 @@ async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
 async function handleSubscriptionDeleted(subscription: any, env: StripeEnv) {
   await getSupabase()
     .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
+    .update({
+      status: "canceled",
+      canceled_at: iso(subscription.canceled_at) ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
     .eq("stripe_subscription_id", subscription.id)
     .eq("environment", env);
 }

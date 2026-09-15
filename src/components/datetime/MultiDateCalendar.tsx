@@ -122,10 +122,11 @@ export function MultiDateCalendar({
               aria-label={key}
               onClick={() => handlePick(key)}
               onMouseEnter={() => {
-                if (mode === "range" && dragFrom && !disabled(key)) onRangeChange?.(
-                  dragFrom <= key ? dragFrom : key,
-                  dragFrom <= key ? key : dragFrom,
-                );
+                if (mode === "range" && dragFrom && !disabled(key))
+                  onRangeChange?.(
+                    dragFrom <= key ? dragFrom : key,
+                    dragFrom <= key ? key : dragFrom,
+                  );
               }}
               className={`aspect-square rounded-xl text-[13px] font-semibold transition-colors disabled:opacity-25 ${
                 selectedSet.has(key) || inRange(key)

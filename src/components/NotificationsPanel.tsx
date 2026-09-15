@@ -44,13 +44,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 import { resolveNotificationTarget } from "@/lib/deep-links";
-import {
-  useNotificationActorId,
-  usePrefetchNotificationActors,
-} from "@/lib/notification-actors";
+import { useNotificationActorId, usePrefetchNotificationActors } from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 
 const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;
@@ -260,11 +259,13 @@ export function NotificationsPanel() {
       <NotificationPreferences />
 
       {fetching ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <ListSkeleton rows={4} label="Loading your notifications…" />
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">
-          You're all caught up. New activity will show up here.
-        </div>
+        <EmptyState
+          icon={<Bell className="h-6 w-6" aria-hidden />}
+          title="You're all caught up"
+          description="Join requests, roster changes and messages about your games will show up here."
+        />
       ) : (
         <div className="space-y-2">
           <p className="text-[10px] text-muted-foreground/70 px-1 mb-1">
@@ -469,10 +470,10 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+          <div className="micro-label text-muted-foreground text-center">
             In-app
           </div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+          <div className="micro-label text-muted-foreground text-center">
             Push
           </div>
           {categories.map((cat) => (

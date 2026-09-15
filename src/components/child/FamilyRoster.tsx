@@ -168,7 +168,7 @@ export function FamilyRoster({
   const section = (title: string, hint: string, entries: RosterEntry[]) =>
     entries.length === 0 ? null : (
       <div className="mt-4">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <h2 className="section-eyebrow text-muted-foreground">
           {title} ({entries.length})
         </h2>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>

@@ -134,11 +134,10 @@ export function logAuthGateDecision(decision: AuthGateDecision, ctx: DecisionCon
   const tag = "[AuthGate]";
   // Always warn on forced redirects so we catch them without the debug flag.
   if (decision === "redirect") {
-    // eslint-disable-next-line no-console
     console.warn(tag, decision, payload);
     return;
   }
   if (!isAuthGateDebugEnabled()) return;
-  // eslint-disable-next-line no-console
+
   console.info(tag, decision, payload);
 }

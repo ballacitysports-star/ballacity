@@ -97,9 +97,7 @@ export function PlayersMapView({ players }: { players: AvailabilityWithAuthor[] 
               <span className="font-semibold">{p.sports?.[0] ?? "Player"}</span>
               <span className="text-muted-foreground">· {p.skill_level}</span>
             </div>
-            <h3 className="font-display text-base font-bold truncate">
-              {p.author_name}
-            </h3>
+            <h3 className="font-display text-base font-bold truncate">{p.author_name}</h3>
             {p.city && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                 <MapPin className="h-3.5 w-3.5" />
@@ -107,9 +105,7 @@ export function PlayersMapView({ players }: { players: AvailabilityWithAuthor[] 
               </div>
             )}
             {p.note && (
-              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
-                {p.note}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.note}</p>
             )}
           </div>
         </Link>

@@ -29,9 +29,7 @@ export function ExpandableAboutSection({
           className="flex w-full items-center justify-between rounded-xl px-1 py-2 text-left transition-colors hover:bg-secondary/60"
         >
           <span className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {label}
-            </span>
+            <span className="section-eyebrow text-muted-foreground">{label}</span>
             {count != null && count > 0 && (
               <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                 {count}

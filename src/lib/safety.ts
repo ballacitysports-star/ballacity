@@ -26,7 +26,8 @@ export const RISK_ACKNOWLEDGMENT = {
     "Sports and recreational activities involve inherent risks, including injury. " +
     "By joining this activity, you acknowledge these risks and agree to follow applicable " +
     "facility, host, and safety rules.",
-  checkboxLabel: "I acknowledge the risks of this activity and agree to follow facility, host, and safety rules.",
+  checkboxLabel:
+    "I acknowledge the risks of this activity and agree to follow facility, host, and safety rules.",
   points: [
     "Games are organized by the host, not by ballaCity. ballaCity does not supervise, referee, or inspect venues.",
     "Play within your ability, warm up, and stop if you're injured or unwell.",
@@ -47,7 +48,8 @@ export const HOST_RESPONSIBILITY = {
     "game information you publish, the venue and its access rules, communicating cancellations " +
     "or changes, and the conduct expected of players you invite. ballaCity does not organize, " +
     "supervise, or guarantee the safety of any game.",
-  checkboxLabel: "I understand I'm responsible for organizing this game and the accuracy of its details.",
+  checkboxLabel:
+    "I understand I'm responsible for organizing this game and the accuracy of its details.",
   points: [
     "Post accurate date, time, venue, skill level, and player limit — update them if anything changes.",
     "Confirm you're allowed to use the court, field, or facility, and share its rules with players.",
@@ -87,14 +89,38 @@ export type GameInfoTip = {
 };
 
 export const GAME_INFO_TIPS: GameInfoTip[] = [
-  { id: "facility", label: "Facility name", hint: "Name the park, gym, or complex — not just a street." },
-  { id: "court", label: "Court or field", hint: "Add the court number or field so players find you." },
-  { id: "indoor", label: "Indoor or outdoor", hint: "Set the indoor toggle so players dress for it." },
-  { id: "time", label: "Start time & duration", hint: "Include end time so players plan around it." },
+  {
+    id: "facility",
+    label: "Facility name",
+    hint: "Name the park, gym, or complex — not just a street.",
+  },
+  {
+    id: "court",
+    label: "Court or field",
+    hint: "Add the court number or field so players find you.",
+  },
+  {
+    id: "indoor",
+    label: "Indoor or outdoor",
+    hint: "Set the indoor toggle so players dress for it.",
+  },
+  {
+    id: "time",
+    label: "Start time & duration",
+    hint: "Include end time so players plan around it.",
+  },
   { id: "skill", label: "Skill level", hint: "Keeps the run competitive and safe for everyone." },
   { id: "limit", label: "Player limit", hint: "Avoid overcrowding the space you booked." },
-  { id: "rules", label: "House rules & what to bring", hint: "Refs, gear, entry code, parking, water." },
-  { id: "contact", label: "How to reach you", hint: "Use in-app messages — no need to share your phone number." },
+  {
+    id: "rules",
+    label: "House rules & what to bring",
+    hint: "Refs, gear, entry code, parking, water.",
+  },
+  {
+    id: "contact",
+    label: "How to reach you",
+    hint: "Use in-app messages — no need to share your phone number.",
+  },
 ];
 
 export const ADDRESS_PRIVACY_NOTE =
@@ -132,9 +158,9 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Tell a friend where you're going and when you expect to be back.",
       "Check the player's profile and reviews before agreeing to anything off-app.",
       "Trust your instincts — you can leave any game at any time.",
-          "Communicate through ballaCity instead of moving to personal channels early.",
+      "Communicate through ballaCity instead of moving to personal channels early.",
       "Avoid sharing unnecessary personal information such as your home address or workplace.",
-],
+    ],
   },
   {
     id: "game",
@@ -144,13 +170,13 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Arrive a few minutes early so you can look the space over.",
       "Ask the host about facility rules, entry, and parking before you commit.",
       "If the game looks nothing like it was described, don't play — report it.",
-          "Follow the facility's rules and any staff instructions while you're there.",
+      "Follow the facility's rules and any staff instructions while you're there.",
       "Respect other participants — no aggressive play, harassment, or trash talk that crosses the line.",
       "Never participate while impaired by alcohol or drugs.",
       "Bring appropriate equipment for the sport and surface.",
       "Know your physical limitations and sit out when you need to.",
       "Report unsafe behavior to the host and to ballaCity.",
-],
+    ],
   },
   {
     id: "payments",
@@ -160,11 +186,11 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Never send money before the game is confirmed, and never pay more than the posted fee.",
       "Keep a receipt or screenshot of what you sent.",
       "Report anyone who pressures you to pay off-app or refuses to confirm payment.",
-          "ballaCity never requests banking passwords, card PINs, or one-time codes.",
+      "ballaCity never requests banking passwords, card PINs, or one-time codes.",
       "Never share payment credentials, logins, or account recovery codes with anyone.",
       "Confirm the host and the game before sending money.",
       "Be cautious of payment scams: pressure to pay fast, changed handles, or refund overpayment requests.",
-],
+    ],
   },
   {
     id: "messaging",
@@ -173,10 +199,10 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Keep conversations in ballaCity so moderators can review them if something goes wrong.",
       "Don't share your home address, financial details, or ID documents.",
       "Block anyone who makes you uncomfortable — they can't message or follow you afterwards.",
-          "Block users who bother you — blocking is private and stops messages, follows, and join requests.",
+      "Block users who bother you — blocking is private and stops messages, follows, and join requests.",
       "Report inappropriate messages with the flag icon in the conversation.",
       "Avoid sharing sensitive personal information in chat.",
-],
+    ],
   },
   {
     id: "reporting",

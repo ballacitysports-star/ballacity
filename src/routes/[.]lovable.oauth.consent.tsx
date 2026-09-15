@@ -24,9 +24,15 @@ type OAuthNs = {
   ) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
 };
 
-function oauth(): OAuthNs {
-  return (supabase.auth as unknown as { oauth: OAuthNs }).oauth;
-}
+/**
+ * The Supabase OAuth namespace, read at call time.
+ *
+ * Deliberately not a module-level helper: the route splitter puts `loader` and
+ * `component` in separate chunks, and a shared local function referenced from
+ * both is not re-exported from the shared chunk, which breaks the dev module
+ * graph. Each call site resolves the namespace itself instead.
+ */
+type WithOAuth = { oauth: OAuthNs };
 
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   head: () =>
@@ -49,7 +55,8 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   loader: async ({ location }) => {
     const authorizationId = new URLSearchParams(location.search).get("authorization_id")!;
-    const { data, error } = await oauth().getAuthorizationDetails(authorizationId);
+    const oauth = (supabase.auth as unknown as WithOAuth).oauth;
+    const { data, error } = await oauth.getAuthorizationDetails(authorizationId);
     if (error) throw new Error(error.message);
     const immediate = data?.redirect_url ?? data?.redirect_to;
     if (immediate && !data?.client) throw redirect({ href: immediate });
@@ -83,9 +90,10 @@ function Consent() {
   async function decide(approve: boolean) {
     setBusy(true);
     setError(null);
+    const oauth = (supabase.auth as unknown as WithOAuth).oauth;
     const { data, error } = approve
-      ? await oauth().approveAuthorization(authorization_id)
-      : await oauth().denyAuthorization(authorization_id);
+      ? await oauth.approveAuthorization(authorization_id)
+      : await oauth.denyAuthorization(authorization_id);
     if (error) {
       setBusy(false);
       setError(error.message);
@@ -101,9 +109,9 @@ function Consent() {
   }
 
   return (
-    <main className="mx-auto max-w-md p-6">
+    <main className="page-shell-narrow py-6">
       <h1 className="page-title">Connect {clientName} to your ballaCity account</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className="mt-3 page-subtitle">
         This lets {clientName} use ballaCity as you. It does not bypass ballaCity's permissions or
         backend policies.
       </p>

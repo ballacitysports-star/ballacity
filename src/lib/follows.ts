@@ -40,8 +40,7 @@ export async function listFollows(
   if (error) throw error;
   const rows = (data ?? []) as any[];
   const ids = rows.map((r) => r[otherCol]).filter(Boolean);
-  const nextCursor =
-    rows.length === pageSize ? (rows[rows.length - 1].created_at as string) : null;
+  const nextCursor = rows.length === pageSize ? (rows[rows.length - 1].created_at as string) : null;
   if (ids.length === 0) return { users: [], nextCursor };
   const [profsRes, mineRes] = await Promise.all([
     supabase
@@ -58,9 +57,7 @@ export async function listFollows(
   ]);
   if (profsRes.error) throw profsRes.error;
   const byId = new Map(((profsRes.data ?? []) as any[]).map((p) => [p.id, p]));
-  const mineSet = new Set(
-    ((mineRes as any).data ?? []).map((r: any) => r.followee_id as string),
-  );
+  const mineSet = new Set(((mineRes as any).data ?? []).map((r: any) => r.followee_id as string));
   const users: FollowUser[] = ids
     .map((id) => byId.get(id))
     .filter(Boolean)
@@ -74,7 +71,6 @@ export async function listFollows(
     }));
   return { users, nextCursor };
 }
-
 
 export type FollowState = {
   isFollowing: boolean;

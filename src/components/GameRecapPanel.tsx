@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  Clapperboard,
-  Download,
-  Eye,
-  EyeOff,
-  Loader2,
-  Share2,
-  Trash2,
-} from "lucide-react";
+import { Clapperboard, Download, Eye, EyeOff, Loader2, Share2, Trash2 } from "lucide-react";
 import {
   pickLatestRecap,
   recapAttempt,
@@ -24,13 +16,7 @@ import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
  * Per-reel manage controls for the profile card: hide/show and delete.
  * Shown only when the signed-in viewer owns the game profile.
  */
-export function ReelManageRow({
-  reel,
-  onChanged,
-}: {
-  reel: RecapSummary;
-  onChanged?: () => void;
-}) {
+export function ReelManageRow({ reel, onChanged }: { reel: RecapSummary; onChanged?: () => void }) {
   const [busy, setBusy] = useState<"hide" | "delete" | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const hidden = !!reel.hidden_at;
@@ -39,7 +25,9 @@ export function ReelManageRow({
     setBusy("hide");
     try {
       await setReelHidden({ data: { reelId: reel.id, hidden: !hidden } });
-      toast.success(hidden ? "Reel is visible on your profile again" : "Reel hidden from your profile");
+      toast.success(
+        hidden ? "Reel is visible on your profile again" : "Reel hidden from your profile",
+      );
       onChanged?.();
     } catch (e: any) {
       toast.error(e?.message ?? "Could not update this reel");
@@ -173,6 +161,7 @@ export function GameRecapPanel({
         <div className="mt-2">
           <InlineVideoPlayer
             videoPath={latest.playback_path ?? latest.video_path}
+            fallbackVideoPath={latest.playback_path ? latest.video_path : null}
             thumbnailUrl={thumbUrl}
             ariaLabel={`Highlight reel for ${gameTitle}`}
             repair={

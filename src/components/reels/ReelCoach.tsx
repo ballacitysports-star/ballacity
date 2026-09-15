@@ -22,7 +22,6 @@ const QUICK_PROMPTS = [
   "How should I film this better?",
 ];
 
-
 const TONES = ["Hype", "Recruiting", "Funny", "Humble"] as const;
 
 /**
@@ -40,8 +39,11 @@ export function ReelCoach({ reelId }: { reelId: string }) {
   const [captionIdx, setCaptionIdx] = useState(0);
   const inFlight = useRef(false);
 
-  const captionOptions = pkg ? (pkg.captions?.length ? pkg.captions : [pkg.caption]).filter(Boolean) : [];
-  const selectedCaption = captionOptions[Math.min(captionIdx, Math.max(captionOptions.length - 1, 0))] ?? "";
+  const captionOptions = pkg
+    ? (pkg.captions?.length ? pkg.captions : [pkg.caption]).filter(Boolean)
+    : [];
+  const selectedCaption =
+    captionOptions[Math.min(captionIdx, Math.max(captionOptions.length - 1, 0))] ?? "";
 
   async function send(question: string) {
     const q = question.trim();
@@ -56,7 +58,6 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       setMessages((m) => [...m, { role: "assistant", content: res.answer }]);
       // The agent can apply copy, overlays, or a new cut list itself.
       if (res.actions?.length) toast.success(res.actions.join(" · "));
-
     } catch (e: any) {
       toast.error(e?.message ?? "Reel Coach is unavailable right now");
       setMessages((m) => m.slice(0, -1));
@@ -150,11 +151,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
             disabled={packing}
             className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[10px] font-semibold text-black disabled:opacity-50"
           >
-            {packing ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Wand2 className="h-3 w-3" />
-            )}
+            {packing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
             {pkg ? "Regenerate post" : "Build my post"}
           </button>
           {TONES.map((t) => (
@@ -163,9 +160,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
               onClick={() => makePackage(t)}
               disabled={packing}
               className={`rounded-full border px-2 py-1 text-[10px] disabled:opacity-50 ${
-                tone === t
-                  ? "border-lime text-lime"
-                  : "border-border text-muted-foreground"
+                tone === t ? "border-lime text-lime" : "border-border text-muted-foreground"
               }`}
             >
               {t}
@@ -182,7 +177,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
         {pkg && (
           <div className="mt-2.5 space-y-2.5">
             {pkg.sport && (
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="micro-label text-muted-foreground">
                 Tailored for {pkg.sport}
               </p>
             )}
@@ -275,7 +270,6 @@ export function ReelCoach({ reelId }: { reelId: string }) {
         )}
       </div>
 
-
       {messages.length > 0 && (
         <ul className="mt-2 space-y-2">
           {messages.map((m, i) => (
@@ -333,7 +327,11 @@ export function ReelCoach({ reelId }: { reelId: string }) {
           aria-label="Send to Reel Coach"
           className="rounded-lg bg-lime p-1.5 text-black disabled:opacity-50"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
         </button>
       </form>
     </div>

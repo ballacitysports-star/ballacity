@@ -41,14 +41,10 @@ export function WhenBlock({
       <p className="text-sm font-semibold">{formatEventWhen(when)}</p>
       {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
       {withStatus && (
-        <p className="text-[11px] font-semibold text-muted-foreground">
-          {formatWhenStatus(when)}
-        </p>
+        <p className="text-[11px] font-semibold text-muted-foreground">{formatWhenStatus(when)}</p>
       )}
       {!!when.arriveEarlyMin && (
-        <p className="text-[11px] text-muted-foreground">
-          Arrive {when.arriveEarlyMin} min early
-        </p>
+        <p className="text-[11px] text-muted-foreground">Arrive {when.arriveEarlyMin} min early</p>
       )}
     </div>
   );

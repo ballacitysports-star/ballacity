@@ -6,11 +6,7 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { listMyAvailabilities } from "@/lib/availability";
 import { parseTimeSlots } from "@/lib/availability-timeslots";
 
-export type AvailabilityGateReason =
-  | null
-  | "signed_out"
-  | "wrong_profile"
-  | "incomplete_profile";
+export type AvailabilityGateReason = null | "signed_out" | "wrong_profile" | "incomplete_profile";
 
 export type AvailabilityGate = {
   /** True when the viewer may post/edit their player availability. */
@@ -57,8 +53,7 @@ export function useAvailabilityGate(): AvailabilityGate {
     reason = "wrong_profile";
   else if (
     profile &&
-    (!profile.name?.trim() ||
-      !(profile.sports ?? []).some((s) => !!s.level?.tier))
+    (!profile.name?.trim() || !(profile.sports ?? []).some((s) => !!s.level?.tier))
   )
     reason = "incomplete_profile";
 

@@ -39,7 +39,9 @@ describe("GameCard fits its grid track", () => {
 
   it("keeps the clip on the card surface", () => {
     // min-w-0 lets the item narrow; overflow-hidden is what stops the rounded
-    // surface's children from painting outside it once it does.
-    expect(src).toMatch(/group block overflow-hidden/);
+    // surface's children from painting outside it once it does. The surface is
+    // a flex column now (equal card heights in a grid row), so the assertion is
+    // on the clip rather than on `block`.
+    expect(src).toMatch(/group flex h-full flex-col overflow-hidden/);
   });
 });

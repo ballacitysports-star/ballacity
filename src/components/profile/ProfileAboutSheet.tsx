@@ -35,9 +35,7 @@ export function ProfileAboutSheet({
 export function AboutBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </h3>
+      <h3 className="mb-1.5 section-eyebrow text-muted-foreground">{label}</h3>
       <div className="text-sm text-foreground/90">{children}</div>
     </section>
   );
@@ -50,7 +48,7 @@ export function AboutStats({ items }: { items: { k: React.ReactNode; v: string }
       {items.map((s) => (
         <div key={s.v} className="rounded-xl border border-border bg-surface p-2.5 text-center">
           <div className="text-sm font-bold">{s.k}</div>
-          <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="mt-0.5 micro-label text-muted-foreground">
             {s.v}
           </div>
         </div>

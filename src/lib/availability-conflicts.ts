@@ -56,8 +56,7 @@ export function gameToBusyBlock(
   const mins = parseDurationMinutes(game.duration);
   const end = new Date(start.getTime() + mins * 60_000);
   // Clip to the start day so comparisons stay within one date key.
-  const sameDayEnd =
-    end.getDate() === start.getDate() ? hhmm(end) : "23:59";
+  const sameDayEnd = end.getDate() === start.getDate() ? hhmm(end) : "23:59";
   return {
     id: `${kind}:${game.id}`,
     date: toDateKey(start),
@@ -122,7 +121,14 @@ export async function listMyBusyBlocks(
     for (const s of parseTimeSlots(row.time_slots ?? [])) {
       if (isDateSlot(s)) {
         if (s.date < today) continue;
-        out.push({ id: `${kind}:${row.id}:${s.date}:${s.start}`, date: s.date, start: s.start, end: s.end, label, kind });
+        out.push({
+          id: `${kind}:${row.id}:${s.date}:${s.start}`,
+          date: s.date,
+          start: s.start,
+          end: s.end,
+          label,
+          kind,
+        });
       } else {
         // Expand the weekly window across the next 8 weeks so recurring
         // clashes surface too.
@@ -133,7 +139,14 @@ export async function listMyBusyBlocks(
           d.setDate(base.getDate() + i);
           if (d.getDay() !== s.weekday) continue;
           const key = toDateKey(d);
-          out.push({ id: `${kind}:${row.id}:${key}:${s.start}`, date: key, start: s.start, end: s.end, label, kind });
+          out.push({
+            id: `${kind}:${row.id}:${key}:${s.start}`,
+            date: key,
+            start: s.start,
+            end: s.end,
+            label,
+            kind,
+          });
         }
       }
     }
@@ -282,13 +295,14 @@ export function suggestSlotFixes(c: SlotConflict): SlotFix[] {
     const start = useBefore ? s : busy.end;
     const end = useBefore ? busy.start : e;
     const already = fromMin(start) === slot.start && fromMin(end) === slot.end;
-    const dupOfSkip = fixes.some((f) => f.slot && (f.slot as any).start === fromMin(start) && (f.slot as any).end === fromMin(end));
+    const dupOfSkip = fixes.some(
+      (f) =>
+        f.slot && (f.slot as any).start === fromMin(start) && (f.slot as any).end === fromMin(end),
+    );
     if (!already && !dupOfSkip) {
       fixes.push({
         id: "shorten",
-        label: useBefore
-          ? `End at ${fmt12(fromMin(end))}`
-          : `Start at ${fmt12(fromMin(start))}`,
+        label: useBefore ? `End at ${fmt12(fromMin(end))}` : `Start at ${fmt12(fromMin(start))}`,
         hint: `Shorten to ${fmt12(fromMin(start))}–${fmt12(fromMin(end))} so it stops clashing.`,
         slot: { ...slot, start: fromMin(start), end: fromMin(end) } as TimeSlot,
       });

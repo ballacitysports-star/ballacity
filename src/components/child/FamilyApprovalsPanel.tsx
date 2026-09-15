@@ -34,7 +34,9 @@ export function FamilyApprovalsPanel() {
           <li
             key={a.id}
             className={`rounded-xl border p-3 text-xs ${
-              a.urgency === "action_needed" ? "border-primary/40 bg-primary/5" : "border-border bg-background"
+              a.urgency === "action_needed"
+                ? "border-primary/40 bg-primary/5"
+                : "border-border bg-background"
             }`}
           >
             <div className="text-sm font-semibold capitalize">{a.title}</div>

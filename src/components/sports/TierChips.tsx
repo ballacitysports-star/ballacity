@@ -33,9 +33,7 @@ export function TierChips({
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () =>
       new Set(
-        selected
-          .map((t) => submenuParentForTier(scale, t))
-          .filter((p): p is string => Boolean(p)),
+        selected.map((t) => submenuParentForTier(scale, t)).filter((p): p is string => Boolean(p)),
       ),
   );
   const submenus = scale.submenus ?? {};
@@ -71,9 +69,7 @@ export function TierChips({
     if (childTiers.has(tier)) return null; // children render under their parent
     const active = selected.includes(tier);
     const label =
-      groupLabel && tier.startsWith(`${groupLabel} `)
-        ? tier.slice(groupLabel.length + 1)
-        : tier;
+      groupLabel && tier.startsWith(`${groupLabel} `) ? tier.slice(groupLabel.length + 1) : tier;
     const children = submenus[tier];
     return (
       <span key={tier} className="inline-flex flex-wrap items-center gap-1.5">
@@ -126,7 +122,7 @@ export function TierChips({
       {scale.groups ? (
         scale.groups.map((g) => (
           <div key={g.label}>
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+            <div className="mb-1 micro-label text-muted-foreground/80">
               {g.label}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

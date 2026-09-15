@@ -1,14 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Sparkles,
-  X,
-  Plus,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus } from "lucide-react";
 import {
   SPORTS,
   HERO_IMAGE,
@@ -44,7 +37,11 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
-import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+import {
+  PositionsPicker,
+  positionsCleanup,
+  type PositionsNeeded,
+} from "@/components/PositionsPicker";
 import {
   listTrainerOrgs,
   createTrainerOrg,
@@ -116,7 +113,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [venues, setVenues] = useState<string[]>([]);
   const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(new Set());
-  const [venueGeoMap, setVenueGeoMap] = useState<Record<string, { placeId: string; lat: number; lng: number }>>({});
+  const [venueGeoMap, setVenueGeoMap] = useState<
+    Record<string, { placeId: string; lat: number; lng: number }>
+  >({});
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(null);
   const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
@@ -141,10 +140,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     () => validateOverrides(overrides, verifiedVenues),
     [overrides, verifiedVenues],
   );
-  const rulesError = useMemo(
-    () => validateRules(rules, verifiedVenues),
-    [rules, verifiedVenues],
-  );
+  const rulesError = useMemo(() => validateRules(rules, verifiedVenues), [rules, verifiedVenues]);
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
     [venueAddresses, verifiedVenues],
@@ -210,9 +206,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     verifiedVenues: isCoach ? Array.from(verifiedVenues) : undefined,
     venueGeo: isCoach ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
     primaryVenue: isCoach
-      ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
-          ? primaryVenue.trim()
-          : undefined)
+      ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+        ? primaryVenue.trim()
+        : undefined
       : undefined,
     cadence: cadences[0],
     cadences,
@@ -318,7 +314,6 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               },
             });
             toast.success("Gym created");
-
           } else if (orgChoice.mode === "join") {
             await requestToJoinTrainerOrg({
               data: { orgId: orgChoice.orgId, trainerId: saved.id },
@@ -337,11 +332,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
         nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : `Failed to create ${isCoach ? "trainer" : "team"}.`;
+      const msg =
+        e instanceof Error ? e.message : `Failed to create ${isCoach ? "trainer" : "team"}.`;
       setSubmitError(
-        /unauthor/i.test(msg)
-          ? `Please sign in to create a ${isCoach ? "trainer" : "team"}.`
-          : msg,
+        /unauthor/i.test(msg) ? `Please sign in to create a ${isCoach ? "trainer" : "team"}.` : msg,
       );
       setSubmitting(false);
     }
@@ -395,7 +389,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       <div className="flex items-center gap-3 mb-4">
         <Link
           to={backHref}
@@ -404,7 +398,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground font-bold">
             Step {step + 1} of {STEPS.length}
           </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step]}</h1>
@@ -557,16 +551,16 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       return (
                         <div key={i} className="space-y-1">
                           <div className="flex items-start gap-2">
-                            <div className={`flex-1 ${rowError ? "rounded-2xl ring-1 ring-coral" : ""}`}>
+                            <div
+                              className={`flex-1 ${rowError ? "rounded-2xl ring-1 ring-coral" : ""}`}
+                            >
                               <LocationAutocomplete
                                 value={addr}
                                 onChange={(v) => {
                                   const prevTrim = trimmed;
                                   const prevKey = prevTrim.toLowerCase();
                                   const newKey = v.trim().toLowerCase();
-                                  setVenueAddresses((cur) =>
-                                    cur.map((a, j) => (j === i ? v : a)),
-                                  );
+                                  setVenueAddresses((cur) => cur.map((a, j) => (j === i ? v : a)));
                                   // Free-typed edits invalidate a previously verified entry.
                                   if (prevKey && prevKey !== newKey) {
                                     setVerifiedVenues((cur) => {
@@ -674,15 +668,15 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                               >
                                 {isPrimary ? "★ Primary" : "Set as primary"}
                               </button>
-                              {trimmed && verifiedVenues.has(trimmed.toLowerCase()) && !rowError && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[11px] font-semibold text-lime">
-                                  <Check className="h-3 w-3" /> Verified
-                                </span>
-                              )}
+                              {trimmed &&
+                                verifiedVenues.has(trimmed.toLowerCase()) &&
+                                !rowError && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[11px] font-semibold text-lime">
+                                    <Check className="h-3 w-3" /> Verified
+                                  </span>
+                                )}
                             </div>
-                            {rowError && (
-                              <p className="text-[11px] text-coral">{rowError}</p>
-                            )}
+                            {rowError && <p className="text-[11px] text-coral">{rowError}</p>}
                           </div>
                           {(() => {
                             const geo = venueGeoMap[trimmed.toLowerCase()];
@@ -712,9 +706,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               {isCoach && (
                 <Section title="Availability calendar">
                   <p className="text-xs text-muted-foreground mb-2">
-                    Set the times you're usually free (weekly pattern) and tap any date up to 6 months
-                    out to override or close it. Attendees see these times automatically converted to
-                    their own timezone.
+                    Set the times you're usually free (weekly pattern) and tap any date up to 6
+                    months out to override or close it. Attendees see these times automatically
+                    converted to their own timezone.
                   </p>
                   <div className="mb-3">
                     <TimezoneSelect value={timezone} onChange={setTimezone} />
@@ -724,7 +718,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     overrides={overrides}
                     venues={venueAddresses
                       .map((v) => v.trim())
-                      .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                      .filter(
+                        (v, idx, arr) =>
+                          v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx,
+                      )}
                     primaryVenue={primaryVenue}
                     timezone={timezone}
                     onWeeklyChange={setSlots}
@@ -734,7 +731,8 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     <div className="mb-2">
                       <div className="text-sm font-semibold">Recurring rules</div>
                       <p className="text-xs text-muted-foreground">
-                        Set patterns like "Every Tue/Thu" or "1st & 3rd Monday" — they auto-fill the calendar.
+                        Set patterns like "Every Tue/Thu" or "1st & 3rd Monday" — they auto-fill the
+                        calendar.
                       </p>
                     </div>
                     <AvailabilityRulesEditor
@@ -742,13 +740,14 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       onChange={setRules}
                       venues={venueAddresses
                         .map((v) => v.trim())
-                        .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                        .filter(
+                          (v, idx, arr) =>
+                            v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx,
+                        )}
                     />
                   </div>
                 </Section>
               )}
-
-
 
               <Section title="Skill range">
                 <div className="rounded-2xl border border-border bg-surface p-4">
@@ -760,7 +759,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Min
                       </div>
                       <select
@@ -780,7 +779,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Max
                       </div>
                       <select
@@ -816,7 +815,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</div>
+                        <div className="micro-label text-muted-foreground">
+                          Min
+                        </div>
                         <select
                           value={ratingMin}
                           onChange={(e) => setRatingMin(e.target.value)}
@@ -824,12 +825,16 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         >
                           <option value="">—</option>
                           {ratingLevels.map((l) => (
-                            <option key={l} value={l}>{l}</option>
+                            <option key={l} value={l}>
+                              {l}
+                            </option>
                           ))}
                         </select>
                       </label>
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</div>
+                        <div className="micro-label text-muted-foreground">
+                          Max
+                        </div>
                         <select
                           value={ratingMax}
                           onChange={(e) => setRatingMax(e.target.value)}
@@ -837,7 +842,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         >
                           <option value="">—</option>
                           {ratingLevels.map((l) => (
-                            <option key={l} value={l}>{l}</option>
+                            <option key={l} value={l}>
+                              {l}
+                            </option>
                           ))}
                         </select>
                       </label>
@@ -932,13 +939,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       showCurrentButton={false}
                       placeholder="Tompkins Square Courts"
                     />
-
                   </Section>
 
                   <Section title="Record (optional)">
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Wins
                         </div>
                         <input
@@ -950,7 +956,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         />
                       </label>
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Losses
                         </div>
                         <input
@@ -1056,9 +1062,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       <PositionsPicker
                         sport={s}
                         value={positionsBySport[s] ?? {}}
-                        onChange={(next) =>
-                          setPositionsBySport((cur) => ({ ...cur, [s]: next }))
-                        }
+                        onChange={(next) => setPositionsBySport((cur) => ({ ...cur, [s]: next }))}
                       />
                     </Section>
                   ))}
@@ -1238,7 +1242,11 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     {(["independent", "join", "create"] as const).map((m) => {
                       const active = orgChoice.mode === m;
                       const label =
-                        m === "independent" ? "Independent" : m === "join" ? "Join existing" : "Create new";
+                        m === "independent"
+                          ? "Independent"
+                          : m === "join"
+                            ? "Join existing"
+                            : "Create new";
                       return (
                         <button
                           key={m}
@@ -1247,7 +1255,14 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                             if (m === "independent") setOrgChoice({ mode: "independent" });
                             else if (m === "join")
                               setOrgChoice({ mode: "join", orgId: "", orgName: "" });
-                            else setOrgChoice({ mode: "create", name: "", handle: "", city: "", bio: "" });
+                            else
+                              setOrgChoice({
+                                mode: "create",
+                                name: "",
+                                handle: "",
+                                city: "",
+                                bio: "",
+                              });
                           }}
                           className={`flex-1 rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
                             active
@@ -1280,7 +1295,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                                 setOrgChoice({ mode: "join", orgId: o.id, orgName: o.name })
                               }
                               className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-left ${
-                                selected ? "border-lime bg-lime/10" : "border-border/50 bg-background"
+                                selected
+                                  ? "border-lime bg-lime/10"
+                                  : "border-border/50 bg-background"
                               }`}
                             >
                               <div className="min-w-0">
@@ -1313,9 +1330,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     <div className="mt-2 space-y-2">
                       <input
                         value={orgChoice.name}
-                        onChange={(e) =>
-                          setOrgChoice({ ...orgChoice, name: e.target.value })
-                        }
+                        onChange={(e) => setOrgChoice({ ...orgChoice, name: e.target.value })}
                         placeholder="Gym name"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
@@ -1326,9 +1341,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                           onChange={(e) =>
                             setOrgChoice({
                               ...orgChoice,
-                              handle: e.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9_-]/g, ""),
+                              handle: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""),
                             })
                           }
                           placeholder="orghandle"
@@ -1337,15 +1350,15 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       </div>
                       <input
                         value={orgChoice.city}
-                        onChange={(e) =>
-                          setOrgChoice({ ...orgChoice, city: e.target.value })
-                        }
+                        onChange={(e) => setOrgChoice({ ...orgChoice, city: e.target.value })}
                         placeholder="City (optional)"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
                       <LocationAutocomplete
                         value={orgChoice.address ?? ""}
-                        onChange={(v) => setOrgChoice({ ...orgChoice, address: v, placeId: undefined, geo: null })}
+                        onChange={(v) =>
+                          setOrgChoice({ ...orgChoice, address: v, placeId: undefined, geo: null })
+                        }
                         onPick={(v, placeId, geo) =>
                           setOrgChoice({
                             ...orgChoice,
@@ -1360,15 +1373,18 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       />
                       {orgChoice.geo && (
                         <div className="overflow-hidden rounded-2xl border border-border">
-                          <VenueMapPreview address={orgChoice.address ?? orgChoice.name} lat={orgChoice.geo.lat} lng={orgChoice.geo.lng} placeId={orgChoice.placeId} />
+                          <VenueMapPreview
+                            address={orgChoice.address ?? orgChoice.name}
+                            lat={orgChoice.geo.lat}
+                            lng={orgChoice.geo.lng}
+                            placeId={orgChoice.placeId}
+                          />
                         </div>
                       )}
 
                       <textarea
                         value={orgChoice.bio}
-                        onChange={(e) =>
-                          setOrgChoice({ ...orgChoice, bio: e.target.value })
-                        }
+                        onChange={(e) => setOrgChoice({ ...orgChoice, bio: e.target.value })}
                         placeholder="Short bio (optional)"
                         className="w-full min-h-16 rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
@@ -1381,12 +1397,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               )}
 
               <Section title="Live preview">
-
                 <div className="rounded-3xl border border-lime/30 bg-surface/40 p-3">
                   <OrgCard org={handlePreview} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how {isCoach ? "athletes" : "players"} will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how{" "}
+                  {isCoach ? "athletes" : "players"} will see you in feeds.
                 </div>
               </Section>
             </div>
@@ -1395,7 +1411,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       </AnimatePresence>
 
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
-        <div className="mx-auto max-w-md flex gap-2">
+        <div className="mx-auto flex w-full max-w-lg gap-2">
           {step > 0 ? (
             <button
               type="button"
@@ -1449,9 +1465,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </div>
+      <div className="mb-2 section-eyebrow text-muted-foreground">{title}</div>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -1489,9 +1503,7 @@ function ChipPicker({
           </button>
         );
       })}
-      {single && selected.length > 0 && (
-        <span className="sr-only">Single-select</span>
-      )}
+      {single && selected.length > 0 && <span className="sr-only">Single-select</span>}
     </div>
   );
 }

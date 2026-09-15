@@ -160,7 +160,9 @@ describe("policy state machine", () => {
     expect(isConsentBlocked({ cohort: "child_under_13" })).toBe(true);
     expect(isConsentBlocked({ cohort: "child_under_13", consent: consent("pending") })).toBe(true);
     expect(isConsentBlocked({ cohort: "child_under_13", consent: consent("revoked") })).toBe(true);
-    expect(isConsentBlocked({ cohort: "child_under_13", consent: consent("approved") })).toBe(false);
+    expect(isConsentBlocked({ cohort: "child_under_13", consent: consent("approved") })).toBe(
+      false,
+    );
     expect(isConsentBlocked({ cohort: "adult" })).toBe(false);
   });
 });
@@ -178,7 +180,12 @@ describe("feature permission matrix", () => {
   });
 
   it("keeps adults on the standard experience", () => {
-    for (const feature of ["direct_messaging", "public_reels", "game_hosting", "ai_analysis"] as const) {
+    for (const feature of [
+      "direct_messaging",
+      "public_reels",
+      "game_hosting",
+      "ai_analysis",
+    ] as const) {
       expect(can(feature, { cohort: "adult" }).allowed).toBe(true);
     }
   });
@@ -262,20 +269,25 @@ describe("messaging policy", () => {
 
   it("allows peer messaging but honours a guardian messaging switch", () => {
     expect(messagingAllowed(child, teen)).toBe(true);
-    const off = { cohort: "child_under_13" as AgeCohort, controls: parseChildControls({ messaging: "off" }) };
+    const off = {
+      cohort: "child_under_13" as AgeCohort,
+      controls: parseChildControls({ messaging: "off" }),
+    };
     expect(messagingAllowed(off, teen)).toBe(false);
   });
 });
 
 describe("privacy floors and tracking", () => {
   it("forces generalized location and non-public profiles for minors", () => {
-    expect(privacyFloor("teen_16_17", { locationPrecision: "exact", profileVisibility: "public" }))
-      .toMatchObject({ locationPrecision: "city", profileVisibility: "members" });
+    expect(
+      privacyFloor("teen_16_17", { locationPrecision: "exact", profileVisibility: "public" }),
+    ).toMatchObject({ locationPrecision: "city", profileVisibility: "members" });
     expect(
       privacyFloor("child_under_13", { locationPrecision: "exact", profileVisibility: "public" }),
     ).toMatchObject({ profileVisibility: "private", marketingEmails: false });
-    expect(privacyFloor("adult", { locationPrecision: "exact", profileVisibility: "public" }))
-      .toMatchObject({ locationPrecision: "exact", profileVisibility: "public" });
+    expect(
+      privacyFloor("adult", { locationPrecision: "exact", profileVisibility: "public" }),
+    ).toMatchObject({ locationPrecision: "exact", profileVisibility: "public" });
   });
 
   it("never enables targeted advertising or session replay for minors", () => {
@@ -303,9 +315,10 @@ describe("child username safety", () => {
   });
 
   it("refuses a child's full name and warns older teens", () => {
-    expect(checkChildUsername("jordanmiller", { cohort: "child_under_13", fullName: "Jordan Miller" }).ok).toBe(
-      false,
-    );
+    expect(
+      checkChildUsername("jordanmiller", { cohort: "child_under_13", fullName: "Jordan Miller" })
+        .ok,
+    ).toBe(false);
     const teen = checkChildUsername("jordanmiller", {
       cohort: "teen_16_17",
       fullName: "Jordan Miller",
@@ -333,7 +346,9 @@ describe("guardian controls parsing", () => {
   });
 
   it("ignores invalid values", () => {
-    expect(parseChildControls({ messaging: "everyone", location_precision: "exact" })).toMatchObject({
+    expect(
+      parseChildControls({ messaging: "everyone", location_precision: "exact" }),
+    ).toMatchObject({
       messaging: "guardian_only",
       locationPrecision: "city",
     });

@@ -67,9 +67,7 @@ function toConsentView(row: ConsentRow | null): ConsentRecordView | null {
   };
 }
 
-async function loadPolicy(
-  supabase: { from: (t: string) => any },
-): Promise<AgePolicyConfig> {
+async function loadPolicy(supabase: { from: (t: string) => any }): Promise<AgePolicyConfig> {
   const { data } = await supabase
     .from("app_settings")
     .select("value")
@@ -96,7 +94,9 @@ export const getMyChildStatus = createServerFn({ method: "GET" })
         supabase.rpc("my_child_context"),
         supabase
           .from("parental_consents")
-          .select("status, method, parent_email, requested_at, approved_at, revoked_at, reverify_at")
+          .select(
+            "status, method, parent_email, requested_at, approved_at, revoked_at, reverify_at",
+          )
           .eq("child_user_id", userId)
           .maybeSingle(),
         supabase.from("child_controls").select("*").eq("child_user_id", userId).maybeSingle(),
@@ -222,7 +222,9 @@ export const lookupConsentRequest = createServerFn({ method: "POST" })
       token_expires_at: string | null;
       child_user_id: string;
     };
-    const expired = r.token_expires_at ? new Date(r.token_expires_at).getTime() < Date.now() : false;
+    const expired = r.token_expires_at
+      ? new Date(r.token_expires_at).getTime() < Date.now()
+      : false;
     const { data: child } = await supabaseAdmin
       .from("profiles")
       .select("display_name")
@@ -470,7 +472,6 @@ export const listFamilyActivity = createServerFn({ method: "POST" })
     });
   });
 
-
 export const updateChildControls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { childUserId: string; controls: Partial<Record<string, unknown>> }) =>
@@ -583,7 +584,10 @@ export const getChildFootprint = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const child = data.childUserId;
     const count = async (table: string, column: string, extra?: (q: any) => any) => {
-      let q = (supabaseAdmin as any).from(table).select("*", { count: "exact", head: true }).eq(column, child);
+      let q = (supabaseAdmin as any)
+        .from(table)
+        .select("*", { count: "exact", head: true })
+        .eq(column, child);
       if (extra) q = extra(q);
       const { count: c } = await q;
       return c ?? 0;
@@ -660,7 +664,11 @@ export const childSafetyOverview = createServerFn({ method: "GET" })
       consentCounts: tally(consents, "status"),
       ageReviews: (reviews ?? []).map((r) => {
         const row = r as { id: string; display_name: string; age_cohort: string };
-        return { userId: row.id, displayName: row.display_name, cohort: parseCohort(row.age_cohort) };
+        return {
+          userId: row.id,
+          displayName: row.display_name,
+          cohort: parseCohort(row.age_cohort),
+        };
       }),
       openRequests: (requests ?? []).map((r) => {
         const row = r as {
@@ -861,9 +869,7 @@ export const adminFamilyOverview = createServerFn({ method: "GET" })
     ]);
 
     const rows = links ?? [];
-    const ids = Array.from(
-      new Set(rows.flatMap((r) => [r.parent_user_id, r.child_user_id])),
-    );
+    const ids = Array.from(new Set(rows.flatMap((r) => [r.parent_user_id, r.child_user_id])));
     const [{ data: people }, { data: consents }] = await Promise.all([
       ids.length
         ? supabaseAdmin.from("profiles").select("id, display_name, age_cohort").in("id", ids)
@@ -872,14 +878,20 @@ export const adminFamilyOverview = createServerFn({ method: "GET" })
         ? supabaseAdmin
             .from("parental_consents")
             .select("child_user_id, status")
-            .in("child_user_id", rows.map((r) => r.child_user_id))
+            .in(
+              "child_user_id",
+              rows.map((r) => r.child_user_id),
+            )
         : Promise.resolve({ data: [] as never[] }),
     ]);
 
     const nameOf = new Map<string, { name: string; cohort: string }>();
     for (const p of people ?? []) {
       const row = p as { id: string; display_name: string | null; age_cohort: string | null };
-      nameOf.set(row.id, { name: row.display_name ?? "Member", cohort: row.age_cohort ?? "unknown" });
+      nameOf.set(row.id, {
+        name: row.display_name ?? "Member",
+        cohort: row.age_cohort ?? "unknown",
+      });
     }
     const consentOf = new Map<string, string>();
     for (const c of consents ?? []) {

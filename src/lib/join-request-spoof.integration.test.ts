@@ -208,7 +208,6 @@ describe.skipIf(skipIfNoBackend)("player_availabilities spoofing rejections", ()
     expect(error?.message ?? "").toMatch(/travel_radius_km/i);
   });
 
-
   it("rejects unknown sport", async () => {
     if (!canRun) return;
     const { error } = await client.from("player_availabilities").insert({

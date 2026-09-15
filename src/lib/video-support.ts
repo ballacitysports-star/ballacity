@@ -32,7 +32,8 @@ export async function needsPlaybackConversion(file: File): Promise<boolean> {
   try {
     if (!(await isWidelyPlayable(file))) return true;
     const ascii = await readHeadAscii(file);
-    const isMp4Container = /ftyp(isom|mp4|avc1|M4V|qt  |iso2|mmp4)/.test(ascii) || /\.(mp4|m4v|mov)$/i.test(file.name);
+    const isMp4Container =
+      /ftyp(isom|mp4|avc1|M4V|qt {2}|iso2|mmp4)/.test(ascii) || /\.(mp4|m4v|mov)$/i.test(file.name);
     const hasH264 = ascii.includes("avc1") || ascii.includes("avcC") || ascii.includes("h264");
     return !(isMp4Container && hasH264);
   } catch {
@@ -47,4 +48,3 @@ async function readHeadAscii(file: File): Promise<string> {
   for (let i = 0; i < head.length; i++) ascii += String.fromCharCode(head[i]);
   return ascii;
 }
-

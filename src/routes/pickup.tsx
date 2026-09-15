@@ -6,7 +6,7 @@ import { pageHead } from "@/lib/seo";
 export const Route = createFileRoute("/pickup")({
   head: () =>
     pageHead({
-      title: "Pickup games — ballaCity",
+      title: "Pickup Sports Games Near You | BallaCity",
       description:
         "Browse open pickup runs by sport, skill level, and distance, then request to join in a tap.",
       noindex: true,

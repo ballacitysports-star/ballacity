@@ -90,7 +90,6 @@ type OrgChoice = {
   geo?: { lat: number; lng: number } | null;
 };
 
-
 export function EditOrgScreen({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
@@ -166,9 +165,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   });
   useEffect(() => {
     const m = membership.data as
-      | { role: string; org: { id: string; name: string } }
-      | null
-      | undefined;
+      { role: string; org: { id: string; name: string } } | null | undefined;
     if (!m || !m.org) return;
     setInitialOrgId(m.org.id);
     setOrgChoice({ mode: "existing", orgId: m.org.id, name: m.org.name });
@@ -604,7 +601,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <Link
@@ -615,13 +612,13 @@ export function EditOrgScreen({ org }: { org: Org }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground">
             Step {step} of {STEPS.length}
           </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
           <SaveStatus {...autosave} className="mt-0.5" />
         </div>
-        <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-full bg-secondary px-3 py-1 micro-label text-muted-foreground">
           {kind === "team" ? "Team" : "Trainer"}
         </div>
       </div>
@@ -850,7 +847,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 {orgChoice.mode === "existing" && orgChoice.orgId ? (
                   <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-lime font-bold">
+                      <div className="micro-label text-lime">
                         {initialOrgId === orgChoice.orgId
                           ? "Current organization"
                           : "Join request on save"}
@@ -869,7 +866,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 ) : orgChoice.mode === "new" && orgChoice.name ? (
                   <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">
+                      <div className="micro-label text-coral">
                         You'll own this new org
                       </div>
                       <div className="truncate text-sm font-bold">{orgChoice.name}</div>
@@ -925,7 +922,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                         {placesResults.data?.suggestions &&
                           placesResults.data.suggestions.length > 0 && (
                             <>
-                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              <div className="pt-1 micro-label text-muted-foreground">
                                 From Google
                               </div>
                               {placesResults.data.suggestions.map((s) => (
@@ -994,7 +991,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Min
                       </div>
                       <select
@@ -1014,7 +1011,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Max
                       </div>
                       <select
@@ -1348,13 +1345,12 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   showCurrentButton={false}
                   placeholder="Tompkins Square Courts"
                 />
-
               </Section>
 
               <Section title="Record (optional)">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       Wins
                     </div>
                     <input
@@ -1366,7 +1362,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     />
                   </label>
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       Losses
                     </div>
                     <input
@@ -1577,7 +1573,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
       {/* Footer nav */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
-        <div className="mx-auto max-w-md flex gap-2">
+        <div className="mx-auto flex w-full max-w-lg gap-2">
           {step > 1 && (
             <button
               type="button"
@@ -1626,9 +1622,7 @@ function Section({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </div>
+        <div className="section-eyebrow text-muted-foreground">{title}</div>
         {hint && <div className="text-[10px] text-muted-foreground text-right">{hint}</div>}
       </div>
       <div className="space-y-2">{children}</div>

@@ -47,7 +47,7 @@ export function RosterTab({ teamId, teamName }: { teamId: string; teamName: stri
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+        <h2 className="inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
           <Users className="h-4 w-4" /> Roster · {members.length}
         </h2>
         {perms.canInvite && (

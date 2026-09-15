@@ -1,18 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
+import type { PaymentMode } from "@/lib/monetization/fees";
 import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
 
-
 export type PaymentType =
-  | "venmo"
-  | "cashapp"
-  | "zelle"
-  | "paypal"
-  | "applecash"
-  | "googlepay"
-  | "cash"
-  | "custom";
+  "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
 
 export type PaymentMethod = {
   id: string;
@@ -36,6 +29,8 @@ export type GamePaymentSettings = {
   refund_policy: string | null;
   payment_instructions: string | null;
   requires_approval: boolean;
+  /** `direct_host` today; `ballacity_processed` is reserved for a future processor. */
+  payment_mode?: PaymentMode;
 };
 
 export type JoinRequest = {
@@ -158,7 +153,6 @@ export async function listPaymentMethodsForHost(
   return (data ?? []) as PaymentMethod[];
 }
 
-
 export async function createPaymentMethod(
   input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean },
 ) {
@@ -218,12 +212,22 @@ export async function upsertGamePaymentSettings(input: {
   refund_policy?: string | null;
   payment_instructions?: string | null;
   requires_approval?: boolean;
+  /**
+   * Only `direct_host` is live: the player pays the host in their own payment
+   * app. `ballacity_processed` exists so a future processor slots in without a
+   * schema redesign, and the database rejects it until one is wired.
+   */
+  payment_mode?: PaymentMode;
 }) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to configure payments.");
+  const payment_mode = input.payment_mode ?? "direct_host";
+  if (payment_mode !== "direct_host") {
+    throw new Error("ballaCity does not process game payments yet — hosts collect directly.");
+  }
   const { error } = await supabase
     .from("game_payment_settings")
-    .upsert({ ...input, host_id: u.user.id }, { onConflict: "game_id,host_id" });
+    .upsert({ ...input, payment_mode, host_id: u.user.id }, { onConflict: "game_id,host_id" });
   if (error) throw error;
 }
 
@@ -245,7 +249,6 @@ export async function uploadProofScreenshot(file: File): Promise<string> {
   if (error) throw error;
   return path;
 }
-
 
 export async function getSignedProofUrl(path: string): Promise<string | null> {
   const { data, error } = await supabase.storage
@@ -453,9 +456,7 @@ export async function createJoinRequest(input: {
         const cooldownMs = joinResubmitCooldownRemainingMs(prev);
         if (cooldownMs > 0) {
           const secs = Math.ceil(cooldownMs / 1000);
-          throw new Error(
-            `Please wait ${formatCooldown(secs)} before resubmitting this request.`,
-          );
+          throw new Error(`Please wait ${formatCooldown(secs)} before resubmitting this request.`);
         }
         const { data: retryData, error: retryErr } = await supabase
           .from("join_requests")
@@ -487,7 +488,6 @@ function formatCooldown(secs: number): string {
   const s = secs % 60;
   return s ? `${m}m ${s}s` : `${m}m`;
 }
-
 
 export async function cancelMyJoinRequest(gameId: string) {
   const { data: u } = await supabase.auth.getUser();
@@ -545,13 +545,19 @@ export async function hostRemoveParticipant(params: {
     .delete()
     .eq("game_id", gameId)
     .eq("player_id", playerId)
-    .then(() => undefined, () => undefined);
+    .then(
+      () => undefined,
+      () => undefined,
+    );
   await supabase
     .from("payment_submissions")
     .delete()
     .eq("game_id", gameId)
     .eq("player_id", playerId)
-    .then(() => undefined, () => undefined);
+    .then(
+      () => undefined,
+      () => undefined,
+    );
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {

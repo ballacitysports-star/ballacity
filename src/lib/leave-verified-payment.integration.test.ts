@@ -63,9 +63,21 @@ describe.skipIf(skipIfNoBackend)("leave-flow DB clearance", () => {
 
   afterEach(async () => {
     if (!canRun) return;
-    await playerClient.from("payment_submissions").delete().eq("player_id", playerId).eq("game_id", gameId);
-    await playerClient.from("join_requests").delete().eq("player_id", playerId).eq("game_id", gameId);
-    await playerClient.from("game_participants").delete().eq("user_id", playerId).eq("game_id", gameId);
+    await playerClient
+      .from("payment_submissions")
+      .delete()
+      .eq("player_id", playerId)
+      .eq("game_id", gameId);
+    await playerClient
+      .from("join_requests")
+      .delete()
+      .eq("player_id", playerId)
+      .eq("game_id", gameId);
+    await playerClient
+      .from("game_participants")
+      .delete()
+      .eq("user_id", playerId)
+      .eq("game_id", gameId);
   });
 
   it("player can DELETE their own payment_submissions row (any status)", async () => {
@@ -113,23 +125,20 @@ describe.skipIf(skipIfNoBackend)("leave-flow DB clearance", () => {
     if (insErr || !ins) return;
     expect(ins.status).toBe("pending");
 
-    const { error: delErr } = await playerClient
-      .from("join_requests")
-      .delete()
-      .eq("id", ins.id);
+    const { error: delErr } = await playerClient.from("join_requests").delete().eq("id", ins.id);
     expect(delErr).toBeNull();
 
-    const { data: after } = await playerClient
-      .from("join_requests")
-      .select("id")
-      .eq("id", ins.id);
+    const { data: after } = await playerClient.from("join_requests").select("id").eq("id", ins.id);
     expect(after ?? []).toHaveLength(0);
   });
 
   it("player cannot DELETE another user's payment_submissions row", async () => {
     if (!canRun) return;
     const other = freshClient();
-    const s = await other.auth.signInWithPassword({ email: player2.email, password: player2.password });
+    const s = await other.auth.signInWithPassword({
+      email: player2.email,
+      password: player2.password,
+    });
     if (s.error || !s.data.user) return;
     const otherId = s.data.user.id;
 
@@ -149,10 +158,7 @@ describe.skipIf(skipIfNoBackend)("leave-flow DB clearance", () => {
     // Signed-in player tries to delete another user's submission — RLS
     // silently filters to 0 rows.
     await playerClient.from("payment_submissions").delete().eq("id", ins.id);
-    const { data: after } = await other
-      .from("payment_submissions")
-      .select("id")
-      .eq("id", ins.id);
+    const { data: after } = await other.from("payment_submissions").select("id").eq("id", ins.id);
     expect((after ?? []).length).toBe(1);
 
     // Cleanup.

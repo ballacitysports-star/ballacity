@@ -23,7 +23,6 @@ export type SigninContext = {
   errorMessage?: string | null;
 };
 
-
 function detectPlatform(ua: string): string {
   if (/iPad|iPhone|iPod/.test(ua)) return "iOS";
   if (/Android/.test(ua)) return "Android";
@@ -37,7 +36,8 @@ export function detectSigninEnv() {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isIOS = /iPad|iPhone|iPod/.test(ua);
   const isIOSChrome = isIOS && /CriOS/.test(ua);
-  const isInAppWebview = /(FBAN|FBAV|Instagram|Line|Twitter|LinkedInApp|Snapchat|TikTok|WhatsApp|Wechat)/i.test(ua);
+  const isInAppWebview =
+    /(FBAN|FBAV|Instagram|Line|Twitter|LinkedInApp|Snapchat|TikTok|WhatsApp|Wechat)/i.test(ua);
   return {
     userAgent: ua,
     browser: parseBrowser(ua),

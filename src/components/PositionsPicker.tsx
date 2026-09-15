@@ -42,7 +42,9 @@ export function PositionsPicker({
               active ? "border-lime/50 bg-lime/5" : "border-border bg-background"
             }`}
           >
-            <span className={`text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>
+            <span
+              className={`text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}
+            >
               {name}
             </span>
             <div className="flex items-center gap-2">
@@ -55,9 +57,7 @@ export function PositionsPicker({
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
-              <span className="w-6 text-center text-sm font-bold tabular-nums">
-                {count}
-              </span>
+              <span className="w-6 text-center text-sm font-bold tabular-nums">{count}</span>
               <button
                 type="button"
                 onClick={() => bump(name, 1)}

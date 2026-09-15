@@ -11,7 +11,12 @@ import { Columns2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-r
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
-import { ReelStudio, type Coaching, type EditPlan, type TimelineEntry } from "@/components/reels/ReelStudio";
+import {
+  ReelStudio,
+  type Coaching,
+  type EditPlan,
+  type TimelineEntry,
+} from "@/components/reels/ReelStudio";
 import { normalizeReelStyle, reelStyleSummary, type ReelStylePrefs } from "@/lib/reel-style";
 import { applyReelStyleDraft, previewReelStyle } from "@/lib/reels.functions";
 
@@ -192,13 +197,13 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
             )}
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Previews reuse the captured footage analysis — nothing changes on your published
-            reel until you publish the restyled version.
+            Previews reuse the captured footage analysis — nothing changes on your published reel
+            until you publish the restyled version.
           </p>
 
           <div className="grid gap-3 md:grid-cols-2">
             <section className="rounded-xl border border-border p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="micro-label text-muted-foreground">
                 Current · {reelStyleSummary(normalizeReelStyle(reel.style_prefs))}
               </p>
               <CopyBlock
@@ -220,7 +225,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
             </section>
 
             <section className="rounded-xl border border-lime/50 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+              <p className="micro-label text-lime">
                 Restyled preview · {reelStyleSummary(style)}
               </p>
               {draft ? (

@@ -66,9 +66,7 @@ export function LocationAccessDialog({
         </Button>
 
         <div className="mt-1 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Or pick a place
-          </p>
+          <p className="section-eyebrow text-muted-foreground">Or pick a place</p>
           <LocationAutocomplete
             value={text}
             onChange={setText}

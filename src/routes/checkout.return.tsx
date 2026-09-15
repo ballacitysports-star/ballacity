@@ -23,7 +23,7 @@ function CheckoutReturn() {
       <div className="max-w-md w-full rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
         <CheckCircle2 className="mx-auto h-12 w-12 text-lime" />
         <h1 className="mt-4 page-title">{session_id ? "Payment complete" : "Checkout complete"}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Thanks for supporting ballaCity! Subscriptions activate immediately. For merch orders,
           you'll receive a confirmation email with shipping details.
         </p>

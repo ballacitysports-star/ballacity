@@ -13,7 +13,7 @@ import { getBrowserTz, tzShortName } from "@/lib/tz";
 const fmt12 = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
   const ampm = (h ?? 0) < 12 ? "AM" : "PM";
-  const hr = ((h ?? 0) % 12) || 12;
+  const hr = (h ?? 0) % 12 || 12;
   return `${hr}:${String(m ?? 0).padStart(2, "0")} ${ampm}`;
 };
 
@@ -53,12 +53,7 @@ export function NextAvailableList({
   );
 
   const { data: bookedByDate = {} } = useQuery({
-    queryKey: [
-      "trainer-booked-slots",
-      org.id,
-      venueFilter ?? "",
-      candidateKeys.join(","),
-    ],
+    queryKey: ["trainer-booked-slots", org.id, venueFilter ?? "", candidateKeys.join(",")],
     queryFn: async () => {
       const entries = await Promise.all(
         candidateKeys.map(async (key) => {
@@ -133,7 +128,7 @@ export function NextAvailableList({
                   {fmt12(s.start)}–{fmt12(s.end)}
                 </span>
                 {viewerShort && (
-                  <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="rounded-full border border-border bg-background px-1.5 py-0.5 micro-label text-muted-foreground">
                     {viewerShort}
                   </span>
                 )}

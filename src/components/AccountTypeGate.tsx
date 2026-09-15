@@ -21,12 +21,12 @@ export function AccountTypeGate({
 
   const requiredLabel = ACCOUNT_TYPE_META[requires].label;
   return (
-    <div className="mx-auto w-full max-w-md p-6">
+    <div className="page-shell-narrow py-6">
       <div className="rounded-2xl border border-border bg-surface p-5 text-sm">
         <div className="font-display text-lg font-bold">Sign in to add a {requiredLabel}</div>
         <p className="mt-2 text-muted-foreground">
-          {requiredLabel} profiles are added to your account. Sign in and you can switch between
-          all of your profiles anytime.
+          {requiredLabel} profiles are added to your account. Sign in and you can switch between all
+          of your profiles anytime.
         </p>
         <div className="mt-4 flex gap-2">
           <Link

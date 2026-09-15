@@ -35,16 +35,14 @@ export function DtChip({
 }
 
 export function DtLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="section-eyebrow text-muted-foreground">{children}</span>;
 }
 
 export function DtSummary({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
   return (
-    <p className={`text-[11px] ${ok === false ? "font-semibold text-coral" : "text-muted-foreground"}`}>
+    <p
+      className={`text-[11px] ${ok === false ? "font-semibold text-coral" : "text-muted-foreground"}`}
+    >
       {children}
     </p>
   );

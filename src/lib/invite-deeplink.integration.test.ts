@@ -31,7 +31,6 @@ vi.mock("@/lib/notifications.functions", () => ({
 }));
 vi.mock("@/lib/push.functions", () => ({ sendPushToUser: async () => {} }));
 
-
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
 
@@ -101,12 +100,10 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
-    const found = notif.calls.find(
-      (c) => c.type === "game_invite" && c.user_id === playerId,
-    ) as { link: string | null } | undefined;
+    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId) as
+      { link: string | null } | undefined;
     expect(found, "game_invite notification should be written").toBeTruthy();
     expect(found!.link, "notification.link must be set").toBeTruthy();
-
 
     // Track for cleanup.
     const { data: rows } = await hostClient

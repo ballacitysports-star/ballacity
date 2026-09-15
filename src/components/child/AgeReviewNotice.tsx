@@ -36,7 +36,7 @@ export function AgeReviewNotice() {
           <>
             <div className="flex items-center gap-2 text-amber-600">
               <ShieldAlert className="h-4 w-4" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wide">
+              <span className="section-eyebrow">
                 Age change under review
               </span>
             </div>
@@ -46,16 +46,20 @@ export function AgeReviewNotice() {
               already set up is affected.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Current age group: <span className="font-semibold">{COHORT_META[status.cohort].label}</span>
+              Current age group:{" "}
+              <span className="font-semibold">{COHORT_META[status.cohort].label}</span>
             </p>
-            <Link to="/contact" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+            <Link
+              to="/contact"
+              className="mt-2 inline-block text-xs font-semibold text-primary underline"
+            >
               Contact support about this review
             </Link>
           </>
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground">
             <History className="h-4 w-4" aria-hidden />
-            <span className="text-xs font-bold uppercase tracking-wide">Age change history</span>
+            <span className="section-eyebrow">Age change history</span>
           </div>
         )}
 

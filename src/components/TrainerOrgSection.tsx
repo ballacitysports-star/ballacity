@@ -49,7 +49,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
     <div className="rounded-2xl border border-border/60 bg-surface p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-lime" />
-        <h3 className="text-sm font-semibold">Gym</h3>
+        <h3 className="section-title">Gym</h3>
       </div>
 
       {current ? (
@@ -90,7 +90,9 @@ export function TrainerOrgSection({ trainerId }: Props) {
         <>
           {(invites.data ?? []).length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Pending invites</div>
+              <div className="micro-label text-muted-foreground">
+                Pending invites
+              </div>
               {invites.data!.map((inv) => (
                 <div
                   key={inv.id}
@@ -151,8 +153,24 @@ export function TrainerOrgSection({ trainerId }: Props) {
             </div>
           )}
 
-          {mode === "join" && <JoinForm trainerId={trainerId} onDone={() => { setMode("idle"); invalidate(); }} />}
-          {mode === "create" && <CreateForm trainerId={trainerId} onDone={() => { setMode("idle"); invalidate(); }} />}
+          {mode === "join" && (
+            <JoinForm
+              trainerId={trainerId}
+              onDone={() => {
+                setMode("idle");
+                invalidate();
+              }}
+            />
+          )}
+          {mode === "create" && (
+            <CreateForm
+              trainerId={trainerId}
+              onDone={() => {
+                setMode("idle");
+                invalidate();
+              }}
+            />
+          )}
           {mode !== "idle" && (
             <button
               className="text-[11px] text-muted-foreground hover:underline"
@@ -239,7 +257,12 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
 
   return (
     <div className="space-y-2">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gym name" className="h-9" />
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Gym name"
+        className="h-9"
+      />
       <Input
         value={handle}
         onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}

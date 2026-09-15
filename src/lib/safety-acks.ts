@@ -15,18 +15,16 @@ export async function recordSafetyAck(input: {
 }) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to continue");
-  const { error } = await supabase
-    .from("game_safety_acknowledgments")
-    .upsert(
-      {
-        user_id: u.user.id,
-        game_id: input.gameId,
-        kind: input.kind,
-        version: input.version ?? SAFETY_ACK_VERSION,
-        user_agent: typeof navigator === "undefined" ? null : navigator.userAgent.slice(0, 400),
-      },
-      { onConflict: "user_id,game_id,kind,version", ignoreDuplicates: true },
-    );
+  const { error } = await supabase.from("game_safety_acknowledgments").upsert(
+    {
+      user_id: u.user.id,
+      game_id: input.gameId,
+      kind: input.kind,
+      version: input.version ?? SAFETY_ACK_VERSION,
+      user_agent: typeof navigator === "undefined" ? null : navigator.userAgent.slice(0, 400),
+    },
+    { onConflict: "user_id,game_id,kind,version", ignoreDuplicates: true },
+  );
   if (error) throw error;
 }
 

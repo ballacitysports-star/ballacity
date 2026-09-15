@@ -41,7 +41,7 @@ export function OrgCard({
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
-          <span className="absolute top-3 left-3 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+          <span className="absolute top-3 left-3 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 micro-label">
             {org.kind === "team" ? "Team" : "Trainer"}
           </span>
         </div>

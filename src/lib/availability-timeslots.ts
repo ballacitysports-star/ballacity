@@ -26,8 +26,7 @@ export const TIME_PRESETS: { id: string; label: string; start: string; end: stri
   { id: "allday", label: "All day", start: "08:00", end: "22:00" },
 ];
 
-export const isDateSlot = (s: TimeSlot): s is DateSlot =>
-  typeof (s as DateSlot).date === "string";
+export const isDateSlot = (s: TimeSlot): s is DateSlot => typeof (s as DateSlot).date === "string";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -107,7 +106,10 @@ export function deriveLegacyFields(
   slots: TimeSlot[],
   fallback: { starts_on?: string | null; ends_on?: string | null } = {},
 ): { starts_on: string | null; ends_on: string | null; recurring_days: string[] } {
-  const dates = slots.filter(isDateSlot).map((s) => s.date).sort();
+  const dates = slots
+    .filter(isDateSlot)
+    .map((s) => s.date)
+    .sort();
   const weekdays = Array.from(
     new Set(slots.filter((s): s is WeekdaySlot => !isDateSlot(s)).map((s) => s.weekday)),
   );
@@ -223,7 +225,7 @@ export function formatAvailabilityWindow(a: {
         ? `Next: ${fmtShortDate(next.dateKey)} · All day`
         : `Next: ${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
       : "";
-const rest = summarizeSlots(slots);
+    const rest = summarizeSlots(slots);
     return [head, rest].filter(Boolean).join(" · ");
   }
   const parts: string[] = [];

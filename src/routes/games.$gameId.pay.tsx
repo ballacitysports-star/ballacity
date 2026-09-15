@@ -494,7 +494,7 @@ function PayPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-xl font-bold leading-tight truncate">{game.title}</h1>
+          <h1 className="bar-title truncate">{game.title}</h1>
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
         <PayFlowPillHeader gameId={gameId} />
@@ -519,7 +519,7 @@ function PayPage() {
           </div>
           {liveCount !== undefined && maxPlayers > 0 && (
             <div className="text-right" data-testid="pay-live-roster">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+              <div className="micro-label text-muted-foreground font-bold">
                 {effectiveJoined}/{maxPlayers} in
               </div>
               <div className="mt-1">
@@ -851,9 +851,7 @@ function PaymentStatusTimeline({
       data-payment-state={state}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Payment status
-        </h3>
+        <h3 className="section-eyebrow text-muted-foreground">Payment status</h3>
         <span
           className={`text-[10px] font-bold uppercase rounded-full px-2 py-0.5 border ${
             meta.tone === "success"
@@ -1455,9 +1453,7 @@ function PaymentInstructionsAndProof({
         onSubmit={submit}
         className="rounded-2xl border border-border bg-surface p-4 space-y-3"
       >
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          I have paid — submit proof
-        </h3>
+        <h3 className="section-eyebrow text-muted-foreground">I have paid — submit proof</h3>
         <ProofUploader
           file={file}
           previewUrl={previewUrl}
@@ -1474,7 +1470,7 @@ function PaymentInstructionsAndProof({
           <div>
             <label
               htmlFor="paid-amount"
-              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+              className="block micro-label text-muted-foreground mb-1"
             >
               Amount paid *
             </label>
@@ -1505,7 +1501,7 @@ function PaymentInstructionsAndProof({
           <div>
             <label
               htmlFor="paid-at"
-              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+              className="block micro-label text-muted-foreground mb-1"
             >
               Payment date *
             </label>
@@ -1767,7 +1763,7 @@ function ProofUploader({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-xl bg-background px-3 py-2 mb-1.5">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="micro-label text-muted-foreground">{label}</span>
       <span className="text-sm font-semibold truncate">{value}</span>
     </div>
   );

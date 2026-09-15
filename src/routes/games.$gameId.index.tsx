@@ -249,7 +249,7 @@ export const Route = createFileRoute("/games/$gameId/")({
             startDate: game.date,
             location: { "@type": "Place", name: game.location, address: game.neighborhood },
             sport: game.sport,
-            url: `https://open-run-connect.lovable.app/games/${params.gameId}`,
+            url: `https://ballacity.com/games/${params.gameId}`,
           }
         : undefined,
     });
@@ -1891,13 +1891,11 @@ function GameDetail() {
 
         {/* About */}
         <div>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            About the run
-          </h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">About the run</h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
           {/* Safety: risk notice + safety reporting entry point */}
           <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-2 section-eyebrow text-muted-foreground">
               <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -1939,9 +1937,7 @@ function GameDetail() {
 
         {/* Discussion */}
         <div>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Discussion
-          </h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">Discussion</h2>
           <PostEngagement subjectType="game" subjectId={game.id} />
         </div>
 
@@ -1952,9 +1948,7 @@ function GameDetail() {
           <div className="rounded-3xl border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <CreditCard className="h-4 w-4 text-lime" />
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Payment settings
-              </h2>
+              <h2 className="section-eyebrow text-muted-foreground">Payment settings</h2>
             </div>
             <div className="space-y-3">
               {settings?.payment_deadline && (
@@ -1985,9 +1979,7 @@ function GameDetail() {
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
           <div id="waitlist" className="scroll-mt-24">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Positions needed
-              </h2>
+              <h2 className="section-eyebrow text-muted-foreground">Positions needed</h2>
               <button
                 type="button"
                 onClick={() => setPositionRosterOpen(true)}
@@ -2260,7 +2252,7 @@ function GameDetail() {
         {/* Players */}
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
+            <h2 className="section-eyebrow text-muted-foreground flex items-center gap-2 flex-wrap">
               <span>
                 Roster (
                 <span
@@ -2400,7 +2392,7 @@ function GameDetail() {
                 </p>
               </div>
               <span
-                className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 micro-label ${
                   gate.joinState === "in_progress"
                     ? "bg-coral/15 text-coral border border-coral/40"
                     : gate.joinState === "completed"
@@ -2547,7 +2539,7 @@ function GameDetail() {
 
           {hostRequests.length > 0 ? (
             <div>
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="section-eyebrow text-muted-foreground mb-2">
                 Pickup requests · {hostRequests.filter((r) => r.status === "pending").length}{" "}
                 pending
               </h2>
@@ -2594,7 +2586,7 @@ function GameDetail() {
                 approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="section-eyebrow text-muted-foreground mb-2">
                     Roster · {totalConfirmed} / {game.maxPlayers}
                   </h2>
 
@@ -2605,9 +2597,7 @@ function GameDetail() {
                   liveRoster.length > 0 &&
                   Date.now() >= new Date(game.date).getTime() ? (
                     <div className="mb-3 rounded-2xl border border-border bg-surface p-3">
-                      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Attendance
-                      </div>
+                      <div className="section-eyebrow text-muted-foreground">Attendance</div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Mark who showed up. This builds your host reliability score.
                       </p>
@@ -3409,7 +3399,7 @@ function EditGameModal({
                         {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
                       <span className="truncate max-w-[10rem]">{a.name || "Loading…"}</span>
-                      <span className="text-[10px] uppercase tracking-wider opacity-70">
+                      <span className="micro-label opacity-70">
                         {affLabel(a)}
                       </span>
                     </button>
@@ -3887,7 +3877,7 @@ function toLocalInput(ms: number): string {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      <div className="micro-label text-muted-foreground mb-1">{label}</div>
       {children}
     </label>
   );
@@ -3917,7 +3907,7 @@ function Meta({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 micro-label text-muted-foreground">
         {icon}
         {label}
       </div>
@@ -3953,7 +3943,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+      <div className="micro-label text-muted-foreground mb-2">
         Blocked players
       </div>
       {blocked.length === 0 ? (
@@ -4447,7 +4437,7 @@ function RosterPlayerRow({
       )}
       {feeRequired && historyOpen && (
         <div className="mt-2 rounded-xl border border-border bg-background/60 p-2.5">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          <div className="mb-1.5 micro-label text-muted-foreground">
             Verification history
           </div>
           {historyLoading ? (

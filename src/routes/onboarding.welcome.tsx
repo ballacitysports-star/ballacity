@@ -30,6 +30,8 @@ import {
 } from "@/components/profile/ProfileLinksFields";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
@@ -131,9 +133,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const isPlayer = type === "player";
   const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
 
+  // Links are optional, so they live inside the Basics step behind a
+  // disclosure rather than costing everyone a whole step of their own.
   const stepLabels = isPlayer
-    ? ["Basics", "Sports", "Links", "Location"]
-    : ["Basics", "Sports", "Links", "Location", "Next steps"];
+    ? ["Basics", "Sports", "Location"]
+    : ["Basics", "Sports", "Location", "Next steps"];
   const locationStep = stepLabels.indexOf("Location");
 
   const [step, setStep] = useState(0);
@@ -472,173 +476,164 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const pct = Math.round(((step + 1) / stepLabels.length) * 100);
 
   return (
-    <div className="page-shell-narrow flex min-h-dvh flex-col py-8">
+    <OnboardingShell
+      step={step + 1}
+      steps={stepLabels.length}
+      title="Set up your profile"
+      description="Same details as Edit profile — you can change any of it later."
+      footer={
+        <button
+          type="button"
+          onClick={() => nav({ to: "/feed" })}
+          className="underline-offset-2 hover:underline"
+        >
+          I&apos;ll do this later
+        </button>
+      }
+    >
       <div>
-        <div className="font-display text-2xl font-bold">Set up your profile</div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Same details as Edit profile — you can change any of it later.
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span>
-            Step {step + 1} of {stepLabels.length} · {stepLabels[step]}
-          </span>
-          <span>{pct}%</span>
-        </div>
-        <div className="mt-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold text-muted-foreground">{stepLabels[step]}</span>
           <SaveStatus {...autosave} variant="pill" />
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface">
-          <div
-            className="h-full bg-lime-gradient transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
 
-      {step === 0 && (
-        <Section title="Basics">
-          <ProfileBasicsFields
-            userId={user?.id}
-            value={basics}
-            birthdayError={birthdayError}
-            onChange={(patch) => {
-              setBasics((b) => ({ ...b, ...patch }));
-              if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
-            }}
-          />
-        </Section>
-      )}
-
-      {step === 1 && (
-        <Section title="Sports">
-          <ProfileSportsFields sports={sports} onChange={setSports} />
-        </Section>
-      )}
-
-      {step === 2 && (
-        <Section title="Profile links">
-          <ProfileLinksFields links={links} onChange={setLinks} />
-        </Section>
-      )}
-
-      {step === locationStep && (
-        <Section title="Location">
-          <p className="mb-3 text-xs text-muted-foreground">
-            We use your location to show nearby games. You can also skip and set a radius manually.
-          </p>
-
-          {geo.kind === "granted" ? (
-            <div className="rounded-xl border border-border/60 bg-surface p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-lime-gradient text-[11px] font-bold text-primary-foreground">
-                    ✓
-                  </span>
-                  <div>
-                    <div className="font-medium text-foreground">Location shared</div>
-                    <div className="text-xs text-muted-foreground">
-                      Accurate to ~{Math.round(geo.accuracy)} m
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={requestLocation}
-                  className="rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium"
-                >
-                  Refresh
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <button
-                onClick={requestLocation}
-                disabled={geo.kind === "requesting"}
-                className="w-full rounded-full border border-border/60 bg-surface px-4 py-2.5 text-sm font-medium disabled:opacity-60"
-              >
-                {geo.kind === "requesting"
-                  ? "Requesting location…"
-                  : attempt === 0
-                    ? "Use my location"
-                    : "Try again"}
-              </button>
-
-              {geo.kind === "denied" || geo.kind === "unavailable" ? (
-                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs">
-                  <div className="font-semibold text-destructive">Location unavailable</div>
-                  <p className="mt-1 text-muted-foreground">{geo.message}</p>
-                  {geo.kind === "denied" && geo.canRetry ? (
-                    <button
-                      onClick={requestLocation}
-                      className="mt-2 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium"
-                    >
-                      Retry
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <div className="mt-5">
-            <ProfileLocationFields
-              showCity={false}
-              value={{ city: basics.city, searchRadiusMi: radiusMi }}
+        {step === 0 && (
+          <Section title="Basics">
+            <ProfileBasicsFields
+              userId={user?.id}
+              value={basics}
+              birthdayError={birthdayError}
               onChange={(patch) => {
-                if (patch.searchRadiusMi != null) setRadius(miToKm(patch.searchRadiusMi));
+                setBasics((b) => ({ ...b, ...patch }));
+                if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
               }}
             />
-          </div>
-        </Section>
-      )}
+            <details className="mt-4 rounded-2xl border border-border bg-surface p-3">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Add links (optional)
+              </summary>
+              <div className="mt-3">
+                <ProfileLinksFields links={links} onChange={setLinks} />
+              </div>
+            </details>
+          </Section>
+        )}
 
-      {step === 3 && nextCfg && (
-        <Section title={nextCfg.title}>
-          <ol className="space-y-2">
-            {nextCfg.steps.map((s, i) => (
-              <li
-                key={s.title}
-                className="flex items-start gap-3 rounded-2xl border border-border/60 bg-surface p-4"
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
-                  {i + 1}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{s.title}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{s.body}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
+        {step === 1 && (
+          <Section title="Sports">
+            <ProfileSportsFields sports={sports} onChange={setSports} />
+          </Section>
+        )}
 
-      <div className="mt-6 flex items-center gap-2">
-        <button
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0 || saving}
-          className="rounded-full border border-border/60 bg-surface px-4 py-2 text-xs font-medium text-foreground disabled:opacity-40"
-        >
-          Back
-        </button>
-        <button
-          onClick={onNext}
-          disabled={saving}
-          className="ml-auto rounded-full bg-lime-gradient px-5 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? "Saving…" : isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
-        </button>
+        {step === locationStep && (
+          <Section title="Location">
+            <p className="mb-3 text-xs text-muted-foreground">
+              We use your location to show nearby games. You can also skip and set a radius
+              manually.
+            </p>
+
+            {geo.kind === "granted" ? (
+              <div className="rounded-xl border border-border/60 bg-surface p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-lime-gradient text-[11px] font-bold text-primary-foreground">
+                      ✓
+                    </span>
+                    <div>
+                      <div className="font-medium text-foreground">Location shared</div>
+                      <div className="text-xs text-muted-foreground">
+                        Accurate to ~{Math.round(geo.accuracy)} m
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={requestLocation}
+                    className="rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  onClick={requestLocation}
+                  disabled={geo.kind === "requesting"}
+                  className="w-full rounded-full border border-border/60 bg-surface px-4 py-2.5 text-sm font-medium disabled:opacity-60"
+                >
+                  {geo.kind === "requesting"
+                    ? "Requesting location…"
+                    : attempt === 0
+                      ? "Use my location"
+                      : "Try again"}
+                </button>
+
+                {geo.kind === "denied" || geo.kind === "unavailable" ? (
+                  <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs">
+                    <div className="font-semibold text-destructive">Location unavailable</div>
+                    <p className="mt-1 text-muted-foreground">{geo.message}</p>
+                    {geo.kind === "denied" && geo.canRetry ? (
+                      <button
+                        onClick={requestLocation}
+                        className="mt-2 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium"
+                      >
+                        Retry
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <div className="mt-5">
+              <ProfileLocationFields
+                showCity={false}
+                value={{ city: basics.city, searchRadiusMi: radiusMi }}
+                onChange={(patch) => {
+                  if (patch.searchRadiusMi != null) setRadius(miToKm(patch.searchRadiusMi));
+                }}
+              />
+            </div>
+          </Section>
+        )}
+
+        {step === 3 && nextCfg && (
+          <Section title={nextCfg.title}>
+            <ol className="space-y-2">
+              {nextCfg.steps.map((s, i) => (
+                <li
+                  key={s.title}
+                  className="flex items-start gap-3 rounded-2xl border border-border/60 bg-surface p-4"
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{s.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{s.body}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        )}
+
+        <div className="mt-6 space-y-2">
+          <PrimaryCTA type="button" onClick={onNext} loading={saving}>
+            {isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
+          </PrimaryCTA>
+          <button
+            type="button"
+            onClick={() =>
+              step === 0 ? nav({ to: "/onboarding/setup-for" }) : setStep((s) => Math.max(0, s - 1))
+            }
+            disabled={saving}
+            className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
+          >
+            Back
+          </button>
+        </div>
       </div>
-
-      <button
-        onClick={() => nav({ to: "/feed" })}
-        className="mt-3 w-full rounded-full px-4 py-2 text-xs text-muted-foreground"
-      >
-        I'll do this later
-      </button>
-    </div>
+    </OnboardingShell>
   );
 }

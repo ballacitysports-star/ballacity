@@ -59,7 +59,7 @@ export const Route = createFileRoute("/players/$userId")({
   head: ({ params }) => ({
     ...pageHead({
       path: `/players/${params.userId}`,
-      title: "Player profile — ballaCity",
+      title: "Player Profile | BallaCity Sports Profile",
       description:
         "See this player's sports, skill levels, availability, badges, and reviews on ballaCity.",
       ogType: "profile",
@@ -72,7 +72,7 @@ export const Route = createFileRoute("/players/$userId")({
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "ProfilePage",
-        url: `https://open-run-connect.lovable.app/players/${params.userId}`,
+        url: `https://ballacity.com/players/${params.userId}`,
       },
     }),
   }),
@@ -136,7 +136,7 @@ function PublicReelsSection({ userId }: { userId: string }) {
 
   return (
     <div className="mt-6">
-      <h2 className="mb-2 flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+      <h2 className="mb-2 flex items-center gap-1.5 section-eyebrow text-muted-foreground">
         <Clapperboard className="h-4 w-4" /> Highlight reels
       </h2>
       <div className="space-y-3">
@@ -151,7 +151,7 @@ function PublicReelsSection({ userId }: { userId: string }) {
             <div className="mt-2 flex items-center gap-2">
               <p className="min-w-0 flex-1 truncate text-sm font-semibold">{reel.title}</p>
               {reel.sport && (
-                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 micro-label text-lime">
                   {reel.sport}
                 </span>
               )}
@@ -513,18 +513,14 @@ function PlayerProfilePage() {
           <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
             {bio && (
               <section>
-                <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  About
-                </h2>
+                <h2 className="mb-1.5 section-eyebrow text-muted-foreground">About</h2>
                 <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
                   {bio}
                 </p>
               </section>
             )}
             <section className={bio ? "mt-4" : ""}>
-              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Details
-              </h3>
+              <h3 className="mb-1.5 section-eyebrow text-muted-foreground">Details</h3>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 {username && <li>{username}</li>}
                 {searchRadiusMi != null && (
@@ -579,7 +575,7 @@ function PlayerProfilePage() {
         {/* Open availability */}
         {availability && (
           <div className="mt-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+            <h2 className="section-eyebrow text-muted-foreground mb-2 flex items-center gap-1.5">
               <Calendar className="h-4 w-4" /> Open availability
             </h2>
             <PlayerCard a={availability} />
@@ -589,9 +585,7 @@ function PlayerProfilePage() {
         {/* Sports */}
         {sportsList.length > 0 && (
           <div className="mt-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Sports
-            </h2>
+            <h2 className="section-eyebrow text-muted-foreground mb-2">Sports</h2>
             <div className="space-y-2">
               {sportsList.map((s) => (
                 <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
@@ -670,9 +664,7 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Looking to play
-        </span>
+        <span className="section-eyebrow text-muted-foreground">Looking to play</span>
         <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
           {a.skill_level}
         </span>
@@ -796,7 +788,7 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
             <Building2 className="h-3.5 w-3.5" />
             <span className="truncate max-w-[160px]">{o.name}</span>
             {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="micro-label text-muted-foreground">
               {r.role}
             </span>
           </Link>

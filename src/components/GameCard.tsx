@@ -86,13 +86,17 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     // composition. Every consumer puts GameCard in a grid, so this belongs
     // here rather than on each of the five call sites.
     <div
-      className="enter-up min-w-0"
+      className="enter-up min-w-0 h-full"
       style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}
     >
+      {/* flex column + h-full: in grid mode a row of cards carries different
+          amounts of status pills and blocked-reason copy, so without this the
+          fill bar floats at a different height on every card in the row. The
+          media band and the footer stay put; only the detail block stretches. */}
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}
-        className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
+        className="group flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
         <div className="relative h-28 overflow-hidden">
           <ResponsiveImage
@@ -165,14 +169,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             )}
           </div>
           <div className="absolute bottom-2 left-3 right-3">
-            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
+            <h3 className="line-clamp-2 font-display text-lg font-bold leading-tight text-foreground drop-shadow-lg">
               {game.title}
             </h3>
           </div>
         </div>
 
-        <div className="p-3 space-y-2">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-1 flex-col gap-2 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
               <Clock className="h-3.5 w-3.5 text-lime" />
               {formatGameWhen(game)}
@@ -290,7 +294,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Users className="h-3.5 w-3.5" /> Join waitlist
             </button>
           )}
-          <div className="h-1 overflow-hidden rounded-full bg-secondary">
+          <div className="mt-auto h-1 overflow-hidden rounded-full bg-secondary">
             <div
               className={`grow-x h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
               style={

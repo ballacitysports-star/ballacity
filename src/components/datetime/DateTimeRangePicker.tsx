@@ -155,7 +155,7 @@ export function DateTimeRangePicker({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="micro-label text-muted-foreground">
               Length
             </span>
             {LENGTH_PRESETS.map((p) => (
@@ -249,9 +249,7 @@ export function DateTimeRangePicker({
         </div>
       )}
 
-      <DtSummary ok={check.ok}>
-        {check.ok ? formatWhenRange(value) : check.error}
-      </DtSummary>
+      <DtSummary ok={check.ok}>{check.ok ? formatWhenRange(value) : check.error}</DtSummary>
 
       {check.ok && !value.allDay && (
         <DtSummary>

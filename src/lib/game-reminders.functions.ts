@@ -40,7 +40,7 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
     for (const r of reminders) {
       const game = byId.get(r.game_id);
       if (!game) continue;
-      const startMs = new Date(String(game['date'])).getTime();
+      const startMs = new Date(String(game["date"])).getTime();
       if (!Number.isFinite(startMs) || startMs <= now) continue;
       const minutesToStart = (startMs - now) / 60000;
       const candidates = (r.offsets ?? [])
@@ -62,12 +62,12 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
       const { error: insErr } = await supabaseAdmin.from("notifications").insert({
         user_id: userId,
         type: "game_reminder",
-        title: `${game['title']} starts in ${lead}`,
+        title: `${game["title"]} starts in ${lead}`,
         // All-day games never surface a clock time in reminders.
         body:
           [
-            formatNotificationWhen({ date: String(game['date']), allDay: !!game['all_day'] }),
-            game['location'] ? `Where: ${game['location']}` : null,
+            formatNotificationWhen({ date: String(game["date"]), allDay: !!game["all_day"] }),
+            game["location"] ? `Where: ${game["location"]}` : null,
           ]
             .filter(Boolean)
             .join(" · ") || null,

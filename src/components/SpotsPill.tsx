@@ -45,7 +45,7 @@ export function SpotsPill({
       : `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left`;
   const cls =
     urgency === "full"
-      ? "rounded-full bg-destructive px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-destructive-foreground"
+      ? "rounded-full bg-destructive px-2.5 py-0.5 micro-label text-destructive-foreground"
       : urgency === "critical"
         ? "rounded-full bg-coral px-2.5 py-0.5 text-[11px] font-bold text-white motion-safe:animate-pulse"
         : urgency === "low"
@@ -63,10 +63,7 @@ export function SpotsPill({
       {/* key={spotsLeft} remounts the inner span on every count change so
           the scale-in keyframe replays — a subtle bump that draws the eye
           to availability updates without being distracting. */}
-      <span
-        key={spotsLeft}
-        className="inline-block motion-safe:animate-scale-in"
-      >
+      <span key={spotsLeft} className="inline-block motion-safe:animate-scale-in">
         {visible}
       </span>
     </span>

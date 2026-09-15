@@ -70,10 +70,14 @@ describe("tones", () => {
   it("grades overnight usage", () => {
     expect(overnightTone([])).toBe("ok");
     expect(
-      overnightTone([{ cohort: "teen_13_15", members: 1, avgDailyMinutes: 10, overnightMinutes: 0 }]),
+      overnightTone([
+        { cohort: "teen_13_15", members: 1, avgDailyMinutes: 10, overnightMinutes: 0 },
+      ]),
     ).toBe("ok");
     expect(
-      overnightTone([{ cohort: "teen_13_15", members: 1, avgDailyMinutes: 10, overnightMinutes: 5 }]),
+      overnightTone([
+        { cohort: "teen_13_15", members: 1, avgDailyMinutes: 10, overnightMinutes: 5 },
+      ]),
     ).toBe("warn");
     expect(
       overnightTone([

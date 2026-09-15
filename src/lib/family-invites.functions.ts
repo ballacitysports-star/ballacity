@@ -74,7 +74,9 @@ export const listMyMinorInvites = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<MinorInvite[]> => {
     const { data, error } = await context.supabase
       .from("minor_invites")
-      .select("id, child_name, relationship, status, expires_at, redeemed_at, child_user_id, created_at")
+      .select(
+        "id, child_name, relationship, status, expires_at, redeemed_at, child_user_id, created_at",
+      )
       .eq("parent_user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -144,7 +146,8 @@ export const redeemMinorInvite = createServerFn({ method: "POST" })
 function friendly(message: string): string {
   const m = message ?? "";
   if (m.includes("ADULT_REQUIRED")) return "Only an adult account can add a minor.";
-  if (m.includes("TOO_MANY_INVITES")) return "You have too many open invitations. Cancel one first.";
+  if (m.includes("TOO_MANY_INVITES"))
+    return "You have too many open invitations. Cancel one first.";
   if (m.includes("NAME_REQUIRED")) return "Add the child's first name.";
   if (m.includes("INVITE_EXPIRED")) return "That invitation has expired. Ask for a new link.";
   if (m.includes("INVITE_REVOKED")) return "That invitation was cancelled.";

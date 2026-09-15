@@ -38,7 +38,17 @@ function actionFor(status: PlayerFlowStatus): Action | null {
   }
 }
 
-const COPY: Record<Action, { button: string; title: string; description: (t: string) => string; confirm: string; success: string; error: string }> = {
+const COPY: Record<
+  Action,
+  {
+    button: string;
+    title: string;
+    description: (t: string) => string;
+    confirm: string;
+    success: string;
+    error: string;
+  }
+> = {
   cancel: {
     button: "Cancel request",
     title: "Cancel your request?",
@@ -50,7 +60,8 @@ const COPY: Record<Action, { button: string; title: string; description: (t: str
   withdraw: {
     button: "Withdraw from game",
     title: "Withdraw from this game?",
-    description: (t) => `Withdraw from ${t}? Your spot will be released and any pending payment submission will be cleared. If you already paid, contact the host about refunds.`,
+    description: (t) =>
+      `Withdraw from ${t}? Your spot will be released and any pending payment submission will be cleared. If you already paid, contact the host about refunds.`,
     confirm: "Withdraw",
     success: "You withdrew from the game.",
     error: "Could not withdraw.",
@@ -58,7 +69,8 @@ const COPY: Record<Action, { button: string; title: string; description: (t: str
   leave: {
     button: "Leave game",
     title: "Leave this game?",
-    description: (t) => `Leave ${t}? Your spot will be released. If you paid, contact the host about refunds.`,
+    description: (t) =>
+      `Leave ${t}? Your spot will be released. If you paid, contact the host about refunds.`,
     confirm: "Leave game",
     success: "You left the game.",
     error: "Could not leave the game.",

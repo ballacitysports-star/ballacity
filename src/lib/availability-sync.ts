@@ -1,6 +1,10 @@
 import { miToKm } from "@/lib/distance";
 import { levelTiers, serializeSkillTiers, ANY_SKILL, type SportLevel } from "@/lib/sport-levels";
-import { listMyAvailabilities, updateAvailability, type PlayerAvailability } from "@/lib/availability";
+import {
+  listMyAvailabilities,
+  updateAvailability,
+  type PlayerAvailability,
+} from "@/lib/availability";
 
 export type ProfileSyncInput = {
   /** Favorite sports with their per-sport level, straight from the profile form. */
@@ -17,7 +21,14 @@ export type ProfileSyncInput = {
 export function availabilityPatchFromProfile(
   post: Pick<
     PlayerAvailability,
-    "sports" | "skill_level" | "city" | "formatted_address" | "place_id" | "lat" | "lng" | "travel_radius_km"
+    | "sports"
+    | "skill_level"
+    | "city"
+    | "formatted_address"
+    | "place_id"
+    | "lat"
+    | "lng"
+    | "travel_radius_km"
   >,
   input: ProfileSyncInput,
 ): Partial<PlayerAvailability> | null {
@@ -67,9 +78,7 @@ export function availabilityPatchFromProfile(
  * open availability posts so they never advertise stale details.
  * Best-effort: failures are logged, never surfaced as a profile save error.
  */
-export async function syncAvailabilitiesFromProfile(
-  input: ProfileSyncInput,
-): Promise<number> {
+export async function syncAvailabilitiesFromProfile(input: ProfileSyncInput): Promise<number> {
   try {
     const rows = await listMyAvailabilities();
     const open = rows.filter((r) => r.status === "open");

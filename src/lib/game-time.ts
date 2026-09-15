@@ -33,10 +33,7 @@ export function gameEndsAt(game: GameTiming): number {
 }
 
 /** True once a game's end time (plus a short grace period) has passed. */
-export function isGameFinished(
-  game: GameTiming,
-  now: number = Date.now(),
-): boolean {
+export function isGameFinished(game: GameTiming, now: number = Date.now()): boolean {
   // A host decision outranks the clock: cancelled or closed-out games drop
   // out of discovery immediately instead of lingering until their end time.
   if (game.cancelledAt || game.status === "cancelled") return true;
@@ -45,17 +42,11 @@ export function isGameFinished(
 }
 
 /** Drop finished games from any list of games. */
-export function hideFinishedGames<T extends GameTiming>(
-  games: T[],
-  now: number = Date.now(),
-): T[] {
+export function hideFinishedGames<T extends GameTiming>(games: T[], now: number = Date.now()): T[] {
   return games.filter((g) => !isGameFinished(g, now));
 }
 
 /** Keep only finished games, for archive/history views. */
-export function onlyFinishedGames<T extends GameTiming>(
-  games: T[],
-  now: number = Date.now(),
-): T[] {
+export function onlyFinishedGames<T extends GameTiming>(games: T[], now: number = Date.now()): T[] {
   return games.filter((g) => isGameFinished(g, now));
 }

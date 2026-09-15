@@ -284,7 +284,7 @@ function ParentCenterPage() {
     return (
       <main className="page-shell-content py-10">
         <h1 className="page-title">Parent Center</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Sign in with your adult account to manage a child&rsquo;s ballaCity account.
         </p>
         <Link
@@ -301,10 +301,10 @@ function ParentCenterPage() {
     <main className="page-shell-content pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Parent Center</span>
+        <span className="section-eyebrow">Parent Center</span>
       </div>
       <h1 className="mt-2 page-title">Your family</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 page-subtitle">
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>

@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { signPublicGameCover } from "@/lib/media-urls.functions";
-import {
-  MEDIA_SIGNED_URL_TTL_SECONDS,
-  buildMediaRef,
-  resolvableMediaRef,
-} from "@/lib/media-refs";
+import { MEDIA_SIGNED_URL_TTL_SECONDS, buildMediaRef, resolvableMediaRef } from "@/lib/media-refs";
 
 type CacheEntry = { url: string; expiresAt: number };
 

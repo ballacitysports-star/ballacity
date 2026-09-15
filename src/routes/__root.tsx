@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
@@ -112,17 +113,13 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   );
 }
 
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "ballaCity" },
-      {
-        name: "description",
-        content: "ballaCity — pickup sports games, teams, trainers, and gyms near you.",
-      },
+      { title: SITE_TITLE },
+      { name: "description", content: SITE_DESCRIPTION },
       { name: "author", content: "ballaCity" },
       { property: "og:site_name", content: "ballaCity" },
       { property: "og:type", content: "website" },
@@ -136,7 +133,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "ballaCity",
-          url: "https://open-run-connect.lovable.app",
+          url: "https://ballacity.com",
         }),
       },
     ],
@@ -304,14 +301,9 @@ async function fetchOnboardingStatus() {
   return getOnboardingStatus();
 }
 
-
-
 function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeoutId = window.setTimeout(
-      () => reject(new Error("Operation timed out")),
-      timeoutMs,
-    );
+    const timeoutId = window.setTimeout(() => reject(new Error("Operation timed out")), timeoutMs);
     Promise.resolve(operation).then(
       (value) => {
         window.clearTimeout(timeoutId);
@@ -428,6 +420,11 @@ const PUBLIC_ROUTES = [
   "/trust-center",
   "/community-guidelines",
   "/contact",
+  // Sports guides are public, indexable content.
+  "/guide",
+  // Articles are public, indexable content.
+  "/blog",
+
 
   // Shareable, sign-in-free surface.
   "/highlights",
@@ -779,10 +776,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // so a social user with stripped provider metadata is still classified
       // correctly. Falls back to the client query if the server fn fails.
       try {
-        const status = await withDeadline(
-          fetchOnboardingStatus(),
-          ONBOARDING_CHECK_TIMEOUT_MS,
-        );
+        const status = await withDeadline(fetchOnboardingStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
         if (cancelled) return;
         if (status.needsOnboarding) {
           // Render the picker in place; no redirect.
@@ -886,9 +880,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         router.navigate({ to: destinationForAccountType(type), replace: true } as never);
       }
     };
-    return (
-      <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />
-    );
+    return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }
   // Hold rendering only on a genuine first check for this user; a cached
   // "ok" keeps the page mounted across navigations.

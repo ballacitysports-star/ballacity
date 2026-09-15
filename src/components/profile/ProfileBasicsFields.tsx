@@ -116,7 +116,8 @@ export function ProfileBasicsFields({
           <div className="rounded-2xl border border-border bg-background px-3 py-2 text-sm">
             {birthdayToDisplay(value.birthday) || "Not set"}
             <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              Locked after signup because it sets your age group. Ask us to correct it from Settings.
+              Locked after signup because it sets your age group. Ask us to correct it from
+              Settings.
             </div>
           </div>
         ) : (

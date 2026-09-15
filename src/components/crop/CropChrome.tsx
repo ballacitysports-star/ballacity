@@ -98,7 +98,10 @@ export function sizeOptionLabel(p: CropSizePreset, aspect: number) {
   const h = aspect >= 1 ? Math.round(p.maxSize / aspect) : p.maxSize;
   return (
     <>
-      {p.label} <span className="opacity-60">· {w}×{h}</span>
+      {p.label}{" "}
+      <span className="opacity-60">
+        · {w}×{h}
+      </span>
     </>
   );
 }

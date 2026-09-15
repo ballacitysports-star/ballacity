@@ -22,56 +22,25 @@ Ordinary sports, gym, team, venue, portrait and logo imagery is safe.`;
  * upload through and leave it in the pending review queue).
  */
 export async function scanImageForSafety(imageUrl: string): Promise<SafetyVerdict> {
-  const apiKey = process.env["LOVABLE_API_KEY"];
-  if (!apiKey) {
-    return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
-  }
-
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: SYSTEM },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Classify this uploaded image." },
-              { type: "image_url", image_url: { url: imageUrl } },
-            ],
-          },
-        ],
-      }),
-    });
-    if (!res.ok) {
+    const { loadAiConfig } = await import("@/lib/ai/settings.server");
+    const { createLovableGatewayProvider } = await import("@/lib/ai/gateway.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const config = await loadAiConfig(supabaseAdmin);
+    // Not gated on the kill switch — safety scanning stays on when AI is off.
+    if (!config.features.features.image_moderation.enabled) {
       return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
     }
-    const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = json.choices?.[0]?.message?.content ?? "";
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) {
-      return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
-    }
-    const parsed = JSON.parse(match[0]) as {
-      safe?: boolean;
-      label?: string;
-      categories?: unknown;
-      reason?: string;
-    };
+    const verdict = await createLovableGatewayProvider(config.provider).moderateImage({ imageUrl });
     return {
-      safe: parsed.safe !== false,
-      label: typeof parsed.label === "string" ? parsed.label : "unknown",
-      reason: typeof parsed.reason === "string" ? parsed.reason.slice(0, 300) : null,
-      categories: Array.isArray(parsed.categories)
-        ? parsed.categories.filter((c): c is string => typeof c === "string").slice(0, 8)
-        : [],
+      safe: verdict.safe,
+      label: verdict.label,
+      reason: verdict.reason,
+      categories: verdict.categories,
       scanned: true,
     };
   } catch {
+    // Unchanged contract: a scan failure leaves the image in the pending queue.
     return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
   }
 }

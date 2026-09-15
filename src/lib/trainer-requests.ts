@@ -20,7 +20,7 @@ export type TrainerSessionRequest = {
 
 export type TrainerBookedSlot = {
   start: string; // "HH:MM" 24h
-  end: string;   // "HH:MM" 24h
+  end: string; // "HH:MM" 24h
   status: "pending" | "accepted";
 };
 
@@ -107,7 +107,6 @@ function toMinutes(hhmm: string): number {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
-
 export async function getMyPendingRequestForTrainer(
   trainerId: string,
 ): Promise<TrainerSessionRequest | null> {
@@ -166,10 +165,7 @@ type SharedSub = {
 };
 const sharedSubs = new Map<string, SharedSub>();
 
-export function subscribeToMyTrainerRequests(
-  userId: string,
-  onChange: () => void,
-) {
+export function subscribeToMyTrainerRequests(userId: string, onChange: () => void) {
   let entry = sharedSubs.get(userId);
   if (!entry) {
     const listeners = new Set<() => void>();
@@ -201,4 +197,3 @@ export function subscribeToMyTrainerRequests(
     }
   };
 }
-

@@ -129,7 +129,10 @@ export function ChannelPill({
 }
 
 export function channelPillClass(variant: "primary" | "outline" = "outline") {
-  return `inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+  // min-h-9 rather than padding alone: the pills carry icon-plus-label and
+  // icon-only content side by side, and only a floor keeps them the same height
+  // and comfortably tappable on a phone.
+  return `inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
     variant === "primary"
       ? "bg-primary text-primary-foreground hover:opacity-90"
       : "bg-surface-2 text-foreground hover:bg-surface"

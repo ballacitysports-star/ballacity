@@ -92,7 +92,7 @@ function AccountSecurityPage() {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
         <h1 className="page-title">Sign in required</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Sign in with Google first, then come back here to add an email password.
         </p>
         <Link
@@ -126,9 +126,7 @@ function AccountSecurityPage() {
               ? "Update the password used for email sign-in. Google sign-in keeps working."
               : "Set an email and password. Afterwards you can sign in with either Google or email/password."}
           </p>
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Email
-          </label>
+          <label className="block section-eyebrow text-muted-foreground">Email</label>
           <input
             type="email"
             value={email}
@@ -137,7 +135,7 @@ function AccountSecurityPage() {
             autoComplete="email"
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <label className="block section-eyebrow text-muted-foreground">
             {hasPassword ? "New password" : "Password"}
           </label>
           <input

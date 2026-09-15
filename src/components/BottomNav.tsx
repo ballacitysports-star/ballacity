@@ -52,26 +52,33 @@ export function BottomNav() {
         key={it.to}
         to={it.to}
         aria-label={it.label}
+        aria-current={active ? "page" : undefined}
         className="relative flex min-w-11 min-h-11 flex-1 items-center justify-center py-2.5 transition-transform active:scale-95"
->
-        {it.render
-          ? it.render(active)
-          : Icon ? (
-              <Icon
-                className={`h-6 w-6 ${
-                  active ? "text-foreground" : "text-muted-foreground"
-                }`}
-                strokeWidth={iconStroke}
-                fill={active ? "currentColor" : "none"}
-              />
-            ) : null}
+      >
+        {it.render ? (
+          it.render(active)
+        ) : Icon ? (
+          <Icon
+            className={`h-6 w-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
+            strokeWidth={iconStroke}
+            fill={active ? "currentColor" : "none"}
+          />
+        ) : null}
+        {/* A shape cue as well as a colour cue, so the active tab is still
+            identifiable without relying on colour alone. */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute bottom-0.5 h-1 w-1 rounded-full transition-opacity ${
+            active ? "bg-lime opacity-100" : "opacity-0"
+          }`}
+        />
         <span className="sr-only">{it.label}</span>
       </Link>
     );
   };
 
   return (
-<nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
       <div
         className="mx-auto flex max-w-md sm:max-w-xl items-center justify-around"
         role="group"

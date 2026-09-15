@@ -30,8 +30,8 @@ export const DEFAULT_AVATAR_VISIBILITY: AvatarVisibility = "public";
 
 export function avatarVisibilityLabel(value: AvatarVisibility | null | undefined): string {
   return (
-    AVATAR_VISIBILITY_OPTIONS.find((o) => o.value === (value ?? DEFAULT_AVATAR_VISIBILITY))?.label ??
-    "Everyone"
+    AVATAR_VISIBILITY_OPTIONS.find((o) => o.value === (value ?? DEFAULT_AVATAR_VISIBILITY))
+      ?.label ?? "Everyone"
   );
 }
 
@@ -51,35 +51,36 @@ export function useAvatarVisibility() {
         .eq("id", auth.user.id)
         .maybeSingle();
       if (cancelled) return;
-      setValue(
-        (((data as any)?.avatar_visibility as AvatarVisibility) ?? DEFAULT_AVATAR_VISIBILITY),
-      );
+      setValue(((data as any)?.avatar_visibility as AvatarVisibility) ?? DEFAULT_AVATAR_VISIBILITY);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const update = useCallback(async (next: AvatarVisibility) => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) throw new Error("Sign in to change privacy settings");
-    const prev = value;
-    setValue(next);
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ avatar_visibility: next } as any)
-        .eq("id", auth.user.id);
-      if (error) throw error;
-      invalidateUserAvatar();
-    } catch (e) {
-      setValue(prev);
-      throw e;
-    } finally {
-      setSaving(false);
-    }
-  }, [value]);
+  const update = useCallback(
+    async (next: AvatarVisibility) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sign in to change privacy settings");
+      const prev = value;
+      setValue(next);
+      setSaving(true);
+      try {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ avatar_visibility: next } as any)
+          .eq("id", auth.user.id);
+        if (error) throw error;
+        invalidateUserAvatar();
+      } catch (e) {
+        setValue(prev);
+        throw e;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [value],
+  );
 
   return { value, saving, update };
 }

@@ -238,6 +238,99 @@ button:disabled,
   }
 }
 
+/* The rest of the page-heading scale. `page-title` standardised the <h1> but
+   left everything around it hand-written: the supporting line under a title is
+   written as `text-sm text-muted-foreground`, `text-xs text-muted-foreground`
+   or `text-sm opacity-70` depending on the route, and section headings inside a
+   page range from text-sm to text-xl. These three utilities are the rest of
+   that one scale, so a page's hierarchy reads the same wherever you land.
+
+   Kept as utilities rather than component props on purpose: about a third of
+   the routes hand-roll their heading markup, and a utility works in both. */
+
+/* The kicker above a title — "Account setup", "Admin", a section label. */
+@utility page-eyebrow {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* The one supporting line under a page title. Capped measure: a subtitle that
+   runs the full width of a 56rem shell reads as body copy, not as a subtitle. */
+@utility page-subtitle {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  text-wrap: pretty;
+  max-width: 60ch;
+}
+
+/* The title in a compact sticky top bar. The bars were written per page —
+   text-sm font-semibold, font-display text-lg font-bold, text-xl font-black —
+   so the same kind of screen changed weight as you moved between them. */
+@utility bar-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  overflow-wrap: break-word;
+}
+
+/* A heading inside the page — a card group, a settings section. Deliberately
+   much smaller than `page-title` so the page keeps one obvious top heading. */
+@utility section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  overflow-wrap: break-word;
+}
+
+/* The small label above a group of cards inside a page — "From teams",
+   "Needs players now", "Recently finished". The routes wrote this as
+   `font-display text-sm font-bold uppercase tracking-wider` in 160-odd places,
+   which is exactly why it belongs here. Colour is deliberately left to the
+   caller so a section can be tinted (coral for urgent) without fighting a
+   colour baked into the utility. */
+@utility section-eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The tiniest uppercase label in the app: the text inside a status pill, a
+   stat caption under a number, a badge on a card. The routes wrote this nine
+   different ways — text-[9px], text-[10px] and text-[11px], sometimes bold and
+   sometimes semibold, tracking-wide and tracking-wider — so two pills sitting
+   side by side on a team or trainer card were different sizes. Colour is left
+   to the caller, exactly as with `section-eyebrow`, because these labels are
+   routinely tinted (lime for verified, coral for urgent). */
+@utility micro-label {
+  font-size: 0.625rem;
+  line-height: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+
+
+/* One visible focus ring for the whole app, so keyboard focus is never
+   invisible on a surface that happens to sit on a dark card. Scoped to
+   :focus-visible, so it never shows on a mouse tap. */
+:where(a, button, [role="button"], input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+
+
 /* iOS Safari zooms the whole page when a focused form control's text is
    under 16px, and does not zoom back out. Every control in the app that uses
    text-sm or text-xs therefore lurches the layout on tap — sign-up, hosting a
@@ -346,6 +439,21 @@ button:disabled,
   width: 100%;
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
+
+/* The column inside a fixed bottom action bar — the join/pay row on a game, the
+   back/next row in a creation wizard. One width so the primary action lands in
+   the same place on every screen, and no `mx-auto` in the markup, because a
+   centred capped div in a route file reads as a page container. */
+@utility action-bar-inner {
+  margin-inline: auto;
+  display: flex;
+  width: 100%;
+  max-width: 32rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+
 
 @layer utilities {
   .glow-lime { box-shadow: var(--shadow-glow-primary); }

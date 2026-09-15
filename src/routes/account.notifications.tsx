@@ -161,7 +161,7 @@ function NotificationSettingsPage() {
         <div className="mt-4 space-y-5">
           {SECTIONS.map((section) => (
             <section key={section.title}>
-              <h2 className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              <h2 className="px-1 pb-2 micro-label text-muted-foreground">
                 {section.title}
               </h2>
               <div className="space-y-3">

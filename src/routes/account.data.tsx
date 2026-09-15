@@ -216,7 +216,9 @@ function DataExportPage() {
                 <p className="text-xs font-semibold">{r.label}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{r.retention}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">If you delete your account: </span>
+                  <span className="font-semibold text-foreground">
+                    If you delete your account:{" "}
+                  </span>
                   {r.onAccountDeletion}
                 </p>
                 {r.survivesDeletion && (

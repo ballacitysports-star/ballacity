@@ -1,9 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+const BG_REMOVE_PROMPT =
+  "Remove the background from this image. Keep the main subject perfectly intact with clean edges. Return a transparent PNG with only the subject on transparency.";
+
 /**
- * Remove background from an image using Lovable AI Gateway
+ * Remove background from an image using the shared AI layer
  * (google/gemini-2.5-flash-image, edit mode). Returns a base64 PNG data URL.
+ *
+ * The gate (`withAiSession` → `assertAiAllowed`) supplies the feature flag,
+ * consent/child-policy, cohort and quota checks this function previously had
+ * none of, and records usage against an `ai_generation_jobs` row.
  */
 export const removeBackground = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -19,47 +26,30 @@ export const removeBackground = createServerFn({ method: "POST" })
     }
     return input;
   })
-  .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+  .handler(async ({ data, context }) => {
+    const { withAiSession } = await import("@/lib/ai/session.server");
+    const { rawChat } = await import("@/lib/ai/gateway.server");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    return withAiSession({ userId: context.userId, feature: "background_remove" }, async () => {
+      const out = await rawChat({
         model: "google/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
         messages: [
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: "Remove the background from this image. Keep the main subject perfectly intact with clean edges. Return a transparent PNG with only the subject on transparency.",
-              },
+              { type: "text", text: BG_REMOVE_PROMPT },
               { type: "image_url", image_url: { url: data.dataUrl } },
             ],
           },
         ],
-        modalities: ["image", "text"],
-      }),
+      });
+
+      const url = (out.message as { images?: { image_url?: { url?: string } }[] } | null)
+        ?.images?.[0]?.image_url?.url;
+      if (!url || !url.startsWith("data:image/")) {
+        throw new Error("No image returned by the AI");
+      }
+      return { dataUrl: url };
     });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      if (res.status === 429) throw new Error("Rate limited — try again in a moment");
-      if (res.status === 402) throw new Error("AI credits exhausted — add credits in Settings");
-      throw new Error(`Background removal failed (${res.status}): ${body.slice(0, 200)}`);
-    }
-
-    const json = (await res.json()) as {
-      choices?: { message?: { images?: { image_url?: { url?: string } }[] } }[];
-    };
-    const url = json.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!url || !url.startsWith("data:image/")) {
-      throw new Error("No image returned by the AI");
-    }
-    return { dataUrl: url };
   });

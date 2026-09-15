@@ -16,6 +16,8 @@ import { UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -172,19 +174,33 @@ function MessagesInbox() {
           </div>
 
           {fetching ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <ListSkeleton rows={4} label="Loading your messages…" />
           ) : list.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">
-              {msgTab === "primary"
-                ? "No conversations yet. Open a game and tap the chat icon to message the host."
-                : "No message requests."}
-            </div>
+            <EmptyState
+              icon={<MessageCircle className="h-6 w-6" aria-hidden />}
+              title={msgTab === "primary" ? "No conversations yet" : "No message requests"}
+              description={
+                msgTab === "primary"
+                  ? "Messages start from a game. Open a game you're in and tap the chat icon to reach the host."
+                  : "Requests from people you haven't messaged before land here first, so nothing reaches you unexpectedly."
+              }
+              action={
+                msgTab === "primary" ? (
+                  <Link
+                    to="/feed"
+                    className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Find a game
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="space-y-2">
               {list.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-border bg-surface p-3"
                 >
                   <Link
                     to="/messages/$conversationId"
@@ -201,14 +217,20 @@ function MessagesInbox() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-sm truncate">
+                        <span className="truncate text-sm font-semibold">
                           {c.other_display_name}
                         </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
                           {timeAgo(c.last_message_at)}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
+                      {/* An unread thread is weighted as well as tinted, so the
+                          state does not rest on colour alone. */}
+                      <p
+                        className={`truncate text-xs ${
+                          c.unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
                         {c.last_message ?? "Say hi 👋"}
                       </p>
                     </div>

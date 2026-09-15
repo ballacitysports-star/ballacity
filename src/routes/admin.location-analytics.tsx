@@ -212,7 +212,7 @@ function LocationAnalyticsPage() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="page-title">Location denial analytics</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="page-subtitle">
             Trends in geolocation permission failures across users, browsers and sports.
           </p>
         </div>

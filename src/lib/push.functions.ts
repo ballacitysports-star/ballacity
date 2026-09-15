@@ -32,7 +32,7 @@ function validate(input: unknown): PushInput {
 async function absolutizeUrl(url: string | null): Promise<string | undefined> {
   if (!url) return undefined;
   if (/^https?:\/\//i.test(url)) return url;
-  let origin = process.env['PUBLIC_SITE_URL'] ?? null;
+  let origin = process.env["PUBLIC_SITE_URL"] ?? null;
   if (!origin) {
     try {
       const { getRequest } = await import("@tanstack/react-start/server");
@@ -124,7 +124,6 @@ export const sendPushToUser = createServerFn({ method: "POST" })
       console.warn("[push] curfew check failed", e);
     }
 
-
     const restKey = process.env.ONESIGNAL_REST_API_KEY;
     if (!restKey) {
       console.warn("[push] ONESIGNAL_REST_API_KEY not configured");
@@ -196,7 +195,7 @@ export const sendTestPushToSelf = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    const restKey = process.env['ONESIGNAL_REST_API_KEY'];
+    const restKey = process.env["ONESIGNAL_REST_API_KEY"];
     if (!restKey) {
       return {
         ok: false as const,
@@ -268,7 +267,10 @@ export const sendTestPushToSelf = createServerFn({ method: "POST" })
       } catch {
         /* ignore */
       }
-      if (!res.ok) sendError = parsed?.errors ? JSON.stringify(parsed.errors).slice(0, 300) : `http_${res.status}`;
+      if (!res.ok)
+        sendError = parsed?.errors
+          ? JSON.stringify(parsed.errors).slice(0, 300)
+          : `http_${res.status}`;
       if (typeof parsed?.recipients === "number") recipients = parsed.recipients;
     } catch (e) {
       sendError = "fetch_failed";

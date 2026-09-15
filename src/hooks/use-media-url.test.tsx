@@ -19,7 +19,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       from: (bucket: string) => ({
         createSignedUrl: async (path: string, ttl: number) => {
           signCalls.push({ bucket, path, ttl });
-          return signResult ? { data: signResult, error: null } : { data: null, error: new Error("denied") };
+          return signResult
+            ? { data: signResult, error: null }
+            : { data: null, error: new Error("denied") };
         },
       }),
     },

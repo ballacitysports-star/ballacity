@@ -82,7 +82,7 @@ export function AvailabilityCalendar({
   );
 
   const currentOverride = editingDate
-    ? overrides.find((o) => o.date === editingDate) ?? null
+    ? (overrides.find((o) => o.date === editingDate) ?? null)
     : null;
   const editingWindows: OverrideWindow[] = currentOverride?.windows ?? [];
 
@@ -146,7 +146,8 @@ export function AvailabilityCalendar({
 
       {timezone && (
         <div className="px-1 text-[11px] text-muted-foreground">
-          Times shown in <span className="font-semibold text-foreground">{timezone.replace(/_/g, " ")}</span> —
+          Times shown in{" "}
+          <span className="font-semibold text-foreground">{timezone.replace(/_/g, " ")}</span> —
           this is the timezone attendees will see converted to their local time.
         </div>
       )}
@@ -166,7 +167,7 @@ export function AvailabilityCalendar({
       )}
 
       {/* Day-of-week header */}
-      <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="grid grid-cols-7 gap-1 px-1 text-center micro-label text-muted-foreground">
         {DAY_LABELS.map((l) => (
           <div key={l}>{l}</div>
         ))}
@@ -205,11 +206,12 @@ export function AvailabilityCalendar({
               className={`${baseCls} ${stateCls} ${!inMonth ? "opacity-40" : ""}`}
             >
               <span>{d.getDate()}</span>
-              {!disabled && (closed ? (
-                <Ban className="h-2.5 w-2.5" />
-              ) : hasAny ? (
-                <span className="h-1 w-1 rounded-full bg-lime" />
-              ) : null)}
+              {!disabled &&
+                (closed ? (
+                  <Ban className="h-2.5 w-2.5" />
+                ) : hasAny ? (
+                  <span className="h-1 w-1 rounded-full bg-lime" />
+                ) : null)}
             </button>
           );
         })}
@@ -236,7 +238,8 @@ export function AvailabilityCalendar({
         {showWeekly && (
           <div className="border-t border-border p-3 space-y-2">
             <p className="text-[11px] text-muted-foreground">
-              Repeating windows applied every week. Use the calendar above to override specific dates.
+              Repeating windows applied every week. Use the calendar above to override specific
+              dates.
             </p>
             {weekly.length === 0 && (
               <p className="text-xs text-muted-foreground">No recurring windows yet.</p>
@@ -354,7 +357,10 @@ export function AvailabilityCalendar({
 
       {/* Day editor sheet */}
       <Sheet open={!!editingDate} onOpenChange={(v) => !v && setEditingDate(null)}>
-        <SheetContent side="bottom" className="rounded-t-3xl border-border max-h-[92vh] overflow-y-auto">
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl border-border max-h-[92vh] overflow-y-auto"
+        >
           {editingDate && (
             <>
               <SheetHeader className="text-left">
@@ -373,11 +379,7 @@ export function AvailabilityCalendar({
 
               <div className="mt-4 space-y-3">
                 {/* Weekly preview */}
-                <DayPreview
-                  weekly={weekly}
-                  overrides={overrides}
-                  dateKey={editingDate}
-                />
+                <DayPreview weekly={weekly} overrides={overrides} dateKey={editingDate} />
 
                 {/* Closed toggle */}
                 <button
@@ -397,17 +399,13 @@ export function AvailabilityCalendar({
                     <Ban className="h-4 w-4" />
                     Mark this day closed
                   </span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider">
-                    {currentOverride?.closed ? "On" : "Off"}
-                  </span>
+                  <span className="section-eyebrow">{currentOverride?.closed ? "On" : "Off"}</span>
                 </button>
 
                 {/* Custom windows */}
                 {!currentOverride?.closed && (
                   <div className="space-y-2">
-                    <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Custom windows
-                    </div>
+                    <div className="section-eyebrow text-muted-foreground">Custom windows</div>
                     {editingWindows.length === 0 && (
                       <p className="text-xs text-muted-foreground">
                         Add a window to override the weekly pattern for this day.
@@ -482,7 +480,11 @@ export function AvailabilityCalendar({
                         const dow = weekdayOf(fromDateKey(editingDate));
                         const fromWeekly = weekly.find((s) => s.day === dow);
                         const nextWindow: OverrideWindow = fromWeekly
-                          ? { start: fromWeekly.start, end: fromWeekly.end, venue: fromWeekly.venue ?? primaryVenue ?? undefined }
+                          ? {
+                              start: fromWeekly.start,
+                              end: fromWeekly.end,
+                              venue: fromWeekly.venue ?? primaryVenue ?? undefined,
+                            }
                           : { start: "17:00", end: "19:00", venue: primaryVenue ?? undefined };
                         setEditingWindows([...editingWindows, nextWindow]);
                       }}
@@ -542,7 +544,7 @@ function DayPreview({
   }
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-1 micro-label text-muted-foreground">
         Currently
       </div>
       <ul className="space-y-1">

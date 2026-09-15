@@ -60,7 +60,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
     const name = o?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
-      title: `${name} — Team on ballaCity`,
+      title: `${name} | BallaCity Sports Team`,
       description: (
         o?.bio ||
         o?.tagline ||
@@ -79,7 +79,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
             name: o.name,
             sport: o.sports?.join(", "),
             address: o.city ?? undefined,
-            url: `https://open-run-connect.lovable.app/teams/${params.teamId}`,
+            url: `https://ballacity.com/teams/${params.teamId}`,
           }
         : undefined,
     });
@@ -649,7 +649,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
         {icon}
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+      <div className="micro-label text-muted-foreground mt-0.5">
         {label}
       </div>
     </div>
@@ -659,7 +659,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
 function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+      <h2 className="section-eyebrow text-muted-foreground mb-2 flex items-center gap-1.5">
         {title}
       </h2>
       {children}

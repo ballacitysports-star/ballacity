@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { isRequestAbort } from "./lib/request-abort";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -62,8 +63,15 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  const captured = consumeLastCapturedError();
+  if (isRequestAbort(captured)) {
+    // The visitor left before the page finished rendering; nothing is broken.
+    return new Response(null, { status: 499 });
+  }
+
+  console.error(captured ?? new Error(`h3 swallowed SSR error: ${body}`));
   return brandedErrorResponse();
+
 }
 
 export default {
@@ -71,10 +79,19 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
+      // When the visitor navigates away or reloads mid-render, the runtime
+      // aborts the request signal and the render fails with an AbortError.
+      // That is not a site error: reporting it as one replaces the page the
+      // browser is already leaving with an error screen.
+      if (request.signal.aborted) return response;
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
+      if (request.signal.aborted || isRequestAbort(error)) {
+        return new Response(null, { status: 499 });
+      }
       console.error(error);
       return brandedErrorResponse();
     }
   },
 };
+

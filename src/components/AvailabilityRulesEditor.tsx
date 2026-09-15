@@ -2,7 +2,13 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Repeat } from "lucide-react";
 import type { AvailabilityRule, Weekday } from "@/lib/availability-resolve";
@@ -16,7 +22,13 @@ type Props = {
 };
 
 const WEEKDAY_LABEL: Record<Weekday, string> = {
-  mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun",
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
 };
 const ALL_WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEK_OF_MONTH_OPTS: (1 | 2 | 3 | 4 | "last")[] = [1, 2, 3, 4, "last"];
@@ -42,7 +54,9 @@ function ruleSummary(r: AvailabilityRule): string {
     return n === 1 ? `Every ${days}` : `Every ${n} weeks on ${days}`;
   }
   if (r.freq === "biweekly") return `Every other ${days}`;
-  const weeks = (r.weekOfMonth ?? []).map((w) => (w === "last" ? "Last" : `${w}${["st","nd","rd"][w-1] ?? "th"}`)).join(", ");
+  const weeks = (r.weekOfMonth ?? [])
+    .map((w) => (w === "last" ? "Last" : `${w}${["st", "nd", "rd"][w - 1] ?? "th"}`))
+    .join(", ");
   return `${weeks || "—"} ${days} of month`;
 }
 
@@ -92,7 +106,8 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
 
       {value.length === 0 && (
         <div className="rounded-xl border border-dashed border-border bg-surface/50 p-4 text-sm text-muted-foreground text-center">
-          No recurring rules yet. Add one for patterns like "Every Tue/Thu 5–7pm" or "1st & 3rd Monday".
+          No recurring rules yet. Add one for patterns like "Every Tue/Thu 5–7pm" or "1st & 3rd
+          Monday".
         </div>
       )}
 
@@ -115,7 +130,11 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                 </div>
               </div>
               <Badge variant="secondary" className="ml-2 text-[10px]">
-                {r.freq === "monthly-nth" ? "Monthly" : r.freq === "biweekly" ? "Bi-weekly" : "Weekly"}
+                {r.freq === "monthly-nth"
+                  ? "Monthly"
+                  : r.freq === "biweekly"
+                    ? "Bi-weekly"
+                    : "Weekly"}
               </Badge>
             </button>
 
@@ -137,7 +156,9 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                     value={r.freq}
                     onValueChange={(v) => update(r.id, { freq: v as AvailabilityRule["freq"] })}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="biweekly">Bi-weekly (every other week)</SelectItem>
@@ -154,7 +175,11 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                       min={1}
                       max={12}
                       value={r.interval ?? 1}
-                      onChange={(e) => update(r.id, { interval: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })}
+                      onChange={(e) =>
+                        update(r.id, {
+                          interval: Math.max(1, Math.min(12, Number(e.target.value) || 1)),
+                        })
+                      }
                     />
                   </div>
                 )}
@@ -191,7 +216,7 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                             onClick={() => toggleWeekOfMonth(r, w)}
                             className={`px-2.5 py-1 rounded-full text-xs border ${active ? "bg-primary text-primary-foreground border-primary" : "bg-surface border-border"}`}
                           >
-                            {w === "last" ? "Last" : `${w}${["st","nd","rd"][w-1] ?? "th"}`}
+                            {w === "last" ? "Last" : `${w}${["st", "nd", "rd"][w - 1] ?? "th"}`}
                           </button>
                         );
                       })}
@@ -202,11 +227,19 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                 <div className="grid grid-cols-2 gap-2">
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Start</Label>
-                    <Input type="time" value={r.start} onChange={(e) => update(r.id, { start: e.target.value })} />
+                    <Input
+                      type="time"
+                      value={r.start}
+                      onChange={(e) => update(r.id, { start: e.target.value })}
+                    />
                   </div>
                   <div className="grid gap-1.5">
                     <Label className="text-xs">End</Label>
-                    <Input type="time" value={r.end} onChange={(e) => update(r.id, { end: e.target.value })} />
+                    <Input
+                      type="time"
+                      value={r.end}
+                      onChange={(e) => update(r.id, { end: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -217,11 +250,15 @@ export function AvailabilityRulesEditor({ value, onChange, venues = [] }: Props)
                       value={r.venue ?? "__none"}
                       onValueChange={(v) => update(r.id, { venue: v === "__none" ? undefined : v })}
                     >
-                      <SelectTrigger><SelectValue placeholder="Any venue" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any venue" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">Any venue</SelectItem>
                         {venues.map((v) => (
-                          <SelectItem key={v} value={v}>{v}</SelectItem>
+                          <SelectItem key={v} value={v}>
+                            {v}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

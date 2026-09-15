@@ -60,7 +60,7 @@ export function ProfileSportsFields({
               return (
                 <div className="mt-3">
                   <div className="mb-1.5 flex items-baseline gap-2">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="micro-label text-muted-foreground">
                       Level
                     </span>
                     <span className="text-[10px] text-muted-foreground/70">{scale.system}</span>
@@ -82,7 +82,7 @@ export function ProfileSportsFields({
 
             {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
               <div className="mt-3">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                <div className="micro-label text-muted-foreground mb-1.5">
                   Positions
                 </div>
                 <div className="flex flex-wrap gap-1.5">

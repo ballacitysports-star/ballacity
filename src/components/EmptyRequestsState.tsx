@@ -1,10 +1,6 @@
 import { Inbox } from "lucide-react";
 
-export function EmptyRequestsState({
-  filter = "all",
-}: {
-  filter?: "all" | "host" | "player";
-}) {
+export function EmptyRequestsState({ filter = "all" }: { filter?: "all" | "host" | "player" }) {
   const title =
     filter === "host"
       ? "No host actions"

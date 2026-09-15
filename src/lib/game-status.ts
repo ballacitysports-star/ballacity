@@ -11,13 +11,7 @@ import { gameEndsAt } from "@/lib/game-time";
  * always outranks anything derived from the clock or the roster.
  */
 export type GameStatus =
-  | "cancelled"
-  | "completed"
-  | "in_progress"
-  | "starting_soon"
-  | "full"
-  | "closed"
-  | "open";
+  "cancelled" | "completed" | "in_progress" | "starting_soon" | "full" | "closed" | "open";
 
 export type GameStatusTone = "danger" | "muted" | "live" | "warn" | "neutral" | "open";
 
@@ -101,8 +95,7 @@ export function resolveGameStatus(
 
   const start = new Date(game.date).getTime();
   const cutoffMin = Number(game.signupCutoffMin ?? 0);
-  const cutoffPassed =
-    cutoffMin > 0 && Number.isFinite(start) && now >= start - cutoffMin * 60_000;
+  const cutoffPassed = cutoffMin > 0 && Number.isFinite(start) && now >= start - cutoffMin * 60_000;
 
   if (game.joinsClosed || cutoffPassed) {
     return {

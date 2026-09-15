@@ -13,9 +13,7 @@ export function Section({
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h2>
+        <h2 className="section-eyebrow text-muted-foreground">{title}</h2>
         {right}
       </div>
       <div>{children}</div>

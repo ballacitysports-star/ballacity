@@ -18,11 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { moderationCheck } from "@/lib/moderation.functions";
 import {
   listAuditLogs,
@@ -81,7 +77,7 @@ function DetailBlock({ label, value }: { label: string; value: unknown }) {
   if (typeof value === "object" && Object.keys(value as object).length === 0) return null;
   return (
     <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="micro-label text-muted-foreground">{label}</p>
       <pre className="mt-1 overflow-x-auto rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed">
         {JSON.stringify(value, null, 2)}
       </pre>
@@ -274,12 +270,12 @@ function AuditLogPage() {
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
+          <h1 className="page-title flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-primary" /> Audit logs
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Append-only record of administrative and security actions. Entries can never be
-            edited or deleted.
+          <p className="page-subtitle">
+            Append-only record of administrative and security actions. Entries can never be edited
+            or deleted.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={doExport} disabled={exporting}>

@@ -50,9 +50,10 @@ export const recordLegalConsent = createServerFn({ method: "POST" })
       accepted_at: new Date().toISOString(),
       user_agent: userAgent,
     }));
-    const { error } = await context.supabase
-      .from("legal_consents")
-      .upsert(rows, { onConflict: "user_id,document_type,document_version", ignoreDuplicates: true });
+    const { error } = await context.supabase.from("legal_consents").upsert(rows, {
+      onConflict: "user_id,document_type,document_version",
+      ignoreDuplicates: true,
+    });
     if (error) throw new Error(error.message);
     return { ok: true, recorded: rows.length };
   });

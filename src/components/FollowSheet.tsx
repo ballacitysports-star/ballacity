@@ -134,21 +134,15 @@ function FollowList({
 }) {
   const { user } = useAuth();
   const viewerId = user?.id ?? null;
-  const {
-    data,
-    isLoading,
-    isError,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery<FollowPage>({
-    queryKey: ["follow-list", kind, userId, viewerId],
-    queryFn: ({ pageParam }) =>
-      listFollows(userId, kind, (pageParam as string | null) ?? null, FOLLOW_PAGE_SIZE, viewerId),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.nextCursor,
-    staleTime: 15_000,
-  });
+  const { data, isLoading, isError, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useInfiniteQuery<FollowPage>({
+      queryKey: ["follow-list", kind, userId, viewerId],
+      queryFn: ({ pageParam }) =>
+        listFollows(userId, kind, (pageParam as string | null) ?? null, FOLLOW_PAGE_SIZE, viewerId),
+      initialPageParam: null as string | null,
+      getNextPageParam: (last) => last.nextCursor,
+      staleTime: 15_000,
+    });
 
   const users = useMemo(() => data?.pages.flatMap((p) => p.users) ?? [], [data]);
   const filtered = useMemo(() => {
@@ -156,8 +150,7 @@ function FollowList({
     if (!q) return users;
     return users.filter(
       (u) =>
-        u.display_name.toLowerCase().includes(q) ||
-        (u.username ?? "").toLowerCase().includes(q),
+        u.display_name.toLowerCase().includes(q) || (u.username ?? "").toLowerCase().includes(q),
     );
   }, [users, query]);
 
@@ -181,8 +174,6 @@ function FollowList({
   const ids = filtered.map((u) => u.id);
   usePrefetchUserAvatars(ids.slice(0, 10), "high");
   usePrefetchUserAvatars(ids.slice(10), "low");
-
-
 
   return (
     <div className="max-h-[60dvh] overflow-y-auto px-2 pb-3 pt-1">
@@ -375,8 +366,8 @@ export function UserSafetyMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Block {displayName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              They won't be able to follow you or interact with your profile. Any existing
-              follow relationships between you will be removed. You can unblock them anytime.
+              They won't be able to follow you or interact with your profile. Any existing follow
+              relationships between you will be removed. You can unblock them anytime.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

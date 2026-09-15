@@ -55,8 +55,7 @@ export function YouthOversightCard() {
   const backlog = data?.backlog;
   const cohorts = data?.cohorts ?? [];
   const rows = [...(data?.usage ?? [])].sort(
-    (a, b) =>
-      a.cohort.localeCompare(b.cohort) || dayPartOrder(a.dayPart) - dayPartOrder(b.dayPart),
+    (a, b) => a.cohort.localeCompare(b.cohort) || dayPartOrder(a.dayPart) - dayPartOrder(b.dayPart),
   );
 
   return (

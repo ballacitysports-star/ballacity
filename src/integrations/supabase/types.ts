@@ -107,6 +107,186 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_generation_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_code: string | null
+          est_cost_cents: number
+          feature: string
+          finished_at: string | null
+          heartbeat_at: string | null
+          id: string
+          input_summary: Json
+          max_attempts: number
+          model: string | null
+          owner_id: string | null
+          owner_type: string
+          progress: Json
+          provider: string | null
+          related_reel_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_message: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_code?: string | null
+          est_cost_cents?: number
+          feature: string
+          finished_at?: string | null
+          heartbeat_at?: string | null
+          id?: string
+          input_summary?: Json
+          max_attempts?: number
+          model?: string | null
+          owner_id?: string | null
+          owner_type?: string
+          progress?: Json
+          provider?: string | null
+          related_reel_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          user_message?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_code?: string | null
+          est_cost_cents?: number
+          feature?: string
+          finished_at?: string | null
+          heartbeat_at?: string | null
+          id?: string
+          input_summary?: Json
+          max_attempts?: number
+          model?: string | null
+          owner_id?: string | null
+          owner_type?: string
+          progress?: Json
+          provider?: string | null
+          related_reel_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_jobs_related_reel_id_fkey"
+            columns: ["related_reel_id"]
+            isOneToOne: false
+            referencedRelation: "highlight_reels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_text_moderation: {
+        Row: {
+          categories: Json
+          created_at: string
+          id: string
+          job_id: string | null
+          model: string | null
+          target_field: string
+          target_id: string | null
+          target_table: string
+          user_id: string
+          verdict: string
+        }
+        Insert: {
+          categories?: Json
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          target_field: string
+          target_id?: string | null
+          target_table: string
+          user_id: string
+          verdict: string
+        }
+        Update: {
+          categories?: Json
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          target_field?: string
+          target_id?: string | null
+          target_table?: string
+          user_id?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_text_moderation_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_events: {
+        Row: {
+          created_at: string
+          est_cost_cents: number
+          feature: string
+          id: string
+          input_tokens: number
+          job_id: string | null
+          model: string | null
+          outcome: string
+          output_tokens: number
+          provider: string | null
+          units: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          est_cost_cents?: number
+          feature: string
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          model?: string | null
+          outcome: string
+          output_tokens?: number
+          provider?: string | null
+          units?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          est_cost_cents?: number
+          feature?: string
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          model?: string | null
+          outcome?: string
+          output_tokens?: number
+          provider?: string | null
+          units?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -603,6 +783,7 @@ export type Database = {
           id: string
           payment_deadline: string | null
           payment_instructions: string | null
+          payment_mode: string
           refund_policy: string | null
           requires_approval: boolean
           updated_at: string
@@ -616,6 +797,7 @@ export type Database = {
           id?: string
           payment_deadline?: string | null
           payment_instructions?: string | null
+          payment_mode?: string
           refund_policy?: string | null
           requires_approval?: boolean
           updated_at?: string
@@ -629,6 +811,7 @@ export type Database = {
           id?: string
           payment_deadline?: string | null
           payment_instructions?: string | null
+          payment_mode?: string
           refund_policy?: string | null
           requires_approval?: boolean
           updated_at?: string
@@ -820,6 +1003,7 @@ export type Database = {
           hidden_at: string | null
           id: string
           last_step_at: string | null
+          media_meta: Json | null
           playback_path: string | null
           processing_started_at: string | null
           processing_step: string
@@ -859,6 +1043,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           last_step_at?: string | null
+          media_meta?: Json | null
           playback_path?: string | null
           processing_started_at?: string | null
           processing_step?: string
@@ -898,6 +1083,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           last_step_at?: string | null
+          media_meta?: Json | null
           playback_path?: string | null
           processing_started_at?: string | null
           processing_step?: string
@@ -1314,6 +1500,51 @@ export type Database = {
           title?: string
           updated_at?: string
           version?: string
+        }
+        Relationships: []
+      }
+      listing_claims: {
+        Row: {
+          created_at: string
+          denial_reason: string | null
+          evidence_url: string | null
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          denial_reason?: string | null
+          evidence_url?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          denial_reason?: string | null
+          evidence_url?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2548,46 +2779,58 @@ export type Database = {
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
+          canceled_at: string | null
           created_at: string | null
           current_period_end: string | null
           current_period_start: string | null
           environment: string
           id: string
+          metadata: Json
           price_id: string
           product_id: string
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string
+          tier: string | null
+          trial_end: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
+          metadata?: Json
           price_id: string
           product_id: string
           status?: string
           stripe_customer_id: string
           stripe_subscription_id: string
+          tier?: string | null
+          trial_end?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
+          metadata?: Json
           price_id?: string
           product_id?: string
           status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string
+          tier?: string | null
+          trial_end?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -2770,6 +3013,7 @@ export type Database = {
           cadence: string | null
           cadences: Json
           city: string
+          claimed_at: string | null
           cover: string
           created_at: string
           credentials: string[]
@@ -2784,9 +3028,11 @@ export type Database = {
           id: string
           kind: string
           league: string | null
+          listed_at: string | null
+          listed_by: string | null
           losses: number
           name: string
-          owner_id: string
+          owner_id: string | null
           positions_needed: Json
           primary_venue: string | null
           rate_per_hour: number | null
@@ -2818,6 +3064,7 @@ export type Database = {
           cadence?: string | null
           cadences?: Json
           city?: string
+          claimed_at?: string | null
           cover?: string
           created_at?: string
           credentials?: string[]
@@ -2832,9 +3079,11 @@ export type Database = {
           id: string
           kind: string
           league?: string | null
+          listed_at?: string | null
+          listed_by?: string | null
           losses?: number
           name: string
-          owner_id: string
+          owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
           rate_per_hour?: number | null
@@ -2866,6 +3115,7 @@ export type Database = {
           cadence?: string | null
           cadences?: Json
           city?: string
+          claimed_at?: string | null
           cover?: string
           created_at?: string
           credentials?: string[]
@@ -2880,9 +3130,11 @@ export type Database = {
           id?: string
           kind?: string
           league?: string | null
+          listed_at?: string | null
+          listed_by?: string | null
           losses?: number
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
           rate_per_hour?: number | null
@@ -3061,6 +3313,7 @@ export type Database = {
           bio: string | null
           category: string | null
           city: string | null
+          claimed_at: string | null
           cover_url: string | null
           created_at: string
           email: string | null
@@ -3069,8 +3322,10 @@ export type Database = {
           hidden_at: string | null
           hours: Json
           id: string
+          listed_at: string | null
+          listed_by: string | null
           name: string
-          owner_id: string
+          owner_id: string | null
           phone: string | null
           photos: string[]
           place_id: string | null
@@ -3087,6 +3342,7 @@ export type Database = {
           bio?: string | null
           category?: string | null
           city?: string | null
+          claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
@@ -3095,8 +3351,10 @@ export type Database = {
           hidden_at?: string | null
           hours?: Json
           id?: string
+          listed_at?: string | null
+          listed_by?: string | null
           name: string
-          owner_id: string
+          owner_id?: string | null
           phone?: string | null
           photos?: string[]
           place_id?: string | null
@@ -3113,6 +3371,7 @@ export type Database = {
           bio?: string | null
           category?: string | null
           city?: string | null
+          claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
@@ -3121,8 +3380,10 @@ export type Database = {
           hidden_at?: string | null
           hours?: Json
           id?: string
+          listed_at?: string | null
+          listed_by?: string | null
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           phone?: string | null
           photos?: string[]
           place_id?: string | null
@@ -3343,6 +3604,23 @@ export type Database = {
       }
       age_verified: { Args: { _user: string }; Returns: boolean }
       ai_analysis_allowed: { Args: { _user: string }; Returns: boolean }
+      ai_reserve_quota: {
+        Args: {
+          _daily_limit: number
+          _feature: string
+          _input_summary?: Json
+          _max_attempts?: number
+          _max_concurrent: number
+          _model?: string
+          _monthly_limit: number
+          _provider?: string
+          _related_reel_id?: string
+          _units: number
+          _user_id: string
+        }
+        Returns: Json
+      }
+      approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
         Args: {
@@ -3424,10 +3702,36 @@ export type Database = {
             }
             Returns: string
           }
+      create_unclaimed_gym: {
+        Args: {
+          _address?: string
+          _category?: string
+          _city?: string
+          _handle: string
+          _name: string
+          _website?: string
+        }
+        Returns: string
+      }
+      create_unclaimed_team: {
+        Args: {
+          _city?: string
+          _handle: string
+          _id: string
+          _kind: string
+          _name: string
+          _sports?: string[]
+        }
+        Returns: string
+      }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
       default_profile_visibility_for: {
         Args: { _user: string }
         Returns: string
+      }
+      deny_listing_claim: {
+        Args: { _claim: string; _reason: string }
+        Returns: undefined
       }
       deny_org_member_request: {
         Args: { _reason: string; _req: string }
@@ -3495,6 +3799,10 @@ export type Database = {
       }
       has_active_subscription: {
         Args: { check_env?: string; user_uuid: string }
+        Returns: boolean
+      }
+      has_entitlement: {
+        Args: { _entitlement: string; _env?: string; _user_id: string }
         Returns: boolean
       }
       has_role: {
@@ -3726,6 +4034,31 @@ export type Database = {
           user_id: string
         }[]
       }
+      public_reel_feed_ids: {
+        Args: {
+          _cursor?: string
+          _include_members?: boolean
+          _limit?: number
+          _sport?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+        }[]
+      }
+      public_reel_feed_sports: {
+        Args: { _include_members?: boolean }
+        Returns: {
+          sport: string
+        }[]
+      }
+      public_user_reel_ids: {
+        Args: { _include_members?: boolean; _limit?: number; _user_id: string }
+        Returns: {
+          created_at: string
+          id: string
+        }[]
+      }
       publish_legal_document: { Args: { _id: string }; Returns: string }
       record_session_heartbeat: {
         Args: { _timezone?: string }
@@ -3786,6 +4119,15 @@ export type Database = {
         Returns: boolean
       }
       shares_team: { Args: { _a: string; _b: string }; Returns: boolean }
+      submit_listing_claim: {
+        Args: {
+          _evidence?: string
+          _id: string
+          _message?: string
+          _type: string
+        }
+        Returns: string
+      }
       team_cancel_invite: { Args: { _invite: string }; Returns: undefined }
       team_invite_player: {
         Args: {
@@ -3817,6 +4159,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      tier_for_price_id: { Args: { _price_id: string }; Returns: string }
+      transfer_team_ownership: {
+        Args: { _team: string; _to: string }
+        Returns: undefined
+      }
       try_uuid: { Args: { _v: string }; Returns: string }
       unpublish_legal_document: {
         Args: { _id: string; _reason?: string }
@@ -3834,6 +4181,7 @@ export type Database = {
           id: string
         }[]
       }
+      withdraw_listing_claim: { Args: { _claim: string }; Returns: undefined }
       youth_flag: { Args: { _flag: string }; Returns: boolean }
     }
     Enums: {

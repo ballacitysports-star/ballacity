@@ -15,8 +15,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const recordSessionHeartbeat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { timezone?: string | null }) => ({
-    timezone:
-      typeof input?.timezone === "string" ? input.timezone.slice(0, 64) : null,
+    timezone: typeof input?.timezone === "string" ? input.timezone.slice(0, 64) : null,
   }))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("record_session_heartbeat" as any, {

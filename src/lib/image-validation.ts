@@ -61,11 +61,7 @@ export function sniffImageMime(bytes: Uint8Array): AllowedImageMime | null {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     return "image/jpeg";
   }
-  if (
-    bytes.length >= 12 &&
-    ascii(bytes, 0, 4) === "RIFF" &&
-    ascii(bytes, 8, 4) === "WEBP"
-  ) {
+  if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WEBP") {
     return "image/webp";
   }
   return null;

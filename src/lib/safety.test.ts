@@ -66,7 +66,16 @@ describe("safety copy", () => {
 
   it("recommends the key game info fields", () => {
     const ids = GAME_INFO_TIPS.map((t) => t.id);
-    for (const id of ["facility", "court", "indoor", "time", "skill", "limit", "rules", "contact"]) {
+    for (const id of [
+      "facility",
+      "court",
+      "indoor",
+      "time",
+      "skill",
+      "limit",
+      "rules",
+      "contact",
+    ]) {
       expect(ids).toContain(id);
     }
     expect(ADDRESS_PRIVACY_NOTE).toMatch(/residential address/i);

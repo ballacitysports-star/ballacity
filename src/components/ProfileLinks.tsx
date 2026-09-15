@@ -68,13 +68,7 @@ function detectTypeFromUrl(url: string): ProfileLinkType | null {
 
 // Extra brand detection beyond the typed ProfileLinkType set
 type BrandKey =
-  | ProfileLinkType
-  | "facebook"
-  | "linkedin"
-  | "twitch"
-  | "github"
-  | "spotify"
-  | "soundcloud";
+  ProfileLinkType | "facebook" | "linkedin" | "twitch" | "github" | "spotify" | "soundcloud";
 
 function detectBrandFromUrl(url: string): BrandKey | null {
   const typed = detectTypeFromUrl(url);

@@ -24,7 +24,8 @@ export const signPublicGameCover = createServerFn({ method: "GET" })
     if (!parsed || !isPrivateMediaBucket(parsed.bucket)) return { url: null as string | null };
     if (parsed.bucket !== "game-covers") return { url: null as string | null };
     // Reject traversal / wildcard probing outright.
-    if (parsed.path.includes("..") || parsed.path.includes("%")) return { url: null as string | null };
+    if (parsed.path.includes("..") || parsed.path.includes("%"))
+      return { url: null as string | null };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

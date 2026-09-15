@@ -20,7 +20,6 @@ async function assertAiProcessingAllowed(context: { supabase: any; userId: strin
   }
 }
 
-
 /**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
  *
@@ -33,13 +32,12 @@ export const processMyReels = createServerFn({ method: "POST" })
     reelId: typeof input?.reelId === "string" ? input.reelId : undefined,
   }))
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, processReel } = await import(
-      "@/lib/reels-pipeline.server"
-    );
+    const { withAiSession } = await import("@/lib/ai/session.server");
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, claimReel, processReel } =
+      await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let q = supabaseAdmin
@@ -57,8 +55,17 @@ export const processMyReels = createServerFn({ method: "POST" })
 
     const results = [];
     for (const reel of (rows ?? []) as any[]) {
-      results.push(await processReel(reel, supabaseAdmin, apiKey));
+      // Claim before opening an AI job so an overlapping request neither runs
+      // the pipeline twice nor reserves quota for work it will not do.
+      if (!(await claimReel(supabaseAdmin, reel))) continue;
+      results.push(
+        await withAiSession(
+          { userId: context.userId, feature: "reel_pipeline", relatedReelId: reel.id },
+          (session) => processReel(reel, supabaseAdmin, apiKey, session, true),
+        ),
+      );
     }
+
     return { processed: results.length, results };
   });
 
@@ -85,18 +92,23 @@ export const askReelCoach = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { runReelCoachAgent } = await import("@/lib/reel-agent.server");
-    return runReelCoachAgent(apiKey, {
-      supabase: context.supabase,
-      userId: context.userId,
-      reelId: data.reelId,
-      question: data.question,
-      history: data.history,
-    });
+    return withAiSession(
+      { userId: context.userId, feature: "reel_coach", relatedReelId: data.reelId },
+      (session) =>
+        runReelCoachAgent(apiKey, {
+          supabase: context.supabase,
+          userId: context.userId,
+          reelId: data.reelId,
+          question: data.question,
+          history: data.history,
+          session,
+        }),
+    );
   });
 
 /**
@@ -114,10 +126,10 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
     const { data: reel, error } = await context.supabase
       .from("highlight_reels")
@@ -128,7 +140,11 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!reel) throw new Error("Reel not found");
 
-    return generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone });
+    return withAiSession(
+      { userId: context.userId, feature: "reel_package", relatedReelId: data.reelId },
+      (session) =>
+        generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone, session }),
+    );
   });
 
 /**
@@ -147,9 +163,8 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } = await import(
-      "@/lib/reels-pipeline.server"
-    );
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } =
+      await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: reel, error } = await supabaseAdmin
@@ -191,7 +206,13 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
 
     const result = await processReel(
-      { ...reel, attempts: 0, processing_step: regen.processing_step, step_progress: regen.step_progress, style_prefs: data.style },
+      {
+        ...reel,
+        attempts: 0,
+        processing_step: regen.processing_step,
+        step_progress: regen.step_progress,
+        style_prefs: data.style,
+      },
       supabaseAdmin,
       apiKey,
     );
@@ -199,9 +220,7 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     // Fresh overlays in the new style, timed to the regenerated timeline.
     if (result.status === "completed") {
       try {
-        const { REEL_COACH_COLUMNS, generateReelPackage } = await import(
-          "@/lib/reel-coach.server"
-        );
+        const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
         const { data: fresh } = await supabaseAdmin
           .from("highlight_reels")
           .select(REEL_COACH_COLUMNS)
@@ -225,6 +244,50 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
   });
 
 /** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */
+/**
+ * Safety check for copy a member writes or publishes onto a reel. Blocked copy is
+ * refused outright; borderline or unverifiable copy keeps the reel owner-only.
+ * Fails closed — never publishes when the checker could not decide.
+ */
+async function screenUserCopy(
+  userId: string,
+  reelId: string,
+  patch: Record<string, any>,
+  source: string,
+): Promise<{ blocked: boolean; hidden: boolean; message: string }> {
+  const text = [
+    patch.ai_title ?? "",
+    patch.ai_caption ?? "",
+    ...((patch.ai_hashtags ?? []) as string[]),
+    ...((patch.ai_overlays ?? []) as { text?: string }[]).map((o) => o?.text ?? ""),
+    ...((patch.ai_coaching?.notes ?? []) as string[]),
+  ]
+    .filter(Boolean)
+    .join("\n");
+  if (!text.trim()) return { blocked: false, hidden: false, message: "" };
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { moderateAiText } = await import("@/lib/ai/moderation.server");
+  const outcome = await moderateAiText(supabaseAdmin, {
+    userId,
+    text,
+    context: "Reel copy written or published by the reel owner",
+    target: { table: "highlight_reels", id: reelId, field: source },
+  });
+  if (outcome.verdict === "block") {
+    return {
+      blocked: true,
+      hidden: false,
+      message: "That wording didn't pass our safety check, so it wasn't saved.",
+    };
+  }
+  return {
+    blocked: false,
+    hidden: outcome.verdict === "review",
+    message: "",
+  };
+}
+
 export const applyReelCopy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -265,13 +328,17 @@ export const applyReelCopy = createServerFn({ method: "POST" })
     if (data.hashtags?.length) patch.ai_hashtags = data.hashtags;
     if (data.overlays?.length) patch.ai_overlays = data.overlays;
     if (Object.keys(patch).length === 0) return { updated: false };
+
+    const held = await screenUserCopy(context.userId, data.reelId, patch, "applyReelCopy");
+    if (held.blocked) throw new Error(held.message);
+
     const { error } = await context.supabase
       .from("highlight_reels")
-      .update(patch as any)
+      .update({ ...patch, ...(held.hidden ? { hidden_at: new Date().toISOString() } : {}) } as any)
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    return { updated: true };
+    return { updated: true, heldForReview: held.hidden };
   });
 
 /**
@@ -286,10 +353,10 @@ export const previewReelStyle = createServerFn({ method: "POST" })
     return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
   })
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { REEL_WORK_COLUMNS, runStyleDraft } = await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -309,7 +376,10 @@ export const previewReelStyle = createServerFn({ method: "POST" })
       throw new Error("This reel has no captured analysis to build on — use Try again instead");
     }
 
-    return runStyleDraft(reel as any, data.style as any, supabaseAdmin, apiKey);
+    return withAiSession(
+      { userId: context.userId, feature: "reel_style", relatedReelId: data.reelId },
+      (session) => runStyleDraft(reel as any, data.style as any, supabaseAdmin, apiKey, session),
+    );
   });
 
 /**
@@ -329,7 +399,10 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
       ai_title: d.ai_title ? String(d.ai_title).slice(0, 120) : null,
       ai_caption: d.ai_caption ? String(d.ai_caption).slice(0, 500) : null,
       ai_hashtags: Array.isArray(d.ai_hashtags)
-        ? d.ai_hashtags.map((h: unknown) => String(h).replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
+        ? d.ai_hashtags
+            .map((h: unknown) => String(h).replace(/^#/, "").trim())
+            .filter(Boolean)
+            .slice(0, 8)
         : [],
       timeline: Array.isArray(d.timeline) ? d.timeline.slice(0, 8) : [],
       edit_plan: d.edit_plan ?? null,
@@ -339,6 +412,11 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
+    // A drafted thumbnail must live in the caller's own storage folder — the
+    // same rule the enforce_reel_media_ownership_trg trigger applies on write.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.thumbnail_path);
+
     const patch: Record<string, any> = {
       style_prefs: data.style,
       ai_title: data.ai_title,
@@ -350,6 +428,10 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     };
     if (data.overlays.length) patch.ai_overlays = data.overlays;
     if (data.thumbnail_path) patch.thumbnail_path = data.thumbnail_path;
+
+    const held = await screenUserCopy(context.userId, data.reelId, patch, "applyReelStyleDraft");
+    if (held.blocked) throw new Error(held.message);
+    if (held.hidden) patch.hidden_at = new Date().toISOString();
 
     const { error } = await context.supabase
       .from("highlight_reels")
@@ -384,20 +466,34 @@ export const setReelHidden = createServerFn({ method: "POST" })
  */
 export const setReelPlaybackPath = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { reelId: string; playbackPath: string }) => {
-    if (!input?.reelId) throw new Error("reelId is required");
-    if (!input?.playbackPath) throw new Error("playbackPath is required");
-    return { reelId: input.reelId, playbackPath: input.playbackPath };
-  })
+  .inputValidator(
+    (input: {
+      reelId: string;
+      playbackPath: string;
+      mediaMeta?: Record<string, unknown> | null;
+    }) => {
+      if (!input?.reelId) throw new Error("reelId is required");
+      if (!input?.playbackPath) throw new Error("playbackPath is required");
+      return {
+        reelId: input.reelId,
+        playbackPath: input.playbackPath,
+        // Optional: the repair flow measures the copy it just made. Absent for
+        // older callers, which keep working unchanged.
+        mediaMeta: input.mediaMeta ?? null,
+      };
+    },
+  )
   .handler(async ({ data, context }) => {
-    // Accept exactly one path: the H.264 re-encode RepairPlaybackButton writes
-    // beside the source, `<video_path>.h264.mp4`. That is the only thing any
-    // caller sends, and playback_path is served to viewers through a
-    // service-role signed URL, so "any non-empty string" is the wrong contract
-    // for it. enforce_reel_media_ownership_trg still backstops this at the row
-    // level — it has to, since the RLS policy lets the client write the column
-    // directly — but a server function should not depend on a trigger to be
-    // correct.
+    // Owner-folder containment first — the shared check every service-role
+    // read path uses.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.playbackPath);
+
+    // Then the tighter one. Containment alone still lets a caller point one of
+    // their reels at a different reel of their own; this pins the value to the
+    // row being updated. The only playback copy that can exist is the H.264
+    // re-encode RepairPlaybackButton writes beside the source, and all four
+    // call sites send exactly `<video_path>.h264.mp4`.
     const { data: reel, error: readErr } = await context.supabase
       .from("highlight_reels")
       .select("video_path")
@@ -407,14 +503,15 @@ export const setReelPlaybackPath = createServerFn({ method: "POST" })
     if (readErr) throw new Error(readErr.message);
     if (!reel) throw new Error("Reel not found");
 
-    const expected = `${(reel as { video_path: string }).video_path}.h264.mp4`;
-    if (data.playbackPath !== expected) {
+    if (data.playbackPath !== `${(reel as { video_path: string }).video_path}.h264.mp4`) {
       throw new Error("That playback path does not belong to this reel");
     }
 
+    const patch: Record<string, unknown> = { playback_path: data.playbackPath };
+    if (data.mediaMeta) patch["media_meta"] = data.mediaMeta;
     const { error } = await context.supabase
       .from("highlight_reels")
-      .update({ playback_path: data.playbackPath } as any)
+      .update(patch as any)
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
@@ -554,9 +651,12 @@ export const setReelsHidden = createServerFn({ method: "POST" })
 /**
  * Public, read-only list of a user's visible completed reels for the public
  * player card. Signed URLs are minted server-side because the storage bucket
- * only allows owners to read objects directly. No auth required — the rows
- * are gated by the "Anyone can view visible completed reels" policy and this
- * function applies the same filter itself.
+ * only allows owners to read objects directly.
+ *
+ * The age-cohort audience gate is applied in SQL (`public_user_reel_ids`, which
+ * uses `public.reel_audience`): reels from children and locked child accounts
+ * are never returned, and reels from 16-17 year olds only for signed-in
+ * viewers — matching the "Anyone can view visible completed reels" policy.
  */
 export const listPublicReels = createServerFn({ method: "GET" })
   .inputValidator((input: { userId: string }) => {
@@ -568,27 +668,51 @@ export const listPublicReels = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { RECAP_COLUMNS } = await import("@/lib/recaps");
+    const { eligibleUserReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
+      await import("@/lib/reel-visibility.server");
+    const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
+
+    const viewerId = await optionalSupabaseUserId();
+    const ids = await eligibleUserReelIds(supabaseAdmin, {
+      userId: data.userId,
+      limit: 12,
+      includeMembers: viewerId !== null,
+    });
+    if (ids.length === 0) return [];
 
     const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(RECAP_COLUMNS)
-      .eq("user_id", data.userId)
-      .eq("status", "completed")
-      .is("hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(12);
+      .in("id", ids)
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
+    const quarantined = await quarantinedMediaPaths(
+      supabaseAdmin,
+      reels.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
+    );
     return Promise.all(
       reels.map(async (r) => {
+        const owner = (r.user_id as string) ?? data.userId;
+        const primaryPath = signablePath(
+          ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path),
+          quarantined,
+        );
+        const originalPath = r.playback_path
+          ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
+          : null;
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
+
         const [video, original, thumb] = await Promise.all([
-          supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.playback_path ?? r.video_path, 3600),
-          r.playback_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
+          primaryPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)
             : Promise.resolve({ data: null }),
-          r.thumbnail_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
+          originalPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(originalPath, 3600)
+            : Promise.resolve({ data: null }),
+          thumbPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(thumbPath, 3600)
             : Promise.resolve({ data: null }),
         ]);
         return {
@@ -629,7 +753,13 @@ export const deleteReels = createServerFn({ method: "POST" })
     if (ids.length === 0) return { deleted: 0 };
 
     const paths = ((rows ?? []) as any[])
-      .flatMap((r) => [r.video_path, r.playback_path, r.thumbnail_path, r.audio_path, ...((r.frame_paths as string[] | null) ?? [])])
+      .flatMap((r) => [
+        r.video_path,
+        r.playback_path,
+        r.thumbnail_path,
+        r.audio_path,
+        ...((r.frame_paths as string[] | null) ?? []),
+      ])
       .filter((p): p is string => typeof p === "string" && p.length > 0);
     if (paths.length > 0) await supabaseAdmin.storage.from("highlight-videos").remove(paths);
 

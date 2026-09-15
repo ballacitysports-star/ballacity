@@ -43,8 +43,8 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
           : gate.locked
             ? gate.label
             : game.price > 0
-                ? `$${game.price}`
-                : "Free";
+              ? `$${game.price}`
+              : "Free";
   const statusTone =
     liveStatus === "in_progress"
       ? "bg-coral text-white"
@@ -67,7 +67,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}
-        className="group flex items-center gap-3 rounded-2xl border border-border bg-surface p-2 pr-3 transition-all hover:border-lime/40"
+        className="group flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-border bg-surface p-2 pr-3 transition-all hover:border-lime/40"
       >
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl">
           <MediaImage
@@ -108,7 +108,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         </div>
 
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone}`}
+          className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone}`}
         >
           {statusLabel}
         </span>

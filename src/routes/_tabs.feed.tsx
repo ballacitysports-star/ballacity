@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { CalendarSearch, Loader2, RefreshCw, Search } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Bell, MessageCircle, MapPin, MapPinOff } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
@@ -72,7 +73,7 @@ export const Route = createFileRoute("/_tabs/feed")({
   head: () =>
     pageHead({
       path: "/feed",
-      title: "Your feed — ballaCity",
+      title: "Pickup Sports Games Near You | BallaCity",
       description: "Games, teams, and trainers picked for your sports, skill level, and distance.",
       noindex: true,
     }),
@@ -609,7 +610,7 @@ function Feed() {
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
-        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+        <p className="page-subtitle inline-flex items-center gap-1">
           {userCityToken ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
@@ -646,7 +647,7 @@ function Feed() {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+              className={`inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
                 active
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -743,9 +744,7 @@ function Feed() {
           {teamPosts.length > 0 && (
             <section className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  From teams
-                </h2>
+                <h2 className="section-eyebrow text-muted-foreground">From teams</h2>
                 <Link to="/teams" className="text-xs font-semibold text-lime">
                   See all
                 </Link>
@@ -873,7 +872,7 @@ function Feed() {
 
           {q ? (
             <>
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="section-eyebrow text-muted-foreground mb-2">
                 {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
               </h2>
               <div className={listContainerClass}>
@@ -882,11 +881,12 @@ function Feed() {
                   : visible.map((g, i) => renderGame(g, i))}
                 {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                 {!refreshing && filtered.length === 0 && (
-                  <div
-                    className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}
-                  >
-                    No games match "{q}".
-                  </div>
+                  <EmptyState
+                    className={emptyColSpan}
+                    icon={<Search className="h-6 w-6" aria-hidden />}
+                    title={`No games match "${q}"`}
+                    description="Try a shorter search, or a different sport or city name."
+                  />
                 )}
               </div>
               <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
@@ -896,9 +896,7 @@ function Feed() {
               {prefs.sections.showUrgent && urgent.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
-                      ⚡ Needs players now
-                    </h2>
+                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
                     <span className="text-xs text-muted-foreground">{urgent.length} games</span>
                   </div>
                   <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
@@ -907,7 +905,7 @@ function Feed() {
 
               {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="section-eyebrow text-muted-foreground mb-2">
                     {tab === "archive" ? "Recently finished" : "For you"}
                   </h2>
                   <div className={listContainerClass}>
@@ -916,21 +914,24 @@ function Feed() {
                       : visible.map((g, i) => renderGame(g, i))}
                     {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                     {!refreshing && filtered.length === 0 && (
-                      <div
-                        className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}
-                      >
-                        <div>
-                          {tab === "archive"
-                            ? "No finished games match your filters yet."
-                            : "No games match your filters."}
-                        </div>
-                        <button
-                          onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                          className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-                        >
-                          Clear filters
-                        </button>
-                      </div>
+                      <EmptyState
+                        className={emptyColSpan}
+                        icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
+                        title={
+                          tab === "archive"
+                            ? "No finished games match your filters"
+                            : "No games match your filters"
+                        }
+                        description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                        action={
+                          <button
+                            onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                            className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                          >
+                            Clear filters
+                          </button>
+                        }
+                      />
                     )}
                   </div>
                   <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />

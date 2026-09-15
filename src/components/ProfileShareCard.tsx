@@ -127,8 +127,7 @@ export function ProfileShareCard({
   const bioSnippet = (data.bio ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
   const kindLabel = KIND_LABEL[data.kind];
 
-  const url =
-    typeof window === "undefined" ? data.path : `${window.location.origin}${data.path}`;
+  const url = typeof window === "undefined" ? data.path : `${window.location.origin}${data.path}`;
 
   const cardImage = ogImageUrl({
     kind: data.kind === "gym" ? "venue" : data.kind,
@@ -195,7 +194,7 @@ export function ProfileShareCard({
               {data.username && (
                 <p className="truncate text-xs text-muted-foreground">{data.username}</p>
               )}
-              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 micro-label text-lime">
                 <ShieldCheck className="h-3 w-3" /> {kindLabel}
               </p>
             </div>
@@ -231,11 +230,7 @@ export function ProfileShareCard({
             <Share2 className="mr-1.5 h-4 w-4" /> Share
           </Button>
           <Button variant="secondary" className="flex-1" onClick={handleCopyLink}>
-            {copied ? (
-              <Check className="mr-1.5 h-4 w-4" />
-            ) : (
-              <Copy className="mr-1.5 h-4 w-4" />
-            )}
+            {copied ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
             Copy link
           </Button>
         </div>

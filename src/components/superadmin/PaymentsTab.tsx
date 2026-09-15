@@ -73,7 +73,9 @@ export function PaymentsTab() {
                       size="sm"
                       variant="outline"
                       disabled={s.status === st || act.isPending}
-                      onClick={() => act.mutate(() => setStatus({ data: { id: s.id, status: st } }))}
+                      onClick={() =>
+                        act.mutate(() => setStatus({ data: { id: s.id, status: st } }))
+                      }
                     >
                       {st}
                     </Button>
@@ -102,9 +104,7 @@ export function PaymentsTab() {
                 variant={m.is_enabled ? "destructive" : "outline"}
                 disabled={act.isPending}
                 onClick={() =>
-                  act.mutate(() =>
-                    toggleMethod({ data: { id: m.id, enabled: !m.is_enabled } }),
-                  )
+                  act.mutate(() => toggleMethod({ data: { id: m.id, enabled: !m.is_enabled } }))
                 }
               >
                 {m.is_enabled ? "Disable" : "Enable"}

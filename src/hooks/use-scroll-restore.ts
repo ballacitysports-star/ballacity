@@ -70,8 +70,7 @@ function shouldRestore(entry: Entry): boolean {
   if (Date.now() - entry.ts < FRESH_MS) return true;
   try {
     const nav = performance.getEntriesByType("navigation")[0] as
-      | PerformanceNavigationTiming
-      | undefined;
+      PerformanceNavigationTiming | undefined;
     const t = nav?.type;
     return t === "reload" || t === "back_forward";
   } catch {
@@ -126,7 +125,10 @@ export function useScrollRestore(key: string, opts: UseScrollRestoreOptions = {}
       }
       if (performance.now() - start > RESTORE_MAX_MS) {
         // Best-effort: scroll as close as we can.
-        window.scrollTo({ top: Math.min(targetY, reachable), behavior: "instant" as ScrollBehavior });
+        window.scrollTo({
+          top: Math.min(targetY, reachable),
+          behavior: "instant" as ScrollBehavior,
+        });
         restoredRef.current = true;
         return;
       }

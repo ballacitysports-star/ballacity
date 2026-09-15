@@ -155,8 +155,6 @@ async function fetchFlowInputs(gameId: string, userId: string) {
   return { settings, joinRequest, submissions, isJoined };
 }
 
-
-
 /**
  * Live-derived join → payment flow status for the signed-in viewer.
  * Refetches whenever a relevant realtime event fires on join_requests,

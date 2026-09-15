@@ -10,6 +10,7 @@ import {
 } from "@/lib/video-transcode";
 import { setReelPlaybackPath } from "@/lib/reels.functions";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
+import { buildMediaMeta, probeVideo } from "@/lib/video-metadata";
 
 /**
  * Owner-only repair for reels whose source clip can't be decoded everywhere
@@ -77,9 +78,21 @@ export function RepairPlaybackButton({
       // The same server-side container sniff the upload path runs. This copy is
       // what the feed serves, and it was the one servable artefact that never
       // faced the check — trusted because our own encoder produced it, which
-      // says nothing about what actually landed at that key.
+      // says nothing about what actually landed at that key. Runs before the
+      // row is pointed at it, so a copy that fails the sniff is deleted and
+      // never becomes a reel's playback path.
       await finalizeVideoUpload({ data: { path, kind: "video" } });
-      await setReelPlaybackPath({ data: { reelId, playbackPath: path } });
+      const mediaMeta = buildMediaMeta({
+        file: { name: file.name, type: file.type, size: file.size },
+        original: await probeVideo(file),
+        processed: {
+          ...(await probeVideo(converted.blob)),
+          bytes: converted.blob.size,
+          pass: converted.pass,
+        },
+        conversionAttempted: true,
+      });
+      await setReelPlaybackPath({ data: { reelId, playbackPath: path, mediaMeta } });
       toast.success("Fixed — this reel now plays everywhere", { id: toastId });
       setFailed(null);
       onRepaired?.();

@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { AlertTriangle, Calendar, Clock, MessageSquare, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar,
+  Clock,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -47,7 +55,7 @@ const fromMin = (n: number) => {
 const fmt12 = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
   const ampm = (h ?? 0) < 12 ? "AM" : "PM";
-  const hr = ((h ?? 0) % 12) || 12;
+  const hr = (h ?? 0) % 12 || 12;
   return `${hr}:${String(m ?? 0).padStart(2, "0")} ${ampm}`;
 };
 
@@ -143,7 +151,7 @@ export function BookSessionSheet({
     const inst = wallTimeToInstant(date, hhmm, trainerTz);
     const w = instantToWall(inst, viewerTz);
     const sameDay = w.dateKey === date;
-    const time = `${((Number(w.hhmm.split(":")[0]) % 12) || 12)}:${w.hhmm.split(":")[1]} ${Number(w.hhmm.split(":")[0]) < 12 ? "AM" : "PM"}`;
+    const time = `${Number(w.hhmm.split(":")[0]) % 12 || 12}:${w.hhmm.split(":")[1]} ${Number(w.hhmm.split(":")[0]) < 12 ? "AM" : "PM"}`;
     return sameDay ? time : `${time} (${w.dateKey})`;
   };
   const viewerTzShort = tzShortName(date ? fromDateKey(date) : new Date(), viewerTz);
@@ -168,7 +176,9 @@ export function BookSessionSheet({
 
   const offAvailability = useMemo(() => {
     if (!selWindow || availWindows.length === 0) return false;
-    return !availWindows.some((w) => selWindow.start >= toMin(w.start) && selWindow.end <= toMin(w.end));
+    return !availWindows.some(
+      (w) => selWindow.start >= toMin(w.start) && selWindow.end <= toMin(w.end),
+    );
   }, [selWindow, availWindows]);
 
   const conflict = useMemo(() => {
@@ -278,15 +288,35 @@ export function BookSessionSheet({
   const statusMeta = (s: TrainerSessionRequest["status"]) => {
     switch (s) {
       case "pending":
-        return { label: "Pending", cls: "bg-amber-500/15 text-amber-300 border-amber-500/40", Icon: Loader2 };
+        return {
+          label: "Pending",
+          cls: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+          Icon: Loader2,
+        };
       case "accepted":
-        return { label: "Accepted", cls: "bg-lime/15 text-lime border-lime/40", Icon: CheckCircle2 };
+        return {
+          label: "Accepted",
+          cls: "bg-lime/15 text-lime border-lime/40",
+          Icon: CheckCircle2,
+        };
       case "declined":
-        return { label: "Declined", cls: "bg-rose-500/15 text-rose-300 border-rose-500/40", Icon: XCircle };
+        return {
+          label: "Declined",
+          cls: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+          Icon: XCircle,
+        };
       case "cancelled":
-        return { label: "Cancelled", cls: "bg-muted text-muted-foreground border-border", Icon: XCircle };
+        return {
+          label: "Cancelled",
+          cls: "bg-muted text-muted-foreground border-border",
+          Icon: XCircle,
+        };
       case "completed":
-        return { label: "Completed", cls: "bg-lime/15 text-lime border-lime/40", Icon: CheckCircle2 };
+        return {
+          label: "Completed",
+          cls: "bg-lime/15 text-lime border-lime/40",
+          Icon: CheckCircle2,
+        };
     }
   };
 
@@ -304,18 +334,35 @@ export function BookSessionSheet({
         if (!v) setTimeout(reset, 250);
       }}
     >
-      <SheetContent side="bottom" className="rounded-t-3xl border-border max-h-[92vh] overflow-y-auto">
+      <SheetContent
+        side="bottom"
+        className="rounded-t-3xl border-border max-h-[92vh] overflow-y-auto"
+      >
         <SheetHeader className="text-left">
           <SheetTitle className="font-display text-xl">
-            {mode === "sent" ? "Request sent" : mode === "existing" ? "Your request" : "Book a session"}
+            {mode === "sent"
+              ? "Request sent"
+              : mode === "existing"
+                ? "Your request"
+                : "Book a session"}
           </SheetTitle>
           <SheetDescription>
             {mode === "sent" ? (
-              <>Your request is on its way to <span className="text-foreground font-semibold">{org.name}</span>. You'll be notified when they respond.</>
+              <>
+                Your request is on its way to{" "}
+                <span className="text-foreground font-semibold">{org.name}</span>. You'll be
+                notified when they respond.
+              </>
             ) : mode === "existing" && existing ? (
-              <>You already have a {existing.status} request with <span className="text-foreground font-semibold">{org.name}</span>.</>
+              <>
+                You already have a {existing.status} request with{" "}
+                <span className="text-foreground font-semibold">{org.name}</span>.
+              </>
             ) : (
-              <>Send a request to <span className="text-foreground font-semibold">{org.name}</span>. They'll confirm availability in your inbox.</>
+              <>
+                Send a request to <span className="text-foreground font-semibold">{org.name}</span>.
+                They'll confirm availability in your inbox.
+              </>
             )}
           </SheetDescription>
         </SheetHeader>
@@ -335,18 +382,18 @@ export function BookSessionSheet({
                 <Globe className="h-3.5 w-3.5 text-lime shrink-0 mt-0.5" />
                 <span>
                   Trainer's schedule is in{" "}
-                  <span className="font-semibold text-foreground">{trainerTz.replace(/_/g, " ")} ({trainerTzShort})</span>.
-                  Times below are shown in trainer time — we'll also show what that is in your local time
-                  ({viewerTzShort}).
+                  <span className="font-semibold text-foreground">
+                    {trainerTz.replace(/_/g, " ")} ({trainerTzShort})
+                  </span>
+                  . Times below are shown in trainer time — we'll also show what that is in your
+                  local time ({viewerTzShort}).
                 </span>
               </div>
             )}
 
             {!date && (
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                  Next available
-                </div>
+                <div className="section-eyebrow text-muted-foreground mb-2">Next available</div>
                 <NextAvailableList
                   org={org}
                   limit={3}
@@ -368,7 +415,9 @@ export function BookSessionSheet({
                 <AlertTriangle className="h-5 w-5 text-rose-300 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-rose-200">
-                    {conflict ? "This time overlaps another session" : "Trainer isn't available at this time"}
+                    {conflict
+                      ? "This time overlaps another session"
+                      : "Trainer isn't available at this time"}
                   </div>
                   <p className="mt-1 text-xs text-rose-100/80">
                     You picked{" "}
@@ -377,7 +426,8 @@ export function BookSessionSheet({
                     </span>
                     {conflict ? (
                       <>
-                        {" "}but the trainer already has a{" "}
+                        {" "}
+                        but the trainer already has a{" "}
                         <span className="font-semibold">{conflict.status}</span> booking from{" "}
                         <span className="font-semibold">
                           {fmt12(conflict.start)}–{fmt12(conflict.end)}
@@ -386,7 +436,8 @@ export function BookSessionSheet({
                       </>
                     ) : availWindows.length > 0 ? (
                       <>
-                        {" "}but they're only free{" "}
+                        {" "}
+                        but they're only free{" "}
                         <span className="font-semibold">
                           {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}
                         </span>
@@ -410,9 +461,7 @@ export function BookSessionSheet({
             )}
 
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                Session type
-              </div>
+              <div className="section-eyebrow text-muted-foreground mb-2">Session type</div>
               <div className="flex flex-wrap gap-2">
                 {sessionTypes.map((s) => (
                   <button
@@ -432,7 +481,7 @@ export function BookSessionSheet({
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <span className="section-eyebrow text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" /> Preferred date
                 </span>
                 <input
@@ -453,13 +502,14 @@ export function BookSessionSheet({
                 )}
                 {date && availWindows.length > 0 && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Available: {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}{" "}
+                    Available:{" "}
+                    {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}{" "}
                     <span className="font-semibold text-foreground">{trainerTzShort}</span>
                   </p>
                 )}
               </label>
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <span className="section-eyebrow text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" /> Duration
                 </span>
                 <div className="flex gap-1.5">
@@ -483,7 +533,7 @@ export function BookSessionSheet({
             {/* Start time picker */}
             {date && (
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <div className="section-eyebrow text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" /> Start time
                 </div>
                 {suggestedTimes.length > 0 ? (
@@ -537,22 +587,23 @@ export function BookSessionSheet({
                 </div>
                 {differ && startTime && toViewerLabel(startTime) && (
                   <p className="mt-1.5 text-[11px] text-lime/90">
-                    In your time: <span className="font-semibold">{toViewerLabel(startTime)} {viewerTzShort}</span>
+                    In your time:{" "}
+                    <span className="font-semibold">
+                      {toViewerLabel(startTime)} {viewerTzShort}
+                    </span>
                   </p>
                 )}
                 {bookings.length > 0 && (
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
                     Already booked:{" "}
-                    {bookings
-                      .map((b) => `${fmt12(b.start)}–${fmt12(b.end)}`)
-                      .join(", ")}
+                    {bookings.map((b) => `${fmt12(b.start)}–${fmt12(b.end)}`).join(", ")}
                   </p>
                 )}
               </div>
             )}
 
             <label className="block">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+              <span className="section-eyebrow text-muted-foreground mb-1.5 flex items-center gap-1">
                 <MessageSquare className="h-3.5 w-3.5" /> Message
               </span>
               <textarea
@@ -715,8 +766,10 @@ function ExistingRequestView({
 function Row({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
   return (
     <div className={multiline ? "" : "flex items-baseline justify-between gap-3"}>
-      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-sm text-foreground ${multiline ? "mt-1 whitespace-pre-wrap" : "text-right"}`}>
+      <div className="section-eyebrow text-muted-foreground">{label}</div>
+      <div
+        className={`text-sm text-foreground ${multiline ? "mt-1 whitespace-pre-wrap" : "text-right"}`}
+      >
         {value}
       </div>
     </div>

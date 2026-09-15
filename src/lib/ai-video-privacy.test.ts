@@ -10,7 +10,16 @@ import { DEFAULT_PRIVACY } from "./privacy";
 describe("AI video disclosure copy", () => {
   it("covers every required disclosure point", () => {
     const all = AI_DISCLOSURE_POINTS.join(" ").toLowerCase();
-    for (const term of ["ai", "wrong", "estimate", "suggestion", "medical", "safety", "recruiting", "employment"]) {
+    for (const term of [
+      "ai",
+      "wrong",
+      "estimate",
+      "suggestion",
+      "medical",
+      "safety",
+      "recruiting",
+      "employment",
+    ]) {
       expect(all).toContain(term);
     }
   });

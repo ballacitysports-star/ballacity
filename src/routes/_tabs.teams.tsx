@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, MapPin } from "lucide-react";
+import { Megaphone, MapPin, Shield } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useAllOrgs } from "@/lib/org-store";
@@ -57,7 +58,7 @@ export const Route = createFileRoute("/_tabs/teams")({
   head: () =>
     pageHead({
       path: "/teams",
-      title: "Teams & clubs — ballaCity",
+      title: "Find Local Sports Teams & Players | BallaCity",
       description:
         "Discover teams and clubs near you. Follow squads, find tryouts, and join open runs.",
       noindex: true,
@@ -322,9 +323,12 @@ function TeamsPage() {
             </div>
           ))}
           {list.length === 0 && (
-            <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
-              No teams match.
-            </div>
+            <EmptyState
+              className="sm:col-span-2"
+              icon={<Shield className="h-6 w-6" aria-hidden />}
+              title="No teams match your filters"
+              description="Try a wider distance or a different sport — new teams are added all the time."
+            />
           )}
         </div>
       )}

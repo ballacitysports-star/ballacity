@@ -126,8 +126,8 @@ function OgPreviewPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">OG card preview</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="page-title">OG card preview</h1>
+            <p className="page-subtitle">
               Paste a game, player, team, trainer, or venue URL to see its share card in every
               supported size.
             </p>
@@ -149,7 +149,7 @@ function OgPreviewPage() {
               id="og-url"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="/games/abc123 or https://open-run-connect.lovable.app/players/…"
+              placeholder="/games/abc123 or https://ballacity.com/players/…"
               spellCheck={false}
               className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary"
             />

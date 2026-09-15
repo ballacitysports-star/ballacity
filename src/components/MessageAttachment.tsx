@@ -51,7 +51,18 @@ export function MessageAttachment({ path, type, name, size, mine }: Props) {
   }
 
   if (isVideo && url) {
-    return <video src={url} controls className="max-h-64 max-w-full rounded-xl" />;
+    // playsInline keeps the clip in the conversation on iPhone instead of
+    // hijacking the screen with the fullscreen player; metadata-only preload
+    // keeps a long thread from downloading every attachment at once.
+    return (
+      <video
+        src={url}
+        controls
+        playsInline
+        preload="metadata"
+        className="max-h-64 max-w-full rounded-xl bg-black"
+      />
+    );
   }
 
   return (

@@ -9,13 +9,7 @@ import {
   resolveDay,
   toDateKey,
 } from "@/lib/availability-resolve";
-import {
-  DEFAULT_TZ,
-  fmt12,
-  getBrowserTz,
-  tzRelativeLabel,
-  tzShortName,
-} from "@/lib/tz";
+import { DEFAULT_TZ, fmt12, getBrowserTz, tzRelativeLabel, tzShortName } from "@/lib/tz";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -132,7 +126,7 @@ export function TrainerAvailabilityMonth({
         </div>
       )}
 
-      <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="grid grid-cols-7 gap-1 px-1 text-center micro-label text-muted-foreground">
         {DAY_LABELS.map((l) => (
           <div key={l}>{l}</div>
         ))}
@@ -147,8 +141,7 @@ export function TrainerAvailabilityMonth({
           const disabled = past || beyond;
           const override = overrides.find((o) => o.date === key);
           const closed = override?.closed;
-          const hasAny =
-            !disabled && resolveDay(d, weekly, overrides, resolverOpts).length > 0;
+          const hasAny = !disabled && resolveDay(d, weekly, overrides, resolverOpts).length > 0;
           const isSelected = key === selected;
           const state = disabled
             ? "border-border/30 bg-transparent text-muted-foreground/40 cursor-not-allowed"
@@ -187,11 +180,11 @@ export function TrainerAvailabilityMonth({
               {tzLabel}
             </span>
             {selectedOverride?.closed ? (
-              <span className="rounded-full border border-rose-500/50 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-300">
+              <span className="rounded-full border border-rose-500/50 bg-rose-500/10 px-2 py-0.5 micro-label text-rose-300">
                 Closed
               </span>
             ) : selectedOverride ? (
-              <span className="rounded-full border border-lime/50 bg-lime/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+              <span className="rounded-full border border-lime/50 bg-lime/10 px-2 py-0.5 micro-label text-lime">
                 Custom
               </span>
             ) : null}

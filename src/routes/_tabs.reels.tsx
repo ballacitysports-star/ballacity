@@ -15,12 +15,15 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
+import { priceLabelFor, productForEntitlement } from "@/lib/monetization/config";
 import { needsPlaybackConversion } from "@/lib/video-support";
 import {
   assertConverterReachable,
   convertToPlayableMp4,
   ConverterUnavailableError,
 } from "@/lib/video-transcode";
+import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
@@ -469,7 +472,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
               <p className="mb-2 text-[10px] italic text-muted-foreground">{AI_RESULTS_CAVEAT}</p>
               {reel.ai_sport && (
-                <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+                <p className="micro-label text-lime">
                   {reel.ai_sport}
                 </p>
               )}
@@ -575,6 +578,9 @@ function ReelsPage() {
     loading: subLoading,
   } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
+  const { config: monetization } = useMonetizationConfig();
+  const plusProduct = productForEntitlement("player_plus", monetization);
+  const plusPriceLabel = plusProduct ? `${priceLabelFor(plusProduct)}` : "";
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
@@ -809,6 +815,11 @@ function ReelsPage() {
       const invalid = validateVideoSize({ bytes: file.size });
       if (invalid) throw new Error(invalid);
 
+      // What the clip actually is (length, size, which way up). Measured here
+      // because the server runtime has no ffprobe; kept so a viewer's player and
+      // a later support question both have the facts.
+      const originalProbe = await probeVideo(file);
+
       // Convert BEFORE storing anything. This ordering is the whole fix: the
       // conversion used to run after the upload and after a container gate that
       // had already thrown the file away, so the pipeline refused the clips it
@@ -816,7 +827,9 @@ function ReelsPage() {
       // playable leaves nothing behind to clean up.
       let playable: Blob = file;
       let converted = false;
-      if (await needsPlaybackConversion(file)) {
+      let processedInfo: (ProbedVideo & { bytes: number; pass: string }) | null = null;
+      const conversionAttempted = await needsPlaybackConversion(file);
+      if (conversionAttempted) {
         // Check the converter exists before promising anything. Without this a
         // missing wasm core reads as "your clip failed", sending the athlete off
         // to re-encode on a desktop over a problem only we can fix.
@@ -842,6 +855,11 @@ function ReelsPage() {
         }
         playable = result.blob;
         converted = true;
+        processedInfo = {
+          ...(await probeVideo(result.blob)),
+          bytes: result.blob.size,
+          pass: result.pass,
+        };
         toast.success("Ready — this reel plays on every device", { id: toastId });
       }
 
@@ -872,6 +890,15 @@ function ReelsPage() {
         await finalizeVideoUpload({ data: { path: p, kind: "video" } });
         playbackPath = p;
       }
+      const mediaMeta = buildMediaMeta({
+        file: { name: file.name, type: file.type, size: file.size },
+        original: originalProbe,
+        processed: processedInfo,
+        // No playbackError: a clip that cannot be converted is refused above
+        // rather than stored, so a saved reel is always "ready" or "original"
+        // and never "failed".
+        conversionAttempted,
+      });
 
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
@@ -923,6 +950,7 @@ function ReelsPage() {
             (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
           video_path: base,
           playback_path: playbackPath,
+          media_meta: mediaMeta,
           status: "processing",
           used_free: usedFree,
           environment: env,
@@ -1005,9 +1033,7 @@ function ReelsPage() {
           <Sparkles className="h-6 w-6 text-lime" />
           <h1 className="page-title">AI Highlight Reels</h1>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload a clip and let AI generate your highlight.
-        </p>
+        <p className="mt-1 page-subtitle">Upload a clip and let AI generate your highlight.</p>
         <Link
           to="/highlights"
           className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
@@ -1018,7 +1044,7 @@ function ReelsPage() {
 
       {gameId && (
         <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+          <p className="micro-label text-lime">
             Recap for finished game
           </p>
           <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>
@@ -1043,8 +1069,8 @@ function ReelsPage() {
         ) : isActive ? (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-lime">Pro · Unlimited reels</p>
-              <p className="text-xs text-muted-foreground">$15 / month</p>
+              <p className="text-sm font-semibold text-lime">ballaCity+ · Unlimited reels</p>
+              <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
             </div>
             <button
               onClick={handleManageBilling}
