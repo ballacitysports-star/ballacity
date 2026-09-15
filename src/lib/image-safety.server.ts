@@ -27,7 +27,8 @@ export async function scanImageForSafety(imageUrl: string): Promise<SafetyVerdic
     const { createLovableGatewayProvider } = await import("@/lib/ai/gateway.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const config = await loadAiConfig(supabaseAdmin);
-    if (config.features.killSwitch || !config.features.features.image_moderation.enabled) {
+    // Not gated on the kill switch — safety scanning stays on when AI is off.
+    if (!config.features.features.image_moderation.enabled) {
       return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
     }
     const verdict = await createLovableGatewayProvider(config.provider).moderateImage({ imageUrl });

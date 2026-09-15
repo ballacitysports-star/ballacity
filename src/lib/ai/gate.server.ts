@@ -102,11 +102,13 @@ export async function assertAiAllowed(
   const admin = ctx.admin ?? supabaseAdmin;
   const config = await loadAiConfig(admin);
   const flag = config.features.features[feature];
-
-  // (a) flags
-  if (config.features.killSwitch || !flag.enabled) throw new AiError("FEATURE_DISABLED");
-
   const platform = PLATFORM_FEATURES.has(feature);
+
+  // (a) flags — safety scanning is exempt from the global kill switch, so
+  // turning AI off to save money can never turn safety scanning off.
+  if (!flag.enabled) throw new AiError("FEATURE_DISABLED");
+  if (!platform && config.features.killSwitch) throw new AiError("FEATURE_DISABLED");
+
   const cohort = platform ? "adult" : await cohortOf(admin, ctx.userId);
 
   if (!platform) {
@@ -138,6 +140,21 @@ export async function assertAiAllowed(
   const tier = platform ? "free" : await resolveAiTier(admin, ctx.userId);
   const limits = config.limits[tier];
   const perFeature = limits.perFeature[feature];
+
+  // Safety scanning is never rationed: no quota, no concurrency ceiling.
+  if (platform) {
+    return {
+      admin,
+      userId: ctx.userId,
+      feature,
+      jobId: null,
+      tier,
+      cohort,
+      limits,
+      config,
+      provider: createLovableGatewayProvider(config.provider),
+    };
+  }
 
   // (d) quota + concurrency, reserved atomically
   const { data, error } = await admin.rpc("ai_reserve_quota", {
