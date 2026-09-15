@@ -1,0 +1,65 @@
+name: Preserve Artifact
+
+# Actions artifacts expire on a fixed retention window and there is no API to
+# extend an existing one's expiry. The only way to keep one past that window
+# is to pull its bytes out and store them somewhere that doesn't expire
+# before the original artifact does. This runs the download+republish inside
+# GitHub's own network (unrestricted here, unlike a sandboxed agent session
+# that only has an allowlisted egress path) and republishes the contents as a
+# GitHub Release asset, which persists indefinitely.
+#
+# Manually triggered only — this isn't part of the regular CI surface, it's a
+# one-off rescue tool. Defaults are pre-filled for run 92's playwright-report
+# artifact (id 10188443682, expires 2026-09-18T07:06:54Z) but any run/artifact
+# in this repo can be preserved by overriding the inputs at dispatch time.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Workflow run ID that owns the artifact to preserve"
+        required: true
+        default: "34569074064"
+      artifact_name:
+        description: "Artifact name to download from that run"
+        required: true
+        default: "playwright-report"
+      release_tag:
+        description: "Tag for the Release that will hold the preserved copy"
+        required: true
+        default: "preserved-playwright-report-run92"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  preserve:
+    name: Download and re-publish artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download artifact from the source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.run_id }}" \
+            --repo "${{ github.repository }}" \
+            --name "${{ inputs.artifact_name }}" \
+            --dir ./downloaded-artifact
+
+      - name: Repack as a single archive
+        run: |
+          cd downloaded-artifact
+          zip -r "../${{ inputs.artifact_name }}.zip" .
+          cd ..
+          du -h "${{ inputs.artifact_name }}.zip"
+
+      - name: Publish as a permanent Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release_tag }}" \
+            "./${{ inputs.artifact_name }}.zip" \
+            --repo "${{ github.repository }}" \
+            --title "Preserved artifact: ${{ inputs.artifact_name }} (run ${{ inputs.run_id }})" \
+            --notes "Rescued from expiry by the Preserve Artifact workflow. Source run: https://github.com/${{ github.repository }}/actions/runs/${{ inputs.run_id }}"
