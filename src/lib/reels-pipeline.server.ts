@@ -600,11 +600,42 @@ async function screenReelOutput(
   };
 }
 
+/**
+ * Claims a reel for one processing run.
+ *
+ * The attempt bump is conditional on the attempt count we read, so two
+ * overlapping requests for the same reel (upload trigger + resume/worker
+ * sweep) can never both run the pipeline and double-charge the AI budget.
+ * Returns false when another run already claimed it.
+ */
+export async function claimReel(supabaseAdmin: any, reel: Reel) {
+  const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
+  const startStep = firstStep(reel.processing_step);
+  const startIdx = STEPS.indexOf(startStep);
+  progress._pipeline = snapshot(STEPS.slice(0, startIdx), startStep, reel.attempts + 1);
+
+  const { data } = await supabaseAdmin
+    .from("highlight_reels")
+    .update({
+      attempts: reel.attempts + 1,
+      processing_started_at: new Date().toISOString(),
+      step_progress: progress,
+      last_step_at: new Date().toISOString(),
+      error_message: null,
+    })
+    .eq("id", reel.id)
+    .eq("attempts", reel.attempts)
+    .select("id");
+
+  return (data?.length ?? 0) > 0;
+}
+
 export async function processReel(
   reel: Reel,
   supabaseAdmin: any,
   apiKey: string,
   session?: AiSession | null,
+  alreadyClaimed = false,
 ) {
   const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
   const startStep = firstStep(reel.processing_step);
@@ -615,16 +646,10 @@ export async function processReel(
 
   progress._pipeline = snapshot(done, startStep, attempt);
 
-  await supabaseAdmin
-    .from("highlight_reels")
-    .update({
-      attempts: attempt,
-      processing_started_at: new Date().toISOString(),
-      step_progress: progress,
-      last_step_at: new Date().toISOString(),
-      error_message: null,
-    })
-    .eq("id", reel.id);
+  if (!alreadyClaimed && !(await claimReel(supabaseAdmin, reel))) {
+    return { id: reel.id, status: "skipped" };
+  }
+
 
   try {
     for (let i = startIdx; i < STEPS.length; i++) {
