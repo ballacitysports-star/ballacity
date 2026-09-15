@@ -53,20 +53,28 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { eligibleFeedReelIds, optionalSupabaseUserId } =
+      await import("@/lib/reel-visibility.server");
+    const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
-    let q = supabaseAdmin
+    // Age-cohort gate lives in SQL: children and locked child accounts are
+    // never returned, and 16-17 year olds only for signed-in viewers.
+    const viewerId = await optionalSupabaseUserId();
+    const ids = await eligibleFeedReelIds(supabaseAdmin, {
+      cursor: data.cursor,
+      sport: data.sport,
+      limit: data.limit + 1,
+      includeMembers: viewerId !== null,
+    });
+    if (ids.length === 0) return { items: [] as HighlightFeedItem[], nextCursor: null };
+
+    const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(
         "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,created_at,game_id,game_title",
       )
-      .eq("status", "completed")
-      .is("hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(data.limit + 1);
-    if (data.sport) q = q.eq("ai_sport", data.sport);
-    if (data.cursor) q = q.lt("created_at", data.cursor);
-
-    const { data: rows, error } = await q;
+      .in("id", ids)
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const page = ((rows ?? []) as any[]).slice(0, data.limit);
