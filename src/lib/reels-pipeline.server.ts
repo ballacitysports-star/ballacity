@@ -516,7 +516,96 @@ function snapshot(
   };
 }
 
-export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
+/**
+ * Screens the reel's AI copy and sampled frames before it may become visible.
+ * Blocked copy is dropped, borderline copy and any unsafe or unverifiable
+ * footage keep the reel owner-only (`hidden_at`), and suspected child sexual
+ * abuse material quarantines the reel outright. Fails closed throughout; the
+ * original upload is never deleted.
+ */
+async function screenReelOutput(
+  reel: Reel,
+  progress: Record<string, any>,
+  ctx: StepCtx,
+): Promise<{ quarantined: boolean; hiddenAt: string | null; note: string | null }> {
+  const { supabaseAdmin, session } = ctx;
+  const jobId = session?.jobId ?? null;
+  const { moderateAiFields, checkReelFrameSafety, quarantineForChildSafety } = await import(
+    "@/lib/ai/moderation.server"
+  );
+
+  const hashtags: string[] = Array.isArray(progress.ai_hashtags) ? progress.ai_hashtags : [];
+  const coaching = progress.coaching ?? null;
+  const moderated = await moderateAiFields(supabaseAdmin, {
+    userId: reel.user_id,
+    jobId,
+    table: "highlight_reels",
+    id: reel.id,
+    context: "AI-written highlight reel copy shown publicly",
+    fields: {
+      ai_title: String(progress.ai_title ?? ""),
+      ai_caption: String(progress.ai_caption ?? ""),
+      ai_hashtags: hashtags.join(" "),
+      ai_coaching: coaching
+        ? [...(coaching.strengths ?? []), ...(coaching.notes ?? []), ...(coaching.drills ?? [])].join(
+            " ",
+          )
+        : "",
+    },
+  });
+
+  if (moderated.blocked.includes("ai_title")) progress.ai_title = "";
+  if (moderated.blocked.includes("ai_caption")) progress.ai_caption = "";
+  if (moderated.blocked.includes("ai_hashtags")) progress.ai_hashtags = [];
+  if (moderated.blocked.includes("ai_coaching")) progress.coaching = null;
+
+  // Frame safety on the frames already sampled at upload time.
+  const framePaths = (reel.frame_paths ?? []).slice(0, 3);
+  const frames: string[] = [];
+  for (const path of framePaths) {
+    const url = await frameDataUrl(supabaseAdmin, reel.user_id, path);
+    if (url) frames.push(url);
+  }
+  const safety = await checkReelFrameSafety(supabaseAdmin, {
+    userId: reel.user_id,
+    reelId: reel.id,
+    frames,
+    jobId,
+  });
+
+  if (safety.csam) {
+    await quarantineForChildSafety(supabaseAdmin, {
+      userId: reel.user_id,
+      reelId: reel.id,
+      path: reel.video_path,
+      categories: safety.categories,
+      source: "reel_pipeline_frame_scan",
+    });
+    return { quarantined: true, hiddenAt: new Date().toISOString(), note: null };
+  }
+
+  const holdBack =
+    !safety.safe ||
+    safety.unavailable ||
+    moderated.review.length > 0 ||
+    moderated.blocked.length > 0 ||
+    moderated.unavailable;
+
+  return {
+    quarantined: false,
+    hiddenAt: holdBack ? new Date().toISOString() : null,
+    note: holdBack
+      ? "Your reel is saved and visible to you only while our safety check finishes reviewing it."
+      : null,
+  };
+}
+
+export async function processReel(
+  reel: Reel,
+  supabaseAdmin: any,
+  apiKey: string,
+  session?: AiSession | null,
+) {
   const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
   const startStep = firstStep(reel.processing_step);
   const startIdx = STEPS.indexOf(startStep);
