@@ -36,7 +36,7 @@ export const processMyReels = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
     const { withAiSession } = await import("@/lib/ai/session.server");
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, processReel } =
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, claimReel, processReel } =
       await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -55,13 +55,17 @@ export const processMyReels = createServerFn({ method: "POST" })
 
     const results = [];
     for (const reel of (rows ?? []) as any[]) {
+      // Claim before opening an AI job so an overlapping request neither runs
+      // the pipeline twice nor reserves quota for work it will not do.
+      if (!(await claimReel(supabaseAdmin, reel))) continue;
       results.push(
         await withAiSession(
           { userId: context.userId, feature: "reel_pipeline", relatedReelId: reel.id },
-          (session) => processReel(reel, supabaseAdmin, apiKey, session),
+          (session) => processReel(reel, supabaseAdmin, apiKey, session, true),
         ),
       );
     }
+
     return { processed: results.length, results };
   });
 
