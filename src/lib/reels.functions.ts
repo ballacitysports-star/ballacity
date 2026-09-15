@@ -390,6 +390,28 @@ export const setReelPlaybackPath = createServerFn({ method: "POST" })
     return { reelId: input.reelId, playbackPath: input.playbackPath };
   })
   .handler(async ({ data, context }) => {
+    // Accept exactly one path: the H.264 re-encode RepairPlaybackButton writes
+    // beside the source, `<video_path>.h264.mp4`. That is the only thing any
+    // caller sends, and playback_path is served to viewers through a
+    // service-role signed URL, so "any non-empty string" is the wrong contract
+    // for it. enforce_reel_media_ownership_trg still backstops this at the row
+    // level — it has to, since the RLS policy lets the client write the column
+    // directly — but a server function should not depend on a trigger to be
+    // correct.
+    const { data: reel, error: readErr } = await context.supabase
+      .from("highlight_reels")
+      .select("video_path")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!reel) throw new Error("Reel not found");
+
+    const expected = `${(reel as { video_path: string }).video_path}.h264.mp4`;
+    if (data.playbackPath !== expected) {
+      throw new Error("That playback path does not belong to this reel");
+    }
+
     const { error } = await context.supabase
       .from("highlight_reels")
       .update({ playback_path: data.playbackPath } as any)

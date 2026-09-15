@@ -9,6 +9,7 @@ import {
   MAX_TRANSCODE_BYTES,
 } from "@/lib/video-transcode";
 import { setReelPlaybackPath } from "@/lib/reels.functions";
+import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 
 /**
  * Owner-only repair for reels whose source clip can't be decoded everywhere
@@ -73,6 +74,11 @@ export function RepairPlaybackButton({
         .from("highlight-videos")
         .upload(path, converted.blob, { upsert: true, contentType: "video/mp4" });
       if (upErr) throw new Error(upErr.message);
+      // The same server-side container sniff the upload path runs. This copy is
+      // what the feed serves, and it was the one servable artefact that never
+      // faced the check — trusted because our own encoder produced it, which
+      // says nothing about what actually landed at that key.
+      await finalizeVideoUpload({ data: { path, kind: "video" } });
       await setReelPlaybackPath({ data: { reelId, playbackPath: path } });
       toast.success("Fixed — this reel now plays everywhere", { id: toastId });
       setFailed(null);
