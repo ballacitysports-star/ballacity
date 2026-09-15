@@ -32,10 +32,10 @@ export const processMyReels = createServerFn({ method: "POST" })
     reelId: typeof input?.reelId === "string" ? input.reelId : undefined,
   }))
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, processReel } =
       await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -55,7 +55,12 @@ export const processMyReels = createServerFn({ method: "POST" })
 
     const results = [];
     for (const reel of (rows ?? []) as any[]) {
-      results.push(await processReel(reel, supabaseAdmin, apiKey));
+      results.push(
+        await withAiSession(
+          { userId: context.userId, feature: "reel_pipeline", relatedReelId: reel.id },
+          (session) => processReel(reel, supabaseAdmin, apiKey, session),
+        ),
+      );
     }
     return { processed: results.length, results };
   });
@@ -83,18 +88,23 @@ export const askReelCoach = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { runReelCoachAgent } = await import("@/lib/reel-agent.server");
-    return runReelCoachAgent(apiKey, {
-      supabase: context.supabase,
-      userId: context.userId,
-      reelId: data.reelId,
-      question: data.question,
-      history: data.history,
-    });
+    return withAiSession(
+      { userId: context.userId, feature: "reel_coach", relatedReelId: data.reelId },
+      (session) =>
+        runReelCoachAgent(apiKey, {
+          supabase: context.supabase,
+          userId: context.userId,
+          reelId: data.reelId,
+          question: data.question,
+          history: data.history,
+          session,
+        }),
+    );
   });
 
 /**
@@ -112,10 +122,10 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
     const { data: reel, error } = await context.supabase
       .from("highlight_reels")
@@ -126,7 +136,11 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!reel) throw new Error("Reel not found");
 
-    return generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone });
+    return withAiSession(
+      { userId: context.userId, feature: "reel_package", relatedReelId: data.reelId },
+      (session) =>
+        generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone, session }),
+    );
   });
 
 /**
@@ -287,10 +301,10 @@ export const previewReelStyle = createServerFn({ method: "POST" })
     return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
   })
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { REEL_WORK_COLUMNS, runStyleDraft } = await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -310,7 +324,10 @@ export const previewReelStyle = createServerFn({ method: "POST" })
       throw new Error("This reel has no captured analysis to build on — use Try again instead");
     }
 
-    return runStyleDraft(reel as any, data.style as any, supabaseAdmin, apiKey);
+    return withAiSession(
+      { userId: context.userId, feature: "reel_style", relatedReelId: data.reelId },
+      (session) => runStyleDraft(reel as any, data.style as any, supabaseAdmin, apiKey, session),
+    );
   });
 
 /**

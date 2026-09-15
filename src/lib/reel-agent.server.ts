@@ -7,6 +7,7 @@
  * (all reads/writes go through the request-scoped, RLS-enforcing client).
  */
 
+import type { AiSession } from "@/lib/ai/gate.server";
 import { buildReelGrounding, REEL_COACH_COLUMNS } from "@/lib/reel-coach.server";
 
 const MODEL = "google/gemini-3-flash-preview";
@@ -29,6 +30,7 @@ type Ctx = {
   reel: Record<string, any>;
   actions: string[];
   changed: boolean;
+  session?: AiSession | null;
 };
 
 const TOOLS = [
