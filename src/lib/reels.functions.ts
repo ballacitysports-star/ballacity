@@ -537,7 +537,8 @@ export const deleteReel = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!reel) throw new Error("Reel not found");
+    // Already gone (or never existed for this owner): deleting is a no-op, not an error.
+    if (!reel) return { deleted: true, alreadyGone: true };
 
     const paths = [
       (reel as any).video_path,
