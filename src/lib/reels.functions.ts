@@ -666,12 +666,25 @@ export const listPublicReels = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
+    const quarantined = await quarantinedMediaPaths(
+      supabaseAdmin,
+      reels.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
+    );
     return Promise.all(
       reels.map(async (r) => {
         const owner = (r.user_id as string) ?? data.userId;
-        const primaryPath = ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path);
-        const originalPath = r.playback_path ? ownedMediaPathOrNull(owner, r.video_path) : null;
-        const thumbPath = ownedMediaPathOrNull(owner, r.thumbnail_path);
+        const primaryPath = signablePath(
+          ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path),
+          quarantined,
+        );
+        const originalPath = r.playback_path
+          ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
+          : null;
+        const thumbPath = signablePath(
+          ownedMediaPathOrNull(owner, r.thumbnail_path),
+          quarantined,
+        );
+
         const [video, original, thumb] = await Promise.all([
           primaryPath
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)
