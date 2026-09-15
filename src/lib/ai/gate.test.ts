@@ -151,11 +151,11 @@ describe("gate order", () => {
     const admin = makeAdmin({});
     const session = await assertAiAllowed({ admin, userId: "u1" }, "reel_pipeline");
     expect(admin.calls).toEqual([
+      "age_cohort_of",
       "child_features_locked",
       "ai_analysis_allowed",
       "ai_reserve_quota",
-    ].filter((c) => admin.calls.includes(c)));
-    expect(admin.calls).toContain("ai_reserve_quota");
+    ]);
     expect(session.jobId).toBe("job-1");
   });
 });
