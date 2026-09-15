@@ -6,6 +6,9 @@
  * must stay a thin wrapper.
  */
 
+import { DEFAULT_AI_PROVIDER } from "@/lib/ai/config";
+import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
+import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import { reelStyleDirectives } from "@/lib/reel-style";
 
 export const REEL_COACH_COLUMNS =
@@ -67,48 +70,26 @@ export function buildReelGrounding(r: Record<string, any>): string {
     .join("\n");
 }
 
-/** Chat-completions call that returns parsed JSON, with gateway error mapping. */
+/**
+ * JSON call routed through the shared AI service layer (same model, prompts and
+ * output as before): retries, usage accounting and typed errors come from there.
+ * `session` is present whenever the caller passed through the AI gate.
+ */
 export async function callReelJson(
   apiKey: string,
   system: string,
   user: string,
+  session?: AiSession | null,
 ): Promise<Record<string, any>> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!res.ok) {
-    if (res.status === 429) throw new Error("Reel Coach is busy — try again in a moment");
-    if (res.status === 402)
-      throw new Error("AI credits exhausted — add credits to keep using Reel Coach");
-    const body = await res.text().catch(() => "");
-    throw new Error(`Reel Coach failed (${res.status}): ${body.slice(0, 200)}`);
+  const request = { system, prompt: user };
+  if (session) {
+    const out = await runAiCall(session, (provider) =>
+      provider.generateStructured<Record<string, any>>(request),
+    );
+    return out.data;
   }
-
-  const json = await res.json();
-  const content = String(json?.choices?.[0]?.message?.content ?? "")
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  if (!content) throw new Error("Reel Coach had nothing to say — try again");
-  try {
-    return JSON.parse(content);
-  } catch {
-    throw new Error("Reel Coach returned an unreadable answer — try again");
-  }
+  const provider = createLovableGatewayProvider(DEFAULT_AI_PROVIDER);
+  return (await provider.generateStructured<Record<string, any>>(request)).data;
 }
 
 const SPORT_HINTS: Record<string, string> = {
@@ -131,7 +112,7 @@ const SPORT_HINTS: Record<string, string> = {
 export async function generateReelPackage(
   apiKey: string,
   reel: Record<string, any>,
-  opts: { tone?: string } = {},
+  opts: { tone?: string; session?: AiSession | null } = {},
 ): Promise<ReelPackage> {
   const sport = reel.ai_sport ? String(reel.ai_sport) : null;
   const sportHint = sport ? SPORT_HINTS[sport.toLowerCase()] : undefined;
@@ -155,6 +136,7 @@ export async function generateReelPackage(
       .filter(Boolean)
       .join("\n"),
     ["Here is everything known about the reel:", buildReelGrounding(reel)].join("\n"),
+    opts.session ?? null,
   );
 
   const overlays: ReelOverlay[] = Array.isArray(pkg.overlays)
@@ -190,11 +172,32 @@ export async function generateReelPackage(
     throw new Error("Reel Coach could not build a package — try again");
   }
 
+  // Every AI-written string here can end up on a publicly visible reel, so it
+  // passes the safety check before it is handed back. Blocked copy is dropped.
+  let safeCaptions = captions;
+  let safeOverlays = overlays;
+  let safeHashtags = hashtags;
+  if (opts.session) {
+    const { moderateAiText } = await import("@/lib/ai/moderation.server");
+    const verdict = await moderateAiText(opts.session.admin, {
+      userId: opts.session.userId,
+      jobId: opts.session.jobId,
+      text: [...captions, ...overlays.map((o) => o.text), ...hashtags].join("\n"),
+      context: "AI-written reel copy the athlete may publish",
+      target: { table: "highlight_reels", id: String(reel.id ?? ""), field: "reel_package" },
+    });
+    if (verdict.verdict === "block") {
+      safeCaptions = [];
+      safeOverlays = [];
+      safeHashtags = [];
+    }
+  }
+
   return {
     sport: pkg.sport ? String(pkg.sport).slice(0, 40) : sport,
-    caption,
-    captions,
-    overlays,
-    hashtags,
+    caption: safeCaptions[0] ?? "",
+    captions: safeCaptions,
+    overlays: safeOverlays,
+    hashtags: safeHashtags,
   };
 }

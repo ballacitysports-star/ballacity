@@ -107,6 +107,186 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_generation_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_code: string | null
+          est_cost_cents: number
+          feature: string
+          finished_at: string | null
+          heartbeat_at: string | null
+          id: string
+          input_summary: Json
+          max_attempts: number
+          model: string | null
+          owner_id: string | null
+          owner_type: string
+          progress: Json
+          provider: string | null
+          related_reel_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_message: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_code?: string | null
+          est_cost_cents?: number
+          feature: string
+          finished_at?: string | null
+          heartbeat_at?: string | null
+          id?: string
+          input_summary?: Json
+          max_attempts?: number
+          model?: string | null
+          owner_id?: string | null
+          owner_type?: string
+          progress?: Json
+          provider?: string | null
+          related_reel_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          user_message?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_code?: string | null
+          est_cost_cents?: number
+          feature?: string
+          finished_at?: string | null
+          heartbeat_at?: string | null
+          id?: string
+          input_summary?: Json
+          max_attempts?: number
+          model?: string | null
+          owner_id?: string | null
+          owner_type?: string
+          progress?: Json
+          provider?: string | null
+          related_reel_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_jobs_related_reel_id_fkey"
+            columns: ["related_reel_id"]
+            isOneToOne: false
+            referencedRelation: "highlight_reels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_text_moderation: {
+        Row: {
+          categories: Json
+          created_at: string
+          id: string
+          job_id: string | null
+          model: string | null
+          target_field: string
+          target_id: string | null
+          target_table: string
+          user_id: string
+          verdict: string
+        }
+        Insert: {
+          categories?: Json
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          target_field: string
+          target_id?: string | null
+          target_table: string
+          user_id: string
+          verdict: string
+        }
+        Update: {
+          categories?: Json
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          target_field?: string
+          target_id?: string | null
+          target_table?: string
+          user_id?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_text_moderation_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_events: {
+        Row: {
+          created_at: string
+          est_cost_cents: number
+          feature: string
+          id: string
+          input_tokens: number
+          job_id: string | null
+          model: string | null
+          outcome: string
+          output_tokens: number
+          provider: string | null
+          units: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          est_cost_cents?: number
+          feature: string
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          model?: string | null
+          outcome: string
+          output_tokens?: number
+          provider?: string | null
+          units?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          est_cost_cents?: number
+          feature?: string
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          model?: string | null
+          outcome?: string
+          output_tokens?: number
+          provider?: string | null
+          units?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -3424,6 +3604,22 @@ export type Database = {
       }
       age_verified: { Args: { _user: string }; Returns: boolean }
       ai_analysis_allowed: { Args: { _user: string }; Returns: boolean }
+      ai_reserve_quota: {
+        Args: {
+          _daily_limit: number
+          _feature: string
+          _input_summary?: Json
+          _max_attempts?: number
+          _max_concurrent: number
+          _model?: string
+          _monthly_limit: number
+          _provider?: string
+          _related_reel_id?: string
+          _units: number
+          _user_id: string
+        }
+        Returns: Json
+      }
       approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
