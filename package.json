@@ -113,5 +113,8 @@
   },
   "overrides": {
     "sharp": "^0.35.4"
+  },
+  "patchedDependencies": {
+    "@tanstack/start-server-core@1.169.32": "patches/@tanstack+start-server-core@1.169.32.patch"
   }
 }
