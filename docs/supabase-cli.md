@@ -2,10 +2,10 @@
 
 Two Supabase projects appear in this repository. They are not interchangeable.
 
-| Purpose                         | Project ref            | Where it is configured                        |
-| ------------------------------- | ---------------------- | --------------------------------------------- |
-| Default / canonical (app + CLI) | `cpqihhcqeivbgxqbzatv` | `supabase/config.toml`, `.env.production`     |
-| E2E / test sandbox (optional)   | `olrbulvwexrkjcxddjxq` | `supabase/config.e2e.toml` (reference only)   |
+| Purpose                         | Project ref            | Where it is configured                      |
+| ------------------------------- | ---------------------- | ------------------------------------------- |
+| Default / canonical (app + CLI) | `cpqihhcqeivbgxqbzatv` | `supabase/config.toml`, `.env.production`   |
+| E2E / test sandbox (optional)   | `olrbulvwexrkjcxddjxq` | `supabase/config.e2e.toml` (reference only) |
 
 ## Normal contributor commands
 
