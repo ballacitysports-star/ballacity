@@ -645,9 +645,10 @@ export const listPublicReels = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { RECAP_COLUMNS } = await import("@/lib/recaps");
-    const { eligibleUserReelIds, optionalSupabaseUserId } =
+    const { eligibleUserReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
       await import("@/lib/reel-visibility.server");
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
+
 
     const viewerId = await optionalSupabaseUserId();
     const ids = await eligibleUserReelIds(supabaseAdmin, {
