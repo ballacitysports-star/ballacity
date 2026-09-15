@@ -186,7 +186,7 @@ export const listHighlightFeedSports = createServerFn({ method: "GET" }).handler
   if (error) throw new Error(error.message);
   const seen = new Set<string>();
   for (const row of (data ?? []) as any[]) {
-    const s = String(row.sport ?? row.ai_sport ?? "").trim();
+    const s = (typeof row === "string" ? row : String(row?.sport ?? row?.ai_sport ?? "")).trim();
     if (s) seen.add(s);
   }
   return Array.from(seen).sort((a, b) => a.localeCompare(b));
