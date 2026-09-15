@@ -23,6 +23,7 @@ dist-ssr
 # Environment variables (may contain client keys that shouldn't be re-committed)
 .env
 .env.development
+.env.production
 .env.local
 .env.*.local
 
