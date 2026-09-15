@@ -18,7 +18,11 @@ import { captureClip } from "@/lib/reel-frames";
 import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
 import { priceLabelFor, productForEntitlement } from "@/lib/monetization/config";
 import { needsPlaybackConversion } from "@/lib/video-support";
-import { convertToPlayableMp4 } from "@/lib/video-transcode";
+import {
+  assertConverterReachable,
+  convertToPlayableMp4,
+  ConverterUnavailableError,
+} from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
@@ -49,7 +53,7 @@ import { useMyPrivacy } from "@/lib/privacy";
 import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { validateVideoMeta } from "@/lib/video-validation";
+import { validateVideoSize } from "@/lib/video-validation";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
@@ -804,34 +808,34 @@ function ReelsPage() {
       // Not getStripeEnvironment(): a free reel involves no charge, so an
       // unconfigured Stripe key must not turn an upload into a payment error.
       const env = getBillingEnvironment();
-      // Client-side gate (type, extension, size). The server re-checks the
-      // stored bytes below, so nothing here is trusted on its own.
-      const invalid = validateVideoMeta({ name: file.name, mime: file.type, bytes: file.size });
+      // Size only. Any container is welcome — what makes a clip acceptable is
+      // that a playable copy of it exists by the end of this block, not what it
+      // arrived as. The old extension/MIME allowlist rejected .avi/.mkv/.wmv
+      // outright, which are exactly the formats the converter below handles.
+      const invalid = validateVideoSize({ bytes: file.size });
       if (invalid) throw new Error(invalid);
-      const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      const { error: upErr } = await supabase.storage
-        .from("highlight-videos")
-        .upload(base, file, { upsert: false });
-      if (upErr) throw upErr;
-      // Deletes the object and throws when the bytes aren't a real video.
-      await finalizeVideoUpload({ data: { path: base, kind: "video" } });
 
       // What the clip actually is (length, size, which way up). Measured here
       // because the server runtime has no ffprobe; kept so a viewer's player and
       // a later support question both have the facts.
       const originalProbe = await probeVideo(file);
 
-      // Every upload lands playable: unless the clip is provably H.264 in an
-      // MP4 container, we build the iPhone/Safari-safe H.264 copy right here
-      // (the server runtime has no encoder) instead of waiting for a manual
-      // "Fix playback" tap.
-      let playbackPath: string | null = null;
+      // Convert BEFORE storing anything. This ordering is the whole fix: the
+      // conversion used to run after the upload and after a container gate that
+      // had already thrown the file away, so the pipeline refused the clips it
+      // could have rescued. Deciding first also means a clip we cannot make
+      // playable leaves nothing behind to clean up.
+      let playable: Blob = file;
+      let converted = false;
       let processedInfo: (ProbedVideo & { bytes: number; pass: string }) | null = null;
-      let playbackError: string | null = null;
       const conversionAttempted = await needsPlaybackConversion(file);
       if (conversionAttempted) {
+        // Check the converter exists before promising anything. Without this a
+        // missing wasm core reads as "your clip failed", sending the athlete off
+        // to re-encode on a desktop over a problem only we can fix.
+        await assertConverterReachable();
         const toastId = toast.loading("Making this clip play everywhere… 0%");
-        const converted = await convertToPlayableMp4(file, (r, pass) =>
+        const result = await convertToPlayableMp4(file, (r, pass) =>
           toast.loading(
             pass === "standard"
               ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
@@ -839,43 +843,77 @@ function ReelsPage() {
             { id: toastId },
           ),
         );
-        if (converted) {
-          const p = `${base}.h264.mp4`;
-          const { error } = await supabase.storage
-            .from("highlight-videos")
-            .upload(p, converted.blob, { upsert: true, contentType: "video/mp4" });
-          if (error) playbackError = "The converted copy could not be saved";
-          else {
-            playbackPath = p;
-            processedInfo = {
-              ...(await probeVideo(converted.blob)),
-              bytes: converted.blob.size,
-              pass: converted.pass,
-            };
-          }
-        } else {
-          playbackError = "This device could not convert the clip";
-        }
-        if (playbackPath) toast.success("Ready — this reel plays on every device", { id: toastId });
-        else
-          toast.warning(
-            "Couldn't convert this clip here — it will still upload, and the original plays on most devices.",
-            { id: toastId },
+        if (!result) {
+          toast.dismiss(toastId);
+          // Every pass failed, so no copy of this clip would play. Refusing is
+          // kinder than storing a reel that shows a dead player to everyone who
+          // opens it; the two things that actually work are named so the athlete
+          // has a next step rather than just a rejection.
+          throw new Error(
+            "This clip couldn't be prepared for playback on this device. Try again on a desktop browser, or re-upload it from your Photos app.",
           );
+        }
+        playable = result.blob;
+        converted = true;
+        processedInfo = {
+          ...(await probeVideo(result.blob)),
+          bytes: result.blob.size,
+          pass: result.pass,
+        };
+        toast.success("Ready — this reel plays on every device", { id: toastId });
+      }
+
+      const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      let playbackPath: string | null = null;
+
+      // The original always lands at `base`. How it is finalized depends on
+      // whether anything will ever play it: without a converted copy it IS the
+      // reel, so it faces the container sniff; with one it is a `source`, which
+      // keeps the size and ownership checks but skips the sniff, because
+      // refusing exotic containers is the bug being fixed. Keeping it is not
+      // sentimental — RepairPlaybackButton re-converts from `video_path`, so
+      // discarding the original would make "Re-run fix" impossible.
+      const { error: upErr } = await supabase.storage
+        .from("highlight-videos")
+        .upload(base, file, { upsert: false });
+      if (upErr) throw upErr;
+      await finalizeVideoUpload({ data: { path: base, kind: converted ? "source" : "video" } });
+
+      if (converted) {
+        // This is the copy the feed serves (`playback_path ?? video_path`), so
+        // it is the one that has to pass the sniff as a real MP4.
+        const p = `${base}.h264.mp4`;
+        const { error: playErr } = await supabase.storage
+          .from("highlight-videos")
+          .upload(p, playable, { upsert: true, contentType: "video/mp4" });
+        if (playErr) throw playErr;
+        await finalizeVideoUpload({ data: { path: p, kind: "video" } });
+        playbackPath = p;
       }
       const mediaMeta = buildMediaMeta({
         file: { name: file.name, type: file.type, size: file.size },
         original: originalProbe,
         processed: processedInfo,
-        playbackError,
+        // No playbackError: a clip that cannot be converted is refused above
+        // rather than stored, so a saved reel is always "ready" or "original"
+        // and never "failed".
         conversionAttempted,
       });
 
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
+      //
+      // Read from the converted copy when there is one. captureClip decodes
+      // through a <video> element and returns nothing at all for a container the
+      // browser can't play, so on an .avi or .mkv the original would yield no
+      // thumbnail and no AI input — converting first fixes those too, not just
+      // playback.
       const framePaths: string[] = [];
       const frameTimes: number[] = [];
-      const { frames, audio } = await captureClip(file);
+      const clipForFrames = converted
+        ? new File([playable], `${file.name}.h264.mp4`, { type: "video/mp4" })
+        : file;
+      const { frames, audio } = await captureClip(clipForFrames);
       for (let i = 0; i < frames.length; i++) {
         const framePath = `${base}.frame${i + 1}.jpg`;
         const { error } = await supabase.storage
@@ -934,7 +972,11 @@ function ReelsPage() {
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
+      toast.error(
+        e instanceof ConverterUnavailableError
+          ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
+          : (e?.message ?? "Upload failed"),
+      );
     } finally {
       setBusy(false);
     }

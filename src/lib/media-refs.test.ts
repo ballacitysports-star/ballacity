@@ -7,7 +7,11 @@ import {
   parseStorageMediaUrl,
   resolvableMediaRef,
 } from "@/lib/media-refs";
-import { sniffVideoContainer, validateVideoMeta, MAX_VIDEO_BYTES } from "@/lib/video-validation";
+import {
+  sniffVideoContainer,
+  validateVideoSize,
+  MAX_VIDEO_BYTES,
+} from "@/lib/video-validation";
 
 describe("media refs", () => {
   it("round-trips a bucket and path", () => {
@@ -52,22 +56,33 @@ describe("media refs", () => {
 });
 
 describe("video upload validation", () => {
-  it("accepts common phone clips", () => {
-    expect(
-      validateVideoMeta({ name: "clip.MOV", mime: "video/quicktime", bytes: 1024 }),
-    ).toBeNull();
-    expect(validateVideoMeta({ name: "clip.mp4", mime: "", bytes: 1024 })).toBeNull();
+  it("judges a clip on size alone, with no container allowlist to disagree with", async () => {
+    expect(validateVideoSize({ bytes: 1024 })).toBeNull();
+
+    // Regression guard, and the real point of this test. This module used to
+    // export ALLOWED_VIDEO_EXTENSIONS / ALLOWED_VIDEO_MIMES and reject anything
+    // absent from them, which turned away .avi/.mkv/.wmv/.flv/.3gp/.mts —
+    // exactly the formats convertToPlayableMp4 handles. It also disagreed with
+    // the server's own byte sniff over `mpeg`. Re-adding an allowlist here
+    // re-creates both faults, so fail loudly if one comes back.
+    const mod = await import("@/lib/video-validation");
+    for (const banned of [
+      "ALLOWED_VIDEO_MIMES",
+      "ALLOWED_VIDEO_EXTENSIONS",
+      "isAllowedVideoMime",
+      "isAllowedVideoExtension",
+      "validateVideoMeta",
+    ]) {
+      expect(Object.keys(mod)).not.toContain(banned);
+    }
   });
 
-  it("rejects disguised files, empty files and oversize uploads", () => {
-    expect(validateVideoMeta({ name: "payload.exe", mime: "video/mp4", bytes: 10 })).toMatch(
-      /only/i,
-    );
-    expect(validateVideoMeta({ name: "clip.mp4", mime: "text/html", bytes: 10 })).toMatch(/only/i);
-    expect(validateVideoMeta({ name: "clip.mp4", mime: "video/mp4", bytes: 0 })).toMatch(/empty/i);
-    expect(
-      validateVideoMeta({ name: "clip.mp4", mime: "video/mp4", bytes: MAX_VIDEO_BYTES + 1 }),
-    ).toMatch(/too large/i);
+  it("still rejects empty and oversize uploads", () => {
+    expect(validateVideoSize({ bytes: 0 })).toMatch(/empty/i);
+    expect(validateVideoSize({ bytes: null })).toMatch(/empty/i);
+    expect(validateVideoSize({ bytes: undefined })).toMatch(/empty/i);
+    expect(validateVideoSize({ bytes: MAX_VIDEO_BYTES + 1 })).toMatch(/too large/i);
+    expect(validateVideoSize({ bytes: MAX_VIDEO_BYTES })).toBeNull();
   });
 
   it("sniffs the real container from magic bytes", () => {
@@ -77,5 +92,18 @@ describe("video upload validation", () => {
     expect(sniffVideoContainer(webm)).toBe("webm");
     const html = new Uint8Array([0x3c, 0x21, 0x64, 0x6f, 0x63, 0x74, 0x79, 0x70, 0x65, 0, 0, 0]);
     expect(sniffVideoContainer(html)).toBeNull();
+    const quicktime = new Uint8Array([0, 0, 0, 20, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20]);
+    expect(sniffVideoContainer(quicktime)).toBe("quicktime");
+  });
+
+  it("does not recognise an MPEG program stream, which is why it must not gate sources", () => {
+    // 00 00 01 BA. This is the exact pair that used to break uploads: `mpeg` sat
+    // on the client allowlist while this sniff — the server gate — could never
+    // match it, so the upload was accepted and then deleted. Sources are now
+    // finalized as `kind: "source"` and skip this check entirely.
+    const mpegPs = new Uint8Array([0x00, 0x00, 0x01, 0xba, 0x44, 0, 0x04, 0, 0x04, 0x01, 0, 0x03]);
+    expect(sniffVideoContainer(mpegPs)).toBeNull();
+    // Accepting it is now the uploader's job, and size is all it checks.
+    expect(validateVideoSize({ bytes: 2048 })).toBeNull();
   });
 });

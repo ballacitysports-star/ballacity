@@ -2,8 +2,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { convertToPlayableMp4, MAX_TRANSCODE_BYTES } from "@/lib/video-transcode";
+import {
+  assertConverterReachable,
+  convertToPlayableMp4,
+  ConverterUnavailableError,
+  MAX_TRANSCODE_BYTES,
+} from "@/lib/video-transcode";
 import { setReelPlaybackPath } from "@/lib/reels.functions";
+import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { buildMediaMeta, probeVideo } from "@/lib/video-metadata";
 
 /**
@@ -32,11 +38,15 @@ export function RepairPlaybackButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /** Distinguishes "the converter is down" from "this clip beat this device" —
+   *  the advice below is actively misleading for the first. */
+  const [outage, setOutage] = useState(false);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
 
   async function repair() {
     setBusy(true);
     setFailed(null);
+    setOutage(false);
     const toastId = toast.loading("Preparing this clip for iPhone & Safari… 0%");
     try {
       const { data, error } = await supabase.storage.from("highlight-videos").download(videoPath);
@@ -47,6 +57,10 @@ export function RepairPlaybackButton({
       if (file.size > MAX_TRANSCODE_BYTES) {
         throw new Error("This clip is too large to convert in the browser (over 200 MB)");
       }
+      // Separates "the converter is down" from "this clip beat this device".
+      // Without it the fallback below sends people off to re-encode on a
+      // desktop over an outage that would defeat them there too.
+      await assertConverterReachable();
       const converted = await convertToPlayableMp4(file, (r, pass) =>
         toast.loading(
           pass === "standard"
@@ -61,6 +75,13 @@ export function RepairPlaybackButton({
         .from("highlight-videos")
         .upload(path, converted.blob, { upsert: true, contentType: "video/mp4" });
       if (upErr) throw new Error(upErr.message);
+      // The same server-side container sniff the upload path runs. This copy is
+      // what the feed serves, and it was the one servable artefact that never
+      // faced the check — trusted because our own encoder produced it, which
+      // says nothing about what actually landed at that key. Runs before the
+      // row is pointed at it, so a copy that fails the sniff is deleted and
+      // never becomes a reel's playback path.
+      await finalizeVideoUpload({ data: { path, kind: "video" } });
       const mediaMeta = buildMediaMeta({
         file: { name: file.name, type: file.type, size: file.size },
         original: await probeVideo(file),
@@ -76,8 +97,12 @@ export function RepairPlaybackButton({
       setFailed(null);
       onRepaired?.();
     } catch (e: any) {
-      const message = e?.message ?? "Could not fix playback for this reel";
+      const down = e instanceof ConverterUnavailableError;
+      const message = down
+        ? "Video conversion is temporarily unavailable"
+        : (e?.message ?? "Could not fix playback for this reel");
       toast.error(message, { id: toastId });
+      setOutage(down);
       setFailed(message);
       // Give the athlete a working way to see their footage in the meantime.
       const { data } = await supabase.storage
@@ -94,8 +119,9 @@ export function RepairPlaybackButton({
       <div className="mx-auto max-w-xs space-y-1.5 text-center">
         <p className="text-[11px] font-semibold text-amber-300">{failed}</p>
         <p className="text-[10px] text-muted-foreground">
-          Converting works best in desktop Chrome. You can also re-upload the clip from your Photos
-          app, which saves it in a format every device plays.
+          {outage
+            ? "This is on our side, not your device — trying again on a desktop won't help. The original is still safe and downloadable below."
+            : "Converting works best in desktop Chrome. You can also re-upload the clip from your Photos app, which saves it in a format every device plays."}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <button

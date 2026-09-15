@@ -1,0 +1,33 @@
+# A manual "are runners back?" button.
+#
+# Every E2E run from 2026-09-11 12:02 onward died in 3-4 seconds with no runner
+# assigned, no step executed and no logs, on main as well as on PR branches.
+# Run 92, immediately before, executed for 53 minutes normally.
+#
+# This workflow was written to find out whether that was the E2E job's own fault
+# or something wider, since the run metadata could not separate the two. It
+# shares none of E2E's surface: no secrets, no concurrency group, no services,
+# one step. Its first run died in 1 second with the same signature, which
+# settles it — the cause is account- or repository-level, and no edit to
+# e2e.yml addresses it. Look at Actions minutes and spending limits under
+# billing, and at Settings -> Actions -> General for the repository.
+#
+# It is kept, on workflow_dispatch only, because it answers "can Actions get a
+# runner yet" in seconds instead of the 40-75 minutes the E2E suite now takes.
+# Run it from the Actions tab after changing anything in billing or settings.
+# If it goes green, re-run E2E. Delete this file once E2E is reliably healthy.
+name: Runner probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Say hello
+        run: |
+          echo "Runner acquired at $(date -u) on ${RUNNER_OS}"
+          echo "If you can read this, runners are being allocated again."

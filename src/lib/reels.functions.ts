@@ -484,9 +484,28 @@ export const setReelPlaybackPath = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    // The playback copy must be the caller's own object, never someone else's.
+    // Owner-folder containment first — the shared check every service-role
+    // read path uses.
     const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
     assertOwnedMediaPath(context.userId, data.playbackPath);
+
+    // Then the tighter one. Containment alone still lets a caller point one of
+    // their reels at a different reel of their own; this pins the value to the
+    // row being updated. The only playback copy that can exist is the H.264
+    // re-encode RepairPlaybackButton writes beside the source, and all four
+    // call sites send exactly `<video_path>.h264.mp4`.
+    const { data: reel, error: readErr } = await context.supabase
+      .from("highlight_reels")
+      .select("video_path")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!reel) throw new Error("Reel not found");
+
+    if (data.playbackPath !== `${(reel as { video_path: string }).video_path}.h264.mp4`) {
+      throw new Error("That playback path does not belong to this reel");
+    }
 
     const patch: Record<string, unknown> = { playback_path: data.playbackPath };
     if (data.mediaMeta) patch["media_meta"] = data.mediaMeta;

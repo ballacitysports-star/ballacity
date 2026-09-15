@@ -11,10 +11,84 @@
  * the wasm bundle.
  */
 
-const CORE_BASE = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Keep in step with `VERSION` in scripts/upload-ffmpeg-core.mjs, which publishes
+ * these two files. The version is part of the storage path, so upgrading means
+ * uploading alongside rather than overwriting an object clients cache for a year.
+ */
+const FFMPEG_CORE_VERSION = "0.12.10";
+const CORE_BUCKET = "app-assets";
+
+/**
+ * The core is served from our own Storage, not a public CDN.
+ *
+ * It used to be fetched from unpkg.com on every upload, which made "every reel
+ * plays" depend on a third party being reachable at that moment — and once a
+ * failed conversion started rejecting the upload outright, an unreachable core
+ * stopped non-H.264 clips uploading at all. Bundling it as a static asset is not
+ * an option: the wasm is ~30.7 MiB and this deploys as a Cloudflare Worker with
+ * assets, capped at 25 MiB per file.
+ */
+function coreUrl(file: string): string {
+  const { data } = supabase.storage
+    .from(CORE_BUCKET)
+    .getPublicUrl(`ffmpeg/${FFMPEG_CORE_VERSION}/${file}`);
+  return data.publicUrl;
+}
 
 /** Hard ceiling: encoding in wasm is slow, so skip absurdly large sources. */
 export const MAX_TRANSCODE_BYTES = 200 * 1024 * 1024;
+
+/**
+ * Thrown when the converter itself is unavailable — the wasm core is missing,
+ * unreadable, or blocked — as opposed to a clip this device could not encode.
+ *
+ * The two look identical to an athlete and need opposite responses: one is a
+ * deploy or outage problem nobody can act on from their phone, the other is
+ * genuinely about this clip on this device. Callers branch on this to say which.
+ */
+export class ConverterUnavailableError extends Error {
+  constructor(message = "Video conversion is unavailable") {
+    super(message);
+    this.name = "ConverterUnavailableError";
+  }
+}
+
+let reachable: Promise<void> | null = null;
+
+/**
+ * One cheap, cached check that the core is actually fetchable before we promise
+ * an athlete their clip will be converted.
+ *
+ * Deliberately separate from `convertToPlayableMp4`, whose contract is to
+ * swallow every encode failure and return null. Folding this in would blur the
+ * distinction this exists to draw. Ranged so it costs a couple of bytes rather
+ * than 30 MiB; a server ignoring Range answers 200, which is just as good an
+ * answer to "can this be fetched".
+ */
+export async function assertConverterReachable(): Promise<void> {
+  if (!reachable) {
+    reachable = (async () => {
+      let res: Response;
+      try {
+        res = await fetch(coreUrl("ffmpeg-core.wasm"), {
+          headers: { range: "bytes=0-1" },
+        });
+      } catch {
+        // Offline, DNS, CORS — indistinguishable here and all equally fatal.
+        throw new ConverterUnavailableError();
+      }
+      if (!res.ok && res.status !== 206) throw new ConverterUnavailableError();
+    })().catch((e) => {
+      // Never cache a failure: the asset may appear, or the network may return.
+      reachable = null;
+      throw e;
+    });
+  }
+  return reachable;
+}
 
 /** Full-quality baseline H.264 + AAC re-encode: the first thing we try. */
 export const DEFAULT_ENCODE_ARGS = [
@@ -61,9 +135,12 @@ async function getFFmpeg(): Promise<FFmpegInstance> {
         import("@ffmpeg/util"),
       ]);
       const ff = new FFmpeg() as unknown as FFmpegInstance;
+      // toBlobURL is given the MIME type explicitly, so what Storage sets as the
+      // object's Content-Type does not matter — but the fetch it does underneath
+      // is cross-origin, so the response does have to be CORS-readable.
       await ff.load({
-        coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, "application/wasm"),
+        coreURL: await toBlobURL(coreUrl("ffmpeg-core.js"), "text/javascript"),
+        wasmURL: await toBlobURL(coreUrl("ffmpeg-core.wasm"), "application/wasm"),
       });
       return ff;
     })().catch((e) => {
