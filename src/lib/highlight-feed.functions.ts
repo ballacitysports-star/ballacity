@@ -106,15 +106,20 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
 
     const items: HighlightFeedItem[] = await Promise.all(
       page.map(async (r) => {
+        // Only ever sign objects inside the reel owner's own folder.
+        const owner = r.user_id as string;
+        const primaryPath = ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path);
+        const originalPath = r.playback_path ? ownedMediaPathOrNull(owner, r.video_path) : null;
+        const thumbPath = ownedMediaPathOrNull(owner, r.thumbnail_path);
         const [video, original, thumb] = await Promise.all([
-          supabaseAdmin.storage
-            .from("highlight-videos")
-            .createSignedUrl(r.playback_path ?? r.video_path, 3600),
-          r.playback_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
+          primaryPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
-          r.thumbnail_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
+          originalPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(originalPath, 3600)
+            : Promise.resolve({ data: null as { signedUrl?: string } | null }),
+          thumbPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(thumbPath, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
         ]);
         const profile = profileById.get(r.user_id as string);
