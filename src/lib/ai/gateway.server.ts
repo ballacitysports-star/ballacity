@@ -7,13 +7,7 @@
  * (3 attempts max); every other status is terminal.
  */
 
-import {
-  AiError,
-  isRetryableStatus,
-  providerErrorFor,
-  toAiError,
-  type AiErrorCode,
-} from "./errors";
+import { AiError, isRetryableStatus, providerErrorFor, toAiError } from "./errors";
 import type { AiProviderConfig } from "./config";
 import type {
   AiImageModerationResult,
@@ -81,45 +75,10 @@ function stringList(v: unknown, max = 8): string[] {
   return Array.isArray(v) ? v.filter((c): c is string => typeof c === "string").slice(0, max) : [];
 }
 
-export function createLovableGatewayProvider(config: AiProviderConfig): AiProvider {
-  function apiKey(): string {
-    const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new AiError("FEATURE_DISABLED", { detail: "AI key not configured" });
-    return key;
-  }
-
-  async function chat(body: {
-    model: string;
-    parts: AiMessagePart[];
-    system: string;
-    json: boolean;
-  }): Promise<{ content: string; usage: AiTokenUsage; model: string }> {
-    const raw = await rawChat({
-      model: body.model,
-      messages: [
-        { role: "system", content: body.system },
-        { role: "user", content: body.parts },
-      ],
-      json: body.json,
-    });
-    const content = String(raw.message?.content ?? "");
-    if (!content.trim()) {
-      throw new AiError("PROVIDER_ERROR", { detail: "gateway returned no content" });
-    }
-    return { content, usage: raw.usage, model: raw.model };
-  }
-
-  return buildProvider();
-
-  function buildProvider(): AiProvider {
-    return provider;
-  }
-}
-
 /**
  * Low-level gateway call shared by the provider methods and by tool-calling
- * agents. Applies the same bounded retry policy and typed error mapping, and
- * never lets the API key escape into an error or a return value.
+ * agents. Applies the bounded retry policy and typed error mapping; the API key
+ * never appears in a result or an error.
  */
 export async function rawChat(body: {
   model: string;
@@ -129,60 +88,80 @@ export async function rawChat(body: {
 }): Promise<{ message: any; usage: AiTokenUsage; model: string }> {
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) throw new AiError("FEATURE_DISABLED", { detail: "AI key not configured" });
-  {
-    const apiKey = () => key;
-    let lastError: AiError | null = null;
 
-    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-      let res: Response;
-      try {
-        res = await fetch(GATEWAY_URL, {
-          method: "POST",
-          headers: {
-            "Lovable-API-Key": key,
-            "X-Lovable-AIG-SDK": "manual-worker",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: body.model,
-            messages: [
-              { role: "system", content: body.system },
-              { role: "user", content: body.parts },
-            ],
-            ...(body.json ? { response_format: { type: "json_object" } } : {}),
-          }),
-        });
-      } catch (e) {
-        lastError = toAiError(e);
-        if (attempt === MAX_TRIES) throw lastError;
-        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
-        continue;
-      }
+  let lastError: AiError | null = null;
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const err = providerErrorFor(res.status, `status ${res.status}: ${text.slice(0, 300)}`);
-        if (isRetryableStatus(res.status) && attempt < MAX_TRIES) {
-          const retryAfter = Number(res.headers.get("retry-after"));
-          const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-            ? Math.min(retryAfter * 1000, 10_000)
-            : BASE_BACKOFF_MS * 2 ** (attempt - 1);
-          lastError = err;
-          await sleep(waitMs);
-          continue;
-        }
-        throw err;
-      }
-
-      const data = (await res.json().catch(() => null)) as Record<string, any> | null;
-      const content = String(data?.["choices"]?.[0]?.message?.content ?? "");
-      if (!content.trim()) {
-        throw new AiError("PROVIDER_ERROR", { detail: "gateway returned no content" });
-      }
-      return { content, usage: usageFrom(data?.["usage"]), model: body.model };
+  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(GATEWAY_URL, {
+        method: "POST",
+        headers: {
+          "Lovable-API-Key": key,
+          "X-Lovable-AIG-SDK": "manual-worker",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: body.model,
+          messages: body.messages,
+          ...(body.tools ? { tools: body.tools } : {}),
+          ...(body.json ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+    } catch (e) {
+      lastError = toAiError(e);
+      if (attempt === MAX_TRIES) throw lastError;
+      await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+      continue;
     }
 
-    throw lastError ?? new AiError("PROVIDER_ERROR");
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const err = providerErrorFor(res.status, `status ${res.status}: ${text.slice(0, 300)}`);
+      if (isRetryableStatus(res.status) && attempt < MAX_TRIES) {
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter * 1000, 10_000)
+            : BASE_BACKOFF_MS * 2 ** (attempt - 1);
+        lastError = err;
+        await sleep(waitMs);
+        continue;
+      }
+      throw err;
+    }
+
+    const data = (await res.json().catch(() => null)) as Record<string, any> | null;
+    return {
+      message: data?.["choices"]?.[0]?.message ?? null,
+      usage: usageFrom(data?.["usage"]),
+      model: body.model,
+    };
+  }
+
+  throw lastError ?? new AiError("PROVIDER_ERROR");
+}
+
+export function createLovableGatewayProvider(config: AiProviderConfig): AiProvider {
+  async function chat(input: {
+    model: string;
+    parts: AiMessagePart[];
+    system: string;
+    json: boolean;
+  }): Promise<{ content: string; usage: AiTokenUsage; model: string }> {
+    const raw = await rawChat({
+      model: input.model,
+      messages: [
+        { role: "system", content: input.system },
+        { role: "user", content: input.parts },
+      ],
+      json: input.json,
+    });
+    const content = String(raw.message?.content ?? "");
+    if (!content.trim()) {
+      throw new AiError("PROVIDER_ERROR", { detail: "gateway returned no content" });
+    }
+    return { content, usage: raw.usage, model: raw.model };
   }
 
   function partsFor(req: GenerateTextRequest): AiMessagePart[] {
@@ -294,6 +273,7 @@ export async function rawChat(body: {
     };
   }
 
+  // Phase 4 surface: declared so call sites can be typed, disabled until then.
   const disabled = (what: string) => async (): Promise<never> => {
     throw new AiError("FEATURE_DISABLED", { detail: `${what} is not implemented yet` });
   };
@@ -313,4 +293,3 @@ export async function rawChat(body: {
 
 export const AI_GATEWAY_URL = GATEWAY_URL;
 export const AI_MAX_TRIES = MAX_TRIES;
-export type { AiErrorCode };
