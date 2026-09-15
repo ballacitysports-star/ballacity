@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "postinstall": "node scripts/patch-tanstack-client-abort.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.54.6",
