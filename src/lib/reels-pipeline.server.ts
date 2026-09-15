@@ -636,7 +636,7 @@ export async function processReel(
         .update({ step_progress: progress, last_step_at: new Date().toISOString() })
         .eq("id", reel.id);
 
-      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey });
+      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey, session });
       Object.assign(progress, patch);
       done.push(step);
       progress._pipeline = snapshot(done, STEPS[i + 1] ?? null, attempt);
@@ -652,10 +652,24 @@ export async function processReel(
 
     progress._pipeline = { ...snapshot(done, null, attempt), percent: 100 };
 
+    // Safety screening runs before the reel can become visible to anyone else.
+    const screening = await screenReelOutput(reel, progress, { supabaseAdmin, apiKey, session });
+    if (screening.quarantined) {
+      await supabaseAdmin.from("notifications").insert({
+        user_id: reel.user_id,
+        type: "reel_blocked",
+        title: "Reel held for review",
+        body: "Your reel didn't pass our safety check and is being reviewed.",
+        link: "/reels",
+      });
+      return { id: reel.id, status: "blocked" };
+    }
+
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: "completed",
+        hidden_at: screening.hiddenAt,
         processing_step: "completed",
         step_progress: progress,
 
@@ -682,7 +696,7 @@ export async function processReel(
       user_id: reel.user_id,
       type: "reel_ready",
       title: "Your highlight reel is ready",
-      body: progress.ai_title ? String(progress.ai_title) : reel.title,
+      body: screening.note ?? (progress.ai_title ? String(progress.ai_title) : reel.title),
       link: reel.game_id ? `/reels?game=${reel.game_id}` : "/reels",
     });
 
@@ -751,12 +765,13 @@ export async function runStyleDraft(
   style: Record<string, any>,
   supabaseAdmin: any,
   apiKey: string,
+  session?: AiSession | null,
 ): Promise<ReelStyleDraft> {
   const progress: Record<string, any> = { ...prepareStyleRegen(reel.step_progress).step_progress };
   const styledReel: Reel = { ...reel, style_prefs: style };
 
   for (const step of STYLE_DRAFT_STEPS) {
-    const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey });
+    const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey, session });
     Object.assign(progress, patch);
   }
 
