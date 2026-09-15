@@ -173,6 +173,25 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
           .slice(0, 6);
       }
       if (Object.keys(patch).length === 0) return { updated: false, reason: "nothing to apply" };
+      // Agent-written copy is publicly visible once saved: check it first.
+      if (ctx.session) {
+        const { moderateAiText } = await import("@/lib/ai/moderation.server");
+        const verdict = await moderateAiText(ctx.session.admin, {
+          userId: ctx.userId,
+          jobId: ctx.session.jobId,
+          text: [
+            patch.ai_title ?? "",
+            patch.ai_caption ?? "",
+            ...(patch.ai_hashtags ?? []),
+            ...((patch.ai_overlays ?? []) as { text: string }[]).map((o) => o.text),
+          ].join("\n"),
+          context: "Reel Coach copy applied to a reel",
+          target: { table: "highlight_reels", id: ctx.reelId, field: "apply_copy" },
+        });
+        if (verdict.verdict === "block") {
+          return { updated: false, reason: "that copy did not pass the safety check" };
+        }
+      }
       const { error } = await ctx.supabase
         .from("highlight_reels")
         .update(patch)
@@ -229,25 +248,25 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
   }
 }
 
-async function gateway(apiKey: string, messages: any[]) {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, messages, tools: TOOLS }),
-  });
-  if (!res.ok) {
-    if (res.status === 429) throw new Error("Reel Coach is busy — try again in a moment");
-    if (res.status === 402)
-      throw new Error("AI credits exhausted — add credits to keep using Reel Coach");
-    const body = await res.text().catch(() => "");
-    throw new Error(`Reel Coach failed (${res.status}): ${body.slice(0, 200)}`);
+/** Tool-calling turn, routed through the shared AI transport (same model + tools). */
+async function gateway(_apiKey: string, messages: any[], session?: AiSession | null) {
+  const { rawChat } = await import("@/lib/ai/gateway.server");
+  const out = await rawChat({ model: session?.config.provider.textModel ?? MODEL, messages, tools: TOOLS });
+  if (session) {
+    const { recordUsage } = await import("@/lib/ai/usage.server");
+    await recordUsage(
+      session.admin,
+      { jobId: session.jobId, userId: session.userId, feature: session.feature },
+      {
+        provider: session.provider.name,
+        model: out.model,
+        usage: out.usage,
+        outcome: "ok",
+        config: session.config,
+      },
+    );
   }
-  const json = await res.json();
-  return json?.choices?.[0]?.message ?? null;
+  return out.message;
 }
 
 /** Runs the agent loop and returns the final answer plus anything it changed. */
@@ -259,6 +278,7 @@ export async function runReelCoachAgent(
     reelId: string;
     question: string;
     history: CoachMessage[];
+    session?: AiSession | null;
   },
 ): Promise<CoachResult> {
   const { data: reel, error } = await input.supabase
@@ -277,6 +297,7 @@ export async function runReelCoachAgent(
     reel: reel as Record<string, any>,
     actions: [],
     changed: false,
+    session: input.session ?? null,
   };
 
   const messages: any[] = [
@@ -297,7 +318,7 @@ export async function runReelCoachAgent(
   ];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const msg = await gateway(apiKey, messages);
+    const msg = await gateway(apiKey, messages, input.session ?? null);
     if (!msg) break;
     const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
     if (calls.length === 0) {
