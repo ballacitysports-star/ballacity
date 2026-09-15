@@ -411,6 +411,10 @@ export const setReelPlaybackPath = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
+    // The playback copy must be the caller's own object, never someone else's.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.playbackPath);
+
     const patch: Record<string, unknown> = { playback_path: data.playbackPath };
     if (data.mediaMeta) patch["media_meta"] = data.mediaMeta;
     const { error } = await context.supabase
