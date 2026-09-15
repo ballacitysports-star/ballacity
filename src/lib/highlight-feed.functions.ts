@@ -180,9 +180,12 @@ export const listHighlightFeedSports = createServerFn({ method: "GET" }).handler
   const { optionalSupabaseUserId } = await import("@/lib/reel-visibility.server");
   const viewerId = await optionalSupabaseUserId();
 
-  const { data, error } = await supabaseAdmin.rpc("public_reel_feed_sports" as never, {
-    _include_members: viewerId !== null,
-  } as never);
+  const { data, error } = await supabaseAdmin.rpc(
+    "public_reel_feed_sports" as never,
+    {
+      _include_members: viewerId !== null,
+    } as never,
+  );
   if (error) throw new Error(error.message);
   const seen = new Set<string>();
   for (const row of (data ?? []) as any[]) {
