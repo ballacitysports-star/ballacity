@@ -1,19 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { type StripeEnv, verifyWebhook } from "@/lib/stripe.server";
 import { tierForPriceId } from "@/lib/monetization/entitlements";
 
 /** Seconds-since-epoch to ISO, tolerating a missing value. */
 function iso(seconds: number | null | undefined): string | null {
   return seconds ? new Date(seconds * 1000).toISOString() : null;
-}
-
-let _supabase: any = null;
-function getSupabase(): any {
-  if (!_supabase) {
-    _supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  }
-  return _supabase;
 }
 
 async function handleSubscriptionCreated(subscription: any, env: StripeEnv) {
@@ -29,28 +21,26 @@ async function handleSubscriptionCreated(subscription: any, env: StripeEnv) {
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
   const periodEnd = item?.current_period_end ?? subscription.current_period_end;
 
-  await getSupabase()
-    .from("subscriptions")
-    .upsert(
-      {
-        user_id: userId,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: subscription.customer,
-        product_id: productId,
-        price_id: priceId,
-        status: subscription.status,
-        // The entitlement tier is resolved from the price on the trusted
-        // server side; it is never read from a client or from metadata.
-        tier: tierForPriceId(String(priceId ?? "")),
-        trial_end: iso(subscription.trial_end),
-        canceled_at: iso(subscription.canceled_at),
-        current_period_start: iso(periodStart),
-        current_period_end: iso(periodEnd),
-        environment: env,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+  await supabaseAdmin.from("subscriptions").upsert(
+    {
+      user_id: userId,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: subscription.customer,
+      product_id: productId,
+      price_id: priceId,
+      status: subscription.status,
+      // The entitlement tier is resolved from the price on the trusted
+      // server side; it is never read from a client or from metadata.
+      tier: tierForPriceId(String(priceId ?? "")),
+      trial_end: iso(subscription.trial_end),
+      canceled_at: iso(subscription.canceled_at),
+      current_period_start: iso(periodStart),
+      current_period_end: iso(periodEnd),
+      environment: env,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_subscription_id" },
+  );
 }
 
 async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
@@ -61,7 +51,7 @@ async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
   const periodEnd = item?.current_period_end ?? subscription.current_period_end;
 
-  await getSupabase()
+  await supabaseAdmin
     .from("subscriptions")
     .update({
       status: subscription.status,
@@ -80,7 +70,7 @@ async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
 }
 
 async function handleSubscriptionDeleted(subscription: any, env: StripeEnv) {
-  await getSupabase()
+  await supabaseAdmin
     .from("subscriptions")
     .update({
       status: "canceled",
@@ -120,27 +110,25 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
   const shipping =
     session.shipping_details ?? session.collected_information?.shipping_details ?? null;
 
-  await getSupabase()
-    .from("purchases")
-    .upsert(
-      {
-        user_id: userId,
-        stripe_session_id: session.id,
-        stripe_payment_intent_id: session.payment_intent ?? null,
-        stripe_customer_id: session.customer ?? null,
-        product_id: productId ?? "unknown",
-        price_id: priceId,
-        amount_total: session.amount_total ?? 0,
-        currency: session.currency ?? "usd",
-        quantity: 1,
-        customer_email: session.customer_details?.email ?? null,
-        shipping_name: shipping?.name ?? null,
-        shipping_address: shipping?.address ?? null,
-        status: session.payment_status === "paid" ? "paid" : (session.payment_status ?? "pending"),
-        environment: env,
-      },
-      { onConflict: "stripe_session_id" },
-    );
+  await supabaseAdmin.from("purchases").upsert(
+    {
+      user_id: userId,
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent ?? null,
+      stripe_customer_id: session.customer ?? null,
+      product_id: productId ?? "unknown",
+      price_id: priceId,
+      amount_total: session.amount_total ?? 0,
+      currency: session.currency ?? "usd",
+      quantity: 1,
+      customer_email: session.customer_details?.email ?? null,
+      shipping_name: shipping?.name ?? null,
+      shipping_address: shipping?.address ?? null,
+      status: session.payment_status === "paid" ? "paid" : (session.payment_status ?? "pending"),
+      environment: env,
+    },
+    { onConflict: "stripe_session_id" },
+  );
 }
 
 async function handleWebhook(req: Request, env: StripeEnv) {
