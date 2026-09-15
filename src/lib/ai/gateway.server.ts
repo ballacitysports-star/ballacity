@@ -83,7 +83,7 @@ function stringList(v: unknown, max = 8): string[] {
 export async function rawChat(body: {
   model: string;
   messages: any[];
-  tools?: any[];
+  tools?: readonly any[];
   json?: boolean;
 }): Promise<{ message: any; usage: AiTokenUsage; model: string }> {
   const key = process.env["LOVABLE_API_KEY"];
