@@ -171,20 +171,22 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     };
   });
 
-/** Distinct sports across the public feed, for the filter chips. */
+/**
+ * Distinct sports across the public feed, for the filter chips. Uses the same
+ * age-cohort audience gate as the feed itself, in SQL.
+ */
 export const listHighlightFeedSports = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("highlight_reels")
-    .select("ai_sport")
-    .eq("status", "completed")
-    .is("hidden_at", null)
-    .not("ai_sport", "is", null)
-    .limit(400);
+  const { optionalSupabaseUserId } = await import("@/lib/reel-visibility.server");
+  const viewerId = await optionalSupabaseUserId();
+
+  const { data, error } = await supabaseAdmin.rpc("public_reel_feed_sports" as never, {
+    _include_members: viewerId !== null,
+  } as never);
   if (error) throw new Error(error.message);
   const seen = new Set<string>();
   for (const row of (data ?? []) as any[]) {
-    const s = String(row.ai_sport ?? "").trim();
+    const s = String(row.sport ?? row.ai_sport ?? "").trim();
     if (s) seen.add(s);
   }
   return Array.from(seen).sort((a, b) => a.localeCompare(b));
