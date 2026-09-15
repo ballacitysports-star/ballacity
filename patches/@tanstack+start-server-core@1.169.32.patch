@@ -1,5 +1,5 @@
---- a/src/createStartHandler.ts	1985-10-26 08:15:00.000000000 +0000
-+++ b/src/createStartHandler.ts	2026-09-15 13:39:53.283824703 +0000
+--- a/node_modules/@tanstack/start-server-core/src/createStartHandler.ts	1985-10-26 08:15:00.000000000 +0000
++++ b/node_modules/@tanstack/start-server-core/src/createStartHandler.ts	2026-09-15 13:39:53.283824703 +0000
 @@ -779,6 +779,14 @@
        request.signal.throwIfAborted()
        responseOwnsCleanup = response.serverSsrCleanup === 'stream'
@@ -15,8 +15,8 @@
      } finally {
        if (router?.serverSsr && !responseOwnsCleanup) {
          // Clean up router SSR state if it was set up but won't be cleaned up by the callback
---- a/dist/esm/createStartHandler.js	1985-10-26 08:15:00.000000000 +0000
-+++ b/dist/esm/createStartHandler.js	2026-09-15 13:39:53.284123957 +0000
+--- a/node_modules/@tanstack/start-server-core/dist/esm/createStartHandler.js	1985-10-26 08:15:00.000000000 +0000
++++ b/node_modules/@tanstack/start-server-core/dist/esm/createStartHandler.js	2026-09-15 13:39:53.284123957 +0000
 @@ -411,6 +411,12 @@
  			request.signal.throwIfAborted();
  			responseOwnsCleanup = response.serverSsrCleanup === "stream";
