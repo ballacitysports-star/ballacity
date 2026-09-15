@@ -96,6 +96,10 @@ export const AUDIT_ACTIONS = {
   "security.setting_update": { label: "Security setting changed", category: "security" },
   "security.audit_export": { label: "Audit log exported", category: "security" },
 
+  // AI
+  "ai.setting_update": { label: "AI setting changed", category: "settings" },
+  "ai.content_quarantine": { label: "AI content quarantined", category: "content" },
+
   // Legacy keys kept so historical entries still render a friendly label.
   moderation_warn: { label: "User warned", category: "users" },
   moderation_suspend: { label: "User suspended", category: "users" },
