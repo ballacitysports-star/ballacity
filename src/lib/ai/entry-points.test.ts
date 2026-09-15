@@ -29,6 +29,7 @@ const ENTRY_POINTS: Record<string, { file: string; feature: AiFeature }> = {
   buildReelPackage: { file: "src/lib/reels.functions.ts", feature: "reel_package" },
   previewReelStyle: { file: "src/lib/reels.functions.ts", feature: "reel_style" },
   removeBackground: { file: "src/lib/bg-remove.functions.ts", feature: "background_remove" },
+  suggestGameDetails: { file: "src/lib/game-assist.functions.ts", feature: "game_assist" },
 };
 
 function baseConfig(): AiConfig {
@@ -166,4 +167,59 @@ describe("image generation stays closed for minors", () => {
       }
     });
   }
+});
+
+describe("game_assist tracks the hosting age gate", () => {
+  // PERMISSION_MATRIX.game_hosting: adult "allowed", teen_16_17 "protected",
+  // both younger cohorts "blocked". can() folds "unknown" into teen_13_15, so
+  // it cannot host either. Offering a hosting assistant to someone the database
+  // trigger block_child_hosting will refuse is worse than not offering it, so
+  // these two lists have to stay identical.
+  const CAN_HOST = ["adult", "teen_16_17"] as const;
+
+  it("is offered to exactly the cohorts that may host", () => {
+    expect([...DEFAULT_AI_FEATURES.features.game_assist.cohorts].sort()).toEqual(
+      [...CAN_HOST].sort(),
+    );
+  });
+
+  for (const cohort of AGE_COHORTS.filter((c) => !(CAN_HOST as readonly string[]).includes(c))) {
+    it(`is refused for ${cohort}, which cannot host`, async () => {
+      const admin = makeAdmin({ consented: true, cohort });
+      const work = vi.fn();
+
+      await expect(
+        withAiSession({ admin, userId: "u", feature: "game_assist" }, work as any),
+      ).rejects.toThrow();
+
+      // Refused before any spend: no provider call, no quota reservation.
+      expect(work).not.toHaveBeenCalled();
+      expect(providerCall).not.toHaveBeenCalled();
+      expect(admin.calls).not.toContain("ai_reserve_quota");
+    });
+  }
+
+  for (const cohort of CAN_HOST) {
+    it(`reaches the work for ${cohort}`, async () => {
+      const admin = makeAdmin({ consented: true, cohort });
+      const work = vi.fn(async () => "drafted");
+
+      await expect(
+        withAiSession({ admin, userId: "u", feature: "game_assist" }, work as any),
+      ).resolves.toBe("drafted");
+      expect(work).toHaveBeenCalledTimes(1);
+    });
+  }
+});
+
+describe("game_assist cannot create a game", () => {
+  it("never writes to hosted_games", () => {
+    // It drafts text for a form the host still has to submit. The existing
+    // create flow stays the only writer, per the brief's rule that AI must
+    // never independently publish a game.
+    const src = readFileSync("src/lib/game-assist.functions.ts", "utf8");
+    expect(src).not.toMatch(/\.from\(\s*["`']hosted_games["`']\s*\)/);
+    expect(src).not.toMatch(/\.insert\(/);
+    expect(src).not.toMatch(/\.upsert\(/);
+  });
 });

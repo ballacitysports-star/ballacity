@@ -68,6 +68,7 @@ import { recordSafetyAck } from "@/lib/safety-acks";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
+import { GameDraftAssist } from "@/components/games/GameDraftAssist";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -657,7 +658,19 @@ function Create() {
           </Section>
 
           {/* Title */}
-          <Section title="Game title">
+          <Section
+            title="Game title"
+            right={
+              <GameDraftAssist
+                sport={sport}
+                skill={skill}
+                onApply={(draft) => {
+                  setTitle(draft.title);
+                  setDescription(draft.description);
+                }}
+              />
+            }
+          >
             <input
               required
               value={title}

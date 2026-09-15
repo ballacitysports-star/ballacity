@@ -21,6 +21,7 @@ export const AI_FEATURES = [
   "text_moderation",
   "image_moderation",
   "background_remove",
+  "game_assist",
   "image_generate",
   "image_enhance",
 ] as const;
@@ -87,6 +88,18 @@ export type AiConfig = {
 const ADULT_ONLY: AgeCohort[] = ["adult"];
 /** Everything a guardian-approved minor may use today (unchanged from current behavior). */
 const REEL_COHORTS: AgeCohort[] = ["adult", "teen_16_17", "teen_13_15", "child_under_13"];
+
+/**
+ * Exactly the cohorts PERMISSION_MATRIX.game_hosting lets host a game: adult is
+ * "allowed", teen_16_17 is "protected", and both younger cohorts are "blocked".
+ * `unknown` is absent on purpose — can() maps it to teen_13_15, so it cannot
+ * host either, and the AI gate denies any cohort not listed here.
+ *
+ * Derived rather than chosen. A hosting assistant for someone who cannot host
+ * is pointless, and a cohort added here that the matrix blocks would offer help
+ * with a form the database trigger block_child_hosting then refuses.
+ */
+const HOSTING_COHORTS: AgeCohort[] = ["adult", "teen_16_17"];
 /** Safety scanning runs on the platform's behalf for every account. */
 const ALL_COHORTS: AgeCohort[] = [...AGE_COHORTS];
 
@@ -100,6 +113,7 @@ export const DEFAULT_AI_FEATURES: AiFeaturesConfig = {
     text_moderation: { enabled: true, cohorts: ALL_COHORTS },
     image_moderation: { enabled: true, cohorts: ALL_COHORTS },
     background_remove: { enabled: true, cohorts: REEL_COHORTS },
+    game_assist: { enabled: true, cohorts: HOSTING_COHORTS },
     // Phase 4. Declared, disabled, and adult-only until a later phase configures cohorts.
     image_generate: { enabled: false, cohorts: ADULT_ONLY },
     image_enhance: { enabled: false, cohorts: ADULT_ONLY },
@@ -135,6 +149,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_package: { daily: 20, monthly: 150 },
       reel_style: { daily: 10, monthly: 60 },
       background_remove: { daily: 20, monthly: 100 },
+      game_assist: { daily: 15, monthly: 100 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -147,6 +162,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_package: { daily: 100, monthly: 1000 },
       reel_style: { daily: 40, monthly: 400 },
       background_remove: { daily: 60, monthly: 600 },
+      game_assist: { daily: 60, monthly: 600 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -159,6 +175,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_package: { daily: 150, monthly: 1500 },
       reel_style: { daily: 80, monthly: 800 },
       background_remove: { daily: 100, monthly: 1000 },
+      game_assist: { daily: 100, monthly: 1000 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -171,6 +188,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_package: { daily: 200, monthly: 2000 },
       reel_style: { daily: 120, monthly: 1200 },
       background_remove: { daily: 150, monthly: 1500 },
+      game_assist: { daily: 150, monthly: 1500 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
