@@ -322,7 +322,7 @@ export async function quarantineForChildSafety(
       type: "safety_alert",
       title: "Urgent safety review required",
       body: "Automated screening quarantined a reel for suspected child sexual abuse material.",
-      data: { reel_id: input.reelId, source: input.source },
+      link: `/superadmin?reel=${input.reelId}`,
     }));
     if (rows.length > 0) await admin.from("notifications").insert(rows);
   } catch {
