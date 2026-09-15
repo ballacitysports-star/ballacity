@@ -89,8 +89,14 @@ async function callLovableAIParts(
 }
 
 /** Downloads a storage object and returns it as a base64 data URL for the gateway. */
-async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | null> {
+async function frameDataUrl(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
@@ -104,8 +110,14 @@ async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | 
 }
 
 /** Downloads the extracted WAV and returns raw base64 (no data: prefix). */
-async function audioBase64(supabaseAdmin: any, path: string): Promise<string | null> {
+async function audioBase64(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
