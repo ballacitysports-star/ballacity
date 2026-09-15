@@ -30,6 +30,23 @@ function LegalSettingsPage() {
 
   const outstanding = statuses.filter((s) => s.needsAcceptance).map((s) => s.type);
 
+  // effectiveVersion() sets `content` only when a published database row was
+  // found, so its absence means these rows describe the bundled placeholder
+  // copy. Same gate LegalDocumentBody uses: the review warning belongs over
+  // draft text and nothing else. This page used to render the banner
+  // unconditionally, so it kept claiming the policies were unreviewed drafts
+  // long after the real ones were published.
+  //
+  // Held back until `published` has actually arrived — it is null while the
+  // fetch is in flight, and without this check a slow load would flash the
+  // warning over policies that turn out to be fine.
+  const showReviewWarning =
+    published !== null &&
+    LEGAL_DOCUMENT_LIST.some((doc) => {
+      const v = effectiveVersion(doc.type, published);
+      return !("content" in v) || !v.content;
+    });
+
   const submit = async () => {
     if (!allAccepted(value, outstanding)) return;
     try {
@@ -48,7 +65,7 @@ function LegalSettingsPage() {
       <BackHeader title="Legal & Privacy" fallbackTo="/settings" />
 
       <main className="page-shell-narrow space-y-4 py-4">
-        <LegalReviewBanner />
+        {showReviewWarning ? <LegalReviewBanner /> : null}
 
         <section className="space-y-2">
           <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
