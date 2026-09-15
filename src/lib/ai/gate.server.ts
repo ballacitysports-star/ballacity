@@ -191,7 +191,9 @@ export async function assertAiAllowed(
         config,
       },
     );
-    throw new AiError(result.reason === "CONCURRENCY_LIMIT" ? "CONCURRENCY_LIMIT" : "QUOTA_EXCEEDED");
+    throw new AiError(
+      result.reason === "CONCURRENCY_LIMIT" ? "CONCURRENCY_LIMIT" : "QUOTA_EXCEEDED",
+    );
   }
 
   return {

@@ -101,7 +101,12 @@ export async function moderateAiText(
       categories: ["moderation_unavailable"],
       model: null,
     });
-    return { verdict: "review", categories: ["moderation_unavailable"], value: text, unavailable: true };
+    return {
+      verdict: "review",
+      categories: ["moderation_unavailable"],
+      value: text,
+      unavailable: true,
+    };
   }
 
   const provider = createLovableGatewayProvider(config.provider);

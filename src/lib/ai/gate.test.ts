@@ -94,9 +94,8 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
 vi.mock("@/lib/audit-log.server", () => ({ logAdminAction: vi.fn(async () => {}) }));
 
 const { assertAiAllowed } = await import("./gate.server");
-const { moderateAiText, checkReelFrameSafety, isCsamCategory } = await import(
-  "./moderation.server"
-);
+const { moderateAiText, checkReelFrameSafety, isCsamCategory } =
+  await import("./moderation.server");
 
 beforeEach(() => {
   config = baseConfig();

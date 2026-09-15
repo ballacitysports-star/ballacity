@@ -30,29 +30,26 @@ export const removeBackground = createServerFn({ method: "POST" })
     const { withAiSession } = await import("@/lib/ai/session.server");
     const { rawChat } = await import("@/lib/ai/gateway.server");
 
-    return withAiSession(
-      { userId: context.userId, feature: "background_remove" },
-      async () => {
-        const out = await rawChat({
-          model: "google/gemini-2.5-flash-image",
-          modalities: ["image", "text"],
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: BG_REMOVE_PROMPT },
-                { type: "image_url", image_url: { url: data.dataUrl } },
-              ],
-            },
-          ],
-        });
+    return withAiSession({ userId: context.userId, feature: "background_remove" }, async () => {
+      const out = await rawChat({
+        model: "google/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: BG_REMOVE_PROMPT },
+              { type: "image_url", image_url: { url: data.dataUrl } },
+            ],
+          },
+        ],
+      });
 
-        const url = (out.message as { images?: { image_url?: { url?: string } }[] } | null)
-          ?.images?.[0]?.image_url?.url;
-        if (!url || !url.startsWith("data:image/")) {
-          throw new Error("No image returned by the AI");
-        }
-        return { dataUrl: url };
-      },
-    );
+      const url = (out.message as { images?: { image_url?: { url?: string } }[] } | null)
+        ?.images?.[0]?.image_url?.url;
+      if (!url || !url.startsWith("data:image/")) {
+        throw new Error("No image returned by the AI");
+      }
+      return { dataUrl: url };
+    });
   });

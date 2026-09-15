@@ -253,7 +253,11 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
 /** Tool-calling turn, routed through the shared AI transport (same model + tools). */
 async function gateway(_apiKey: string, messages: any[], session?: AiSession | null) {
   const { rawChat } = await import("@/lib/ai/gateway.server");
-  const out = await rawChat({ model: session?.config.provider.textModel ?? MODEL, messages, tools: TOOLS });
+  const out = await rawChat({
+    model: session?.config.provider.textModel ?? MODEL,
+    messages,
+    tools: TOOLS,
+  });
   if (session) {
     const { recordUsage } = await import("@/lib/ai/usage.server");
     await recordUsage(
