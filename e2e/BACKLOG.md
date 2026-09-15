@@ -169,3 +169,65 @@ None of this can be re-measured until Actions allocates runners. Every run since
 identically on `main` and on branches. The `Runner probe` workflow
 (`workflow_dispatch`) answers "can Actions get a runner yet" in seconds; run that
 before spending 40–75 minutes on the suite.
+
+## Update: full run-92 job log re-read (2026-09-16)
+
+Run 92's `playwright-report` artifact was still downloadable (`10188443682`,
+expires ~2026-09-18) and its full job log — not just the "Summarise results"
+tally — is retrievable through the Actions API. Reading the actual per-test
+`waitForURL`/`toBeVisible` failure text (not just the one-line error summary)
+turned up two concrete, confirmed causes and closed out a third hypothesis:
+
+**Confirmed: `invite=1` is rewritten to `invite=true` on load.** The
+`invite-request-happy-path` failure's log shows Playwright's own navigation
+trace: `navigated to ".../games/g2?invite=true&from=...&exp=..."`. The app's
+`validateSearch` on `/games/$gameId` (`src/routes/games.$gameId.index.tsx`)
+parses `invite=1` into the boolean `true`, and the router's own URL sync
+writes that back as `invite=true` — the app is doing exactly what
+`invite-deeplink-join-cta.spec.ts` and `invite-deeplink-to-pay.spec.ts`
+already expected (`["1", "true"].includes(...)`). Eleven other `invite-*`
+spec files asserted the stricter, incorrect `=== "1"` and have been fixed to
+match: `invite-request-happy-path`, `invite-notification-cta`,
+`invite-expired`, `invite-request-to-join`, `invite-request-tampered`,
+`invite-request-duplicate`, `invite-request-retry-after-error`,
+`invite-request-retry-then-reload`, `invite-pay-and-join`,
+`invite-pay-and-join-confirmation`, `invite-pay-and-join-verified`.
+
+**Confirmed: `desktop-refresh-protected` still asserts on `/discover`.**
+`/discover` (`src/routes/_tabs.discover.tsx`) is a `beforeLoad` redirect to
+`/feed` — an intentional merge ("Merged into /feed as the 'Map' view"), not a
+regression. The log shows the refresh landing on
+`/feed?q=&sport=&sort=&dist=null&pos=&view=&density=&tab=upcoming`, which is
+`/feed`'s own canonicalized search — not a hydration bounce. The sibling
+`mobile-refresh-protected.spec.ts` already excludes `/discover` for this exact
+reason; `desktop-refresh-protected.spec.ts` was out of sync and has been
+fixed to match.
+
+**Narrowed, not fixed: the `getByText('E2E ...')` / `/auth` cluster.** A large
+share of the remaining failures — the `invite-*` tests that seed a
+notification directly and then look for it on `/notifications`
+(`invite-expired`, `invite-notification-cta`, `invite-pay-and-join*`,
+`invite-request-tampered`, `invite-request-to-join`), plus
+`host-name-realtime`/`host-name-throttled` (looking for `'E2E Player'`) and
+the `social-login-identity-cases`/`google-vendor-rejection` OAuth specs that
+sign in for real through the `/auth` form and end up parked on `/auth`
+instead — all share one shape: content seeded or authenticated earlier in the
+same test never shows up. `notifications` RLS (`INSERT`/`SELECT ... USING
+(user_id = auth.uid())`) checks out fine by inspection, and the real
+`signInWithPassword` failing to reach `/auth`'s destination is exactly what
+`e2e/global-setup.ts`'s fixture-account/`SUPABASE_SERVICE_ROLE_KEY` seeding
+gaps (documented inline in that file) would produce. Those specific seeding
+gaps were fixed in this repo after run 92 — the g1/g2 host account, adult
+birthdays, and the loud missing-service-role-key warning all landed later —
+so this cluster is most likely already resolved by those fixes rather than a
+live bug, but it is unverified: nothing has re-run since 2026-09-11 12:02.
+Re-run the suite once Actions allocates a runner before assuming it's clear.
+
+**Not re-verified: the OAuth `account_type` coalesce question.** Still
+depends on live schema state on the E2E Supabase project
+(`olrbulvwexrkjcxddjxq`), which nothing in this repo can inspect or migrate —
+`.github/workflows/e2e.yml` never runs `supabase db push` against it (see
+`supabase/config.e2e.toml`). `20260912150000_account_type_nullable_preserve_onboarding.sql`
+is the correct fix and is already in `supabase/migrations/`; whether it has
+been applied to that project is an infra question for whoever holds its
+credentials, not something resolvable from the codebase.

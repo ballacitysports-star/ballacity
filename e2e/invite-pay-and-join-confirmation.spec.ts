@@ -191,7 +191,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -204,7 +204,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}/pay` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -240,7 +240,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   // URL STILL preserves invite=1 and from=<hostId> at the confirmation step.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}/pay`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   await ctx.close();
