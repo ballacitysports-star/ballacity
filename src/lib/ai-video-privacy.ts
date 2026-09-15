@@ -13,6 +13,7 @@ export const AI_DISCLOSURE_POINTS: string[] = [
   "AI results can be wrong, incomplete, or miss things entirely.",
   "Any rating, level, or score the AI suggests is an estimate, not a measurement.",
   "Treat everything the AI writes as a suggestion to review — not as fact.",
+  "AI cover art is an edited or invented image, not a photo of what happened.",
   "Don't use AI results as the only basis for medical, safety, recruiting, employment, or other high-stakes decisions.",
 ];
 
@@ -23,7 +24,7 @@ export const AI_DATA_USE: AiDataUseItem[] = [
   {
     question: "Why is the video processed?",
     answer:
-      "To create your highlight — a title, caption, hashtags, suggested clip moments, and coaching notes for you.",
+      "To create your highlight — a title, caption, hashtags, suggested clip moments, and coaching notes for you. Your clips are also used, only when you ask, to design cover art, to build a best-of cut across several reels, and to write a coaching report that looks at your reels together.",
   },
   {
     question: "Is the original video kept?",

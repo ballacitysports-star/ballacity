@@ -160,17 +160,23 @@ describe("gate order", () => {
 });
 
 describe("cohort default-deny", () => {
-  it("denies image_generate and image_enhance for every under-18 cohort", () => {
+  it("denies free-form image_generate for every under-18 cohort", () => {
     const minors = AGE_COHORTS.filter((c) => c !== "adult");
-    for (const feature of ["image_generate", "image_enhance"] as const) {
-      const flag = DEFAULT_AI_FEATURES.features[feature];
-      for (const cohort of minors) expect(cohortAllowed(flag, cohort)).toBe(false);
-    }
+    const flag = DEFAULT_AI_FEATURES.features.image_generate;
+    for (const cohort of minors) expect(cohortAllowed(flag, cohort)).toBe(false);
   });
 
-  it("ships image_generate and image_enhance disabled for adults too", () => {
-    expect(DEFAULT_AI_FEATURES.features.image_generate.enabled).toBe(false);
-    expect(DEFAULT_AI_FEATURES.features.image_enhance.enabled).toBe(false);
+  it("grants image_enhance exactly the cohorts background_remove already has", () => {
+    // Both only ever transform media the athlete uploaded, so they must not
+    // drift apart: widening one silently widening the other is the bug.
+    expect([...DEFAULT_AI_FEATURES.features.image_enhance.cohorts].sort()).toEqual(
+      [...DEFAULT_AI_FEATURES.features.background_remove.cohorts].sort(),
+    );
+  });
+
+  it("ships the Phase 4 image features enabled", () => {
+    expect(DEFAULT_AI_FEATURES.features.image_generate.enabled).toBe(true);
+    expect(DEFAULT_AI_FEATURES.features.image_enhance.enabled).toBe(true);
   });
 
   it("denies a cohort that is simply not listed", () => {

@@ -75,7 +75,7 @@ async function callLovableAIParts(
 }
 
 /** Downloads a storage object and returns it as a base64 data URL for the gateway. */
-async function frameDataUrl(
+export async function frameDataUrl(
   supabaseAdmin: any,
   ownerId: string,
   path: string,

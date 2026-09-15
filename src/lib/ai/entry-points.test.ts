@@ -140,30 +140,39 @@ describe("consent / child policy refuses before any AI work", () => {
   }
 });
 
-describe("image generation stays closed for minors", () => {
-  for (const feature of ["image_generate", "image_enhance"] as const) {
-    it(`${feature} is refused for an under-13 account even with consent`, async () => {
-      // Enabled for adults, so only the cohort allowance can refuse this.
-      config.features.features[feature].enabled = true;
-      const admin = makeAdmin({ consented: true, cohort: "child_under_13" });
-      const work = vi.fn();
+describe("free-form image generation stays closed for minors", () => {
+  const feature = "image_generate" as const;
+
+  it(`${feature} is refused for an under-13 account even with consent`, async () => {
+    // Enabled for adults, so only the cohort allowance can refuse this.
+    config.features.features[feature].enabled = true;
+    const admin = makeAdmin({ consented: true, cohort: "child_under_13" });
+    const work = vi.fn();
+    await expect(withAiSession({ admin, userId: "kid", feature }, work as any)).rejects.toThrow(
+      AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED,
+    );
+
+    expect(work).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(admin.calls).not.toContain("ai_reserve_quota");
+  });
+
+  it(`${feature} is refused for every minor cohort`, async () => {
+    config.features.features[feature].enabled = true;
+    for (const cohort of AGE_COHORTS.filter((c) => c !== "adult")) {
+      const admin = makeAdmin({ consented: true, cohort });
       await expect(
-        withAiSession({ admin, userId: "kid", feature }, work as any),
+        withAiSession({ admin, userId: "kid", feature }, vi.fn() as any),
       ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
+    }
+  });
 
-      expect(work).not.toHaveBeenCalled();
-      expect(providerCall).not.toHaveBeenCalled();
-      expect(admin.calls).not.toContain("ai_reserve_quota");
-    });
-
-    it(`${feature} is refused for every minor cohort`, async () => {
-      config.features.features[feature].enabled = true;
-      for (const cohort of AGE_COHORTS.filter((c) => c !== "adult")) {
-        const admin = makeAdmin({ consented: true, cohort });
-        await expect(
-          withAiSession({ admin, userId: "kid", feature }, vi.fn() as any),
-        ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
-      }
-    });
-  }
+  it("image_enhance still refuses a minor who has no consent on file", async () => {
+    // It is open to minors by cohort, so consent is the control that must hold.
+    const admin = makeAdmin({ consented: false, cohort: "teen_13_15" });
+    await expect(
+      withAiSession({ admin, userId: "kid", feature: "image_enhance" }, vi.fn() as any),
+    ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
+    expect(admin.calls).not.toContain("ai_reserve_quota");
+  });
 });

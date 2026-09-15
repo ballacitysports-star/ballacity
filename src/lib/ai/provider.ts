@@ -17,6 +17,15 @@ export type AiTokenUsage = { inputTokens: number; outputTokens: number };
 export type AiTextResult = { text: string; model: string; usage: AiTokenUsage };
 export type AiStructuredResult<T = unknown> = { data: T; model: string; usage: AiTokenUsage };
 
+/**
+ * A produced image, always as a self-contained `data:image/...;base64,` URL.
+ *
+ * The gateway returns images inline rather than as a hosted link, so nothing
+ * here depends on a provider-side URL that could expire or leak. Callers decide
+ * whether to store it; it is never persisted by the provider.
+ */
+export type AiImageResult = { dataUrl: string; model: string; usage: AiTokenUsage };
+
 export type TextVerdict = "allow" | "review" | "block";
 
 export type AiTextModerationResult = {
@@ -63,6 +72,19 @@ export type TranscribeAudioRequest = {
   model?: string;
 };
 
+export type GenerateImageRequest = {
+  prompt: string;
+  model?: string;
+};
+
+export type EnhanceImageRequest = {
+  /** Data URL or a signed URL the caller has already authorized. */
+  imageUrl: string;
+  /** What to change. The subject of the source image must be preserved. */
+  prompt: string;
+  model?: string;
+};
+
 export interface AiProvider {
   readonly name: string;
 
@@ -74,7 +96,11 @@ export interface AiProvider {
   moderateText(req: { text: string; context?: string }): Promise<AiTextModerationResult>;
   moderateImage(req: { imageUrl: string }): Promise<AiImageModerationResult>;
 
-  /** Declared for Phase 4. Both currently throw FEATURE_DISABLED. */
-  generateImage(req: { prompt: string; model?: string }): Promise<never>;
-  enhanceImage(req: { imageUrl: string; prompt: string; model?: string }): Promise<never>;
+  /**
+   * Text-to-image and image editing. Both return an inline data URL and, like
+   * every other method here, leave storage and moderation to the caller — a
+   * produced image is untrusted content until it has passed `moderateImage`.
+   */
+  generateImage(req: GenerateImageRequest): Promise<AiImageResult>;
+  enhanceImage(req: EnhanceImageRequest): Promise<AiImageResult>;
 }
