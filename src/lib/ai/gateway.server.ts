@@ -94,7 +94,43 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
     system: string;
     json: boolean;
   }): Promise<{ content: string; usage: AiTokenUsage; model: string }> {
-    const key = apiKey();
+    const raw = await rawChat({
+      model: body.model,
+      messages: [
+        { role: "system", content: body.system },
+        { role: "user", content: body.parts },
+      ],
+      json: body.json,
+    });
+    const content = String(raw.message?.content ?? "");
+    if (!content.trim()) {
+      throw new AiError("PROVIDER_ERROR", { detail: "gateway returned no content" });
+    }
+    return { content, usage: raw.usage, model: raw.model };
+  }
+
+  return buildProvider();
+
+  function buildProvider(): AiProvider {
+    return provider;
+  }
+}
+
+/**
+ * Low-level gateway call shared by the provider methods and by tool-calling
+ * agents. Applies the same bounded retry policy and typed error mapping, and
+ * never lets the API key escape into an error or a return value.
+ */
+export async function rawChat(body: {
+  model: string;
+  messages: any[];
+  tools?: any[];
+  json?: boolean;
+}): Promise<{ message: any; usage: AiTokenUsage; model: string }> {
+  const key = process.env["LOVABLE_API_KEY"];
+  if (!key) throw new AiError("FEATURE_DISABLED", { detail: "AI key not configured" });
+  {
+    const apiKey = () => key;
     let lastError: AiError | null = null;
 
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
