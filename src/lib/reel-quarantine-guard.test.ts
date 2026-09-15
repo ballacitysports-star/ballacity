@@ -7,7 +7,8 @@ function admin(rows: { path: string }[] | null, fail = false) {
   const chain: any = {
     select: () => chain,
     eq: () => chain,
-    in: () => (fail ? Promise.resolve({ error: { message: "down" } }) : Promise.resolve({ data: rows })),
+    in: () =>
+      fail ? Promise.resolve({ error: { message: "down" } }) : Promise.resolve({ data: rows }),
   };
   return { from: () => chain };
 }

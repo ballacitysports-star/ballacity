@@ -98,11 +98,7 @@ export async function quarantinedMediaPaths(
 }
 
 /** Owner-scoped path that is safe to sign, or null when missing or quarantined. */
-export function signablePath(
-  path: string | null,
-  quarantined: Set<string>,
-): string | null {
+export function signablePath(path: string | null, quarantined: Set<string>): string | null {
   if (!path) return null;
   return quarantined.has(path) ? null : path;
 }
-

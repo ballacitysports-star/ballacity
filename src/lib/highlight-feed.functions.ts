@@ -122,10 +122,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
         const originalPath = r.playback_path
           ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
           : null;
-        const thumbPath = signablePath(
-          ownedMediaPathOrNull(owner, r.thumbnail_path),
-          quarantined,
-        );
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
 
         const [video, original, thumb] = await Promise.all([
           primaryPath

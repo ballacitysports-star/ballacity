@@ -649,7 +649,6 @@ export const listPublicReels = createServerFn({ method: "GET" })
       await import("@/lib/reel-visibility.server");
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
-
     const viewerId = await optionalSupabaseUserId();
     const ids = await eligibleUserReelIds(supabaseAdmin, {
       userId: data.userId,
@@ -680,10 +679,7 @@ export const listPublicReels = createServerFn({ method: "GET" })
         const originalPath = r.playback_path
           ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
           : null;
-        const thumbPath = signablePath(
-          ownedMediaPathOrNull(owner, r.thumbnail_path),
-          quarantined,
-        );
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
 
         const [video, original, thumb] = await Promise.all([
           primaryPath
