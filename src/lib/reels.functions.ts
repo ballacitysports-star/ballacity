@@ -841,3 +841,149 @@ export const suggestGameForReel = createServerFn({ method: "GET" })
       date: (best.date as string) ?? null,
     };
   });
+
+/**
+ * Career Film Room: one cross-reel coaching report over the caller's own
+ * processed reels. Reads the analysis the pipeline already wrote — it never
+ * re-opens the video — so the cost is one text call regardless of window size.
+ */
+export const buildCareerReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { sport?: string; focus?: string } | undefined) => ({
+    sport: input?.sport ? String(input.sport).slice(0, 40) : undefined,
+    focus: input?.focus ? String(input.focus).slice(0, 200) : undefined,
+  }))
+  .handler(async ({ data, context }) => {
+    const { withAiSession } = await import("@/lib/ai/session.server");
+    const { CAREER_COLUMNS, CAREER_MAX_REELS, CAREER_MIN_REELS, generateCareerReport } =
+      await import("@/lib/reel-career.server");
+
+    let query = context.supabase
+      .from("highlight_reels")
+      .select(CAREER_COLUMNS)
+      .eq("user_id", context.userId)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(CAREER_MAX_REELS);
+    if (data.sport) query = query.eq("ai_sport", data.sport);
+
+    const { data: reels, error } = await query;
+    if (error) throw new Error(error.message);
+
+    // Only reels the pipeline actually analysed carry a pattern worth reading.
+    const analysed = ((reels ?? []) as Record<string, any>[]).filter(
+      (r) => r.ai_analysis || r.ai_coaching,
+    );
+    if (analysed.length < CAREER_MIN_REELS) {
+      throw new Error(
+        `The film room needs at least ${CAREER_MIN_REELS} analysed reels — upload and process a few more first`,
+      );
+    }
+
+    return withAiSession(
+      {
+        userId: context.userId,
+        feature: "reel_career",
+        inputSummary: { reels: analysed.length, sport: data.sport ?? null },
+      },
+      (session) => generateCareerReport(analysed, { session, focus: data.focus }),
+    );
+  });
+
+/**
+ * Builds a "best of" cut across several of the caller's reels. The returned
+ * clip list is validated against the reels themselves, so every segment points
+ * at a reel the caller owns and sits inside that reel's real duration.
+ */
+export const buildHighlightCompilation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelIds?: string[]; sport?: string; theme?: string } | undefined) => ({
+    reelIds: Array.isArray(input?.reelIds)
+      ? input.reelIds.filter((id): id is string => typeof id === "string").slice(0, 12)
+      : undefined,
+    sport: input?.sport ? String(input.sport).slice(0, 40) : undefined,
+    theme: input?.theme ? String(input.theme).slice(0, 200) : undefined,
+  }))
+  .handler(async ({ data, context }) => {
+    const { withAiSession } = await import("@/lib/ai/session.server");
+    const {
+      COMPILATION_COLUMNS,
+      COMPILATION_MAX_REELS,
+      COMPILATION_MIN_REELS,
+      generateCompilation,
+      reelDuration,
+    } = await import("@/lib/reel-compilation.server");
+
+    let query = context.supabase
+      .from("highlight_reels")
+      .select(COMPILATION_COLUMNS)
+      .eq("user_id", context.userId)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(COMPILATION_MAX_REELS);
+    // An explicit selection wins over the sport filter.
+    if (data.reelIds?.length) query = query.in("id", data.reelIds);
+    else if (data.sport) query = query.eq("ai_sport", data.sport);
+
+    const { data: reels, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const usable = ((reels ?? []) as Record<string, any>[]).filter(
+      (r) => reelDuration(r) !== null && (r.ai_moments || r.ai_timeline || r.suggested_clip),
+    );
+    if (usable.length < COMPILATION_MIN_REELS) {
+      throw new Error(
+        `A compilation needs at least ${COMPILATION_MIN_REELS} processed reels with detected moments`,
+      );
+    }
+
+    return withAiSession(
+      {
+        userId: context.userId,
+        feature: "reel_compilation",
+        inputSummary: { reels: usable.length, sport: data.sport ?? null },
+      },
+      (session) => generateCompilation(usable, { session, theme: data.theme }),
+    );
+  });
+
+/**
+ * Generates AI cover art for one reel and saves it as that reel's thumbnail.
+ *
+ * The gate is opened with whichever Phase 4 feature the reel actually needs —
+ * `image_enhance` when there is a frame to restyle, `image_generate` only when
+ * there is not — so the cohort policy for free-form generation is applied
+ * before any model runs.
+ */
+export const generateReelCoverArt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; note?: string }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    return {
+      reelId: String(input.reelId),
+      note: input.note ? String(input.note).slice(0, 200) : undefined,
+    };
+  })
+  .handler(async ({ data, context }) => {
+    const { withAiSession } = await import("@/lib/ai/session.server");
+    const { COVER_COLUMNS, coverFeatureFor, generateReelCover } =
+      await import("@/lib/reel-cover.server");
+
+    const { data: reel, error } = await context.supabase
+      .from("highlight_reels")
+      .select(COVER_COLUMNS)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+
+    return withAiSession(
+      {
+        userId: context.userId,
+        feature: coverFeatureFor(reel as Record<string, any>),
+        relatedReelId: data.reelId,
+      },
+      (session) => generateReelCover(reel as Record<string, any>, { session, note: data.note }),
+    );
+  });

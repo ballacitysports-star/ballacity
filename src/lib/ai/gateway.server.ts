@@ -11,6 +11,7 @@ import { AiError, isRetryableStatus, providerErrorFor, toAiError } from "./error
 import type { AiProviderConfig } from "./config";
 import type {
   AiImageModerationResult,
+  AiImageResult,
   AiMessagePart,
   AiProvider,
   AiStructuredResult,
@@ -18,6 +19,8 @@ import type {
   AiTextResult,
   AiTokenUsage,
   AnalyzeImagesRequest,
+  EnhanceImageRequest,
+  GenerateImageRequest,
   GenerateStructuredRequest,
   GenerateTextRequest,
   TextVerdict,
@@ -73,6 +76,41 @@ function parseJsonLoose<T>(text: string): T {
 
 function stringList(v: unknown, max = 8): string[] {
   return Array.isArray(v) ? v.filter((c): c is string => typeof c === "string").slice(0, max) : [];
+}
+
+/**
+ * Pulls the inline image out of an image-modality reply.
+ *
+ * The gateway answers with `message.images[]`, each carrying a base64 data URL.
+ * Anything else (a hosted link, a text-only refusal) is treated as no image, so
+ * a caller can never end up storing a URL it did not verify.
+ */
+function imageFrom(message: unknown): string | null {
+  const images = (message as { images?: unknown } | null)?.images;
+  if (!Array.isArray(images)) return null;
+  for (const entry of images) {
+    const url = (entry as { image_url?: { url?: unknown } } | null)?.image_url?.url;
+    if (typeof url === "string" && url.startsWith("data:image/")) return url;
+  }
+  return null;
+}
+
+/** Shared by generate/enhance: one image-modality call that must yield an image. */
+async function imageCall(model: string, content: AiMessagePart[]): Promise<AiImageResult> {
+  const raw = await rawChat({
+    model,
+    modalities: ["image", "text"],
+    messages: [{ role: "user", content }],
+  });
+  const dataUrl = imageFrom(raw.message);
+  if (!dataUrl) {
+    // A refusal comes back as prose in place of an image. Surfacing it as a
+    // provider error keeps the reason server-side.
+    throw new AiError("PROVIDER_ERROR", {
+      detail: `no image returned: ${String((raw.message as { content?: unknown })?.content ?? "").slice(0, 200)}`,
+    });
+  }
+  return { dataUrl, model: raw.model, usage: raw.usage };
 }
 
 /**
@@ -275,10 +313,16 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
     };
   }
 
-  // Phase 4 surface: declared so call sites can be typed, disabled until then.
-  const disabled = (what: string) => async (): Promise<never> => {
-    throw new AiError("FEATURE_DISABLED", { detail: `${what} is not implemented yet` });
-  };
+  async function generateImage(req: GenerateImageRequest): Promise<AiImageResult> {
+    return imageCall(req.model ?? config.imageModel, [{ type: "text", text: req.prompt }]);
+  }
+
+  async function enhanceImage(req: EnhanceImageRequest): Promise<AiImageResult> {
+    return imageCall(req.model ?? config.imageModel, [
+      { type: "text", text: req.prompt },
+      { type: "image_url", image_url: { url: req.imageUrl } },
+    ]);
+  }
 
   return {
     name: config.provider,
@@ -288,8 +332,8 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
     transcribeAudio,
     moderateText,
     moderateImage,
-    generateImage: disabled("image generation") as AiProvider["generateImage"],
-    enhanceImage: disabled("image enhancement") as AiProvider["enhanceImage"],
+    generateImage,
+    enhanceImage,
   };
 }
 

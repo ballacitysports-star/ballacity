@@ -18,6 +18,8 @@ export const AI_FEATURES = [
   "reel_coach",
   "reel_package",
   "reel_style",
+  "reel_career",
+  "reel_compilation",
   "text_moderation",
   "image_moderation",
   "background_remove",
@@ -97,12 +99,25 @@ export const DEFAULT_AI_FEATURES: AiFeaturesConfig = {
     reel_coach: { enabled: true, cohorts: REEL_COHORTS },
     reel_package: { enabled: true, cohorts: REEL_COHORTS },
     reel_style: { enabled: true, cohorts: REEL_COHORTS },
+    // Read-only analysis over reels the athlete already owns, shown only to them.
+    reel_career: { enabled: true, cohorts: REEL_COHORTS },
+    reel_compilation: { enabled: true, cohorts: REEL_COHORTS },
     text_moderation: { enabled: true, cohorts: ALL_COHORTS },
     image_moderation: { enabled: true, cohorts: ALL_COHORTS },
     background_remove: { enabled: true, cohorts: REEL_COHORTS },
-    // Phase 4. Declared, disabled, and adult-only until a later phase configures cohorts.
-    image_generate: { enabled: false, cohorts: ADULT_ONLY },
-    image_enhance: { enabled: false, cohorts: ADULT_ONLY },
+    /*
+     * Phase 4 image features, split by how much the athlete's own footage
+     * constrains the output:
+     *
+     * - `image_enhance` only ever restyles a frame the athlete already uploaded
+     *   (and already had frame-safety screened), so it carries the same risk
+     *   profile as `background_remove` and shares its cohorts.
+     * - `image_generate` is free-form text-to-image with no such anchor, so it
+     *   stays adult-only. Widening it is a policy decision, not a code change:
+     *   `app_settings.ai_features` can do it without a deploy.
+     */
+    image_enhance: { enabled: true, cohorts: REEL_COHORTS },
+    image_generate: { enabled: true, cohorts: ADULT_ONLY },
   },
 };
 
@@ -134,7 +149,11 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 40, monthly: 400 },
       reel_package: { daily: 20, monthly: 150 },
       reel_style: { daily: 10, monthly: 60 },
+      reel_career: { daily: 3, monthly: 20 },
+      reel_compilation: { daily: 3, monthly: 20 },
       background_remove: { daily: 20, monthly: 100 },
+      image_enhance: { daily: 5, monthly: 30 },
+      image_generate: { daily: 3, monthly: 20 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -146,7 +165,11 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 200, monthly: 2000 },
       reel_package: { daily: 100, monthly: 1000 },
       reel_style: { daily: 40, monthly: 400 },
+      reel_career: { daily: 20, monthly: 200 },
+      reel_compilation: { daily: 20, monthly: 200 },
       background_remove: { daily: 60, monthly: 600 },
+      image_enhance: { daily: 30, monthly: 300 },
+      image_generate: { daily: 20, monthly: 200 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -158,7 +181,11 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 300, monthly: 3000 },
       reel_package: { daily: 150, monthly: 1500 },
       reel_style: { daily: 80, monthly: 800 },
+      reel_career: { daily: 40, monthly: 400 },
+      reel_compilation: { daily: 40, monthly: 400 },
       background_remove: { daily: 100, monthly: 1000 },
+      image_enhance: { daily: 50, monthly: 500 },
+      image_generate: { daily: 40, monthly: 400 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },
@@ -170,7 +197,11 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 400, monthly: 4000 },
       reel_package: { daily: 200, monthly: 2000 },
       reel_style: { daily: 120, monthly: 1200 },
+      reel_career: { daily: 60, monthly: 600 },
+      reel_compilation: { daily: 60, monthly: 600 },
       background_remove: { daily: 150, monthly: 1500 },
+      image_enhance: { daily: 80, monthly: 800 },
+      image_generate: { daily: 60, monthly: 600 },
       text_moderation: UNMETERED,
       image_moderation: UNMETERED,
     },

@@ -48,6 +48,8 @@ import {
   suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
+import { ReelCoverButton } from "@/components/reels/ReelCoverButton";
+import { FilmRoom } from "@/components/reels/FilmRoom";
 import { AiDisclosureDialog, AiDisclosureNotice } from "@/components/reels/AiVideoDisclosure";
 import { useMyPrivacy } from "@/lib/privacy";
 import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
@@ -558,6 +560,12 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
       )}
 
       {isDone && <ReelCompare reel={reel} />}
+
+      {isDone && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <ReelCoverButton reelId={reel.id} onCover={setThumb} />
+        </div>
+      )}
 
       {isDone && <ReelCoach reelId={reel.id} />}
     </li>
@@ -1232,6 +1240,10 @@ function ReelsPage() {
           <p className="mt-2 text-center text-xs text-muted-foreground">{lockedReason}</p>
         )}
       </section>
+
+      {/* Archive-wide AI. Hidden while the page is filtered to one game,
+          because these read across every reel, not just the visible ones. */}
+      {!gameId && <FilmRoom readyReels={reels.filter((r) => r.status === "completed").length} />}
 
       <section className="mx-5 pb-24">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
