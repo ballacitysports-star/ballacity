@@ -1,492 +1,308 @@
-# ballaCity
+# BallaCity
 
-Build a modern mobile-first sports community platform called “OpenRun” that allows users to create, discover, and join local pickup sports games.
+**BallaCity is a mobile-first sports social platform that brings players, teams, games, content, and sports communities together in one place.**
 
-The platform should feel like a mix of Meetup, OpenTable, and a social sports network.
+It combines the social experience of a modern social network with the functionality of a pickup-sports marketplace, player profile platform, team network, and AI-powered sports content studio.
 
-PRIMARY GOAL:
+The goal is to make it easy for athletes and sports communities to **discover games, connect with players, join teams, showcase their abilities, create content, and build a sports identity.**
 
-Help people instantly find and organize pickup sports games nearby while building community, reputation, and social engagement around sports.
+## Core Experience
 
-TARGET USERS:
+### Player Profiles
 
-- Casual athletes
+Every player can build a dedicated sports identity that can include:
 
-- Competitive adult players
+* Profile photo
+* Bio
+* Sports
+* Positions
+* Skill levels
+* Teams
+* Stats
+* Game history
+* Availability
+* Highlights
+* Posts
+* Reels
+* Social connections
+* Reputation/community activity
 
-- College students
+Player profiles are designed to function similarly to modern social-media profiles while being specifically built around sports.
 
-- Weekend sports groups
+### Social Feed
 
-- Young professionals
+BallaCity includes a social feed where users can:
 
-- Local sports communities
+* Create posts
+* Share sports content
+* Like and comment
+* Follow players and teams
+* Discover community activity
+* Interact with sports-related content
+* Share highlights and achievements
 
-TOP 10 SPORTS SUPPORTED:
+The feed is designed to make BallaCity feel like a true sports social network rather than simply a game-finding application.
 
-1. Basketball
+### Reels & Short-Form Video
 
-2. Soccer
+Players and teams can create and share short-form sports videos.
 
-3. Pickleball
+The platform supports:
 
-4. Volleyball
+* Reel creation
+* Video uploads
+* AI-assisted content creation
+* Sports highlights
+* Social engagement
+* Video processing and format handling
+* Watermarking for AI-generated content
 
-5. Tennis
+BallaCity's goal is to make sports content creation accessible without requiring advanced video-editing skills.
 
-6. Flag Football
+### AI Content Studio
 
-7. Baseball
+BallaCity includes an AI-powered content creation environment designed to help users create higher-quality sports content.
 
-8. Softball
+Capabilities include:
 
-9. Hockey
+* AI-generated posts
+* AI-assisted captions
+* AI-generated images
+* AI-generated video concepts/content
+* Reel creation assistance
+* Highlight creation
+* Content optimization
+* Sports-focused creative tools
+* AI-generated content watermarking
 
-10. Running / Fitness Groups
+The system is intended to evolve into an advanced creator studio for players, teams, gyms, and sports organizations.
 
-PLATFORM REQUIREMENTS:
+### Games
 
-- Mobile-first responsive design
+Players can discover and participate in local sports games.
 
-- Modern clean UI
+Game functionality includes:
 
-- Fast interactions
+* Create games
+* Discover games
+* Join games
+* Game details
+* Location-based discovery
+* Player participation
+* Host functionality
+* Game availability
+* Sport-specific game organization
 
-- Social-media quality experience
+Supported sports include:
 
-- Gamified engagement
+* Basketball
+* Soccer
+* Pickleball
+* Volleyball
+* Tennis
+* Flag Football
+* Baseball
+* Softball
+* Hockey
+* Running / Fitness Groups
 
-- Dark mode support
+### Teams
 
-- Real-time updates
+BallaCity supports sports teams and team communities.
 
-- Scalable architecture
+Teams can have their own presence within the platform, allowing them to:
 
-CORE FEATURES:
+* Build a team profile
+* Showcase players
+* Share content
+* Post updates
+* Promote games
+* Build a community
+* Connect with players
 
-1. USER AUTHENTICATION
+This creates a bridge between individual player profiles and organized sports communities.
 
-- Email/password login
+### Messaging
 
-- Google login
+BallaCity includes player-to-player and community messaging with safety controls.
 
-- Apple login
+Messaging functionality includes:
 
-- User onboarding flow
+* Direct conversations
+* Messaging permissions
+* Conversation controls
+* Guardian-related restrictions
+* Safety enforcement
+* Restricted messaging workflows
 
-- Username selection
+For users whose age or permissions require Guardian involvement, applicable actions can be routed through the Guardian rather than simply being exposed directly to the player.
 
-- Profile photo upload
+### Guardian → Player Architecture
 
-- Skill level selection per sport
+BallaCity uses a **Guardian → Player** model for minors.
 
-- Location permissions
+The Player remains the central sports/social identity, while a Guardian can manage applicable aspects of a minor player's account.
 
-2. USER PROFILE SYSTEM
+Guardian functionality includes:
 
-Profiles should include:
+* Managing multiple Players
+* Player oversight
+* Permissions
+* Approvals
+* Privacy controls
+* Messaging controls
+* Notifications
+* Safety controls
+* Account management
 
-- Name
+This allows BallaCity to maintain a social-media-style Player experience while providing additional protections and controls for younger users.
 
-- Username
+### Safety & Minor Protection
 
-- Bio
+BallaCity includes an age-aware architecture designed to provide additional protections for younger users.
 
-- Favorite sports
+The platform incorporates:
 
-- Skill ratings
+* Age verification during signup
+* Birthday protection/immutability
+* Guardian relationships
+* Guardian consent
+* Guardian controls
+* Permission enforcement
+* Messaging restrictions
+* Guardian-routed functionality
+* Audit trails
+* Role-based access
+* Row-level security
+* Minor-specific restrictions
 
-- Games played
+The architecture is designed so that age-appropriate functionality can be enforced at the backend rather than relying solely on the interface.
 
-- Attendance reliability score
+### AI Player Development
 
-- Sportsmanship rating
+BallaCity can use AI to turn player information and sports media into more useful player-development and recruiting-oriented information.
 
-- Highlight videos
+Planned/available concepts include:
 
-- Achievements/badges
+* Video analysis
+* Automatic highlight identification
+* Highlight clipping
+* Player ratings
+* Sport-specific metrics
+* Radar-style player evaluations
+* Position recommendations
+* AI-generated scouting reports
+* Premium player reports
 
-- Friends/following
+This creates a potential bridge between social content and meaningful athletic information.
 
-- Recent activity
+### Player Reputation & Community
 
-3. GAME CREATION SYSTEM
+BallaCity is designed around more than simply finding a game.
 
-Users can create pickup games with:
+Players can build a reputation through:
 
-- Sport type
+* Participation
+* Games
+* Teams
+* Social activity
+* Content
+* Community interactions
+* Player profiles
 
-- Date/time
+This creates a persistent sports identity that can grow over time.
 
-- Location
+### Social Media Integration
 
-- Max players
+BallaCity is designed to allow users to connect external social-media accounts and, where supported, publish BallaCity-created content to those platforms.
 
-- Skill level
+This can allow players and teams to use BallaCity as a central sports-content creation and distribution platform.
 
-- Free or paid game
+### Monetization
 
-- Public or private game
+BallaCity includes infrastructure for premium features and subscriptions.
 
-- Indoor/outdoor toggle
+Potential premium functionality includes:
 
-- Game description
+* Advanced AI tools
+* AI player analysis
+* Premium scouting reports
+* Advanced content creation
+* Premium highlights
+* Advanced player analytics
+* Creator features
 
-- Equipment needed
+The architecture also includes subscription/payment infrastructure and premium-access controls.
 
-- Team size
+### Admin & Moderation
 
-- Recurring game option
+BallaCity includes an administrative environment for operating the platform.
 
-4. GAME DISCOVERY
+Administrative capabilities include:
 
-Create:
+* User management
+* Moderation
+* Account controls
+* Subscription management
+* Feature management
+* Support/review workflows
+* Platform analytics
+* AI usage monitoring
+* Revenue metrics
 
-- Interactive map view
+The platform is designed so administrative functionality is separated from normal player functionality.
 
-- Nearby games feed
+### Performance & Cross-Platform Experience
 
-- Filter system
+BallaCity is being built as a responsive, mobile-first web application.
 
-- Sport filters
+The interface is designed to work across:
 
-- Skill level filters
+* Phones
+* Tablets
+* Laptops
+* Desktop computers
+* Different screen sizes
+* Major modern browsers
 
-- Time/date filters
+The platform is also being optimized for consistent page sizing, responsive layouts, performance, video compatibility, and fast interactions.
 
-- Distance filters
+## The BallaCity Concept
 
-- “Need players now” urgency tag
+At its core, BallaCity combines several products into one ecosystem:
 
-- Trending games section
+**Social Network**
+→ Posts, Reels, Followers, Comments, Likes, Messaging
 
-- Recommended games using AI
+**Sports Network**
+→ Players, Teams, Stats, Highlights, Reputation
 
-5. REAL-TIME FEATURES
+**Pickup Sports Platform**
+→ Discover, Create, Join, and Organize Games
 
-- Live player count
+**AI Sports Platform**
+→ Video analysis, highlights, player insights, scouting reports, AI content
 
-- Real-time chat
+**Creator Platform**
+→ AI images, videos, posts, Reels, publishing and social distribution
 
-- Push notifications
+**Family-Safe Sports Platform**
+→ Guardian → Player architecture, age-aware permissions, approvals and safety controls
 
-- Last-minute player alerts
+## One-Sentence Description
 
-- Waitlist system
+**BallaCity is a sports-focused social network where players and teams can build their identity, discover and organize games, connect with their community, create AI-powered content, showcase their skills, and grow within a safer sports ecosystem.**
 
-- Auto-fill open spots
+## Short Marketing Description
 
-- Live game status updates
+**BallaCity is where sports happen online.**
 
-6. SOCIAL FEATURES
+Discover games.
+Meet players.
+Build your profile.
+Join teams.
+Share highlights.
+Create content with AI.
+Connect with your sports community.
 
-- Follow users
-
-- Friend system
-
-- Group chats
-
-- Team chats
-
-- Post-game comments
-
-- Like/comment system
-
-- Share games
-
-- Invite friends
-
-- Social activity feed
-
-7. AI HIGHLIGHT VIDEO FEATURE (IMPORTANT)
-
-Users can upload raw gameplay videos.
-
-The platform should use AI to automatically:
-
-- Detect highlights
-
-- Trim dead time
-
-- Create cinematic clips
-
-- Add slow motion
-
-- Add player tracking
-
-- Add transitions
-
-- Add score overlays
-
-- Add background music
-
-- Generate vertical TikTok/Reels versions
-
-- Generate YouTube highlight compilations
-
-- Auto-create thumbnails
-
-- Generate captions/subtitles
-
-- Detect best plays automatically
-
-Include:
-
-- “Create Highlight Reel” button
-
-- AI video editor dashboard
-
-- One-click export to:
-
-  - TikTok
-
-  - Instagram Reels
-
-  - YouTube Shorts
-
-  - YouTube
-
-  - X/Twitter
-
-AI FEATURES:
-
-- AI-generated player performance summaries
-
-- AI matchmaking for balanced teams
-
-- AI game recommendations
-
-- AI skill estimation
-
-- AI toxicity/sportsmanship moderation
-
-8. REPUTATION SYSTEM
-
-Create:
-
-- Attendance reliability score
-
-- No-show tracking
-
-- Skill endorsements
-
-- Sportsmanship ratings
-
-- Verified player badges
-
-- Organizer ratings
-
-9. PAYMENTS
-
-Integrate Stripe for:
-
-- Paid games
-
-- Venue fee splitting
-
-- Tournament entry fees
-
-- Premium subscriptions
-
-10. PREMIUM FEATURES
-
-Create a Pro subscription with:
-
-- Unlimited game hosting
-
-- Advanced analytics
-
-- Priority visibility
-
-- AI advanced highlights
-
-- Custom profile themes
-
-- Enhanced stats
-
-- Verified badge
-
-11. ADMIN PANEL
-
-Include:
-
-- User moderation
-
-- Report system
-
-- Content moderation
-
-- Video moderation
-
-- Analytics dashboard
-
-- Revenue dashboard
-
-- Community management tools
-
-DESIGN STYLE:
-
-- Clean modern sports-tech aesthetic
-
-- Similar quality to:
-
-  - Strava
-
-  - Discord
-
-  - Instagram
-
-  - Nike Training Club
-
-  - Airbnb
-
-- Large sports imagery
-
-- Smooth animations
-
-- Card-based layouts
-
-- Interactive maps
-
-- Dynamic gradients
-
-- High-end typography
-
-PAGES TO BUILD:
-
-- Landing page
-
-- Onboarding flow
-
-- Login/signup
-
-- Home feed
-
-- Map discovery
-
-- Create game page
-
-- Game details page
-
-- User profiles
-
-- Messaging/chat
-
-- Notifications
-
-- Video upload/editor
-
-- AI highlight generator
-
-- Premium subscription page
-
-- Admin dashboard
-
-TECH STACK:
-
-Frontend:
-
-- React Native or Next.js
-
-- Tailwind CSS
-
-- Framer Motion
-
-Backend:
-
-- Supabase or Firebase
-
-- PostgreSQL
-
-Realtime:
-
-- Supabase realtime or WebSockets
-
-Maps:
-
-- Google Maps API
-
-Payments:
-
-- Stripe
-
-AI VIDEO TOOLS:
-
-- OpenAI APIs
-
-- Runway
-
-- FFmpeg
-
-- AWS MediaConvert
-
-- Cloudinary
-
-VIDEO STORAGE:
-
-- AWS S3 or Cloudflare R2
-
-NOTIFICATIONS:
-
-- OneSignal
-
-AI RECOMMENDATION ENGINE:
-
-- Personalized game recommendations
-
-- Skill balancing
-
-- Social graph recommendations
-
-MONETIZATION MODEL:
-
-- Freemium
-
-- Transaction fees
-
-- Premium subscriptions
-
-- Sponsored venues
-
-- Tournament hosting
-
-- Local advertising
-
-IMPORTANT UX GOALS:
-
-- Users can join a game within 15 seconds
-
-- Extremely simple game creation flow
-
-- Highly engaging social feed
-
-- Viral sharing mechanics
-
-- Retention-focused notifications
-
-- Smooth mobile performance
-
-Build the app, also web friendly with scalable architecture and production-ready UI components.
-
-Include polished animations, responsive layouts, and realistic sample data throughout the platform.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9bd576a8-703f-4180-84d6-2cd32f2a851b).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+**One platform for the way athletes play, connect, compete, and share.**
