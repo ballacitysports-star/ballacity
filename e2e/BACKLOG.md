@@ -21,12 +21,28 @@ summary step.
 Run 92 uploaded `playwright-report` — **artifact `10188443682`, 148,597,243 bytes,
 299 files**, `retention-days: 7` from 2026-09-11. That archive holds the traces,
 screenshots and `results.json` that make these failures debuggable rather than just
-countable, and it is the only copy.
+countable.
 
     https://github.com/ballacitysports-star/ballacity/actions/runs/34569074064/artifacts/10188443682
 
-After it expires this file is all that remains. Nothing can regenerate it until
-Actions allocates runners again.
+**It is no longer the only copy of the failure record.** Every failing test's
+error, locator, call log and code frame — plus the full 197-test execution
+roster — is transcribed from the job log into `e2e/run92-failures.md`, which is
+in version control and does not expire. Read that first; it is what most
+debugging actually needs.
+
+What only the artifact has, and what is lost at 2026-09-18T07:06:54Z, is the
+`trace.zip` per failure (DOM snapshots, network waterfalls), the screenshots and
+the `error-context.md` accessibility dumps. `run92-failures.md` keeps the
+`test-results/...` path against each failure so they can still be matched up if
+someone rescues the artifact in time.
+
+Two rescue paths exist and both are currently blocked: `preserve-artifact.yml`
+(republishes it as a Release asset, but cannot get a runner — same Actions
+outage), and a direct download (refused by egress policy from a sandboxed agent
+session). A person on an unrestricted machine can still do it in one command:
+
+    gh run download 34569074064 -R ballacitysports-star/ballacity -n playwright-report
 
 ## What the failures look like
 
