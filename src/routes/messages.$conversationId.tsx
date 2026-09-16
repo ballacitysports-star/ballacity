@@ -302,9 +302,7 @@ function Thread() {
     if (!text.trim() && !pendingFile) return;
     if (uploading) return;
     if (!messagingDecision.allowed) {
-      toast.error(
-        messagingDecision.reason || "A parent or guardian must approve this account first.",
-      );
+      toast.error(messagingDecision.reason || "Your Guardian must approve this account first.");
       return;
     }
     setSending(true);
@@ -708,7 +706,7 @@ function Thread() {
             className="mb-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted-foreground"
           >
             <span className="font-semibold text-foreground">Messaging is off for now. </span>
-            {messagingDecision.reason || "A parent or guardian must approve this account first."}
+            {messagingDecision.reason || "Your Guardian must approve this account first."}
           </div>
         )}
 
@@ -823,7 +821,7 @@ function Thread() {
             rows={1}
             placeholder={
               !messagingDecision.allowed
-                ? "Parent approval needed to message"
+                ? "Guardian approval needed to message"
                 : isRequest
                   ? "Accept to reply"
                   : "Message…"

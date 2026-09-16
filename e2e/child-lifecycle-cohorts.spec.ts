@@ -18,7 +18,7 @@ import { DEFAULT_AGE_POLICY, DEFAULT_CHILD_CONTROLS } from "../src/lib/child-pol
  * surface matches the server decision for every cohort:
  *
  *   under-13, consent required  → banner + app browsable, routed to the consent flow
- *   under-13, consent pending   → banner + app browsable, "waiting for your parent"
+ *   under-13, consent pending   → banner + app browsable, "waiting for your Guardian"
  *   under-13, consent approved  → no banner, app usable
  *   under-13, consent revoked   → banner again, "turned this account off"
  *   13-15 / 16-17 / adult       → app usable, never gated
@@ -122,13 +122,12 @@ async function signIn(page: Page) {
   await expect(page).not.toHaveURL(/\/auth(?:[?#].*)?$/, { timeout: 20_000 });
 }
 
-const gate = (page: Page) =>
-  page.getByText(/parent or guardian|turned this account off/i);
+const gate = (page: Page) => page.getByText(/your Guardian|turned this account off/i);
 
 test.describe("child lifecycle: consent gate per cohort", () => {
   const blocked: Array<[string, Consent["status"], RegExp]> = [
-    ["consent required", "required", /A parent or guardian needs to approve this account/i],
-    ["consent pending", "pending", /Waiting for your parent or guardian/i],
+    ["consent required", "required", /Your Guardian needs to approve this account/i],
+    ["consent pending", "pending", /Waiting for your Guardian/i],
     ["consent revoked", "revoked", /A parent or guardian turned this account off/i],
   ];
 
@@ -199,7 +198,7 @@ test.describe("child lifecycle: consent gate per cohort", () => {
 
       await page.goto("/onboarding/child", { waitUntil: "domcontentloaded" });
       await expect(
-        page.getByRole("heading", { name: /A parent or guardian approves this account/i }),
+        page.getByRole("heading", { name: /Your Guardian approves this account/i }),
       ).toBeVisible({ timeout: 20_000 });
 
       await page.goto("/safety/children", { waitUntil: "domcontentloaded" });

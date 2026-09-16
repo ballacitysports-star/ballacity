@@ -14,7 +14,8 @@ export const Route = createFileRoute("/players/add")({
     pageHead({
       path: "/players/add",
       title: "Add a player — ballaCity",
-      description: "Add yourself or your child as a player. Children don't need their own login.",
+      description:
+        "Add yourself or a player you manage. Guardian-managed players don't need their own login.",
       noindex: true,
     }),
   ssr: false,
@@ -104,7 +105,7 @@ function AddPlayerPage() {
         <div className="mt-3 flex gap-2">
           {(
             [
-              { id: "child", label: "Child" },
+              { id: "child", label: "A player I manage" },
               { id: "me", label: "Me" },
             ] as const
           ).map((o) => (
@@ -125,7 +126,7 @@ function AddPlayerPage() {
         </div>
         {who === "child" && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Your child doesn&apos;t need their own login — you manage this profile from your
+            This player doesn&apos;t need their own login — you manage this profile from your
             account.
           </p>
         )}

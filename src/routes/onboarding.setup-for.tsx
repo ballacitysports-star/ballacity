@@ -11,7 +11,7 @@ export const Route = createFileRoute("/onboarding/setup-for")({
       path: "/onboarding/setup-for",
       title: "Who are you setting up ballaCity for? — ballaCity",
       description:
-        "Set up ballaCity for yourself, for your child, or for both. One login covers your whole family.",
+        "Set up ballaCity for yourself, for a player you manage, or for both. One login covers your whole family.",
       noindex: true,
     }),
   ssr: false,
@@ -22,28 +22,28 @@ export const Route = createFileRoute("/onboarding/setup-for")({
  * Step 2 of onboarding: who is this account for?
  *
  * This is the fork that decides whether the account owner gets their own
- * player profile, a child's, or both — and it is the reason a child never
- * needs a login. Nothing here creates anything; it only routes, so backing
- * out costs nothing.
+ * Player Profile, a managed player's, or both — and it is the reason a managed
+ * player never needs a login. Nothing here creates anything; it only routes, so
+ * backing out costs nothing.
  */
 const CHOICES = [
   {
     id: "me",
     icon: User,
     label: "I'm playing",
-    body: "Set up your own player profile.",
+    body: "Set up your own Player Profile.",
   },
   {
     id: "child",
     icon: Users,
-    label: "I'm setting this up for my child",
-    body: "Create a profile you manage. Your child doesn't need their own login.",
+    label: "I'm setting this up for a player I manage",
+    body: "Create a Player Profile you manage. They don't need their own login.",
   },
   {
     id: "both",
     icon: UserPlus,
-    label: "I'm playing and setting it up for my child",
-    body: "Start with your profile, then add your child.",
+    label: "I'm playing and setting it up for a player I manage",
+    body: "Start with your Player Profile, then add theirs.",
   },
 ] as const;
 

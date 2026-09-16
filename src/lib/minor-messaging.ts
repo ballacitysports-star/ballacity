@@ -25,10 +25,10 @@ export type MinorMessagingReason =
   | "teen_needs_shared_game";
 
 const MESSAGES: Record<MinorMessagingReason, string> = {
-  messaging_off: "This player's parent or guardian has turned off direct messages.",
-  guardian_only: "This player can only be messaged by their parent or guardian.",
+  messaging_off: "This player's Guardian has turned off direct messages.",
+  guardian_only: "This player can only be messaged by their Guardian.",
   teammates_only: "This player can only be messaged by teammates. Add them to your team first.",
-  child_needs_guardian: "Players under 13 can only be messaged by their own parent or guardian.",
+  child_needs_guardian: "Players under 13 can only be messaged by their own Guardian.",
   // Both of these are the encouraging case: the host is not blocked outright,
   // they simply do not share a game with this player yet.
   child_needs_shared_game: "You can message this player once they've joined one of your games.",

@@ -7,7 +7,7 @@ import type { GuardianChild } from "@/lib/child-safety.functions";
  * The guardian's roster: who is waiting on them, who is active, and what they
  * are allowed to see of each child.
  *
- * The Parent Center could previously only show one child at a time, behind a
+ * The Guardian Dashboard could previously only show one player at a time, behind a
  * switcher that appeared at two or more children. A guardian had no single
  * view answering "who needs me, and who is set up" — they had to click each
  * child in turn to find out. This builds that view.

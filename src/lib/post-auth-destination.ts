@@ -17,7 +17,7 @@ export type PostAuthDestinationInput = {
  * Where to send a member immediately after they authenticate.
  *
  * `AuthGate` already treats account-setup screens — guardian consent
- * (`/parent/consent/:token`), the Parent Center, safety/legal reading — as
+ * (`/parent/consent/:token`), the Guardian Dashboard, safety/legal reading — as
  * escapes from the ordinary account-type gate (`isAccountSetupEscape`,
  * `skipTypeCheck` in `__root.tsx`). A brand-new guardian account signing in
  * from a consent link has no player/team/trainer/gym answer to give and

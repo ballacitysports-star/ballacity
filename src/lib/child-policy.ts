@@ -33,20 +33,20 @@ export type AgeCohort = (typeof AGE_COHORTS)[number];
 export const COHORT_META: Record<AgeCohort, { label: string; short: string; description: string }> =
   {
     child_under_13: {
-      label: "Child (under 13)",
+      label: "Under 13",
       short: "Under 13",
       description:
-        "Child account. A parent or guardian must approve the account before most features unlock.",
+        "Guardian-managed player. A parent or legal guardian must approve the account before most features unlock.",
     },
     teen_13_15: {
-      label: "Teen (13–15)",
+      label: "Ages 13–15",
       short: "13–15",
-      description: "Teen account with the strongest teen privacy and safety defaults.",
+      description: "Player account with the strongest teen privacy and safety defaults.",
     },
     teen_16_17: {
-      label: "Teen (16–17)",
+      label: "Ages 16–17",
       short: "16–17",
-      description: "Teen account with protective privacy defaults.",
+      description: "Player account with protective privacy defaults.",
     },
     adult: { label: "Adult (18+)", short: "18+", description: "Standard adult account." },
     unknown: {
@@ -589,7 +589,7 @@ export const FEATURE_META: Record<FeatureKey, { label: string; group: string }> 
   follows: { label: "Followers & following", group: "Social" },
   comments: { label: "Comments", group: "Social" },
   targeted_advertising: { label: "Targeted advertising", group: "Privacy" },
-  parent_controls: { label: "Parent/guardian controls", group: "Identity" },
+  parent_controls: { label: "Guardian controls", group: "Identity" },
   night_notifications: { label: "Overnight notifications", group: "Communication" },
 };
 
@@ -800,8 +800,8 @@ export function can(
       level,
       reason:
         state === "PARENTAL_CONSENT_REVOKED"
-          ? "A parent or guardian withdrew consent for this account."
-          : "A parent or guardian must approve this account first.",
+          ? "Your Guardian withdrew consent for this account."
+          : "Your Guardian must approve this account first.",
     };
   }
 
@@ -831,7 +831,7 @@ export function can(
     return {
       allowed: on,
       level,
-      reason: on ? null : "A parent or guardian has turned this off.",
+      reason: on ? null : "Your Guardian has turned this off.",
     };
   }
 

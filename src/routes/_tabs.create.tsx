@@ -304,7 +304,7 @@ function Create() {
           <h2 className="font-display text-lg font-bold">{HOSTING_BLOCKED_MESSAGE}</h2>
           <p className="text-sm text-muted-foreground">
             {hostingDecision.reason ||
-              "An adult account has to host games. Ask a parent, guardian or coach to set the game up for you."}
+              "An adult account has to host games. Ask your Guardian or a coach to set the game up for you."}
           </p>
         </div>
       </div>

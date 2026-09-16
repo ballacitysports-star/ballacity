@@ -81,7 +81,7 @@ test("a revoked child sees the account-off explanation with a way forward", asyn
   await signInAs(page, "player");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/A parent or guardian turned this account off/i)).toBeVisible({
+  await expect(page.getByText(/Your Guardian turned this account off/i)).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByRole("link", { name: /Start approval|Check status/i })).toBeVisible();

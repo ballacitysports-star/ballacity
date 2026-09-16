@@ -27,9 +27,9 @@ export const Route = createFileRoute("/parent/")({
   head: () =>
     pageHead({
       path: "/parent",
-      title: "Parent Center — ballaCity",
+      title: "Guardian Dashboard — ballaCity",
       description:
-        "Manage your child's ballaCity account: messaging, video visibility, discoverability, data requests and consent.",
+        "Manage your player's ballaCity account: messaging, video visibility, discoverability, data requests and consent.",
       noindex: true,
     }),
   ssr: false,
@@ -49,7 +49,7 @@ const MEDIA_OPTIONS: Array<{
   label: string;
   hint: string;
 }> = [
-  { value: "private", label: "Private", hint: "Only your child and you." },
+  { value: "private", label: "Private", hint: "Only this player and you." },
   { value: "guardian", label: "Guardian review", hint: "You see everything they upload." },
   { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
 ];
@@ -213,8 +213,8 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           we hold push alerts until morning. The alert still appears in the app straight away.
         </div>
         <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
-          Precise location is never shared for a child account — only a general city, and venue
-          details only with the host and participants of a game they join.
+          Precise location is never shared for a Guardian-managed player — only a general city, and
+          venue details only with the host and participants of a game they join.
         </div>
       </div>
       <ConsentTrail childUserId={childUserId} />
@@ -236,7 +236,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           disabled={revoke.isPending || child.consent?.status === "revoked"}
           onClick={() =>
             revoke.mutate(
-              { childUserId, reason: "Withdrawn from the Parent Center" },
+              { childUserId, reason: "Withdrawn from the Guardian Dashboard" },
               {
                 onSuccess: () => toast.success("Consent withdrawn and restrictions applied."),
                 onError: (e) => toast.error(e instanceof Error ? e.message : "Could not withdraw"),
@@ -252,20 +252,20 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           disabled={unlink.isPending}
           onClick={() => {
             const ok = window.confirm(
-              `End your family link with ${child.displayName}? You will no longer manage their settings, and your consent for their account is withdrawn.`,
+              `End your Guardian link with ${child.displayName}? You will no longer manage their settings, and your consent for their account is withdrawn.`,
             );
             if (!ok) return;
             unlink.mutate(
-              { childUserId, reason: "Guardian ended the link from the Parent Center" },
+              { childUserId, reason: "Guardian ended the link from the Guardian Dashboard" },
               {
-                onSuccess: () => toast.success("Family link ended."),
+                onSuccess: () => toast.success("Guardian link ended."),
                 onError: (e) =>
                   toast.error(e instanceof Error ? e.message : "Could not end that link"),
               },
             );
           }}
         >
-          End family link
+          End Guardian link
         </Button>
       </div>
     </section>
@@ -283,9 +283,9 @@ function ParentCenterPage() {
   if (!loading && !user) {
     return (
       <main className="page-shell-content py-10">
-        <h1 className="page-title">Parent Center</h1>
+        <h1 className="page-title">Guardian Dashboard</h1>
         <p className="mt-2 page-subtitle">
-          Sign in with your adult account to manage a child&rsquo;s ballaCity account.
+          Sign in with your adult account to manage a player&rsquo;s ballaCity account.
         </p>
         <Link
           to="/auth"
@@ -301,12 +301,12 @@ function ParentCenterPage() {
     <main className="page-shell-content pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="section-eyebrow">Parent Center</span>
+        <span className="section-eyebrow">Guardian Dashboard</span>
       </div>
       <h1 className="mt-2 page-title">Your family</h1>
       <p className="mt-2 page-subtitle">
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
-        discoverability and data requests. You only ever see information about your own children.
+        discoverability and data requests. You only ever see information about your own players.
       </p>
 
       <FamilyApprovalsPanel />
@@ -316,12 +316,12 @@ function ParentCenterPage() {
       ) : children.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm">
           <div className="flex items-center gap-2 font-semibold">
-            <Users className="h-4 w-4" aria-hidden /> No linked child accounts
+            <Users className="h-4 w-4" aria-hidden /> No linked players
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            When your child asks for approval, open the link they send you and approve it while
-            signed in here. Their account then appears in this Parent Center. You can also invite a
-            minor yourself with the form below.
+            When your player asks for approval, open the link they send you and approve it while
+            signed in here. Their account then appears in this Guardian Dashboard. You can also
+            invite a player yourself with the form below.
           </p>
         </div>
       ) : (

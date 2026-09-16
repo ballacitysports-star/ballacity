@@ -49,7 +49,7 @@ export const ADULT_AGE = DEFAULT_AGE_POLICY.adultAge;
 /** Implausible birthdays are still rejected, purely as data validation. */
 export const MAX_PLAUSIBLE_AGE = 120;
 
-export const CONSENT_REQUIRED_MESSAGE = `Because you're under ${PARENTAL_CONSENT_MAX_AGE + 1}, a parent or guardian has to approve this account before games, messages and videos turn on.`;
+export const CONSENT_REQUIRED_MESSAGE = `Because you're under ${PARENTAL_CONSENT_MAX_AGE + 1}, your Guardian has to approve this account before games, messages and videos turn on.`;
 
 export const CHILD_SUPPORT_NOTE =
   "ballaCity supports members under the consent age through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; ballaCity does not claim COPPA compliance without legal review of the consent method.";

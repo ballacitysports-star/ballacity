@@ -84,7 +84,7 @@ function ChildSafetyCenter() {
           to="/parent"
           className="rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground"
         >
-          Parent Center
+          Guardian Dashboard
         </Link>
         <Link to="/safety" className="rounded-full border border-border px-4 py-2 font-semibold">
           Safety Center

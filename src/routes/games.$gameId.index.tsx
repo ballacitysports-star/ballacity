@@ -2756,8 +2756,7 @@ function GameDetail() {
                 }
                 if (!messagingDecision.allowed) {
                   toast.error(
-                    messagingDecision.reason ||
-                      "A parent or guardian must approve this account first.",
+                    messagingDecision.reason || "Your Guardian must approve this account first.",
                   );
                   return;
                 }
@@ -2868,7 +2867,7 @@ function GameDetail() {
                       if (consentBlocksNewJoin) {
                         toast.error(
                           participationDecision.reason ||
-                            "A parent or guardian must approve this account first.",
+                            "Your Guardian must approve this account first.",
                         );
                         return;
                       }

@@ -44,9 +44,7 @@ describe("minorMessagingMessage", () => {
   });
 
   it("names the guardian control when that is what refused", () => {
-    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off")).toMatch(
-      /parent or guardian/i,
-    );
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off")).toMatch(/Guardian/i);
     expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only")).toMatch(/teammates/i);
   });
 
@@ -95,7 +93,7 @@ describe("isMinorMessagingBlock", () => {
 describe("describeMessagingError", () => {
   it("explains a minor-messaging refusal", () => {
     expect(describeMessagingError(new Error("MINOR_MESSAGING_BLOCKED:guardian_only"))).toMatch(
-      /parent or guardian/i,
+      /Guardian/i,
     );
   });
 

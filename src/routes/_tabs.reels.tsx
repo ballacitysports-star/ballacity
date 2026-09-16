@@ -749,7 +749,7 @@ function ReelsPage() {
    */
   function startUpload() {
     if (!uploadDecision.allowed) {
-      toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
+      toast.error(uploadDecision.reason || "Your Guardian must approve this account first.");
       return;
     }
     if (!privacyPrefs.ai_disclosure_ack_at) {
@@ -796,7 +796,7 @@ function ReelsPage() {
   async function handleUpload(file: File) {
     if (!user) return;
     if (!uploadDecision.allowed) {
-      toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
+      toast.error(uploadDecision.reason || "Your Guardian must approve this account first.");
       return;
     }
     if (!canGenerate) {

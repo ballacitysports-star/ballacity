@@ -25,9 +25,9 @@ describe("describeFamilyActivity", () => {
   it("describes consent transitions", () => {
     expect(
       describeFamilyActivity({ action: "consent.approved", context: { method: "email" } }),
-    ).toEqual({ title: "Parental consent approved", detail: "By email confirmation" });
+    ).toEqual({ title: "Guardian consent approved", detail: "By email confirmation" });
     expect(describeFamilyActivity({ action: "consent.revoked" }).title).toBe(
-      "Parental consent withdrawn",
+      "Guardian consent withdrawn",
     );
     expect(
       describeFamilyActivity({ action: "consent.pending", context: { method: "credit_card" } })
@@ -35,18 +35,18 @@ describe("describeFamilyActivity", () => {
     ).toBe("By credit card");
   });
 
-  it("describes family link transitions", () => {
+  it("describes Guardian link transitions", () => {
     expect(
       describeFamilyActivity({ action: "link.active", context: { relationship: "parent" } }),
-    ).toEqual({ title: "Family link connected", detail: "Relationship: parent" });
-    expect(describeFamilyActivity({ action: "link.revoked" }).title).toBe("Family link ended");
+    ).toEqual({ title: "Guardian link connected", detail: "Relationship: parent" });
+    expect(describeFamilyActivity({ action: "link.revoked" }).title).toBe("Guardian link ended");
   });
 
   it("falls back readably for unknown keys", () => {
     expect(describeFamilyActivity({ action: "consent.reverify_due" }).title).toBe(
       "Consent reverify due",
     );
-    expect(describeFamilyActivity({ action: "link.paused" }).title).toBe("Family link paused");
+    expect(describeFamilyActivity({ action: "link.paused" }).title).toBe("Guardian link paused");
     expect(describeFamilyActivity({ action: "something.else_new" }).title).toBe(
       "something else new",
     );

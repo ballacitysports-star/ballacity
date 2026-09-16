@@ -24,9 +24,9 @@ import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
 export const Route = createFileRoute("/parent/consent/$token")({
   head: () =>
     pageHead({
-      title: "Approve a child's ballaCity account",
+      title: "Approve a player's ballaCity account",
       description:
-        "Review what ballaCity collects and what your child can do, then approve or decline the account.",
+        "Review what ballaCity collects and what this player can do, then approve or decline the account.",
       noindex: true,
     }),
   ssr: false,
@@ -36,7 +36,7 @@ export const Route = createFileRoute("/parent/consent/$token")({
 const CONSENT_SCOPE = [
   {
     key: "profile",
-    label: "A private player profile",
+    label: "A private Player Profile",
     detail: "Display name, username, sports and a general city — never a home address.",
   },
   {
@@ -47,7 +47,7 @@ const CONSENT_SCOPE = [
   {
     key: "messaging",
     label: "Limited messaging",
-    detail: "Unknown adults cannot message your child. You can turn messaging off entirely.",
+    detail: "Unknown adults cannot message this player. You can turn messaging off entirely.",
   },
   {
     key: "media",
@@ -115,7 +115,7 @@ function ConsentApprovalPage() {
     setSubmitting(true);
     try {
       await approve({ data: { token, acknowledgedPolicies: true, scope: { all: true } } });
-      toast.success("Approved — you can manage settings in the Parent Center.");
+      toast.success("Approved — you can manage settings in the Guardian Dashboard.");
       void navigate({ to: "/parent" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not approve this request.");
@@ -128,12 +128,10 @@ function ConsentApprovalPage() {
     <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="section-eyebrow">
-          Parent / guardian approval
-        </span>
+        <span className="section-eyebrow">Guardian approval</span>
       </div>
       <h1 className="mt-2 page-title">
-        Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
+        Approve {info?.childDisplayName ?? "a player"}&rsquo;s ballaCity account
       </h1>
 
       {query.isLoading ? (
@@ -159,7 +157,7 @@ function ConsentApprovalPage() {
           <section className="mt-4 rounded-2xl border border-border bg-surface p-4 text-xs text-muted-foreground">
             <h2 className="text-sm font-bold text-foreground">Your controls</h2>
             <p className="mt-1">
-              After approving you get a Parent Center where you can change messaging, video
+              After approving you get a Guardian Dashboard where you can change messaging, video
               visibility, discoverability and AI analysis, request a copy of your child's
               information, ask for corrections or deletion, and withdraw consent at any time.
               Withdrawing consent immediately turns off messaging, hides videos and makes the
@@ -201,7 +199,7 @@ function ConsentApprovalPage() {
             <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-xs">
               <p className="text-muted-foreground">
                 Sign in with your own adult ballaCity account to approve. This confirms your email
-                and gives you the Parent Center.
+                and gives you the Guardian Dashboard.
               </p>
               <Link
                 to="/auth"

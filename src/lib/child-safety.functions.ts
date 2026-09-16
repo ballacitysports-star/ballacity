@@ -233,7 +233,7 @@ export const lookupConsentRequest = createServerFn({ method: "POST" })
     return {
       valid: !expired && r.status === "pending",
       reason: expired
-        ? "This approval link has expired. Ask your child to send a new request."
+        ? "This approval link has expired. Ask your player to send a new request."
         : r.status !== "pending"
           ? "This request has already been handled."
           : null,
@@ -247,7 +247,7 @@ export const lookupConsentRequest = createServerFn({ method: "POST" })
 /**
  * Approval requires the guardian to be signed in with their own adult account.
  * That gives us a verified email address plus an account to attach the guardian
- * link and the Parent Center to — and it blocks casual "fake parent" approvals
+ * link and the Guardian Dashboard to — and it blocks casual "fake parent" approvals
  * from a forwarded link alone.
  *
  * LEGAL REVIEW REQUIRED — whether this method is a sufficient verifiable
@@ -295,7 +295,7 @@ export const approveConsentAsGuardian = createServerFn({ method: "POST" })
     }
     if (cohort !== "adult") {
       throw new Error(
-        "Only an adult account can approve a child account. Add your birthday to your profile first.",
+        "Only an adult account can approve a player. Add your birthday to your profile first.",
       );
     }
 
@@ -311,7 +311,7 @@ export const approveConsentAsGuardian = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
-/* Parent Center                                                      */
+/* Guardian Dashboard                                                 */
 /* ------------------------------------------------------------------ */
 
 export type GuardianChild = {
@@ -383,7 +383,7 @@ export const listMyChildren = createServerFn({ method: "GET" })
       );
       return {
         childUserId: r.child_user_id,
-        displayName: r.display_name ?? "Child account",
+        displayName: r.display_name ?? "Player",
         username: r.username ?? null,
         avatarUrl: r.avatar_url ?? null,
         cohort: parseCohort(r.age_cohort ?? undefined),
@@ -425,8 +425,8 @@ export const revokeGuardianLink = createServerFn({ method: "POST" })
     if (error) {
       throw new Error(
         error.message.includes("NOT_FOUND")
-          ? "That family link is no longer active."
-          : "Could not end that family link.",
+          ? "That Guardian link is no longer active."
+          : "Could not end that Guardian link.",
       );
     }
     return { ok: true };
@@ -453,7 +453,7 @@ export const listFamilyActivity = createServerFn({ method: "POST" })
       .eq("child_user_id", data.childUserId)
       .order("created_at", { ascending: false })
       .limit(40);
-    if (error) throw new Error("Could not load the family activity log.");
+    if (error) throw new Error("Could not load the Guardian activity log.");
     return (rows ?? []).map((r) => {
       const row = r as {
         id: string;
@@ -579,7 +579,7 @@ export const getChildFootprint = createServerFn({ method: "POST" })
       _parent: context.userId,
       _child: data.childUserId,
     });
-    if (isGuardian !== true) throw new Error("Not authorized for this child account.");
+    if (isGuardian !== true) throw new Error("Not authorized for this player.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const child = data.childUserId;
@@ -801,7 +801,7 @@ export const getChildConsentTrail = createServerFn({ method: "POST" })
       _parent: context.userId,
       _child: data.childUserId,
     });
-    if (isGuardian !== true) throw new Error("Not authorized for this child account.");
+    if (isGuardian !== true) throw new Error("Not authorized for this player.");
 
     const { data: rows, error } = await context.supabase
       .from("parental_consent_events")

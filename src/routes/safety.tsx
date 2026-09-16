@@ -46,7 +46,7 @@ function SafetyCenter() {
             to="/parent"
             className="rounded-full border border-border px-3 py-1.5 font-semibold"
           >
-            Parent Center
+            Guardian Dashboard
           </Link>
         </div>
 

@@ -15,7 +15,7 @@ export const Route = createFileRoute("/family/join/$token")({
     pageHead({
       title: "Join your family on ballaCity",
       description:
-        "Accept a parent or guardian invitation so they can manage your ballaCity safety settings.",
+        "Accept a Guardian invitation so they can manage your ballaCity safety settings.",
       noindex: true,
     }),
   ssr: false,
@@ -43,7 +43,7 @@ function FamilyJoinPage() {
     try {
       await redeem({ data: { token } });
       setDone(true);
-      toast.success("You're connected to your parent or guardian.");
+      toast.success("You're connected to your Guardian.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not accept that invitation.");
     } finally {
@@ -79,7 +79,7 @@ function FamilyJoinPage() {
           <h1 className="page-title">You're all set</h1>
         </div>
         <p className="mt-2 page-subtitle">
-          Your parent or guardian is connected and can manage your safety settings.
+          Your Guardian is connected and can manage your safety settings.
         </p>
         <Button className="mt-4 w-full" onClick={() => void navigate({ to: "/settings" })}>
           Go to Settings
@@ -94,7 +94,7 @@ function FamilyJoinPage() {
     <Shell>
       <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-muted-foreground" />
-        <h1 className="page-title">Family invitation</h1>
+        <h1 className="page-title">Guardian invitation</h1>
       </div>
 
       {query.isLoading ? (
@@ -102,8 +102,7 @@ function FamilyJoinPage() {
       ) : state === "pending" ? (
         <>
           <p className="mt-3 text-sm">
-            {query.data?.parentName ?? "A parent or guardian"} invited you as their{" "}
-            {query.data?.relationship === "guardian" ? "dependent" : "minor"}
+            {query.data?.parentName ?? "Your Guardian"} invited you to join as a Player
             {query.data?.childName ? ` (${query.data.childName})` : ""}.
           </p>
           <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
@@ -125,7 +124,7 @@ function FamilyJoinPage() {
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
           {state === "expired"
-            ? "This invitation has expired. Ask your parent or guardian for a new link."
+            ? "This invitation has expired. Ask your Guardian for a new link."
             : state === "revoked"
               ? "This invitation was cancelled."
               : state === "redeemed"

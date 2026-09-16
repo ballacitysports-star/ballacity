@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 const RELATIONSHIPS = ["parent", "guardian", "grandparent", "other adult"];
 
 /**
- * Parent-first flow: an adult invites a minor to their family. The link is
- * single-use and expires in 14 days; the child accepts it after signing in and
+ * Guardian-first flow: an adult invites a player to their family. The link is
+ * single-use and expires in 14 days; the player accepts it after signing in and
  * entering their date of birth, which links the guardian and (under 13)
  * records approved consent.
  */
@@ -30,7 +30,7 @@ export function AddMinorPanel() {
       const url = `${window.location.origin}${res.path}`;
       setLink(url);
       setName("");
-      toast.success("Invitation created. Share the link with your minor.");
+      toast.success("Invitation created. Share the link with your player.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create that invitation.");
     }
@@ -52,16 +52,16 @@ export function AddMinorPanel() {
     <section className="mt-5 rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center gap-2">
         <UserPlus className="h-4 w-4 text-muted-foreground" />
-        <h2 className="font-display text-sm font-bold">Add a minor to your family</h2>
+        <h2 className="font-display text-sm font-bold">Add a Player</h2>
       </div>
       <p className="mt-1 text-xs leading-snug text-muted-foreground">
-        Create an invitation, then share the link with your minor. They sign in, enter their date of
-        birth, and accepting connects them to you. Links work once and expire after 14 days.
+        Create an invitation, then share the link with your player. They sign in, enter their date
+        of birth, and accepting connects them to you. Links work once and expire after 14 days.
       </p>
 
       <div className="mt-3 space-y-2">
         <label className="block text-[11px] font-semibold text-muted-foreground">
-          Minor's first name
+          Player's first name
           <input
             value={name}
             maxLength={60}

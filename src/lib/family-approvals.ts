@@ -6,7 +6,7 @@ import type { MinorInvite } from "@/lib/family-invites.functions";
 
 /**
  * One reusable shape for every guardian-facing approval in the app, so new
- * features can surface an item in the Parent Center without inventing their
+ * features can surface an item in the Guardian Dashboard without inventing their
  * own UI, wording or state machine.
  */
 export type FamilyApproval = {

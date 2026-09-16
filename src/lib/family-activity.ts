@@ -1,5 +1,5 @@
 /**
- * Plain-language labels for the append-only family activity trail.
+ * Plain-language labels for the append-only Guardian activity trail.
  *
  * Rows are written by database triggers, so the action keys are stable and the
  * UI never has to trust client-side bookkeeping. Unknown keys still render
@@ -57,17 +57,17 @@ export function describeFamilyActivity(entry: {
       };
     }
     case "consent.pending":
-      return { title: "Parental consent requested", detail: methodDetail(ctx) };
+      return { title: "Guardian consent requested", detail: methodDetail(ctx) };
     case "consent.approved":
-      return { title: "Parental consent approved", detail: methodDetail(ctx) };
+      return { title: "Guardian consent approved", detail: methodDetail(ctx) };
     case "consent.revoked":
-      return { title: "Parental consent withdrawn", detail: null };
+      return { title: "Guardian consent withdrawn", detail: null };
     case "link.active":
-      return { title: "Family link connected", detail: relationshipDetail(ctx) };
+      return { title: "Guardian link connected", detail: relationshipDetail(ctx) };
     case "link.pending":
-      return { title: "Family link invited", detail: relationshipDetail(ctx) };
+      return { title: "Guardian link invited", detail: relationshipDetail(ctx) };
     case "link.revoked":
-      return { title: "Family link ended", detail: null };
+      return { title: "Guardian link ended", detail: null };
     default:
       break;
   }
@@ -76,7 +76,7 @@ export function describeFamilyActivity(entry: {
     return { title: `Consent ${entry.action.slice(8).replace(/_/g, " ")}`, detail: null };
   }
   if (entry.action.startsWith("link.")) {
-    return { title: `Family link ${entry.action.slice(5).replace(/_/g, " ")}`, detail: null };
+    return { title: `Guardian link ${entry.action.slice(5).replace(/_/g, " ")}`, detail: null };
   }
   return { title: entry.action.replace(/[._]/g, " "), detail: null };
 }

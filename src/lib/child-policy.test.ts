@@ -190,7 +190,7 @@ describe("feature permission matrix", () => {
     }
   });
 
-  it("locks a pre-consent child out of everything but the consent flow", () => {
+  it("locks a pre-consent player out of everything but the consent flow", () => {
     const subject = { cohort: "child_under_13" as AgeCohort };
     expect(can("account", subject).allowed).toBe(true);
     expect(can("parent_controls", subject).allowed).toBe(true);
@@ -203,7 +203,7 @@ describe("feature permission matrix", () => {
     ] as const) {
       const d = can(feature, subject);
       expect(d.allowed).toBe(false);
-      expect(d.reason).toMatch(/parent or guardian/i);
+      expect(d.reason).toMatch(/your Guardian/i);
     }
   });
 

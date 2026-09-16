@@ -14,9 +14,9 @@ export const Route = createFileRoute("/onboarding/child")({
   head: () =>
     pageHead({
       path: "/onboarding/child",
-      title: "Parent or guardian approval — ballaCity",
+      title: "Guardian approval — ballaCity",
       description:
-        "Under-13 ballaCity accounts need a parent or guardian to approve them before games, messages and videos turn on.",
+        "Under-13 ballaCity accounts need a Guardian to approve them before games, messages and videos turn on.",
       noindex: true,
     }),
   ssr: false,
@@ -32,7 +32,7 @@ const RELATIONSHIPS = [
 const COLLECTED_BEFORE_CONSENT = [
   "Your first name or nickname",
   "Your date of birth (kept private)",
-  "Your parent or guardian's email address",
+  "Your Guardian's email address",
 ];
 
 const NOT_COLLECTED_BEFORE_CONSENT = [
@@ -59,7 +59,7 @@ function ChildOnboardingPage() {
     try {
       const res = await request.mutateAsync({ parentEmail, parentName, relationship });
       setLink(`${window.location.origin}${(res as { path: string }).path}`);
-      toast.success("Approval request created — send the link to your parent or guardian.");
+      toast.success("Approval request created — send the link to your Guardian.");
       void refetch();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create the request.");
@@ -68,8 +68,8 @@ function ChildOnboardingPage() {
 
   return (
     <OnboardingShell
-      title="A parent or guardian approves this account"
-      description={`ballaCity requires a parent or guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
+      title="Your Guardian approves this account"
+      description={`ballaCity requires a Guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
     >
       <>
         {!isLoading && !approved && (
@@ -89,8 +89,8 @@ function ChildOnboardingPage() {
               <CheckCircle2 className="h-5 w-5" aria-hidden /> Approved
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your parent or guardian approved this account. They can change your settings anytime
-              in the Parent Center.
+              Your Guardian approved this account. They can change your settings anytime in the
+              Guardian Dashboard.
             </p>
             <Link
               to="/feed"
@@ -134,7 +134,7 @@ function ChildOnboardingPage() {
 
             <section className="mt-6 space-y-3 rounded-2xl border border-border bg-surface p-4">
               <h2 className="text-sm font-bold">
-                {pending ? "Send a new approval request" : "Ask your parent or guardian"}
+                {pending ? "Send a new approval request" : "Ask your Guardian"}
               </h2>
               <div className="space-y-1.5">
                 <Label htmlFor="parent-email">Their email address</Label>
@@ -191,8 +191,8 @@ function ChildOnboardingPage() {
               <section className="mt-4 rounded-2xl border border-border bg-surface p-4">
                 <h2 className="text-sm font-bold">Approval link</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Give this one-time link to your parent or guardian. It expires in 72 hours and can
-                  only be used once, and they must sign in with their own adult account to approve.
+                  Give this one-time link to your Guardian. It expires in 72 hours and can only be
+                  used once, and they must sign in with their own adult account to approve.
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="min-w-0 flex-1 truncate rounded-lg bg-background px-2 py-1.5 text-[11px]">

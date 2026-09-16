@@ -3,9 +3,9 @@ import { useMyChildStatus, useMyChildren } from "@/lib/child-safety";
 import { SettingsGroup, SettingsLinkRow } from "@/components/settings/SettingsRow";
 
 /**
- * Entry point into the Parent Center from Settings. Adults always see it (they
- * may need to invite a minor), and anyone already linked to a child sees the
- * count so approval and controls are one tap away.
+ * Entry point into the Guardian Dashboard from Settings. Adults always see it
+ * (they may need to invite a player), and anyone already linked to a player sees
+ * the count so approval and controls are one tap away.
  */
 export function ParentCenterSection() {
   const { status, isLoading } = useMyChildStatus();
@@ -19,18 +19,18 @@ export function ParentCenterSection() {
       <SettingsLinkRow
         to="/parent"
         icon={ShieldCheck}
-        label="Parent Center"
+        label="Guardian Dashboard"
         description={
           children.length > 0
-            ? `${children.length} linked child ${children.length === 1 ? "account" : "accounts"} — consent, messaging, videos and data requests`
-            : "Approve a child's account, invite a minor, and manage their safety settings"
+            ? `${children.length} linked ${children.length === 1 ? "player" : "players"} — consent, messaging, videos and data requests`
+            : "Approve a player, add a player, and manage their safety settings"
         }
       />
       {children.length === 0 ? (
         <SettingsLinkRow
           to="/parent"
           icon={UserPlus}
-          label="Invite a child or teen"
+          label="Add a Player"
           description="Create a one-time invite so they join linked to your account"
         />
       ) : null}

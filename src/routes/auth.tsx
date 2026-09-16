@@ -59,7 +59,7 @@ function AuthPage() {
   const { published: publishedLegal } = usePublishedLegalDocuments();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   // A `next` that points at an account-setup escape (guardian consent, the
-  // Parent Center, safety/legal reading) has no player/team/trainer/gym
+  // Guardian Dashboard, safety/legal reading) has no player/team/trainer/gym
   // answer to give — AuthGate itself skips the type gate on those routes, so
   // asking here would only strand a brand-new guardian one step before the
   // screen they were emailed a link to.

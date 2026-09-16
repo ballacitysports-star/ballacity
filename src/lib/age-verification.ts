@@ -93,7 +93,7 @@ export function signupStateFor(input: {
   if (input.status === "age_verification_required" || input.cohort === "unknown") {
     return "DOB_REQUIRED";
   }
-  // "Needs a guardian" is a policy question (currently under-16 by default),
+  // "Needs a Guardian" is a policy question (currently under-16 by default),
   // not a synonym for the under-13 cohort.
   if (requiresParentalConsent(input.cohort, input.policy ?? DEFAULT_AGE_POLICY)) {
     switch (input.status) {

@@ -20,7 +20,7 @@ export const Route = createFileRoute("/admin/child-safety")({
     pageHead({
       path: "/admin/child-safety",
       title: "Child safety — ballaCity Admin",
-      description: "Review parental consent, age-change reviews and guardian requests.",
+      description: "Review Guardian consent, age-change reviews and Guardian requests.",
       noindex: true,
     }),
   ssr: false,
@@ -78,7 +78,7 @@ function AdminChildSafetyPage() {
         <ShieldAlert className="h-5 w-5" aria-hidden />
         <span className="section-eyebrow">Child safety</span>
       </div>
-      <h1 className="mt-1 page-title">Consent, age reviews &amp; guardian requests</h1>
+      <h1 className="mt-1 page-title">Consent, age reviews &amp; Guardian requests</h1>
 
       {query.isLoading || !data ? (
         <p className="mt-6 page-subtitle">Loading…</p>
@@ -98,7 +98,7 @@ function AdminChildSafetyPage() {
           <BirthdayCorrectionQueue />
 
           <section className="mt-5">
-            <h2 className="section-title">Parental consent</h2>
+            <h2 className="section-title">Guardian consent</h2>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {["required", "pending", "approved", "revoked", "expired"].map((s) => (
                 <Stat key={s} label={s} value={data.consentCounts[s] ?? 0} />

@@ -145,16 +145,16 @@ export const redeemMinorInvite = createServerFn({ method: "POST" })
 
 function friendly(message: string): string {
   const m = message ?? "";
-  if (m.includes("ADULT_REQUIRED")) return "Only an adult account can add a minor.";
+  if (m.includes("ADULT_REQUIRED")) return "Only an adult account can add a player.";
   if (m.includes("TOO_MANY_INVITES"))
     return "You have too many open invitations. Cancel one first.";
-  if (m.includes("NAME_REQUIRED")) return "Add the child's first name.";
+  if (m.includes("NAME_REQUIRED")) return "Add the player's first name.";
   if (m.includes("INVITE_EXPIRED")) return "That invitation has expired. Ask for a new link.";
   if (m.includes("INVITE_REVOKED")) return "That invitation was cancelled.";
   if (m.includes("INVITE_USED")) return "That invitation was already used.";
   if (m.includes("INVITE_SELF")) return "You cannot accept your own invitation.";
   if (m.includes("INVITE_INVALID")) return "That invitation link is not valid.";
-  if (m.includes("ALREADY_LINKED")) return "You are already connected to this parent or guardian.";
+  if (m.includes("ALREADY_LINKED")) return "You are already connected to this Guardian.";
   if (m.includes("AGE_VERIFICATION_REQUIRED"))
     return "Add your date of birth first, then open the invitation again.";
   if (m.includes("AUTH_REQUIRED")) return "Sign in first.";

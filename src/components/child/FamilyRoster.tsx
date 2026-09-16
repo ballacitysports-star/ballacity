@@ -187,9 +187,9 @@ export function FamilyRoster({
     );
 
   return (
-    <div role="tablist" aria-label="Your linked children">
-      {section("Needs your approval", "These accounts stay limited until you act.", needsAction)}
-      {section("Approved players", "Active accounts you manage.", approved)}
+    <div role="tablist" aria-label="Your linked players">
+      {section("Needs your approval", "These players stay limited until you act.", needsAction)}
+      {section("Approved players", "Active players you manage.", approved)}
     </div>
   );
 }

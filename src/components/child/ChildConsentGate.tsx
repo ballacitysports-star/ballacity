@@ -40,10 +40,10 @@ export function ChildConsentGate() {
         <p className="min-w-0 flex-1 text-muted-foreground">
           <span className="font-semibold text-foreground">
             {revoked
-              ? "A parent or guardian turned this account off."
+              ? "Your Guardian turned this account off."
               : pending
-                ? "Waiting for your parent or guardian."
-                : "A parent or guardian needs to approve this account."}
+                ? "Waiting for your Guardian."
+                : "Your Guardian needs to approve this account."}
           </span>{" "}
           {revoked
             ? "Games, messages, videos and comments stay off until they approve again."

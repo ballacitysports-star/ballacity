@@ -63,8 +63,8 @@ test("a parent adds a child, who gets no login", async ({ page }) => {
     timeout: 15_000,
   });
 
-  // "Who is this player?" — Child is the case that matters.
-  await page.getByRole("button", { name: "Child", exact: true }).click();
+  // "Who is this player?" — the Guardian-managed player is the case that matters.
+  await page.getByRole("button", { name: "A player I manage", exact: true }).click();
   await expect(page.getByText(/doesn't need their own login/i)).toBeVisible();
 
   await page.locator("#first-name").fill(CHILD_FIRST);
@@ -122,13 +122,13 @@ test("onboarding asks who the account is for", async ({ page }) => {
     timeout: 15_000,
   });
   await expect(
-    page.getByRole("button", { name: /setting this up for my child/i }),
+    page.getByRole("button", { name: /setting this up for a player I manage/i }),
   ).toBeVisible({ timeout: 15_000 });
 
   // Continue stays disabled until a choice is made.
   const cont = page.getByRole("button", { name: /^continue$/i });
   await expect(cont).toBeDisabled();
-  await page.getByRole("button", { name: /setting this up for my child/i }).click();
+  await page.getByRole("button", { name: /setting this up for a player I manage/i }).click();
   await expect(cont).toBeEnabled();
   await cont.click();
   await expect(page).toHaveURL(/\/players\/add/, { timeout: 15_000 });

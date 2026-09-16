@@ -30,8 +30,7 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   FEATURE_DISABLED: "This AI feature is turned off right now. Try again later.",
   CONSENT_REQUIRED:
     "AI processing is turned off for your account. You can turn it on in Settings → Privacy.",
-  PARENT_APPROVAL_REQUIRED:
-    "A parent or guardian needs to allow AI features for this account first.",
+  PARENT_APPROVAL_REQUIRED: "Your Guardian needs to allow AI features for this account first.",
   QUOTA_EXCEEDED: "You've used your AI allowance for now. It resets shortly.",
   CONCURRENCY_LIMIT: "You already have AI work in progress. Let it finish, then try again.",
   RATE_LIMITED: "AI is busy right now. Try again in a moment.",

@@ -156,9 +156,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
       return;
     }
     if (!commentsDecision.allowed) {
-      toast.error(
-        commentsDecision.reason || "A parent or guardian must approve this account first.",
-      );
+      toast.error(commentsDecision.reason || "Your Guardian must approve this account first.");
       return;
     }
     createMut.mutate(trimmed);
@@ -223,7 +221,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 1000))}
             placeholder={
-              commentsDecision.allowed ? "Add a comment…" : "Parent approval needed to comment"
+              commentsDecision.allowed ? "Add a comment…" : "Guardian approval needed to comment"
             }
             rows={2}
             disabled={!commentsDecision.allowed}

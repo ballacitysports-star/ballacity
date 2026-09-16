@@ -146,7 +146,7 @@ assertions.
   pixel assertion on EXIF-rotated export, unrelated to session or routing, and
   probably the most self-contained bug in the whole list.
 - `fixture-age-gated-flows` — teen_16_17 hosting policy.
-- `fixture-family-flows` — Parent Center from Settings.
+- `fixture-family-flows` — Guardian Dashboard from Settings.
 - `host-name-realtime`, `host-name-throttled` — host name stays on `display_name`.
 - `team-post-create` — composer publishes end-to-end (timeout).
 

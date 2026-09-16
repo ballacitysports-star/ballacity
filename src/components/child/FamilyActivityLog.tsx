@@ -36,7 +36,7 @@ export function FamilyActivityLog({ childUserId }: { childUserId: string }) {
                 </div>
                 {d.detail ? <div className="text-muted-foreground">{d.detail}</div> : null}
                 <div className="text-[11px] text-muted-foreground">
-                  {e.actorIsMe ? "By you" : "By your child or our team"}
+                  {e.actorIsMe ? "By you" : "By your player or our team"}
                 </div>
               </li>
             );

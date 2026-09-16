@@ -82,7 +82,7 @@ describe("postAuthDestination", () => {
     ).toBe(DEFAULT_POST_AUTH_DESTINATION);
   });
 
-  it("honors the safety/legal and Parent Center escapes too, not just guardian consent", () => {
+  it("honors the safety/legal and Guardian Dashboard escapes too, not just guardian consent", () => {
     for (const next of ["/safety/children", "/account/legal", "/parent"]) {
       expect(postAuthDestination({ next, needsAccountType: true })).toBe(next);
     }

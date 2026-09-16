@@ -286,7 +286,7 @@ function PaymentsUnavailableCard({ reason }: { reason?: string | null }) {
       <div className="mt-1 font-display text-lg font-bold">{PAYMENTS_BLOCKED_MESSAGE}</div>
       <p className="mt-1 text-xs text-muted-foreground">
         {reason ||
-          "An adult account handles payment for this game. Ask a parent or guardian to take care of it for you."}
+          "An adult account handles payment for this game. Ask your Guardian to take care of it for you."}
       </p>
     </div>
   );

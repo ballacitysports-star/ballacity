@@ -164,7 +164,7 @@ export function joinGateErrorMessage(err: unknown): string {
   if (raw.includes("GAME_SIGNUP_CLOSED")) return "Signups for this game are closed.";
   if (raw.includes("GAME_FULL")) return "The roster filled up — try the waitlist.";
   if (raw.includes("CHILD_GAME_PARTICIPATION_BLOCKED"))
-    return "A parent or guardian must approve game participation for this account.";
+    return "Your Guardian must approve game participation for this account.";
   if (raw.includes("age requirement"))
     return "This game has an age requirement — request approval from the host.";
   return "Couldn't join this game. Please try again.";

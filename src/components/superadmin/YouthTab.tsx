@@ -41,8 +41,8 @@ const BOOL_META: Record<BoolKey, { label: string; description: string }> = {
     description: "Off removes under-13 members from nearby players and search.",
   },
   childAiAnalysisRequiresParent: {
-    label: "AI video analysis needs parent approval",
-    description: "Reel Coach stays off for children until a parent opts in.",
+    label: "AI video analysis needs Guardian approval",
+    description: "Reel Coach stays off for under-13 members until a Guardian opts in.",
   },
   childPreciseLocationEverPublic: {
     label: "Children may share precise location",
@@ -152,8 +152,8 @@ export function YouthTab() {
         <p className="text-xs text-muted-foreground">{CHILD_POLICY_DISCLAIMER}</p>
         <p className="text-xs text-muted-foreground">
           Members of every age are supported. Accounts at or under the consent age stay
-          feature-locked until a parent or guardian approves them — these settings tune the cohorts
-          and protections, and the database enforces the same values.
+          feature-locked until a Guardian approves them — these settings tune the cohorts and
+          protections, and the database enforces the same values.
         </p>
       </div>
 
