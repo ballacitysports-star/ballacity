@@ -21,10 +21,12 @@ import { needsPlaybackConversion } from "@/lib/video-support";
 import {
   assertConverterReachable,
   convertToPlayableMp4,
+  ClipConversionFailedError,
   ConverterUnavailableError,
 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
+import { VideoErrorBanner, type VideoErrorInfo } from "@/components/reels/VideoErrorBanner";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -584,6 +586,7 @@ function ReelsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const [videoError, setVideoError] = useState<VideoErrorInfo | null>(null);
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const { prefs: privacyPrefs, update: updatePrivacy } = useMyPrivacy();
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
@@ -804,6 +807,7 @@ function ReelsPage() {
       return;
     }
     setBusy(true);
+    setVideoError(null);
     try {
       // Not getStripeEnvironment(): a free reel involves no charge, so an
       // unconfigured Stripe key must not turn an upload into a payment error.
@@ -849,9 +853,7 @@ function ReelsPage() {
           // kinder than storing a reel that shows a dead player to everyone who
           // opens it; the two things that actually work are named so the athlete
           // has a next step rather than just a rejection.
-          throw new Error(
-            "This clip couldn't be prepared for playback on this device. Try again on a desktop browser, or re-upload it from your Photos app.",
-          );
+          throw new ClipConversionFailedError();
         }
         playable = result.blob;
         converted = true;
@@ -972,11 +974,16 @@ function ReelsPage() {
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
-      toast.error(
-        e instanceof ConverterUnavailableError
-          ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
-          : (e?.message ?? "Upload failed"),
-      );
+      if (e instanceof ConverterUnavailableError) {
+        setVideoError({
+          message: "Video conversion is temporarily unavailable. Nothing was uploaded.",
+          outage: true,
+        });
+      } else if (e instanceof ClipConversionFailedError) {
+        setVideoError({ message: e.message, outage: false });
+      } else {
+        toast.error(e?.message ?? "Upload failed");
+      }
     } finally {
       setBusy(false);
     }
@@ -1130,6 +1137,23 @@ function ReelsPage() {
       />
 
       <section className="mx-5 mb-6">
+        <VideoErrorBanner
+          error={videoError}
+          onDismiss={() => setVideoError(null)}
+          className="mb-4"
+          actions={
+            <button
+              type="button"
+              onClick={() => {
+                setVideoError(null);
+                startUpload();
+              }}
+              className="rounded-full border border-amber-400/50 px-3 py-1 text-[11px] font-bold text-amber-300"
+            >
+              Try again
+            </button>
+          }
+        />
         {/* Name the highlight before publishing — this is the title shown on the
             public highlight feed and on the player card. */}
         <label

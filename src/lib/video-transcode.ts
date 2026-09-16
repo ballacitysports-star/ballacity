@@ -56,6 +56,21 @@ export class ConverterUnavailableError extends Error {
   }
 }
 
+/**
+ * Thrown when the converter is reachable and ran, but every fallback pass
+ * still failed to produce a playable file for this specific clip — as
+ * opposed to {@link ConverterUnavailableError}, where the converter itself
+ * never got a chance to run. See that class for why callers branch on this.
+ */
+export class ClipConversionFailedError extends Error {
+  constructor(
+    message = "This clip couldn't be prepared for playback on this device. Try again on a desktop browser, or re-upload it from your Photos app.",
+  ) {
+    super(message);
+    this.name = "ClipConversionFailedError";
+  }
+}
+
 let reachable: Promise<void> | null = null;
 
 /**
