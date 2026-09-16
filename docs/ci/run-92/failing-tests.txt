@@ -1,0 +1,224 @@
+Run 92 (workflow run 34569074064) - 97 failed, 89 passed, 11 skipped, 197 total
+60 spec files contain a failure.
+
+=== invite-* / pay-* / oauth-* (the flows under investigation) ===
+
+e2e/invite-deeplink-join-cta.spec.ts  (1 failing)
+    :47  opening an invite deeplink to an unpaid game -> Join CTA keeps invite params on the detail page
+
+e2e/invite-deeplink-to-pay.spec.ts  (1 failing)
+    :38  opening an invite deeplink lands on the game and the pay CTA routes to checkout
+
+e2e/invite-expired.spec.ts  (1 failing)
+    :42  expired invite → renders Invite expired banner, CTA routes to /discover fallback
+
+e2e/invite-fallback-params.spec.ts  (4 failing)
+    :122  unknown gameId with invite params → routes to notFound fallback, not invite flow
+    :47  invite=0 with `from` → fallback: no banner, no error, normal Join CTA
+    :76  `from` param alone (no invite) → fallback: no banner, no error
+    :96  invite=bogus with junk `from` → fallback: params stripped, no banner
+
+e2e/invite-malformed-exp.spec.ts  (4 failing)
+    :40  malformed exp (NaN literal) → Invite expired banner, CTA routes to /discover
+    :40  malformed exp (negative timestamp) → Invite expired banner, CTA routes to /discover
+    :40  malformed exp (non-numeric string) → Invite expired banner, CTA routes to /discover
+    :40  malformed exp (zero) → Invite expired banner, CTA routes to /discover
+
+e2e/invite-notification-cta.spec.ts  (1 failing)
+    :41  tapping an invite notification opens the game with preserved invite params + CTA copy
+
+e2e/invite-pay-and-join-confirmation.spec.ts  (1 failing)
+    :50  invite → Pay & join → confirmation with invite params preserved
+
+e2e/invite-pay-and-join-verified.spec.ts  (1 failing)
+    :48  invite → Pay & join → host-verified → Confirmed on game page (invite params preserved)
+
+e2e/invite-pay-and-join.spec.ts  (1 failing)
+    :46  tapping invite -> Pay & join CTA routes to checkout with preserved invite params
+
+e2e/invite-request-duplicate.spec.ts  (1 failing)
+    :51  re-opening a valid invite after submitting blocks a second join request
+
+e2e/invite-request-happy-path.spec.ts  (1 failing)
+    :48  well-formed invite → Request to join succeeds and shows pending UI with params preserved
+
+e2e/invite-request-idempotent-taps.spec.ts  (1 failing)
+    :47  rapid taps on Request-to-join create exactly one pending row (server-side idempotency)
+
+e2e/invite-request-in-flight.spec.ts  (1 failing)
+    :49  double-tapping Request to join while the first POST is in flight blocks the second submission
+
+e2e/invite-request-malformed-exp.spec.ts  (4 failing)
+    :101  malformed exp (NaN literal) → Request to join is blocked, no join_requests POST
+    :101  malformed exp (negative timestamp) → Request to join is blocked, no join_requests POST
+    :101  malformed exp (non-numeric string) → Request to join is blocked, no join_requests POST
+    :101  malformed exp (zero) → Request to join is blocked, no join_requests POST
+
+e2e/invite-request-network-error.spec.ts  (1 failing)
+    :43  network error on first Request-to-join blocks a mid-flight second tap, then allows a successful retry
+
+e2e/invite-request-retry-after-error.spec.ts  (1 failing)
+    :41  failed first join request can be retried and lands on pending UI with invite params preserved
+
+e2e/invite-request-retry-then-reload.spec.ts  (1 failing)
+    :42  pending UI + invite params survive a reload after network-error retry
+
+e2e/invite-request-tampered.spec.ts  (2 failing)
+    :183  invite tampered: missing `from` → CTA errors and no join_requests POST
+    :189  invite tampered: wrong `from` → CTA errors and no join_requests POST
+
+e2e/invite-request-to-join.spec.ts  (1 failing)
+    :50  tapping invite -> Request to join CTA posts correct payload with preserved invite params
+
+e2e/oauth-empty-referrer.spec.ts  (2 failing)
+    :121  apple: RETURNING user with stashed next → next path (not "/")
+    :121  google: RETURNING user with stashed next → next path (not "/")
+
+e2e/oauth-from-auth-referrer.spec.ts  (2 failing)
+    :81  apple: new user lands on /onboarding/account-type with pending state preserved
+    :81  google: new user lands on /onboarding/account-type with pending state preserved
+
+e2e/oauth-no-signin-flash-on-navigation.spec.ts  (2 failing)
+    :76  no auth loader flash while navigating after apple login
+    :76  no auth loader flash while navigating after google login
+
+e2e/oauth-non-root-referrer.spec.ts  (4 failing)
+    :116  apple: RETURNING user → saved next path (not landing page)
+    :116  google: RETURNING user → saved next path (not landing page)
+    :88  apple: NEW user → /onboarding/account-type with pending state preserved
+    :88  google: NEW user → /onboarding/account-type with pending state preserved
+
+e2e/pay-approval-gate-flips.spec.ts  (1 failing)
+    :44  pay page auto-flips from approval gate to payment picker on approval
+
+e2e/pay-approval-polling-fallback.spec.ts  (1 failing)
+    :43  pay page flips from gate to picker via polling when realtime is unavailable
+
+e2e/pay-approval-realtime-only.spec.ts  (1 failing)
+    :49  realtime approval flips pay page from gate to picker (no focus / reload)
+
+e2e/pay-blocked-until-approved.spec.ts  (1 failing)
+    :48  payment submission is blocked while join request is unapproved
+
+e2e/pay-button-navigates.spec.ts  (7 failing)
+    :156  Pay host button on a custom (sample) game routes to the pay screen
+    :180  Pay host still renders when optional status lookups hang
+    :258  Pay screen exits payment-options loading when payment settings hang
+    :302  Pay host button remains a pay link when local joined state is stale
+    :329  Payment status button with a pending submission still routes to the pay screen
+    :360  Payment rejected button routes back to the pay screen without deleting the attempt
+    :391  Pay host button on a hosted game routes to the pay screen
+
+e2e/pay-cta-reaches-success-or-retry.spec.ts  (2 failing)
+    :115  Pay CTA reaches the ready pay screen when the backend responds
+    :142  Pay CTA surfaces retry affordance when the payment service hangs
+
+e2e/pay-only-after-approval-no-duplicates.spec.ts  (1 failing)
+    :42  pay is blocked while pending; after approval exactly one submission is created
+
+e2e/pay-realtime-delayed-polling-no-duplicates.spec.ts  (1 failing)
+    :96  delayed realtime: polling flips gate once, late frames create no duplicate submissions
+
+e2e/pay-rejected-confirmation.spec.ts  (1 failing)
+    :43  payment rejected by host updates pay screen to rejected state
+
+e2e/pay-screen-no-cross-host-leak.spec.ts  (1 failing)
+    :91  Pay screen for HOST_A never renders or requests HOST_B's payment methods
+
+e2e/pay-screen-rpc-and-empty-state.spec.ts  (1 failing)
+    :77  Pay screen uses host-scoped RPC and renders empty state when no methods
+
+e2e/pay-submission-confirmation.spec.ts  (1 failing)
+    :40  submitting mocked payment shows the post-payment confirmation UI
+
+e2e/pay-submission-declined.spec.ts  (1 failing)
+    :40  declined submission shows actionable error and stays on the pay screen
+
+e2e/pay-verified-confirmation.spec.ts  (1 failing)
+    :42  payment verified by host updates pay screen to confirmed state
+
+=== everything else that failed in the same run ===
+
+e2e/add-player.spec.ts  (1 failing)
+    :108  onboarding asks who the account is for ────────────
+
+e2e/boot-recovery.spec.ts  (1 failing)
+    :58  slow client boot is not interrupted by an automatic reload
+
+e2e/desktop-refresh-protected.spec.ts  (1 failing)
+    :39  refresh on /discover stays on /discover (desktop)
+
+e2e/filterbar-persistence.spec.ts  (4 failing)
+    :64  FilterBar sport filter updates results and persists on /feed
+    :64  FilterBar sport filter updates results and persists on /players
+    :64  FilterBar sport filter updates results and persists on /teams
+    :64  FilterBar sport filter updates results and persists on /trainers
+
+e2e/fixture-age-gated-flows.spec.ts  (1 failing)
+    :34  hosting screen matches the teen_16_17 hosting policy
+
+e2e/fixture-family-flows.spec.ts  (1 failing)
+    :19  adult host reaches the Parent Center from Settings
+
+e2e/google-vendor-rejection.spec.ts  (2 failing)
+    :75  apple: signup vendor error preserves pending account type for onboarding
+    :75  google: signup vendor error preserves pending account type for onboarding
+
+e2e/host-name-realtime.spec.ts  (1 failing)
+    :60  realtime refetches never flicker the host name off display_name
+
+e2e/host-name-throttled.spec.ts  (1 failing)
+    :30  host name stays on display_name under throttled profile reads
+
+e2e/image-orientation.spec.ts  (2 failing)
+    :73  upright export for EXIF orientation 6 (o6.jpg)
+    :73  upright export for EXIF orientation 8 (o8.jpg)
+
+e2e/join-cross-device-discover-spots.spec.ts  (1 failing)
+    :66  Discover bottom card 'N spots' pill refreshes instantly when another device joins
+
+e2e/join-cross-device-roster.spec.ts  (1 failing)
+    :66  another device joining updates roster + counters on feed, map, detail, profile
+
+e2e/join-realtime-cross-views.spec.ts  (1 failing)
+    :53  joining from game detail updates feed, profile, and detail CTA in real time
+
+e2e/join-request-host-approval-realtime.spec.ts  (1 failing)
+    :50  join request → host approval arrives via realtime and status flips live
+
+e2e/leave-host-pending-realtime.spec.ts  (1 failing)
+    :49  host's pending list clears in realtime when the player's join_request is deleted
+
+e2e/leave-verified-payment-consistency.spec.ts  (1 failing)
+    :45  leaving with a verified payment flips CTA, roster, and clears host-visible rows
+
+e2e/mobile-refresh-protected.spec.ts  (5 failing)
+    :48  refresh on /feed stays on /feed
+    :48  refresh on /feed stays on /feed
+    :48  refresh on /notifications stays on /notifications
+    :48  refresh on /profile stays on /profile
+    :48  refresh on /profile stays on /profile
+
+e2e/player-orgs-realtime.spec.ts  (1 failing)
+    :48  player profile Organizations section updates in real time
+
+e2e/roster-realtime-reconnect.spec.ts  (1 failing)
+    :114  roster stays consistent across INSERT, DELETE, and reconnect
+
+e2e/social-login-identity-cases.spec.ts  (5 failing)
+    :159  identity-present (apple): new user lands on onboarding with state preserved
+    :159  identity-present (google): new user lands on onboarding with state preserved
+    :191  identity-missing (apple): provider marker without a linked identity still routes to onboarding
+    :191  identity-missing (google): provider marker without a linked identity still routes to onboarding
+    :247  identity-present (apple), onboarding complete: saved next path is consumed
+
+e2e/team-post-create.spec.ts  (1 failing)
+    :48  team-post composer publishes a post end-to-end
+
+e2e/trainers-venue-filter-bookmark.spec.ts  (1 failing)
+    :48  bookmarked venue+radius URL persists across tabs, profile, and booking sheet
+
+e2e/trainers-venue-filter.spec.ts  (2 failing)
+    :49  venue filter narrows feed and persists across profile navigation
+    :95  book session sheet opens with sticky venue from the feed
+
