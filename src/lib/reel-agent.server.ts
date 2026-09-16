@@ -176,6 +176,9 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
       }
       if (Object.keys(patch).length === 0) return { updated: false, reason: "nothing to apply" };
       // Agent-written copy is publicly visible once saved: check it first.
+      // Mirrors screenUserCopy() in reels.functions.ts — block refuses outright,
+      // review saves but holds the reel owner-only until a human clears it.
+      let heldForReview = false;
       if (ctx.session) {
         const { moderateAiText } = await import("@/lib/ai/moderation.server");
         const verdict = await moderateAiText(ctx.session.admin, {
@@ -193,10 +196,11 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
         if (verdict.verdict === "block") {
           return { updated: false, reason: "that copy did not pass the safety check" };
         }
+        heldForReview = verdict.verdict === "review";
       }
       const { error } = await ctx.supabase
         .from("highlight_reels")
-        .update(patch)
+        .update({ ...patch, ...(heldForReview ? { hidden_at: new Date().toISOString() } : {}) })
         .eq("id", ctx.reelId)
         .eq("user_id", ctx.userId);
       if (error) return { updated: false, error: error.message };
@@ -205,9 +209,10 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
       ctx.actions.push(
         `Updated ${Object.keys(patch)
           .map((k) => k.replace(/^ai_/, ""))
-          .join(", ")}`,
+          .join(", ")}` +
+          (heldForReview ? " (held for safety review — visible to you only for now)" : ""),
       );
-      return { updated: true, fields: Object.keys(patch) };
+      return { updated: true, fields: Object.keys(patch), heldForReview };
     }
     case "apply_edit_plan": {
       const PACES = ["normal", "slowmo", "hold", "quick"];

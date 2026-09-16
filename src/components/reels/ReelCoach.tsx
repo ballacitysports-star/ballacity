@@ -12,7 +12,14 @@ type Package = {
   captions: string[];
   overlays: Overlay[];
   hashtags: string[];
+  moderationBlocked: boolean;
 };
+
+/** Shown after saving copy that our safety check held for review, so the
+ *  athlete knows their reel just went owner-only rather than assuming the
+ *  generic success toast means it's still public. */
+const HELD_FOR_REVIEW_NOTICE =
+  "Saved — but held for a quick safety review, so it's visible to you only for now.";
 
 const QUICK_PROMPTS = [
   "Write a punchier caption",
@@ -70,8 +77,9 @@ export function ReelCoach({ reelId }: { reelId: string }) {
 
   async function useAsCaption(text: string) {
     try {
-      await applyReelCopy({ data: { reelId, caption: text } });
-      toast.success("Caption updated");
+      const res = await applyReelCopy({ data: { reelId, caption: text } });
+      if (res?.heldForReview) toast.info(HELD_FOR_REVIEW_NOTICE);
+      else toast.success("Caption updated");
     } catch (e: any) {
       toast.error(e?.message ?? "Could not update the caption");
     }
@@ -87,6 +95,9 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       setPkg(res as Package);
       setApplied(false);
       setCaptionIdx(0);
+      if ((res as Package).moderationBlocked) {
+        toast.error("That suggestion didn't pass our safety check — try a different tone.");
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Reel Coach could not build the package");
     } finally {
@@ -97,7 +108,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
   async function applyPackage() {
     if (!pkg) return;
     try {
-      await applyReelCopy({
+      const res = await applyReelCopy({
         data: {
           reelId,
           caption: selectedCaption || undefined,
@@ -106,7 +117,8 @@ export function ReelCoach({ reelId }: { reelId: string }) {
         },
       });
       setApplied(true);
-      toast.success("Caption, hashtags and text moments saved");
+      if (res?.heldForReview) toast.info(HELD_FOR_REVIEW_NOTICE);
+      else toast.success("Caption, hashtags and text moments saved");
     } catch (e: any) {
       toast.error(e?.message ?? "Could not save the package");
     }
@@ -176,6 +188,12 @@ export function ReelCoach({ reelId }: { reelId: string }) {
 
         {pkg && (
           <div className="mt-2.5 space-y-2.5">
+            {pkg.moderationBlocked && (
+              <p className="rounded-lg border border-amber-400/40 bg-amber-50/10 px-2.5 py-1.5 text-[11px] text-amber-300">
+                That suggestion didn't pass our safety check, so nothing was generated. Try a
+                different tone, or write your own caption above.
+              </p>
+            )}
             {pkg.sport && (
               <p className="micro-label text-muted-foreground">
                 Tailored for {pkg.sport}
@@ -251,21 +269,23 @@ export function ReelCoach({ reelId }: { reelId: string }) {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={applyPackage}
-                className="inline-flex items-center gap-1 rounded-full border border-lime px-2.5 py-1 text-[10px] font-semibold text-lime"
-              >
-                {applied ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-                {applied ? "Saved to this reel" : "Use this post"}
-              </button>
-              <button
-                onClick={copyPackage}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] text-muted-foreground"
-              >
-                <Copy className="h-3 w-3" /> Copy all
-              </button>
-            </div>
+            {!pkg.moderationBlocked && (
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={applyPackage}
+                  className="inline-flex items-center gap-1 rounded-full border border-lime px-2.5 py-1 text-[10px] font-semibold text-lime"
+                >
+                  {applied ? <Check className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                  {applied ? "Saved to this reel" : "Use this post"}
+                </button>
+                <button
+                  onClick={copyPackage}
+                  className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] text-muted-foreground"
+                >
+                  <Copy className="h-3 w-3" /> Copy all
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

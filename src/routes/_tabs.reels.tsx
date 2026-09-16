@@ -388,6 +388,14 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         </button>
       </div>
 
+      {reel.hidden_at && (
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          Only visible to you right now — either you hid it, or our safety check is giving the AI
+          copy a quick review. Tap "Show on profile" once you're ready, or check back shortly if
+          this happened on its own.
+        </p>
+      )}
+
       {/* Name this highlight before it goes out on the public feed. */}
       {renaming && (
         <form
@@ -398,8 +406,14 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             if (!title) return;
             setSavingName(true);
             try {
-              await applyReelCopy({ data: { reelId: reel.id, title } });
-              toast.success("Reel title updated");
+              const res = await applyReelCopy({ data: { reelId: reel.id, title } });
+              if (res?.heldForReview) {
+                toast.info(
+                  "Renamed — but held for a quick safety review, so it's visible to you only for now.",
+                );
+              } else {
+                toast.success("Reel title updated");
+              }
               setRenaming(false);
             } catch (err: any) {
               toast.error(err?.message ?? "Could not rename this reel");

@@ -327,7 +327,7 @@ export const applyReelCopy = createServerFn({ method: "POST" })
     if (data.caption) patch.ai_caption = data.caption;
     if (data.hashtags?.length) patch.ai_hashtags = data.hashtags;
     if (data.overlays?.length) patch.ai_overlays = data.overlays;
-    if (Object.keys(patch).length === 0) return { updated: false };
+    if (Object.keys(patch).length === 0) return { updated: false, heldForReview: false };
 
     const held = await screenUserCopy(context.userId, data.reelId, patch, "applyReelCopy");
     if (held.blocked) throw new Error(held.message);

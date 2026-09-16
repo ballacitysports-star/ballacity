@@ -29,6 +29,12 @@ export type ReelPackage = {
   captions: string[];
   overlays: ReelOverlay[];
   hashtags: string[];
+  /**
+   * Set when the AI's proposed copy didn't pass the safety check, so an empty
+   * package reads as "blocked" to the athlete instead of looking like the
+   * model simply produced nothing.
+   */
+  moderationBlocked: boolean;
 };
 
 /** Everything the AI knows about one reel, as plain prompt text. */
@@ -177,6 +183,7 @@ export async function generateReelPackage(
   let safeCaptions = captions;
   let safeOverlays = overlays;
   let safeHashtags = hashtags;
+  let moderationBlocked = false;
   if (opts.session) {
     const { moderateAiText } = await import("@/lib/ai/moderation.server");
     const verdict = await moderateAiText(opts.session.admin, {
@@ -190,6 +197,7 @@ export async function generateReelPackage(
       safeCaptions = [];
       safeOverlays = [];
       safeHashtags = [];
+      moderationBlocked = true;
     }
   }
 
@@ -199,5 +207,6 @@ export async function generateReelPackage(
     captions: safeCaptions,
     overlays: safeOverlays,
     hashtags: safeHashtags,
+    moderationBlocked,
   };
 }
