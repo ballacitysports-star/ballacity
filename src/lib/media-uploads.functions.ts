@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { MAX_VIDEO_BYTES, sniffVideoContainer } from "@/lib/video-validation";
+import { MAX_VIDEO_BYTES, sniffVideoContainer, UPLOAD_REJECTED } from "@/lib/video-validation";
 
 const VIDEO_BUCKET = "highlight-videos";
 
@@ -60,9 +60,9 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       throw new Error(reason);
     };
 
-    if (bytes <= 0) await reject("The file is empty");
+    if (bytes <= 0) await reject(UPLOAD_REJECTED.empty);
     if ((kind === "video" || kind === "source") && bytes > MAX_VIDEO_BYTES) {
-      await reject("Video is too large (max 200 MB)");
+      await reject(UPLOAD_REJECTED.tooLarge);
     }
     if (kind === "frame" && bytes > 8 * 1024 * 1024) await reject("Frame image is too large");
     if (kind === "audio" && bytes > 50 * 1024 * 1024) await reject("Audio track is too large");
@@ -73,7 +73,7 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       if (error || !blob) await reject("Uploaded file could not be read");
       const header = new Uint8Array(await blob!.slice(0, 64).arrayBuffer());
       const container = sniffVideoContainer(header);
-      if (!container) await reject("That file could not be prepared for playback");
+      if (!container) await reject(UPLOAD_REJECTED.unplayable);
       return { ok: true, bytes, container };
     }
 

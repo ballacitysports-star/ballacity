@@ -22,11 +22,15 @@ import {
   assertConverterReachable,
   convertToPlayableMp4,
   ClipConversionFailedError,
-  ConverterUnavailableError,
 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
-import { VideoErrorBanner, type VideoErrorInfo } from "@/components/reels/VideoErrorBanner";
+import {
+  classifyUploadError,
+  isRetryableVideoError,
+  VideoErrorBanner,
+  type VideoErrorInfo,
+} from "@/components/reels/VideoErrorBanner";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -601,6 +605,10 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const [videoError, setVideoError] = useState<VideoErrorInfo | null>(null);
+  /** The clip of the last attempt, so a dropped connection can be retried
+   *  without making the athlete find the file again. */
+  const lastFileRef = useRef<File | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const { prefs: privacyPrefs, update: updatePrivacy } = useMyPrivacy();
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
@@ -760,6 +768,13 @@ function ReelsPage() {
     return () => clearInterval(id);
   }, [user, hasWorkInFlight, busy]);
 
+  // A conversion can run for minutes, by which point the athlete has usually
+  // scrolled away — bring the explanation to them rather than leaving a button
+  // that silently went back to idle.
+  useEffect(() => {
+    if (videoError) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [videoError]);
+
   /**
    * Nothing is uploaded until the AI disclosure has been seen and accepted at
    * least once; after that the short notice on the page carries the reminder.
@@ -822,6 +837,7 @@ function ReelsPage() {
     }
     setBusy(true);
     setVideoError(null);
+    lastFileRef.current = file;
     try {
       // Not getStripeEnvironment(): a free reel involves no charge, so an
       // unconfigured Stripe key must not turn an upload into a payment error.
@@ -985,19 +1001,13 @@ function ReelsPage() {
       if (insErr) throw insErr;
 
       setTitleDraft("");
+      lastFileRef.current = null;
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
-      if (e instanceof ConverterUnavailableError) {
-        setVideoError({
-          message: "Video conversion is temporarily unavailable. Nothing was uploaded.",
-          outage: true,
-        });
-      } else if (e instanceof ClipConversionFailedError) {
-        setVideoError({ message: e.message, outage: false });
-      } else {
-        toast.error(e?.message ?? "Upload failed");
-      }
+      // Every failure gets named and explained in the banner. A raw message in
+      // a toast that fades is what made a failed upload read as a freeze.
+      setVideoError(classifyUploadError(e));
     } finally {
       setBusy(false);
     }
@@ -1151,23 +1161,36 @@ function ReelsPage() {
       />
 
       <section className="mx-5 mb-6">
-        <VideoErrorBanner
-          error={videoError}
-          onDismiss={() => setVideoError(null)}
-          className="mb-4"
-          actions={
-            <button
-              type="button"
-              onClick={() => {
-                setVideoError(null);
-                startUpload();
-              }}
-              className="rounded-full border border-amber-400/50 px-3 py-1 text-[11px] font-bold text-amber-300"
-            >
-              Try again
-            </button>
-          }
-        />
+        <div ref={errorRef}>
+          <VideoErrorBanner
+            error={videoError}
+            onDismiss={() => setVideoError(null)}
+            className="mb-4"
+            actions={
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  // A dropped connection or an outage is worth re-sending the
+                  // same clip for; a rejected format or size never is, so those
+                  // go back to the picker instead of failing identically twice.
+                  const retryFile =
+                    videoError && isRetryableVideoError(videoError.kind)
+                      ? lastFileRef.current
+                      : null;
+                  setVideoError(null);
+                  if (retryFile) void handleUpload(retryFile);
+                  else startUpload();
+                }}
+                className="rounded-full border border-amber-400/50 px-3 py-1 text-[11px] font-bold text-amber-300 disabled:opacity-50"
+              >
+                {videoError && isRetryableVideoError(videoError.kind)
+                  ? "Retry upload"
+                  : "Choose another clip"}
+              </button>
+            }
+          />
+        </div>
         {/* Name the highlight before publishing — this is the title shown on the
             public highlight feed and on the player card. */}
         <label

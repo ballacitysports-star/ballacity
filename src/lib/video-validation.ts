@@ -13,6 +13,19 @@ export function videoExtension(name: string): string | null {
 }
 
 /**
+ * Every reason an upload is refused, in one place.
+ *
+ * Shared because the uploader classifies a failure to decide what advice to
+ * show for it, and matching our own prose with a regex across the client/server
+ * boundary breaks silently the first time someone rewords a message.
+ */
+export const UPLOAD_REJECTED = {
+  empty: "The file is empty",
+  tooLarge: `Video is too large (max ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB)`,
+  unplayable: "That file could not be prepared for playback",
+} as const;
+
+/**
  * The only gate a source clip has to pass to be accepted.
  *
  * There is deliberately no container or MIME allowlist here any more. One used to
@@ -32,8 +45,8 @@ export function videoExtension(name: string): string | null {
  * still sniffed server-side by `finalizeVideoUpload`.
  */
 export function validateVideoSize(input: { bytes: number | null | undefined }): string | null {
-  if (!input.bytes || input.bytes <= 0) return "The file is empty";
-  if (input.bytes > MAX_VIDEO_BYTES) return "Video is too large (max 200 MB)";
+  if (!input.bytes || input.bytes <= 0) return UPLOAD_REJECTED.empty;
+  if (input.bytes > MAX_VIDEO_BYTES) return UPLOAD_REJECTED.tooLarge;
   return null;
 }
 
