@@ -14,6 +14,20 @@ let authState: AuthState = { session: null, user: null, loading: true };
 let initialized = false;
 const AUTH_HYDRATION_TIMEOUT_MS = 6_000;
 
+function isInvalidSessionError(message: string | undefined): boolean {
+  return /user.*not.*found|user_not_found|does not exist|invalid.*(?:jwt|token)|jwt.*invalid/i.test(
+    message ?? "",
+  );
+}
+
+function clearInvalidLocalSession() {
+  setAuthState({ session: null, user: null, loading: false });
+  void supabase.auth.signOut({ scope: "local" }).catch(() => {
+    // The state is already signed out. A failed cleanup must not restore or
+    // keep using a token that the backend has rejected.
+  });
+}
+
 function emit() {
   listeners.forEach((listener) => listener());
 }
@@ -66,8 +80,8 @@ function initAuthStore() {
           .then(({ data: userData, error }) => {
             if (userData?.user) {
               setAuthState({ user: userData.user });
-            } else if (error && /user.*not.*found|invalid|jwt/i.test(error.message ?? "")) {
-              setAuthState({ session: null, user: null });
+            } else if (error && isInvalidSessionError(error.message)) {
+              clearInvalidLocalSession();
             }
           })
           .catch(() => {
@@ -125,6 +139,10 @@ export async function signOut() {
 export async function getCurrentUser() {
   const { data, error } = await supabase.auth.getUser();
   if (!error && data.user) return data.user;
+  if (isInvalidSessionError(error?.message)) {
+    clearInvalidLocalSession();
+    return null;
+  }
   const { data: sessionData } = await supabase.auth.getSession();
   return sessionData.session?.user ?? null;
 }
