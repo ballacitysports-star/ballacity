@@ -23,6 +23,14 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 // `.env.local` override still beats this because Vite applies it later.
 seedEnvFromProductionFile();
 
+const publicBackendDefine = {
+  "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env.VITE_SUPABASE_URL),
+  "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  ),
+  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(process.env.VITE_SUPABASE_PROJECT_ID),
+};
+
 function seedEnvFromProductionFile() {
   const file = resolve(dirname(fileURLToPath(import.meta.url)), ".env.production");
   let contents: string;
@@ -48,6 +56,10 @@ export default defineConfig({
   },
   vite: {
     plugins: [mcpPlugin()],
+    // Keep the browser bundle deterministic in Lovable's multi-environment
+    // production build. The base config normally injects these values, but an
+    // environment-specific client build can otherwise replace them with `{}`.
+    define: publicBackendDefine,
     // Email rendering pulls in `entities`; a nested v7 copy breaks SSR because it
     // dropped ./lib/decode.js. Pin every import to the hoisted v4.5.0 copy.
     resolve: {
@@ -66,6 +78,7 @@ export default defineConfig({
 
     environments: {
       client: {
+        define: publicBackendDefine,
         build: {
       // Split large third-party libraries out of the shared entry chunk so the
       // first paint of / and /profile only downloads what it needs, and heavy
