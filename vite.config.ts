@@ -22,6 +22,8 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 // Lovable's managed injection and the CI secrets still take precedence, and a
 // `.env.local` override still beats this because Vite applies it later.
 seedEnvFromProductionFile();
+// Deploy marker: 2026-09-17 — forces a fresh build artifact so the deployment
+// cannot reuse the stale September client bundle (index-BR82iF4e.js).
 
 const publicBackendDefine = {
   "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env.VITE_SUPABASE_URL),
