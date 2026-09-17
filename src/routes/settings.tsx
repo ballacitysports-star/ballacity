@@ -142,7 +142,7 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Billing",
+    title: "Plan",
     items: [
       {
         to: "/plans",

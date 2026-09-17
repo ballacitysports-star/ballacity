@@ -3,14 +3,14 @@
  *
  * Every screen, hook and server function asks this module — none of them keeps
  * its own idea of "is this account paid". That matters because ballaCity is
- * currently free for everyone: `access.billingEnabled` is false in the shipped
+ * currently free for everyone: `access.platformFreeMode` is true in the shipped
  * config, so `has()` grants every entitlement and no paywall, checkout or
  * upgrade prompt may render.
  *
  * Nothing is deleted while free mode is on. Products, prices, Stripe wiring and
- * the billing webhook all stay live, and a superadmin flipping `billingEnabled`
- * back on in the Monetization panel restores the paid product exactly as it
- * was. That reversibility is what this indirection buys.
+ * the billing webhook all stay live, and a superadmin switching free mode off
+ * in the Monetization panel — then enabling the surfaces they want — restores
+ * the paid product. That reversibility is what this indirection buys.
  */
 
 import {
@@ -50,7 +50,7 @@ export function resolveFeatureAccess(
   state: EntitlementState = EMPTY_ENTITLEMENTS,
 ): FeatureAccess {
   const access = config.access ?? DEFAULT_MONETIZATION_CONFIG.access;
-  const freeMode = !access.billingEnabled;
+  const freeMode = access.platformFreeMode;
 
   if (freeMode) {
     const granted = new Set(access.freeModeEntitlements);
@@ -71,7 +71,11 @@ export function resolveFeatureAccess(
     freeMode: false,
     has: (key) => hasEntitlement(state, key),
     showUpgradePrompts: access.upgradePromptsEnabled,
-    canCheckout: access.subscriptionsEnabled || access.merchShopEnabled,
+    // Checkout needs both the payment rails and something to sell.
+    canCheckout:
+      access.checkoutEnabled &&
+      access.paymentsEnabled &&
+      (access.subscriptionsEnabled || access.merchShopEnabled),
     merchEnabled: access.merchShopEnabled,
     unlimitedReels: false,
     reelAllowance: config.freeReelAllowance,
@@ -92,6 +96,7 @@ export function canCheckoutPrice(
   isMerch: boolean,
 ): boolean {
   const access = config.access ?? DEFAULT_MONETIZATION_CONFIG.access;
-  if (!access.billingEnabled) return false;
+  if (access.platformFreeMode) return false;
+  if (!access.checkoutEnabled || !access.paymentsEnabled) return false;
   return isMerch ? access.merchShopEnabled : access.subscriptionsEnabled;
 }

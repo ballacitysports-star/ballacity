@@ -62,20 +62,20 @@ describe("admin overrides", () => {
 
   it("round-trips the access switches", () => {
     const parsed = parseMonetizationOverrides({
-      access: { billingEnabled: true, freeModeAiTier: "team", freeModeNotice: "On us." },
+      access: { platformFreeMode: false, freeModeAiTier: "team", freeModeNotice: "On us." },
     });
     expect(parsed.access).toEqual({
-      billingEnabled: true,
+      platformFreeMode: false,
       freeModeAiTier: "team",
       freeModeNotice: "On us.",
     });
-    expect(resolveMonetizationConfig(parsed).access.billingEnabled).toBe(true);
+    expect(resolveMonetizationConfig(parsed).access.platformFreeMode).toBe(false);
     // Unspecified switches keep their defaults rather than becoming undefined.
-    expect(resolveMonetizationConfig(parsed).access.merchShopEnabled).toBe(true);
+    expect(resolveMonetizationConfig(parsed).access.merchShopEnabled).toBe(false);
   });
 
   it("drops malformed access values rather than trusting them", () => {
-    expect(parseMonetizationOverrides({ access: { billingEnabled: "yes" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: { platformFreeMode: "yes" } })).toEqual({});
     expect(parseMonetizationOverrides({ access: { freeModeAiTier: "platinum" } })).toEqual({});
     expect(parseMonetizationOverrides({ access: {} })).toEqual({});
 
@@ -86,11 +86,11 @@ describe("admin overrides", () => {
   });
 
   it("never lets a malformed blob silently start charging people", () => {
-    // The dangerous direction is junk resolving to billingEnabled: true.
+    // The dangerous direction is junk resolving to "not free".
     const config = resolveMonetizationConfig(
-      parseMonetizationOverrides({ access: { billingEnabled: "true" } }),
+      parseMonetizationOverrides({ access: { platformFreeMode: "false" } }),
     );
-    expect(config.access.billingEnabled).toBe(false);
+    expect(config.access.platformFreeMode).toBe(true);
   });
 
   it("falls back to built-in defaults with no overrides saved", () => {

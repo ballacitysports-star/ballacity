@@ -722,19 +722,28 @@ export const superadminListSettings = createServerFn({ method: "GET" })
 
 export const superadminSetSetting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { key: string; value: unknown; description?: string; isPublic?: boolean }) =>
-    z
-      .object({
-        key: z
-          .string()
-          .min(1)
-          .max(80)
-          .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
-        value: z.any(),
-        description: z.string().max(300).optional(),
-        isPublic: z.boolean().optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      key: string;
+      value: unknown;
+      description?: string;
+      isPublic?: boolean;
+      reason?: string;
+    }) =>
+      z
+        .object({
+          key: z
+            .string()
+            .min(1)
+            .max(80)
+            .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
+          value: z.any(),
+          description: z.string().max(300).optional(),
+          isPublic: z.boolean().optional(),
+          /** Why this changed. Recorded in the audit log for consequential flips. */
+          reason: z.string().max(500).optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -761,6 +770,7 @@ export const superadminSetSetting = createServerFn({ method: "POST" })
       action: settingAuditAction(data.key, data.value),
       targetType: "app_setting",
       targetId: data.key,
+      reason: data.reason ?? null,
       before,
       after: { value: data.value },
       metadata: { key: data.key, isPublic: data.isPublic ?? before?.is_public ?? false },

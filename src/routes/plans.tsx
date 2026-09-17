@@ -19,9 +19,11 @@ export const Route = createFileRoute("/plans")({
   head: () =>
     pageHead({
       path: "/plans",
-      title: "Plans & subscriptions — ballaCity",
-      description:
-        "Compare ballaCity plans: host games, run a team, and generate unlimited AI highlight reels.",
+      // Neutral on purpose: this is SSR metadata, so no hook can suppress it
+      // when free mode is on. Copy that is true in both modes beats copy that
+      // advertises subscriptions on a platform that is currently free.
+      title: "Your plan — ballaCity",
+      description: "What your ballaCity account includes.",
     }),
   component: PlansPage,
 });

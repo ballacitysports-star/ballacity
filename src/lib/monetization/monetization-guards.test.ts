@@ -6,14 +6,28 @@ import { displayStatusFor, displayStatusLabel } from "@/lib/payment-states";
 
 describe("the platform ships free", () => {
   it("has billing switched off in the shipped config", () => {
-    expect(DEFAULT_MONETIZATION_CONFIG.access.billingEnabled).toBe(false);
+    expect(DEFAULT_MONETIZATION_CONFIG.access.platformFreeMode).toBe(true);
   });
 
   it("keeps the paid catalog intact so billing can be switched back on", () => {
     // Free mode must never be implemented by deleting products.
     expect(liveProducts(DEFAULT_MONETIZATION_CONFIG).length).toBeGreaterThan(0);
-    expect(DEFAULT_MONETIZATION_CONFIG.access.subscriptionsEnabled).toBe(true);
-    expect(DEFAULT_MONETIZATION_CONFIG.access.merchShopEnabled).toBe(true);
+  });
+
+  it("ships every paid surface switched off", () => {
+    // Turning free mode off must not be enough to start charging: each surface
+    // is enabled deliberately.
+    const a = DEFAULT_MONETIZATION_CONFIG.access;
+    for (const k of [
+      "subscriptionsEnabled",
+      "paymentsEnabled",
+      "premiumFeaturesEnabled",
+      "checkoutEnabled",
+      "merchShopEnabled",
+      "upgradePromptsEnabled",
+    ] as const) {
+      expect(a[k]).toBe(false);
+    }
   });
 });
 

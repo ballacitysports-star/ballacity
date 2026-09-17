@@ -87,7 +87,7 @@ vi.mock("./settings.server", () => ({
  */
 let monetizationConfig = {
   ...DEFAULT_MONETIZATION_CONFIG,
-  access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: true },
+  access: { ...DEFAULT_MONETIZATION_CONFIG.access, platformFreeMode: false },
 };
 
 vi.mock("@/lib/monetization/settings.server", () => ({
@@ -119,7 +119,7 @@ beforeEach(() => {
   config = baseConfig();
   monetizationConfig = {
     ...DEFAULT_MONETIZATION_CONFIG,
-    access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: true },
+    access: { ...DEFAULT_MONETIZATION_CONFIG.access, platformFreeMode: false },
   };
   moderateText.mockReset();
   moderateImage.mockReset();
@@ -375,7 +375,7 @@ describe("AI tier follows the monetization switch", () => {
   it("gives everyone the configured tier while ballaCity is free", async () => {
     monetizationConfig = {
       ...DEFAULT_MONETIZATION_CONFIG,
-      access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: false },
+      access: { ...DEFAULT_MONETIZATION_CONFIG.access, platformFreeMode: true },
     };
     // No subscription at all, yet still the top tier.
     expect(await resolveAiTier(adminWith([]), "u1")).toBe("gym");
@@ -386,7 +386,7 @@ describe("AI tier follows the monetization switch", () => {
       ...DEFAULT_MONETIZATION_CONFIG,
       access: {
         ...DEFAULT_MONETIZATION_CONFIG.access,
-        billingEnabled: false,
+        platformFreeMode: true,
         freeModeAiTier: "premium",
       },
     };

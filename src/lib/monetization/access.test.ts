@@ -7,11 +7,26 @@ import {
 } from "./config";
 import { entitlementsFor, EMPTY_ENTITLEMENTS } from "./entitlements";
 
-/** The shipped config with billing switched back on. */
+/**
+ * The shipped config with monetization fully switched on.
+ *
+ * Every surface has to be named explicitly, because they all ship OFF — turning
+ * free mode off is deliberately not enough to start charging.
+ */
 function paid(overrides: Partial<MonetizationConfig["access"]> = {}): MonetizationConfig {
   return {
     ...DEFAULT_MONETIZATION_CONFIG,
-    access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: true, ...overrides },
+    access: {
+      ...DEFAULT_MONETIZATION_CONFIG.access,
+      platformFreeMode: false,
+      subscriptionsEnabled: true,
+      paymentsEnabled: true,
+      premiumFeaturesEnabled: true,
+      checkoutEnabled: true,
+      merchShopEnabled: true,
+      upgradePromptsEnabled: true,
+      ...overrides,
+    },
   };
 }
 
@@ -19,7 +34,7 @@ const ALL: EntitlementKey[] = ["player_plus", "host_pro", "team_pro", "org_pro",
 
 describe("free mode (the shipped default)", () => {
   it("ships free — nothing is sold until a superadmin says so", () => {
-    expect(DEFAULT_MONETIZATION_CONFIG.access.billingEnabled).toBe(false);
+    expect(DEFAULT_MONETIZATION_CONFIG.access.platformFreeMode).toBe(true);
     expect(resolveFeatureAccess(DEFAULT_MONETIZATION_CONFIG).freeMode).toBe(true);
   });
 
@@ -90,6 +105,20 @@ describe("turning billing back on restores the paid product", () => {
 
   it("stops overriding the AI tier so real entitlements decide it", () => {
     expect(resolveFeatureAccess(paid()).aiTierOverride).toBeNull();
+  });
+
+  it("stays free until the surfaces are switched on, not just free mode off", () => {
+    // The spec's staged rollout: free mode off alone charges nobody.
+    const staged: MonetizationConfig = {
+      ...DEFAULT_MONETIZATION_CONFIG,
+      access: { ...DEFAULT_MONETIZATION_CONFIG.access, platformFreeMode: false },
+    };
+    const access = resolveFeatureAccess(staged, EMPTY_ENTITLEMENTS);
+    expect(access.freeMode).toBe(false);
+    expect(access.canCheckout).toBe(false);
+    expect(access.merchEnabled).toBe(false);
+    expect(access.showUpgradePrompts).toBe(false);
+    expect(canCheckoutPrice(staged, "ai_highlight_reel_monthly", false)).toBe(false);
   });
 
   it("honours the per-surface switches independently", () => {

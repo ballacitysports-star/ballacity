@@ -565,7 +565,7 @@ function EditProfile() {
 
 
 
-      <Section title="Plans & subscriptions">
+      <Section title="Your plan">
         <Link
           to="/plans"
           className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"

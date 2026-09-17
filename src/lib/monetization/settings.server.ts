@@ -3,7 +3,7 @@
  * in-process cache, so a burst of server calls doesn't re-read the same row.
  *
  * Any read failure falls back to the built-in defaults — and because the
- * shipped default is free (`access.billingEnabled: false`), that failure mode
+ * shipped default is free (`access.platformFreeMode: true`), that failure mode
  * is *open*. A settings blip can never accidentally paywall someone.
  *
  * Takes the client as a parameter, exactly like `@/lib/ai/settings.server`, so

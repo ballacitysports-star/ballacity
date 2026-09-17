@@ -57,28 +57,57 @@ export type FeeConfig = {
 export type MonetizationAiTier = "free" | "premium" | "team" | "gym";
 
 /**
- * The master switch for everything ballaCity charges for.
+ * Everything ballaCity charges for, and whether it is charging at all.
  *
- * While `billingEnabled` is false the platform is free for everyone: no
- * paywall, checkout, upgrade prompt or premium lock renders anywhere, and
- * `resolveFeatureAccess` hands every account every entitlement. Nothing is
- * deleted when it is off — the products, prices, Stripe wiring and webhook all
- * stay exactly as they are, so flipping it back on in the SuperAdmin panel
- * restores the paid product in one click.
+ * While `platformFreeMode` is true the platform is free for everyone: no
+ * paywall, checkout, upgrade prompt or premium lock renders anywhere, every
+ * account holds every entitlement, and a feature configured as `premium` is
+ * served as `free`. Nothing is deleted — the products, prices, Stripe wiring
+ * and webhook all stay exactly as they are.
  *
- * The sub-switches below are only consulted once `billingEnabled` is true.
+ * Free mode governs PAYMENT only. It can never widen an age, guardian, safety,
+ * moderation, privacy or legal restriction; `canAccessFeature` evaluates those
+ * first and short-circuits before any of this is consulted.
+ *
+ * The switches below are only reached once `platformFreeMode` is false.
  */
+
+/** How a single feature is priced. */
+export type FeatureAccessMode = "free" | "premium" | "disabled";
+
+export const FEATURE_ACCESS_MODES: FeatureAccessMode[] = ["free", "premium", "disabled"];
+
 export type MonetizationAccess = {
-  billingEnabled: boolean;
+  /**
+   * The master switch. True means ballaCity is free for everyone and every
+   * feature configured as `premium` is served as `free`.
+   */
+  platformFreeMode: boolean;
+
+  /**
+   * The global controls. All default OFF, so monetization is re-enabled
+   * deliberately, one surface at a time, rather than all at once by a single
+   * mis-click.
+   */
   subscriptionsEnabled: boolean;
+  paymentsEnabled: boolean;
+  premiumFeaturesEnabled: boolean;
+  checkoutEnabled: boolean;
   merchShopEnabled: boolean;
   upgradePromptsEnabled: boolean;
-  /** Entitlements every account holds while billing is off. */
+
+  /** Entitlements every account holds while free mode is on. */
   freeModeEntitlements: EntitlementKey[];
-  /** AI limit tier every account resolves to while billing is off. */
+  /** AI limit tier every account resolves to while free mode is on. */
   freeModeAiTier: MonetizationAiTier;
   /** Copy shown where a paywall used to be. */
   freeModeNotice: string;
+
+  /**
+   * Per-feature pricing. A feature that is not listed is `free`, so adding a
+   * feature to the registry never silently locks it.
+   */
+  featureAccess: Record<string, FeatureAccessMode>;
 };
 
 export type MonetizationConfig = {
@@ -107,17 +136,22 @@ export const MONETIZATION_AI_TIERS: MonetizationAiTier[] = ["free", "premium", "
 export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
   freeReelAllowance: 3,
   ballacityProcessedPaymentsEnabled: false,
-  // ballaCity ships free. The sub-switches stay true so that turning billing
-  // back on restores the paid product exactly as it was, without also having
-  // to remember which surfaces to re-enable.
+  // ballaCity ships free, and every paid surface ships off. Turning free mode
+  // off is therefore not enough to start charging: each surface has to be
+  // switched on deliberately, so monetization can be staged rather than
+  // arriving all at once.
   access: {
-    billingEnabled: false,
-    subscriptionsEnabled: true,
-    merchShopEnabled: true,
-    upgradePromptsEnabled: true,
+    platformFreeMode: true,
+    subscriptionsEnabled: false,
+    paymentsEnabled: false,
+    premiumFeaturesEnabled: false,
+    checkoutEnabled: false,
+    merchShopEnabled: false,
+    upgradePromptsEnabled: false,
     freeModeEntitlements: ["player_plus", "host_pro", "team_pro", "org_pro", "facility_pro"],
     freeModeAiTier: "gym",
     freeModeNotice: "Everything on ballaCity is free right now — no subscription needed.",
+    featureAccess: {},
   },
   fees: {
     platformFeeBps: 500,
@@ -136,13 +170,13 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
       priceCents: 999,
       interval: "month",
       trialDays: 0,
-      features: [
-        "Unlimited AI highlight reels",
-        "Advanced discovery filters",
-        "Member badge on your profile",
-        "Advanced stats & availability",
-        "Recruiting visibility",
-      ],
+      // Only capabilities that actually exist. Several strings that used to be
+      // here ("Member badge on your profile", "Advanced discovery filters",
+      // "Advanced stats & availability", "Recruiting visibility") had no
+      // implementation behind them — see docs/monetization-free-mode.md. Free
+      // mode renders the union of every product's features, so an unbuilt claim
+      // would now be promised to every member.
+      features: ["Unlimited AI highlight reels", "AI reel coach, styles and captions"],
       cta: "Get ballaCity+",
       status: "live",
     },
@@ -229,9 +263,9 @@ const FREE_TIER_BASE_FEATURES: string[] = [
 export function freeTierFeatures(
   config: MonetizationConfig = DEFAULT_MONETIZATION_CONFIG,
 ): string[] {
-  const reels = config.access?.billingEnabled
-    ? `${config.freeReelAllowance} free AI highlight reels`
-    : "Unlimited AI highlight reels";
+  const reels = config.access?.platformFreeMode
+    ? "Unlimited AI highlight reels"
+    : `${config.freeReelAllowance} free AI highlight reels`;
   return [...FREE_TIER_BASE_FEATURES, reels];
 }
 
@@ -296,12 +330,31 @@ export function parseMonetizationOverrides(raw: unknown): MonetizationOverrides 
     const access: Partial<MonetizationAccess> = {};
 
     for (const k of [
-      "billingEnabled",
+      "platformFreeMode",
       "subscriptionsEnabled",
+      "paymentsEnabled",
+      "premiumFeaturesEnabled",
+      "checkoutEnabled",
       "merchShopEnabled",
       "upgradePromptsEnabled",
     ] as const) {
       if (typeof src[k] === "boolean") access[k] = src[k] as boolean;
+    }
+
+    // A row written before the rename still carries `billingEnabled`, which is
+    // the inverse. An explicit `platformFreeMode` always wins.
+    if (access.platformFreeMode === undefined && typeof src["billingEnabled"] === "boolean") {
+      access.platformFreeMode = !(src["billingEnabled"] as boolean);
+    }
+
+    if (src["featureAccess"] && typeof src["featureAccess"] === "object") {
+      const modes: Record<string, FeatureAccessMode> = {};
+      for (const [k, v] of Object.entries(src["featureAccess"] as Record<string, unknown>)) {
+        if (FEATURE_ACCESS_MODES.includes(v as FeatureAccessMode)) {
+          modes[k] = v as FeatureAccessMode;
+        }
+      }
+      if (Object.keys(modes).length > 0) access.featureAccess = modes;
     }
 
     const grants = src["freeModeEntitlements"];
