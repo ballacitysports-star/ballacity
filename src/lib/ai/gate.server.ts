@@ -93,6 +93,32 @@ function isMinorCohort(cohort: AgeCohort): boolean {
   return cohort === "child_under_13" || cohort === "teen_13_15" || cohort === "teen_16_17";
 }
 
+/**
+ * Restricted-action attempts (a blocked message, a locked-activity refusal)
+ * were enforced but never logged anywhere a guardian could review them —
+ * unlike consent/link/controls changes, which family_audit_log already
+ * covers. Best-effort only: a logging failure must never mask the real
+ * denial the caller already has, so every call site awaits this inside its
+ * own try/catch and ignores the result either way.
+ */
+async function logMinorAiDenial(
+  admin: any,
+  userId: string,
+  feature: AiFeature,
+  reason: string,
+): Promise<void> {
+  try {
+    await admin.from("family_audit_log").insert({
+      actor_user_id: userId,
+      child_user_id: userId,
+      action: "ai_gate.denied",
+      context: { feature, reason },
+    });
+  } catch {
+    /* logging must never mask the real denial */
+  }
+}
+
 /** Runs the gate and, when allowed, returns a session with a reserved job row. */
 export async function assertAiAllowed(
   ctx: AiGateContext,
@@ -117,23 +143,30 @@ export async function assertAiAllowed(
       .rpc("child_features_locked", { _user: ctx.userId })
       .then((r: any) => r.data === true)
       .catch(() => false);
-    if (locked) throw new AiError("PARENT_APPROVAL_REQUIRED");
+    if (locked) {
+      await logMinorAiDenial(admin, ctx.userId, feature, "child_features_locked");
+      throw new AiError("PARENT_APPROVAL_REQUIRED");
+    }
 
     const consented = await admin
       .rpc("ai_analysis_allowed", { _user: ctx.userId })
       .then((r: any) => r.data === true)
       .catch(() => false);
     if (!consented) {
-      throw new AiError(isMinorCohort(cohort) ? "PARENT_APPROVAL_REQUIRED" : "CONSENT_REQUIRED");
+      if (isMinorCohort(cohort)) {
+        await logMinorAiDenial(admin, ctx.userId, feature, "consent_not_approved");
+        throw new AiError("PARENT_APPROVAL_REQUIRED");
+      }
+      throw new AiError("CONSENT_REQUIRED");
     }
 
     // (c) cohort allowance — default deny
     if (!cohortAllowed(flag, cohort)) {
-      throw new AiError(
-        isMinorCohort(cohort) || cohort === "unknown"
-          ? "PARENT_APPROVAL_REQUIRED"
-          : "FEATURE_DISABLED",
-      );
+      if (isMinorCohort(cohort) || cohort === "unknown") {
+        await logMinorAiDenial(admin, ctx.userId, feature, "cohort_not_allowed");
+        throw new AiError("PARENT_APPROVAL_REQUIRED");
+      }
+      throw new AiError("FEATURE_DISABLED");
     }
   }
 

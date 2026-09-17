@@ -4128,6 +4128,7 @@ export type Database = {
         }
         Returns: string
       }
+      subscription_payments_allowed: { Args: { _user: string }; Returns: boolean }
       team_cancel_invite: { Args: { _invite: string }; Returns: undefined }
       team_invite_player: {
         Args: {

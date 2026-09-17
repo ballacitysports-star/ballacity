@@ -375,6 +375,26 @@ describe("game payment coordination gate", () => {
   });
 });
 
+describe("subscription payments gate", () => {
+  it("blocks subscription payments for every minor cohort, including 16-17", () => {
+    for (const cohort of ["child_under_13", "teen_13_15", "teen_16_17"] as const) {
+      expect(PERMISSION_MATRIX.subscription_payments[cohort]).toBe("blocked");
+      expect(can("subscription_payments", { cohort, consent: consent("approved") }).allowed).toBe(
+        false,
+      );
+    }
+  });
+
+  it("allows subscription payments for adults", () => {
+    expect(PERMISSION_MATRIX.subscription_payments.adult).toBe("allowed");
+    expect(can("subscription_payments", { cohort: "adult" }).allowed).toBe(true);
+  });
+
+  it("treats an unknown age protectively for subscription payments", () => {
+    expect(can("subscription_payments", { cohort: "unknown" }).allowed).toBe(false);
+  });
+});
+
 describe("server-side payment participant gate", () => {
   it("rejects a blocked cohort's submission even when the client check is bypassed", () => {
     const gate = paymentParticipantsGate({

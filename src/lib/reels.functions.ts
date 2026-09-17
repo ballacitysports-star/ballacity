@@ -3,24 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
 
 /**
- * AI/video processing is opt-out for adults (Settings → Privacy) and
- * guardian-controlled for minors (child_controls.ai_analysis, which wins over
- * the minor's own toggle). `ai_analysis_allowed` resolves both in the database
- * so every entry point — server fn or worker — sees the same answer.
- */
-async function assertAiProcessingAllowed(context: { supabase: any; userId: string }) {
-  const { data: allowed, error } = await context.supabase.rpc("ai_analysis_allowed", {
-    _user: context.userId,
-  });
-  if (error) throw new Error(error.message);
-  if (allowed !== true) {
-    throw new Error(
-      "AI video processing is turned off. Enable it in Settings → Privacy — for a Guardian-managed player, the Guardian controls this.",
-    );
-  }
-}
-
-/**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
  *
  * Called right after an upload (so nothing sits in the queue) and from the
@@ -159,14 +141,17 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
   })
   .handler(async ({ data, context }) => {
-    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
+    const { withAiSession } = await import("@/lib/ai/session.server");
     const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } =
       await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Fetch + validate outside the AI session so these specific messages reach
+    // the client unchanged, rather than being flattened to a generic AiError
+    // string by withAiSession's catch path.
     const { data: reel, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(`${REEL_WORK_COLUMNS},status`)
@@ -183,64 +168,79 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
       throw new Error("This reel has no captured analysis to build on — use Try again instead");
     }
 
-    const regen = prepareStyleRegen(progress);
-    const { error: upErr } = await supabaseAdmin
-      .from("highlight_reels")
-      .update({
-        style_prefs: data.style as any,
-        status: "processing",
-        processing_step: regen.processing_step,
-        step_progress: regen.step_progress,
-        attempts: 0,
-        error_message: null,
-        ai_title: null,
-        ai_caption: null,
-        ai_hashtags: [],
-        ai_overlays: null,
-        ai_timeline: [],
-        ai_edit_plan: null,
-        ai_coaching: null,
-        thumbnail_path: null,
-      } as any)
-      .eq("id", reel.id);
-    if (upErr) throw new Error(upErr.message);
-
-    const result = await processReel(
-      {
-        ...reel,
-        attempts: 0,
-        processing_step: regen.processing_step,
-        step_progress: regen.step_progress,
-        style_prefs: data.style,
-      },
-      supabaseAdmin,
-      apiKey,
-    );
-
-    // Fresh overlays in the new style, timed to the regenerated timeline.
-    if (result.status === "completed") {
-      try {
-        const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
-        const { data: fresh } = await supabaseAdmin
+    // Everything that actually calls AI goes through the same gate every
+    // sibling entry point uses (kill-switch, cohort allow-list, quota) — this
+    // previously ran only the lighter, consent-only assertAiProcessingAllowed
+    // check, and separately shipped its regenerated overlay text with no
+    // moderation pass at all (screenReelOutput only runs inside processReel's
+    // own pipeline, not on this second, standalone generateReelPackage call).
+    return withAiSession(
+      { userId: context.userId, feature: "reel_style", relatedReelId: data.reelId },
+      async (session) => {
+        const regen = prepareStyleRegen(progress);
+        const { error: upErr } = await supabaseAdmin
           .from("highlight_reels")
-          .select(REEL_COACH_COLUMNS)
-          .eq("id", reel.id)
-          .maybeSingle();
-        if (fresh) {
-          const pkg = await generateReelPackage(apiKey, fresh as Record<string, any>);
-          if (pkg.overlays.length > 0) {
-            await supabaseAdmin
+          .update({
+            style_prefs: data.style as any,
+            status: "processing",
+            processing_step: regen.processing_step,
+            step_progress: regen.step_progress,
+            attempts: 0,
+            error_message: null,
+            ai_title: null,
+            ai_caption: null,
+            ai_hashtags: [],
+            ai_overlays: null,
+            ai_timeline: [],
+            ai_edit_plan: null,
+            ai_coaching: null,
+            thumbnail_path: null,
+          } as any)
+          .eq("id", reel.id);
+        if (upErr) throw new Error(upErr.message);
+
+        const result = await processReel(
+          {
+            ...reel,
+            attempts: 0,
+            processing_step: regen.processing_step,
+            step_progress: regen.step_progress,
+            style_prefs: data.style,
+          },
+          supabaseAdmin,
+          apiKey,
+          session,
+        );
+
+        // Fresh overlays in the new style, timed to the regenerated timeline.
+        if (result.status === "completed") {
+          try {
+            const { REEL_COACH_COLUMNS, generateReelPackage } =
+              await import("@/lib/reel-coach.server");
+            const { data: fresh } = await supabaseAdmin
               .from("highlight_reels")
-              .update({ ai_overlays: pkg.overlays as any })
-              .eq("id", reel.id);
+              .select(REEL_COACH_COLUMNS)
+              .eq("id", reel.id)
+              .maybeSingle();
+            if (fresh) {
+              const pkg = await generateReelPackage(apiKey, fresh as Record<string, any>, {
+                session,
+              });
+              if (pkg.overlays.length > 0) {
+                await supabaseAdmin
+                  .from("highlight_reels")
+                  .update({ ai_overlays: pkg.overlays as any })
+                  .eq("id", reel.id);
+              }
+            }
+          } catch {
+            // Overlays are a bonus — the restyled reel is already saved.
           }
         }
-      } catch {
-        // Overlays are a bonus — the restyled reel is already saved.
-      }
-    }
 
-    return { ...result, style: data.style, attemptsLimit: MAX_ATTEMPTS };
+        return { ...result, style: data.style, attemptsLimit: MAX_ATTEMPTS };
+      },
+    );
   });
 
 /** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */

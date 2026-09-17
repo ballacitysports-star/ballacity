@@ -137,3 +137,90 @@ Two real defects were found by this run and fixed:
    reproduced between the two test minors. The control is now enforced on both
    sides for all minor cohorts: after the fix, minor→minor raised
    `MINOR_MESSAGING_BLOCKED` while minor→linked guardian still succeeded.
+
+## 6. Subscription/purchase checkout is adult-only
+
+Static audit (2026-09-17) found Stripe subscription checkout had no age-cohort gate
+anywhere; fixed additively with `enforce_subscription_payment_cohort` (BEFORE INSERT
+trigger, not UPDATE — see the migration's own comment for why). Not yet re-verified
+live; run before/after deploying `20260917174500_subscription_payments_cohort_gate.sql`:
+
+```sql
+BEGIN;
+UPDATE public.profiles SET age_cohort = 'teen_16_17' WHERE id = '<TEST_USER>';
+INSERT INTO public.subscriptions (user_id, stripe_subscription_id, stripe_customer_id, product_id, price_id)
+VALUES ('<TEST_USER>', 'sub_test', 'cus_test', 'prod_test', 'price_test');
+-- expect: ERROR  SUBSCRIPTION_PAYMENTS_NOT_AVAILABLE
+ROLLBACK;
+
+BEGIN;
+UPDATE public.profiles SET age_cohort = 'adult' WHERE id = '<TEST_USER>';
+INSERT INTO public.subscriptions (user_id, stripe_subscription_id, stripe_customer_id, product_id, price_id)
+VALUES ('<TEST_USER>', 'sub_test', 'cus_test', 'prod_test', 'price_test');
+-- expect: succeeds (baseline — adults unaffected)
+ROLLBACK;
+
+-- Renewal/status sync on an existing row must still work even if the owner's
+-- cohort is later corrected downward — this is deliberately INSERT-only:
+BEGIN;
+INSERT INTO public.subscriptions (user_id, stripe_subscription_id, stripe_customer_id, product_id, price_id)
+VALUES ('<TEST_USER>', 'sub_test2', 'cus_test', 'prod_test', 'price_test');
+UPDATE public.profiles SET age_cohort = 'teen_16_17' WHERE id = '<TEST_USER>';
+UPDATE public.subscriptions SET status = 'canceled' WHERE stripe_subscription_id = 'sub_test2';
+-- expect: succeeds (UPDATE is untouched by this trigger)
+ROLLBACK;
+```
+
+## 7. `post_reactions` and `post_comments` respect the minor-content and block gates
+
+Static audit (2026-09-17) found `post_reactions` INSERT had no minor-content check
+(its SELECT policy already had one) and neither table checked blocks at all. Fixed
+additively in `20260917174600_reaction_and_block_gates.sql`. Not yet re-verified live:
+
+```sql
+-- Minor-content gate on post_reactions INSERT (mirrors post_comments' existing one)
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<UNRELATED_ADULT>","role":"authenticated"}';
+INSERT INTO public.post_reactions (subject_type, subject_id, user_id, emoji)
+VALUES ('team_post', '<CHILD_UNDER_13_TEAM_POST_ID>', '<UNRELATED_ADULT>', '👍');
+-- expect: 403 42501 new row violates row-level security policy
+RESET ROLE;
+
+-- Block check on both tables — as the child's guardian or teammate this succeeds;
+-- as someone the content owner has blocked, it must not, regardless of cohort:
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<BLOCKED_ADULT>","role":"authenticated"}';
+INSERT INTO public.post_comments (subject_type, subject_id, author_id, body)
+VALUES ('game', '<ADULT_OWNED_GAME_ID>', '<BLOCKED_ADULT>', 'test');
+-- expect: 403 42501, where <ADULT_OWNED_GAME_ID> is hosted by someone who blocked <BLOCKED_ADULT>
+RESET ROLE;
+```
+
+## 8. `create_direct_conversation` refuses a blocked pair before creating anything
+
+Static audit (2026-09-17) found two blocked users could still get an empty
+conversation + participant rows created (first message was already blocked).
+Fixed additively in `20260917174700_conversation_block_check.sql`. Not yet
+re-verified live:
+
+```sql
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<BLOCKER>","role":"authenticated"}';
+SELECT public.create_direct_conversation('<BLOCKED_PARTY>');
+-- expect: ERROR  Messaging is unavailable because one of you blocked the other
+RESET ROLE;
+
+-- Reverse direction — the blocked party calling on the blocker — must also refuse:
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<BLOCKED_PARTY>","role":"authenticated"}';
+SELECT public.create_direct_conversation('<BLOCKER>');
+-- expect: same error
+RESET ROLE;
+
+-- Regression guard: an unrelated, unblocked pair must still get a conversation:
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<ADULT_A>","role":"authenticated"}';
+SELECT public.create_direct_conversation('<ADULT_B>');
+-- expect: a uuid, no error
+RESET ROLE;
+```

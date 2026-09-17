@@ -553,6 +553,7 @@ export const FEATURE_KEYS = [
   "targeted_advertising",
   "parent_controls",
   "night_notifications",
+  "subscription_payments",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -591,6 +592,7 @@ export const FEATURE_META: Record<FeatureKey, { label: string; group: string }> 
   targeted_advertising: { label: "Targeted advertising", group: "Privacy" },
   parent_controls: { label: "Guardian controls", group: "Identity" },
   night_notifications: { label: "Overnight notifications", group: "Communication" },
+  subscription_payments: { label: "Subscriptions & payments", group: "Payments" },
 };
 
 type MatrixCohort = Exclude<AgeCohort, "unknown">;
@@ -720,6 +722,15 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
     child_under_13: "parent_controlled",
     teen_13_15: "parent_controlled",
     teen_16_17: "parent_controlled",
+    adult: "allowed",
+  },
+  // Real money to ballaCity — hard-blocked for every minor cohort, unlike
+  // game_payments' 16-17 carve-out. Mirrored server-side by
+  // enforce_subscription_payment_cohort on subscriptions/purchases.
+  subscription_payments: {
+    child_under_13: "blocked",
+    teen_13_15: "blocked",
+    teen_16_17: "blocked",
     adult: "allowed",
   },
 };

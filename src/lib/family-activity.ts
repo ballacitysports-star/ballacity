@@ -68,6 +68,13 @@ export function describeFamilyActivity(entry: {
       return { title: "Guardian link invited", detail: relationshipDetail(ctx) };
     case "link.revoked":
       return { title: "Guardian link ended", detail: null };
+    case "ai_gate.denied": {
+      const feature = typeof ctx["feature"] === "string" ? ctx["feature"] : null;
+      return {
+        title: "AI feature blocked by Guardian settings",
+        detail: feature ? `Feature: ${feature.replace(/_/g, " ")}` : null,
+      };
+    }
     default:
       break;
   }

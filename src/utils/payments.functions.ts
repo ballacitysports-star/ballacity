@@ -53,9 +53,23 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }): Promise<CheckoutSessionResult> => {
+    // Always derive identity from the verified session — never trust the client.
+    const userId = context.userId;
+
+    // Subscriptions are adult-only — checked here (before any Stripe call) and
+    // enforced again server-side by enforce_subscription_payment_cohort on the
+    // subscriptions/purchases tables, since the payments webhook writes those with
+    // the service-role client, which this RLS-scoped check can't see.
+    const { data: allowed, error: cohortError } = await context.supabase.rpc(
+      "subscription_payments_allowed",
+      { _user: userId },
+    );
+    if (cohortError) return { error: cohortError.message };
+    if (allowed !== true) {
+      return { error: "Subscriptions aren't available for this account yet." };
+    }
+
     try {
-      // Always derive identity from the verified session — never trust the client.
-      const userId = context.userId;
       const customerEmail =
         typeof context.claims?.email === "string" ? (context.claims.email as string) : undefined;
 

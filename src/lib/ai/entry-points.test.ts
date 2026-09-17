@@ -28,6 +28,7 @@ const ENTRY_POINTS: Record<string, { file: string; feature: AiFeature }> = {
   askReelCoach: { file: "src/lib/reels.functions.ts", feature: "reel_coach" },
   buildReelPackage: { file: "src/lib/reels.functions.ts", feature: "reel_package" },
   previewReelStyle: { file: "src/lib/reels.functions.ts", feature: "reel_style" },
+  regenerateReelStyle: { file: "src/lib/reels.functions.ts", feature: "reel_style" },
   removeBackground: { file: "src/lib/bg-remove.functions.ts", feature: "background_remove" },
 };
 

@@ -137,6 +137,27 @@ describe("gate order", () => {
     expect(noConsent.calls).not.toContain("ai_reserve_quota");
   });
 
+  it("logs a minor's blocked-activity denial to the family activity trail, never an adult's", async () => {
+    const locked = makeAdmin({ childLocked: true, cohort: "teen_13_15" });
+    expect(await codeOf(assertAiAllowed({ admin: locked, userId: "kid-1" }, "reel_pipeline"))).toBe(
+      "PARENT_APPROVAL_REQUIRED",
+    );
+    expect(locked.inserted["family_audit_log"]).toEqual([
+      expect.objectContaining({
+        actor_user_id: "kid-1",
+        child_user_id: "kid-1",
+        action: "ai_gate.denied",
+        context: { feature: "reel_pipeline", reason: "child_features_locked" },
+      }),
+    ]);
+
+    const noConsent = makeAdmin({ consented: false, cohort: "adult" });
+    expect(await codeOf(assertAiAllowed({ admin: noConsent, userId: "u1" }, "reel_pipeline"))).toBe(
+      "CONSENT_REQUIRED",
+    );
+    expect(noConsent.inserted["family_audit_log"]).toBeUndefined();
+  });
+
   it("checks the cohort allowance before reserving quota", async () => {
     config.features.features.reel_pipeline.cohorts = ["adult"];
     const admin = makeAdmin({ cohort: "teen_16_17" });
