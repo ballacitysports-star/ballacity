@@ -1,6 +1,6 @@
 /**
- * Reel style preferences — the athlete's editing vibe, pacing, and overlay
- * theme, chosen *before* the AI generates a highlight.
+ * Reel style preferences — the athlete's editing vibe, pacing, overlay theme,
+ * and cut transitions, chosen *before* the AI generates a highlight.
  *
  * Pure module: safe to import from the browser (the preferences panel) and from
  * the server pipeline (which turns them into prompt directives), so both sides
@@ -10,17 +10,21 @@
 export type ReelVibe = "hype" | "cinematic" | "broadcast" | "documentary";
 export type ReelPacing = "punchy" | "balanced" | "slowburn";
 export type ReelOverlayTheme = "scoreboard" | "minimal" | "bold" | "retro" | "none";
+/** How the player bridges one cut to the next during "Play the AI edit". */
+export type ReelTransition = "cut" | "dip" | "fade";
 
 export type ReelStylePrefs = {
   vibe: ReelVibe;
   pacing: ReelPacing;
   overlayTheme: ReelOverlayTheme;
+  transition: ReelTransition;
 };
 
 export const DEFAULT_REEL_STYLE: ReelStylePrefs = {
   vibe: "hype",
   pacing: "balanced",
   overlayTheme: "scoreboard",
+  transition: "cut",
 };
 
 type Option<T extends string> = {
@@ -123,6 +127,30 @@ export const OVERLAY_THEME_OPTIONS: Option<ReelOverlayTheme>[] = [
   },
 ];
 
+export const TRANSITION_OPTIONS: Option<ReelTransition>[] = [
+  {
+    value: "cut",
+    label: "Hard cuts",
+    blurb: "Jumps straight to the next moment",
+    directive:
+      "Transitions: HARD CUTS — the player cuts directly between moments with no fade, so favor more, shorter segments.",
+  },
+  {
+    value: "dip",
+    label: "Quick dip",
+    blurb: "A fast flash between cuts",
+    directive:
+      "Transitions: QUICK DIP — a brief dip masks each cut, so segments can run a touch longer without feeling abrupt.",
+  },
+  {
+    value: "fade",
+    label: "Soft fade",
+    blurb: "Cuts fade out and back in",
+    directive:
+      "Transitions: SOFT FADE — each cut fades, which reads best with fewer, longer segments rather than many quick ones.",
+  },
+];
+
 function pick<T extends string>(opts: Option<T>[], value: unknown, fallback: T): T {
   return opts.some((o) => o.value === value) ? (value as T) : fallback;
 }
@@ -138,6 +166,10 @@ export function normalizeReelStyle(input: unknown): ReelStylePrefs {
       raw.overlayTheme ?? raw.overlay_theme,
       DEFAULT_REEL_STYLE.overlayTheme,
     ),
+    // Reels styled before this existed have no `transition` in their saved
+    // prefs, so they fall back to "cut" — the hard-cut behavior every reel
+    // already had, unchanged.
+    transition: pick(TRANSITION_OPTIONS, raw.transition, DEFAULT_REEL_STYLE.transition),
   };
 }
 
@@ -169,12 +201,18 @@ export function reelStyleDirectives(input: unknown) {
     vibe: directive(VIBE_OPTIONS, p.vibe),
     pacing: directive(PACING_OPTIONS, p.pacing),
     overlay: directive(OVERLAY_THEME_OPTIONS, p.overlayTheme),
+    transition: directive(TRANSITION_OPTIONS, p.transition),
     /** Copy-writing steps (title/caption/hashtags/coach package). */
     copy: [directive(VIBE_OPTIONS, p.vibe), directive(OVERLAY_THEME_OPTIONS, p.overlayTheme)].join(
       " ",
     ),
-    /** Cut-list step. */
-    edit: [directive(VIBE_OPTIONS, p.vibe), directive(PACING_OPTIONS, p.pacing)].join(" "),
+    /** Cut-list step. Transition is included because it shapes segment count
+     *  and length (e.g. a soft fade reads best with fewer, longer cuts). */
+    edit: [
+      directive(VIBE_OPTIONS, p.vibe),
+      directive(PACING_OPTIONS, p.pacing),
+      directive(TRANSITION_OPTIONS, p.transition),
+    ].join(" "),
   };
 }
 
@@ -184,15 +222,15 @@ export function reelStyleDirectives(input: unknown) {
  * a sport's style, their override is remembered for that sport instead.
  */
 export const SPORT_STYLE_DEFAULTS: Record<string, Partial<ReelStylePrefs>> = {
-  Basketball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard" },
-  Soccer: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard" },
-  Football: { vibe: "hype", pacing: "punchy", overlayTheme: "bold" },
-  Volleyball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard" },
-  Baseball: { vibe: "broadcast", pacing: "balanced", overlayTheme: "scoreboard" },
-  Softball: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard" },
-  Tennis: { vibe: "cinematic", pacing: "balanced", overlayTheme: "minimal" },
-  Pickleball: { vibe: "hype", pacing: "punchy", overlayTheme: "bold" },
-  Running: { vibe: "cinematic", pacing: "slowburn", overlayTheme: "minimal" },
+  Basketball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard", transition: "cut" },
+  Soccer: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard", transition: "cut" },
+  Football: { vibe: "hype", pacing: "punchy", overlayTheme: "bold", transition: "cut" },
+  Volleyball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard", transition: "cut" },
+  Baseball: { vibe: "broadcast", pacing: "balanced", overlayTheme: "scoreboard", transition: "dip" },
+  Softball: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard", transition: "cut" },
+  Tennis: { vibe: "cinematic", pacing: "balanced", overlayTheme: "minimal", transition: "fade" },
+  Pickleball: { vibe: "hype", pacing: "punchy", overlayTheme: "bold", transition: "cut" },
+  Running: { vibe: "cinematic", pacing: "slowburn", overlayTheme: "minimal", transition: "fade" },
 };
 
 /** The built-in default style for a sport (global default when unknown). */

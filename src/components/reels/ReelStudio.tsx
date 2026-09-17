@@ -21,6 +21,8 @@ export type Coaching = {
 };
 
 const PACE_RATE: Record<string, number> = { normal: 1, slowmo: 0.5, hold: 0.35, quick: 1.5 };
+/** How long each transition style dims the video across a cut, in ms. 0 = no fade. */
+const TRANSITION_FADE_MS: Record<string, number> = { cut: 0, dip: 120, fade: 350 };
 
 function clock(t: number): string {
   const s = Math.max(0, Math.round(t));
@@ -33,22 +35,38 @@ export function ReelStudio({
   editPlan,
   coaching,
   transcript,
+  transition = "cut",
 }: {
   videoUrl: string;
   timeline?: TimelineEntry[];
   editPlan?: EditPlan | null;
   coaching?: Coaching | null;
   transcript?: string | null;
+  /**
+   * How the player bridges one cut to the next during "Play the AI edit" —
+   * a hard cut by default, matching every reel styled before this existed.
+   * Manual scrubbing (the timeline, or tapping a specific cut) always stays
+   * instant regardless of this setting; a transition only masks the jump
+   * the player makes on its own between consecutive segments.
+   */
+  transition?: "cut" | "dip" | "fade";
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [segIndex, setSegIndex] = useState<number | null>(null);
+  const [dimmed, setDimmed] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const segments = editPlan?.segments ?? [];
+  const fadeMs = TRANSITION_FADE_MS[transition] ?? 0;
 
   // Drive the live cut: play each planned segment in order, at its own pace.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || segIndex == null) return;
+    if (!video || segIndex == null) {
+      // Covers every path that stops playback (Stop, the last segment
+      // ending, an empty edit plan) without needing to reset it at each one.
+      setDimmed(false);
+      return;
+    }
     const seg = segments[segIndex];
     if (!seg) {
       setSegIndex(null);
@@ -62,10 +80,23 @@ export function ReelStudio({
     }
     void video.play().catch(() => setSegIndex(null));
 
+    // If a fade carried us here, the seek above just happened while still
+    // dimmed, so it's hidden — reveal on the next frame so the fade-in from
+    // the new segment is actually visible instead of an instant pop.
+    let raf = 0;
+    if (fadeMs > 0) raf = requestAnimationFrame(() => setDimmed(false));
+
+    let advanceTimer = 0;
     const onTime = () => {
       if (video.currentTime >= seg.end - 0.05) {
-        if (segIndex + 1 < segments.length) setSegIndex(segIndex + 1);
-        else {
+        if (segIndex + 1 < segments.length) {
+          if (fadeMs > 0) {
+            setDimmed(true);
+            advanceTimer = window.setTimeout(() => setSegIndex(segIndex + 1), fadeMs);
+          } else {
+            setSegIndex(segIndex + 1);
+          }
+        } else {
           video.pause();
           video.playbackRate = 1;
           setSegIndex(null);
@@ -73,13 +104,18 @@ export function ReelStudio({
       }
     };
     video.addEventListener("timeupdate", onTime);
-    return () => video.removeEventListener("timeupdate", onTime);
-  }, [segIndex, segments]);
+    return () => {
+      video.removeEventListener("timeupdate", onTime);
+      if (raf) cancelAnimationFrame(raf);
+      if (advanceTimer) window.clearTimeout(advanceTimer);
+    };
+  }, [segIndex, segments, fadeMs]);
 
   function jumpTo(t: number) {
     const video = videoRef.current;
     if (!video) return;
     setSegIndex(null);
+    setDimmed(false);
     video.playbackRate = 1;
     try {
       video.currentTime = t;
@@ -93,14 +129,17 @@ export function ReelStudio({
 
   return (
     <div className="mt-3 space-y-3">
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        controls
-        playsInline
-        preload="metadata"
-        className="w-full rounded-lg bg-black"
-      />
+      <div className="overflow-hidden rounded-lg bg-black">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          controls
+          playsInline
+          preload="metadata"
+          className="w-full"
+          style={fadeMs > 0 ? { opacity: dimmed ? 0 : 1, transition: `opacity ${fadeMs}ms ease` } : undefined}
+        />
+      </div>
 
       {segments.length > 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-3">

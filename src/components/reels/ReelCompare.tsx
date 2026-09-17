@@ -218,6 +218,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
                   editPlan={reel.ai_edit_plan ?? null}
                   coaching={reel.ai_coaching ?? null}
                   transcript={reel.ai_transcript?.text ?? null}
+                  transition={normalizeReelStyle(reel.style_prefs).transition}
                 />
               ) : (
                 <p className="mt-3 text-[11px] text-muted-foreground">Loading video…</p>
@@ -243,6 +244,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
                       editPlan={draft.edit_plan ?? null}
                       coaching={draft.coaching ?? null}
                       transcript={reel.ai_transcript?.text ?? null}
+                      transition={style.transition}
                     />
                   )}
                 </>

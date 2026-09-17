@@ -476,6 +476,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           editPlan={reel.ai_edit_plan ?? null}
           coaching={reel.ai_coaching ?? null}
           transcript={reel.ai_transcript?.text ?? null}
+          transition={normalizeReelStyle(reel.style_prefs).transition}
         />
       )}
 

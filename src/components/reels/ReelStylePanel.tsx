@@ -2,6 +2,7 @@ import { Sliders, Check } from "lucide-react";
 import {
   OVERLAY_THEME_OPTIONS,
   PACING_OPTIONS,
+  TRANSITION_OPTIONS,
   VIBE_OPTIONS,
   reelStyleSummary,
   type ReelStylePrefs,
@@ -117,6 +118,13 @@ export function ReelStylePanel({
           options={OVERLAY_THEME_OPTIONS}
           value={value.overlayTheme}
           onSelect={(overlayTheme) => onChange({ ...value, overlayTheme })}
+        />
+        <ChipGroup
+          title="Transitions"
+          hint="How cuts connect to each other when you play the AI edit."
+          options={TRANSITION_OPTIONS}
+          value={value.transition}
+          onSelect={(transition) => onChange({ ...value, transition })}
         />
       </div>
     </section>
