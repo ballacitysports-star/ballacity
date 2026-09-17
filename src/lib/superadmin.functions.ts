@@ -10,6 +10,11 @@ import {
   countRows,
   EDITABLE_PROFILE_FIELDS,
 } from "@/lib/superadmin.server";
+import {
+  MONETIZATION_SETTING_KEY,
+  invalidateMonetizationConfigCache,
+} from "@/lib/monetization/settings.server";
+import { AI_SETTING_KEYS, invalidateAiConfigCache } from "@/lib/ai/settings.server";
 
 export const superadminCheck = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -748,6 +753,10 @@ export const superadminSetSetting = createServerFn({ method: "POST" })
     if (data.isPublic !== undefined) row["is_public"] = data.isPublic;
     const { error } = await admin.from("app_settings").upsert(row as any, { onConflict: "key" });
     if (error) throw new Error(error.message);
+    // Drop the server caches so a toggle takes effect on this isolate at once
+    // rather than after its TTL.
+    if (data.key === MONETIZATION_SETTING_KEY) invalidateMonetizationConfigCache();
+    if ((AI_SETTING_KEYS as readonly string[]).includes(data.key)) invalidateAiConfigCache();
     await writeAudit(admin, context.userId, {
       action: settingAuditAction(data.key, data.value),
       targetType: "app_setting",

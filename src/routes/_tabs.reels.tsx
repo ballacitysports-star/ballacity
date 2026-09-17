@@ -57,12 +57,12 @@ import { validateVideoSize } from "@/lib/video-validation";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
-import { FREE_REEL_ALLOWANCE, useSubscription } from "@/hooks/useSubscription";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { getBillingEnvironment, getStripeEnvironment } from "@/lib/stripe";
+import { getBillingEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
-import { FREE_TIER } from "@/lib/catalog";
+import { freeTierFor } from "@/lib/catalog";
 import {
   recapAttempt,
   recapProgress,
@@ -574,6 +574,9 @@ function ReelsPage() {
     isPastDue,
     freeUsed,
     freeRemaining,
+    freeAllowance,
+    unlimitedReels,
+    access,
     paymentsConfigured,
     loading: subLoading,
   } = useSubscription();
@@ -658,13 +661,13 @@ function ReelsPage() {
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
 
-  const canGenerate = isActive || freeRemaining > 0;
+  const canGenerate = isActive || unlimitedReels || freeRemaining > 0;
   const lockedReason = !user
     ? "Sign in to create reels"
     : !canGenerate
       ? paymentsConfigured
-        ? `You've used all ${FREE_REEL_ALLOWANCE} free reels. Subscribe to keep going.`
-        : `You've used all ${FREE_REEL_ALLOWANCE} free reels. Subscriptions aren't available yet — check back soon.`
+        ? `You've used all ${freeAllowance} free reels. Subscribe to keep going.`
+        : `You've used all ${freeAllowance} free reels. Subscriptions aren't available yet — check back soon.`
       : null;
 
   useEffect(() => {
@@ -987,6 +990,10 @@ function ReelsPage() {
       toast.error("Please sign in first");
       return;
     }
+    if (!access.canCheckout) {
+      toast.success(access.notice || "Everything is free right now — nothing to buy.");
+      return;
+    }
     if (!paymentsConfigured) {
       // Opening checkout here would throw inside StripeEmbeddedCheckout and
       // surface as a raw build-configuration error to an athlete.
@@ -1001,8 +1008,12 @@ function ReelsPage() {
 
   async function handleManageBilling() {
     try {
+      // getBillingEnvironment(), not getStripeEnvironment(): the latter throws
+      // when this build has no publishable key, which would leave an existing
+      // subscriber with no way to reach the portal and cancel. The portal is
+      // opened server-side and needs no client key.
       const result = await createPortalSession({
-        data: { environment: getStripeEnvironment(), returnUrl: window.location.href },
+        data: { environment: getBillingEnvironment(), returnUrl: window.location.href },
       });
       if ("error" in result) throw new Error(result.error);
       window.open(result.url, "_blank");
@@ -1056,7 +1067,9 @@ function ReelsPage() {
         </section>
       )}
 
-      {isPastDue && (
+      {/* Nothing is being charged while ballaCity is free, so a past-due
+          warning would be alarming and meaningless. */}
+      {isPastDue && access.showUpgradePrompts && (
         <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
           <AlertTriangle className="h-4 w-4" />
           Payment past due — we're retrying. Update your card to avoid losing access.
@@ -1066,6 +1079,11 @@ function ReelsPage() {
       <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
         {subLoading ? (
           <p className="text-sm text-muted-foreground">Loading plan…</p>
+        ) : access.freeMode ? (
+          <div>
+            <p className="text-sm font-semibold text-lime">Unlimited reels · Free</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{access.notice}</p>
+          </div>
         ) : isActive ? (
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -1085,32 +1103,38 @@ function ReelsPage() {
               <div>
                 <p className="text-sm font-semibold">Free trial</p>
                 <p className="text-xs text-muted-foreground">
-                  {freeRemaining} of {FREE_REEL_ALLOWANCE} free reels left
+                  {freeRemaining} of {freeAllowance} free reels left
                 </p>
               </div>
               <span className="text-xs text-muted-foreground">
-                {freeUsed}/{FREE_REEL_ALLOWANCE} used
+                {freeUsed}/{freeAllowance} used
               </span>
             </div>
             {/* No upgrade button on a build that cannot take a payment — it
                 would only lead to a checkout that immediately fails. */}
-            {paymentsConfigured && (
+            {paymentsConfigured && access.showUpgradePrompts && (
               <button
                 onClick={handleSubscribe}
                 className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
               >
-                {freeRemaining > 0 ? "Upgrade to unlimited · $15/mo" : "Subscribe · $15/mo"}
+                {freeRemaining > 0
+                  ? `Upgrade to unlimited · ${plusPriceLabel}`
+                  : `Subscribe · ${plusPriceLabel}`}
               </button>
             )}
           </div>
         )}
       </section>
 
-      {!isActive && (
+      {/* In free mode `isActive` is true for everyone, which would hide this
+          list entirely — so key it on whether anything is actually sold. */}
+      {(access.freeMode || !isActive) && (
         <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="mb-3 text-sm font-semibold">Free account includes</h2>
+          <h2 className="mb-3 text-sm font-semibold">
+            {access.freeMode ? "Your account includes" : "Free account includes"}
+          </h2>
           <ul className="space-y-2">
-            {FREE_TIER.features.map((f) => (
+            {freeTierFor(monetization).features.map((f) => (
               <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
               </li>

@@ -60,6 +60,39 @@ describe("admin overrides", () => {
     expect(parseMonetizationOverrides({ fees: { platformFeeBps: -5 } })).toEqual({});
   });
 
+  it("round-trips the access switches", () => {
+    const parsed = parseMonetizationOverrides({
+      access: { billingEnabled: true, freeModeAiTier: "team", freeModeNotice: "On us." },
+    });
+    expect(parsed.access).toEqual({
+      billingEnabled: true,
+      freeModeAiTier: "team",
+      freeModeNotice: "On us.",
+    });
+    expect(resolveMonetizationConfig(parsed).access.billingEnabled).toBe(true);
+    // Unspecified switches keep their defaults rather than becoming undefined.
+    expect(resolveMonetizationConfig(parsed).access.merchShopEnabled).toBe(true);
+  });
+
+  it("drops malformed access values rather than trusting them", () => {
+    expect(parseMonetizationOverrides({ access: { billingEnabled: "yes" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: { freeModeAiTier: "platinum" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: {} })).toEqual({});
+
+    const parsed = parseMonetizationOverrides({
+      access: { freeModeEntitlements: ["player_plus", "not_a_tier"] },
+    });
+    expect(parsed.access?.freeModeEntitlements).toEqual(["player_plus"]);
+  });
+
+  it("never lets a malformed blob silently start charging people", () => {
+    // The dangerous direction is junk resolving to billingEnabled: true.
+    const config = resolveMonetizationConfig(
+      parseMonetizationOverrides({ access: { billingEnabled: "true" } }),
+    );
+    expect(config.access.billingEnabled).toBe(false);
+  });
+
   it("falls back to built-in defaults with no overrides saved", () => {
     expect(resolveMonetizationConfig(parseMonetizationOverrides({}))).toEqual(
       DEFAULT_MONETIZATION_CONFIG,

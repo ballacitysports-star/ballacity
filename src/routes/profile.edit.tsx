@@ -574,8 +574,8 @@ function EditProfile() {
             <Trophy className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm">Plans & Subscriptions</div>
-            <div className="text-xs text-muted-foreground">Host, Team, Org & Reel plans</div>
+            <div className="font-semibold text-sm">Your plan</div>
+            <div className="text-xs text-muted-foreground">What your account includes</div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>
         </Link>

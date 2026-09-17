@@ -6,6 +6,7 @@
 import {
   DEFAULT_MONETIZATION_CONFIG,
   FREE_TIER_FEATURES,
+  freeTierFeatures,
   liveProducts,
   priceLabelFor,
   type MonetizationConfig,
@@ -30,6 +31,11 @@ export const FREE_TIER: PlanTier = {
   features: FREE_TIER_FEATURES,
   cta: "Included",
 };
+
+/** The free tier with admin-resolved numbers, for screens that have the config. */
+export function freeTierFor(config: MonetizationConfig): PlanTier {
+  return { ...FREE_TIER, features: freeTierFeatures(config) };
+}
 
 export function planTierFor(product: MonetizationProduct): PlanTier {
   return {

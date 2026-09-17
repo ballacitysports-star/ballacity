@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "test": "vitest run",
     "test:e2e": "playwright test",
     "postinstall": "node scripts/patch-tanstack-client-abort.mjs"
   },

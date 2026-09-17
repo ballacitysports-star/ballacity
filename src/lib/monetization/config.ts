@@ -49,6 +49,38 @@ export type FeeConfig = {
   maxPlatformFeeCents: number;
 };
 
+/**
+ * AI limit tiers, mirrored from `@/lib/ai/config` rather than imported so the
+ * monetization package carries no AI knowledge. The AI layer narrows this
+ * against its own `AI_TIERS` at the single call site.
+ */
+export type MonetizationAiTier = "free" | "premium" | "team" | "gym";
+
+/**
+ * The master switch for everything ballaCity charges for.
+ *
+ * While `billingEnabled` is false the platform is free for everyone: no
+ * paywall, checkout, upgrade prompt or premium lock renders anywhere, and
+ * `resolveFeatureAccess` hands every account every entitlement. Nothing is
+ * deleted when it is off — the products, prices, Stripe wiring and webhook all
+ * stay exactly as they are, so flipping it back on in the SuperAdmin panel
+ * restores the paid product in one click.
+ *
+ * The sub-switches below are only consulted once `billingEnabled` is true.
+ */
+export type MonetizationAccess = {
+  billingEnabled: boolean;
+  subscriptionsEnabled: boolean;
+  merchShopEnabled: boolean;
+  upgradePromptsEnabled: boolean;
+  /** Entitlements every account holds while billing is off. */
+  freeModeEntitlements: EntitlementKey[];
+  /** AI limit tier every account resolves to while billing is off. */
+  freeModeAiTier: MonetizationAiTier;
+  /** Copy shown where a paywall used to be. */
+  freeModeNotice: string;
+};
+
 export type MonetizationConfig = {
   products: MonetizationProduct[];
   fees: FeeConfig;
@@ -59,11 +91,34 @@ export type MonetizationConfig = {
    * genuinely wired up — we never present a payment path that does not exist.
    */
   ballacityProcessedPaymentsEnabled: boolean;
+  access: MonetizationAccess;
 };
+
+export const ALL_ENTITLEMENTS: EntitlementKey[] = [
+  "player_plus",
+  "host_pro",
+  "team_pro",
+  "org_pro",
+  "facility_pro",
+];
+
+export const MONETIZATION_AI_TIERS: MonetizationAiTier[] = ["free", "premium", "team", "gym"];
 
 export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
   freeReelAllowance: 3,
   ballacityProcessedPaymentsEnabled: false,
+  // ballaCity ships free. The sub-switches stay true so that turning billing
+  // back on restores the paid product exactly as it was, without also having
+  // to remember which surfaces to re-enable.
+  access: {
+    billingEnabled: false,
+    subscriptionsEnabled: true,
+    merchShopEnabled: true,
+    upgradePromptsEnabled: true,
+    freeModeEntitlements: ["player_plus", "host_pro", "team_pro", "org_pro", "facility_pro"],
+    freeModeAiTier: "gym",
+    freeModeNotice: "Everything on ballaCity is free right now — no subscription needed.",
+  },
   fees: {
     platformFeeBps: 500,
     processingFeeBps: 290,
@@ -156,14 +211,32 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
 };
 
 /** Everything a member gets without paying anything, ever. */
-export const FREE_TIER_FEATURES: string[] = [
+const FREE_TIER_BASE_FEATURES: string[] = [
   "Create your player profile & availability",
   "Discover, search and filter games",
   "Request to join and host games",
   "Messaging & notifications",
   "Teams, reputation and reviews",
-  "3 free AI highlight reels",
 ];
+
+/**
+ * The free-tier list, with the reel line derived rather than hardcoded.
+ *
+ * The count follows the resolved allowance, and while ballaCity is free it
+ * reads "Unlimited" — otherwise the page would promise unlimited reels at the
+ * top and "3 free" three lines below.
+ */
+export function freeTierFeatures(
+  config: MonetizationConfig = DEFAULT_MONETIZATION_CONFIG,
+): string[] {
+  const reels = config.access?.billingEnabled
+    ? `${config.freeReelAllowance} free AI highlight reels`
+    : "Unlimited AI highlight reels";
+  return [...FREE_TIER_BASE_FEATURES, reels];
+}
+
+/** Default-config view, for code that cannot resolve the admin overrides. */
+export const FREE_TIER_FEATURES: string[] = freeTierFeatures();
 
 export type MonetizationOverrides = {
   prices?: Record<string, number>;
@@ -171,6 +244,7 @@ export type MonetizationOverrides = {
   fees?: Partial<FeeConfig>;
   freeReelAllowance?: number;
   ballacityProcessedPaymentsEnabled?: boolean;
+  access?: Partial<MonetizationAccess>;
 };
 
 function num(value: unknown): number | null {
@@ -216,6 +290,43 @@ export function parseMonetizationOverrides(raw: unknown): MonetizationOverrides 
   if (typeof o["ballacityProcessedPaymentsEnabled"] === "boolean") {
     out.ballacityProcessedPaymentsEnabled = o["ballacityProcessedPaymentsEnabled"];
   }
+
+  if (o["access"] && typeof o["access"] === "object") {
+    const src = o["access"] as Record<string, unknown>;
+    const access: Partial<MonetizationAccess> = {};
+
+    for (const k of [
+      "billingEnabled",
+      "subscriptionsEnabled",
+      "merchShopEnabled",
+      "upgradePromptsEnabled",
+    ] as const) {
+      if (typeof src[k] === "boolean") access[k] = src[k] as boolean;
+    }
+
+    const grants = src["freeModeEntitlements"];
+    if (Array.isArray(grants)) {
+      // An explicit empty list is meaningful ("free mode grants nothing"), so
+      // it is kept; only junk entries are dropped.
+      access.freeModeEntitlements = grants.filter((g): g is EntitlementKey =>
+        ALL_ENTITLEMENTS.includes(g as EntitlementKey),
+      );
+    }
+
+    const tier = src["freeModeAiTier"];
+    if (MONETIZATION_AI_TIERS.includes(tier as MonetizationAiTier)) {
+      access.freeModeAiTier = tier as MonetizationAiTier;
+    }
+
+    if (typeof src["freeModeNotice"] === "string") {
+      access.freeModeNotice = (src["freeModeNotice"] as string).slice(0, 300);
+    }
+
+    // Only emit the key when something actually parsed, so a malformed blob
+    // still round-trips to `{}` like every other override group above.
+    if (Object.keys(access).length > 0) out.access = access;
+  }
+
   return out;
 }
 
@@ -231,6 +342,7 @@ export function resolveMonetizationConfig(
     ballacityProcessedPaymentsEnabled:
       overrides.ballacityProcessedPaymentsEnabled ?? base.ballacityProcessedPaymentsEnabled,
     fees: { ...base.fees, ...(overrides.fees ?? {}) },
+    access: { ...base.access, ...(overrides.access ?? {}) },
     products: base.products.map((p) => ({
       ...p,
       priceCents: overrides.prices?.[p.priceId] ?? p.priceCents,

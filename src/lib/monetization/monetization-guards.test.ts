@@ -4,6 +4,19 @@ import { DEFAULT_MONETIZATION_CONFIG, liveProducts } from "./config";
 import { quoteFees } from "./fees";
 import { displayStatusFor, displayStatusLabel } from "@/lib/payment-states";
 
+describe("the platform ships free", () => {
+  it("has billing switched off in the shipped config", () => {
+    expect(DEFAULT_MONETIZATION_CONFIG.access.billingEnabled).toBe(false);
+  });
+
+  it("keeps the paid catalog intact so billing can be switched back on", () => {
+    // Free mode must never be implemented by deleting products.
+    expect(liveProducts(DEFAULT_MONETIZATION_CONFIG).length).toBeGreaterThan(0);
+    expect(DEFAULT_MONETIZATION_CONFIG.access.subscriptionsEnabled).toBe(true);
+    expect(DEFAULT_MONETIZATION_CONFIG.access.merchShopEnabled).toBe(true);
+  });
+});
+
 describe("free tier stays free", () => {
   it("never puts a core capability behind an entitlement", () => {
     for (const capability of ALWAYS_FREE_CAPABILITIES) {

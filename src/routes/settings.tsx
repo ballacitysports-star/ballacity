@@ -146,8 +146,8 @@ const SECTIONS: Section[] = [
     items: [
       {
         to: "/plans",
-        label: "Subscription",
-        description: "Plans and billing details",
+        label: "Your plan",
+        description: "What your account includes",
         icon: CreditCard,
       },
     ],

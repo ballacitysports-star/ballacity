@@ -22,6 +22,7 @@ import {
   type AiConfig,
 } from "./config";
 import { AGE_COHORTS } from "@/lib/child-policy";
+import { DEFAULT_MONETIZATION_CONFIG } from "@/lib/monetization/config";
 
 const FAKE_KEY = "lov_supersecretkey_1234567890";
 
@@ -78,6 +79,23 @@ vi.mock("./settings.server", () => ({
   loadAiConfig: async () => config,
 }));
 
+/**
+ * Monetization defaults to free, which would hand every caller the top AI tier
+ * and quietly stop these tests exercising the entitlement ladder. Pin billing
+ * on so tier resolution is the thing under test; `monetizationConfig` lets an
+ * individual test opt back into free mode.
+ */
+let monetizationConfig = {
+  ...DEFAULT_MONETIZATION_CONFIG,
+  access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: true },
+};
+
+vi.mock("@/lib/monetization/settings.server", () => ({
+  MONETIZATION_SETTING_KEY: "monetization",
+  invalidateMonetizationConfigCache: () => {},
+  loadMonetizationConfig: async () => monetizationConfig,
+}));
+
 const moderateText = vi.fn();
 const moderateImage = vi.fn();
 
@@ -93,12 +111,16 @@ vi.mock("./gateway.server", () => ({
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
 vi.mock("@/lib/audit-log.server", () => ({ logAdminAction: vi.fn(async () => {}) }));
 
-const { assertAiAllowed } = await import("./gate.server");
+const { assertAiAllowed, resolveAiTier } = await import("./gate.server");
 const { moderateAiText, checkReelFrameSafety, isCsamCategory } =
   await import("./moderation.server");
 
 beforeEach(() => {
   config = baseConfig();
+  monetizationConfig = {
+    ...DEFAULT_MONETIZATION_CONFIG,
+    access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: true },
+  };
   moderateText.mockReset();
   moderateImage.mockReset();
   process.env["LOVABLE_API_KEY"] = FAKE_KEY;
@@ -339,5 +361,51 @@ describe("error mapping and secret hygiene", () => {
     );
     expect(logged).not.toContain(FAKE_KEY);
     expect(redactSecrets(FAKE_KEY)).toBe("[redacted]");
+  });
+});
+
+describe("AI tier follows the monetization switch", () => {
+  /** Minimal admin stub: only the subscriptions read matters here. */
+  function adminWith(rows: unknown[]) {
+    return {
+      from: () => ({ select: () => ({ eq: async () => ({ data: rows }) }) }),
+    };
+  }
+
+  it("gives everyone the configured tier while ballaCity is free", async () => {
+    monetizationConfig = {
+      ...DEFAULT_MONETIZATION_CONFIG,
+      access: { ...DEFAULT_MONETIZATION_CONFIG.access, billingEnabled: false },
+    };
+    // No subscription at all, yet still the top tier.
+    expect(await resolveAiTier(adminWith([]), "u1")).toBe("gym");
+  });
+
+  it("honours a superadmin dialling the free-mode tier down", async () => {
+    monetizationConfig = {
+      ...DEFAULT_MONETIZATION_CONFIG,
+      access: {
+        ...DEFAULT_MONETIZATION_CONFIG.access,
+        billingEnabled: false,
+        freeModeAiTier: "premium",
+      },
+    };
+    expect(await resolveAiTier(adminWith([]), "u1")).toBe("premium");
+  });
+
+  it("goes back to deriving the tier from real subscriptions once billing is on", async () => {
+    expect(await resolveAiTier(adminWith([]), "u1")).toBe("free");
+    expect(
+      await resolveAiTier(
+        adminWith([{ status: "active", price_id: "team_plan_monthly", tier: null }]),
+        "u1",
+      ),
+    ).toBe("team");
+    expect(
+      await resolveAiTier(
+        adminWith([{ status: "active", price_id: "ai_highlight_reel_monthly", tier: null }]),
+        "u1",
+      ),
+    ).toBe("premium");
   });
 });

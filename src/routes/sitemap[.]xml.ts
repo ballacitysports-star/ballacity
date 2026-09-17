@@ -45,7 +45,31 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const urls = ENTRIES.map((e) =>
+        // Don't advertise a page that redirects. The shop is switched off while
+        // ballaCity is free, so it is dropped from the sitemap until a
+        // superadmin turns merch back on.
+        //
+        // Imported inside the handler: this route is part of the client graph
+        // (routeTree.gen.ts), so a top-level import would pull server-only code
+        // into the browser bundle.
+        let merchEnabled = false;
+        try {
+          const [{ supabaseAdmin }, { loadMonetizationConfig }, { resolveFeatureAccess }] =
+            await Promise.all([
+              import("@/integrations/supabase/client.server"),
+              import("@/lib/monetization/settings.server"),
+              import("@/lib/monetization/access"),
+            ]);
+          const config = await loadMonetizationConfig(supabaseAdmin);
+          merchEnabled = resolveFeatureAccess(config).merchEnabled;
+        } catch {
+          // A settings read failure must not break the sitemap; omitting /shop
+          // is the safe direction.
+        }
+
+        const entries = ENTRIES.filter((e) => e.path !== "/shop" || merchEnabled);
+
+        const urls = entries.map((e) =>
           [
             `  <url>`,
             `    <loc>${SITE_URL}${e.path}</loc>`,

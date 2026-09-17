@@ -15,8 +15,10 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { AgeCohort } from "@/lib/child-policy";
 import { entitlementsFor, type SubscriptionLike } from "@/lib/monetization/entitlements";
-import { DEFAULT_MONETIZATION_CONFIG } from "@/lib/monetization/config";
+import { resolveFeatureAccess } from "@/lib/monetization/access";
+import { loadMonetizationConfig } from "@/lib/monetization/settings.server";
 import {
+  AI_TIERS,
   cohortAllowed,
   estimateCostCents,
   type AiConfig,
@@ -59,15 +61,21 @@ export type AiSession = {
 
 export async function resolveAiTier(admin: any, userId: string): Promise<AiTier> {
   try {
+    const monetization = await loadMonetizationConfig(admin);
+    const access = resolveFeatureAccess(monetization);
+
+    // While ballaCity is free, nobody's tier depends on what they bought. The
+    // quota itself still applies — it is a cost ceiling, not a paywall — so an
+    // admin can dial the tier down without charging anyone.
+    if (access.aiTierOverride && AI_TIERS.includes(access.aiTierOverride as AiTier)) {
+      return access.aiTierOverride as AiTier;
+    }
+
     const { data } = await admin
       .from("subscriptions")
       .select("status,price_id,tier,current_period_end")
       .eq("user_id", userId);
-    const state = entitlementsFor(
-      (data ?? []) as SubscriptionLike[],
-      Date.now(),
-      DEFAULT_MONETIZATION_CONFIG,
-    );
+    const state = entitlementsFor((data ?? []) as SubscriptionLike[], Date.now(), monetization);
     if (state.entitlements.has("facility_pro") || state.entitlements.has("org_pro")) return "gym";
     if (state.entitlements.has("team_pro")) return "team";
     if (state.entitlements.has("player_plus") || state.entitlements.has("host_pro")) {
