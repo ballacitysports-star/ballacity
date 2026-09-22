@@ -16,33 +16,38 @@ Run 92 did both — it finished, and it uploaded its report — and the job log 
 retrievable through the API. The enumeration below is taken from that log's own
 summary step.
 
-## Download the artifact before 2026-09-18
+## The artifact expired on 2026-09-18 — read `run92-failures.md` instead
 
-Run 92 uploaded `playwright-report` — **artifact `10188443682`, 148,597,243 bytes,
-299 files**, `retention-days: 7` from 2026-09-11. That archive holds the traces,
-screenshots and `results.json` that make these failures debuggable rather than just
-countable.
+Run 92 uploaded `playwright-report` — artifact `10188443682`, 148,597,243 bytes,
+299 files, `retention-days: 7` from 2026-09-11. **It expired at
+2026-09-18T07:06:54Z and GitHub has purged it** (the Actions API now reports
+`"expired": true` for it). Nothing can regenerate it: it was the output of a run
+that no longer has a runner to repeat.
 
-    https://github.com/ballacitysports-star/ballacity/actions/runs/34569074064/artifacts/10188443682
+Both rescue paths stayed blocked for the whole retention window:
+`preserve-artifact.yml`, which would have republished it as a Release asset,
+never acquired a runner (same Actions outage, still ongoing as of 2026-09-22 —
+every run since 2026-09-11 12:02 dies in seconds with no steps and no logs), and
+a direct download was refused by this session's egress policy.
 
-**It is no longer the only copy of the failure record.** Every failing test's
-error, locator, call log and code frame — plus the full 197-test execution
-roster — is transcribed from the job log into `e2e/run92-failures.md`, which is
-in version control and does not expire. Read that first; it is what most
-debugging actually needs.
+**The failure record itself survived.** Every failing test's error, locator, call
+log and code frame — plus the full 197-test execution roster — was transcribed
+out of the job log into `e2e/run92-failures.md` before the deadline. That file is
+in version control, does not expire, and is what most debugging actually needs.
+Start there.
 
-What only the artifact has, and what is lost at 2026-09-18T07:06:54Z, is the
-`trace.zip` per failure (DOM snapshots, network waterfalls), the screenshots and
-the `error-context.md` accessibility dumps. `run92-failures.md` keeps the
-`test-results/...` path against each failure so they can still be matched up if
-someone rescues the artifact in time.
+What went with the artifact, permanently:
 
-Two rescue paths exist and both are currently blocked: `preserve-artifact.yml`
-(republishes it as a Release asset, but cannot get a runner — same Actions
-outage), and a direct download (refused by egress policy from a sandboxed agent
-session). A person on an unrestricted machine can still do it in one command:
+- the per-failure `trace.zip` (DOM snapshots, network waterfalls, action timeline)
+- the failure screenshots
+- the `error-context.md` accessibility dumps
+- `results.json`
 
-    gh run download 34569074064 -R ballacitysports-star/ballacity -n playwright-report
+So the `invite-*`, `pay-*` and `oauth-*` failures can still be read — assertion,
+selector, timeout, and the exact line that failed — but they can no longer be
+*replayed*. `run92-failures.md` keeps each failure's `test-results/...` path, which
+is now only useful for correlating against a future run that reproduces the same
+case.
 
 ## What the failures look like
 
@@ -181,16 +186,20 @@ assertions.
 ## Blocked
 
 None of this can be re-measured until Actions allocates runners. Every run since
-2026-09-11 12:02 fails in 3–4 seconds with no runner, no steps and no logs,
-identically on `main` and on branches. The `Runner probe` workflow
-(`workflow_dispatch`) answers "can Actions get a runner yet" in seconds; run that
-before spending 40–75 minutes on the suite.
+2026-09-11 12:02 fails within seconds with no runner, no steps and no logs,
+identically on `main` and on branches — still true at 2026-09-22 (run 166,
+`35676681560`, 4s; its job's log download 404s because no step ever ran). Most
+die in 3–5s; a few wait longer before giving up (run 162 took 38s) but are the
+same failure. The `Runner probe` workflow (`workflow_dispatch`) answers "can
+Actions get a runner yet" in seconds; run that before spending 40–75 minutes on
+the suite.
 
 ## Update: full run-92 job log re-read (2026-09-16)
 
-Run 92's `playwright-report` artifact was still downloadable (`10188443682`,
-expires ~2026-09-18) and its full job log — not just the "Summarise results"
-tally — is retrievable through the Actions API. Reading the actual per-test
+At the time of this re-read, run 92's `playwright-report` artifact was still
+downloadable (`10188443682`; it has since expired — see above) and its full job
+log — not just the "Summarise results" tally — is retrievable through the Actions
+API. Reading the actual per-test
 `waitForURL`/`toBeVisible` failure text (not just the one-line error summary)
 turned up two concrete, confirmed causes and closed out a third hypothesis:
 
