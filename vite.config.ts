@@ -22,15 +22,29 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 // Lovable's managed injection and the CI secrets still take precedence, and a
 // `.env.local` override still beats this because Vite applies it later.
 seedEnvFromProductionFile();
-// Deploy marker: 2026-09-17 — forces a fresh build artifact so the deployment
-// cannot reuse the stale September client bundle (index-BR82iF4e.js).
+
+// Public (publishable) backend config, baked in as literals. The deploy build
+// environment has been observed supplying EMPTY values for these variables,
+// which beat any env-file seeding, so the client bundle must not depend on the
+// environment for them. Non-empty environment values still win.
+const PUBLIC_BACKEND = {
+  VITE_SUPABASE_URL: "https://cpqihhcqeivbgxqbzatv.supabase.co",
+  VITE_SUPABASE_PUBLISHABLE_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwcWloaGNxZWl2Ymd4cWJ6YXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDQ0MTgsImV4cCI6MjA5NjA4MDQxOH0.TFSxi4AlWxcx8ccyLPqKeTnXCOMra3hprsGEWFIEo3I",
+  VITE_SUPABASE_PROJECT_ID: "cpqihhcqeivbgxqbzatv",
+} as const;
+
+function publicValue(key: keyof typeof PUBLIC_BACKEND): string {
+  const fromEnv = process.env[key]?.trim();
+  return fromEnv ? fromEnv : PUBLIC_BACKEND[key];
+}
 
 const publicBackendDefine = {
-  "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env.VITE_SUPABASE_URL),
+  "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(publicValue("VITE_SUPABASE_URL")),
   "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    publicValue("VITE_SUPABASE_PUBLISHABLE_KEY"),
   ),
-  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(process.env.VITE_SUPABASE_PROJECT_ID),
+  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(publicValue("VITE_SUPABASE_PROJECT_ID")),
 };
 
 function seedEnvFromProductionFile() {
