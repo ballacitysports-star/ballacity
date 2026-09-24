@@ -3,6 +3,11 @@
 ballaCity is **free for every member right now**. No paywall, checkout, upgrade
 prompt or premium lock appears anywhere in the normal experience.
 
+`/plans` still shows the real plans while free — each with its normal price
+struck through and nothing to buy — so members can see what the free run is
+worth and that it is temporary. That is presentation, not a paywall: no card
+offers a purchase, and checkout is refused server-side.
+
 **Nothing was deleted to achieve this.** Products, prices, Stripe wiring, the
 billing webhook and every entitlement check are still in place. Monetization is
 configuration, and a superadmin can stage it back on without a rebuild.
@@ -27,6 +32,7 @@ SuperAdmin → **Monetization**. Stored in `app_settings.monetization`, under
 | `freeModeEntitlements` | all five | What every account holds while free. |
 | `freeModeAiTier` | `gym` | AI quota tier everyone resolves to while free. |
 | `freeModeNotice` | — | Copy shown where a paywall used to be. |
+| `freeModeEndsAt` | `null` | Optional date advertised as "Free through …". **Messaging only** — see below. |
 
 Every paid surface ships **off**, so turning Free Mode off is deliberately *not*
 enough to start charging — each surface is switched on separately.
@@ -34,6 +40,24 @@ enough to start charging — each surface is switched on separately.
 Prices, trial lengths, fees and the reel allowance are editable in the same
 panel. Leaving a field alone means "use the built-in default": the panel writes
 only overrides, never a snapshot of the defaults.
+
+### The "free through" date is advertising, not a schedule
+
+`freeModeEndsAt` drives one thing: the "Free through 31 Mar 2026" line on
+`/plans` and `/reels`. When it passes, the line stops rendering and **everything
+stays free**. Nothing switches off, no gate starts enforcing, and no member
+loses access.
+
+That is deliberate. Monetization begins only when a superadmin turns Free Mode
+off — which takes typing `MONETIZE` and giving a reason — so a typo in a date
+field can never start charging anyone. `public.monetization_free_mode()` does
+not read this field at all, keeping the database out of it too.
+
+The resolver exposes it as `FeatureAccess.freeUntil`, which is null once the
+date has passed, so every screen asks one question instead of each re-deriving
+"is it still in the future" and drifting apart. `access.test.ts` asserts the
+expired case explicitly: date passed ⇒ `freeUntil` null, `freeMode` still true,
+`canCheckout` still false.
 
 ---
 
@@ -169,7 +193,9 @@ reservation.
 
 ## 7. Turning monetization on (§14 staging)
 
-**Stage 1 — now.** Free Mode ON, everything else OFF.
+**Stage 1 — now.** Free Mode ON, everything else OFF. Optionally set
+`freeModeEndsAt` so members are told up front that the free run is temporary —
+it changes no behaviour, only what they are told.
 
 **Stage 2 — controlled.** In the panel: set the features you want to charge for
 to **Premium**, switch on `subscriptionsEnabled`, `paymentsEnabled`,

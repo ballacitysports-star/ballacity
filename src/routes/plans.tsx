@@ -10,7 +10,8 @@ import { freeTierFor, planTiersFrom } from "@/lib/catalog";
 import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
-import { freeTierFeatures, liveProducts, productForPriceId } from "@/lib/monetization/config";
+import { productForPriceId } from "@/lib/monetization/config";
+import { formatFullDay } from "@/lib/datetime";
 import { getBillingEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { useState } from "react";
@@ -34,21 +35,20 @@ function PlansPage() {
   const { config } = useMonetizationConfig();
   const entitlements = useEntitlements();
   const planTiers = planTiersFrom(config);
-  // A plan counts as current when its entitlement is held, so someone who
-  // subscribed under an older plan name still sees "Current plan".
+  // A plan counts as current when its entitlement was actually PAID for, so
+  // someone who subscribed under an older plan name still sees "Current plan".
+  //
+  // `hasPaid`, not `has`: free mode grants every entitlement to everyone, so
+  // `has` would mark every card as the member's current plan. In paid mode the
+  // two are identical, so this changes nothing there.
   const isCurrent = (priceId: string) => {
     if (hasActive(priceId)) return true;
     const product = productForPriceId(priceId, config);
-    return product ? entitlements.has(product.entitlement) : false;
+    return product ? entitlements.hasPaid(product.entitlement) : false;
   };
   const { openCheckout, checkoutElement, closeCheckout, isOpen } = useStripeCheckout();
   const access = useFeatureAccess();
   const [portalBusy, setPortalBusy] = useState(false);
-  // Free mode hands out every entitlement, so the one card shows the union of
-  // the free tier and every paid product's features, de-duplicated.
-  const freeModeFeatures = Array.from(
-    new Set([...freeTierFeatures(config), ...liveProducts(config).flatMap((p) => p.features)]),
-  );
 
   function handleSubscribe(priceId: string) {
     if (priceId === "free") return;
@@ -120,7 +120,17 @@ function PlansPage() {
         </h1>
         <p className="mt-1 page-subtitle">
           {access.freeMode ? (
-            access.notice
+            <>
+              {access.notice}
+              {access.freeUntil ? (
+                <>
+                  {" "}
+                  <span className="font-semibold text-foreground">
+                    Free through {formatFullDay(access.freeUntil)}.
+                  </span>
+                </>
+              ) : null}
+            </>
           ) : (
             <>
               Subscribe or upgrade anytime. All plans are no-commitment monthly.{" "}
@@ -144,61 +154,69 @@ function PlansPage() {
           </button>
         )}
 
-        {/* Free mode: one card listing everything the account already has, with
-            no prices and nothing to buy. The paid catalog below is skipped
-            rather than deleted — turning billing back on restores it. */}
-        {access.freeMode ? (
-          <div className="mt-6 rounded-2xl border border-lime/50 bg-lime/5 p-5">
-            <div className="font-display text-xl font-bold">Everything, included</div>
-            <div className="text-sm text-muted-foreground">
-              Every ballaCity feature is unlocked on your account.
-            </div>
-            <ul className="mt-3 space-y-1.5">
-              {freeModeFeatures.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" /> {f}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-4">
-            {[freeTierFor(config), ...planTiers].map((plan) => {
-              const active = isCurrent(plan.priceId);
-              const isFree = plan.priceId === "free";
-              return (
-                <div
-                  key={plan.priceId}
-                  className={`rounded-2xl border p-5 ${plan.highlight ? "border-lime/50 bg-lime/5" : "border-border bg-surface"}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-display text-xl font-bold">{plan.name}</div>
-                      <div className="text-sm text-muted-foreground">{plan.tagline}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-display text-2xl font-bold">{plan.priceLabel}</div>
-                    </div>
+        {/* One grid in both modes. While ballaCity is free the real plans are
+            still shown — with their normal price struck through and nothing to
+            buy — so a member can see what they are getting and that it is
+            temporary. Hiding them made the offer invisible. */}
+        <div className="mt-6 grid gap-4">
+          {[freeTierFor(config), ...planTiers].map((plan) => {
+            const active = isCurrent(plan.priceId);
+            const isFree = plan.priceId === "free";
+            // The free tier has no price to strike through, so it keeps its
+            // ordinary presentation even while everything else is free.
+            const freeForNow = access.freeMode && !isFree;
+            return (
+              <div
+                key={plan.priceId}
+                className={`rounded-2xl border p-5 ${plan.highlight ? "border-lime/50 bg-lime/5" : "border-border bg-surface"}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-display text-xl font-bold">{plan.name}</div>
+                    <div className="text-sm text-muted-foreground">{plan.tagline}</div>
+                    {freeForNow ? (
+                      <span className="mt-1.5 inline-flex items-center rounded-full bg-lime/15 px-2 py-0.5 text-xs font-semibold text-lime">
+                        {access.freeUntil ? "Free — limited time" : "Free right now"}
+                      </span>
+                    ) : null}
                   </div>
-                  <ul className="mt-3 space-y-1.5">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => handleSubscribe(plan.priceId)}
-                    disabled={loading || active || isFree}
-                    className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-black disabled:bg-muted disabled:text-muted-foreground"
-                  >
-                    {active ? "Current plan" : isFree ? "Included" : plan.cta}
-                  </button>
+                  <div className="text-right">
+                    {freeForNow ? (
+                      <>
+                        <div className="font-display text-2xl font-bold text-lime">Free</div>
+                        <div className="text-xs text-muted-foreground line-through">
+                          {plan.priceLabel}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="font-display text-2xl font-bold">{plan.priceLabel}</div>
+                    )}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <ul className="mt-3 space-y-1.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => handleSubscribe(plan.priceId)}
+                  disabled={loading || active || isFree || freeForNow}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-black disabled:bg-muted disabled:text-muted-foreground"
+                >
+                  {active
+                    ? "Current plan"
+                    : isFree
+                      ? "Included"
+                      : freeForNow
+                        ? "Included right now"
+                        : plan.cta}
+                </button>
+              </div>
+            );
+          })}
+        </div>
 
         {!access.freeMode && (
           <p className="mt-6 text-xs text-muted-foreground">

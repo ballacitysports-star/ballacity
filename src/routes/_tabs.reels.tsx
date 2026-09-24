@@ -61,6 +61,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { getBillingEnvironment } from "@/lib/stripe";
+import { formatFullDay } from "@/lib/datetime";
 import { createPortalSession } from "@/utils/payments.functions";
 import { freeTierFor } from "@/lib/catalog";
 import {
@@ -1081,8 +1082,15 @@ function ReelsPage() {
           <p className="text-sm text-muted-foreground">Loading plan…</p>
         ) : access.freeMode ? (
           <div>
-            <p className="text-sm font-semibold text-lime">Unlimited reels · Free</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{access.notice}</p>
+            <p className="text-sm font-semibold text-lime">
+              Unlimited reels · Free{access.freeUntil ? " — limited time" : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {access.notice}
+              {/* Same date as /plans, from the same resolved value, so the two
+                  screens can never tell a member different things. */}
+              {access.freeUntil ? ` Free through ${formatFullDay(access.freeUntil)}.` : ""}
+            </p>
           </div>
         ) : isActive ? (
           <div className="flex items-center justify-between gap-3">

@@ -59,11 +59,15 @@ export type MonetizationAiTier = "free" | "premium" | "team" | "gym";
 /**
  * Everything ballaCity charges for, and whether it is charging at all.
  *
- * While `platformFreeMode` is true the platform is free for everyone: no
- * paywall, checkout, upgrade prompt or premium lock renders anywhere, every
- * account holds every entitlement, and a feature configured as `premium` is
- * served as `free`. Nothing is deleted — the products, prices, Stripe wiring
- * and webhook all stay exactly as they are.
+ * While `platformFreeMode` is true the platform is free for everyone: nothing
+ * is purchasable, no paywall, checkout, upgrade prompt or premium lock blocks
+ * anyone, every account holds every entitlement, and a feature configured as
+ * `premium` is served as `free`. Nothing is deleted — the products, prices,
+ * Stripe wiring and webhook all stay exactly as they are.
+ *
+ * `/plans` still shows the real plans while free, with their normal prices
+ * struck through and nothing to buy, so members can see what they are getting.
+ * That is presentation, not a paywall: no card offers a purchase.
  *
  * Free mode governs PAYMENT only. It can never widen an age, guardian, safety,
  * moderation, privacy or legal restriction; `canAccessFeature` evaluates those
@@ -102,6 +106,15 @@ export type MonetizationAccess = {
   freeModeAiTier: MonetizationAiTier;
   /** Copy shown where a paywall used to be. */
   freeModeNotice: string;
+  /**
+   * Optional ISO date the free run is advertised until.
+   *
+   * MESSAGING ONLY. Nothing switches itself off when it passes — the countdown
+   * simply stops and the platform stays free. Monetization only ever starts
+   * because a superadmin turned it on, so a typo in this field cannot begin
+   * gating members.
+   */
+  freeModeEndsAt: string | null;
 
   /**
    * Per-feature pricing. A feature that is not listed is `free`, so adding a
@@ -151,6 +164,7 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
     freeModeEntitlements: ["player_plus", "host_pro", "team_pro", "org_pro", "facility_pro"],
     freeModeAiTier: "gym",
     freeModeNotice: "Everything on ballaCity is free right now — no subscription needed.",
+    freeModeEndsAt: null,
     featureAccess: {},
   },
   fees: {
@@ -373,6 +387,15 @@ export function parseMonetizationOverrides(raw: unknown): MonetizationOverrides 
 
     if (typeof src["freeModeNotice"] === "string") {
       access.freeModeNotice = (src["freeModeNotice"] as string).slice(0, 300);
+    }
+
+    // An explicit null clears the date; a string is kept only when it is a real
+    // date. Junk is dropped rather than rendered as "Invalid Date" to members.
+    const endsAt = src["freeModeEndsAt"];
+    if (endsAt === null) {
+      access.freeModeEndsAt = null;
+    } else if (typeof endsAt === "string" && Number.isFinite(Date.parse(endsAt))) {
+      access.freeModeEndsAt = endsAt;
     }
 
     // Only emit the key when something actually parsed, so a malformed blob

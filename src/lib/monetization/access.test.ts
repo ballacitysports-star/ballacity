@@ -139,6 +139,59 @@ describe("turning billing back on restores the paid product", () => {
   });
 });
 
+describe("the advertised free-through date", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const NOW = Date.parse("2026-06-01T12:00:00Z");
+
+  const withDate = (freeModeEndsAt: string | null): MonetizationConfig => ({
+    ...DEFAULT_MONETIZATION_CONFIG,
+    access: { ...DEFAULT_MONETIZATION_CONFIG.access, freeModeEndsAt },
+  });
+
+  it("advertises nothing by default", () => {
+    expect(DEFAULT_MONETIZATION_CONFIG.access.freeModeEndsAt).toBeNull();
+    expect(
+      resolveFeatureAccess(DEFAULT_MONETIZATION_CONFIG, EMPTY_ENTITLEMENTS, NOW).freeUntil,
+    ).toBeNull();
+  });
+
+  it("returns a date that is still ahead", () => {
+    const future = new Date(NOW + 30 * DAY).toISOString();
+    expect(resolveFeatureAccess(withDate(future), EMPTY_ENTITLEMENTS, NOW).freeUntil).toBe(future);
+  });
+
+  it("stops advertising once the date passes — and everything stays free", () => {
+    // The assertion this whole feature rests on. An expired date must never be
+    // able to start charging anyone: monetization only begins when a superadmin
+    // turns it on.
+    const past = new Date(NOW - DAY).toISOString();
+    const access = resolveFeatureAccess(withDate(past), EMPTY_ENTITLEMENTS, NOW);
+
+    expect(access.freeUntil).toBeNull();
+    expect(access.freeMode).toBe(true);
+    expect(access.canCheckout).toBe(false);
+    expect(access.showUpgradePrompts).toBe(false);
+    for (const key of ALL) expect(access.has(key)).toBe(true);
+    expect(canCheckoutPrice(withDate(past), "ai_highlight_reel_monthly", false)).toBe(false);
+  });
+
+  it("drops a malformed date rather than rendering it to members", () => {
+    expect(
+      resolveFeatureAccess(withDate("not a date"), EMPTY_ENTITLEMENTS, NOW).freeUntil,
+    ).toBeNull();
+    // ...and stays free regardless.
+    expect(resolveFeatureAccess(withDate("not a date"), EMPTY_ENTITLEMENTS, NOW).freeMode).toBe(
+      true,
+    );
+  });
+
+  it("advertises nothing once billing is on", () => {
+    const future = new Date(NOW + 30 * DAY).toISOString();
+    const config = paid({ freeModeEndsAt: future });
+    expect(resolveFeatureAccess(config, EMPTY_ENTITLEMENTS, NOW).freeUntil).toBeNull();
+  });
+});
+
 describe("degenerate config", () => {
   it("falls open to free when the access block is missing entirely", () => {
     const config = { ...DEFAULT_MONETIZATION_CONFIG } as MonetizationConfig;

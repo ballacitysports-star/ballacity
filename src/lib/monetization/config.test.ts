@@ -85,6 +85,21 @@ describe("admin overrides", () => {
     expect(parsed.access?.freeModeEntitlements).toEqual(["player_plus"]);
   });
 
+  it("round-trips a free-through date and drops junk", () => {
+    const parsed = parseMonetizationOverrides({
+      access: { freeModeEndsAt: "2026-12-31T00:00:00.000Z" },
+    });
+    expect(parsed.access?.freeModeEndsAt).toBe("2026-12-31T00:00:00.000Z");
+
+    expect(parseMonetizationOverrides({ access: { freeModeEndsAt: "whenever" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: { freeModeEndsAt: 42 } })).toEqual({});
+
+    // An explicit null is meaningful — it clears a date an admin set earlier.
+    expect(
+      parseMonetizationOverrides({ access: { freeModeEndsAt: null } }).access?.freeModeEndsAt,
+    ).toBeNull();
+  });
+
   it("never lets a malformed blob silently start charging people", () => {
     // The dangerous direction is junk resolving to "not free".
     const config = resolveMonetizationConfig(

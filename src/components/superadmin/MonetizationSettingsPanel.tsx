@@ -67,6 +67,9 @@ export function MonetizationSettingsPanel() {
   const freeMode = access.platformFreeMode;
   const busy = settings.isLoading || saving;
 
+  const freeThroughPassed =
+    !!access.freeModeEndsAt && Date.parse(access.freeModeEndsAt) <= Date.now();
+
   const premiumFeatures = FEATURE_REGISTRY.filter(
     (f) => isConfigurable(f) && (access.featureAccess?.[f.key] ?? "free") === "premium",
   );
@@ -310,6 +313,35 @@ export function MonetizationSettingsPanel() {
             <span className="text-[11px] text-muted-foreground">
               AI still has daily and monthly caps — a cost ceiling, not a paywall. Tune the numbers
               under the <code>ai_limits</code> setting.
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium">Free through (optional)</span>
+            <input
+              type="date"
+              value={(access.freeModeEndsAt ?? "").slice(0, 10)}
+              disabled={busy}
+              onChange={(e) =>
+                setAccess(
+                  { freeModeEndsAt: e.target.value ? e.target.value : null },
+                  "Free-through date",
+                )
+              }
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            />
+            <span className="text-[11px] text-muted-foreground">
+              Shown on /plans and /reels as &ldquo;Free through &hellip;&rdquo;.{" "}
+              <strong>Messaging only</strong> — nothing switches off when it passes, and
+              monetization never starts by itself. Leave empty for no end date.
+              {freeThroughPassed ? (
+                <>
+                  {" "}
+                  <span className="text-amber-400">
+                    This date has passed. Members still have everything free and nothing was
+                    switched off; the date simply stopped being advertised.
+                  </span>
+                </>
+              ) : null}
             </span>
           </label>
           <label className="block">

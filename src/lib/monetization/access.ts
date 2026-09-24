@@ -43,11 +43,35 @@ export type FeatureAccess = {
   aiTierOverride: MonetizationAiTier | null;
   /** Copy to show where a paywall used to be. */
   notice: string;
+  /**
+   * ISO date the free run is advertised until, or null.
+   *
+   * Null once the date has passed: the countdown stops and the platform stays
+   * free. Screens ask `freeUntil != null` rather than each re-deriving "is it
+   * still in the future", which is where two surfaces would otherwise drift
+   * into telling a member different things.
+   */
+  freeUntil: string | null;
 };
+
+/**
+ * The advertised end date, but only while it is still ahead of us.
+ *
+ * Deliberately returns null rather than throwing or passing a bad value
+ * through: a malformed date is an admin typo, and the right response is to
+ * stop advertising an end, never to stop being free.
+ */
+function upcomingFreeUntil(endsAt: string | null, now: number): string | null {
+  if (!endsAt) return null;
+  const at = Date.parse(endsAt);
+  if (!Number.isFinite(at) || at <= now) return null;
+  return endsAt;
+}
 
 export function resolveFeatureAccess(
   config: MonetizationConfig = DEFAULT_MONETIZATION_CONFIG,
   state: EntitlementState = EMPTY_ENTITLEMENTS,
+  now: number = Date.now(),
 ): FeatureAccess {
   const access = config.access ?? DEFAULT_MONETIZATION_CONFIG.access;
   const freeMode = access.platformFreeMode;
@@ -64,6 +88,7 @@ export function resolveFeatureAccess(
       reelAllowance: config.freeReelAllowance,
       aiTierOverride: access.freeModeAiTier,
       notice: access.freeModeNotice,
+      freeUntil: upcomingFreeUntil(access.freeModeEndsAt ?? null, now),
     };
   }
 
@@ -81,6 +106,8 @@ export function resolveFeatureAccess(
     reelAllowance: config.freeReelAllowance,
     aiTierOverride: null,
     notice: "",
+    // Nothing is free, so there is no free run to advertise an end for.
+    freeUntil: null,
   };
 }
 
