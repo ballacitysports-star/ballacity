@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +22,17 @@ export const Route = createFileRoute("/shop")({
 function ShopPage() {
   const { user } = useAuth();
   const { openCheckout, checkoutElement, closeCheckout, isOpen } = useStripeCheckout();
+  const { merchEnabled, loading: accessLoading } = useFeatureAccess();
+  const navigate = useNavigate();
+
+  // The shop is switched off while ballaCity is free. Same imperative-guard
+  // idiom the other gated screens use; the route stays registered so a
+  // superadmin can bring it back without a deploy.
+  useEffect(() => {
+    if (!accessLoading && !merchEnabled) navigate({ to: "/profile" });
+  }, [accessLoading, merchEnabled, navigate]);
+
+  if (accessLoading || !merchEnabled) return null;
 
   function buy(priceId: string) {
     if (!user) {

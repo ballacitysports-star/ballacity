@@ -142,12 +142,12 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Billing",
+    title: "Plan",
     items: [
       {
         to: "/plans",
-        label: "Subscription",
-        description: "Plans and billing details",
+        label: "Your plan",
+        description: "What your account includes",
         icon: CreditCard,
       },
     ],

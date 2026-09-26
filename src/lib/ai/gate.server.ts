@@ -7,6 +7,8 @@
  *      `child_features_locked` database functions stay authoritative)
  *   c) cohort allowance — a cohort not explicitly listed for the feature is
  *      DENIED, so minors never gain a feature by omission
+ *   c2) monetization — only ever reached once every safety step above has
+ *      passed, so pricing can never be what admits a member
  *   d) quota + concurrency, reserved atomically in the database
  *
  * Denials are typed (`AiError`), never generic.
@@ -14,9 +16,16 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { AgeCohort } from "@/lib/child-policy";
-import { entitlementsFor, type SubscriptionLike } from "@/lib/monetization/entitlements";
-import { DEFAULT_MONETIZATION_CONFIG } from "@/lib/monetization/config";
 import {
+  EMPTY_ENTITLEMENTS,
+  entitlementsFor,
+  type SubscriptionLike,
+} from "@/lib/monetization/entitlements";
+import { resolveFeatureAccess } from "@/lib/monetization/access";
+import { canAccessFeature } from "@/lib/monetization/can-access";
+import { loadMonetizationConfig } from "@/lib/monetization/settings.server";
+import {
+  AI_TIERS,
   cohortAllowed,
   estimateCostCents,
   type AiConfig,
@@ -59,15 +68,21 @@ export type AiSession = {
 
 export async function resolveAiTier(admin: any, userId: string): Promise<AiTier> {
   try {
+    const monetization = await loadMonetizationConfig(admin);
+    const access = resolveFeatureAccess(monetization);
+
+    // While ballaCity is free, nobody's tier depends on what they bought. The
+    // quota itself still applies — it is a cost ceiling, not a paywall — so an
+    // admin can dial the tier down without charging anyone.
+    if (access.aiTierOverride && AI_TIERS.includes(access.aiTierOverride as AiTier)) {
+      return access.aiTierOverride as AiTier;
+    }
+
     const { data } = await admin
       .from("subscriptions")
       .select("status,price_id,tier,current_period_end")
       .eq("user_id", userId);
-    const state = entitlementsFor(
-      (data ?? []) as SubscriptionLike[],
-      Date.now(),
-      DEFAULT_MONETIZATION_CONFIG,
-    );
+    const state = entitlementsFor((data ?? []) as SubscriptionLike[], Date.now(), monetization);
     if (state.entitlements.has("facility_pro") || state.entitlements.has("org_pro")) return "gym";
     if (state.entitlements.has("team_pro")) return "team";
     if (state.entitlements.has("player_plus") || state.entitlements.has("host_pro")) {
@@ -77,6 +92,32 @@ export async function resolveAiTier(admin: any, userId: string): Promise<AiTier>
     /* fall through to free */
   }
   return "free";
+}
+
+/**
+ * AI feature keys are the AI layer's own namespace; the monetization registry
+ * has its own. Mapped explicitly rather than by convention so a renamed key is
+ * a compile/test failure instead of a silently unpriced feature.
+ */
+const AI_FEATURE_TO_MONETIZABLE: Partial<Record<AiFeature, string>> = {
+  reel_pipeline: "ai_reel_pipeline",
+  reel_coach: "ai_reel_coach",
+  reel_package: "ai_reel_package",
+  reel_style: "ai_reel_style",
+  background_remove: "ai_background_remove",
+};
+
+/** The member's real entitlements, for the monetization leg of the gate. */
+async function entitlementStateFor(admin: Parameters<typeof resolveAiTier>[0], userId: string) {
+  try {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("status,price_id,tier,current_period_end")
+      .eq("user_id", userId);
+    return entitlementsFor((data ?? []) as SubscriptionLike[]);
+  } catch {
+    return EMPTY_ENTITLEMENTS;
+  }
 }
 
 async function cohortOf(admin: any, userId: string): Promise<AgeCohort> {
@@ -133,6 +174,22 @@ export async function assertAiAllowed(
         isMinorCohort(cohort) || cohort === "unknown"
           ? "PARENT_APPROVAL_REQUIRED"
           : "FEATURE_DISABLED",
+      );
+    }
+
+    // (c2) monetization — deliberately AFTER every safety check above, so a
+    // pricing setting can never be the thing that lets a minor through, and
+    // before quota so a denied member never consumes a reservation. Platform
+    // safety features skip this entire block and are never priced.
+    const monetization = await loadMonetizationConfig(admin);
+    const decision = canAccessFeature({
+      feature: AI_FEATURE_TO_MONETIZABLE[feature] ?? feature,
+      config: monetization,
+      entitlements: await entitlementStateFor(admin, ctx.userId),
+    });
+    if (!decision.allowed) {
+      throw new AiError(
+        decision.level === "payment_required" ? "SUBSCRIPTION_REQUIRED" : "FEATURE_DISABLED",
       );
     }
   }

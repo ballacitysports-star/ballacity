@@ -9,6 +9,7 @@ import {
   hasEntitlement as hasEntitlementIn,
   type SubscriptionLike,
 } from "@/lib/monetization/entitlements";
+import { resolveFeatureAccess } from "@/lib/monetization/access";
 import type { EntitlementKey } from "@/lib/monetization/config";
 
 /**
@@ -21,7 +22,7 @@ import type { EntitlementKey } from "@/lib/monetization/config";
  */
 export function useEntitlements() {
   const { user } = useAuth();
-  const { config } = useMonetizationConfig();
+  const { config, loading: configLoading } = useMonetizationConfig();
   const [rows, setRows] = useState<SubscriptionLike[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,13 +65,23 @@ export function useEntitlements() {
     };
   }, [user]);
 
-  const state = loading ? EMPTY_ENTITLEMENTS : entitlementsFor(rows, Date.now(), config);
+  // Until the config has loaded we do not know whether billing is even on, so
+  // treat the whole hook as loading. Deciding early would flash the wrong state.
+  const busy = loading || configLoading;
+  const state = busy ? EMPTY_ENTITLEMENTS : entitlementsFor(rows, Date.now(), config);
+  const access = resolveFeatureAccess(config, state);
 
   return {
-    loading,
+    loading: busy,
+    /** The raw derivation from subscription rows — what billing actually sees. */
     state,
-    has: (key: EntitlementKey) => hasEntitlementIn(state, key),
-    pastDue: state.pastDue,
+    /** The centralized gate. True for everything while ballaCity is free. */
+    has: (key: EntitlementKey) => access.has(key),
+    /** True when the account really holds it, ignoring free mode. */
+    hasPaid: (key: EntitlementKey) => hasEntitlementIn(state, key),
+    access,
+    /** Past due only matters when something is actually being charged. */
+    pastDue: access.freeMode ? false : state.pastDue,
     /** False when this build has no billing key — nothing can be bought. */
     paymentsConfigured: isPaymentsConfigured(),
   };

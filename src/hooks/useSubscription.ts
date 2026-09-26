@@ -3,15 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { getBillingEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 import { useAuth } from "@/hooks/use-auth";
 import { DEFAULT_MONETIZATION_CONFIG } from "@/lib/monetization/config";
-import {
-  entitlementsFor,
-  hasEntitlement,
-  type SubscriptionLike,
-} from "@/lib/monetization/entitlements";
+import { resolveFeatureAccess } from "@/lib/monetization/access";
+import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
+import { entitlementsFor, type SubscriptionLike } from "@/lib/monetization/entitlements";
 
 /**
- * Reels a member may generate before ballaCity+ is required. Sourced from the
- * monetization config so the number lives in exactly one place.
+ * The built-in reel allowance.
+ *
+ * Kept as an export for back-compat only — it is frozen to the shipped default
+ * and so ignores any superadmin override. Read `freeAllowance` off the hook
+ * instead; that one resolves the admin-editable config.
  */
 export const FREE_REEL_ALLOWANCE = DEFAULT_MONETIZATION_CONFIG.freeReelAllowance;
 
@@ -32,6 +33,7 @@ export type SubscriptionRow = {
  */
 export function useSubscription() {
   const { user } = useAuth();
+  const { config, loading: configLoading } = useMonetizationConfig();
   const [rows, setRows] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [freeUsed, setFreeUsed] = useState(0);
@@ -91,18 +93,28 @@ export function useSubscription() {
     };
   }, [user]);
 
-  const state = entitlementsFor(rows as SubscriptionLike[]);
-  const isActive = hasEntitlement(state, "player_plus");
-  const isPastDue = state.pastDue;
+  // Both queries plus the config have to land before we can say whether reels
+  // are gated at all; deciding early would flash a lock that does not apply.
+  const busy = loading || configLoading;
+  const state = entitlementsFor(rows as SubscriptionLike[], Date.now(), config);
+  const access = resolveFeatureAccess(config, state);
+  const isActive = access.has("player_plus");
   const sub = rows[0] ?? null;
+  const freeAllowance = access.reelAllowance;
 
   return {
     subscription: sub,
     isActive,
-    isPastDue,
-    loading,
+    /** Past due only matters when something is actually being charged. */
+    isPastDue: access.freeMode ? false : state.pastDue,
+    loading: busy,
     freeUsed,
-    freeRemaining: Math.max(0, FREE_REEL_ALLOWANCE - freeUsed),
+    /** The admin-resolved allowance. Meaningless while `unlimitedReels`. */
+    freeAllowance,
+    /** True when the allowance does not apply — render a word, not a number. */
+    unlimitedReels: access.unlimitedReels,
+    freeRemaining: access.unlimitedReels ? freeAllowance : Math.max(0, freeAllowance - freeUsed),
+    access,
     /** False when this build has no Stripe key — nothing can be bought. */
     paymentsConfigured: isPaymentsConfigured(),
   };
