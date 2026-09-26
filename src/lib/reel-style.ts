@@ -1,6 +1,6 @@
 /**
- * Reel style preferences — the athlete's editing vibe, pacing, and overlay
- * theme, chosen *before* the AI generates a highlight.
+ * Reel style preferences — the athlete's editing vibe, pacing, transitions and
+ * overlay theme, chosen *before* the AI generates a highlight.
  *
  * Pure module: safe to import from the browser (the preferences panel) and from
  * the server pipeline (which turns them into prompt directives), so both sides
@@ -9,21 +9,36 @@
 
 export type ReelVibe = "hype" | "cinematic" | "broadcast" | "documentary";
 export type ReelPacing = "punchy" | "balanced" | "slowburn";
+export type ReelTransition = "cut" | "flash" | "fade" | "whip" | "zoom";
 export type ReelOverlayTheme = "scoreboard" | "minimal" | "bold" | "retro" | "none";
 
 export type ReelStylePrefs = {
   vibe: ReelVibe;
   pacing: ReelPacing;
+  transition: ReelTransition;
   overlayTheme: ReelOverlayTheme;
 };
 
 export const DEFAULT_REEL_STYLE: ReelStylePrefs = {
   vibe: "hype",
   pacing: "balanced",
+  transition: "flash",
   overlayTheme: "scoreboard",
 };
 
-type Option<T extends string> = {
+/**
+ * The transition each vibe naturally cuts with. Styles saved before
+ * transitions existed (reel rows, localStorage) have none, so they pick up the
+ * one that matches their vibe instead of a single global default.
+ */
+export const VIBE_TRANSITION: Record<ReelVibe, ReelTransition> = {
+  hype: "flash",
+  cinematic: "fade",
+  broadcast: "whip",
+  documentary: "cut",
+};
+
+export type Option<T extends string> = {
   value: T;
   label: string;
   blurb: string;
@@ -86,6 +101,48 @@ export const PACING_OPTIONS: Option<ReelPacing>[] = [
   },
 ];
 
+/**
+ * Transitions render live in the player between the AI edit's cuts — nothing is
+ * re-encoded. The directive only nudges where the AI places its cut points.
+ */
+export const TRANSITION_OPTIONS: Option<ReelTransition>[] = [
+  {
+    value: "cut",
+    label: "Hard cut",
+    blurb: "Straight cuts, no effect",
+    directive:
+      "Transitions: HARD CUTS — no effects between segments, so cut on action and keep motion continuous across each cut.",
+  },
+  {
+    value: "flash",
+    label: "Flash",
+    blurb: "White flash on each cut",
+    directive:
+      "Transitions: FLASH — a white flash hits on every cut, so start each segment right on a moment of impact.",
+  },
+  {
+    value: "fade",
+    label: "Fade",
+    blurb: "Dip through black",
+    directive:
+      "Transitions: FADE — each cut dips through black, so let every segment settle for a beat after its key action.",
+  },
+  {
+    value: "whip",
+    label: "Whip",
+    blurb: "Fast swipe between cuts",
+    directive:
+      "Transitions: WHIP — a fast motion swipe links segments, so end and start segments mid-movement to carry momentum.",
+  },
+  {
+    value: "zoom",
+    label: "Zoom punch",
+    blurb: "Punch-in on each new beat",
+    directive:
+      "Transitions: ZOOM PUNCH — each segment opens with a quick punch-in, so start segments just before the key action.",
+  },
+];
+
 export const OVERLAY_THEME_OPTIONS: Option<ReelOverlayTheme>[] = [
   {
     value: "scoreboard",
@@ -127,12 +184,18 @@ function pick<T extends string>(opts: Option<T>[], value: unknown, fallback: T):
   return opts.some((o) => o.value === value) ? (value as T) : fallback;
 }
 
+export function isReelTransition(value: unknown): value is ReelTransition {
+  return TRANSITION_OPTIONS.some((o) => o.value === value);
+}
+
 /** Accepts anything (URL/JSON/DB row) and returns a valid preferences object. */
 export function normalizeReelStyle(input: unknown): ReelStylePrefs {
   const raw = (input ?? {}) as Record<string, unknown>;
+  const vibe = pick(VIBE_OPTIONS, raw.vibe, DEFAULT_REEL_STYLE.vibe);
   return {
-    vibe: pick(VIBE_OPTIONS, raw.vibe, DEFAULT_REEL_STYLE.vibe),
+    vibe,
     pacing: pick(PACING_OPTIONS, raw.pacing, DEFAULT_REEL_STYLE.pacing),
+    transition: pick(TRANSITION_OPTIONS, raw.transition, VIBE_TRANSITION[vibe]),
     overlayTheme: pick(
       OVERLAY_THEME_OPTIONS,
       raw.overlayTheme ?? raw.overlay_theme,
@@ -141,17 +204,33 @@ export function normalizeReelStyle(input: unknown): ReelStylePrefs {
   };
 }
 
+/**
+ * Whether two styles would make the AI write the same reel. The transition is
+ * left out on purpose: it only changes playback, so switching it never needs a
+ * paid AI re-run.
+ */
+export function sameAiStyle(a: unknown, b: unknown): boolean {
+  const x = normalizeReelStyle(a);
+  const y = normalizeReelStyle(b);
+  return x.vibe === y.vibe && x.pacing === y.pacing && x.overlayTheme === y.overlayTheme;
+}
+
 const label = <T extends string>(opts: Option<T>[], value: T) =>
   opts.find((o) => o.value === value)?.label ?? value;
 
-/** "Hype · Balanced · Scoreboard overlays" — the one-line summary used in the UI. */
+/** "Hype · Balanced · Flash · Scoreboard overlays" — the one-line summary used in the UI. */
 export function reelStyleSummary(prefs: ReelStylePrefs): string {
   const p = normalizeReelStyle(prefs);
   const overlay =
     p.overlayTheme === "none"
       ? "No overlays"
       : `${label(OVERLAY_THEME_OPTIONS, p.overlayTheme)} overlays`;
-  return `${label(VIBE_OPTIONS, p.vibe)} · ${label(PACING_OPTIONS, p.pacing)} · ${overlay}`;
+  return [
+    label(VIBE_OPTIONS, p.vibe),
+    label(PACING_OPTIONS, p.pacing),
+    label(TRANSITION_OPTIONS, p.transition),
+    overlay,
+  ].join(" · ");
 }
 
 const directive = <T extends string>(opts: Option<T>[], value: T) =>
@@ -168,13 +247,18 @@ export function reelStyleDirectives(input: unknown) {
     summary: reelStyleSummary(p),
     vibe: directive(VIBE_OPTIONS, p.vibe),
     pacing: directive(PACING_OPTIONS, p.pacing),
+    transition: directive(TRANSITION_OPTIONS, p.transition),
     overlay: directive(OVERLAY_THEME_OPTIONS, p.overlayTheme),
     /** Copy-writing steps (title/caption/hashtags/coach package). */
     copy: [directive(VIBE_OPTIONS, p.vibe), directive(OVERLAY_THEME_OPTIONS, p.overlayTheme)].join(
       " ",
     ),
     /** Cut-list step. */
-    edit: [directive(VIBE_OPTIONS, p.vibe), directive(PACING_OPTIONS, p.pacing)].join(" "),
+    edit: [
+      directive(VIBE_OPTIONS, p.vibe),
+      directive(PACING_OPTIONS, p.pacing),
+      directive(TRANSITION_OPTIONS, p.transition),
+    ].join(" "),
   };
 }
 
@@ -198,7 +282,10 @@ export const SPORT_STYLE_DEFAULTS: Record<string, Partial<ReelStylePrefs>> = {
 /** The built-in default style for a sport (global default when unknown). */
 export function defaultReelStyleForSport(sport: string | null | undefined): ReelStylePrefs {
   const preset = sport ? SPORT_STYLE_DEFAULTS[sport] : undefined;
-  return normalizeReelStyle({ ...DEFAULT_REEL_STYLE, ...(preset ?? {}) });
+  // Leave the transition out of the base so it follows the sport's vibe
+  // (a cinematic tennis reel fades) unless the preset names one itself.
+  const { transition: _transition, ...base } = DEFAULT_REEL_STYLE;
+  return normalizeReelStyle({ ...base, ...(preset ?? {}) });
 }
 
 const STORAGE_KEY = "reel-style-prefs.v1";

@@ -31,11 +31,15 @@ import {
   loadReelStyleForSport,
   normalizeReelStyle,
   reelStyleSummary,
+  sameAiStyle,
   saveReelStyleForSport,
   SPORT_STYLE_DEFAULTS,
   DEFAULT_REEL_STYLE,
+  TRANSITION_OPTIONS,
   type ReelStylePrefs,
+  type ReelTransition,
 } from "@/lib/reel-style";
+import { formatPostCopy, suggestReelTitles } from "@/lib/reel-copy";
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { ReelCompare } from "@/components/reels/ReelCompare";
@@ -45,6 +49,7 @@ import {
   processMyReels,
   regenerateReelStyle,
   setReelHidden,
+  setReelTransition,
   suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
@@ -72,7 +77,7 @@ import {
   shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
-import { EyeOff, Film, Pencil, Share2, Trash2 } from "lucide-react";
+import { Copy, EyeOff, Film, Pencil, Share2, Trash2, Wand2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -129,6 +134,8 @@ type Reel = {
     confidence?: string;
   } | null;
   ai_transcript?: { text?: string } | null;
+  /** On-screen text cards, drawn over the player in the reel's overlay theme. */
+  ai_overlays?: { at: string; text: string }[] | null;
   style_prefs?: Record<string, any> | null;
   hidden_at?: string | null;
 };
@@ -175,10 +182,39 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
     setOpen(true);
   }
 
+  /** Transitions only change playback, so this saves without any AI re-run. */
+  async function saveTransition(transition: ReelTransition): Promise<boolean> {
+    setRestyle((prev) => ({ ...prev, transition }));
+    try {
+      await setReelTransition({ data: { reelId: reel.id, transition } });
+      const label = TRANSITION_OPTIONS.find((o) => o.value === transition)?.label ?? transition;
+      toast.success(`${label} transitions saved for this reel`);
+      return true;
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save the transition");
+      return false;
+    }
+  }
+
+  async function copyPost() {
+    try {
+      await navigator.clipboard.writeText(formatPostCopy(reel.ai_caption, reel.ai_hashtags));
+      toast.success("Caption and hashtags copied — paste them into your post");
+    } catch {
+      toast.error("Could not copy — select the text instead");
+    }
+  }
+
   const isDone = reel.status === "completed";
   const displayTitle = reel.ai_title || reel.title;
   const isProcessing = reel.status === "processing";
   const attempt = recapAttempt(reel as unknown as RecapSummary);
+  const savedStyle = normalizeReelStyle(reel.style_prefs);
+  // Only the transition differs from the saved style: apply it directly
+  // instead of paying for an AI re-run that would rewrite the same copy.
+  const transitionOnly =
+    sameAiStyle(restyle, savedStyle) && restyle.transition !== savedStyle.transition;
+  const hashtags = (reel.ai_hashtags ?? []).filter(Boolean);
 
   return (
     <li className="rounded-xl border border-border bg-surface p-3">
@@ -204,6 +240,20 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           </p>
           {reel.ai_caption && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
+          )}
+          {isDone && hashtags.length > 0 && (
+            <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-lime">
+              {hashtags.map((h) => `#${String(h).replace(/^#/, "")}`).join(" ")}
+            </p>
+          )}
+          {isDone && (reel.ai_caption || hashtags.length > 0) && (
+            <button
+              type="button"
+              onClick={copyPost}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+            >
+              <Copy className="h-3 w-3" /> Copy post
+            </button>
           )}
           {isProcessing && (
             <div className="mt-1.5">
@@ -457,6 +507,9 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           editPlan={reel.ai_edit_plan ?? null}
           coaching={reel.ai_coaching ?? null}
           transcript={reel.ai_transcript?.text ?? null}
+          overlays={reel.ai_overlays ?? []}
+          style={reel.style_prefs}
+          onTransitionChange={saveTransition}
         />
       )}
 
@@ -530,6 +583,10 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
                 onClick={async () => {
                   setRestyling(true);
                   try {
+                    if (transitionOnly) {
+                      if (await saveTransition(restyle.transition)) setShowRestyle(false);
+                      return;
+                    }
                     await regenerateReelStyle({ data: { reelId: reel.id, style: restyle } });
                     toast.success("Restyling your reel — same footage, new style");
                     setShowRestyle(false);
@@ -544,14 +601,17 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
               >
                 {restyling ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : transitionOnly ? (
+                  <Check className="h-3.5 w-3.5" />
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Regenerate with this style
+                {transitionOnly ? "Save transition" : "Regenerate with this style"}
               </button>
               <p className="mt-1 text-[10px] text-muted-foreground">
-                Reuses the captured footage analysis — only the title, caption, timeline, edit plan,
-                coaching, and overlays are rewritten in the new style.
+                {transitionOnly
+                  ? "Transitions play live between cuts, so this saves instantly — no AI re-run."
+                  : "Reuses the captured footage analysis — only the title, caption, timeline, edit plan, coaching, and overlays are rewritten in the new style."}
               </p>
             </div>
           )}
@@ -657,6 +717,19 @@ function ReelsPage() {
   }, [activeSport, gameId, gameSport, profileLoaded]);
   const styleRef = useRef(style);
   styleRef.current = style;
+  // Title ideas built from what the page already knows — the linked game, its
+  // sport and date, and the chosen vibe. Tapping one fills the title field.
+  const copyGame = gameId
+    ? { title: gameTitle || null, sport: gameSport, date: null }
+    : autoLink && autoGame
+      ? autoGame
+      : null;
+  const titleIdeas = suggestReelTitles({
+    sport: copyGame?.sport ?? activeSport,
+    gameTitle: copyGame?.title,
+    date: copyGame?.date,
+    vibe: style.vibe,
+  });
   const autoOpened = useRef(false);
   const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
@@ -952,6 +1025,9 @@ function ReelsPage() {
           title:
             chosenTitle ||
             (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
+          // The published title. When the athlete named the reel the pipeline
+          // keeps this and only writes a caption; blank lets the AI title it.
+          ai_title: chosenTitle || null,
           video_path: base,
           playback_path: playbackPath,
           media_meta: mediaMeta,
@@ -1178,8 +1254,38 @@ function ReelsPage() {
           placeholder="e.g. Sunday basketball buzzer beater"
           className="mb-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
         />
+        {titleIdeas.length > 0 && (
+          <div
+            className="mb-2 flex flex-wrap items-center gap-1.5"
+            role="group"
+            aria-label="Title suggestions"
+          >
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+              <Wand2 className="h-3 w-3 text-lime" aria-hidden /> Try
+            </span>
+            {titleIdeas.map((idea) => {
+              const picked = titleDraft === idea;
+              return (
+                <button
+                  key={idea}
+                  type="button"
+                  aria-pressed={picked}
+                  onClick={() => setTitleDraft(idea)}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    picked
+                      ? "border-lime bg-lime/10 text-lime"
+                      : "border-border text-muted-foreground hover:border-lime/40 hover:text-foreground"
+                  }`}
+                >
+                  {idea}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <p className="mb-3 text-[11px] text-muted-foreground">
-          Optional — we'll fall back to the game name or file name. You can rename any reel later.
+          Optional — a title you set here is kept as-is. Leave it blank and the AI titles the reel
+          from the footage. You can rename any reel later.
         </p>
 
         {!gameId && autoGame && (

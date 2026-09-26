@@ -45,6 +45,7 @@ type CompareReel = {
   ai_edit_plan?: EditPlan | null;
   ai_coaching?: Coaching | null;
   ai_transcript?: { text?: string } | null;
+  ai_overlays?: { at: string; text: string }[] | null;
   style_prefs?: Record<string, any> | null;
 };
 
@@ -210,6 +211,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
                 title={reel.ai_title || reel.title}
                 caption={reel.ai_caption}
                 hashtags={reel.ai_hashtags}
+                overlays={reel.ai_overlays ?? []}
               />
               {videoUrl ? (
                 <ReelStudio
@@ -218,6 +220,8 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
                   editPlan={reel.ai_edit_plan ?? null}
                   coaching={reel.ai_coaching ?? null}
                   transcript={reel.ai_transcript?.text ?? null}
+                  overlays={reel.ai_overlays ?? []}
+                  style={reel.style_prefs}
                 />
               ) : (
                 <p className="mt-3 text-[11px] text-muted-foreground">Loading video…</p>
@@ -243,6 +247,8 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
                       editPlan={draft.edit_plan ?? null}
                       coaching={draft.coaching ?? null}
                       transcript={reel.ai_transcript?.text ?? null}
+                      overlays={draft.overlays ?? []}
+                      style={draft.style}
                     />
                   )}
                 </>
