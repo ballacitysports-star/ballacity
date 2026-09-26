@@ -3953,6 +3953,7 @@ export type Database = {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
       }
+      monetization_free_mode: { Args: never; Returns: boolean }
       my_age_category: { Args: never; Returns: string }
       my_age_cohort: { Args: never; Returns: string }
       my_birthday_corrections: {
