@@ -184,10 +184,11 @@ reservation.
   latter throws when the build has no publishable key — which would strand a
   subscriber with no way to cancel.
 - `createCheckoutSession` refuses server-side while Free Mode is on.
-- **Stripe status in this build:** `VITE_PAYMENTS_CLIENT_TOKEN` is commented out
-  in `.env.production`, so checkout cannot open at all. That is an environment
-  fact, not a product guarantee — Free Mode is the authoritative switch and does
-  not depend on it.
+- **Stripe status in this build:** `.env.production` carries a **live**
+  publishable key (`VITE_PAYMENTS_CLIENT_TOKEN`), so nothing in the environment
+  stops a checkout from opening. What refuses it is configuration: Free Mode
+  server-side, and behind it the separate `checkoutEnabled` and
+  `paymentsEnabled` switches, which both ship off.
 
 ---
 
