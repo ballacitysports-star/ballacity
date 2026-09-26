@@ -51,7 +51,9 @@ export function useEntitlements() {
     refetch();
 
     const channel = supabase
-      .channel(`entitlements-${user.id}`)
+      // Unique per mount: several screens can use this hook at once, and a
+      // shared channel name returns an already-subscribed channel that throws.
+      .channel(`entitlements-${user.id}-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "subscriptions", filter: `user_id=eq.${user.id}` },
