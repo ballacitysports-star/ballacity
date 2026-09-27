@@ -168,9 +168,33 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
       _versions: data.versions ?? {},
     });
     if (error) throw new Error(error.message);
+    const path = `/parent/consent/${token}`;
+    // Email the one-time link to the guardian. Failure must not block the
+    // request — the minor can still copy/share the link manually.
+    let emailed = false;
+    try {
+      const { data: prof } = await context.supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const { sendTemplateEmail } = await import("@/lib/email-templates/send-email");
+      const res = await sendTemplateEmail("guardian-approval", data.parentEmail, {
+        templateData: {
+          childName: (prof as { display_name?: string } | null)?.display_name ?? undefined,
+          parentName: data.parentName || undefined,
+          approvalUrl: `https://ballacity.com${path}`,
+          expiresHours: CONSENT_TOKEN_TTL_HOURS,
+        },
+        idempotencyKey: `guardian-approval-${hashToken(token)}`,
+      });
+      emailed = Boolean((res as { sent?: boolean }).sent);
+    } catch (e) {
+      console.error("[guardian-approval] email send failed", e);
+    }
     // The plain token is returned exactly once so it can be delivered to the
     // guardian. It is never stored in readable form.
-    return { token, expiresAt, path: `/parent/consent/${token}` };
+    return { token, expiresAt, path, emailed };
   });
 
 /* ------------------------------------------------------------------ */
