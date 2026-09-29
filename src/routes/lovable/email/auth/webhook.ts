@@ -7,6 +7,7 @@ import { MagicLinkEmail } from "@/lib/email-templates/magic-link";
 import { RecoveryEmail } from "@/lib/email-templates/recovery";
 import { EmailChangeEmail } from "@/lib/email-templates/email-change";
 import { ReauthenticationEmail } from "@/lib/email-templates/reauthentication";
+import { isManagedAuthEmailPayload } from "@/lib/managed-children";
 
 // Configuration
 const SITE_NAME = "ballacity";
@@ -20,7 +21,20 @@ const SITE_URL = `https://${ROOT_DOMAIN}`;
 export const Route = createFileRoute("/lovable/email/auth/webhook")({
   server: {
     handlers: {
-      POST: ({ request }) => {
+      POST: async ({ request }) => {
+        // Managed children have an undeliverable placeholder address and no
+        // inbox. Acknowledge without sending so nothing is attempted and no
+        // email change started from a child session can complete. Read from a
+        // clone: the SDK handler below needs the untouched body to verify the
+        // signature for every other request.
+        try {
+          if (isManagedAuthEmailPayload(await request.clone().json())) {
+            return Response.json({});
+          }
+        } catch {
+          /* not JSON — let the handler reject it */
+        }
+
         const handler = createAuthEmailHandler({
           apiKey: process.env["LOVABLE_API_KEY"]!,
           from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,

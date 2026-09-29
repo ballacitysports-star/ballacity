@@ -132,11 +132,11 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
-  // Signed media URLs are per-viewer credentials: drop them so a shared device
-  // can't keep rendering the previous account's private media.
+  // Signed media URLs and cached per-account lists must not carry over to the
+  // next person on a shared device.
   try {
-    const { clearMediaUrlCache } = await import("@/hooks/use-media-url");
-    clearMediaUrlCache();
+    const { resetPerUserClientState } = await import("@/lib/per-user-state");
+    await resetPerUserClientState();
   } catch {
     /* ignore */
   }
