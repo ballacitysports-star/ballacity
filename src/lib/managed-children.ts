@@ -116,20 +116,30 @@ const MESSAGES: Record<string, string> = {
   DOB_INVALID: "Enter a real birthday.",
   DOB_IN_FUTURE: "The birthday can't be in the future.",
   NAME_REQUIRED: "Enter your child's first name.",
+  NAME_INVALID: "Use letters only in your child's name.",
+  LEGAL_VERSION_STALE:
+    "Our Terms or Privacy Policy were just updated. Reload the page and try again.",
+  LEGAL_VERSION_INVALID:
+    "Our Terms or Privacy Policy couldn't be loaded. Reload the page and try again.",
   ATTESTATION_REQUIRED: "Confirm that you're this child's parent or legal guardian.",
   NOT_AUTHORIZED: "You can only manage children linked to your account.",
   NOT_MANAGED: "That child has their own login, so you can't switch into their profile.",
   MANAGED_CHILD_DELETE_INSTEAD:
     "This child only exists under your account. Delete their profile instead of ending the link.",
   MANAGED_SESSION_NOT_ALLOWED: "Switch back to your own account to do that.",
-  MANAGES_CHILDREN:
-    "Delete or hand over the child profiles you manage before deleting your account.",
+  MANAGES_CHILDREN: "Your account can't be deleted while it manages child profiles.",
 };
 
-export function managedChildErrorMessage(error: unknown): string {
+/** The code a database or server error starts with, when it is one we know. */
+export function managedChildErrorCode(error: unknown): string | null {
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   for (const code of Object.keys(MESSAGES)) {
-    if (raw.includes(code)) return MESSAGES[code];
+    if (new RegExp(`\\b${code}\\b`).test(raw)) return code;
   }
-  return "Something went wrong. Please try again.";
+  return null;
+}
+
+export function managedChildErrorMessage(error: unknown): string {
+  const code = managedChildErrorCode(error);
+  return code ? MESSAGES[code] : "Something went wrong. Please try again.";
 }

@@ -17,6 +17,7 @@ const TONE: Record<RosterEntry["status"], string> = {
   awaiting_approval: "text-amber-500",
   consent_withdrawn: "text-destructive",
   no_consent: "text-muted-foreground",
+  not_required: "text-primary",
   approved: "text-primary",
 };
 
@@ -71,7 +72,7 @@ function ChildCard({
             <span className="block truncate text-sm font-bold">{child.displayName}</span>
             <span className="block truncate text-xs text-muted-foreground">
               {COHORT_META[child.cohort].label}
-              {child.username ? ` · @${child.username}` : ""}
+              {entry.managed ? " · Managed by you" : child.username ? ` · @${child.username}` : ""}
             </span>
             <span className={`block truncate text-xs font-semibold ${TONE[entry.status]}`}>
               {entry.statusLabel}

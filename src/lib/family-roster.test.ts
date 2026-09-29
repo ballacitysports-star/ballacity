@@ -22,6 +22,7 @@ function child(over: Partial<GuardianChild> = {}): GuardianChild {
     teamCount: 0,
     consent: null,
     controls: {} as GuardianChild["controls"],
+    managed: false,
     ...over,
   };
 }
@@ -131,5 +132,26 @@ describe("profile visibility", () => {
   it("offers it for teen accounts, which are visible to signed-in members", () => {
     expect(canGuardianOpenPublicProfile(child({ cohort: "teen_13_15" }))).toBe(true);
     expect(canGuardianOpenPublicProfile(child({ cohort: "teen_16_17" }))).toBe(true);
+  });
+});
+
+describe("buildFamilyRoster — cohorts that need no consent, and managed children", () => {
+  it("does not flag a 16–17-year-old with no consent row as needing the guardian", () => {
+    // Consent is not required for 16–17 under the default policy, so no row
+    // exists; that is not something the guardian can or must fix.
+    const r = buildFamilyRoster([child({ cohort: "teen_16_17", consent: null })]);
+    expect(r.approved).toHaveLength(1);
+    expect(r.approved[0]!.status).toBe("not_required");
+    expect(r.approved[0]!.statusLabel).toBe("No approval needed");
+  });
+
+  it("still flags a child whose age is unknown", () => {
+    const r = buildFamilyRoster([child({ cohort: "unknown", consent: null })]);
+    expect(r.needsAction[0]!.status).toBe("no_consent");
+  });
+
+  it("carries the managed flag through to the roster entry", () => {
+    const r = buildFamilyRoster([approved({ managed: true }), approved({ childUserId: "c2" })]);
+    expect(r.all.map((e) => e.managed)).toEqual([true, false]);
   });
 });

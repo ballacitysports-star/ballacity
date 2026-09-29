@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Users } from "lucide-react";
+import { ShieldCheck, UserPlus, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
 import { useFamilyRoster } from "@/lib/family-roster";
@@ -22,6 +22,8 @@ import { AddMinorPanel } from "@/components/child/AddMinorPanel";
 import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
+import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
+import { useDeleteManagedChild } from "@/lib/use-managed-children";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -93,6 +95,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
   const update = useUpdateChildControls();
   const revoke = useRevokeChildConsent();
   const unlink = useRevokeGuardianLink();
+  const remove = useDeleteManagedChild();
   const footprint = useChildFootprint(childUserId);
   const { submit } = useParentRequests();
   if (!child) return null;
@@ -135,9 +138,16 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
               ? "Consent approved"
               : child.consent?.status === "revoked"
                 ? "Consent withdrawn"
-                : "Consent pending"}
+                : child.managed
+                  ? "No approval needed"
+                  : "Consent pending"}
             {child.ageReviewRequired ? " · Age under review" : ""}
           </p>
+          {child.managed ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Managed by you — no email or password of their own.
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -227,46 +237,85 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         <Button size="sm" variant="outline" onClick={() => request("correction")}>
           Request a correction
         </Button>
-        <Button size="sm" variant="outline" onClick={() => request("deletion")}>
-          Request deletion
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={revoke.isPending || child.consent?.status === "revoked"}
-          onClick={() =>
-            revoke.mutate(
-              { childUserId, reason: "Withdrawn from the Parent Center" },
-              {
-                onSuccess: () => toast.success("Consent withdrawn and restrictions applied."),
-                onError: (e) => toast.error(e instanceof Error ? e.message : "Could not withdraw"),
-              },
-            )
-          }
-        >
-          Withdraw consent
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={unlink.isPending}
-          onClick={() => {
-            const ok = window.confirm(
-              `End your family link with ${child.displayName}? You will no longer manage their settings, and your consent for their account is withdrawn.`,
-            );
-            if (!ok) return;
-            unlink.mutate(
-              { childUserId, reason: "Guardian ended the link from the Parent Center" },
-              {
-                onSuccess: () => toast.success("Family link ended."),
-                onError: (e) =>
-                  toast.error(e instanceof Error ? e.message : "Could not end that link"),
-              },
-            );
-          }}
-        >
-          End family link
-        </Button>
+        {child.managed ? null : (
+          <Button size="sm" variant="outline" onClick={() => request("deletion")}>
+            Request deletion
+          </Button>
+        )}
+        {child.managed ? (
+          // A managed child exists only under this guardian: there is no
+          // login to hand back to, and no second adult to re-approve consent,
+          // so the way out is deleting the profile — not unlinking it or
+          // withdrawing consent, which would leave an account nobody can reach.
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={remove.isPending}
+            onClick={() => {
+              const first = child.displayName.split(" ")[0] ?? child.displayName;
+              const typed = window.prompt(
+                `This permanently deletes ${child.displayName}'s profile, games, videos and messages. It can't be undone.\n\nType ${first} to confirm.`,
+              );
+              if (typed === null) return;
+              if (typed.trim().toLowerCase() !== first.toLowerCase()) {
+                toast.error(`Type ${first} exactly to delete the profile.`);
+                return;
+              }
+              remove.mutate(
+                { childUserId },
+                {
+                  onSuccess: () => toast.success(`${child.displayName}'s profile was deleted.`),
+                  onError: (e) =>
+                    toast.error(e instanceof Error ? e.message : "Could not delete that profile"),
+                },
+              );
+            }}
+          >
+            Delete {child.displayName.split(" ")[0]}&apos;s profile
+          </Button>
+        ) : null}
+        {child.managed ? null : (
+          <>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={revoke.isPending || child.consent?.status === "revoked"}
+              onClick={() =>
+                revoke.mutate(
+                  { childUserId, reason: "Withdrawn from the Parent Center" },
+                  {
+                    onSuccess: () => toast.success("Consent withdrawn and restrictions applied."),
+                    onError: (e) =>
+                      toast.error(e instanceof Error ? e.message : "Could not withdraw"),
+                  },
+                )
+              }
+            >
+              Withdraw consent
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={unlink.isPending}
+              onClick={() => {
+                const ok = window.confirm(
+                  `End your family link with ${child.displayName}? You will no longer manage their settings, and your consent for their account is withdrawn.`,
+                );
+                if (!ok) return;
+                unlink.mutate(
+                  { childUserId, reason: "Guardian ended the link from the Parent Center" },
+                  {
+                    onSuccess: () => toast.success("Family link ended."),
+                    onError: (e) =>
+                      toast.error(e instanceof Error ? e.message : "Could not end that link"),
+                  },
+                );
+              }}
+            >
+              End family link
+            </Button>
+          </>
+        )}
       </div>
     </section>
   );
@@ -311,17 +360,37 @@ function ParentCenterPage() {
 
       <FamilyApprovalsPanel />
 
+      <section className="mt-5 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+        <div className="flex items-center gap-2">
+          <UserPlus className="h-4 w-4 text-primary" aria-hidden />
+          <h2 className="font-display text-sm font-bold">Add a child — no login needed</h2>
+        </div>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+          Create your child&rsquo;s player profile under your account. They don&rsquo;t need an
+          email or password, and every child-safety setting applies from the start.
+        </p>
+        <Link
+          to="/players/add"
+          search={{ from: "parent" }}
+          className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
+        >
+          Add your child
+        </Link>
+      </section>
+
+      <UnfinishedChildProfilesPrompt />
+
       {isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
       ) : children.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm">
           <div className="flex items-center gap-2 font-semibold">
-            <Users className="h-4 w-4" aria-hidden /> No linked child accounts
+            <Users className="h-4 w-4" aria-hidden /> No children yet
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            When your child asks for approval, open the link they send you and approve it while
-            signed in here. Their account then appears in this Parent Center. You can also invite a
-            minor yourself with the form below.
+            Add your child above — they don&rsquo;t need their own login. If your child already has
+            an account, invite them with the form below, or open the approval link they send you
+            while signed in here.
           </p>
         </div>
       ) : (
@@ -336,6 +405,9 @@ function ParentCenterPage() {
         </>
       )}
 
+      <h2 className="mt-8 section-eyebrow text-muted-foreground">
+        Child already has their own login?
+      </h2>
       <AddMinorPanel />
 
       {requests.length > 0 ? (

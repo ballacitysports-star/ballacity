@@ -352,6 +352,12 @@ export type GuardianChild = {
   teamCount: number;
   consent: ConsentRecordView | null;
   controls: ChildControls;
+  /**
+   * True when this guardian created the child's profile and the child has no
+   * login of their own. Such a child can only be reached — managed, switched
+   * into, or deleted — through this guardian.
+   */
+  managed: boolean;
 };
 
 type OverviewRow = {
@@ -396,10 +402,18 @@ export const listMyChildren = createServerFn({ method: "GET" })
     if (list.length === 0) return [];
 
     const ids = list.map((r) => r.child_user_id);
-    const { data: controls } = await supabase
-      .from("child_controls")
-      .select("*")
-      .in("child_user_id", ids);
+    const [{ data: controls }, { data: managedRows }] = await Promise.all([
+      supabase.from("child_controls").select("*").in("child_user_id", ids),
+      // RLS returns only rows this guardian manages.
+      supabase
+        .from("managed_accounts")
+        .select("child_user_id")
+        .eq("managed_by", context.userId)
+        .in("child_user_id", ids),
+    ]);
+    const managed = new Set(
+      ((managedRows ?? []) as { child_user_id: string }[]).map((m) => m.child_user_id),
+    );
 
     return list.map((r) => {
       const ct = (controls ?? []).find(
@@ -429,6 +443,7 @@ export const listMyChildren = createServerFn({ method: "GET" })
             })
           : null,
         controls: parseChildControls(ct ?? null),
+        managed: managed.has(r.child_user_id),
       };
     });
   });
