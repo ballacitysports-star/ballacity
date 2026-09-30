@@ -76,12 +76,12 @@ test.describe("Add your child form", () => {
 test.describe("managed child, end to end", () => {
   test.describe.configure({ mode: "serial" });
 
-  test.beforeAll(async ({ playwright }) => {
-    // Is the migration on this backend? Ask with the host's own token: an
-    // unapplied migration answers 404 for the function.
-    const api = await playwright.request.newContext();
+  // One test in this group, so beforeEach runs once. Is the migration on this
+  // backend? Ask with the host's own token: an unapplied migration answers 404
+  // for the function.
+  test.beforeEach(async ({ request }) => {
     const host = account("host");
-    const tokenRes = await api.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const tokenRes = await request.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       headers: { apikey: PUBLISHABLE_KEY, "Content-Type": "application/json" },
       data: { email: host.email, password: host.password },
     });
@@ -89,7 +89,7 @@ test.describe("managed child, end to end", () => {
       ? ((await tokenRes.json()) as { access_token?: string }).access_token
       : null;
     const probe = token
-      ? await api.post(`${SUPABASE_URL}/rest/v1/rpc/is_managed_account`, {
+      ? await request.post(`${SUPABASE_URL}/rest/v1/rpc/is_managed_account`, {
           headers: {
             apikey: PUBLISHABLE_KEY,
             Authorization: `Bearer ${token}`,
@@ -98,21 +98,30 @@ test.describe("managed child, end to end", () => {
           data: { _user: "00000000-0000-0000-0000-000000000000" },
         })
       : null;
-    const migrated = probe?.ok() === true;
-    await api.dispose();
-    test.skip(!migrated, "E2E backend has not applied 20260930120000_managed_children.sql.");
+    test.skip(
+      probe?.ok() !== true,
+      "E2E backend has not applied 20260930120000_managed_children.sql.",
+    );
   });
 
+  const appears = (locator: ReturnType<Page["getByRole"]>, timeout: number) =>
+    locator.waitFor({ state: "visible", timeout }).then(
+      () => true,
+      () => false,
+    );
+
   async function deleteChild(page: Page) {
-    // Make sure we are the guardian, not inside the child's profile.
-    const back = page.getByRole("button", { name: /^back to /i });
-    if (await back.isVisible().catch(() => false)) {
-      await back.click();
-      await expect(page).toHaveURL(/\/parent/, { timeout: 20_000 });
-    }
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
+    // Still inside the child's profile (a step failed mid-way)? The banner is
+    // on every page there; go back to the guardian first.
+    const back = page.getByRole("button", { name: /^back to /i });
+    if (await appears(back, 5_000)) {
+      await back.click();
+      await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
+    }
+    // The roster loads after the page; wait for it rather than sampling once.
     const tab = page.getByRole("tab", { name: new RegExp(CHILD_FIRST) });
-    if (!(await tab.isVisible({ timeout: 10_000 }).catch(() => false))) return;
+    if (!(await appears(tab, 15_000))) return;
     await tab.click();
     page.once("dialog", (d) => void d.accept(CHILD_FIRST));
     await page
