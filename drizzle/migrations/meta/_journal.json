@@ -8,6 +8,13 @@
       "when": 1790774598247,
       "tag": "0000_managed_children",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790774725817,
+      "tag": "0001_freeze_player_profiles",
+      "breakpoints": true
     }
   ]
 }
