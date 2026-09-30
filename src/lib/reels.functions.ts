@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizeReelStyle } from "@/lib/reel-style";
+import { isReelTransition, normalizeReelStyle, type ReelTransition } from "@/lib/reel-style";
 
 /**
  * AI/video processing is opt-out for adults (Settings → Privacy) and
@@ -212,6 +212,8 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
         processing_step: regen.processing_step,
         step_progress: regen.step_progress,
         style_prefs: data.style,
+        // Cleared above: a restyle writes a fresh title in the new style.
+        ai_title: null,
       },
       supabaseAdmin,
       apiKey,
@@ -440,6 +442,38 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { published: true, style: data.style };
+  });
+
+/**
+ * Saves the transition played between a reel's cuts. Transitions render live in
+ * the player, so this only updates the stored style — no AI re-run, no copy to
+ * screen, and the vibe, pacing and overlay theme are left exactly as they were.
+ */
+export const setReelTransition = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; transition: string }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    if (!isReelTransition(input.transition)) throw new Error("Unknown transition");
+    return { reelId: input.reelId, transition: input.transition as ReelTransition };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: reel, error } = await context.supabase
+      .from("highlight_reels")
+      .select("style_prefs")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+
+    const style = { ...normalizeReelStyle(reel.style_prefs), transition: data.transition };
+    const { error: upErr } = await context.supabase
+      .from("highlight_reels")
+      .update({ style_prefs: style })
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (upErr) throw new Error(upErr.message);
+    return { style };
   });
 
 /** Hides or re-shows one of the caller's reels on their profile card. */

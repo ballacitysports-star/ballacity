@@ -46,10 +46,12 @@ export type Reel = {
   frame_times?: number[] | null;
   audio_path?: string | null;
   style_prefs?: Record<string, any> | null;
+  /** Set at upload when the athlete named the reel; the pipeline keeps it. */
+  ai_title?: string | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs,ai_title";
 
 async function callLovableAI(prompt: string, system: string, ctx: StepCtx) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, ctx);
@@ -398,6 +400,23 @@ const STEP_RUNNERS: Record<
           .map((m: any) => m.label)
           .join(", ")}.`
       : "";
+    // A title the athlete typed (or picked from the suggestions) at upload is
+    // the one the upload form promised would be published, so keep it and
+    // only write a caption to go with it.
+    const athleteTitle = String(reel.ai_title ?? "").trim();
+    if (athleteTitle) {
+      const out = await callLovableAI(
+        `The athlete titled this sports highlight clip "${athleteTitle}". ${context} Write a caption that goes with that title.`,
+        `Respond ONLY with JSON: {"caption":"..."}. Caption max 200 chars. ${
+          reelStyleDirectives(reel.style_prefs).copy
+        }`,
+        ctx,
+      );
+      return {
+        ai_title: athleteTitle.slice(0, 120),
+        ai_caption: String(out.caption ?? "").slice(0, 500),
+      };
+    }
     const out = await callLovableAI(
       `Original filename/title: "${reel.title}". ${context} Generate an engaging title and caption for this sports highlight clip.`,
       `Respond ONLY with JSON: {"title":"...","caption":"..."}. Title max 60 chars, caption max 200 chars. ${
@@ -793,7 +812,8 @@ export async function runStyleDraft(
   session?: AiSession | null,
 ): Promise<ReelStyleDraft> {
   const progress: Record<string, any> = { ...prepareStyleRegen(reel.step_progress).step_progress };
-  const styledReel: Reel = { ...reel, style_prefs: style };
+  // A restyle rewrites the title too, so the current one is not carried over.
+  const styledReel: Reel = { ...reel, ai_title: null, style_prefs: style };
 
   for (const step of STYLE_DRAFT_STEPS) {
     const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey, session });
