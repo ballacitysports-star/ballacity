@@ -198,6 +198,36 @@ document use, and the only one that rebuilds a fresh database completely) and
 `drizzle/migrations/` (what Lovable's tool applied). The overlap is harmless
 because both copies are idempotent.
 
+**A production migration that no branch held.** Reading production's migration
+history for the checks above turned up `20260926155719`
+(`monetization_surfaces_ship_off`), which `supabase_migrations.schema_migrations`
+records as applied but which had no file in `supabase/migrations/`, on `main` or
+on any other branch — the same kind of drift that commit `b09c2d7` back-filled
+for three earlier migrations. Its `created_by` is NULL, so who applied it is not
+recorded. It is unrelated to managed children; it is recorded here only because
+it was found while checking.
+
+It is now in `supabase/migrations/20260926155719_monetization_surfaces_ship_off.sql`,
+under production's exact version, with production's stored statement as its
+body. Checked:
+
+- The body is byte-identical: its md5 (`1b707e78b26580751d77ca10d4b8b123`) equals
+  `md5(array_to_string(statements, E'\n'))` for that version in production.
+- The whole chain (288 files, this one included) applies on the local
+  Postgres 16 replay. Without the file, the chain leaves `subscriptionsEnabled`,
+  `merchShopEnabled` and `upgradePromptsEnabled` ON; with it they end OFF, and
+  those are the only three values in the `monetization` setting that change.
+- A second run changes nothing. A configuration an admin has changed is left
+  alone (each of seven variations tried: Free Mode off, payments on, checkout
+  on, premium features on, and each of the three surfaces already off), and it
+  applies cleanly when the `monetization` row is absent.
+- Production already shows the result. Its live `monetization.access` (one row
+  of app configuration, read-only, no user data) is identical to the replay's
+  result with this migration applied, and the row was last updated on
+  2026-09-26 at 16:00 UTC, a few minutes after the migration's version timestamp
+  (15:57). Nothing was written to production: the statement and that one row
+  were only read.
+
 ## Still to run on the live backend
 
 Run these against the dev/E2E project first where possible, with real user
