@@ -1,15 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { destinationForSetupChoice } from "@/routes/onboarding.setup-for";
-import { destinationForManageChoice } from "@/routes/onboarding.manage";
-import {
-  destinationForAccountType,
-  destinationForStartingPoint,
-} from "@/components/onboarding/AccountTypeScreen";
-import { MANAGER_ROUTE } from "@/lib/age-verification";
+import { hrefForSetup, SETUPS } from "@/lib/account-type";
 
 /**
- * Adding a child, and the onboarding fork that leads to it.
+ * Adding a child, and the one role selection that leads to it.
  *
  * A child added by a parent is a real auth user with no credentials (a
  * "managed child"), so every child-safety control that keys on the child's
@@ -78,63 +72,29 @@ describe("the Add your child form", () => {
   });
 });
 
-describe("the onboarding fork", () => {
-  it("asks who the account is for before the profile wizard", () => {
-    // The wizard asks about one athlete; reaching it first would assume that
-    // athlete is the account owner.
-    expect(destinationForAccountType("player")).toBe("/onboarding/setup-for");
+describe("a parent or guardian goes straight to Add your child", () => {
+  it("is one selection: Parent / Guardian leads to Add your child, stored as a player", () => {
+    // No "who is this for?" and no athlete questions in between.
+    expect(hrefForSetup("child")).toBe("/players/add?from=onboarding");
+    expect(SETUPS.child.accountType).toBe("player");
   });
 
-  it("sends a parent setting up for a child straight to Add your child", () => {
-    expect(destinationForSetupChoice("child")).toBe("/players/add");
+  it("opens Add your child with the onboarding wording", () => {
+    expect(addChild).toMatch(/from === "onboarding"\s*\?\s*"Set up the player you're managing/);
   });
 
-  it("sends an adult player, and 'both', to their own profile first", () => {
-    expect(destinationForSetupChoice("me")).toBe("/onboarding/welcome");
-    expect(destinationForSetupChoice("both")).toBe("/onboarding/welcome");
+  it("offers a way on to the Parent Center without adding a child", () => {
+    expect(addChild).toMatch(
+      /from === "onboarding" \?[\s\S]{0,400}to="\/parent"[\s\S]{0,200}Skip for now/,
+    );
   });
 
-  it("continues 'both' into Add your child after the owner's own profile", () => {
+  it("leaves the welcome wizard for players alone, with nothing leading back to a fork", () => {
     const welcome = readFileSync(
       new URL("../routes/onboarding.welcome.tsx", import.meta.url),
       "utf8",
     );
-    expect(welcome).toMatch(/addChildNext: z\.boolean\(\)\.optional\(\)/);
-    expect(welcome).toMatch(/addChildNext\) nav\(\{ to: "\/players\/add"/);
-  });
-
-  it("leaves the other account types where they were", () => {
-    expect(destinationForAccountType("team")).toBe("/teams/create");
-    expect(destinationForAccountType("trainer")).toBe("/trainers/create");
-    expect(destinationForAccountType("gym")).toBe("/orgs/create");
-  });
-});
-
-describe("the Parent / Guardian / Owner fork", () => {
-  it("sends the new top-level choice to 'what will you manage?', not the player fork", () => {
-    // Stored as a player, but they have already said who they are: asking "who
-    // is this for?" as well would be the same question twice.
-    expect(destinationForStartingPoint("manager")).toBe(MANAGER_ROUTE);
-    expect(MANAGER_ROUTE).toBe("/onboarding/manage");
-  });
-
-  it("leaves every real account type going where it went before", () => {
-    for (const t of ["player", "team", "trainer", "gym"] as const) {
-      expect(destinationForStartingPoint(t)).toBe(destinationForAccountType(t));
-    }
-  });
-
-  it("sends each thing they can manage to the flow that creates it", () => {
-    expect(destinationForManageChoice("child")).toBe("/players/add");
-    expect(destinationForManageChoice("team")).toBe("/teams/create");
-    expect(destinationForManageChoice("gym")).toBe("/orgs/create");
-  });
-
-  it("opens Add your child with the onboarding wording when the child is chosen", () => {
-    const manage = readFileSync(
-      new URL("../routes/onboarding.manage.tsx", import.meta.url),
-      "utf8",
-    );
-    expect(manage).toMatch(/choice === "child" \? \{ from: "onboarding" \} : undefined/);
+    expect(welcome).not.toMatch(/addChildNext|setup-for/);
+    expect(hrefForSetup("player")).toBe("/onboarding/welcome");
   });
 });

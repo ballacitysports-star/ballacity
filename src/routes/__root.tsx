@@ -26,25 +26,18 @@ import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-l
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import {
   type AccountType,
-  type StartingPoint,
+  type SetupId,
   clearPendingAccountType,
   isAccountType,
   readPendingAccountType,
+  routeForSetup,
 } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
-import {
-  CHILD_CONSENT_ROUTE,
-  MANAGER_ROUTE,
-  isAccountSetupEscape,
-  needsAgeGate,
-} from "@/lib/age-verification";
+import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
-import {
-  AccountTypeScreen,
-  destinationForAccountType,
-} from "@/components/onboarding/AccountTypeScreen";
+import { AccountTypeScreen } from "@/components/onboarding/AccountTypeScreen";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
@@ -885,15 +878,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
   // Same for the profile-type step: render the picker in place.
   if (!skipTypeCheck && typeStatus === "missing") {
-    const finishType = (type?: AccountType, startingPoint?: StartingPoint) => {
+    // The setup they chose decides where they go — for every role, Player
+    // included — and there is no question in between. `onAlreadySet` passes none.
+    const finishType = (_type?: AccountType, setup?: SetupId) => {
       if (user) onboardedUsers.add(user.id);
       setTypeStatus("ok");
-      if (startingPoint === "manager") {
-        // Stored as a player; what they will manage is asked next.
-        router.navigate({ to: MANAGER_ROUTE, replace: true } as never);
-      } else if (type && type !== "player") {
-        router.navigate({ to: destinationForAccountType(type), replace: true } as never);
-      }
+      if (setup) router.navigate({ ...routeForSetup(setup), replace: true } as never);
     };
     return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }

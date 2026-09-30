@@ -1,4 +1,4 @@
-import { ACCOUNT_TYPE_ROUTE, MANAGER_ROUTE, isAccountSetupEscape } from "@/lib/age-verification";
+import { ACCOUNT_TYPE_ROUTE, isAccountSetupEscape } from "@/lib/age-verification";
 
 export const DEFAULT_POST_AUTH_DESTINATION = "/feed";
 
@@ -8,10 +8,10 @@ export type PostAuthDestinationInput = {
   /** True when the signed-in account still needs to pick an account type. */
   needsAccountType: boolean;
   /**
-   * True while the account still carries the Parent / Guardian / Owner hint it
-   * signed up with (`hasManagerHint`). It has not yet said what it will manage.
+   * The setup this account chose at sign-up and has not started yet
+   * (`hrefForSetup(startSetupOf(user))`), if any.
    */
-  startAsManager?: boolean;
+  startDestination?: string | undefined;
   /** Path recorded before the visitor was routed to `/auth`, if any. */
   lastVisited?: string | undefined;
   /** Same-origin referrer path, used when neither of the above is set. */
@@ -33,16 +33,16 @@ export type PostAuthDestinationInput = {
  * through a question the root gate itself skips for them, stranded one step
  * before the consent screen they were emailed a link to.
  *
- * A manager who signed up as Parent / Guardian / Owner is asked what they will
- * manage before anything they merely visited or were referred from — but never
- * ahead of a page they explicitly asked for (`next`), which they keep.
+ * An account that chose a role at sign-up goes to that role's setup before
+ * anything it merely visited or was referred from — but never ahead of a page it
+ * explicitly asked for (`next`), which it keeps.
  */
 export function postAuthDestination(input: PostAuthDestinationInput): string {
-  const { next, needsAccountType, startAsManager, lastVisited, referrer } = input;
+  const { next, needsAccountType, startDestination, lastVisited, referrer } = input;
 
   if (next && isAccountSetupEscape(next)) return next;
   if (needsAccountType) return ACCOUNT_TYPE_ROUTE;
   if (next !== undefined) return next;
-  if (startAsManager) return MANAGER_ROUTE;
+  if (startDestination) return startDestination;
   return lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
 }

@@ -3,71 +3,58 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { AccountTypePicker } from "@/components/AccountTypePicker";
+import { RolePicker } from "@/components/RolePicker";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   type AccountType,
-  type StartingPoint,
-  accountTypeForStartingPoint,
-  canStartAsManager,
+  type SetupId,
+  accountTypeForSetup,
+  canChooseRole,
   clearPendingAccountType,
+  hrefForSetup,
   isAccountType,
   setAccountTypeForCurrentUser,
 } from "@/lib/account-type";
-import { MANAGER_ROUTE, useMyAgeStatus } from "@/lib/age-verification";
+import { useMyAgeStatus } from "@/lib/age-verification";
 
-/**
- * Where the standalone picker sends each starting point. A manager is stored as
- * a player but does not go through "who is this for?" — they have already said,
- * and what they manage is the next question.
- */
-export function destinationForStartingPoint(point: StartingPoint): string {
-  return point === "manager" ? MANAGER_ROUTE : destinationForAccountType(point);
-}
-
-export function destinationForAccountType(t: AccountType): string {
-  switch (t) {
-    case "team":
-      return "/teams/create";
-    case "trainer":
-      return "/trainers/create";
-    case "gym":
-      return "/orgs/create";
-    case "player":
-    default:
-      // Players go through "who is this for?" first (§4 step 2). That is the
-      // fork deciding whether this account gets the owner's own profile, a
-      // child's, or both, and it has to come before the profile wizard —
-      // which asks about one athlete and would otherwise assume it is them.
-      return "/onboarding/setup-for";
-  }
-}
+/** How long the cards wait for the age answer before showing without Parent / Guardian. */
+const AGE_WAIT_MS = 3000;
 
 /**
  * The profile-type step. Rendered either as its own page
  * (/onboarding/account-type) or inline by the root gate.
  *
- * `onResolved` fires after a type is saved (with the starting point they chose,
- * which differs from the type for Parent / Guardian / Owner); `onAlreadySet`
- * fires when the account already has one. When omitted, the screen navigates
- * itself.
+ * One selection, then straight to that setup: Player to the sport and position
+ * wizard, Parent / Guardian to Add your child, Team / Coach to the team or coach
+ * setup, Facility / Gym to the facility setup. There is no second question.
+ *
+ * `onResolved` fires after a type is saved, with the setup they chose (which is
+ * what decides where they go; the type is only what is stored);
+ * `onAlreadySet` fires when the account already has a type. When omitted, the
+ * screen navigates itself.
  */
 export function AccountTypeScreen({
   onResolved,
   onAlreadySet,
 }: {
-  onResolved?: (type: AccountType, startingPoint: StartingPoint) => void;
+  onResolved?: (type: AccountType, setup: SetupId) => void;
   onAlreadySet?: () => void;
 }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [choice, setChoice] = useState<StartingPoint | null>(null);
-  // Age is settled before this screen is reachable. Parent / Guardian / Owner is
-  // offered to adults only, and only once that is known.
-  const { data: ageStatus } = useMyAgeStatus(!!user);
-  const allowManager = canStartAsManager(ageStatus?.cohort);
+  const [choice, setChoice] = useState<SetupId | null>(null);
+  // Age is settled before this screen is reachable. Parent / Guardian is offered
+  // to adults only, so the cards wait for the answer rather than reflow when it
+  // comes — but not for long: a stalled request must not hold the picker back.
+  const { data: ageStatus, isPending: agePending } = useMyAgeStatus(!!user);
+  const allowParent = canChooseRole("parent", ageStatus?.cohort);
+  const [ageWaitOver, setAgeWaitOver] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setAgeWaitOver(true), AGE_WAIT_MS);
+    return () => window.clearTimeout(t);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -105,7 +92,7 @@ export function AccountTypeScreen({
     if (!choice || busy) return;
     setBusy(true);
     try {
-      const type = accountTypeForStartingPoint(choice);
+      const type = accountTypeForSetup(choice);
       await setAccountTypeForCurrentUser(type);
       clearPendingAccountType();
       toast.success("Account type set.");
@@ -113,7 +100,7 @@ export function AccountTypeScreen({
         onResolved(type, choice);
         setBusy(false);
       } else {
-        window.location.replace(destinationForStartingPoint(choice));
+        window.location.replace(hrefForSetup(choice));
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save.");
@@ -128,7 +115,7 @@ export function AccountTypeScreen({
     navigate({ to: "/auth", replace: true });
   };
 
-  if (loading || !user || !checked) {
+  if (loading || !user || !checked || (agePending && !ageWaitOver)) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <LoadingState label="Loading your account…" />
@@ -141,7 +128,7 @@ export function AccountTypeScreen({
       step={2}
       steps={2}
       title="Where do you want to start?"
-      description="Pick what fits you now. You can add team, trainer, and gym profiles later and switch between them anytime."
+      description="Pick what fits you now. You can add other profiles later and switch between them anytime."
       footer={
         <button type="button" onClick={signOut} className="underline-offset-2 hover:underline">
           Sign out
@@ -149,12 +136,7 @@ export function AccountTypeScreen({
       }
     >
       <div className="space-y-5">
-        <AccountTypePicker
-          value={choice}
-          onChange={setChoice}
-          heading={false}
-          allowManager={allowManager}
-        />
+        <RolePicker value={choice} onChange={setChoice} heading={false} allowParent={allowParent} />
         <p className="rounded-2xl border border-border bg-surface p-3 text-xs text-muted-foreground">
           This is just your starting point. You can add other profiles later and switch between them
           anytime.

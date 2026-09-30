@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_TYPE_ROUTE,
   AGE_GATE_ROUTE,
-  MANAGER_ROUTE,
   isAccountSetupEscape,
   needsAgeGate,
   routeForSignupState,
   signupStateFor,
 } from "@/lib/age-verification";
+import { SETUPS } from "@/lib/account-type";
 
 /**
  * Regression: /onboarding/age and /onboarding/account-type used to redirect
@@ -82,14 +82,17 @@ describe("onboarding guards never loop", () => {
   });
 });
 
-describe("the Parent / Guardian / Owner screen", () => {
-  it("is an ordinary gated route, not an account-setup escape", () => {
-    // The account is stored as a player before this screen is reached, so both
-    // gates have already been answered and stay active on it. Making it an
-    // escape would let an account skip the age step by going straight to it.
-    expect(isAccountSetupEscape(MANAGER_ROUTE)).toBe(false);
-    const { skipAgeCheck, skipTypeCheck } = gates(MANAGER_ROUTE);
-    expect(skipAgeCheck).toBe(false);
-    expect(skipTypeCheck).toBe(false);
-  });
+describe("the setup screens a role leads to", () => {
+  it.each(Object.entries(SETUPS))(
+    "%s goes to an ordinary gated route, not an account-setup escape",
+    (_setup, { to }) => {
+      // The account type is saved before the member is sent there, so both gates
+      // have been answered and stay active on it. Making any of them an escape
+      // would let an account skip the age step by going straight to it.
+      expect(isAccountSetupEscape(to)).toBe(false);
+      const { skipAgeCheck, skipTypeCheck } = gates(to);
+      expect(skipAgeCheck).toBe(false);
+      expect(skipTypeCheck).toBe(false);
+    },
+  );
 });

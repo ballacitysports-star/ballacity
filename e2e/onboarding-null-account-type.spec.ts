@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { toJSONAsync } from "seroval";
 
 /**
  * Integration test: any signed-in user whose `profiles.account_type` is NULL
@@ -10,6 +11,9 @@ import { test, expect, type Page } from "@playwright/test";
  * Covers both entry points:
  *  1. `SIGNED_IN` reconcile in `onAuthStateChange` (fires on OAuth return).
  *  2. Route-level `typeStatus` gate on any protected navigation.
+ *
+ * It also covers the picker itself: one role selection, then straight to that
+ * role's setup (see "role picker" at the bottom).
  */
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
@@ -161,6 +165,211 @@ test.describe("null account_type → account-type setup", () => {
       await page.waitForTimeout(1000);
 
       await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/**
+ * Role picker: one selection right after sign-up, then straight to that role's
+ * setup. Nothing on the fixture account changes: the account-type save is a
+ * stubbed PATCH, and the age cohort is stubbed so the Parent / Guardian card does
+ * not depend on the fixture's birth date. So this checks where each role goes,
+ * not what the database does with the type.
+ */
+
+/** Which server fn is this `_serverFn` request for? */
+function serverFnId(url: string): string {
+  const seg = decodeURIComponent(new URL(url).pathname.split("/_serverFn/")[1] ?? "").split("?")[0];
+  try {
+    return Buffer.from(seg ?? "", "base64").toString("utf8");
+  } catch {
+    return seg ?? "";
+  }
+}
+
+/** Answer `getMyAgeStatus` as a member of this cohort; every other server fn falls through. */
+async function stubAgeCohort(page: Page, cohort: "adult" | "teen_16_17") {
+  await page.route("**/_serverFn/**", async (route) => {
+    if (!/getMyAgeStatus/.test(serverFnId(route.request().url()))) {
+      await route.fallback();
+      return;
+    }
+    const status = {
+      cohort,
+      ageCategory: cohort,
+      reviewRequired: false,
+      status: "active",
+      birthdaySet: true,
+    };
+    const payload = await toJSONAsync({ result: status, error: undefined, context: {} });
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json", "x-tss-serialized": "true" },
+      body: JSON.stringify(payload.t),
+    });
+  });
+}
+
+/** Swallow the account-type save, and hand back what was sent. */
+async function stubAccountTypeSave(page: Page): Promise<string[]> {
+  const saved: string[] = [];
+  await page.route(/\/rest\/v1\/profiles\?/, async (route) => {
+    if (route.request().method() !== "PATCH") {
+      await route.fallback();
+      return;
+    }
+    saved.push(route.request().postData() ?? "");
+    await route.fulfill({ status: 204, body: "" });
+  });
+  return saved;
+}
+
+async function openPicker(page: Page, cohort: "adult" | "teen_16_17" = "adult") {
+  await stubNullAccountType(page);
+  await stubAgeCohort(page, cohort);
+  const saved = await stubAccountTypeSave(page);
+  await restoreSession(page);
+  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: /Where do you want to start/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  return saved;
+}
+
+const ROLE_CARDS: [label: string, blurb: string][] = [
+  ["Player", "Athletes looking for games and runs"],
+  ["Parent / Guardian", "Parents managing kids' sports schedules"],
+  ["Team / Coach", "Coaches and captains organizing squads"],
+  ["Facility / Gym", "Venue owners and sports facilities"],
+];
+
+const ROLE_SETUPS = [
+  {
+    name: "Player",
+    pick: async (page: Page) => page.getByRole("button", { name: /Player/i }).click(),
+    saves: "player",
+    goes: /\/onboarding\/welcome(?:[?#].*)?$/,
+  },
+  {
+    name: "Parent / Guardian",
+    pick: async (page: Page) => page.getByRole("button", { name: /Parent \/ Guardian/ }).click(),
+    saves: "player",
+    goes: /\/players\/add\?from=onboarding$/,
+  },
+  {
+    name: "Team / Coach, Team",
+    pick: async (page: Page) => {
+      await page.getByRole("button", { name: /Team \/ Coach/ }).click();
+      await page.getByRole("group").getByRole("button", { name: /^Team/ }).click();
+    },
+    saves: "team",
+    goes: /\/teams\/create(?:\?finish=1)?$/,
+  },
+  {
+    name: "Team / Coach, Coach",
+    pick: async (page: Page) => {
+      await page.getByRole("button", { name: /Team \/ Coach/ }).click();
+      await page
+        .getByRole("group")
+        .getByRole("button", { name: /^Coach/ })
+        .click();
+    },
+    saves: "trainer",
+    goes: /\/trainers\/create(?:\?finish=1)?$/,
+  },
+  {
+    name: "Facility / Gym",
+    pick: async (page: Page) => page.getByRole("button", { name: /Facility \/ Gym/ }).click(),
+    saves: "gym",
+    goes: /\/orgs\/create(?:\?finish=1)?$/,
+  },
+];
+
+test.describe("role picker: one selection, straight to that role's setup", () => {
+  test("offers the four roles, with who each is for", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await openPicker(page);
+      for (const [label, blurb] of ROLE_CARDS) {
+        const card = page.getByRole("button", { name: new RegExp(label) });
+        await expect(card).toBeVisible();
+        await expect(card).toContainText(blurb);
+      }
+      // Nothing is chosen, so there is nothing to continue with yet.
+      await expect(page.getByRole("button", { name: /^Continue$/ })).toBeDisabled();
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const role of ROLE_SETUPS) {
+    test(`${role.name} goes straight to its setup`, async ({ browser }) => {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      try {
+        const saved = await openPicker(page);
+        await role.pick(page);
+        await page.getByRole("button", { name: /^Continue$/ }).click();
+        await expect(page).toHaveURL(role.goes, { timeout: 30_000 });
+        expect(saved.some((body) => body.includes(`"account_type":"${role.saves}"`))).toBe(true);
+        // It stays there: no bounce back to a picker or a second question.
+        await page.waitForTimeout(1500);
+        await expect(page).toHaveURL(role.goes);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test("Team / Coach asks which one on the same screen, and waits for an answer", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await openPicker(page);
+      await expect(page.getByText("Which one are you setting up?")).toHaveCount(0);
+      await page.getByRole("button", { name: /Team \/ Coach/ }).click();
+      await expect(page.getByText("Which one are you setting up?")).toBeVisible();
+      await expect(page.getByRole("group").getByRole("button", { name: /^Team/ })).toBeVisible();
+      await expect(page.getByRole("group").getByRole("button", { name: /^Coach/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^Continue$/ })).toBeDisabled();
+      await expect(page).toHaveURL(/\/feed/);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("a member under 18 is not offered Parent / Guardian", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await openPicker(page, "teen_16_17");
+      await expect(page.getByRole("button", { name: /Player/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Team \/ Coach/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Facility \/ Gym/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Parent \/ Guardian/ })).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("the standalone page sends a parent to Add your child too", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await stubNullAccountType(page);
+      await stubAgeCohort(page, "adult");
+      const saved = await stubAccountTypeSave(page);
+      await restoreSession(page);
+      await page.goto("/onboarding/account-type", { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: /Parent \/ Guardian/ }).click();
+      await page.getByRole("button", { name: /^Continue$/ }).click();
+      await expect(page).toHaveURL(/\/players\/add\?from=onboarding$/, { timeout: 30_000 });
+      expect(saved.some((body) => body.includes('"account_type":"player"'))).toBe(true);
     } finally {
       await context.close();
     }

@@ -35,9 +35,6 @@ import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
-  // Set by /onboarding/setup-for "I'm playing and setting it up for my
-  // child": the owner's own profile comes first, then Add your child.
-  addChildNext: z.boolean().optional(),
 });
 
 export const Route = createFileRoute("/onboarding/welcome")({
@@ -105,7 +102,7 @@ const NEXT_STEPS: Record<
 
 function OnboardingWelcomePage() {
   const nav = useNavigate();
-  const { type: typeFromSearch, addChildNext } = Route.useSearch();
+  const { type: typeFromSearch } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const { accountType, loading: typeLoading } = useAccountType();
   const type: AccountType | null = typeFromSearch ?? accountType;
@@ -117,7 +114,7 @@ function OnboardingWelcomePage() {
 
   if (authLoading || typeLoading || !type) return null;
 
-  return <OnboardingWizard type={type} addChildNext={addChildNext === true} />;
+  return <OnboardingWizard type={type} />;
 }
 
 type GeoState =
@@ -127,7 +124,7 @@ type GeoState =
   | { kind: "denied"; message: string; canRetry: boolean }
   | { kind: "unavailable"; message: string };
 
-function OnboardingWizard({ type, addChildNext }: { type: AccountType; addChildNext: boolean }) {
+function OnboardingWizard({ type }: { type: AccountType }) {
   const nav = useNavigate();
   const { user } = useAuth();
   const { profile, loaded: profileLoaded } = useMyProfileState(user);
@@ -470,7 +467,6 @@ function OnboardingWizard({ type, addChildNext }: { type: AccountType; addChildN
         return;
       }
       if (nextCfg) nav({ to: nextCfg.goto, search: { finish: 1 } as never });
-      else if (addChildNext) nav({ to: "/players/add", search: { from: "onboarding" } });
       else nav({ to: "/feed" });
       return;
     }
@@ -626,16 +622,17 @@ function OnboardingWizard({ type, addChildNext }: { type: AccountType; addChildN
           <PrimaryCTA type="button" onClick={onNext} loading={saving}>
             {isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
           </PrimaryCTA>
-          <button
-            type="button"
-            onClick={() =>
-              step === 0 ? nav({ to: "/onboarding/setup-for" }) : setStep((s) => Math.max(0, s - 1))
-            }
-            disabled={saving}
-            className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
-          >
-            Back
-          </button>
+          {/* The first step is where setup starts: the role was chosen before it. */}
+          {step > 0 ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={saving}
+              className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
+            >
+              Back
+            </button>
+          ) : null}
         </div>
       </div>
     </OnboardingShell>
