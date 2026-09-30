@@ -233,8 +233,7 @@ export function ReelStudio({
   }
 
   const playingCut = segIndex != null;
-  const themeLabel =
-    OVERLAY_THEME_OPTIONS.find((o) => o.value === prefs.overlayTheme)?.label ?? "";
+  const themeLabel = OVERLAY_THEME_OPTIONS.find((o) => o.value === prefs.overlayTheme)?.label ?? "";
   const transitionLabel = TRANSITION_OPTIONS.find((o) => o.value === transition)?.label ?? "";
   const cards = prefs.overlayTheme === "none" ? [] : scheduleOverlays(overlays, timeline, duration);
   const card = showCards ? activeOverlay(cards, now) : null;

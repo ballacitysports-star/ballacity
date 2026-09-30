@@ -33,9 +33,10 @@ describe("suggestReelTitles", () => {
   });
 
   it("ignores an unparseable date", () => {
-    expect(suggestReelTitles({ sport: "Tennis", date: "not a date", vibe: "cinematic" })).toEqual(
-      ["Tennis · Moments", "My tennis film"],
-    );
+    expect(suggestReelTitles({ sport: "Tennis", date: "not a date", vibe: "cinematic" })).toEqual([
+      "Tennis · Moments",
+      "My tennis film",
+    ]);
   });
 
   it("never offers a title longer than the field allows", () => {

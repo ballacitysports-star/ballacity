@@ -190,8 +190,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
       const label = TRANSITION_OPTIONS.find((o) => o.value === transition)?.label ?? transition;
       toast.success(`${label} transitions saved for this reel`);
       return true;
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not save the transition");
+    } catch (e) {
+      toast.error((e as { message?: string } | null)?.message ?? "Could not save the transition");
       return false;
     }
   }

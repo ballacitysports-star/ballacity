@@ -466,13 +466,10 @@ export const setReelTransition = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!reel) throw new Error("Reel not found");
 
-    const style = normalizeReelStyle({
-      ...(((reel as any).style_prefs ?? {}) as Record<string, unknown>),
-      transition: data.transition,
-    });
+    const style = { ...normalizeReelStyle(reel.style_prefs), transition: data.transition };
     const { error: upErr } = await context.supabase
       .from("highlight_reels")
-      .update({ style_prefs: style } as any)
+      .update({ style_prefs: style })
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (upErr) throw new Error(upErr.message);
