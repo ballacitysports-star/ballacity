@@ -181,8 +181,59 @@ read or written):
 | L7 | `player_profiles` table comment marks it frozen | yes | "Frozen (read/delete only). Superseded by…" | PASS |
 | L8 | `revoke_guardian_link` contains the managed-child guard | yes | yes | PASS |
 
-Not yet done on the live database: the behavioural checks (M1–M19 through the
-Data API with real user tokens) listed below.
+### Live behavioural check (2026-09-30)
+
+A guardian added one test child (a 13–15-year-old) on the live site, switched
+into the child's profile, switched back and deleted the profile, all inside 83
+seconds and before any of the child's rows were read. So this check rests on
+what persists after deletion: the append-only `family_audit_log`, the tables
+with no foreign key to `auth.users`, and a sweep of the whole database for the
+child's id (280 uuid and id-like columns across `public`, `auth` and `storage`).
+Everything was read-only.
+
+| # | Check | Expected | Observed | Result |
+| --- | --- | --- | --- | --- |
+| L9 | Provisioning ran as one transaction, by the guardian | `managed.created`, plus the link, consent and controls rows the triggers log, all with the guardian as actor | four rows: `managed.created` (`teen_13_15`, `parent`), `link.active`, `consent.approved` (`email_confirmation`, `US_FEDERAL`), `controls.created`; actor is the guardian on all, and all four carry the same transaction timestamp (19:51:27 UTC) | PASS |
+| L10 | Terms and Privacy accepted by the guardian | two `legal_consents` rows at the current versions, `accepted_by` = guardian | both present, version `2026-09-11`, `accepted_by` = the guardian, `user_agent` `guardian-on-behalf` | PASS |
+| L11 | Guardian and child both notified | the approval notification reaches the guardian (the link is written before the consent) | the guardian got "You approved a child account" in the same transaction; the child got "Your account is approved" | PASS |
+| L12 | Switching into the child works | `managed.session_started`, then the app runs as the child | logged at 19:51:53; a `session_activity` row for the child opened 0.3 s later and stayed alive until 19:52:29 (the heartbeat runs as `auth.uid()`, so the session was the child's) | PASS |
+| L13 | Switching back works | the guardian deletes the child; `deleteManagedChild` refuses a managed session | `managed.deleted` at 19:52:50 with the guardian as actor, 21 s after the child's last heartbeat | PASS (inferred from the audit log) |
+| L14 | Deleting the child leaves nothing behind | no row for the child's id, no `@managed.invalid` or `managed` auth user, `managed_accounts` and `player_profiles` empty | no row remains in any table scanned, including profile, birthday, link, consent and its events, controls, privacy preferences and account profile; no placeholder or managed auth user exists; both tables are empty | PASS, apart from the two rows below |
+| L15 | Safe defaults the provisioning function relies on | guardian-only messaging, private media, discovery and AI off, games on | the live column defaults of `child_controls` are exactly that | PASS |
+| L16 | The triggers it depends on are live | birthday sets the cohort and clamps privacy, birthday lock, minor handle safety, consent notification | `trg_sync_age_category_from_birthdays`, `trg_guard_birthday_immutability`, `enforce_minor_handle_safety_trg` and `notify_on_consent_change_trg` are all present and enabled | PASS |
+
+**Left behind by deleting the child.** Expected: six `family_audit_log` rows
+(append-only, no foreign key, by design) and the two `legal_consents` rows (kept
+as the consent record, as for every account). Not expected: one `notifications`
+row (the child's "Your account is approved", with no name in it) and one
+`session_activity` row (start and heartbeat times and a timezone). Neither table
+has a foreign key to `auth.users`, and `purgeUserAccount` removes neither.
+
+This is not specific to managed children. Since `purgeUserAccount` removes
+neither table's rows, deleting any account through it leaves that account's
+rows in both, and the database already holds 19 more orphaned `session_activity`
+rows and 4 more `notifications` rows than this child's (20 of 152 and 5 of 30 in
+all), plus 4 more `legal_consents` rows (6 in all, kept by design). More
+widely, 19 columns across 17 public tables look like user references by
+name and have no foreign key at all (for example `team_members.user_id`,
+`join_requests.player_id`, `conversation_participants.user_id`,
+`scheduled_notifications.user_id`; `account_profiles` and `messages` are handled
+by the purge). Only the two tables above held anything for this short-lived test
+child, and the others have not been examined.
+
+**Not verified on a live child**, because it was deleted before its rows were
+read: the auth user's placeholder email and lack of a password (its
+`app_metadata` is implied: provisioning and `startManagedSession` both refuse
+unless `managed` is true and `managed_by` is the guardian, and both went
+through); the profile values (name "First L.", initials, cohort, private); the
+privacy floor (`privacy_preferences.profile_visibility` defaults to
+`public`, and provisioning relies on the birthday trigger to clamp it to
+private, which the local replay confirmed (M10) and the live database has not);
+the actual `child_controls` values (only their defaults); and what the screens
+showed (the session banner, Security and Delete account hidden, "Back to…").
+M1–M19 through the Data API with real user tokens also remain to be run. To
+close the gap: add another test child, leave it in place until its rows have
+been read, then delete it.
 
 **Repository side effects of Lovable's migration tool**, all on `main` and not
 part of this pull request: it added `drizzle.config.ts`, `drizzle/schema.ts` (an
@@ -240,6 +291,7 @@ tokens as in the earlier verification documents:
 3. `startManagedSession`: refused for an unrelated adult, for a managed child's
    own token, and for a child with their own login (`NOT_MANAGED`); the returned
    token redeems with `verifyOtp({ type: 'email' })` into the child's session.
+   (The happy path was confirmed live, L12; the refusals were not.)
 4. Sections E and F of the final-verification document with a managed child as
    the subject.
 5. `e2e/managed-child.spec.ts` (it skips itself until the migration is present).
