@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isManagedUser, managedChildErrorMessage } from "@/lib/managed-children";
+import {
+  isManagedUser,
+  isMissingRelationError,
+  managedChildErrorMessage,
+} from "@/lib/managed-children";
 
 /**
  * Permanently delete the currently authenticated user's account.
@@ -23,10 +27,16 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
     // anything is scrubbed: managed_accounts.managed_by is ON DELETE RESTRICT,
     // so the final delete would fail anyway — but only after this account's
     // profile had already been anonymised.
-    const { count } = await context.supabase
+    const { count, error: countError } = await context.supabase
       .from("managed_accounts")
       .select("child_user_id", { count: "exact", head: true })
       .eq("managed_by", userId);
+    // Before the managed-children migration is applied there is no such table
+    // and nobody can manage a child. Any other failure must not be read as "no
+    // children": this function anonymises the account before it deletes it.
+    if (countError && !isMissingRelationError(countError)) {
+      throw new Error(managedChildErrorMessage("MANAGES_CHECK_FAILED"));
+    }
     if ((count ?? 0) > 0) {
       throw new Error(
         `${managedChildErrorMessage("MANAGES_CHILDREN")} You manage ${count} child ${

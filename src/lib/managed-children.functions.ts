@@ -15,6 +15,7 @@ import {
   GUARDIAN_RELATIONSHIPS,
   childDisplayName,
   isManagedUser,
+  isMissingRelationError,
   managedByOf,
   managedChildErrorMessage,
   managedEmailFor,
@@ -133,10 +134,15 @@ export const createManagedChild = createServerFn({ method: "POST" })
       throw new Error(managedChildErrorMessage("ADULT_REQUIRED"));
     }
 
-    const { data: mine } = await ctx.supabase
+    const { data: mine, error: mineError } = await ctx.supabase
       .from("managed_accounts")
       .select("created_at")
       .eq("managed_by", ctx.userId);
+    // The migration hasn't been applied to this backend yet: say so now rather
+    // than creating an account only to delete it again when provisioning fails.
+    if (isMissingRelationError(mineError)) {
+      throw new Error(managedChildErrorMessage("MANAGED_UNAVAILABLE"));
+    }
     const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
     const rows = (mine ?? []) as { created_at: string }[];
     if (

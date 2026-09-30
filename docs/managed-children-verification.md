@@ -100,6 +100,55 @@ children. The app's delete path (`purgeUserAccount`) now removes the
 `account_profiles` rows explicitly; `legal_consents` rows are kept as the
 consent record, as before.
 
+## Applying the migrations and publishing
+
+The migrations are applied through Lovable (`docs/supabase-cli.md`), which is a
+separate step from publishing the app, so for a while the new code may run
+against a database without the new table, column and functions. Ordinary
+accounts must not notice, and this was made so after review found one case that
+would have broken them:
+
+- **Published before the migration:** "Add your child" answers "isn't available
+  yet" without creating anything, and account deletion behaves as before. The
+  Terms/Privacy acceptance never names `legal_consents.accepted_by` for an
+  ordinary account (PostgREST rejects a column that does not exist even when its
+  value is null, which would have broken every signup and re-accept).
+  `managed-children.test.ts` pins all of this.
+- **Migrated before publishing:** the previously published Add Player screen can
+  no longer create `player_profiles` rows (writes are revoked). That screen wrote
+  rows nothing read, so nothing of value is lost.
+- **Recommended order:** apply both migrations, run the checks below, then
+  publish.
+
+Do not use `supabase db push` for this: Lovable records the migrations it
+applies under its own versions, so the CLI can try to replay history the
+database has already moved past (see the note in `docs/supabase-cli.md` and the
+back-fill history behind it). Ask Lovable to apply the two files, in order,
+exactly as written; it may save its own copy of the SQL as a new migration file,
+which is harmless because every statement is written to be safe to run twice.
+
+Read-only checks to run afterwards (SQL editor); each was run against the local
+replay both before and after the migrations, and the expected result is the
+"after" one:
+
+```sql
+-- 1. true
+select to_regclass('public.managed_accounts') is not null as managed_accounts_exists;
+-- 2. two rows: is_managed_account, provision_managed_child
+select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname in ('provision_managed_child', 'is_managed_account')
+ order by 1;
+-- 3. one row: accepted_by
+select column_name from information_schema.columns
+ where table_schema = 'public' and table_name = 'legal_consents' and column_name = 'accepted_by';
+-- 4. false (true before the migration)
+select has_any_column_privilege('authenticated', 'public.player_profiles', 'INSERT')
+  as authenticated_can_insert_player_profiles;
+-- 5. false, true (errors if the function is missing)
+select has_function_privilege('anon', 'public.provision_managed_child(uuid,date,text,text,text,jsonb,boolean)', 'EXECUTE') as anon_can_provision,
+       has_function_privilege('authenticated', 'public.provision_managed_child(uuid,date,text,text,text,jsonb,boolean)', 'EXECUTE') as authenticated_can_provision;
+```
+
 ## Still to run on the live backend
 
 Run these once Lovable has applied both migrations, against the dev/E2E project

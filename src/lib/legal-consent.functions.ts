@@ -54,7 +54,10 @@ export const recordLegalConsent = createServerFn({ method: "POST" })
       document_version: a.version,
       accepted_at: new Date().toISOString(),
       user_agent: userAgent,
-      accepted_by: acceptedBy,
+      // Named only in a managed child's session. An ordinary account's
+      // acceptance must not depend on the accepted_by column existing, so the
+      // app can be published before the managed-children migration is applied.
+      ...(acceptedBy ? { accepted_by: acceptedBy } : {}),
     }));
     const { error } = await context.supabase.from("legal_consents").upsert(rows, {
       onConflict: "user_id,document_type,document_version",

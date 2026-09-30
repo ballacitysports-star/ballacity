@@ -74,6 +74,17 @@ export function managedByOf(user: Pick<User, "app_metadata"> | null | undefined)
   return typeof v === "string" ? v : null;
 }
 
+/**
+ * A database error that means "this table does not exist (yet)": PostgREST's
+ * schema-cache miss, or Postgres's undefined_table. The managed-children
+ * migration is applied separately from publishing the app, so every place that
+ * reads `managed_accounts` has to decide what a missing table means — usually
+ * "nobody manages a child", never "something unexpected went wrong".
+ */
+export function isMissingRelationError(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
+
 export const GUARDIAN_RELATIONSHIPS = ["parent", "guardian", "grandparent", "other adult"] as const;
 export type GuardianRelationship = (typeof GUARDIAN_RELATIONSHIPS)[number];
 
@@ -144,6 +155,9 @@ const MESSAGES: Record<string, string> = {
     "This child only exists under your account. Delete their profile instead of ending the link.",
   MANAGED_SESSION_NOT_ALLOWED: "Switch back to your own account to do that.",
   MANAGES_CHILDREN: "Your account can't be deleted while it manages child profiles.",
+  MANAGED_UNAVAILABLE: "Adding a child isn't available yet. Please try again later.",
+  MANAGES_CHECK_FAILED:
+    "We couldn't check whether your account manages any children, so nothing was deleted. Please try again.",
 };
 
 /** The code a database or server error starts with, when it is one we know. */

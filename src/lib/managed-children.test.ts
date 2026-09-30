@@ -6,6 +6,7 @@ import {
   isManagedAuthEmailPayload,
   isManagedEmail,
   isManagedUser,
+  isMissingRelationError,
   managedByOf,
   managedChildErrorCode,
   managedChildErrorMessage,
@@ -175,5 +176,44 @@ describe("helpers", () => {
       "Something went wrong. Please try again.",
     );
     expect(managedChildErrorMessage(new Error("NAME_INVALID: x"))).toMatch(/letters only/);
+  });
+});
+
+describe("the app before the migration is applied", () => {
+  // The migration is applied through Lovable, separately from publishing the
+  // app, so for a while the new code runs against a database without the new
+  // table, column and functions. Ordinary accounts must not notice.
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const legal = read("./legal-consent.functions.ts");
+  const account = read("./account.functions.ts");
+  const fns = read("./managed-children.functions.ts");
+
+  it("recognises a missing table, and nothing else, as missing", () => {
+    expect(isMissingRelationError({ code: "PGRST205" })).toBe(true);
+    expect(isMissingRelationError({ code: "42P01" })).toBe(true);
+    expect(isMissingRelationError({ code: "42501" })).toBe(false);
+    expect(isMissingRelationError({ code: "PGRST204" })).toBe(false);
+    expect(isMissingRelationError(null)).toBe(false);
+  });
+
+  it("never names accepted_by when an ordinary account accepts the legal documents", () => {
+    // PostgREST rejects a column that does not exist even when its value is
+    // null, which would break every signup and every Terms/Privacy re-accept.
+    expect(legal).not.toMatch(/^\s*accepted_by: acceptedBy,/m);
+    expect(legal).toMatch(/\.\.\.\(acceptedBy \? \{ accepted_by: acceptedBy \} : \{\}\)/);
+  });
+
+  it("lets an account be deleted when the table is missing, but not when the check fails", () => {
+    // Deleting anonymises the account first, so an unexpected failure to count
+    // its children must stop the deletion rather than count as "none".
+    expect(account).toMatch(/countError && !isMissingRelationError\(countError\)/);
+    expect(account).toMatch(/MANAGES_CHECK_FAILED/);
+  });
+
+  it("does not create an auth user for a child when the table is missing", () => {
+    const missing = fns.search(/isMissingRelationError\(mineError\)/);
+    const create = fns.search(/auth\.admin\.createUser\(/);
+    expect(missing).toBeGreaterThan(0);
+    expect(create).toBeGreaterThan(missing);
   });
 });
