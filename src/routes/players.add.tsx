@@ -15,7 +15,11 @@ import {
   childDisplayName,
   type GuardianRelationship,
 } from "@/lib/managed-children";
-import { fetchUnfinishedChildProfile, useCreateManagedChild } from "@/lib/use-managed-children";
+import {
+  fetchUnfinishedChildProfile,
+  useCreateManagedChild,
+  useSwitchToManagedChild,
+} from "@/lib/use-managed-children";
 import type { CreatedManagedChild } from "@/lib/managed-children.functions";
 
 const searchSchema = z.object({
@@ -63,6 +67,7 @@ function AddChildPage() {
   const navigate = useNavigate();
   const { from, prefill } = Route.useSearch();
   const create = useCreateManagedChild();
+  const switchTo = useSwitchToManagedChild();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -131,6 +136,24 @@ function AddChildPage() {
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Button className="w-full sm:w-auto" onClick={() => navigate({ to: "/parent" })}>
             Go to Parent Center
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={switchTo.isPending}
+            onClick={() =>
+              switchTo.mutate(
+                { childUserId: created.childUserId, childName: created.displayName },
+                {
+                  onError: (e) =>
+                    toast.error(
+                      e instanceof Error ? e.message : "Couldn't switch to that profile.",
+                    ),
+                },
+              )
+            }
+          >
+            {switchTo.isPending ? "Switching…" : `Switch to ${first}'s profile`}
           </Button>
           <Button
             variant="outline"

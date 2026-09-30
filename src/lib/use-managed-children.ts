@@ -5,9 +5,12 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   createManagedChild,
   deleteManagedChild,
+  startManagedSession,
   type CreatedManagedChild,
 } from "@/lib/managed-children.functions";
 import type { GuardianRelationship } from "@/lib/managed-children";
+import { useMyProfiles } from "@/lib/account-profiles";
+import { switchToManagedChild } from "@/lib/managed-session";
 
 export function useCreateManagedChild() {
   const fn = useServerFn(createManagedChild);
@@ -35,6 +38,22 @@ export function useDeleteManagedChild() {
     mutationFn: (input: { childUserId: string }) => fn({ data: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["guardian-children"] });
+    },
+  });
+}
+
+/**
+ * Switch this device into a managed child's profile. Ends in a full page
+ * load, so a successful call never resolves back into the guardian's UI.
+ */
+export function useSwitchToManagedChild() {
+  const fn = useServerFn(startManagedSession);
+  const { profiles } = useMyProfiles();
+  const guardianName = profiles.find((p) => p.kind === "player")?.name ?? null;
+  return useMutation({
+    mutationFn: async (input: { childUserId: string; childName: string }) => {
+      const { tokenHash } = await fn({ data: { childUserId: input.childUserId } });
+      await switchToManagedChild({ ...input, tokenHash, guardianName });
     },
   });
 }

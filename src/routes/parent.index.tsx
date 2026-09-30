@@ -23,7 +23,7 @@ import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
-import { useDeleteManagedChild } from "@/lib/use-managed-children";
+import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -96,6 +96,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
   const revoke = useRevokeChildConsent();
   const unlink = useRevokeGuardianLink();
   const remove = useDeleteManagedChild();
+  const switchTo = useSwitchToManagedChild();
   const footprint = useChildFootprint(childUserId);
   const { submit } = useParentRequests();
   if (!child) return null;
@@ -149,6 +150,30 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             </p>
           ) : null}
         </div>
+        {child.managed ? (
+          // Everything done after switching is done as the child, under the
+          // child's rules — that is what makes acting on their behalf safe.
+          <Button
+            size="sm"
+            className="shrink-0"
+            disabled={switchTo.isPending}
+            onClick={() =>
+              switchTo.mutate(
+                { childUserId, childName: child.displayName },
+                {
+                  onError: (e) =>
+                    toast.error(
+                      e instanceof Error ? e.message : "Could not switch to that profile",
+                    ),
+                },
+              )
+            }
+          >
+            {switchTo.isPending
+              ? "Switching…"
+              : `Switch to ${child.displayName.split(" ")[0]}'s profile`}
+          </Button>
+        ) : null}
       </header>
 
       <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs">

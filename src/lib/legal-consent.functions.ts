@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { ConsentRecord, LegalDocumentType } from "@/lib/legal-documents";
+import { isManagedUser, managedByOf } from "@/lib/managed-children";
 
 const typeSchema = z.enum(["terms", "privacy"]);
 
@@ -43,12 +44,17 @@ export const recordLegalConsent = createServerFn({ method: "POST" })
     } catch {
       /* no request context */
     }
+    // In a managed child's session the person accepting is their guardian,
+    // acting for them; record that rather than implying the child did.
+    const actor = { app_metadata: context.claims?.app_metadata ?? {} };
+    const acceptedBy = isManagedUser(actor) ? managedByOf(actor) : null;
     const rows = data.acceptances.map((a) => ({
       user_id: context.userId,
       document_type: a.type,
       document_version: a.version,
       accepted_at: new Date().toISOString(),
       user_agent: userAgent,
+      accepted_by: acceptedBy,
     }));
     const { error } = await context.supabase.from("legal_consents").upsert(rows, {
       onConflict: "user_id,document_type,document_version",

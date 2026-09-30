@@ -56,7 +56,8 @@ import { useTheme } from "@/lib/theme";
 import { listMyOrgs, deleteTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { deleteMyAccount } from "@/lib/account.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { useAuth } from "@/hooks/use-auth";
+import { signOut, useAuth } from "@/hooks/use-auth";
+import { isManagedUser } from "@/lib/managed-children";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -220,12 +221,20 @@ const SECTIONS: Section[] = [
 
 function SettingsHubPage() {
   const [theme, setTheme, , resolved] = useTheme();
+  const { user } = useAuth();
+  // A managed child has no email or password, so the password screens don't
+  // apply — and setting a password there would hand the child a login their
+  // guardian never gave them.
+  const sections = isManagedUser(user)
+    ? SECTIONS.filter((section) => section.title !== "Security")
+    : SECTIONS;
 
   const handleSignOut = async () => {
     try {
-      // Device-level sign-out — see signOut() in @/hooks/use-auth for why
-      // this is `local` and not Supabase's default `global` scope.
-      await supabase.auth.signOut({ scope: "local" });
+      // The shared device-level sign-out: `local` scope (see signOut() in
+      // @/hooks/use-auth), unlinks push, clears per-account caches, and ends
+      // a parked guardian session too when signing out of a child's profile.
+      await signOut();
       toast.success("Signed out");
       window.location.href = "/auth";
     } catch {
@@ -296,7 +305,7 @@ function SettingsHubPage() {
 
         <MyOrgsSection />
 
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <SettingsGroup key={section.title} title={section.title}>
             {section.items.map((item) => (
               <SettingsLinkRow
@@ -566,6 +575,11 @@ export function DeleteAccountButton() {
   const [confirm, setConfirm] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // A managed child's profile is deleted by their guardian from the Parent
+  // Center (the server refuses it from here too). Covers every place this
+  // button is rendered.
+  if (isManagedUser(user)) return null;
 
   const primaryProvider = (user?.app_metadata as { provider?: string } | undefined)?.provider;
   const hasPassword = primaryProvider

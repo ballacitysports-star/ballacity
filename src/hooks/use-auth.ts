@@ -140,11 +140,25 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
+  // A guardian acting as a managed child has their own session parked on this
+  // device. Take it first so nothing restores it mid-sign-out, then revoke it
+  // after the current one: "Sign out" ends both.
+  let parked: import("@/lib/managed-session").ParkedGuardianSession | null = null;
+  try {
+    const { takeParkedGuardianSession } = await import("@/lib/managed-session");
+    parked = takeParkedGuardianSession();
+  } catch {
+    /* ignore */
+  }
   // `local` scope signs the user out of *this* device only. Supabase defaults
   // to `global`, which revokes every refresh token on the account — ending the
   // user's sessions on every other device they own, which is not what a
   // "Sign out" button on one browser should do.
   await supabase.auth.signOut({ scope: "local" });
+  if (parked) {
+    const { revokeParkedGuardianSession } = await import("@/lib/managed-session");
+    await revokeParkedGuardianSession(parked);
+  }
 }
 
 export async function getCurrentUser() {

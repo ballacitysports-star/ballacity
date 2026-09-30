@@ -15,6 +15,7 @@ import {
   GUARDIAN_RELATIONSHIPS,
   childDisplayName,
   isManagedUser,
+  managedByOf,
   managedChildErrorMessage,
   managedEmailFor,
 } from "@/lib/managed-children";
@@ -184,6 +185,17 @@ export const createManagedChild = createServerFn({ method: "POST" })
     const row = (Array.isArray(provisioned) ? provisioned[0] : provisioned) as
       { cohort: string; consent_recorded: boolean } | undefined;
 
+    // The auth record still carries the "Player" placeholder; give it the real
+    // name so anything reading the session's metadata agrees with the profile.
+    // No migration puts an UPDATE trigger on auth.users (handle_new_user is
+    // AFTER INSERT), so this touches nothing else. Best-effort: the profile
+    // row is the source of truth.
+    await supabaseAdmin.auth.admin
+      .updateUserById(childUserId, {
+        user_metadata: { display_name: name.displayName, account_type: "player" },
+      })
+      .catch(() => undefined);
+
     // A child the parent started on the old Add Player screen: the leftover
     // login-less row is replaced by the real profile, so remove it. RLS limits
     // the delete to the caller's own rows.
@@ -241,4 +253,64 @@ export const deleteManagedChild = createServerFn({ method: "POST" })
     } as never);
     await purgeUserAccount(data.childUserId);
     return { ok: true };
+  });
+
+/**
+ * Let the managing guardian act as their managed child.
+ *
+ * Returns only the one-time hashed token of a magic link: the browser redeems
+ * it with `verifyOtp`, so the child's session tokens are minted for the
+ * browser and never pass through this server. No email is involved —
+ * `generateLink` returns the link instead of sending it, and the auth-email
+ * hook ignores the child's placeholder address in any case.
+ *
+ * Only for a managed child (no credentials) and only for the guardian who
+ * manages them. A child with their own login is never switchable: that login
+ * is theirs.
+ */
+export const startManagedSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string }) =>
+    z.object({ childUserId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ context, data }): Promise<{ tokenHash: string }> => {
+    const ctx: Ctx = context;
+    refuseManagedCaller(ctx);
+    if ((await callerCohort(ctx)) !== "adult") {
+      throw new Error(managedChildErrorMessage("ADULT_REQUIRED"));
+    }
+
+    const { data: managed } = await ctx.supabase
+      .from("managed_accounts")
+      .select("child_user_id")
+      .eq("child_user_id", data.childUserId)
+      .eq("managed_by", ctx.userId)
+      .maybeSingle();
+    if (!managed) throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: child } = await supabaseAdmin.auth.admin.getUserById(data.childUserId);
+    const user = child?.user;
+    if (!user?.email || !isManagedUser(user) || managedByOf(user) !== ctx.userId) {
+      throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+    }
+
+    const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink",
+      email: user.email,
+    });
+    const tokenHash = link?.properties?.hashed_token;
+    if (error || !tokenHash) {
+      console.error("[managed-children] generateLink failed", error?.message);
+      throw new Error(managedChildErrorMessage(null));
+    }
+
+    await supabaseAdmin.from("family_audit_log").insert({
+      actor_user_id: ctx.userId,
+      child_user_id: data.childUserId,
+      action: "managed.session_started",
+      context: {},
+    } as never);
+
+    return { tokenHash };
   });

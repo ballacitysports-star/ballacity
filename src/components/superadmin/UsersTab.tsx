@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { displayEmail } from "@/lib/managed-children";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -125,7 +126,7 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                   ) : null}
                 </div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {u.email ?? "no email"} · {u.account_type ?? "unset"}
+                  {displayEmail(u.email) ?? "no email"} · {u.account_type ?? "unset"}
                   {u.city ? ` · ${u.city}` : ""}
                 </div>
               </div>
@@ -179,7 +180,7 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                   <CardTitle className="text-sm">Identity</CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-1">
-                  <div>Email: {userDetail.data.email ?? "—"}</div>
+                  <div>Email: {displayEmail(userDetail.data.email) ?? "—"}</div>
                   <div>
                     User id: <span className="font-mono">{openUser}</span>
                   </div>

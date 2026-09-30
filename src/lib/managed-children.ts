@@ -31,6 +31,22 @@ export function isManagedEmail(email: string | null | undefined): boolean {
 }
 
 /**
+ * The part of an address before "@", for the places that fall back to it as a
+ * name — or null. Never a managed child's placeholder, which is random
+ * characters, not a name.
+ */
+export function emailLocalPart(email: string | null | undefined): string | null {
+  if (!email || isManagedEmail(email)) return null;
+  return email.split("@")[0] || null;
+}
+
+/** An address fit to show a person; a managed child has none to show. */
+export function displayEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  return isManagedEmail(email) ? "Managed child · no email" : email;
+}
+
+/**
  * True when an auth-email hook payload is addressed to a managed child. The
  * hook is how Supabase asks the app to send signup, recovery, magic-link and
  * email-change mail; for a managed child there is nobody to receive it, and an

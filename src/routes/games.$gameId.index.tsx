@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { emailLocalPart } from "@/lib/managed-children";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -951,7 +952,7 @@ function GameDetail() {
         toast("You left the game.");
         // Notify host in real time that a player left.
         if (gameHostId && user && gameHostId !== user.id) {
-          const who = myProfile?.name || user.email?.split("@")[0] || "A player";
+          const who = myProfile?.name || emailLocalPart(user.email) || "A player";
           void createNotification({
             user_id: gameHostId,
             type: "participant_left",
@@ -1103,7 +1104,7 @@ function GameDetail() {
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
     if (gameHostId && user && gameHostId !== user.id) {
-      const who = myProfile?.name || user.email?.split("@")[0] || "A player";
+      const who = myProfile?.name || emailLocalPart(user.email) || "A player";
       void createNotification({
         user_id: gameHostId,
         type: "participant_joined",
@@ -2075,7 +2076,7 @@ function GameDetail() {
                             const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
                             if (gameHostId && user && gameHostId !== user.id) {
                               const who =
-                                myProfile?.name || user.email?.split("@")[0] || "A player";
+                                myProfile?.name || emailLocalPart(user.email) || "A player";
                               void createNotification({
                                 user_id: gameHostId,
                                 type: "waitlist_join",
