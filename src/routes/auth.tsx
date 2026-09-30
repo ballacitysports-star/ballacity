@@ -23,7 +23,12 @@ import {
 } from "@/lib/age-verification";
 import {
   ACCOUNT_TYPE_META,
-  type AccountType,
+  MANAGER_META,
+  START_AS_KEY,
+  type StartingPoint,
+  accountTypeForStartingPoint,
+  canStartAsManager,
+  hasManagerHint,
   isAccountType,
   setPendingAccountType,
 } from "@/lib/account-type";
@@ -65,9 +70,18 @@ function AuthPage() {
   // screen they were emailed a link to.
   const isGuardianEntry = !!next && isAccountSetupEscape(next);
   const [signupStep, setSignupStep] = useState<"type" | "form">(isGuardianEntry ? "form" : "type");
-  const [accountType, setAccountType] = useState<AccountType | null>(
+  const [startingPoint, setStartingPoint] = useState<StartingPoint | null>(
     isGuardianEntry ? "player" : null,
   );
+  // What the database stores: Parent / Guardian / Owner is stored as a player
+  // (see StartingPoint) and carried separately as a hint.
+  const accountType = startingPoint ? accountTypeForStartingPoint(startingPoint) : null;
+  const startingMeta =
+    startingPoint === "manager"
+      ? MANAGER_META
+      : startingPoint
+        ? ACCOUNT_TYPE_META[startingPoint]
+        : null;
   // Mandatory at signup: no account is activated without a date of birth.
   const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [email, setEmail] = useState("");
@@ -171,6 +185,7 @@ function AuthPage() {
     const dest = postAuthDestination({
       next: sanitizeNextPath(next),
       needsAccountType: await needsAccountType(currentUser),
+      startAsManager: hasManagerHint(currentUser),
       lastVisited: readLastVisited() ?? undefined,
       referrer,
     });
@@ -209,7 +224,7 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        if (!accountType) {
+        if (!startingPoint || !accountType) {
           setErrors((p) => ({ ...p, type: "Pick an account type first." }));
           toast.error("Pick an account type first.");
           setSignupStep("type");
@@ -222,6 +237,16 @@ function AuthPage() {
         if (!dobCheck.ok) {
           setErrors((p) => ({ ...p, dob: dobCheck.message }));
           toast.error(dobCheck.message);
+          dobRef.current?.focus();
+          return;
+        }
+        // The date is entered after the type is chosen, so this is the first
+        // point the account type can be checked against it. Everything a
+        // manager creates (a child, a team, a gym) needs an adult.
+        if (startingPoint === "manager" && !canStartAsManager(dobCheck.cohort)) {
+          const message = `${MANAGER_META.label} accounts are for adults. Choose another account type to continue.`;
+          setErrors((p) => ({ ...p, dob: message }));
+          toast.error(message);
           dobRef.current?.focus();
           return;
         }
@@ -246,6 +271,9 @@ function AuthPage() {
             data: {
               display_name: displayName || email.split("@")[0],
               account_type: accountType,
+              // Survives email confirmation on another device; read once by
+              // the landing routes and cleared when its screen is used.
+              ...(startingPoint === "manager" ? { [START_AS_KEY]: "manager" } : {}),
             },
           },
         });
@@ -527,7 +555,7 @@ function AuthPage() {
 
         {mode === "signup" && signupStep === "type" ? (
           <>
-            <AccountTypePicker value={accountType} onChange={setAccountType} />
+            <AccountTypePicker value={startingPoint} onChange={setStartingPoint} />
             <p className="text-center text-xs text-muted-foreground">
               You can add team, trainer, and gym profiles later and switch between them anytime.
             </p>
@@ -540,7 +568,7 @@ function AuthPage() {
 
             <button
               onClick={() => {
-                if (!accountType) {
+                if (!startingPoint) {
                   setErrors((p) => ({ ...p, type: "Pick an account type to continue." }));
                   toast.error("Pick an account type to continue.");
                   return;
@@ -566,12 +594,12 @@ function AuthPage() {
                 This account is for supervising your child — you can set up a player profile of your
                 own later.
               </div>
-            ) : mode === "signup" && accountType ? (
+            ) : mode === "signup" && startingMeta ? (
               <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
                 <span>
                   Signing up as{" "}
                   <span className="font-bold">
-                    {ACCOUNT_TYPE_META[accountType].emoji} {ACCOUNT_TYPE_META[accountType].label}
+                    {startingMeta.emoji} {startingMeta.label}
                   </span>
                 </span>
                 <button

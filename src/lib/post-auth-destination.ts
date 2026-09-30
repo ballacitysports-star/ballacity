@@ -1,4 +1,4 @@
-import { ACCOUNT_TYPE_ROUTE, isAccountSetupEscape } from "@/lib/age-verification";
+import { ACCOUNT_TYPE_ROUTE, MANAGER_ROUTE, isAccountSetupEscape } from "@/lib/age-verification";
 
 export const DEFAULT_POST_AUTH_DESTINATION = "/feed";
 
@@ -7,6 +7,11 @@ export type PostAuthDestinationInput = {
   next: string | undefined;
   /** True when the signed-in account still needs to pick an account type. */
   needsAccountType: boolean;
+  /**
+   * True while the account still carries the Parent / Guardian / Owner hint it
+   * signed up with (`hasManagerHint`). It has not yet said what it will manage.
+   */
+  startAsManager?: boolean;
   /** Path recorded before the visitor was routed to `/auth`, if any. */
   lastVisited?: string | undefined;
   /** Same-origin referrer path, used when neither of the above is set. */
@@ -27,11 +32,17 @@ export type PostAuthDestinationInput = {
  * account to the account-type picker first, a guardian would be forced
  * through a question the root gate itself skips for them, stranded one step
  * before the consent screen they were emailed a link to.
+ *
+ * A manager who signed up as Parent / Guardian / Owner is asked what they will
+ * manage before anything they merely visited or were referred from — but never
+ * ahead of a page they explicitly asked for (`next`), which they keep.
  */
 export function postAuthDestination(input: PostAuthDestinationInput): string {
-  const { next, needsAccountType, lastVisited, referrer } = input;
+  const { next, needsAccountType, startAsManager, lastVisited, referrer } = input;
 
   if (next && isAccountSetupEscape(next)) return next;
   if (needsAccountType) return ACCOUNT_TYPE_ROUTE;
-  return next ?? lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
+  if (next !== undefined) return next;
+  if (startAsManager) return MANAGER_ROUTE;
+  return lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
 }

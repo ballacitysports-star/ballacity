@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_TYPE_ROUTE,
   AGE_GATE_ROUTE,
+  MANAGER_ROUTE,
   isAccountSetupEscape,
   needsAgeGate,
   routeForSignupState,
@@ -76,6 +77,18 @@ describe("onboarding guards never loop", () => {
 
   it("still guards ordinary protected routes", () => {
     const { skipAgeCheck, skipTypeCheck } = gates("/feed");
+    expect(skipAgeCheck).toBe(false);
+    expect(skipTypeCheck).toBe(false);
+  });
+});
+
+describe("the Parent / Guardian / Owner screen", () => {
+  it("is an ordinary gated route, not an account-setup escape", () => {
+    // The account is stored as a player before this screen is reached, so both
+    // gates have already been answered and stay active on it. Making it an
+    // escape would let an account skip the age step by going straight to it.
+    expect(isAccountSetupEscape(MANAGER_ROUTE)).toBe(false);
+    const { skipAgeCheck, skipTypeCheck } = gates(MANAGER_ROUTE);
     expect(skipAgeCheck).toBe(false);
     expect(skipTypeCheck).toBe(false);
   });

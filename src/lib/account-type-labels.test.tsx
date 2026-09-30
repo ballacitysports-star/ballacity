@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ACCOUNT_TYPE_META, ACCOUNT_TYPES } from "./account-type";
+import {
+  ACCOUNT_TYPE_META,
+  ACCOUNT_TYPES,
+  MANAGER_META,
+  accountTypeForStartingPoint,
+} from "./account-type";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
 
 /**
@@ -79,6 +84,66 @@ describe("AccountTypePicker (onboarding)", () => {
     for (const word of RETIRED_PROFILE_TYPE_WORDS) {
       expect(html).not.toMatch(new RegExp(`\\b${word}\\b`));
     }
+  });
+});
+
+/**
+ * Parent / Guardian / Owner is a starting point, not a fifth account type: the
+ * database only holds the four above, and this contract pins them. The tile is
+ * named in the same vocabulary as the rest of the picker.
+ */
+describe("Parent / Guardian / Owner starting point", () => {
+  it("is not an account type", () => {
+    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym"]);
+    expect(ACCOUNT_TYPES as string[]).not.toContain("manager");
+  });
+
+  it("uses the label the product asked for", () => {
+    expect(MANAGER_META.label).toBe("Parent / Guardian / Owner");
+  });
+
+  it("keeps the retired vocabulary out of its copy", () => {
+    for (const word of RETIRED_PROFILE_TYPE_WORDS) {
+      const re = new RegExp(`\\b${word}\\b`);
+      expect(MANAGER_META.label).not.toMatch(re);
+      expect(MANAGER_META.blurb).not.toMatch(re);
+    }
+    for (const pair of RETIRED_SLASH_PAIRS) {
+      expect(MANAGER_META.label).not.toContain(pair);
+      expect(MANAGER_META.blurb).not.toContain(pair);
+    }
+  });
+
+  it("never says 'player', so the Player tile stays the only match for /Player/i", () => {
+    // e2e/onboarding-null-account-type.spec.ts finds the Player tile with
+    // getByRole("button", { name: /Player/i }), and Playwright refuses a
+    // locator that matches two buttons.
+    expect(`${MANAGER_META.label} ${MANAGER_META.blurb}`).not.toMatch(/player/i);
+  });
+
+  it("is stored as a player, and every real type is stored as itself", () => {
+    expect(accountTypeForStartingPoint("manager")).toBe("player");
+    for (const t of ACCOUNT_TYPES) expect(accountTypeForStartingPoint(t)).toBe(t);
+  });
+
+  it("is offered in the picker by default and can be left out", () => {
+    const offered = renderToStaticMarkup(<AccountTypePicker value={null} onChange={() => {}} />);
+    expect(offered).toContain(`>${MANAGER_META.label}<`);
+    expect(offered).toContain(MANAGER_META.blurb);
+
+    const left = renderToStaticMarkup(
+      <AccountTypePicker value={null} onChange={() => {}} allowManager={false} />,
+    );
+    expect(left).not.toContain(MANAGER_META.label);
+    // The four real types are unaffected either way.
+    for (const t of ACCOUNT_TYPES) expect(left).toContain(`>${ACCOUNT_TYPE_META[t].label}<`);
+  });
+
+  it("marks only the chosen tile as pressed", () => {
+    const html = renderToStaticMarkup(<AccountTypePicker value="manager" onChange={() => {}} />);
+    expect((html.match(/aria-pressed="true"/g) ?? []).length).toBe(1);
+    const plain = renderToStaticMarkup(<AccountTypePicker value="team" onChange={() => {}} />);
+    expect((plain.match(/aria-pressed="true"/g) ?? []).length).toBe(1);
   });
 });
 
