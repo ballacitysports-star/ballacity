@@ -81,6 +81,12 @@ export async function purgeUserAccount(userId: string): Promise<void> {
   // account_profiles.user_id has no foreign key, so the cascade in step 3
   // never reaches the account's own player row.
   await supabaseAdmin.from("account_profiles").delete().eq("user_id", userId);
+  // The same goes for these three: keyed by user_id with no foreign key, an inbox
+  // entry, a queued push and a session-time row would outlive the account under
+  // an id that no longer exists.
+  await supabaseAdmin.from("notifications").delete().eq("user_id", userId);
+  await supabaseAdmin.from("scheduled_notifications").delete().eq("user_id", userId);
+  await supabaseAdmin.from("session_activity").delete().eq("user_id", userId);
 
   // 2. Delete uploaded media owned by this user.
   for (const bucket of MEDIA_BUCKETS) {

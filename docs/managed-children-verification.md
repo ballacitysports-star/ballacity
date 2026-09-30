@@ -99,8 +99,10 @@ Note on M18: the test deleted the auth user directly. `legal_consents` rows and
 the `account_profiles` player row are not foreign-keyed to `auth.users`, so a
 direct delete leaves them — true for every account today, not only managed
 children. The app's delete path (`purgeUserAccount`) now removes the
-`account_profiles` rows explicitly; `legal_consents` rows are kept as the
-consent record, as before.
+`account_profiles` rows explicitly, and (after the live check below) the
+`notifications`, `scheduled_notifications` and `session_activity` rows, which
+have no foreign key either; `legal_consents` rows are kept as the consent
+record, as before.
 
 ## Applying the migrations and publishing
 
@@ -207,19 +209,30 @@ Everything was read-only.
 as the consent record, as for every account). Not expected: one `notifications`
 row (the child's "Your account is approved", with no name in it) and one
 `session_activity` row (start and heartbeat times and a timezone). Neither table
-has a foreign key to `auth.users`, and `purgeUserAccount` removes neither.
+has a foreign key to `auth.users`, and `purgeUserAccount` removed neither.
 
-This is not specific to managed children. Since `purgeUserAccount` removes
-neither table's rows, deleting any account through it leaves that account's
-rows in both, and the database already holds 19 more orphaned `session_activity`
+This was not specific to managed children. Since `purgeUserAccount` removed
+neither table's rows, deleting any account through it left that account's rows
+in both, and the database already holds 19 more orphaned `session_activity`
 rows and 4 more `notifications` rows than this child's (20 of 152 and 5 of 30 in
 all), plus 4 more `legal_consents` rows (6 in all, kept by design). More
 widely, 19 columns across 17 public tables look like user references by
 name and have no foreign key at all (for example `team_members.user_id`,
-`join_requests.player_id`, `conversation_participants.user_id`,
-`scheduled_notifications.user_id`; `account_profiles` and `messages` are handled
-by the purge). Only the two tables above held anything for this short-lived test
-child, and the others have not been examined.
+`join_requests.player_id`, `conversation_participants.user_id`;
+`account_profiles` and `messages` are handled by the purge). Only the two tables
+above held anything for this short-lived test child, and the others have not
+been examined.
+
+**Fixed afterwards.** `purgeUserAccount` now also deletes the account's
+`notifications`, `session_activity` and `scheduled_notifications` rows (the
+curfew queue of held pushes: the same shape, though it held nothing for this
+child), before it deletes the auth user. `src/lib/account-purge.test.ts` pins
+it, and the three deletes were run as `service_role` on the local replay: one
+user's rows went and another's stayed. This only applies to deletions from now
+on. The rows already orphaned in production (above) are still there; removing
+them is a one-off `DELETE` on the live database that has not been run. The
+other FK-less tables listed above are unchanged: several need a product decision
+(a team roster entry, a conversation participant) rather than a plain delete.
 
 **Not verified on a live child**, because it was deleted before its rows were
 read: the auth user's placeholder email and lack of a password (its
