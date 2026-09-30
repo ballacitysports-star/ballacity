@@ -51,12 +51,6 @@ export type SignupState =
 export const AGE_GATE_ROUTE = "/onboarding/age";
 export const CHILD_CONSENT_ROUTE = "/onboarding/child";
 export const ACCOUNT_TYPE_ROUTE = "/onboarding/account-type";
-/**
- * Where a Parent / Guardian / Owner goes once the account exists: what will they
- * manage? An ordinary gated route — it needs the age and account-type steps done
- * first — so it is deliberately not one of ACCOUNT_SETUP_ESCAPES.
- */
-export const MANAGER_ROUTE = "/onboarding/manage";
 
 /**
  * Screens that belong to the age / guardian-consent step. Both root gates (age

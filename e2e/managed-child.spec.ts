@@ -58,18 +58,25 @@ test.describe("Add your child form", () => {
     await expect(page.getByRole("button", { name: /^add child$/i })).toBeDisabled();
   });
 
-  test("onboarding sends a parent setting up for a child to Add your child", async ({ page }) => {
+  // Choosing Parent / Guardian lands here (see onboarding-null-account-type.spec.ts).
+  // A parent who is not ready to add a child yet can go on to the Parent Center.
+  test("Add your child, reached from onboarding, can be skipped for the Parent Center", async ({
+    page,
+  }) => {
     await signInAs(page, "host");
-    await page.goto("/onboarding/setup-for", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.getByRole("heading", { name: /who are you setting up ballacity for/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await page.goto("/players/add?from=parent", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /add your child/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    // From the Parent Center there is nothing to skip.
+    await expect(page.getByRole("link", { name: /skip for now/i })).toHaveCount(0);
 
-    const cont = page.getByRole("button", { name: /^continue$/i });
-    await expect(cont).toBeDisabled();
-    await page.getByRole("button", { name: /setting this up for my child/i }).click();
-    await cont.click();
-    await expect(page).toHaveURL(/\/players\/add\?from=onboarding/, { timeout: 15_000 });
+    await page.goto("/players/add?from=onboarding", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /add your child/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("link", { name: /skip for now/i }).click();
+    await expect(page).toHaveURL(/\/parent(?:[?#].*)?$/, { timeout: 15_000 });
   });
 });
 

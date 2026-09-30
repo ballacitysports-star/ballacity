@@ -12,7 +12,7 @@ import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
-import { AccountTypePicker } from "@/components/AccountTypePicker";
+import { RolePicker } from "@/components/RolePicker";
 import {
   EMPTY_DOB,
   MONTHS,
@@ -22,15 +22,17 @@ import {
   type DobParts,
 } from "@/lib/age-verification";
 import {
-  ACCOUNT_TYPE_META,
-  MANAGER_META,
+  SETUPS,
   START_AS_KEY,
-  type StartingPoint,
-  accountTypeForStartingPoint,
-  canStartAsManager,
-  hasManagerHint,
+  type SetupId,
+  accountTypeForSetup,
+  canChooseRole,
+  clearStartHint,
+  hrefForSetup,
   isAccountType,
+  roleOfSetup,
   setPendingAccountType,
+  startSetupOf,
 } from "@/lib/account-type";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
 import {
@@ -70,18 +72,11 @@ function AuthPage() {
   // screen they were emailed a link to.
   const isGuardianEntry = !!next && isAccountSetupEscape(next);
   const [signupStep, setSignupStep] = useState<"type" | "form">(isGuardianEntry ? "form" : "type");
-  const [startingPoint, setStartingPoint] = useState<StartingPoint | null>(
-    isGuardianEntry ? "player" : null,
-  );
-  // What the database stores: Parent / Guardian / Owner is stored as a player
-  // (see StartingPoint) and carried separately as a hint.
-  const accountType = startingPoint ? accountTypeForStartingPoint(startingPoint) : null;
-  const startingMeta =
-    startingPoint === "manager"
-      ? MANAGER_META
-      : startingPoint
-        ? ACCOUNT_TYPE_META[startingPoint]
-        : null;
+  // What they chose to do, and the account type the database stores for it (a
+  // parent is stored as a player; see SetupId).
+  const [setup, setSetup] = useState<SetupId | null>(isGuardianEntry ? "player" : null);
+  const accountType = setup ? accountTypeForSetup(setup) : null;
+  const role = setup ? roleOfSetup(setup) : null;
   // Mandatory at signup: no account is activated without a date of birth.
   const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [email, setEmail] = useState("");
@@ -164,7 +159,14 @@ function AuthPage() {
     }, 2500);
   };
 
+  // The session effect, the auth listener and a fresh `user` all call goPostAuth
+  // for one sign-in, and clearing the hint is itself a user update that raises
+  // another. Once one of them has used the hint the rest stand down: a later one
+  // sees no hint and would send the member to the feed instead of their setup.
+  const usedStartHint = useRef(false);
+
   const goPostAuth = async (currentUser: User | null | undefined = user) => {
+    if (usedStartHint.current) return;
     // Some mobile in-app browsers strip the `next` query on redirects; fall
     // back to a same-origin referrer so users never get bounced back to
     // marketing. Read this before the account-type check so a guardian
@@ -182,13 +184,22 @@ function AuthPage() {
       /* ignore */
     }
 
+    const startSetup = startSetupOf(currentUser);
+    const startDestination = startSetup ? hrefForSetup(startSetup) : undefined;
     const dest = postAuthDestination({
       next: sanitizeNextPath(next),
       needsAccountType: await needsAccountType(currentUser),
-      startAsManager: hasManagerHint(currentUser),
+      startDestination,
       lastVisited: readLastVisited() ?? undefined,
       referrer,
     });
+    // Once the hint is what sends them on it has done its job. Wait for that, or
+    // the full-page navigation below can cancel the update and send them again.
+    if (startDestination && dest === startDestination) {
+      if (usedStartHint.current) return;
+      usedStartHint.current = true;
+      await withTimeout(clearStartHint(), 2000, undefined);
+    }
     leave(dest);
   };
 
@@ -224,9 +235,9 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        if (!startingPoint || !accountType) {
-          setErrors((p) => ({ ...p, type: "Pick an account type first." }));
-          toast.error("Pick an account type first.");
+        if (!setup || !accountType || !role) {
+          setErrors((p) => ({ ...p, type: "Pick a role first." }));
+          toast.error("Pick a role first.");
           setSignupStep("type");
           return;
         }
@@ -240,11 +251,11 @@ function AuthPage() {
           dobRef.current?.focus();
           return;
         }
-        // The date is entered after the type is chosen, so this is the first
-        // point the account type can be checked against it. Everything a
-        // manager creates (a child, a team, a gym) needs an adult.
-        if (startingPoint === "manager" && !canStartAsManager(dobCheck.cohort)) {
-          const message = `${MANAGER_META.label} accounts are for adults. Choose another account type to continue.`;
+        // The date is entered after the role is chosen, so this is the first
+        // point the role can be checked against it. Everything a parent or
+        // guardian sets up needs an adult.
+        if (!canChooseRole(role.id, dobCheck.cohort)) {
+          const message = `${role.label} accounts are for adults. Choose another role to continue.`;
           setErrors((p) => ({ ...p, dob: message }));
           toast.error(message);
           dobRef.current?.focus();
@@ -271,9 +282,11 @@ function AuthPage() {
             data: {
               display_name: displayName || email.split("@")[0],
               account_type: accountType,
-              // Survives email confirmation on another device; read once by
-              // the landing routes and cleared when its screen is used.
-              ...(startingPoint === "manager" ? { [START_AS_KEY]: "manager" } : {}),
+              // Survives email confirmation on another device; read once by the
+              // landing routes, which send them to it and then clear it. Not for
+              // a guardian who came in on a consent link: that link is where
+              // they are going.
+              ...(isGuardianEntry ? {} : { [START_AS_KEY]: setup }),
             },
           },
         });
@@ -555,9 +568,9 @@ function AuthPage() {
 
         {mode === "signup" && signupStep === "type" ? (
           <>
-            <AccountTypePicker value={startingPoint} onChange={setStartingPoint} />
+            <RolePicker value={setup} onChange={setSetup} />
             <p className="text-center text-xs text-muted-foreground">
-              You can add team, trainer, and gym profiles later and switch between them anytime.
+              You can add other profiles later and switch between them anytime.
             </p>
 
             {errors.type ? (
@@ -568,9 +581,9 @@ function AuthPage() {
 
             <button
               onClick={() => {
-                if (!startingPoint) {
-                  setErrors((p) => ({ ...p, type: "Pick an account type to continue." }));
-                  toast.error("Pick an account type to continue.");
+                if (!setup) {
+                  setErrors((p) => ({ ...p, type: "Pick a role to continue." }));
+                  toast.error("Pick a role to continue.");
                   return;
                 }
                 setErrors((p) => ({ ...p, type: null }));
@@ -594,12 +607,13 @@ function AuthPage() {
                 This account is for supervising your child — you can set up a player profile of your
                 own later.
               </div>
-            ) : mode === "signup" && startingMeta ? (
+            ) : mode === "signup" && setup && role ? (
               <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
                 <span>
                   Signing up as{" "}
                   <span className="font-bold">
-                    {startingMeta.emoji} {startingMeta.label}
+                    {role.emoji} {role.label}
+                    {role.setups.length > 1 ? ` · ${SETUPS[setup].label}` : ""}
                   </span>
                 </span>
                 <button

@@ -298,6 +298,17 @@ function AddChildPage() {
       <Button className="mt-6 w-full" disabled={!canSubmit} onClick={submit}>
         {saving ? "Adding…" : "Add child"}
       </Button>
+      {from === "onboarding" ? (
+        // A parent who signed up may want to look around, or add the child later.
+        <div className="mt-3 text-center">
+          <Link
+            to="/parent"
+            className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Skip for now — go to the Parent Center
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
