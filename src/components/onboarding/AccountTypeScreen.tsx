@@ -9,10 +9,23 @@ import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   type AccountType,
+  type StartingPoint,
+  accountTypeForStartingPoint,
+  canStartAsManager,
   clearPendingAccountType,
   isAccountType,
   setAccountTypeForCurrentUser,
 } from "@/lib/account-type";
+import { MANAGER_ROUTE, useMyAgeStatus } from "@/lib/age-verification";
+
+/**
+ * Where the standalone picker sends each starting point. A manager is stored as
+ * a player but does not go through "who is this for?" — they have already said,
+ * and what they manage is the next question.
+ */
+export function destinationForStartingPoint(point: StartingPoint): string {
+  return point === "manager" ? MANAGER_ROUTE : destinationForAccountType(point);
+}
 
 export function destinationForAccountType(t: AccountType): string {
   switch (t) {
@@ -36,19 +49,25 @@ export function destinationForAccountType(t: AccountType): string {
  * The profile-type step. Rendered either as its own page
  * (/onboarding/account-type) or inline by the root gate.
  *
- * `onResolved` fires after a type is saved; `onAlreadySet` fires when the
- * account already has one. When omitted, the screen navigates itself.
+ * `onResolved` fires after a type is saved (with the starting point they chose,
+ * which differs from the type for Parent / Guardian / Owner); `onAlreadySet`
+ * fires when the account already has one. When omitted, the screen navigates
+ * itself.
  */
 export function AccountTypeScreen({
   onResolved,
   onAlreadySet,
 }: {
-  onResolved?: (type: AccountType) => void;
+  onResolved?: (type: AccountType, startingPoint: StartingPoint) => void;
   onAlreadySet?: () => void;
 }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [choice, setChoice] = useState<AccountType | null>(null);
+  const [choice, setChoice] = useState<StartingPoint | null>(null);
+  // Age is settled before this screen is reachable. Parent / Guardian / Owner is
+  // offered to adults only, and only once that is known.
+  const { data: ageStatus } = useMyAgeStatus(!!user);
+  const allowManager = canStartAsManager(ageStatus?.cohort);
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -86,14 +105,15 @@ export function AccountTypeScreen({
     if (!choice || busy) return;
     setBusy(true);
     try {
-      await setAccountTypeForCurrentUser(choice);
+      const type = accountTypeForStartingPoint(choice);
+      await setAccountTypeForCurrentUser(type);
       clearPendingAccountType();
       toast.success("Account type set.");
       if (onResolved) {
-        onResolved(choice);
+        onResolved(type, choice);
         setBusy(false);
       } else {
-        window.location.replace(destinationForAccountType(choice));
+        window.location.replace(destinationForStartingPoint(choice));
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save.");
@@ -129,7 +149,12 @@ export function AccountTypeScreen({
       }
     >
       <div className="space-y-5">
-        <AccountTypePicker value={choice} onChange={setChoice} heading={false} />
+        <AccountTypePicker
+          value={choice}
+          onChange={setChoice}
+          heading={false}
+          allowManager={allowManager}
+        />
         <p className="rounded-2xl border border-border bg-surface p-3 text-xs text-muted-foreground">
           This is just your starting point. You can add other profiles later and switch between them
           anytime.

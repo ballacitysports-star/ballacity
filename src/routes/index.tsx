@@ -10,7 +10,8 @@ import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
-import { isAccountType } from "@/lib/account-type";
+import { hasManagerHint, isAccountType } from "@/lib/account-type";
+import { MANAGER_ROUTE } from "@/lib/age-verification";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 
@@ -64,7 +65,14 @@ function Landing() {
         .maybeSingle();
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
-      const dest = isAccountType(t) ? (readLastVisited() ?? "/feed") : "/onboarding/account-type";
+      // An email-confirmation link lands here, possibly on another device from
+      // the sign-up, so a Parent / Guardian / Owner is asked what they will
+      // manage before the feed. The hint is cleared when that screen is used.
+      const dest = !isAccountType(t)
+        ? "/onboarding/account-type"
+        : hasManagerHint(user)
+          ? MANAGER_ROUTE
+          : (readLastVisited() ?? "/feed");
       router.navigate({ to: dest, replace: true });
     })();
     return () => {

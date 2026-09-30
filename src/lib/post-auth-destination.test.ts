@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACCOUNT_TYPE_ROUTE } from "@/lib/age-verification";
+import { ACCOUNT_TYPE_ROUTE, MANAGER_ROUTE } from "@/lib/age-verification";
 import { DEFAULT_POST_AUTH_DESTINATION, postAuthDestination } from "@/lib/post-auth-destination";
 
 /**
@@ -86,5 +86,61 @@ describe("postAuthDestination", () => {
     for (const next of ["/safety/children", "/account/legal", "/parent"]) {
       expect(postAuthDestination({ next, needsAccountType: true })).toBe(next);
     }
+  });
+});
+
+/**
+ * A member who signed up as Parent / Guardian / Owner is stored as a player and
+ * carries a hint (`hasManagerHint`) until they have said what they will manage.
+ * The hint only ever adds one screen; it never takes away a page someone asked
+ * for, and never gets ahead of a question the account has to answer first.
+ */
+describe("postAuthDestination with the manager hint", () => {
+  const base = { needsAccountType: false, lastVisited: undefined, referrer: undefined };
+
+  it("asks what they will manage before anything they merely visited", () => {
+    expect(postAuthDestination({ ...base, next: undefined, startAsManager: true })).toBe(
+      MANAGER_ROUTE,
+    );
+    expect(
+      postAuthDestination({
+        ...base,
+        next: undefined,
+        startAsManager: true,
+        lastVisited: "/games/42",
+        referrer: "/players",
+      }),
+    ).toBe(MANAGER_ROUTE);
+  });
+
+  it("keeps the page they explicitly asked for", () => {
+    expect(postAuthDestination({ ...base, next: "/games/42", startAsManager: true })).toBe(
+      "/games/42",
+    );
+  });
+
+  it("still sends an unresolved account to the type picker first", () => {
+    expect(
+      postAuthDestination({
+        next: undefined,
+        needsAccountType: true,
+        startAsManager: true,
+        lastVisited: undefined,
+        referrer: undefined,
+      }),
+    ).toBe(ACCOUNT_TYPE_ROUTE);
+  });
+
+  it("still honours an account-setup escape, such as a consent link", () => {
+    expect(
+      postAuthDestination({ ...base, next: "/parent/consent/abc123", startAsManager: true }),
+    ).toBe("/parent/consent/abc123");
+  });
+
+  it("changes nothing without the hint", () => {
+    expect(postAuthDestination({ ...base, next: undefined, startAsManager: false })).toBe(
+      DEFAULT_POST_AUTH_DESTINATION,
+    );
+    expect(postAuthDestination({ ...base, next: undefined })).toBe(DEFAULT_POST_AUTH_DESTINATION);
   });
 });

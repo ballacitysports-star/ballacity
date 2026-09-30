@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { destinationForSetupChoice } from "@/routes/onboarding.setup-for";
-import { destinationForAccountType } from "@/components/onboarding/AccountTypeScreen";
+import { destinationForManageChoice } from "@/routes/onboarding.manage";
+import {
+  destinationForAccountType,
+  destinationForStartingPoint,
+} from "@/components/onboarding/AccountTypeScreen";
+import { MANAGER_ROUTE } from "@/lib/age-verification";
 
 /**
  * Adding a child, and the onboarding fork that leads to it.
@@ -102,5 +107,34 @@ describe("the onboarding fork", () => {
     expect(destinationForAccountType("team")).toBe("/teams/create");
     expect(destinationForAccountType("trainer")).toBe("/trainers/create");
     expect(destinationForAccountType("gym")).toBe("/orgs/create");
+  });
+});
+
+describe("the Parent / Guardian / Owner fork", () => {
+  it("sends the new top-level choice to 'what will you manage?', not the player fork", () => {
+    // Stored as a player, but they have already said who they are: asking "who
+    // is this for?" as well would be the same question twice.
+    expect(destinationForStartingPoint("manager")).toBe(MANAGER_ROUTE);
+    expect(MANAGER_ROUTE).toBe("/onboarding/manage");
+  });
+
+  it("leaves every real account type going where it went before", () => {
+    for (const t of ["player", "team", "trainer", "gym"] as const) {
+      expect(destinationForStartingPoint(t)).toBe(destinationForAccountType(t));
+    }
+  });
+
+  it("sends each thing they can manage to the flow that creates it", () => {
+    expect(destinationForManageChoice("child")).toBe("/players/add");
+    expect(destinationForManageChoice("team")).toBe("/teams/create");
+    expect(destinationForManageChoice("gym")).toBe("/orgs/create");
+  });
+
+  it("opens Add your child with the onboarding wording when the child is chosen", () => {
+    const manage = readFileSync(
+      new URL("../routes/onboarding.manage.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(manage).toMatch(/choice === "child" \? \{ from: "onboarding" \} : undefined/);
   });
 });

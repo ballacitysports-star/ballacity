@@ -68,6 +68,7 @@ import { Route as MessagesConversationIdRouteImport } from './routes/messages.$c
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as OnboardingAgeRouteImport } from './routes/onboarding.age'
 import { Route as OnboardingChildRouteImport } from './routes/onboarding.child'
+import { Route as OnboardingManageRouteImport } from './routes/onboarding.manage'
 import { Route as OnboardingSetupForRouteImport } from './routes/onboarding.setup-for'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
@@ -401,6 +402,11 @@ const OnboardingChildRoute = OnboardingChildRouteImport.update({
   path: '/onboarding/child',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingManageRoute = OnboardingManageRouteImport.update({
+  id: '/onboarding/manage',
+  path: '/onboarding/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingSetupForRoute = OnboardingSetupForRouteImport.update({
   id: '/onboarding/setup-for',
   path: '/onboarding/setup-for',
@@ -637,6 +643,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/manage': typeof OnboardingManageRoute
   '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -731,6 +738,7 @@ export interface FileRoutesByTo {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/manage': typeof OnboardingManageRoute
   '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -828,6 +836,7 @@ export interface FileRoutesById {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/manage': typeof OnboardingManageRoute
   '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -925,6 +934,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/manage'
     | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -1019,6 +1029,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/manage'
     | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -1115,6 +1126,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/manage'
     | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -1202,6 +1214,7 @@ export interface RootRouteChildren {
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
   OnboardingChildRoute: typeof OnboardingChildRoute
+  OnboardingManageRoute: typeof OnboardingManageRoute
   OnboardingSetupForRoute: typeof OnboardingSetupForRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
@@ -1654,6 +1667,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingChildRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/manage': {
+      id: '/onboarding/manage'
+      path: '/onboarding/manage'
+      fullPath: '/onboarding/manage'
+      preLoaderRoute: typeof OnboardingManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/setup-for': {
       id: '/onboarding/setup-for'
       path: '/onboarding/setup-for'
@@ -1994,6 +2014,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,
   OnboardingChildRoute: OnboardingChildRoute,
+  OnboardingManageRoute: OnboardingManageRoute,
   OnboardingSetupForRoute: OnboardingSetupForRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,

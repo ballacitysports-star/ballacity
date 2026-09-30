@@ -1,4 +1,9 @@
-import { ACCOUNT_TYPE_META, ACCOUNT_TYPES, type AccountType } from "@/lib/account-type";
+import {
+  ACCOUNT_TYPE_META,
+  ACCOUNT_TYPES,
+  MANAGER_META,
+  type StartingPoint,
+} from "@/lib/account-type";
 
 export function AccountTypePicker({
   value,
@@ -10,12 +15,18 @@ export function AccountTypePicker({
    * shell does, and two headings asking the same thing reads as a bug.
    */
   heading = true,
+  /**
+   * The Parent / Guardian / Owner tile. Off where the member is known not to
+   * be an adult, since everything it leads to needs one.
+   */
+  allowManager = true,
 }: {
-  value: AccountType | null;
-  onChange: (t: AccountType) => void;
+  value: StartingPoint | null;
+  onChange: (t: StartingPoint) => void;
   title?: string;
   subtitle?: string;
   heading?: boolean;
+  allowManager?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -47,6 +58,24 @@ export function AccountTypePicker({
             </button>
           );
         })}
+        {allowManager ? (
+          <button
+            type="button"
+            onClick={() => onChange("manager")}
+            className={`col-span-2 flex items-center gap-3 rounded-2xl border p-4 text-left transition ${
+              value === "manager"
+                ? "border-lime bg-lime/10 ring-2 ring-lime"
+                : "border-border bg-surface hover:border-foreground/30"
+            }`}
+            aria-pressed={value === "manager"}
+          >
+            <span className="text-3xl leading-none">{MANAGER_META.emoji}</span>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="text-sm font-bold">{MANAGER_META.label}</span>
+              <span className="text-xs text-muted-foreground">{MANAGER_META.blurb}</span>
+            </span>
+          </button>
+        ) : null}
       </div>
     </div>
   );
