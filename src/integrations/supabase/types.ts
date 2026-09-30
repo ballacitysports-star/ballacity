@@ -1425,6 +1425,7 @@ export type Database = {
       legal_consents: {
         Row: {
           accepted_at: string
+          accepted_by: string | null
           created_at: string
           document_type: string
           document_version: string
@@ -1434,6 +1435,7 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string
+          accepted_by?: string | null
           created_at?: string
           document_type: string
           document_version: string
@@ -1443,6 +1445,7 @@ export type Database = {
         }
         Update: {
           accepted_at?: string
+          accepted_by?: string | null
           created_at?: string
           document_type?: string
           document_version?: string
@@ -1581,6 +1584,27 @@ export type Database = {
           sport?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      managed_accounts: {
+        Row: {
+          child_user_id: string
+          created_at: string
+          managed_by: string
+          relationship: string
+        }
+        Insert: {
+          child_user_id: string
+          created_at?: string
+          managed_by: string
+          relationship?: string
+        }
+        Update: {
+          child_user_id?: string
+          created_at?: string
+          managed_by?: string
+          relationship?: string
         }
         Relationships: []
       }
@@ -3850,6 +3874,7 @@ export type Database = {
         Args: { _reviewee_id: string; _user: string }
         Returns: boolean
       }
+      is_managed_account: { Args: { _user: string }; Returns: boolean }
       is_minor: { Args: { _user: string }; Returns: boolean }
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
@@ -4027,6 +4052,21 @@ export type Database = {
         }[]
       }
       profile_visibility_of: { Args: { _user: string }; Returns: string }
+      provision_managed_child: {
+        Args: {
+          _attested?: boolean
+          _child: string
+          _display_name: string
+          _dob: string
+          _relationship?: string
+          _sport?: string
+          _versions?: Json
+        }
+        Returns: {
+          cohort: string
+          consent_recorded: boolean
+        }[]
+      }
       public_privacy_flags: {
         Args: { _ids: string[] }
         Returns: {
