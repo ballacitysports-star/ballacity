@@ -17,9 +17,11 @@ Code: `supabase/migrations/20260930120000_managed_children.sql`,
 
 ## How this was verified
 
-**Not yet against the live backend.** The migrations are applied through Lovable
-(`docs/supabase-cli.md`: never by hand on the production project), so this run
-replayed the **entire migration chain (287 files) on vanilla Postgres 16** with
+**Behaviour was verified on a local replay; the live database has been checked
+structurally only** (see "Applied to the live database" below). The migrations
+are applied through Lovable (`docs/supabase-cli.md`: never by hand on the
+production project), so the provisioning and guard matrix in this document
+comes from a run that replayed the **entire migration chain (287 files) on vanilla Postgres 16** with
 minimal Supabase stubs (`auth.users`, `auth.uid()` from the
 `request.jwt.claim.sub` setting, `storage`/`realtime` tables, the API roles),
 then called every function **as the `authenticated` role with the caller's id in
@@ -120,12 +122,15 @@ would have broken them:
 - **Recommended order:** apply both migrations, run the checks below, then
   publish.
 
-Do not use `supabase db push` for this: Lovable records the migrations it
-applies under its own versions, so the CLI can try to replay history the
+Do not use `supabase db push` for this: Lovable does not record what it applies
+in the CLI's history (older migrations sit in `supabase_migrations.schema_migrations`
+under Lovable's own names; the current tool tracks them in
+`drizzle.__drizzle_migrations`), so the CLI can try to replay history the
 database has already moved past (see the note in `docs/supabase-cli.md` and the
 back-fill history behind it). Ask Lovable to apply the two files, in order,
-exactly as written; it may save its own copy of the SQL as a new migration file,
-which is harmless because every statement is written to be safe to run twice.
+exactly as written. Its current tool saves its own copy of each migration under
+`drizzle/migrations/` (see below); the copy is harmless because every statement
+is written to be safe to run twice.
 
 Read-only checks to run afterwards (SQL editor); each was run against the local
 replay both before and after the migrations, and the expected result is the
@@ -149,10 +154,54 @@ select has_function_privilege('anon', 'public.provision_managed_child(uuid,date,
        has_function_privilege('authenticated', 'public.provision_managed_child(uuid,date,text,text,text,jsonb,boolean)', 'EXECUTE') as authenticated_can_provision;
 ```
 
+## Applied to the live database (2026-09-30)
+
+Both migrations were applied to the production database through Lovable's agent.
+The pull request was not merged yet, so the two files were not in Lovable's copy
+of the repo; the exact SQL was pasted into the project chat instead, with an
+instruction to run it unchanged, and each migration was held for approval before
+it ran. The saved copies were then compared with the files in this repository:
+`drizzle/migrations/0000_managed_children.sql` and
+`0001_freeze_player_profiles.sql` are identical to
+`supabase/migrations/20260930120000_managed_children.sql` and
+`20260930121000_freeze_player_profiles.sql` except for the missing final newline.
+
+Read-only structural checks afterwards, against the live database (no user data
+read or written):
+
+| # | Check | Expected | Actual | Result |
+| --- | --- | --- | --- | --- |
+| L1 | `public.managed_accounts` exists, row-level security on, one policy, no rows | yes | yes, on, 1, 0 rows | PASS |
+| L2 | `is_managed_account`, `provision_managed_child` exist | both | both | PASS |
+| L3 | `legal_consents.accepted_by` exists | yes | yes | PASS |
+| L4 | `authenticated` can INSERT / UPDATE `player_profiles` | no / no | false / false | PASS |
+| L4b | `authenticated` can still SELECT / DELETE `player_profiles` | yes / yes | true / true | PASS |
+| L5 | `provision_managed_child` executable by `anon` / `authenticated` | no / yes | false / true | PASS |
+| L6 | `player_profiles` keeps its four policies | 4 | 4 | PASS |
+| L7 | `player_profiles` table comment marks it frozen | yes | "Frozen (read/delete only). Superseded by…" | PASS |
+| L8 | `revoke_guardian_link` contains the managed-child guard | yes | yes | PASS |
+
+Not yet done on the live database: the behavioural checks (M1–M19 through the
+Data API with real user tokens) listed below.
+
+**Repository side effects of Lovable's migration tool**, all on `main` and not
+part of this pull request: it added `drizzle.config.ts`, `drizzle/schema.ts` (an
+empty placeholder), `drizzle/migrations/` (the two SQL files, a journal and two
+snapshots), the dev dependencies `drizzle-kit`, `drizzle-orm` and `postgres`
+(with the matching `bun.lock` update), and regenerated
+`src/integrations/supabase/types.ts` (identical to this branch's hand-added
+types: merging `main` into this branch is conflict-free). It tracks the two
+migrations in `drizzle.__drizzle_migrations` and did **not** record them in
+`supabase_migrations.schema_migrations`. The schema history is therefore now
+split across `supabase/migrations/` (the chain the replay tests and this
+document use, and the only one that rebuilds a fresh database completely) and
+`drizzle/migrations/` (what Lovable's tool applied). The overlap is harmless
+because both copies are idempotent.
+
 ## Still to run on the live backend
 
-Run these once Lovable has applied both migrations, against the dev/E2E project
-first, with real user tokens as in the earlier verification documents:
+Run these against the dev/E2E project first where possible, with real user
+tokens as in the earlier verification documents:
 
 1. `admin.createUser` accepts an `@managed.invalid` address with no password,
    and `auth.admin.generateLink({ type: 'magiclink' })` returns a
