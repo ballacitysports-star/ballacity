@@ -4,6 +4,7 @@ import { ME, type Sport } from "@/lib/sample-data";
 import { earnedBadgeIds } from "@/lib/badges";
 import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
 import { clampDistanceMi } from "@/lib/distance";
+import { emailLocalPart } from "@/lib/managed-children";
 
 import { parseSportLevels, type SportLevel } from "@/lib/sport-levels";
 import {
@@ -280,9 +281,10 @@ function defaultsFromUser(user: User): MyProfile {
     (meta.display_name as string) ||
     (meta.full_name as string) ||
     (meta.name as string) ||
-    (user.email ? user.email.split("@")[0] : "Player");
+    (emailLocalPart(user.email) ?? "Player");
 
-  const username = user.email ? "@" + user.email.split("@")[0] : "@" + user.id.slice(0, 6);
+  const emailLocal = emailLocalPart(user.email);
+  const username = emailLocal ? "@" + emailLocal : "@" + user.id.slice(0, 6);
   return {
     name,
     username,

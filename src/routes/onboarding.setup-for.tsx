@@ -37,7 +37,7 @@ const CHOICES = [
     id: "child",
     icon: Users,
     label: "I'm setting this up for my child",
-    body: "Create a profile you manage. Your child doesn't need their own login.",
+    body: "Add a profile you manage from your account. Your child doesn't need an email or password.",
   },
   {
     id: "both",
@@ -105,7 +105,12 @@ function SetupForPage() {
           // welcome wizard rather than being stacked on top of it here.
           navigate({
             to: destinationForSetupChoice(choice),
-            search: choice === "both" ? { addChildNext: true } : undefined,
+            search:
+              choice === "both"
+                ? { addChildNext: true }
+                : choice === "child"
+                  ? { from: "onboarding" }
+                  : undefined,
           } as never);
         }}
       >

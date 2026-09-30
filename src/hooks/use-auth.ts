@@ -132,11 +132,21 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
-  // Signed media URLs are per-viewer credentials: drop them so a shared device
-  // can't keep rendering the previous account's private media.
+  // Signed media URLs and cached per-account lists must not carry over to the
+  // next person on a shared device.
   try {
-    const { clearMediaUrlCache } = await import("@/hooks/use-media-url");
-    clearMediaUrlCache();
+    const { resetPerUserClientState } = await import("@/lib/per-user-state");
+    await resetPerUserClientState();
+  } catch {
+    /* ignore */
+  }
+  // A guardian acting as a managed child has their own session parked on this
+  // device. Take it first so nothing restores it mid-sign-out, then revoke it
+  // after the current one: "Sign out" ends both.
+  let parked: import("@/lib/managed-session").ParkedGuardianSession | null = null;
+  try {
+    const { takeParkedGuardianSession } = await import("@/lib/managed-session");
+    parked = takeParkedGuardianSession();
   } catch {
     /* ignore */
   }
@@ -145,6 +155,10 @@ export async function signOut() {
   // user's sessions on every other device they own, which is not what a
   // "Sign out" button on one browser should do.
   await supabase.auth.signOut({ scope: "local" });
+  if (parked) {
+    const { revokeParkedGuardianSession } = await import("@/lib/managed-session");
+    await revokeParkedGuardianSession(parked);
+  }
 }
 
 export async function getCurrentUser() {

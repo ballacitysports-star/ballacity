@@ -43,6 +43,8 @@ import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
+import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
+import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -534,6 +536,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [verifying, setVerifying] = useState(false);
   useNotificationPush();
   useOneSignal();
+  // Guardian ⇄ managed-child switching: reload tabs whose identity changed,
+  // and restore a parked guardian if the child's session disappears.
+  useManagedSessionWatcher();
   // Delivers due pre-game reminders for the signed-in player.
   useGameReminderFlush();
 
@@ -840,6 +845,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (isPublic) {
     return (
       <>
+        <ManagedSessionBanner />
         {children}
         {user && <BottomNav />}
       </>
@@ -890,6 +896,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <ManagedSessionBanner />
       {children}
       <BottomNav />
     </>

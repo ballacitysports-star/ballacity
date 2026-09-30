@@ -168,3 +168,16 @@ already-trigger-derived `player_profiles.age_cohort`, materializing a stored row
 only when a parent loosens a default, and teaching each gate to resolve a player
 profile as actor. Re-verify sections E and F with a managed minor as the subject
 before any repointing lands.
+
+### Superseded (2026-09-30): managed children are real auth users
+
+Stage 3 will not happen. Instead of athletes with no auth row, a child a parent
+adds is now a **credential-less auth user** (`managed_accounts`,
+`provision_managed_child()`), so every control in sections A–F applies to them
+unchanged — nothing had to learn a new kind of actor, and no table was
+repointed. `player_profiles` is frozen: signed-in users can no longer insert or
+update rows, and the rows the old Add Player screen created are offered to
+their parents as "Finish setting up" in the Parent Center. See
+[`managed-children-verification.md`](./managed-children-verification.md);
+sections E and F still need re-running there with a managed child as the subject
+once the migrations are live.

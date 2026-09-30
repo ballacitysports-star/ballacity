@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { displayEmail } from "@/lib/managed-children";
 import { pageHead } from "@/lib/seo";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -375,7 +376,7 @@ function UsersPanel() {
           >
             <div className="min-w-0">
               <div className="font-medium">{u.display_name || u.username || "—"}</div>
-              <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+              <div className="text-xs text-muted-foreground truncate">{displayEmail(u.email)}</div>
               <div className="flex gap-1 mt-1">
                 {u.roles.map((r: string) => (
                   <Badge key={r} variant="secondary">

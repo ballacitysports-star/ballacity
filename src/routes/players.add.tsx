@@ -1,94 +1,173 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { SPORTS } from "@/lib/sample-data";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createPlayer, PlayerProfileError, type PlayerProfile } from "@/lib/player-profiles";
+import { COHORT_META, cohortFromBirthday, isMinorCohort } from "@/lib/child-policy";
+import {
+  GUARDIAN_RELATIONSHIPS,
+  childDisplayName,
+  type GuardianRelationship,
+} from "@/lib/managed-children";
+import {
+  fetchUnfinishedChildProfile,
+  useCreateManagedChild,
+  useSwitchToManagedChild,
+} from "@/lib/use-managed-children";
+import type { CreatedManagedChild } from "@/lib/managed-children.functions";
+
+const searchSchema = z.object({
+  /** Where the parent came from, so the success screen sends them onward. */
+  from: z.enum(["onboarding", "parent"]).optional(),
+  /** A child started on the old Add Player screen, to finish setting up. */
+  prefill: z.string().uuid().optional(),
+});
 
 export const Route = createFileRoute("/players/add")({
   head: () =>
     pageHead({
       path: "/players/add",
-      title: "Add a player — ballaCity",
-      description: "Add yourself or your child as a player. Children don't need their own login.",
+      title: "Add your child — ballaCity",
+      description:
+        "Add your child's player profile to your account. They don't need an email or password.",
       noindex: true,
     }),
+  validateSearch: searchSchema,
   ssr: false,
-  component: AddPlayerPage,
+  component: AddChildPage,
 });
 
+const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
+  parent: "Parent",
+  guardian: "Legal guardian",
+  grandparent: "Grandparent",
+  "other adult": "Other responsible adult",
+};
+
 /**
- * Add Player (§20).
+ * Add your child (§20).
  *
- * Four fields and a button. Everything else about an athlete — positions,
- * skill level, teams, stats, highlights, availability — is filled in later
- * from the profile itself, so this never becomes a sports résumé form.
+ * A child added here is a real account with no email or password, managed
+ * from the parent's login. Because it is a real account, every child-safety
+ * rule applies to it exactly as it does to a child who signed up themselves:
+ * the age group comes from the birthday (checked again on the server and
+ * locked once saved), messaging starts guardian-only, and the profile is
+ * private.
  *
- * A child created here has no auth account: `isSelf` is false, which leaves
- * player_profiles.user_id null. Their age cohort is derived from the birthday
- * by a database trigger, not chosen here, so the safety rules cannot be
- * side-stepped by picking a different answer on this screen.
+ * Everything else about the athlete — positions, teams, highlights,
+ * availability — is filled in later, so this never becomes a sports résumé.
  */
-function AddPlayerPage() {
+function AddChildPage() {
   const navigate = useNavigate();
-  const [who, setWho] = useState<"child" | "me" | null>(null);
+  const { from, prefill } = Route.useSearch();
+  const create = useCreateManagedChild();
+  const switchTo = useSwitchToManagedChild();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dob, setDob] = useState("");
   const [sport, setSport] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [created, setCreated] = useState<PlayerProfile | null>(null);
+  const [relationship, setRelationship] = useState<GuardianRelationship>("parent");
+  const [attested, setAttested] = useState(false);
+  const [created, setCreated] = useState<CreatedManagedChild | null>(null);
 
-  const canSubmit = !!who && firstName.trim() !== "" && dob !== "" && !saving;
+  // Finishing a child started on the old screen: prefill what they entered.
+  useEffect(() => {
+    if (!prefill) return;
+    let cancelled = false;
+    void fetchUnfinishedChildProfile(prefill).then((p) => {
+      if (cancelled || !p) return;
+      setFirstName(p.firstName);
+      setLastName(p.lastName ?? "");
+      setDob(p.dateOfBirth ?? "");
+      setSport(p.sport ?? "");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [prefill]);
 
-  const submit = async () => {
-    if (!canSubmit || !who) return;
-    setSaving(true);
-    try {
-      const player = await createPlayer({
+  const cohort = useMemo(() => (dob ? cohortFromBirthday(dob) : null), [dob]);
+  const tooOld = cohort !== null && cohort !== "unknown" && !isMinorCohort(cohort);
+  const name = childDisplayName(firstName, lastName);
+  const saving = create.isPending;
+
+  const canSubmit =
+    firstName.trim() !== "" && dob !== "" && attested && !tooOld && name.ok && !saving;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    create.mutate(
+      {
         firstName,
-        lastName,
+        lastName: lastName || undefined,
         dateOfBirth: dob,
-        sport,
-        isSelf: who === "me",
-      });
-      setCreated(player);
-    } catch (e) {
-      // §23: the thrown message is already user-facing; anything else is a bug
-      // and must not reach the screen as a raw database error.
-      toast.error(
-        e instanceof PlayerProfileError ? e.message : "Couldn't create that player. Try again.",
-      );
-    } finally {
-      setSaving(false);
-    }
+        sport: sport || undefined,
+        relationship,
+        fromPlayerProfileId: prefill,
+      },
+      {
+        onSuccess: (child) => setCreated(child),
+        // §23: the server only ever throws a message written for a parent.
+        onError: (e) =>
+          toast.error(e instanceof Error ? e.message : "Couldn't add your child. Try again."),
+      },
+    );
   };
 
   if (created) {
-    const name = created.displayName.split(" ")[0] || "your player";
+    const first = created.displayName.split(" ")[0] || "your child";
     return (
       <div className="page-shell-narrow py-10">
         <div className="flex items-center gap-2 text-lime">
-          <CheckCircle2 className="h-6 w-6" />
-          <h1 className="page-title">Player created!</h1>
+          <CheckCircle2 className="h-6 w-6" aria-hidden />
+          <h1 className="page-title">{first}&apos;s profile is ready</h1>
         </div>
         <p className="mt-2 page-subtitle">
-          Let&apos;s build {name}&apos;s profile when you&apos;re ready.
+          You manage {first}&apos;s profile from your account. It starts private, with messages from
+          you only — change that any time in the Parent Center.
         </p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-          <Button className="w-full sm:w-auto" onClick={() => navigate({ to: "/profile" })}>
-            Complete profile
+          <Button className="w-full sm:w-auto" onClick={() => navigate({ to: "/parent" })}>
+            Go to Parent Center
           </Button>
           <Button
             variant="outline"
             className="w-full sm:w-auto"
-            onClick={() => navigate({ to: "/feed" })}
+            disabled={switchTo.isPending}
+            onClick={() =>
+              switchTo.mutate(
+                { childUserId: created.childUserId, childName: created.displayName },
+                {
+                  onError: (e) =>
+                    toast.error(
+                      e instanceof Error ? e.message : "Couldn't switch to that profile.",
+                    ),
+                },
+              )
+            }
           >
-            Do this later
+            {switchTo.isPending ? "Switching…" : `Switch to ${first}'s profile`}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => {
+              setCreated(null);
+              setFirstName("");
+              setLastName("");
+              setDob("");
+              setSport("");
+              setAttested(false);
+            }}
+          >
+            Add another child
           </Button>
         </div>
       </div>
@@ -97,39 +176,12 @@ function AddPlayerPage() {
 
   return (
     <div className="page-shell-narrow py-10">
-      <h1 className="page-title">Add a player</h1>
-
-      <fieldset className="mt-6">
-        <legend className="text-sm font-semibold text-foreground">Who is this player?</legend>
-        <div className="mt-3 flex gap-2">
-          {(
-            [
-              { id: "child", label: "Child" },
-              { id: "me", label: "Me" },
-            ] as const
-          ).map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setWho(o.id)}
-              aria-pressed={who === o.id}
-              className={`flex-1 rounded-2xl border px-4 py-3 font-semibold transition-colors ${
-                who === o.id
-                  ? "border-lime bg-lime/5 text-foreground"
-                  : "border-border bg-surface text-muted-foreground hover:border-lime/40"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-        {who === "child" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Your child doesn&apos;t need their own login — you manage this profile from your
-            account.
-          </p>
-        )}
-      </fieldset>
+      <h1 className="page-title">Add your child</h1>
+      <p className="mt-2 page-subtitle">
+        {from === "onboarding"
+          ? "Set up the player you're managing. They don't need an email or password — you'll manage their profile from your account."
+          : "They don't need an email or password. You manage their profile from your account and can switch into it any time."}
+      </p>
 
       <div className="mt-6 space-y-4">
         <div>
@@ -137,28 +189,49 @@ function AddPlayerPage() {
           <Input
             id="first-name"
             value={firstName}
+            maxLength={40}
             onChange={(e) => setFirstName(e.target.value)}
             autoComplete="off"
           />
         </div>
         <div>
-          <Label htmlFor="last-name">Last name</Label>
+          <Label htmlFor="last-name">Last name (optional)</Label>
           <Input
             id="last-name"
             value={lastName}
+            maxLength={60}
             onChange={(e) => setLastName(e.target.value)}
             autoComplete="off"
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Only the first letter is kept, so their profile shows e.g. &ldquo;
+            {name.ok ? name.displayName : "Jake S."}&rdquo;.
+          </p>
         </div>
+        {!name.ok && firstName.trim() !== "" ? (
+          <p className="text-xs text-destructive" role="alert">
+            {name.message}
+          </p>
+        ) : null}
         <div>
           <Label htmlFor="dob">Birthday</Label>
           <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
           <p className="mt-1 text-xs text-muted-foreground">
-            Used to keep younger players&apos; profiles private. Never shown publicly.
+            Sets the safety rules for their age. Never shown publicly, and it can&apos;t be changed
+            later without a correction request.
           </p>
+          {tooOld ? (
+            <p className="mt-1 text-xs text-destructive" role="alert">
+              That birthday makes them an adult — they can sign up with their own account.
+            </p>
+          ) : cohort && cohort !== "unknown" ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Age group: {COHORT_META[cohort].label}
+            </p>
+          ) : null}
         </div>
         <div>
-          <Label htmlFor="sport">Sport</Label>
+          <Label htmlFor="sport">Sport (optional)</Label>
           <select
             id="sport"
             value={sport}
@@ -173,10 +246,57 @@ function AddPlayerPage() {
             ))}
           </select>
         </div>
+        <div>
+          <Label htmlFor="relationship">You are their</Label>
+          <select
+            id="relationship"
+            value={relationship}
+            onChange={(e) => setRelationship(e.target.value as GuardianRelationship)}
+            className="mt-1 h-10 w-full rounded-xl border border-border bg-surface px-3 text-base text-foreground"
+          >
+            {GUARDIAN_RELATIONSHIPS.map((r) => (
+              <option key={r} value={r}>
+                {RELATIONSHIP_LABEL[r]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface p-3">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="attest"
+              checked={attested}
+              onCheckedChange={(v) => setAttested(v === true)}
+              className="mt-0.5"
+            />
+            <label htmlFor="attest" className="text-xs leading-relaxed text-foreground">
+              I&apos;m this child&apos;s parent or legal guardian. I agree to the{" "}
+              <Link to="/terms" className="font-semibold text-primary underline">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="font-semibold text-primary underline">
+                Privacy Policy
+              </Link>{" "}
+              on their behalf and give consent for their account.
+            </label>
+          </div>
+          <p className="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              Their profile starts private, only you can message them, and precise location is never
+              shared.{" "}
+              <Link to="/safety/children" className="underline">
+                How we protect children
+              </Link>
+            </span>
+          </p>
+        </div>
       </div>
 
       <Button className="mt-6 w-full" disabled={!canSubmit} onClick={submit}>
-        {saving ? "Creating…" : "Create player"}
+        {saving ? "Adding…" : "Add child"}
       </Button>
     </div>
   );
