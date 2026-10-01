@@ -1,6 +1,12 @@
 import { ACCOUNT_TYPE_ROUTE, isAccountSetupEscape } from "@/lib/age-verification";
+import type { AccountType } from "@/lib/account-type";
 
 export const DEFAULT_POST_AUTH_DESTINATION = "/feed";
+
+/** Where an account with this active profile kind lands, absent any more specific destination. */
+export function defaultHomeFor(kind: AccountType | null | undefined): string {
+  return kind === "parent" ? "/parent" : DEFAULT_POST_AUTH_DESTINATION;
+}
 
 export type PostAuthDestinationInput = {
   /** The sanitized `next` search param from `/auth`, if present. */
@@ -16,6 +22,8 @@ export type PostAuthDestinationInput = {
   lastVisited?: string | undefined;
   /** Same-origin referrer path, used when neither of the above is set. */
   referrer?: string | undefined;
+  /** The signed-in account's active profile kind, consulted only at the final fallback. */
+  activeProfileKind?: AccountType | null;
 };
 
 /**
@@ -38,11 +46,12 @@ export type PostAuthDestinationInput = {
  * explicitly asked for (`next`), which it keeps.
  */
 export function postAuthDestination(input: PostAuthDestinationInput): string {
-  const { next, needsAccountType, startDestination, lastVisited, referrer } = input;
+  const { next, needsAccountType, startDestination, lastVisited, referrer, activeProfileKind } =
+    input;
 
   if (next && isAccountSetupEscape(next)) return next;
   if (needsAccountType) return ACCOUNT_TYPE_ROUTE;
   if (next !== undefined) return next;
   if (startDestination) return startDestination;
-  return lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
+  return lastVisited ?? referrer ?? defaultHomeFor(activeProfileKind);
 }

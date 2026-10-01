@@ -9,8 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import {
+  addableProfileKinds,
   addProfileRoute,
   useMyProfiles,
   useSetDefaultProfile,
@@ -22,8 +23,6 @@ import { useMyChildren } from "@/lib/child-safety";
 import { isManagedUser } from "@/lib/managed-children";
 import { switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
-
-const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
 function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number }) {
   return (
@@ -57,6 +56,7 @@ export function ProfileSwitcher({ className }: { className?: string }) {
   const { children } = useMyChildren();
   const managedChildren = inChildProfile ? [] : children.filter((c) => c.managed);
   const toChild = useSwitchToManagedChild();
+  const addable = addableProfileKinds(profiles);
 
   if (loading || !active) return null;
 
@@ -216,7 +216,7 @@ export function ProfileSwitcher({ className }: { className?: string }) {
 
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Add a profile</DropdownMenuLabel>
-            {ADDABLE.map((kind) => (
+            {addable.map((kind) => (
               <DropdownMenuItem key={kind} asChild className="gap-2">
                 <Link to={addProfileRoute(kind)}>
                   <Plus className="h-4 w-4" aria-hidden />

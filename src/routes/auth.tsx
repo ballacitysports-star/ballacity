@@ -25,6 +25,7 @@ import {
 import {
   SETUPS,
   START_AS_KEY,
+  type AccountType,
   type SetupId,
   accountTypeForSetup,
   canChooseRole,
@@ -127,8 +128,11 @@ function AuthPage() {
     }
   };
 
-  const needsAccountType = async (currentUser: User | null | undefined) => {
-    if (!currentUser) return false;
+  const fetchAccountTypeStatus = async (
+    currentUser: User | null | undefined,
+  ): Promise<{ needsAccountType: boolean; activeProfileKind: AccountType | null }> => {
+    const notNeeded = { needsAccountType: false, activeProfileKind: null };
+    if (!currentUser) return notNeeded;
     const query = supabase
       .from("profiles")
       .select("account_type")
@@ -137,15 +141,16 @@ function AuthPage() {
     const res = await withTimeout(query, 2500, null as unknown as Awaited<typeof query> | null);
     if (!res) {
       console.warn("[auth] account type check timed out; continuing");
-      return false;
+      return notNeeded;
     }
     const { data, error } = res;
     if (error) {
       console.warn("[auth] account type check failed", error.message);
-      return false;
+      return notNeeded;
     }
     const t = (data as { account_type?: string } | null)?.account_type;
-    return !isAccountType(t);
+    const activeProfileKind = isAccountType(t) ? t : null;
+    return { needsAccountType: !activeProfileKind, activeProfileKind };
   };
 
   const leave = (dest: string) => {
@@ -187,9 +192,11 @@ function AuthPage() {
 
     const startSetup = startSetupOf(currentUser);
     const startDestination = startSetup ? hrefForSetup(startSetup) : undefined;
+    const { needsAccountType, activeProfileKind } = await fetchAccountTypeStatus(currentUser);
     const dest = postAuthDestination({
       next: sanitizeNextPath(next),
-      needsAccountType: await needsAccountType(currentUser),
+      needsAccountType,
+      activeProfileKind,
       startDestination,
       lastVisited: readLastVisited() ?? undefined,
       referrer,

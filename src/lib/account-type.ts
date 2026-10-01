@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
-export type AccountType = "player" | "team" | "trainer" | "gym";
+export type AccountType = "player" | "team" | "trainer" | "gym" | "parent";
 
-export const ACCOUNT_TYPES: AccountType[] = ["player", "team", "trainer", "gym"];
+export const ACCOUNT_TYPES: AccountType[] = ["player", "team", "trainer", "gym", "parent"];
 
 export const ACCOUNT_TYPE_META: Record<
   AccountType,
@@ -33,6 +33,12 @@ export const ACCOUNT_TYPE_META: Record<
     plural: "Gyms",
     emoji: "🏢",
     blurb: "Run a gym with trainers and members.",
+  },
+  parent: {
+    label: "Guardian",
+    plural: "Guardians",
+    emoji: "🛡️",
+    blurb: "Manage your kids' sports profiles and guardian settings.",
   },
 };
 
@@ -70,7 +76,7 @@ export type SetupMeta = {
 export const SETUPS: Record<SetupId, SetupMeta> = {
   player: { accountType: "player", to: "/onboarding/welcome", label: "Player" },
   child: {
-    accountType: "player",
+    accountType: "parent",
     to: "/players/add",
     search: { from: "onboarding" },
     label: "Add your child",

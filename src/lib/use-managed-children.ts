@@ -27,6 +27,11 @@ export function useCreateManagedChild() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["guardian-children"] });
       void qc.invalidateQueries({ queryKey: ["unfinished-child-profiles"] });
+      // The guardian's first child creates their account_profiles "parent"
+      // row (provision_managed_child) — without this, a ProfileSwitcher or
+      // Settings open in another tab won't show the new Guardian profile
+      // until it happens to remount.
+      void qc.invalidateQueries({ queryKey: ["my-account-profiles"] });
     },
   });
 }
