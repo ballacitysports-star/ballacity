@@ -9,6 +9,59 @@ The last run that executed to completion and wrote a report.
 89 passed (50.9m)
 ```
 
+## Update 2026-10-01: Actions is back, and there are two newer real runs
+
+| | job | code under test | result |
+|---|---|---|---|
+| run 191 | `110390007245` | `main` @ `3cb8129` | 98 failed, 110 passed, 8 skipped, 216 total (58.6m) |
+| PR #17 re-run | `110434858916` (run `35745044651`) | PR head `9f07d54` merged with the `main` of 2026-09-22 | 90 failed, 101 passed, 5 skipped, 196 total (49.1m) |
+
+Run 191 uploaded a trace artifact, `11170155125` (125,080,828 bytes, 300 files),
+which expires about 2026-10-08. Traces for these failures exist again. The job
+logs below are what could be read from here; downloading the artifact is blocked
+by this environment's egress policy, so the *causes* of the later failures are
+still unread. Someone with access should `npx playwright show-trace` a few of
+them before 2026-10-08 (or run `preserve-artifact.yml`).
+
+What the two runs show:
+
+- **The fixture sign-in gap is closed.** `global-setup` now prints
+  `Signed in e2e-player@lovable.test`, and the `fixture-auth-flows` specs pass.
+  Real sign-ins work against the E2E project.
+- **The `invite=1` assertion fix does what it says, and is not sufficient.**
+  `invite-request-happy-path` failed on `main` at `page.waitForURL` (the strict
+  `=== "1"` check); with the fix it gets past that and fails later, at the invite
+  banner. The same holds for the other touched specs. **None of the 11 specs
+  edited here passes yet.** After the URL step they fail on one of three things:
+  1. the "You're invited to this game" banner never renders (`happy-path`,
+     `retry-then-reload`);
+  2. the CTA's POST never fires — `join_requests` or `game_participants`
+     (`duplicate`, `to-join`, `retry-after-error`, plus `in-flight` and
+     `network-error`, which were not edited);
+  3. a seeded notification never shows or cannot be clicked
+     (`pay-and-join`, `notification-cta`, `pay-and-join-verified`, `tampered`,
+     `expired`).
+- **`desktop-refresh-protected` is fixed**: the `/discover` case is gone and the
+  rest pass.
+- **The sample-game ids are a lead, not a verdict.** `GAMES` in
+  `src/lib/sample-data.ts` has been `[]` since `12b39bd` (2026-09-05), and 39 specs
+  open `/games/g1`, `/games/g2`… without stubbing `hosted_games`, so they only work
+  if the E2E project's `hosted_games` table holds rows with those ids. They did
+  in the PR re-run (`invite-deeplink-to-pay` passes there) and apparently did not
+  in run 191, where the same spec fails with the banner missing. The two runs
+  differ in both base commit and time, so this could be data or code — check
+  whether `g1`/`g2` exist in the E2E project before changing 39 specs.
+- **Runs are not comparable one-to-one.** Different base, different test count
+  (216 vs 196). `host-name-deeplink` and `invite-deeplink-to-pay` fail on `main`
+  and pass in the PR re-run (same specs, which this PR does not touch).
+  `social-login-identity-cases` goes the other way: 7 of 7 pass on `main`, 7 of 7
+  fail in the PR re-run — it tests the routing that `main`'s onboarding rework
+  changed. `managed-child` and `add-player` exist in only one of the two bases.
+  Those differences come from the base, not from the edits in this PR. A run of
+  this branch merged with current `main` is the fair comparison.
+
+## Older notes (written while runners were down)
+
 This was believed unrecoverable. Run 91 was killed by the 40-minute ceiling before
 Playwright could finalise its JSON, and every run from 2026-09-11 12:02 onward dies
 in 3–4 seconds without acquiring a runner, so no later run has produced anything.
@@ -185,14 +238,13 @@ assertions.
 
 ## Blocked
 
-None of this can be re-measured until Actions allocates runners. Every run since
-2026-09-11 12:02 fails within seconds with no runner, no steps and no logs,
-identically on `main` and on branches — still true at 2026-09-22 (run 166,
-`35676681560`, 4s; its job's log download 404s because no step ever ran). Most
-die in 3–5s; a few wait longer before giving up (run 162 took 38s) but are the
-same failure. The `Runner probe` workflow (`workflow_dispatch`) answers "can
-Actions get a runner yet" in seconds; run that before spending 40–75 minutes on
-the suite.
+**No longer blocked as of 2026-10-01.** Actions allocated runners again at about
+13:25 UTC that day (run 191); see "Update 2026-10-01" at the top of this file. The
+outage ran from 2026-09-11 12:02 to 2026-10-01 — every run in between failed
+within seconds with no runner, no steps and no logs (e.g. run 166, `35676681560`,
+4s; its job log 404s because no step ever ran). If it comes back, the `Runner
+probe` workflow (`workflow_dispatch`) answers "can Actions get a runner" in
+seconds; run it before spending 40–75 minutes on the suite.
 
 ## Update: full run-92 job log re-read (2026-09-16)
 
