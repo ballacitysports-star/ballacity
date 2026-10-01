@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { ACCOUNT_TYPE_META, isAccountType, type AccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, isAccountType, type AccountType, type HostedAccountType } from "@/lib/account-type";
 
 /**
  * An account can hold several profiles at once: one personal player profile
@@ -34,7 +34,7 @@ export type MyProfilesResult = {
    * app would silently fall back to the player profile, so surfaces label the
    * registered type as "setup incomplete" and the tabs route into setup.
    */
-  pendingKind: Exclude<AccountType, "player"> | null;
+  pendingKind: HostedAccountType | null;
 };
 
 function initials(name: string): string {
@@ -166,6 +166,31 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     });
   }
 
+  // A guardian has no athlete profile: the account itself is the guardian
+  // identity, opened at the Parent Center. Hide the player row the sign-up
+  // trigger created and act as the guardian.
+  if (profile?.account_type === "parent") {
+    const name = profile.display_name || "Guardian";
+    const guardian: AccountProfile = {
+      id: list.find((r) => r.kind === "parent")?.id ?? `parent:${userId}`,
+      kind: "parent",
+      refId: null,
+      name,
+      handle: profile.username ?? null,
+      avatarUrl: profile.avatar_url ?? null,
+      avatarFallback: profile.avatar_initials || initials(name),
+      href: { to: "/parent" },
+    };
+    const others = profiles.filter((p) => p.kind !== "player" && p.kind !== "parent");
+    return {
+      profiles: [guardian, ...others],
+      activeId: guardian.id,
+      defaultId: null,
+      active: guardian,
+      pendingKind: null,
+    };
+  }
+
   // Player profile always first.
   profiles.sort((a, b) => (a.kind === "player" ? -1 : b.kind === "player" ? 1 : 0));
 
@@ -203,8 +228,9 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   const pendingKind =
     isAccountType(registered) &&
     registered !== "player" &&
+    registered !== "parent" &&
     !profiles.some((p) => p.kind === registered)
-      ? (registered as Exclude<AccountType, "player">)
+      ? (registered as HostedAccountType)
       : null;
 
   return { profiles, activeId, defaultId, active, pendingKind };
@@ -362,7 +388,7 @@ export async function continueAsPlayer(): Promise<void> {
   if (error) throw error;
 }
 
-export function addProfileRoute(kind: Exclude<AccountType, "player">): string {
+export function addProfileRoute(kind: HostedAccountType): string {
   return kind === "team"
     ? "/teams/create"
     : kind === "trainer"

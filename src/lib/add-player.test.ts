@@ -76,7 +76,7 @@ describe("a parent or guardian goes straight to Add your child", () => {
   it("is one selection: Parent / Guardian leads to Add your child, stored as a player", () => {
     // No "who is this for?" and no athlete questions in between.
     expect(hrefForSetup("child")).toBe("/players/add?from=onboarding");
-    expect(SETUPS.child.accountType).toBe("player");
+    expect(SETUPS.child.accountType).toBe("parent");
   });
 
   it("opens Add your child with the onboarding wording", () => {

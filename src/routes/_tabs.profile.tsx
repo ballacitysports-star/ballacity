@@ -90,6 +90,12 @@ export const Route = createFileRoute("/_tabs/profile")({
  */
 function ProfileRoute() {
   const { active, loading } = useMyProfiles();
+  const navigate = useNavigate();
+  const isGuardian = !loading && active?.kind === "parent";
+  useEffect(() => {
+    if (isGuardian) navigate({ to: "/parent", replace: true });
+  }, [isGuardian, navigate]);
+  if (isGuardian) return null;
   if (!loading && active && active.kind !== "player") {
     return (
       <div className="page-shell-flush">

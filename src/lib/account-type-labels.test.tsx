@@ -45,7 +45,7 @@ const escapeHtml = (s: string) =>
 
 describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
   it("exposes exactly the four supported account types", () => {
-    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym"]);
+    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym", "parent"]);
   });
 
   it.each([
@@ -53,6 +53,7 @@ describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
     ["team", "Team", "Teams"],
     ["trainer", "Trainer", "Trainers"],
     ["gym", "Gym", "Gyms"],
+    ["parent", "Guardian", "Guardians"],
   ] as const)("uses canonical label/plural for %s", (type, label, plural) => {
     const meta = ACCOUNT_TYPE_META[type];
     expect(meta.label).toBe(label);
@@ -125,12 +126,12 @@ describe("RolePicker (sign-up and onboarding)", () => {
     );
     expect(stored).toEqual({
       player: "player",
-      child: "player",
+      child: "parent",
       team: "team",
       coach: "trainer",
       facility: "gym",
     });
-    expect(ACCOUNT_TYPES as string[]).not.toContain("parent");
+    expect(ACCOUNT_TYPES as string[]).toContain("parent");
   });
 
   it("keeps the word 'player' on the Player card alone", () => {
