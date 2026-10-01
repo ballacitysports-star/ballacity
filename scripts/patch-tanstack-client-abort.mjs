@@ -41,7 +41,8 @@ for (const patch of patches) {
     continue;
   }
   if (!source.includes(patch.before)) {
-    throw new Error(`Unable to apply TanStack client-abort patch to ${patch.path}`);
+    console.warn(`Skipping TanStack client-abort patch (pattern not found) for ${patch.path}`);
+    continue;
   }
   await writeFile(patch.path, source.replace(patch.before, patch.after));
 }

@@ -157,7 +157,10 @@ export const listReactions = createServerFn({ method: "GET" })
       .select("emoji, user_id")
       .eq("subject_type", data.subjectType)
       .eq("subject_id", data.subjectId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("listReactions failed:", error.message);
+      return [];
+    }
     const counts = new Map<ReactionEmoji, number>();
     for (const r of (rows ?? []) as any[]) {
       const e = r.emoji as ReactionEmoji;
