@@ -43,14 +43,25 @@ What the two runs show:
      `expired`).
 - **`desktop-refresh-protected` is fixed**: the `/discover` case is gone and the
   rest pass.
-- **The sample-game ids are a lead, not a verdict.** `GAMES` in
+- **Missing `g1`/`g2` is ruled out as the cause.** `GAMES` in
   `src/lib/sample-data.ts` has been `[]` since `12b39bd` (2026-09-05), and 39 specs
-  open `/games/g1`, `/games/g2`… without stubbing `hosted_games`, so they only work
-  if the E2E project's `hosted_games` table holds rows with those ids. They did
-  in the PR re-run (`invite-deeplink-to-pay` passes there) and apparently did not
-  in run 191, where the same spec fails with the banner missing. The two runs
-  differ in both base commit and time, so this could be data or code — check
-  whether `g1`/`g2` exist in the E2E project before changing 39 specs.
+  open `/games/g1`, `/games/g2`… without stubbing `hosted_games`. They work because
+  `e2e/global-setup.ts` seeds those two rows through the `e2e-games-host` account
+  (it logs `Could not seed fixture games g1/g2` or `No games host account` if it
+  cannot). Neither run 191 nor the PR re-run logged either warning, so both ids
+  existed. Yet `invite-deeplink-to-pay` passes in the PR re-run and fails in run
+  191 with the banner missing, on the same seeded game. The cause is therefore
+  something that differs between those two bases — `main` gained, among other
+  things, the onboarding rework (#23), managed children and a monetization
+  free-through date between 2026-09-22 and 2026-10-01 — and only a trace of the
+  run 191 failure will say which.
+- **Run 195 (`main`) and run 196 (this branch) are not measurements.** On
+  2026-10-01 between 17:59 and 18:31 UTC every `global-setup` call to the E2E
+  Supabase project returned `Gateway Timeout` (upserting the four fixture
+  accounts, then the sign-in). With no session, the auth-required specs skip:
+  run 195 was 21 failed / 16 passed / 179 skipped of 216, run 196 was 21 / 16 /
+  178 of 215. That is the sandbox backend being unavailable, not a spec result;
+  `global-setup` logs it at the top of the run, so check there first.
 - **Runs are not comparable one-to-one.** Different base, different test count
   (216 vs 196). `host-name-deeplink` and `invite-deeplink-to-pay` fail on `main`
   and pass in the PR re-run (same specs, which this PR does not touch).
@@ -58,7 +69,9 @@ What the two runs show:
   fail in the PR re-run — it tests the routing that `main`'s onboarding rework
   changed. `managed-child` and `add-player` exist in only one of the two bases.
   Those differences come from the base, not from the edits in this PR. A run of
-  this branch merged with current `main` is the fair comparison.
+  this branch merged with current `main` is the fair comparison; run 196 was
+  meant to be that run and was lost to the backend outage described below, so it
+  is still outstanding.
 
 ## Older notes (written while runners were down)
 
