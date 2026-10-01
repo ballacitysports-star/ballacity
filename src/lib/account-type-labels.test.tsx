@@ -45,7 +45,7 @@ const escapeHtml = (s: string) =>
 
 describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
   it("exposes exactly the four supported account types", () => {
-    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym"]);
+    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym", "parent"]);
   });
 
   it.each([
