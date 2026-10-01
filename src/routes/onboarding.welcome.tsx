@@ -5,7 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useAccountType, type AccountType } from "@/lib/account-type";
+import { useAccountType, type AccountType, type HostedAccountType } from "@/lib/account-type";
 import {
   getFeedPrefsSnapshot,
   setFeedPrefs,
@@ -53,7 +53,7 @@ export const Route = createFileRoute("/onboarding/welcome")({
 type NextStep = { title: string; body: string };
 
 const NEXT_STEPS: Record<
-  Exclude<AccountType, "player">,
+  HostedAccountType,
   { title: string; steps: NextStep[]; cta: string; goto: string }
 > = {
   team: {
@@ -130,8 +130,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const { profile, loaded: profileLoaded } = useMyProfileState(user);
   const queryClient = useQueryClient();
 
-  const isPlayer = type === "player";
-  const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
+  const isPlayer = type === "player" || type === "parent";
+  const nextCfg = isPlayer ? null : NEXT_STEPS[type as HostedAccountType];
 
   // Links are optional, so they live inside the Basics step behind a
   // disclosure rather than costing everyone a whole step of their own.
