@@ -1,6 +1,14 @@
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN;
 
 export function PaymentTestModeBanner() {
+  const { freeMode } = useFeatureAccess();
+
+  // Nothing is chargeable while ballaCity is free, so a banner about payment
+  // modes is noise at best and implies a cost at worst.
+  if (freeMode) return null;
+
   if (!clientToken) {
     // Builder-facing, not athlete-facing: a missing key is a deploy task, and
     // on a live site it reads to a member as though the app is demanding

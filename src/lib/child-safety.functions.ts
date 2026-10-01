@@ -168,9 +168,33 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
       _versions: data.versions ?? {},
     });
     if (error) throw new Error(error.message);
+    const path = `/parent/consent/${token}`;
+    // Email the one-time link to the guardian. Failure must not block the
+    // request — the minor can still copy/share the link manually.
+    let emailed = false;
+    try {
+      const { data: prof } = await context.supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const { sendTemplateEmail } = await import("@/lib/email-templates/send-email");
+      const res = await sendTemplateEmail("guardian-approval", data.parentEmail, {
+        templateData: {
+          childName: (prof as { display_name?: string } | null)?.display_name ?? undefined,
+          parentName: data.parentName || undefined,
+          approvalUrl: `https://ballacity.com${path}`,
+          expiresHours: CONSENT_TOKEN_TTL_HOURS,
+        },
+        idempotencyKey: `guardian-approval-${hashToken(token)}`,
+      });
+      emailed = Boolean((res as { sent?: boolean }).sent);
+    } catch (e) {
+      console.error("[guardian-approval] email send failed", e);
+    }
     // The plain token is returned exactly once so it can be delivered to the
     // guardian. It is never stored in readable form.
-    return { token, expiresAt, path: `/parent/consent/${token}` };
+    return { token, expiresAt, path, emailed };
   });
 
 /* ------------------------------------------------------------------ */
@@ -328,6 +352,12 @@ export type GuardianChild = {
   teamCount: number;
   consent: ConsentRecordView | null;
   controls: ChildControls;
+  /**
+   * True when this guardian created the child's profile and the child has no
+   * login of their own. Such a child can only be reached — managed, switched
+   * into, or deleted — through this guardian.
+   */
+  managed: boolean;
 };
 
 type OverviewRow = {
@@ -372,10 +402,18 @@ export const listMyChildren = createServerFn({ method: "GET" })
     if (list.length === 0) return [];
 
     const ids = list.map((r) => r.child_user_id);
-    const { data: controls } = await supabase
-      .from("child_controls")
-      .select("*")
-      .in("child_user_id", ids);
+    const [{ data: controls }, { data: managedRows }] = await Promise.all([
+      supabase.from("child_controls").select("*").in("child_user_id", ids),
+      // RLS returns only rows this guardian manages.
+      supabase
+        .from("managed_accounts")
+        .select("child_user_id")
+        .eq("managed_by", context.userId)
+        .in("child_user_id", ids),
+    ]);
+    const managed = new Set(
+      ((managedRows ?? []) as { child_user_id: string }[]).map((m) => m.child_user_id),
+    );
 
     return list.map((r) => {
       const ct = (controls ?? []).find(
@@ -405,6 +443,7 @@ export const listMyChildren = createServerFn({ method: "GET" })
             })
           : null,
         controls: parseChildControls(ct ?? null),
+        managed: managed.has(r.child_user_id),
       };
     });
   });

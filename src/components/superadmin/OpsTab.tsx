@@ -24,6 +24,19 @@ import {
 import { ConfirmAction } from "./ConfirmAction";
 import { sendTestPushToSelf } from "@/lib/push.functions";
 
+/**
+ * Settings that have a dedicated editor elsewhere.
+ *
+ * They are hidden from the raw JSON editor below because two editors over one
+ * row means the stale one wins: this list renders as a pointer instead. Every
+ * other key keeps the raw editor, which is the escape hatch when a structured
+ * UI cannot express something.
+ */
+const STRUCTURED_KEYS = new Set(["monetization"]);
+
+const STRUCTURED_KEYS_PRESENT = (rows: { key: string }[]) =>
+  rows.map((r) => r.key).filter((k) => STRUCTURED_KEYS.has(k));
+
 export function OpsTab() {
   const qc = useQueryClient();
   const loadSettings = useServerFn(superadminListSettings);
@@ -90,17 +103,34 @@ export function OpsTab() {
           {settings.isLoading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>
           ) : (
-            (settings.data?.settings ?? []).map((s: any) => (
-              <SettingRow
-                key={s.key}
-                setting={s}
-                pending={save.isPending}
-                onSave={(value, isPublic) =>
-                  save.mutate(() => setSetting({ data: { key: s.key, value, isPublic } }))
-                }
-              />
-            ))
+            (settings.data?.settings ?? [])
+              .filter((s: { key: string }) => !STRUCTURED_KEYS.has(s.key))
+              .map((s: any) => (
+                <SettingRow
+                  // Keyed on the value as well as the key so the row re-seeds
+                  // its draft after a refetch. Without this, editing the same
+                  // row in a structured panel leaves a stale JSON draft here
+                  // that silently overwrites those changes on Save.
+                  key={`${s.key}:${JSON.stringify(s.value)}`}
+                  setting={s}
+                  pending={save.isPending}
+                  onSave={(value, isPublic) =>
+                    save.mutate(() => setSetting({ data: { key: s.key, value, isPublic } }))
+                  }
+                />
+              ))
           )}
+
+          {STRUCTURED_KEYS_PRESENT(settings.data?.settings ?? []).map((key) => (
+            <div
+              key={key}
+              className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground"
+            >
+              <span className="font-mono">{key}</span> is edited on the{" "}
+              <span className="font-medium">Monetization</span> tab, which understands its shape.
+              Editing it as raw JSON here would be easy to get wrong.
+            </div>
+          ))}
 
           <div className="rounded-lg border p-3 space-y-2">
             <div className="text-xs font-medium">Add setting</div>

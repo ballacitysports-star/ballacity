@@ -23,6 +23,34 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 // `.env.local` override still beats this because Vite applies it later.
 seedEnvFromProductionFile();
 
+// Public (publishable) backend config, baked in as literals. The deploy build
+// environment has been observed supplying EMPTY values for these variables,
+// which beat any env-file seeding, so the client bundle must not depend on the
+// environment for them. Non-empty environment values still win.
+const PUBLIC_BACKEND = {
+  VITE_SUPABASE_URL: "https://cpqihhcqeivbgxqbzatv.supabase.co",
+  VITE_SUPABASE_PUBLISHABLE_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwcWloaGNxZWl2Ymd4cWJ6YXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDQ0MTgsImV4cCI6MjA5NjA4MDQxOH0.TFSxi4AlWxcx8ccyLPqKeTnXCOMra3hprsGEWFIEo3I",
+  VITE_SUPABASE_PROJECT_ID: "cpqihhcqeivbgxqbzatv",
+} as const;
+
+function publicValue(key: keyof typeof PUBLIC_BACKEND): string {
+  const fromEnv = process.env[key]?.trim();
+  return fromEnv ? fromEnv : PUBLIC_BACKEND[key];
+}
+
+const publicBackendDefine = {
+  "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(publicValue("VITE_SUPABASE_URL")),
+  "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+    publicValue("VITE_SUPABASE_PUBLISHABLE_KEY"),
+  ),
+  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(publicValue("VITE_SUPABASE_PROJECT_ID")),
+  // GA4 measurement IDs are public identifiers; bake in at build time.
+  "import.meta.env.VITE_GA_MEASUREMENT_ID": JSON.stringify(
+    (process.env.GOOGLE_ANALYTICS_MEASUREMENT_ID ?? "").trim(),
+  ),
+};
+
 function seedEnvFromProductionFile() {
   const file = resolve(dirname(fileURLToPath(import.meta.url)), ".env.production");
   let contents: string;
@@ -48,6 +76,10 @@ export default defineConfig({
   },
   vite: {
     plugins: [mcpPlugin()],
+    // Keep the browser bundle deterministic in Lovable's multi-environment
+    // production build. The base config normally injects these values, but an
+    // environment-specific client build can otherwise replace them with `{}`.
+    define: publicBackendDefine,
     // Email rendering pulls in `entities`; a nested v7 copy breaks SSR because it
     // dropped ./lib/decode.js. Pin every import to the hoisted v4.5.0 copy.
     resolve: {
@@ -66,6 +98,7 @@ export default defineConfig({
 
     environments: {
       client: {
+        define: publicBackendDefine,
         build: {
       // Split large third-party libraries out of the shared entry chunk so the
       // first paint of / and /profile only downloads what it needs, and heavy

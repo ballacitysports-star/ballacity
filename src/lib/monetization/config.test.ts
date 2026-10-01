@@ -60,6 +60,54 @@ describe("admin overrides", () => {
     expect(parseMonetizationOverrides({ fees: { platformFeeBps: -5 } })).toEqual({});
   });
 
+  it("round-trips the access switches", () => {
+    const parsed = parseMonetizationOverrides({
+      access: { platformFreeMode: false, freeModeAiTier: "team", freeModeNotice: "On us." },
+    });
+    expect(parsed.access).toEqual({
+      platformFreeMode: false,
+      freeModeAiTier: "team",
+      freeModeNotice: "On us.",
+    });
+    expect(resolveMonetizationConfig(parsed).access.platformFreeMode).toBe(false);
+    // Unspecified switches keep their defaults rather than becoming undefined.
+    expect(resolveMonetizationConfig(parsed).access.merchShopEnabled).toBe(false);
+  });
+
+  it("drops malformed access values rather than trusting them", () => {
+    expect(parseMonetizationOverrides({ access: { platformFreeMode: "yes" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: { freeModeAiTier: "platinum" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: {} })).toEqual({});
+
+    const parsed = parseMonetizationOverrides({
+      access: { freeModeEntitlements: ["player_plus", "not_a_tier"] },
+    });
+    expect(parsed.access?.freeModeEntitlements).toEqual(["player_plus"]);
+  });
+
+  it("round-trips a free-through date and drops junk", () => {
+    const parsed = parseMonetizationOverrides({
+      access: { freeModeEndsAt: "2026-12-31T00:00:00.000Z" },
+    });
+    expect(parsed.access?.freeModeEndsAt).toBe("2026-12-31T00:00:00.000Z");
+
+    expect(parseMonetizationOverrides({ access: { freeModeEndsAt: "whenever" } })).toEqual({});
+    expect(parseMonetizationOverrides({ access: { freeModeEndsAt: 42 } })).toEqual({});
+
+    // An explicit null is meaningful — it clears a date an admin set earlier.
+    expect(
+      parseMonetizationOverrides({ access: { freeModeEndsAt: null } }).access?.freeModeEndsAt,
+    ).toBeNull();
+  });
+
+  it("never lets a malformed blob silently start charging people", () => {
+    // The dangerous direction is junk resolving to "not free".
+    const config = resolveMonetizationConfig(
+      parseMonetizationOverrides({ access: { platformFreeMode: "false" } }),
+    );
+    expect(config.access.platformFreeMode).toBe(true);
+  });
+
   it("falls back to built-in defaults with no overrides saved", () => {
     expect(resolveMonetizationConfig(parseMonetizationOverrides({}))).toEqual(
       DEFAULT_MONETIZATION_CONFIG,

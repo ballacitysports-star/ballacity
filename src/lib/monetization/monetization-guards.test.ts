@@ -4,6 +4,33 @@ import { DEFAULT_MONETIZATION_CONFIG, liveProducts } from "./config";
 import { quoteFees } from "./fees";
 import { displayStatusFor, displayStatusLabel } from "@/lib/payment-states";
 
+describe("the platform ships free", () => {
+  it("has billing switched off in the shipped config", () => {
+    expect(DEFAULT_MONETIZATION_CONFIG.access.platformFreeMode).toBe(true);
+  });
+
+  it("keeps the paid catalog intact so billing can be switched back on", () => {
+    // Free mode must never be implemented by deleting products.
+    expect(liveProducts(DEFAULT_MONETIZATION_CONFIG).length).toBeGreaterThan(0);
+  });
+
+  it("ships every paid surface switched off", () => {
+    // Turning free mode off must not be enough to start charging: each surface
+    // is enabled deliberately.
+    const a = DEFAULT_MONETIZATION_CONFIG.access;
+    for (const k of [
+      "subscriptionsEnabled",
+      "paymentsEnabled",
+      "premiumFeaturesEnabled",
+      "checkoutEnabled",
+      "merchShopEnabled",
+      "upgradePromptsEnabled",
+    ] as const) {
+      expect(a[k]).toBe(false);
+    }
+  });
+});
+
 describe("free tier stays free", () => {
   it("never puts a core capability behind an entitlement", () => {
     for (const capability of ALWAYS_FREE_CAPABILITIES) {

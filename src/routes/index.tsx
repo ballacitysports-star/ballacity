@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
 import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -10,7 +10,7 @@ import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
-import { isAccountType } from "@/lib/account-type";
+import { clearStartHint, isAccountType, routeForSetup, startSetupOf } from "@/lib/account-type";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 
@@ -52,9 +52,12 @@ function Landing() {
   const { user, loading } = useAuth();
   const hosted = useHostedGames();
   const hasStoredSession = typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
+  // Clearing the hint below updates the user, which runs the effect again; that
+  // run sees no hint and would send them on to the feed over their setup.
+  const startedSetup = useRef(false);
 
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading || !user || startedSetup.current) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -64,8 +67,21 @@ function Landing() {
         .maybeSingle();
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
-      const dest = isAccountType(t) ? (readLastVisited() ?? "/feed") : "/onboarding/account-type";
-      router.navigate({ to: dest, replace: true });
+      if (!isAccountType(t)) {
+        router.navigate({ to: "/onboarding/account-type", replace: true });
+        return;
+      }
+      // An email-confirmation link lands here, possibly on another device from
+      // the sign-up, so a member who chose a role goes to that role's setup —
+      // once — before the feed.
+      const setup = startSetupOf(user);
+      if (setup) {
+        startedSetup.current = true;
+        void clearStartHint();
+        router.navigate({ ...routeForSetup(setup), replace: true } as never);
+        return;
+      }
+      router.navigate({ to: readLastVisited() ?? "/feed", replace: true });
     })();
     return () => {
       cancelled = true;

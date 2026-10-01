@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { type StripeEnv, createStripeClient, getStripeErrorMessage } from "@/lib/stripe.server";
+import { canCheckoutPrice } from "@/lib/monetization/access";
+import { loadMonetizationConfig } from "@/lib/monetization/settings.server";
+import { MERCH_ITEMS } from "@/lib/catalog";
 
 type CheckoutSessionResult = { clientSecret: string } | { error: string };
 type PortalSessionResult = { url: string } | { error: string };
@@ -58,6 +61,20 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       const userId = context.userId;
       const customerEmail =
         typeof context.claims?.email === "string" ? (context.claims.email as string) : undefined;
+
+      // Monetization is switched server-side, so a crafted client cannot open
+      // checkout while ballaCity is free. Checked before Stripe is touched, so
+      // no session is ever created. `createPortalSession` is deliberately NOT
+      // gated: existing subscribers must always be able to cancel.
+      const monetization = await loadMonetizationConfig(context.supabase);
+      const isMerch = MERCH_ITEMS.some((item) => item.priceId === data.priceId);
+      if (!canCheckoutPrice(monetization, data.priceId, isMerch)) {
+        return {
+          error:
+            monetization.access.freeModeNotice ||
+            "ballaCity is free right now — there is nothing to buy.",
+        };
+      }
 
       const stripe = createStripeClient(data.environment);
 

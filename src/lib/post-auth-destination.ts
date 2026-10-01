@@ -7,6 +7,11 @@ export type PostAuthDestinationInput = {
   next: string | undefined;
   /** True when the signed-in account still needs to pick an account type. */
   needsAccountType: boolean;
+  /**
+   * The setup this account chose at sign-up and has not started yet
+   * (`hrefForSetup(startSetupOf(user))`), if any.
+   */
+  startDestination?: string | undefined;
   /** Path recorded before the visitor was routed to `/auth`, if any. */
   lastVisited?: string | undefined;
   /** Same-origin referrer path, used when neither of the above is set. */
@@ -27,11 +32,17 @@ export type PostAuthDestinationInput = {
  * account to the account-type picker first, a guardian would be forced
  * through a question the root gate itself skips for them, stranded one step
  * before the consent screen they were emailed a link to.
+ *
+ * An account that chose a role at sign-up goes to that role's setup before
+ * anything it merely visited or was referred from — but never ahead of a page it
+ * explicitly asked for (`next`), which it keeps.
  */
 export function postAuthDestination(input: PostAuthDestinationInput): string {
-  const { next, needsAccountType, lastVisited, referrer } = input;
+  const { next, needsAccountType, startDestination, lastVisited, referrer } = input;
 
   if (next && isAccountSetupEscape(next)) return next;
   if (needsAccountType) return ACCOUNT_TYPE_ROUTE;
-  return next ?? lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
+  if (next !== undefined) return next;
+  if (startDestination) return startDestination;
+  return lastVisited ?? referrer ?? DEFAULT_POST_AUTH_DESTINATION;
 }

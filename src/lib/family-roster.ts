@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useMyChildren } from "@/lib/child-safety";
-import type { AgeCohort } from "@/lib/child-policy";
+import { requiresParentalConsent, type AgeCohort } from "@/lib/child-policy";
 import type { GuardianChild } from "@/lib/child-safety.functions";
 
 /**
@@ -16,7 +16,8 @@ import type { GuardianChild } from "@/lib/child-safety.functions";
  * visibility rule can be tested without rendering anything.
  */
 
-export type RosterStatus = "awaiting_approval" | "consent_withdrawn" | "no_consent" | "approved";
+export type RosterStatus =
+  "awaiting_approval" | "consent_withdrawn" | "no_consent" | "not_required" | "approved";
 
 export type RosterEntry = {
   child: GuardianChild;
@@ -29,6 +30,8 @@ export type RosterEntry = {
   ageReviewRequired: boolean;
   /** Whether /players/$userId will actually render for this guardian. */
   publicProfileReachable: boolean;
+  /** Created by this guardian with no login of their own. */
+  managed: boolean;
 };
 
 export type FamilyRoster = {
@@ -43,6 +46,7 @@ const STATUS_LABEL: Record<RosterStatus, string> = {
   awaiting_approval: "Waiting on your approval",
   consent_withdrawn: "Consent withdrawn",
   no_consent: "No consent on file",
+  not_required: "No approval needed",
   approved: "Approved",
 };
 
@@ -80,6 +84,10 @@ function statusOf(child: GuardianChild): RosterStatus {
   if (status === "approved") return "approved";
   if (status === "revoked") return "consent_withdrawn";
   if (status === "pending" || status === "required") return "awaiting_approval";
+  // A cohort the policy does not require consent for (16–17 by default) has
+  // no consent row at all; that is not something the guardian must fix.
+  // An unknown age is never "not required": the guardian still has to act.
+  if (child.cohort !== "unknown" && !requiresParentalConsent(child.cohort)) return "not_required";
   return "no_consent";
 }
 
@@ -90,9 +98,10 @@ export function buildFamilyRoster(children: GuardianChild[]): FamilyRoster {
       child,
       status,
       statusLabel: STATUS_LABEL[status],
-      needsGuardian: status !== "approved",
+      needsGuardian: status !== "approved" && status !== "not_required",
       ageReviewRequired: child.ageReviewRequired === true,
       publicProfileReachable: canGuardianOpenPublicProfile(child),
+      managed: child.managed === true,
     };
   });
 

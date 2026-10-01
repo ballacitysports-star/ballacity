@@ -101,7 +101,7 @@ function SuperadminPage() {
           <TabsTrigger value="moderation">Content</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="monetization">Revenue</TabsTrigger>
+          <TabsTrigger value="monetization">Monetization</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
           <TabsTrigger value="youth">Youth &amp; age</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>

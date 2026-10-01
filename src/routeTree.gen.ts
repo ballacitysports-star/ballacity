@@ -68,7 +68,6 @@ import { Route as MessagesConversationIdRouteImport } from './routes/messages.$c
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as OnboardingAgeRouteImport } from './routes/onboarding.age'
 import { Route as OnboardingChildRouteImport } from './routes/onboarding.child'
-import { Route as OnboardingSetupForRouteImport } from './routes/onboarding.setup-for'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
@@ -102,6 +101,7 @@ import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
+import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -400,11 +400,6 @@ const OnboardingChildRoute = OnboardingChildRouteImport.update({
   path: '/onboarding/child',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OnboardingSetupForRoute = OnboardingSetupForRouteImport.update({
-  id: '/onboarding/setup-for',
-  path: '/onboarding/setup-for',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
   id: '/onboarding/welcome',
   path: '/onboarding/welcome',
@@ -573,6 +568,12 @@ const LovableEmailAuthWebhookRoute = LovableEmailAuthWebhookRouteImport.update({
   path: '/lovable/email/auth/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LovableEmailTransactionalPreviewRoute =
+  LovableEmailTransactionalPreviewRouteImport.update({
+    id: '/lovable/email/transactional/preview',
+    path: '/lovable/email/transactional/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -630,7 +631,6 @@ export interface FileRoutesByFullPath {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
-  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
@@ -667,6 +667,7 @@ export interface FileRoutesByFullPath {
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -723,7 +724,6 @@ export interface FileRoutesByTo {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
-  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
@@ -760,6 +760,7 @@ export interface FileRoutesByTo {
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -819,7 +820,6 @@ export interface FileRoutesById {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
-  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
@@ -856,6 +856,7 @@ export interface FileRoutesById {
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -915,7 +916,6 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
-    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
@@ -952,6 +952,7 @@ export interface FileRouteTypes {
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1008,7 +1009,6 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
-    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
@@ -1045,6 +1045,7 @@ export interface FileRouteTypes {
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/transactional/preview'
   id:
     | '__root__'
     | '/'
@@ -1103,7 +1104,6 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
-    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
@@ -1140,6 +1140,7 @@ export interface FileRouteTypes {
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1189,7 +1190,6 @@ export interface RootRouteChildren {
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
   OnboardingChildRoute: typeof OnboardingChildRoute
-  OnboardingSetupForRoute: typeof OnboardingSetupForRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
@@ -1223,6 +1223,7 @@ export interface RootRouteChildren {
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
+  LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1640,13 +1641,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingChildRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/onboarding/setup-for': {
-      id: '/onboarding/setup-for'
-      path: '/onboarding/setup-for'
-      fullPath: '/onboarding/setup-for'
-      preLoaderRoute: typeof OnboardingSetupForRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/onboarding/welcome': {
       id: '/onboarding/welcome'
       path: '/onboarding/welcome'
@@ -1878,6 +1872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailAuthWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lovable/email/transactional/preview': {
+      id: '/lovable/email/transactional/preview'
+      path: '/lovable/email/transactional/preview'
+      fullPath: '/lovable/email/transactional/preview'
+      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1973,7 +1974,6 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,
   OnboardingChildRoute: OnboardingChildRoute,
-  OnboardingSetupForRoute: OnboardingSetupForRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayerCardUserIdRoute: PlayerCardUserIdRoute,
@@ -2007,6 +2007,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
+  LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

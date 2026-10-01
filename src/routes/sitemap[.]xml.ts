@@ -45,7 +45,39 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const urls = ENTRIES.map((e) =>
+        // Don't advertise pages that sell nothing. The shop is switched off
+        // while ballaCity is free, and /plans has no prices on it, so both are
+        // dropped from the sitemap until monetization returns.
+        //
+        // Imported inside the handler: this route is part of the client graph
+        // (routeTree.gen.ts), so a top-level import would pull server-only code
+        // into the browser bundle.
+        let merchEnabled = false;
+        let subscriptionsEnabled = false;
+        try {
+          const [{ supabaseAdmin }, { loadMonetizationConfig }, { resolveFeatureAccess }] =
+            await Promise.all([
+              import("@/integrations/supabase/client.server"),
+              import("@/lib/monetization/settings.server"),
+              import("@/lib/monetization/access"),
+            ]);
+          const config = await loadMonetizationConfig(supabaseAdmin);
+          const access = resolveFeatureAccess(config);
+          merchEnabled = access.merchEnabled;
+          // /plans still exists while free, but it sells nothing, so there is
+          // nothing for a search engine to index.
+          subscriptionsEnabled = !access.freeMode;
+        } catch {
+          // A settings read failure must not break the sitemap; omitting /shop
+          // is the safe direction.
+        }
+
+        const entries = ENTRIES.filter(
+          (e) =>
+            (e.path !== "/shop" || merchEnabled) && (e.path !== "/plans" || subscriptionsEnabled),
+        );
+
+        const urls = entries.map((e) =>
           [
             `  <url>`,
             `    <loc>${SITE_URL}${e.path}</loc>`,

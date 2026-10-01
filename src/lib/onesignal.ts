@@ -2,6 +2,7 @@
 // App ID is public; safe to inline.
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { isManagedUser } from "@/lib/managed-children";
 import { openDeepLink } from "@/lib/deep-links";
 
 export const ONESIGNAL_APP_ID = "c6024ea7-b1a2-4f64-b43a-783971d802f9";
@@ -169,8 +170,13 @@ export async function isOneSignalSubscribed(): Promise<boolean> {
 /** Mount once near the app root; initializes OneSignal for the signed-in user. */
 export function useOneSignal() {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const managed = isManagedUser(user);
   useEffect(() => {
-    if (!user) return;
-    void initOneSignal(user.id);
-  }, [user?.id]);
+    // A managed child has no device of their own: this is the guardian's
+    // device, acting as the child. Leave it tied to the guardian so their own
+    // alerts keep arriving and the child's subscription never claims it.
+    if (!userId || managed) return;
+    void initOneSignal(userId);
+  }, [userId, managed]);
 }

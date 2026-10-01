@@ -10,6 +10,11 @@ import {
   countRows,
   EDITABLE_PROFILE_FIELDS,
 } from "@/lib/superadmin.server";
+import {
+  MONETIZATION_SETTING_KEY,
+  invalidateMonetizationConfigCache,
+} from "@/lib/monetization/settings.server";
+import { AI_SETTING_KEYS, invalidateAiConfigCache } from "@/lib/ai/settings.server";
 
 export const superadminCheck = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -717,19 +722,28 @@ export const superadminListSettings = createServerFn({ method: "GET" })
 
 export const superadminSetSetting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { key: string; value: unknown; description?: string; isPublic?: boolean }) =>
-    z
-      .object({
-        key: z
-          .string()
-          .min(1)
-          .max(80)
-          .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
-        value: z.any(),
-        description: z.string().max(300).optional(),
-        isPublic: z.boolean().optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      key: string;
+      value: unknown;
+      description?: string;
+      isPublic?: boolean;
+      reason?: string;
+    }) =>
+      z
+        .object({
+          key: z
+            .string()
+            .min(1)
+            .max(80)
+            .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
+          value: z.any(),
+          description: z.string().max(300).optional(),
+          isPublic: z.boolean().optional(),
+          /** Why this changed. Recorded in the audit log for consequential flips. */
+          reason: z.string().max(500).optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -748,10 +762,15 @@ export const superadminSetSetting = createServerFn({ method: "POST" })
     if (data.isPublic !== undefined) row["is_public"] = data.isPublic;
     const { error } = await admin.from("app_settings").upsert(row as any, { onConflict: "key" });
     if (error) throw new Error(error.message);
+    // Drop the server caches so a toggle takes effect on this isolate at once
+    // rather than after its TTL.
+    if (data.key === MONETIZATION_SETTING_KEY) invalidateMonetizationConfigCache();
+    if ((AI_SETTING_KEYS as readonly string[]).includes(data.key)) invalidateAiConfigCache();
     await writeAudit(admin, context.userId, {
       action: settingAuditAction(data.key, data.value),
       targetType: "app_setting",
       targetId: data.key,
+      reason: data.reason ?? null,
       before,
       after: { value: data.value },
       metadata: { key: data.key, isPublic: data.isPublic ?? before?.is_public ?? false },

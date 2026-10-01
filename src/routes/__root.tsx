@@ -26,23 +26,24 @@ import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-l
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import {
   type AccountType,
+  type SetupId,
   clearPendingAccountType,
   isAccountType,
   readPendingAccountType,
+  routeForSetup,
 } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
 import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
-import {
-  AccountTypeScreen,
-  destinationForAccountType,
-} from "@/components/onboarding/AccountTypeScreen";
+import { AccountTypeScreen } from "@/components/onboarding/AccountTypeScreen";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
+import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
+import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -154,6 +155,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) ?? "";
+const GA_INIT_SCRIPT = GA_ID
+  ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',${JSON.stringify(GA_ID)});`
+  : "";
+
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
@@ -263,6 +269,12 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        {GA_ID ? (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`} />
+            <script dangerouslySetInnerHTML={{ __html: GA_INIT_SCRIPT }} />
+          </>
+        ) : null}
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG_SCRIPT }} />
@@ -534,6 +546,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [verifying, setVerifying] = useState(false);
   useNotificationPush();
   useOneSignal();
+  // Guardian ⇄ managed-child switching: reload tabs whose identity changed,
+  // and restore a parked guardian if the child's session disappears.
+  useManagedSessionWatcher();
   // Delivers due pre-game reminders for the signed-in player.
   useGameReminderFlush();
 
@@ -840,6 +855,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (isPublic) {
     return (
       <>
+        <ManagedSessionBanner />
         {children}
         {user && <BottomNav />}
       </>
@@ -873,12 +889,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
   // Same for the profile-type step: render the picker in place.
   if (!skipTypeCheck && typeStatus === "missing") {
-    const finishType = (type?: AccountType) => {
+    // The setup they chose decides where they go — for every role, Player
+    // included — and there is no question in between. `onAlreadySet` passes none.
+    const finishType = (_type?: AccountType, setup?: SetupId) => {
       if (user) onboardedUsers.add(user.id);
       setTypeStatus("ok");
-      if (type && type !== "player") {
-        router.navigate({ to: destinationForAccountType(type), replace: true } as never);
-      }
+      if (setup) router.navigate({ ...routeForSetup(setup), replace: true } as never);
     };
     return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }
@@ -890,6 +906,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <ManagedSessionBanner />
       {children}
       <BottomNav />
     </>

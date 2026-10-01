@@ -622,16 +622,17 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           <PrimaryCTA type="button" onClick={onNext} loading={saving}>
             {isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
           </PrimaryCTA>
-          <button
-            type="button"
-            onClick={() =>
-              step === 0 ? nav({ to: "/onboarding/setup-for" }) : setStep((s) => Math.max(0, s - 1))
-            }
-            disabled={saving}
-            className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
-          >
-            Back
-          </button>
+          {/* The first step is where setup starts: the role was chosen before it. */}
+          {step > 0 ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={saving}
+              className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
+            >
+              Back
+            </button>
+          ) : null}
         </div>
       </div>
     </OnboardingShell>

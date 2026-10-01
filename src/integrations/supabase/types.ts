@@ -1425,6 +1425,7 @@ export type Database = {
       legal_consents: {
         Row: {
           accepted_at: string
+          accepted_by: string | null
           created_at: string
           document_type: string
           document_version: string
@@ -1434,6 +1435,7 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string
+          accepted_by?: string | null
           created_at?: string
           document_type: string
           document_version: string
@@ -1443,6 +1445,7 @@ export type Database = {
         }
         Update: {
           accepted_at?: string
+          accepted_by?: string | null
           created_at?: string
           document_type?: string
           document_version?: string
@@ -1581,6 +1584,69 @@ export type Database = {
           sport?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      managed_accounts: {
+        Row: {
+          child_user_id: string
+          created_at: string
+          managed_by: string
+          relationship: string
+        }
+        Insert: {
+          child_user_id: string
+          created_at?: string
+          managed_by: string
+          relationship?: string
+        }
+        Update: {
+          child_user_id?: string
+          created_at?: string
+          managed_by?: string
+          relationship?: string
+        }
+        Relationships: []
+      }
+      managed_device_pairings: {
+        Row: {
+          child_user_id: string
+          code_hash: string
+          created_at: string
+          created_by: string
+          device_label: string | null
+          expires_at: string
+          id: string
+          paired_at: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+        }
+        Insert: {
+          child_user_id: string
+          code_hash: string
+          created_at?: string
+          created_by: string
+          device_label?: string | null
+          expires_at: string
+          id?: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+        }
+        Update: {
+          child_user_id?: string
+          code_hash?: string
+          created_at?: string
+          created_by?: string
+          device_label?: string | null
+          expires_at?: string
+          id?: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
         }
         Relationships: []
       }
@@ -3657,6 +3723,16 @@ export type Database = {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
       }
+      confirm_device_pairing: { Args: never; Returns: boolean }
+      create_device_pairing: {
+        Args: {
+          _child_user_id: string
+          _code_hash: string
+          _device_label?: string
+          _ttl_minutes?: number
+        }
+        Returns: string
+      }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
@@ -3850,6 +3926,7 @@ export type Database = {
         Args: { _reviewee_id: string; _user: string }
         Returns: boolean
       }
+      is_managed_account: { Args: { _user: string }; Returns: boolean }
       is_minor: { Args: { _user: string }; Returns: boolean }
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
@@ -3918,6 +3995,13 @@ export type Database = {
           status: string
         }[]
       }
+      lookup_device_pairing: {
+        Args: { _code_hash: string }
+        Returns: {
+          child_user_id: string
+          state: string
+        }[]
+      }
       lookup_minor_invite: {
         Args: { _token_hash: string }
         Returns: {
@@ -3953,6 +4037,7 @@ export type Database = {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
       }
+      monetization_free_mode: { Args: never; Returns: boolean }
       my_age_category: { Args: never; Returns: string }
       my_age_cohort: { Args: never; Returns: string }
       my_birthday_corrections: {
@@ -4026,6 +4111,21 @@ export type Database = {
         }[]
       }
       profile_visibility_of: { Args: { _user: string }; Returns: string }
+      provision_managed_child: {
+        Args: {
+          _attested?: boolean
+          _child: string
+          _display_name: string
+          _dob: string
+          _relationship?: string
+          _sport?: string
+          _versions?: Json
+        }
+        Returns: {
+          cohort: string
+          consent_recorded: boolean
+        }[]
+      }
       public_privacy_flags: {
         Args: { _ids: string[] }
         Returns: {
@@ -4091,6 +4191,10 @@ export type Database = {
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
         Returns: undefined
+      }
+      revoke_device_pairing: {
+        Args: { _child_user_id: string }
+        Returns: boolean
       }
       revoke_guardian_link: {
         Args: { _child_user_id: string; _reason?: string }

@@ -6,6 +6,7 @@ import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { isManagedUser } from "@/lib/managed-children";
 
 export const Route = createFileRoute("/account/security")({
   head: () =>
@@ -44,6 +45,13 @@ function AccountSecurityPage() {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  // A managed child has no credentials, and giving them some is a guardian
+  // decision, not something to do from inside their profile.
+  const managed = isManagedUser(user);
+  useEffect(() => {
+    if (managed) nav({ to: "/settings", replace: true });
+  }, [managed, nav]);
 
   const providers = (user?.app_metadata?.providers as string[] | undefined) ?? [];
   const hasPassword = providers.includes("email");
@@ -86,7 +94,7 @@ function AccountSecurityPage() {
     }
   };
 
-  if (!checked) return null;
+  if (!checked || managed) return null;
 
   if (!user) {
     return (

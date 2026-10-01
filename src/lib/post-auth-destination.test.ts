@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ACCOUNT_TYPE_ROUTE } from "@/lib/age-verification";
+import { hrefForSetup } from "@/lib/account-type";
 import { DEFAULT_POST_AUTH_DESTINATION, postAuthDestination } from "@/lib/post-auth-destination";
 
 /**
@@ -86,5 +87,75 @@ describe("postAuthDestination", () => {
     for (const next of ["/safety/children", "/account/legal", "/parent"]) {
       expect(postAuthDestination({ next, needsAccountType: true })).toBe(next);
     }
+  });
+});
+
+/**
+ * A member who chose a role at sign-up carries a hint (`start_as`) until it has
+ * sent them to that role's setup. The hint only ever adds one redirect; it never
+ * takes away a page someone asked for, and never gets ahead of a question the
+ * account has to answer first.
+ */
+describe("postAuthDestination with a setup chosen at sign-up", () => {
+  const base = { needsAccountType: false, lastVisited: undefined, referrer: undefined };
+  const setups = ["player", "child", "team", "coach", "facility"] as const;
+
+  it.each(setups)("sends %s straight to its setup before anything merely visited", (setup) => {
+    const startDestination = hrefForSetup(setup);
+    expect(postAuthDestination({ ...base, next: undefined, startDestination })).toBe(
+      startDestination,
+    );
+    expect(
+      postAuthDestination({
+        ...base,
+        next: undefined,
+        startDestination,
+        lastVisited: "/games/42",
+        referrer: "/players",
+      }),
+    ).toBe(startDestination);
+  });
+
+  it("goes where the roles say", () => {
+    expect(hrefForSetup("player")).toBe("/onboarding/welcome");
+    expect(hrefForSetup("child")).toBe("/players/add?from=onboarding");
+    expect(hrefForSetup("team")).toBe("/teams/create");
+    expect(hrefForSetup("coach")).toBe("/trainers/create");
+    expect(hrefForSetup("facility")).toBe("/orgs/create");
+  });
+
+  it("keeps the page they explicitly asked for", () => {
+    expect(
+      postAuthDestination({ ...base, next: "/games/42", startDestination: "/orgs/create" }),
+    ).toBe("/games/42");
+  });
+
+  it("still sends an unresolved account to the type picker first", () => {
+    expect(
+      postAuthDestination({
+        next: undefined,
+        needsAccountType: true,
+        startDestination: "/orgs/create",
+        lastVisited: undefined,
+        referrer: undefined,
+      }),
+    ).toBe(ACCOUNT_TYPE_ROUTE);
+  });
+
+  it("still honours an account-setup escape, such as a consent link", () => {
+    expect(
+      postAuthDestination({
+        ...base,
+        next: "/parent/consent/abc123",
+        startDestination: "/players/add?from=onboarding",
+      }),
+    ).toBe("/parent/consent/abc123");
+  });
+
+  it("changes nothing without one", () => {
+    expect(postAuthDestination({ ...base, next: undefined })).toBe(DEFAULT_POST_AUTH_DESTINATION);
+    expect(postAuthDestination({ ...base, next: undefined, startDestination: undefined })).toBe(
+      DEFAULT_POST_AUTH_DESTINATION,
+    );
   });
 });

@@ -13,6 +13,7 @@ export const AI_ERROR_CODES = [
   "PARENT_APPROVAL_REQUIRED",
   "QUOTA_EXCEEDED",
   "CONCURRENCY_LIMIT",
+  "SUBSCRIPTION_REQUIRED",
   "RATE_LIMITED",
   "INVALID_MEDIA",
   "UNSUPPORTED_FORMAT",
@@ -28,6 +29,7 @@ export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
 
 export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   FEATURE_DISABLED: "This AI feature is turned off right now. Try again later.",
+  SUBSCRIPTION_REQUIRED: "This feature needs a subscription.",
   CONSENT_REQUIRED:
     "AI processing is turned off for your account. You can turn it on in Settings → Privacy.",
   PARENT_APPROVAL_REQUIRED:
