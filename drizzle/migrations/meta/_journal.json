@@ -43,6 +43,13 @@
       "when": 1790896626609,
       "tag": "0005_parent_account_type",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790896636058,
+      "tag": "0006_backfill_parent_account_profiles",
+      "breakpoints": true
     }
   ]
 }
