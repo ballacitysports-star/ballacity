@@ -45,6 +45,10 @@ const publicBackendDefine = {
     publicValue("VITE_SUPABASE_PUBLISHABLE_KEY"),
   ),
   "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(publicValue("VITE_SUPABASE_PROJECT_ID")),
+  // GA4 measurement IDs are public identifiers; bake in at build time.
+  "import.meta.env.VITE_GA_MEASUREMENT_ID": JSON.stringify(
+    (process.env.GOOGLE_ANALYTICS_MEASUREMENT_ID ?? "").trim(),
+  ),
 };
 
 function seedEnvFromProductionFile() {
