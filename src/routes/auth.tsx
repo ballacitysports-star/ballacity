@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
+import { trackEvent } from "@/lib/analytics";
 import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
@@ -301,6 +302,7 @@ function AuthPage() {
           setMode("signin");
           return;
         }
+        trackEvent("sign_up", { method: "email", role: setup ?? "unknown" });
         if (data.session) {
           toast.success("Account created!");
         } else {

@@ -18,6 +18,7 @@ import {
   setAccountTypeForCurrentUser,
 } from "@/lib/account-type";
 import { useMyAgeStatus } from "@/lib/age-verification";
+import { trackEvent } from "@/lib/analytics";
 
 /** How long the cards wait for the age answer before showing without Parent / Guardian. */
 const AGE_WAIT_MS = 3000;
@@ -95,6 +96,7 @@ export function AccountTypeScreen({
       const type = accountTypeForSetup(choice);
       await setAccountTypeForCurrentUser(type);
       clearPendingAccountType();
+      trackEvent("select_role", { role: choice, account_type: type });
       toast.success("Account type set.");
       if (onResolved) {
         onResolved(type, choice);
