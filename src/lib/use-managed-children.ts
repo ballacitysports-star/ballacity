@@ -49,7 +49,7 @@ export function useDeleteManagedChild() {
 export function useSwitchToManagedChild() {
   const fn = useServerFn(startManagedSession);
   const { profiles } = useMyProfiles();
-  const guardianName = profiles.find((p) => p.kind === "parent" || p.kind === "player")?.name ?? null;
+  const guardianName = profiles.find((p) => p.kind === "player")?.name ?? null;
   return useMutation({
     mutationFn: async (input: { childUserId: string; childName: string }) => {
       const { tokenHash } = await fn({ data: { childUserId: input.childUserId } });

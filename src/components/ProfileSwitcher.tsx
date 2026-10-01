@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ACCOUNT_TYPE_META, type AccountType, type HostedAccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
 import {
   addProfileRoute,
   useMyProfiles,
@@ -23,7 +23,7 @@ import { isManagedUser } from "@/lib/managed-children";
 import { switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
 
-const ADDABLE: HostedAccountType[] = ["team", "trainer", "gym"];
+const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
 function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number }) {
   return (

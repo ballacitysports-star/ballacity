@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { ACCOUNT_TYPE_META, type AccountType, type HostedAccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
 import { continueAsPlayer, myProfilesKey } from "@/lib/account-profiles";
 
 /**
@@ -12,7 +12,7 @@ import { continueAsPlayer, myProfilesKey } from "@/lib/account-profiles";
  * their registration is unfinished. Explains why they are here and lets them
  * bail out to a plain player account instead of being stuck.
  */
-export function FinishSetupNotice({ kind }: { kind: HostedAccountType }) {
+export function FinishSetupNotice({ kind }: { kind: Exclude<AccountType, "player"> }) {
   const meta = ACCOUNT_TYPE_META[kind];
   const label = meta.label.toLowerCase();
   const navigate = useNavigate();
