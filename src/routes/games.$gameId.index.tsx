@@ -3,6 +3,7 @@ import { emailLocalPart } from "@/lib/managed-children";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
+import { trackEvent } from "@/lib/analytics";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -294,6 +295,9 @@ function formatCooldownLabel(ms: number): string {
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
+  useEffect(() => {
+    trackEvent("view_game", { game_id: gameId });
+  }, [gameId]);
   const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
   const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
 
