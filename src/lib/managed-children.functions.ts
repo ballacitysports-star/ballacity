@@ -301,6 +301,16 @@ export const startManagedSession = createServerFn({ method: "POST" })
       throw new Error(managedChildErrorMessage("NOT_MANAGED"));
     }
 
+    // A device pairing this child had was revoked bans the account (see
+    // revokeDevicePairing in device-pairing.functions.ts) so no new session
+    // can start from a device the guardian no longer controls. Switching into
+    // the child's profile here is a guardian action just as legitimate as
+    // pairing a fresh one, so it lifts a stale ban the same way. Best-effort:
+    // nothing below depends on this succeeding.
+    await supabaseAdmin.auth.admin
+      .updateUserById(data.childUserId, { ban_duration: "none" })
+      .catch(() => undefined);
+
     const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
       type: "magiclink",
       email: user.email,

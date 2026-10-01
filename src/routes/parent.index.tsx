@@ -23,6 +23,7 @@ import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
+import { DevicePairingCard } from "@/components/child/DevicePairingCard";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
 
 export const Route = createFileRoute("/parent/")({
@@ -253,6 +254,12 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         </div>
       </div>
       <ConsentTrail childUserId={childUserId} />
+      {child.managed ? (
+        <DevicePairingCard
+          childUserId={childUserId}
+          childFirstName={child.displayName.split(" ")[0] ?? child.displayName}
+        />
+      ) : null}
       <FamilyActivityLog childUserId={childUserId} />
 
       <div className="mt-4 flex flex-wrap gap-2">

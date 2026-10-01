@@ -426,10 +426,13 @@ const PUBLIC_ROUTES = [
   // Articles are public, indexable content.
   "/blog",
 
-
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
+  // A managed child's own device has no session of any kind — not even a
+  // different user's — to sign in with first, unlike /family/join/$token
+  // (deliberately not public: accepting that invite needs an account).
+  "/devices/pair",
 ];
 const TAB_PATHS = [
   "/feed",
