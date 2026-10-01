@@ -29,6 +29,13 @@
       "when": 1790861002560,
       "tag": "0003_grant_post_reactions_anon_select",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790896578711,
+      "tag": "0004_profiles_account_type_valid",
+      "breakpoints": true
     }
   ]
 }
