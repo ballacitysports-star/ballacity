@@ -15,6 +15,20 @@
       "when": 1790774725817,
       "tag": "0001_freeze_player_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790860940937,
+      "tag": "0002_managed_device_pairing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790861002560,
+      "tag": "0003_grant_post_reactions_anon_select",
+      "breakpoints": true
     }
   ]
 }
