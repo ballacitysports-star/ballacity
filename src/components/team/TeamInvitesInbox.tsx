@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import {
   useMyTeamInvites,
   useRespondToTeamInvite,
 } from "@/lib/team-roster";
+import { useSignTeamWaiver, teamWaiverErrorMessage } from "@/lib/team-waivers";
 
 /**
  * Pending team invitations for the signed-in player.
@@ -17,6 +19,13 @@ import {
 export function TeamInvitesInbox({ className = "" }: { className?: string }) {
   const invites = useMyTeamInvites();
   const respond = useRespondToTeamInvite();
+  // Which invite's Accept most recently hit WAIVER_REQUIRED, if any — swaps
+  // that one card's Accept button for a "sign, then join" affordance instead
+  // of just leaving the user with a toast and nothing to do about it.
+  const [waiverNeededFor, setWaiverNeededFor] = useState<string | null>(null);
+  const signWaiver = useSignTeamWaiver(
+    invites.data?.find((i) => i.id === waiverNeededFor)?.teamId ?? "",
+  );
 
   if (!invites.data?.length) return null;
 
@@ -34,22 +43,51 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
             invited you as {ROLE_META[inv.role].label.toLowerCase()}
           </div>
           {inv.message && <p className="mt-1 text-xs text-muted-foreground">“{inv.message}”</p>}
+          {waiverNeededFor === inv.id ? (
+            <p className="mt-2 text-xs font-medium text-coral">
+              This team requires a signed waiver before you can join.
+            </p>
+          ) : null}
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              disabled={respond.isPending}
-              onClick={() =>
+              disabled={respond.isPending || signWaiver.isPending}
+              onClick={() => {
+                if (waiverNeededFor === inv.id) {
+                  signWaiver.mutate(
+                    { waiverId: inv.id },
+                    {
+                      onError: (err) => toast.error(teamWaiverErrorMessage(err)),
+                      onSuccess: () =>
+                        respond.mutate(
+                          { inviteId: inv.id, accept: true },
+                          {
+                            onSuccess: () => {
+                              setWaiverNeededFor(null);
+                              toast.success(`You joined ${inv.teamName}`);
+                            },
+                            onError: (err) => toast.error(teamRosterErrorMessage(err)),
+                          },
+                        ),
+                    },
+                  );
+                  return;
+                }
                 respond.mutate(
                   { inviteId: inv.id, accept: true },
                   {
                     onSuccess: () => toast.success(`You joined ${inv.teamName}`),
-                    onError: (err) => toast.error(teamRosterErrorMessage(err)),
+                    onError: (err) => {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      if (msg.includes("WAIVER_REQUIRED")) setWaiverNeededFor(inv.id);
+                      toast.error(teamRosterErrorMessage(err));
+                    },
                   },
-                )
-              }
+                );
+              }}
               className="flex-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
             >
-              Accept
+              {waiverNeededFor === inv.id ? "Sign waiver & join" : "Accept"}
             </button>
             <button
               type="button"

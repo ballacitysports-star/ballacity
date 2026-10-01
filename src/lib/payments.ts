@@ -45,6 +45,8 @@ export type JoinRequest = {
   reviewed_at: string | null;
   attempt_count?: number;
   last_rejected_at?: string | null;
+  guardian_approved_at?: string | null;
+  guardian_approved_by?: string | null;
 };
 
 export const JOIN_RESUBMIT_COOLDOWN_MS = 15 * 60 * 1000;
@@ -605,6 +607,31 @@ export async function listMyJoinRequests(
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as JoinRequest[];
+}
+
+/** Every pending join request from one of the signed-in guardian's children. */
+export async function listMyChildrensJoinRequests(): Promise<JoinRequest[]> {
+  // RLS (is_guardian_of) scopes this to the signed-in guardian's own children,
+  // the same way listHostJoinRequests/listMyJoinRequests rely on RLS to scope
+  // theirs, just without a single column to also filter on explicitly here.
+  const { data, error } = await supabase
+    .from("join_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as JoinRequest[];
+}
+
+/** Approve or decline a child's pending game join request, as their guardian. */
+export async function guardianApproveJoinRequest(requestId: string, approve = true) {
+  // Not yet in the generated Database type until this migration ships live.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.rpc as any)("guardian_approve_join_request", {
+    _request: requestId,
+    _approve: approve,
+  });
+  if (error) throw error;
 }
 
 export async function reviewJoinRequest(

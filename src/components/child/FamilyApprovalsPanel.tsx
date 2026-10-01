@@ -1,10 +1,113 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BellRing, Clock } from "lucide-react";
-import { useFamilyApprovals } from "@/lib/family-approvals";
+import { toast } from "sonner";
+import { useFamilyApprovals, type FamilyApproval } from "@/lib/family-approvals";
+import { useGuardianApproveTeamInvite, teamRosterErrorMessage } from "@/lib/team-roster";
+import { guardianApproveJoinRequest } from "@/lib/payments";
+import { useSignTeamWaiver, teamWaiverErrorMessage } from "@/lib/team-waivers";
+
+/** The inline Approve / Decline / Sign row for an item that carries one. */
+function ApprovalAction({ approval }: { approval: FamilyApproval }) {
+  const action = approval.approveAction!;
+  const approveInvite = useGuardianApproveTeamInvite();
+  const signWaiver = useSignTeamWaiver(action.teamId ?? "");
+
+  if (action.kind === "team_invite") {
+    return (
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={() =>
+            approveInvite.mutate(
+              { inviteId: action.id, approve: true },
+              {
+                onSuccess: () => toast.success("Invite approved"),
+                onError: (e) => toast.error(teamRosterErrorMessage(e)),
+              },
+            )
+          }
+          disabled={approveInvite.isPending}
+          className="rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+        >
+          Approve
+        </button>
+        <button
+          onClick={() =>
+            approveInvite.mutate(
+              { inviteId: action.id, approve: false },
+              {
+                onSuccess: () => toast.success("Invite declined"),
+                onError: (e) => toast.error(teamRosterErrorMessage(e)),
+              },
+            )
+          }
+          disabled={approveInvite.isPending}
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+        >
+          Decline
+        </button>
+      </div>
+    );
+  }
+
+  if (action.kind === "join_request") {
+    return (
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={async () => {
+            try {
+              await guardianApproveJoinRequest(action.id, true);
+              toast.success("Request approved");
+            } catch (e) {
+              toast.error(teamRosterErrorMessage(e));
+            }
+          }}
+          className="rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Approve
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              await guardianApproveJoinRequest(action.id, false);
+              toast.success("Request declined");
+            } catch (e) {
+              toast.error(teamRosterErrorMessage(e));
+            }
+          }}
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold"
+        >
+          Decline
+        </button>
+      </div>
+    );
+  }
+
+  // waiver — a single deliberate button, labeled as the attestation itself,
+  // the same one-click-after-reading-the-label convention players.add.tsx's
+  // own guardian-attests checkbox already uses.
+  return (
+    <button
+      onClick={() =>
+        signWaiver.mutate(
+          { waiverId: action.id, onBehalfOf: approval.childUserId ?? undefined, attested: true },
+          {
+            onSuccess: () => toast.success("Waiver signed"),
+            onError: (e) => toast.error(teamWaiverErrorMessage(e)),
+          },
+        )
+      }
+      disabled={signWaiver.isPending || !approval.childUserId}
+      className="mt-2 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+    >
+      Sign on their behalf
+    </button>
+  );
+}
 
 /**
  * One shared place where every guardian-facing approval shows up, whatever
- * feature raised it — consent, family invitations, or data requests.
+ * feature raised it — consent, family invitations, data requests, or a
+ * child's pending team invite, game request or team waiver.
  */
 export function FamilyApprovalsPanel() {
   const { approvals, actionNeeded, isLoading } = useFamilyApprovals();
@@ -41,7 +144,9 @@ export function FamilyApprovalsPanel() {
           >
             <div className="text-sm font-semibold capitalize">{a.title}</div>
             <p className="mt-1 text-muted-foreground">{a.detail}</p>
-            {a.actionLabel && a.actionTo && a.actionTo !== here ? (
+            {a.approveAction ? (
+              <ApprovalAction approval={a} />
+            ) : a.actionLabel && a.actionTo && a.actionTo !== here ? (
               <Link
                 to={a.actionTo}
                 className="mt-2 inline-block font-semibold text-primary underline"
