@@ -1608,6 +1608,48 @@ export type Database = {
         }
         Relationships: []
       }
+      managed_device_pairings: {
+        Row: {
+          child_user_id: string
+          code_hash: string
+          created_at: string
+          created_by: string
+          device_label: string | null
+          expires_at: string
+          id: string
+          paired_at: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+        }
+        Insert: {
+          child_user_id: string
+          code_hash: string
+          created_at?: string
+          created_by: string
+          device_label?: string | null
+          expires_at: string
+          id?: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+        }
+        Update: {
+          child_user_id?: string
+          code_hash?: string
+          created_at?: string
+          created_by?: string
+          device_label?: string | null
+          expires_at?: string
+          id?: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string
@@ -3681,6 +3723,16 @@ export type Database = {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
       }
+      confirm_device_pairing: { Args: never; Returns: boolean }
+      create_device_pairing: {
+        Args: {
+          _child_user_id: string
+          _code_hash: string
+          _device_label?: string
+          _ttl_minutes?: number
+        }
+        Returns: string
+      }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
@@ -3943,6 +3995,13 @@ export type Database = {
           status: string
         }[]
       }
+      lookup_device_pairing: {
+        Args: { _code_hash: string }
+        Returns: {
+          child_user_id: string
+          state: string
+        }[]
+      }
       lookup_minor_invite: {
         Args: { _token_hash: string }
         Returns: {
@@ -4132,6 +4191,10 @@ export type Database = {
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
         Returns: undefined
+      }
+      revoke_device_pairing: {
+        Args: { _child_user_id: string }
+        Returns: boolean
       }
       revoke_guardian_link: {
         Args: { _child_user_id: string; _reason?: string }
