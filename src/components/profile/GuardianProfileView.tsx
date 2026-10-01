@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { ProfileChannelHeader, channelPillClass } from "@/components/profile/ProfileChannelHeader";
+import { ProfileAboutSheet, AboutBlock } from "@/components/profile/ProfileAboutSheet";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
 import { useFamilyRoster } from "@/lib/family-roster";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
+import { useMyEmergencyContact } from "@/lib/guardian-emergency-contact";
+import { telHref } from "@/lib/org-listing";
 
 /**
  * The Profile tab rendered for the guardian ("parent") active profile.
@@ -18,6 +22,8 @@ import { FamilyRoster } from "@/components/child/FamilyRoster";
 export function GuardianProfileView({ profile }: { profile: AccountProfile }) {
   const navigate = useNavigate();
   const { needsAction, approved, all, isLoading } = useFamilyRoster();
+  const emergencyContact = useMyEmergencyContact();
+  const [aboutOpen, setAboutOpen] = useState(false);
   const meta = ACCOUNT_TYPE_META.parent;
   const childCount = all.length;
 
@@ -39,12 +45,53 @@ export function GuardianProfileView({ profile }: { profile: AccountProfile }) {
             ? `${needsAction.length} need${needsAction.length === 1 ? "s" : ""} your approval`
             : null,
         ]}
+        onOpenAbout={() => setAboutOpen(true)}
         actions={
           <Link to="/parent" className={channelPillClass("primary")}>
             Open Parent Center
           </Link>
         }
       />
+
+      <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
+        <AboutBlock label="Emergency contact">
+          {emergencyContact.loading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : emergencyContact.value.name || emergencyContact.value.phone ? (
+            <ul className="space-y-1 text-sm">
+              <li className="font-medium">{emergencyContact.value.name || "—"}</li>
+              {emergencyContact.value.phone && (
+                <li>
+                  {telHref(emergencyContact.value.phone) ? (
+                    <a
+                      href={telHref(emergencyContact.value.phone)!}
+                      className="text-foreground underline-offset-2 hover:underline"
+                    >
+                      {emergencyContact.value.phone}
+                    </a>
+                  ) : (
+                    emergencyContact.value.phone
+                  )}
+                </li>
+              )}
+              {emergencyContact.value.relationship && (
+                <li className="text-muted-foreground">{emergencyContact.value.relationship}</li>
+              )}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Not added yet.{" "}
+              <Link
+                to="/profile/edit"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                Add one
+              </Link>
+              . Visible only to you.
+            </p>
+          )}
+        </AboutBlock>
+      </ProfileAboutSheet>
 
       <div className="mt-5 px-4">
         {isLoading ? (

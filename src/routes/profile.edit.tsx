@@ -31,6 +31,7 @@ import {
   validateBirthday,
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
+import { GuardianEmergencyContactFields } from "@/components/profile/GuardianEmergencyContactFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
 import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import {
@@ -73,6 +74,8 @@ function EditProfile() {
   // Date of birth is locked once saved; corrections go through support review.
   const { data: birthdayLock } = useMyBirthdayLock(Boolean(profileUser));
   const showOrgs = !accountTypeLoading && !!activeProfile && activeProfile.kind !== "player";
+  const showEmergencyContact =
+    !accountTypeLoading && !!activeProfile && activeProfile.kind === "parent";
   const nav = useNavigate();
 
   const [name, setName] = useState(profile?.name ?? "");
@@ -402,6 +405,12 @@ function EditProfile() {
         />
       </Section>
 
+      {showEmergencyContact && (
+        <Section title="Emergency contact">
+          <GuardianEmergencyContactFields />
+        </Section>
+      )}
+
       {showOrgs && (
         <Section
           title="My organizations"
@@ -562,8 +571,6 @@ function EditProfile() {
           <div className="text-lime text-xs font-bold">→</div>
         </Link>
       </Section>
-
-
 
       <Section title="Your plan">
         <Link
