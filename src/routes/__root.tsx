@@ -44,6 +44,7 @@ import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
+import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -916,6 +917,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <ManagedSessionBanner />
       {children}
       <BottomNav />
+      <PwaInstallPrompt />
     </>
   );
 }
