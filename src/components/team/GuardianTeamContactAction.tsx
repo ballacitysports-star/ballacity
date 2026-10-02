@@ -35,7 +35,7 @@ function ContactAvatar({ contact }: { contact: GuardianTeamContact }) {
 
 export function GuardianTeamContactAction({ teamId }: { teamId: string }) {
   const navigate = useNavigate();
-  const { isParentMode, isLoading: parentModeLoading } = useParentMode();
+  const { isParentMode, loading: parentModeLoading } = useParentMode();
   const listContacts = useServerFn(listGuardianTeamContacts);
   const [open, setOpen] = useState(false);
   const [openingUserId, setOpeningUserId] = useState<string | null>(null);
