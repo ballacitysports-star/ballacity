@@ -69,6 +69,7 @@ import {
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
+import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -90,6 +91,18 @@ export const Route = createFileRoute("/_tabs/profile")({
  */
 function ProfileRoute() {
   const { active, loading } = useMyProfiles();
+  const guardian = useIsGuardianAccount();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (guardian.isGuardian) navigate({ to: "/parent", replace: true });
+  }, [guardian.isGuardian, navigate]);
+  if (guardian.loading || guardian.isGuardian) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    );
+  }
   if (!loading && active && active.kind !== "player") {
     return (
       <div className="page-shell-flush">
