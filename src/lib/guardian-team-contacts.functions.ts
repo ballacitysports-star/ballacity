@@ -77,12 +77,26 @@ export const listGuardianTeamContacts = createServerFn({ method: "GET" })
 
     const { data: leaders, error: leadersError } = await supabaseAdmin
       .from("team_members")
-      .select(
-        "user_id,role,profiles!team_members_user_id_fkey(display_name,username,avatar_url,avatar_initials)",
-      )
+      .select("user_id,role")
       .eq("team_id", data.teamId)
       .in("role", [...TEAM_LEADER_ROLES]);
     if (leadersError) throw new Error("Could not load this team's contacts.");
 
-    return selectGuardianTeamContacts((leaders ?? []) as unknown as LeaderRow[], context.userId);
+    const leaderIds = (leaders ?? [])
+      .map((leader) => leader.user_id)
+      .filter((userId) => userId !== context.userId);
+    if (leaderIds.length === 0) return [];
+
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .select("id,display_name,username,avatar_url,avatar_initials")
+      .in("id", leaderIds);
+    if (profilesError) throw new Error("Could not load this team's contacts.");
+    const profilesById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+    const rows: LeaderRow[] = (leaders ?? []).map((leader) => ({
+      user_id: leader.user_id,
+      role: String(leader.role),
+      profiles: profilesById.get(leader.user_id) ?? null,
+    }));
+    return selectGuardianTeamContacts(rows, context.userId);
   });
