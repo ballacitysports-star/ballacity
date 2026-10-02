@@ -3076,6 +3076,104 @@ export type Database = {
           },
         ]
       }
+      team_waiver_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          signed_at: string
+          signed_by: string | null
+          signer_user_id: string
+          team_id: string
+          user_agent: string | null
+          waiver_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_user_id: string
+          team_id: string
+          user_agent?: string | null
+          waiver_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_user_id?: string
+          team_id?: string
+          user_agent?: string | null
+          waiver_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_waiver_signatures_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_waiver_signatures_waiver_id_fkey"
+            columns: ["waiver_id"]
+            isOneToOne: false
+            referencedRelation: "team_waivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_waivers: {
+        Row: {
+          archived_at: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          published: boolean
+          published_at: string | null
+          team_id: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          archived_at?: string | null
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          team_id: string
+          title?: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          archived_at?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          team_id?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_waivers_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           accent: string
@@ -4177,6 +4275,7 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      publish_team_waiver: { Args: { _id: string }; Returns: string }
       record_session_heartbeat: {
         Args: { _timezone?: string }
         Returns: string
@@ -4240,6 +4339,15 @@ export type Database = {
         Returns: boolean
       }
       shares_team: { Args: { _a: string; _b: string }; Returns: boolean }
+      sign_team_waiver: {
+        Args: {
+          _attested?: boolean
+          _on_behalf_of?: string
+          _team_id: string
+          _waiver_id: string
+        }
+        Returns: string
+      }
       submit_listing_claim: {
         Args: {
           _evidence?: string
