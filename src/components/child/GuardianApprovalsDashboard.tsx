@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { fetchWaiverRequirement, type TeamWaiver } from "@/lib/team-waivers";
+import { SignWaiverDialog } from "@/components/team/SignWaiverDialog";
 import { toast } from "sonner";
 import { CalendarDays, Check, Inbox, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -116,7 +118,14 @@ export function GuardianApprovalsDashboard() {
                       `Expires ${new Date(i.expiresAt).toLocaleDateString()}`,
                     ]}
                     busy={busyId === i.id}
-                    onApprove={() => decide("invite", i.id, true, i.childName, "this invite")}
+                    onApprove={async () => {
+                      const req = await fetchWaiverRequirement(i.teamId, i.childUserId);
+                      if (req && !req.signed) {
+                        setWaiverFor({ invite: i, waiver: req.waiver });
+                        return;
+                      }
+                      decide("invite", i.id, true, i.childName, "this invite");
+                    }}
                     onDecline={() => decide("invite", i.id, false, i.childName, "this invite")}
                   />
                 ))}
@@ -146,6 +155,18 @@ export function GuardianApprovalsDashboard() {
           ) : null}
         </>
       )}
+      <SignWaiverDialog
+        open={!!waiverFor}
+        onOpenChange={(o) => !o && setWaiverFor(null)}
+        waiver={waiverFor?.waiver ?? null}
+        teamName={waiverFor?.invite.teamName ?? ""}
+        onBehalfOf={waiverFor?.invite.childUserId}
+        childName={waiverFor?.invite.childName}
+        onSigned={() => {
+          const i = waiverFor?.invite;
+          if (i) decide("invite", i.id, true, i.childName, "this invite");
+        }}
+      />
     </section>
   );
 }
