@@ -64,6 +64,13 @@
       "when": 1790942833720,
       "tag": "0008_team_waivers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790943198801,
+      "tag": "0009_guardian_approval_columns",
+      "breakpoints": true
     }
   ]
 }

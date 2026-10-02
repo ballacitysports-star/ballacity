@@ -1374,6 +1374,8 @@ export type Database = {
           attempt_count: number
           created_at: string
           game_id: string
+          guardian_approved_at: string | null
+          guardian_approved_by: string | null
           host_id: string
           id: string
           idempotency_key: string
@@ -1388,6 +1390,8 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           game_id: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           host_id: string
           id?: string
           idempotency_key: string
@@ -1402,6 +1406,8 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           game_id?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           host_id?: string
           id?: string
           idempotency_key?: string
@@ -2915,6 +2921,8 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          guardian_approved_at: string | null
+          guardian_approved_by: string | null
           id: string
           invited_by: string
           invitee_id: string
@@ -2928,6 +2936,8 @@ export type Database = {
         Insert: {
           created_at?: string
           expires_at?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           id?: string
           invited_by: string
           invitee_id: string
@@ -2941,6 +2951,8 @@ export type Database = {
         Update: {
           created_at?: string
           expires_at?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           id?: string
           invited_by?: string
           invitee_id?: string
@@ -3963,6 +3975,14 @@ export type Database = {
           contact_phone: string
           relationship: string
         }[]
+      }
+      guardian_approve_join_request: {
+        Args: { _approve?: boolean; _request: string }
+        Returns: undefined
+      }
+      guardian_approve_team_invite: {
+        Args: { _approve?: boolean; _invite: string }
+        Returns: undefined
       }
       guardian_children_overview: {
         Args: never
