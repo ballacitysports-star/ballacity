@@ -5,6 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import {
   getFeedPrefsSnapshot,
