@@ -37,13 +37,14 @@ precedent before writing this migration, not assumed.
 
 ## Still to run
 
-- **Apply via Lovable's chat with per-statement approval on the canonical
-  project — not done yet, holding for explicit go-ahead.** This migration
-  has no ordering dependency on anything else in this plan (it only touches
-  `profiles`), but PR #25's three migrations must already be live first,
-  since `profiles.account_type`'s `'parent'` value is what makes the edit
-  screen's and profile view's guard (`activeProfile?.kind === "parent"`)
-  ever true.
+- ~~Apply via Lovable's chat with per-statement approval on the canonical
+  project.~~ **Done**, after confirming PR #25's three migrations were
+  already live (commit `97b0c3b`). This migration landed at commit
+  `7d85ea0` and was independently re-verified live against all four
+  points: the three columns exist as nullable `text`; `get_my_emergency_contact()`
+  exists with the exact signature; its `EXECUTE` grant is `authenticated`-only
+  (`anon`/`PUBLIC` revoked); and the three columns stay off `profiles`'
+  column-ACL allowlist, matching `birthday`.
 - A real browser dry run of the edit-screen section and the About-sheet
   round trip — not attempted in this pass (same limitation noted on PR #25
   for `GuardianProfileView` generally: faking a signed-in session for a
