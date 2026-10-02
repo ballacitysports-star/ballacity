@@ -21,6 +21,7 @@ import { ConsentTrail } from "@/components/child/ConsentTrail";
 import { AddMinorPanel } from "@/components/child/AddMinorPanel";
 import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
+import { GuardianApprovalsDashboard } from "@/components/child/GuardianApprovalsDashboard";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
@@ -383,6 +384,7 @@ function ParentCenterPage() {
         discoverability and data requests. You only ever see information about your own children.
       </p>
 
+      <GuardianApprovalsDashboard />
       <FamilyApprovalsPanel />
 
       <section className="mt-5 rounded-2xl border border-primary/40 bg-primary/5 p-4">
