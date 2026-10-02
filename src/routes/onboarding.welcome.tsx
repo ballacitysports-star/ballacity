@@ -5,6 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import {
   getFeedPrefsSnapshot,
@@ -105,6 +106,7 @@ function OnboardingWelcomePage() {
   const { type: typeFromSearch } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const { accountType, loading: typeLoading } = useAccountType();
+  const guardian = useIsGuardianAccount();
   const type: AccountType | null = typeFromSearch ?? accountType;
 
   useEffect(() => {
@@ -112,7 +114,15 @@ function OnboardingWelcomePage() {
     if (!user) nav({ to: "/auth" });
   }, [user, authLoading, nav]);
 
-  if (authLoading || typeLoading || !type) return null;
+  // Parents never see the athlete setup — send them to add their child.
+  const sendGuardianAway = guardian.isGuardian && (!type || type === "player");
+  useEffect(() => {
+    if (sendGuardianAway) {
+      nav({ to: "/players/add", search: { from: "onboarding" } as never, replace: true });
+    }
+  }, [sendGuardianAway, nav]);
+
+  if (authLoading || typeLoading || guardian.loading || sendGuardianAway || !type) return null;
 
   return <OnboardingWizard type={type} />;
 }

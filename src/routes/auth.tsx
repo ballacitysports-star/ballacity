@@ -288,6 +288,7 @@ function AuthPage() {
               // a guardian who came in on a consent link: that link is where
               // they are going.
               ...(isGuardianEntry ? {} : { [START_AS_KEY]: setup }),
+              ...(setup === "child" || isGuardianEntry ? { is_guardian: true } : {}),
             },
           },
         });
@@ -385,6 +386,13 @@ function AuthPage() {
     const providerLabel = provider === "apple" ? "Apple" : "Google";
     if (mode === "signup" && accountType) {
       setPendingAccountType(accountType);
+    }
+    if (mode === "signup" && (setup === "child" || isGuardianEntry)) {
+      try {
+        window.localStorage.setItem("ballacity.pending_guardian", "1");
+      } catch {
+        /* storage unavailable */
+      }
     }
     // Stash the intended destination so we can navigate to it AFTER the
     // session is confirmed. `redirect_uri` MUST stay a public same-origin URL —
