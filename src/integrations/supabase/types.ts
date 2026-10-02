@@ -2537,6 +2537,9 @@ export type Database = {
           created_at: string
           default_profile_id: string | null
           display_name: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           graduating_class: number | null
           id: string
           jurisdiction: string
@@ -2567,6 +2570,9 @@ export type Database = {
           created_at?: string
           default_profile_id?: string | null
           display_name?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           graduating_class?: number | null
           id: string
           jurisdiction?: string
@@ -2597,6 +2603,9 @@ export type Database = {
           created_at?: string
           default_profile_id?: string | null
           display_name?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           graduating_class?: number | null
           id?: string
           jurisdiction?: string
@@ -3849,6 +3858,14 @@ export type Database = {
         }[]
       }
       get_my_birthday: { Args: never; Returns: string }
+      get_my_emergency_contact: {
+        Args: never
+        Returns: {
+          contact_name: string
+          contact_phone: string
+          relationship: string
+        }[]
+      }
       guardian_children_overview: {
         Args: never
         Returns: {
