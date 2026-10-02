@@ -30,6 +30,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
+import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -366,11 +367,20 @@ function ProfileIdentitySection() {
   // Derived from the active profile so the section follows a profile switch
   // immediately (the account_type read has its own state and would go stale).
   const { active, pendingKind, loading } = useMyProfiles();
+  const { isGuardian } = useIsGuardianAccount();
   // An unfinished team/trainer/gym registration has no profile to act as yet;
   // show the type they registered as rather than silently saying "Player".
   const accountType = pendingKind ?? active?.kind ?? null;
   if (loading || !accountType) return null;
-  const meta = ACCOUNT_TYPE_META[accountType];
+  const meta =
+    isGuardian && !pendingKind && accountType === "player"
+      ? {
+          ...ACCOUNT_TYPE_META.player,
+          label: "Parent / Guardian",
+          emoji: "🛡️",
+          blurb: "Manage your children's profiles, approvals and safety settings.",
+        }
+      : ACCOUNT_TYPE_META[accountType];
   return (
     <SettingsGroup title="Your profiles">
       <SettingsStaticRow>
