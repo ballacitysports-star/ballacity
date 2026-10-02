@@ -54,6 +54,10 @@ export function GuardianApprovalsDashboard() {
   const { invites, requests, isLoading, hasChildren } = useGuardianApprovals();
   const { invite, request } = useGuardianDecision();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [waiverFor, setWaiverFor] = useState<{
+    invite: import("@/lib/guardian-approvals").GuardianTeamInvite;
+    waiver: TeamWaiver;
+  } | null>(null);
 
   if (!hasChildren) return null;
   const total = invites.length + requests.length;
