@@ -84,13 +84,18 @@ the correct block.
 
 ## Still to run
 
-- **Apply all three migrations via Lovable's chat with per-statement
-  approval on the canonical project — not done yet, holding for explicit
-  go-ahead.** Order: `20261001160000_team_waivers.sql`, then
-  `20261001170000_guardian_approval_columns.sql`, then
-  `20261001180000_guardian_accept_path_guards.sql` (the last one
-  `CREATE OR REPLACE`s `team_respond_invite`, which references
-  `team_waivers`/`team_waiver_signatures`, so it must come after the first).
+- ~~Apply all three migrations via Lovable's chat with per-statement
+  approval on the canonical project.~~ **Done.** All three ran in order
+  against the canonical project (commits `e12282a`, `937d73b`, `5a2de05`)
+  and were independently re-verified there: both tables + RLS + the
+  partial unique index + both RPCs (migration 1); the new columns on
+  `team_invites`/`join_requests` + both guardian-read policies sitting
+  alongside the existing ones + both RPCs (migration 2); and, via
+  `pg_get_functiondef` character-offset checks, the exact guard ordering
+  inside `team_respond_invite` (`CHILD_ACTIVITY_LOCKED` → `GUARDIAN_APPROVAL_REQUIRED`
+  → `WAIVER_REQUIRED` → the `team_members` insert) and `GUARDIAN_APPROVAL_REQUIRED`
+  scoped inside `enforce_child_game_participation`'s `game_participants`-only
+  branch (migration 3), with no other objects touched.
 - A full end-to-end browser run of a guardian approving a team invite and a
   manager publishing/a member signing a waiver. `e2e/guardian-team-approvals.spec.ts`
   only confirms the Parent Center's approvals panel renders correctly with
