@@ -152,6 +152,20 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       });
       continue;
     }
+    if (row.kind === "parent") {
+      const name = profile?.display_name || "Guardian";
+      profiles.push({
+        id: row.id,
+        kind: "parent",
+        refId: null,
+        name,
+        handle: profile?.username ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
+        avatarFallback: profile?.avatar_initials || initials(name),
+        href: { to: "/profile" },
+      });
+      continue;
+    }
     const team = row.ref_id ? teams.get(row.ref_id) : undefined;
     if (!team) continue;
     profiles.push({
@@ -367,5 +381,24 @@ export function addProfileRoute(kind: Exclude<AccountType, "player">): string {
     ? "/teams/create"
     : kind === "trainer"
       ? "/trainers/create"
-      : "/orgs/create";
+      : kind === "parent"
+        ? "/players/add"
+        : "/orgs/create";
+}
+
+const SINGLETON_ADDABLE: readonly Extract<AccountType, "parent">[] = ["parent"];
+const REPEATABLE_ADDABLE: readonly Exclude<AccountType, "player" | "parent">[] = [
+  "team",
+  "trainer",
+  "gym",
+];
+
+/**
+ * Kinds offered in "Add a profile": team/trainer/gym always (an owner can
+ * hold several, one per linked team/org), "parent" only while the account
+ * doesn't already have one — it's capped at one per user, the same as player.
+ */
+export function addableProfileKinds(profiles: AccountProfile[]): Exclude<AccountType, "player">[] {
+  const have = new Set(profiles.map((p) => p.kind));
+  return [...SINGLETON_ADDABLE.filter((k) => !have.has(k)), ...REPEATABLE_ADDABLE];
 }

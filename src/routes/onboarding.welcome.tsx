@@ -53,7 +53,7 @@ export const Route = createFileRoute("/onboarding/welcome")({
 type NextStep = { title: string; body: string };
 
 const NEXT_STEPS: Record<
-  Exclude<AccountType, "player">,
+  Exclude<AccountType, "player" | "parent">,
   { title: string; steps: NextStep[]; cta: string; goto: string }
 > = {
   team: {
@@ -112,7 +112,16 @@ function OnboardingWelcomePage() {
     if (!user) nav({ to: "/auth" });
   }, [user, authLoading, nav]);
 
-  if (authLoading || typeLoading || !type) return null;
+  // No live path sends a guardian here — SETUPS.child goes to /players/add —
+  // but a stale bookmark or back-button nav could still land one on this
+  // route with their real (database) account_type resolved to "parent",
+  // which NEXT_STEPS has no entry for. Send them where they actually belong
+  // instead of crashing on a missing lookup.
+  useEffect(() => {
+    if (type === "parent") nav({ to: "/parent", replace: true });
+  }, [type, nav]);
+
+  if (authLoading || typeLoading || !type || type === "parent") return null;
 
   return <OnboardingWizard type={type} />;
 }
@@ -131,7 +140,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const queryClient = useQueryClient();
 
   const isPlayer = type === "player";
-  const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
+  const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player" | "parent">];
 
   // Links are optional, so they live inside the Basics step behind a
   // disclosure rather than costing everyone a whole step of their own.

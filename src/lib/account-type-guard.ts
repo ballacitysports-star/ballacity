@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-export type AccountTypeName = "player" | "team" | "trainer" | "gym";
+export type AccountTypeName = "player" | "team" | "trainer" | "gym" | "parent";
 
 /**
  * Confirms the caller has a profile before a privileged create/mutation runs.

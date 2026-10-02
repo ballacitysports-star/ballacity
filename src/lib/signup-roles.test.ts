@@ -68,9 +68,9 @@ describe("where each role goes", () => {
     });
   });
 
-  it("stores a parent as a player: there is no fifth account type", () => {
-    expect(accountTypeForSetup("child")).toBe("player");
-    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym"]);
+  it("stores a parent as a first-class account type", () => {
+    expect(accountTypeForSetup("child")).toBe("parent");
+    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym", "parent"]);
     for (const s of SETUP_IDS) expect(ACCOUNT_TYPES).toContain(accountTypeForSetup(s));
   });
 });

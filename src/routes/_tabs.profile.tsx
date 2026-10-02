@@ -61,6 +61,7 @@ import { makeBadgeStats } from "@/lib/badges";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { ActiveProfileView } from "@/components/profile/ActiveProfileView";
+import { GuardianProfileView } from "@/components/profile/GuardianProfileView";
 import {
   ProfileChannelHeader,
   ChannelPill,
@@ -90,6 +91,16 @@ export const Route = createFileRoute("/_tabs/profile")({
  */
 function ProfileRoute() {
   const { active, loading } = useMyProfiles();
+  if (!loading && active && active.kind === "parent") {
+    return (
+      <div className="page-shell-flush">
+        <div className="flex items-center justify-between gap-2 px-4 pt-3">
+          <ProfileSwitcher />
+        </div>
+        <GuardianProfileView profile={active} />
+      </div>
+    );
+  }
   if (!loading && active && active.kind !== "player") {
     return (
       <div className="page-shell-flush">

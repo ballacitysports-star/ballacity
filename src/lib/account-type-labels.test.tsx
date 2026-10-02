@@ -44,8 +44,8 @@ const escapeHtml = (s: string) =>
     .replace(/'/g, "&#x27;");
 
 describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
-  it("exposes exactly the four supported account types", () => {
-    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym"]);
+  it("exposes exactly the five supported account types", () => {
+    expect(ACCOUNT_TYPES).toEqual(["player", "team", "trainer", "gym", "parent"]);
   });
 
   it.each([
@@ -53,6 +53,7 @@ describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
     ["team", "Team", "Teams"],
     ["trainer", "Trainer", "Trainers"],
     ["gym", "Gym", "Gyms"],
+    ["parent", "Guardian", "Guardians"],
   ] as const)("uses canonical label/plural for %s", (type, label, plural) => {
     const meta = ACCOUNT_TYPE_META[type];
     expect(meta.label).toBe(label);
@@ -116,7 +117,7 @@ describe("RolePicker (sign-up and onboarding)", () => {
     expect(html).not.toMatch(/\bClubs?\b/);
   });
 
-  it("stores each setup as the nearest account type, never a fifth one", () => {
+  it("stores each setup as a real account type, child included", () => {
     const stored = Object.fromEntries(
       (["player", "child", "team", "coach", "facility"] as SetupId[]).map((s) => [
         s,
@@ -125,12 +126,12 @@ describe("RolePicker (sign-up and onboarding)", () => {
     );
     expect(stored).toEqual({
       player: "player",
-      child: "player",
+      child: "parent",
       team: "team",
       coach: "trainer",
       facility: "gym",
     });
-    expect(ACCOUNT_TYPES as string[]).not.toContain("parent");
+    expect(ACCOUNT_TYPES as string[]).toContain("parent");
   });
 
   it("keeps the word 'player' on the Player card alone", () => {

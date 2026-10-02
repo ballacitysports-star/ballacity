@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
 import { clearStartHint, isAccountType, routeForSetup, startSetupOf } from "@/lib/account-type";
+import { defaultHomeFor } from "@/lib/post-auth-destination";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 
@@ -81,7 +82,7 @@ function Landing() {
         router.navigate({ ...routeForSetup(setup), replace: true } as never);
         return;
       }
-      router.navigate({ to: readLastVisited() ?? "/feed", replace: true });
+      router.navigate({ to: readLastVisited() ?? defaultHomeFor(t), replace: true });
     })();
     return () => {
       cancelled = true;
