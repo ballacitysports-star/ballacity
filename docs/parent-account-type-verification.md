@@ -65,18 +65,12 @@ branch.
 
 ## Still to run
 
-- **Apply through Lovable's chat with per-statement approval on the canonical
-  project — not done yet, holding for explicit go-ahead, same as every prior
-  migration this session.** Order: `20260725025124_profiles_account_type_valid.sql`
-  first (back-filled drift — establishes the pre-existing narrow constraint
-  the next file expects to find, matching production's own actual history),
-  then `20261001130000_parent_account_type.sql`, then
-  `20261001140000_backfill_parent_account_profiles.sql`.
-- Read-only structural checks after applying (mirroring the checks already
-  proven in the replay above): both widened `profiles` constraints, the
-  widened `account_profiles_kind_check`, `account_profiles_parent_uniq`'s
-  definition, and the backfill's actual row count against the live
-  `managed_accounts` table.
+- ~~Apply through Lovable's chat with per-statement approval on the canonical
+  project.~~ **Done.** All three ran in that order (commit `97b0c3b`) and
+  were re-verified live: `'parent'` is accepted by both widened `profiles`
+  constraints and by `account_profiles_kind_check`; `account_profiles_parent_uniq`
+  exists as a unique index; the backfill inserted 0 rows, since no guardian
+  had used the managed-child flow in production yet at the time it ran.
 - A real signup through "Parent / Guardian" on the published app, once the
   TypeScript changes in this same feature are also live — this doc only
   covers the database side.
