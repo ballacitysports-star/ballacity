@@ -11,6 +11,7 @@ import {
   superadminSuspendUser,
   superadminUpdateProfile,
   superadminForceSignOut,
+  superadminDeleteUser,
 } from "@/lib/superadmin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
   const suspend = useServerFn(superadminSuspendUser);
   const updateProfile = useServerFn(superadminUpdateProfile);
   const forceSignOut = useServerFn(superadminForceSignOut);
+  const deleteUser = useServerFn(superadminDeleteUser);
 
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -331,6 +333,26 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                       }
                     >
                       Force sign-out
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={openUser === currentUserId}
+                      onClick={() => {
+                        const target = openUser!;
+                        setConfirm({
+                          title: "Delete account permanently",
+                          description:
+                            "Erases this account, its profile, uploads and personal content. This cannot be undone.",
+                          word: "DELETE",
+                          run: async (reason) => {
+                            await deleteUser({ data: { userId: target, reason } });
+                            setOpenUser(null);
+                          },
+                        });
+                      }}
+                    >
+                      Delete account
                     </Button>
                   </div>
                 </CardContent>
