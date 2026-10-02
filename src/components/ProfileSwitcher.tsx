@@ -22,6 +22,7 @@ import { useMyChildren } from "@/lib/child-safety";
 import { isManagedUser } from "@/lib/managed-children";
 import { switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
+import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
@@ -53,6 +54,7 @@ export function ProfileSwitcher({ className }: { className?: string }) {
   const inChildProfile = isManagedUser(user);
   const { profiles, active, defaultId, pendingKind, loading } = useMyProfiles();
   const switcher = useSwitchProfile();
+  const { isGuardian } = useIsGuardianAccount();
   const setDefault = useSetDefaultProfile();
   const { children } = useMyChildren();
   const managedChildren = inChildProfile ? [] : children.filter((c) => c.managed);
