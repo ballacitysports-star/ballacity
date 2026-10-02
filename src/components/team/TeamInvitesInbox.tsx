@@ -62,7 +62,7 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
             <button
               type="button"
               disabled={respond.isPending}
-              onClick={() => void accept(inv.id, inv.teamId, inv.teamName)}
+              onClick={() => void accept(inv.id, inv.teamId ?? "", inv.teamName ?? "the team")}
               className="flex-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
             >
               Accept
