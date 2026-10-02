@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Download, Share, SquarePlus, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Download, EllipsisVertical, Share, SquarePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const DISMISS_KEY = "ballacity:pwa-dismissed-at";
@@ -11,6 +11,15 @@ type BIPEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+/**
+ * native      — Chromium on Android fired beforeinstallprompt; one-tap install.
+ * ios-safari  — Safari share sheet.
+ * ios-other   — Chrome/Edge/Firefox on iOS (WebKit, different toolbar).
+ * android-menu — Android browser without the native event (Firefox, Samsung edge cases).
+ * in-app      — Instagram/Facebook/TikTok/etc. webviews can't install at all.
+ */
+type Mode = "native" | "ios-safari" | "ios-other" | "android-menu" | "in-app";
+
 function isStandalone() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -19,13 +28,28 @@ function isStandalone() {
   );
 }
 
-function isIos() {
+function detect(): { os: "ios" | "android" | "other"; mode: Exclude<Mode, "native"> | null; browser: string } {
   const ua = navigator.userAgent;
-  return /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
-}
+  const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const android = /Android/i.test(ua);
+  const os = ios ? "ios" : android ? "android" : "other";
+  if (os === "other") return { os, mode: null, browser: "" };
 
-function isMobile() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || isIos();
+  const inApp =
+    /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|musical_ly|Snapchat|Twitter|LinkedInApp|Pinterest|GSA\//i.test(ua) ||
+    (android && /; wv\)/.test(ua));
+  if (inApp) return { os, mode: "in-app", browser: "" };
+
+  if (ios) {
+    if (/CriOS/.test(ua)) return { os, mode: "ios-other", browser: "Chrome" };
+    if (/EdgiOS/.test(ua)) return { os, mode: "ios-other", browser: "Edge" };
+    if (/FxiOS/.test(ua)) return { os, mode: "ios-other", browser: "Firefox" };
+    if (/OPiOS|OPT\//.test(ua)) return { os, mode: "ios-other", browser: "Opera" };
+    return { os, mode: "ios-safari", browser: "Safari" };
+  }
+  if (/Firefox/i.test(ua)) return { os, mode: "android-menu", browser: "Firefox" };
+  if (/SamsungBrowser/i.test(ua)) return { os, mode: "android-menu", browser: "Samsung Internet" };
+  return { os, mode: "android-menu", browser: "your browser" };
 }
 
 function recentlyDismissed() {
@@ -40,27 +64,36 @@ function recentlyDismissed() {
 /** Asks mobile visitors who haven't installed BallaCity to add it to their home screen. */
 export function PwaInstallPrompt() {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
-  const [mode, setMode] = useState<"android" | "ios" | null>(null);
+  const [mode, setMode] = useState<Mode | null>(null);
+  const [info, setInfo] = useState<ReturnType<typeof detect> | null>(null);
 
   useEffect(() => {
     if (isStandalone() || recentlyDismissed() || window.self !== window.top) return;
+    const d = detect();
+    setInfo(d);
+    if (!d.mode) return;
 
+    let gotNative = false;
     const onPrompt = (e: Event) => {
       e.preventDefault();
+      gotNative = true;
       setDeferred(e as BIPEvent);
-      setTimeout(() => setMode("android"), SHOW_DELAY_MS);
+      setMode((m) => (m === null || m === "android-menu" ? "native" : m));
     };
     const onInstalled = () => setMode(null);
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);
 
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (isIos() && isMobile()) t = setTimeout(() => setMode("ios"), SHOW_DELAY_MS);
+    // Give Chromium a moment to fire its native install event before falling
+    // back to manual menu instructions.
+    const t = setTimeout(() => {
+      setMode((m) => m ?? (gotNative ? "native" : d.mode));
+    }, SHOW_DELAY_MS);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
-      if (t) clearTimeout(t);
+      clearTimeout(t);
     };
   }, []);
 
@@ -82,7 +115,35 @@ export function PwaInstallPrompt() {
     else dismiss();
   };
 
-  if (!mode) return null;
+  if (!mode || !info) return null;
+
+  const browser = info.browser;
+  const steps: ReactNode[] | null =
+    mode === "ios-safari"
+      ? [
+          <>Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in Safari's toolbar</>,
+          <>Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b></>,
+          <>Tap <b>Add</b></>,
+        ]
+      : mode === "ios-other"
+        ? [
+            <>Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in {browser} (next to the address bar, or under <b>•••</b>)</>,
+            <>Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b></>,
+            <>Tap <b>Add</b></>,
+          ]
+        : mode === "android-menu"
+          ? [
+              <>Tap the <EllipsisVertical className="h-4 w-4 text-primary" /> <b>menu</b> in {browser}</>,
+              <>Choose <b>Install</b> or <b>Add to Home screen</b></>,
+              <>Confirm with <b>Add</b></>,
+            ]
+          : mode === "in-app"
+            ? [
+                <>Tap the <b>•••</b> or <EllipsisVertical className="h-4 w-4 text-primary" /> menu in this app</>,
+                <>Choose <b>Open in {info.os === "ios" ? "Safari" : "Chrome"}</b> (or "Open in browser")</>,
+                <>Then add BallaCity to your home screen from there</>,
+              ]
+            : null;
 
   return (
     <div
@@ -104,11 +165,13 @@ export function PwaInstallPrompt() {
         <div>
           <p className="font-semibold">Get the BallaCity app</p>
           <p className="text-xs text-muted-foreground">
-            Full screen, faster loading and game alerts — free.
+            {mode === "in-app"
+              ? "Open this page in your browser to install it — free."
+              : "Full screen, faster loading and game alerts — free."}
           </p>
         </div>
       </div>
-      {mode === "android" ? (
+      {mode === "native" ? (
         <div className="mt-3 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={dismiss}>
             Not now
@@ -119,15 +182,11 @@ export function PwaInstallPrompt() {
         </div>
       ) : (
         <ol className="mt-3 space-y-1.5 text-sm">
-          <li className="flex items-center gap-2">
-            1. Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in Safari
-          </li>
-          <li className="flex items-center gap-2">
-            2. Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b>
-          </li>
-          <li>
-            3. Tap <b>Add</b>
-          </li>
+          {steps?.map((s, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-1">
+              {i + 1}. {s}
+            </li>
+          ))}
         </ol>
       )}
     </div>
