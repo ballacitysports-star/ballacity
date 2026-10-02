@@ -111,6 +111,7 @@ import {
 import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
 
@@ -199,6 +200,7 @@ function migrateLegacyPlayersFilters() {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
   const profile = useMyProfile(user);
   const hostedGames = useHostedGames();
 
@@ -545,7 +547,7 @@ function PlayersPage() {
       </motion.div>
 
       {/* Browse everyone's availability, or manage your own posts/requests. */}
-      <div className="mb-4 flex gap-2">
+      {!isParentMode && <div className="mb-4 flex gap-2">
         {(
           [
             { id: "browse", label: "Browse" },
@@ -565,9 +567,9 @@ function PlayersPage() {
             {t.label}
           </button>
         ))}
-      </div>
+      </div>}
 
-      {tab === "mine" ? (
+      {!isParentMode && tab === "mine" ? (
         <div className="space-y-3 pb-6">
           {!availGate.loading && !availGate.canPost && (
             <AvailabilityRequiredNotice
@@ -603,7 +605,7 @@ function PlayersPage() {
             searchPlaceholder="Search name, city, sport"
             activeFilterCount={activeFilterCount}
             sheetTitle="Filter players"
-            rightExtra={
+            rightExtra={isParentMode ? undefined : (
               <button
                 onClick={openPostFlow}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
@@ -611,7 +613,7 @@ function PlayersPage() {
               >
                 <Plus className="h-5 w-5" strokeWidth={2.5} />
               </button>
-            }
+            )}
             onReset={() => {
               markSportChoice("players");
               setSports([]);
@@ -692,7 +694,7 @@ function PlayersPage() {
                   : "Be the first — share when you're free and where you'll travel."
               }
               cta={
-                user ? (
+                isParentMode ? undefined : user ? (
                   <Button
                     onClick={openPostFlow}
                     className="rounded-full bg-lime-gradient text-primary-foreground"
@@ -744,7 +746,7 @@ function PlayersPage() {
         </>
       )}
 
-      <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
+      {!isParentMode && <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Post availability</DialogTitle>
@@ -757,9 +759,9 @@ function PlayersPage() {
             }}
           />
         </DialogContent>
-      </Dialog>
+      </Dialog>}
 
-      {(postOpen || editingPost) && (
+      {!isParentMode && (postOpen || editingPost) && (
         <PostAvailabilityDialog
           initial={editingPost}
           onClose={() => {

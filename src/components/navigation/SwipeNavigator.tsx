@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { useSwipeNavigation } from "@/hooks/use-swipe-navigation";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useAuth } from "@/hooks/use-auth";
-import { isTabPath, type SwipeIntent } from "@/lib/navigation-gestures";
+import { isTabPath, tabsForMode, type SwipeIntent } from "@/lib/navigation-gestures";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 /**
  * Wraps the routed view so horizontal swipes navigate, the way Instagram and
@@ -31,6 +32,8 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const reducedMotion = useReducedMotion();
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
+  const tabs = tabsForMode(isParentMode);
 
   // Read fresh every render rather than memoised: the answer changes as the
   // user navigates, and the call is trivial.
@@ -63,6 +66,7 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
     canGoBack,
     onCommit,
     tabsEnabled: pageableTabs,
+    tabs,
     // With reduced motion the gesture still navigates, but nothing tracks the
     // finger — the drag is read on release and the route just changes.
     disabled: false,
@@ -71,7 +75,7 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
   // A drag with nowhere to go still gives feedback, just a stiff one.
   const offset = state.active ? (state.intent === "none" ? state.dx * RESISTANCE : state.dx) : 0;
 
-  const onTab = isTabPath(pathname);
+  const onTab = isTabPath(pathname, tabs);
 
   return (
     <div

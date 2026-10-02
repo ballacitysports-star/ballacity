@@ -11,6 +11,7 @@ import {
   useMyTeamInvites,
   useRespondToTeamInvite,
 } from "@/lib/team-roster";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 /**
  * Pending team invitations for the signed-in player.
@@ -22,6 +23,7 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
   const invites = useMyTeamInvites();
   const respond = useRespondToTeamInvite();
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
   const [pending, setPending] = useState<{ inviteId: string; teamName: string; waiver: TeamWaiver } | null>(null);
 
   const doAccept = (inviteId: string, teamName: string) =>
@@ -42,7 +44,7 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
     doAccept(inviteId, teamName);
   };
 
-  if (!invites.data?.length) return null;
+  if (isParentMode || !invites.data?.length) return null;
 
   return (
     <div className={`space-y-2 ${className}`}>

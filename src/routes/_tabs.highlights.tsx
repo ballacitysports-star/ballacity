@@ -24,6 +24,7 @@ import {
   type HighlightFeedItem,
 } from "@/lib/highlight-feed.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/_tabs/highlights")({
 });
 
 function HighlightFeedPage() {
+  const { isParentMode } = useParentMode();
   const [items, setItems] = useState<HighlightFeedItem[]>([]);
   const [sports, setSports] = useState<string[]>([]);
   const [sport, setSport] = useState<string | null>(null);
@@ -150,14 +152,16 @@ function HighlightFeedPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <h1 className="page-title flex-1 truncate">Highlights</h1>
-          <Link
-            to="/reels"
-            search={{ game: "", title: "", upload: "" }}
-            className="shrink-0 text-foreground"
-            aria-label="Post a reel"
-          >
-            <PlusSquare className="h-6 w-6" />
-          </Link>
+          {!isParentMode && (
+            <Link
+              to="/reels"
+              search={{ game: "", title: "", upload: "" }}
+              className="shrink-0 text-foreground"
+              aria-label="Post a reel"
+            >
+              <PlusSquare className="h-6 w-6" />
+            </Link>
+          )}
           <button
             type="button"
             onClick={() =>
@@ -202,13 +206,15 @@ function HighlightFeedPage() {
                 ? "Try another sport, or be the first to post one."
                 : "Be the first to post one."}
             </p>
-            <Link
-              to="/reels"
-              search={{ game: "", title: "", upload: "" }}
-              className="mt-3 inline-block text-xs font-bold text-lime underline"
-            >
-              Create a highlight reel
-            </Link>
+            {!isParentMode && (
+              <Link
+                to="/reels"
+                search={{ game: "", title: "", upload: "" }}
+                className="mt-3 inline-block text-xs font-bold text-lime underline"
+              >
+                Create a highlight reel
+              </Link>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-border/70">

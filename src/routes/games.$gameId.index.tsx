@@ -158,6 +158,7 @@ import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -330,6 +331,7 @@ function GameDetail() {
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
   const myProfile = useMyProfile(user);
   const { can: canChildFeature } = useMyChildStatus();
   const participationDecision = canChildFeature("game_participation");
@@ -2009,6 +2011,7 @@ function GameDetail() {
                 const posWaitlist = waitlistEntries.filter((w) => w.position === name);
                 const viewerOnWaitlist = !!user && posWaitlist.some((w) => w.userId === user.id);
                 const canJoinAs =
+                  !isParentMode &&
                   !isFull &&
                   !isHost &&
                   !isConfirmed &&
@@ -2020,6 +2023,7 @@ function GameDetail() {
                   spotsLeft > 0 &&
                   !!user;
                 const canWaitlist =
+                  !isParentMode &&
                   (isFull || viewerGate.waitlistOpen) &&
                   !isHost &&
                   !isConfirmed &&
@@ -2743,7 +2747,7 @@ function GameDetail() {
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto w-[min(100%,28rem)]">
-          {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
+          {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
           )}
           {ageNotice && !isConfirmed && !isApproved && (
@@ -2797,7 +2801,7 @@ function GameDetail() {
             >
               <MessageCircle className="h-5 w-5" />
             </button>
-            {!isHost &&
+            {!isParentMode && !isHost &&
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
