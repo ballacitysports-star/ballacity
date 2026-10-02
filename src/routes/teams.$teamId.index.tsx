@@ -29,6 +29,7 @@ import {
 } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
+import { GuardianTeamContactAction } from "@/components/team/GuardianTeamContactAction";
 import { useTeamPermissions } from "@/lib/team-roster";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
@@ -258,6 +259,7 @@ function TeamPage() {
                 <Settings className="h-3.5 w-3.5" /> Manage
               </Link>
             )}
+            <GuardianTeamContactAction teamId={org.id} />
             {useCanReview(org.id) && (
               <Link
                 to="/review/new"
