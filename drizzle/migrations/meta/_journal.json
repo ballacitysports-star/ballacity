@@ -71,6 +71,13 @@
       "when": 1790943198801,
       "tag": "0009_guardian_approval_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790943898920,
+      "tag": "0010_guardian_accept_path_guards",
+      "breakpoints": true
     }
   ]
 }
