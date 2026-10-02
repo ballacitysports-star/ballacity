@@ -20,8 +20,9 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildren } from "@/lib/child-safety";
 import { isManagedUser } from "@/lib/managed-children";
-import { switchBackToGuardian } from "@/lib/managed-session";
+import { readParkedGuardianSession, switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
+import { supabase } from "@/integrations/supabase/client";
 
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
@@ -164,10 +165,23 @@ export function ProfileSwitcher({ className }: { className?: string }) {
         {inChildProfile ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2" onSelect={() => void switchBackToGuardian()}>
-              <ArrowLeftRight className="h-4 w-4" aria-hidden />
-              <span className="text-sm">Back to your account</span>
-            </DropdownMenuItem>
+            {readParkedGuardianSession() ? (
+              <DropdownMenuItem className="gap-2" onSelect={() => void switchBackToGuardian()}>
+                <ArrowLeftRight className="h-4 w-4" aria-hidden />
+                <span className="text-sm">Back to your account</span>
+              </DropdownMenuItem>
+            ) : (
+              // A paired device (src/routes/devices.pair.tsx) never had a
+              // guardian session on it to park — there is nothing to switch
+              // back to, just a sign-out.
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => void supabase.auth.signOut({ scope: "local" })}
+              >
+                <ArrowLeftRight className="h-4 w-4" aria-hidden />
+                <span className="text-sm">Sign out</span>
+              </DropdownMenuItem>
+            )}
           </>
         ) : (
           <>

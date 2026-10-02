@@ -61,6 +61,7 @@ import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blo
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
+import { Route as DevicesPairRouteImport } from './routes/devices.pair'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as GuideIndexRouteImport } from './routes/guide.index'
 import { Route as GuideSportRouteImport } from './routes/guide.$sport'
@@ -366,6 +367,11 @@ const DevRouteDoctorRoute = DevRouteDoctorRouteImport.update({
   path: '/dev/route-doctor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevicesPairRoute = DevicesPairRouteImport.update({
+  id: '/devices/pair',
+  path: '/devices/pair',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
@@ -632,6 +638,7 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/devices/pair': typeof DevicesPairRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -727,6 +734,7 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/devices/pair': typeof DevicesPairRoute
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
@@ -823,6 +831,7 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/devices/pair': typeof DevicesPairRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -920,6 +929,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/devices/pair'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1015,6 +1025,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/devices/pair'
     | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
@@ -1110,6 +1121,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/devices/pair'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1197,6 +1209,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
+  DevicesPairRoute: typeof DevicesPairRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   GuideSportRoute: typeof GuideSportRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
@@ -1605,6 +1618,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevRouteDoctorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/devices/pair': {
+      id: '/devices/pair'
+      path: '/devices/pair'
+      fullPath: '/devices/pair'
+      preLoaderRoute: typeof DevicesPairRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId': {
       id: '/games/$gameId'
       path: '/games/$gameId'
@@ -1989,6 +2009,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
+  DevicesPairRoute: DevicesPairRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   GuideSportRoute: GuideSportRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,

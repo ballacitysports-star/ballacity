@@ -158,6 +158,14 @@ const MESSAGES: Record<string, string> = {
   MANAGED_UNAVAILABLE: "Adding a child isn't available yet. Please try again later.",
   MANAGES_CHECK_FAILED:
     "We couldn't check whether your account manages any children, so nothing was deleted. Please try again.",
+  // Device pairing (src/lib/device-pairing.functions.ts): a guardian-issued
+  // code that lets a managed child's own device hold its own session.
+  PAIRING_INVALID: "That pairing code isn't valid. Ask your guardian for a new one.",
+  PAIRING_EXPIRED: "That pairing code has expired. Ask your guardian for a new one.",
+  PAIRING_USED: "That pairing code was already used. Ask your guardian for a new one.",
+  PAIRING_REVOKED: "That pairing code was cancelled. Ask your guardian for a new one.",
+  PAIRING_NOT_FOUND: "No device is currently paired.",
+  PAIRING_UNAVAILABLE: "Pairing a device isn't available yet. Please try again later.",
 };
 
 /** The code a database or server error starts with, when it is one we know. */
