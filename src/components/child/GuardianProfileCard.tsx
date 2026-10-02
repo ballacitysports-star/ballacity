@@ -21,6 +21,22 @@ export function useIsGuardianAccount() {
     queryFn: async () => {
       const meta = (user!.user_metadata ?? {}) as Record<string, unknown>;
       if (meta["is_guardian"] === true) return true;
+      // Google/Apple sign-up can't carry metadata; persist the choice now.
+      let pending = false;
+      try {
+        pending = window.localStorage.getItem("ballacity.pending_guardian") === "1";
+      } catch {
+        /* ignore */
+      }
+      if (pending) {
+        await supabase.auth.updateUser({ data: { is_guardian: true } }).catch(() => undefined);
+        try {
+          window.localStorage.removeItem("ballacity.pending_guardian");
+        } catch {
+          /* ignore */
+        }
+        return true;
+      }
       const [{ data: p }, { count: managed }, { count: linked }] = await Promise.all([
         supabase.from("profiles").select("account_type").eq("id", user!.id).maybeSingle(),
         supabase

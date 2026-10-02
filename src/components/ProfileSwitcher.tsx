@@ -79,7 +79,10 @@ export function ProfileSwitcher({ className }: { className?: string }) {
     );
   }
 
-  const activeMeta = ACCOUNT_TYPE_META[active.kind];
+  const activeMeta =
+    isGuardian && active.kind === "player"
+      ? { ...ACCOUNT_TYPE_META.player, label: "Parent / Guardian", emoji: "🛡️" }
+      : ACCOUNT_TYPE_META[active.kind];
 
   return (
     <DropdownMenu>
