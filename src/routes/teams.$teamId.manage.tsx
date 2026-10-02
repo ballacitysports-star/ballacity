@@ -8,6 +8,7 @@ import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { RosterTab } from "@/components/team/manage/RosterTab";
 import { InvitesTab } from "@/components/team/manage/InvitesTab";
 import { SettingsTab } from "@/components/team/manage/SettingsTab";
+import { WaiverTab } from "@/components/team/manage/WaiverTab";
 
 export const Route = createFileRoute("/teams/$teamId/manage")({
   head: () =>
@@ -89,6 +90,7 @@ function ManageTeam() {
           <TabsTrigger value="roster">Roster</TabsTrigger>
           <TabsTrigger value="invites">Invitations</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="waiver">Waiver</TabsTrigger>
         </TabsList>
         <TabsContent value="roster" className="pt-4">
           <RosterTab teamId={teamId} teamName={teamName} />
@@ -98,6 +100,9 @@ function ManageTeam() {
         </TabsContent>
         <TabsContent value="settings" className="pt-4">
           <SettingsTab teamId={teamId} teamName={teamName} />
+        </TabsContent>
+        <TabsContent value="waiver" className="pt-4">
+          <WaiverTab teamId={teamId} teamName={teamName} />
         </TabsContent>
       </Tabs>
     </div>

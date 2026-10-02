@@ -127,6 +127,11 @@ export function teamRosterErrorMessage(err: unknown): string {
   if (raw.includes("CHILD_ACTIVITY_LOCKED"))
     return "A parent or guardian has paused team activity on this account.";
   if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
+  if (raw.includes("NOT_GUARDIAN")) return "You're not this player's guardian on file.";
+  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
+    return "A parent or guardian must approve this invite first.";
+  if (raw.includes("WAIVER_REQUIRED"))
+    return "This team requires a signed waiver before you can join.";
   if (raw.includes("NOT_A_MEMBER")) return "That player isn't on the roster.";
   if (raw.includes("duplicate key")) return "That player already has a pending invitation.";
   if (raw.includes("AUTH_REQUIRED")) return "Sign in to manage a team roster.";
@@ -421,5 +426,90 @@ export function useMyTeamMemberships() {
     },
     enabled: !!user,
     staleTime: 30_000,
+  });
+}
+
+/** A child's pending team invite, as seen by their guardian. */
+export type GuardianPendingTeamInvite = TeamInvite & {
+  childDisplayName: string;
+  guardianApproved: boolean;
+};
+
+/**
+ * Every pending team invite sent to one of the signed-in guardian's children
+ * — RLS (`is_guardian_of`) scopes this to their own children, the same way
+ * `useTeamPendingInvites` relies on RLS rather than an explicit filter.
+ */
+export function useMyChildrensPendingTeamInvites() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["team-invites", "guardian", user?.id],
+    queryFn: async (): Promise<GuardianPendingTeamInvite[]> => {
+      const { data, error } = await supabase
+        .from("team_invites")
+        .select(
+          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at, guardian_approved_at",
+        )
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      // guardian_approved_at isn't in the generated Database type yet, so
+      // Supabase's own select-string typing can't confirm this result shape
+      // the way it does an already-typed column list — same transient gap
+      // as src/lib/guardian-emergency-contact.ts, here forcing `any` rather
+      // than `unknown` since the cast needs to bypass that check entirely.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (data ?? []) as any[];
+      const teamIds = [...new Set(rows.map((r) => String(r["team_id"])))];
+      const childIds = [...new Set(rows.map((r) => String(r["invitee_id"])))];
+      const [{ data: teams }, { data: children }] = await Promise.all([
+        teamIds.length
+          ? supabase.from("teams").select("id, name").in("id", teamIds)
+          : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+        childIds.length
+          ? supabase.from("profiles").select("id, display_name, username").in("id", childIds)
+          : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+      ]);
+      const teamNames = new Map(
+        ((teams ?? []) as Record<string, unknown>[]).map((t) => [
+          String(t["id"]),
+          String(t["name"]),
+        ]),
+      );
+      const childNames = new Map(
+        ((children ?? []) as Record<string, unknown>[]).map((p) => [
+          String(p["id"]),
+          (p["display_name"] as string) || (p["username"] as string) || "Your child",
+        ]),
+      );
+      return rows.map((r) => ({
+        id: String(r["id"]),
+        teamId: String(r["team_id"]),
+        inviteeId: String(r["invitee_id"]),
+        invitedBy: String(r["invited_by"]),
+        role: r["role"] as TeamRole,
+        message: (r["message"] as string) ?? null,
+        status: r["status"] as TeamInvite["status"],
+        expiresAt: String(r["expires_at"]),
+        createdAt: String(r["created_at"]),
+        teamName: teamNames.get(String(r["team_id"])) ?? "A team",
+        childDisplayName: childNames.get(String(r["invitee_id"])) ?? "Your child",
+        guardianApproved: r["guardian_approved_at"] != null,
+      }));
+    },
+    enabled: !!user,
+    staleTime: 15_000,
+  });
+}
+
+/** Approve or decline a child's pending team invite, as their guardian. */
+export function useGuardianApproveTeamInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { inviteId: string; approve?: boolean }) =>
+      rpc("guardian_approve_team_invite", { _invite: v.inviteId, _approve: v.approve ?? true }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-invites"] });
+    },
   });
 }
