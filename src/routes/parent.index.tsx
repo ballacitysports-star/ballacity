@@ -384,6 +384,9 @@ function ParentCenterPage() {
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>
+      <Link to="/guardian" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+        See your kids' teams and games → Guardian Dashboard
+      </Link>
 
       <GuardianProfileCard />
       <GuardianApprovalsDashboard />
