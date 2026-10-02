@@ -95,6 +95,10 @@ export function AccountTypeScreen({
     try {
       const type = accountTypeForSetup(choice);
       await setAccountTypeForCurrentUser(type);
+      // Parents are stored as "player"; remember the role so they're labelled as guardians.
+      if (choice === "child") {
+        await supabase.auth.updateUser({ data: { is_guardian: true } }).catch(() => undefined);
+      }
       clearPendingAccountType();
       trackEvent("select_role", { role: choice, account_type: type });
       toast.success("Account type set.");

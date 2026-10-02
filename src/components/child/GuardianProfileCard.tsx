@@ -8,21 +8,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /** Reads the signed-in adult's account type straight from their own profile row. */
+/**
+ * Parents are stored with account_type "player" (the database allows only four
+ * types), so a guardian is recognised by what they did: chose Parent / Guardian
+ * at sign-up, or manage / are linked to at least one child.
+ */
 export function useIsGuardianAccount() {
   const { user } = useAuth();
   const q = useQuery({
-    queryKey: ["my-account-type", user?.id],
+    queryKey: ["is-guardian-account", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("account_type")
-        .eq("id", user!.id)
-        .maybeSingle();
-      return data?.account_type ?? null;
+      const meta = (user!.user_metadata ?? {}) as Record<string, unknown>;
+      if (meta["is_guardian"] === true) return true;
+      const [{ data: p }, { count: managed }, { count: linked }] = await Promise.all([
+        supabase.from("profiles").select("account_type").eq("id", user!.id).maybeSingle(),
+        supabase
+          .from("managed_accounts")
+          .select("child_user_id", { count: "exact", head: true })
+          .eq("managed_by", user!.id),
+        supabase
+          .from("guardian_links")
+          .select("id", { count: "exact", head: true })
+          .eq("parent_user_id", user!.id)
+          .neq("status", "revoked"),
+      ]);
+      return (p?.account_type as string | null) === "parent" || (managed ?? 0) > 0 || (linked ?? 0) > 0;
     },
   });
-  return { isGuardian: q.data === "parent", loading: !!user && q.isLoading };
+  return { isGuardian: q.data === true, loading: !!user && q.isLoading };
 }
 
 /** Guardian identity + private emergency contact, shown in the Parent Center. */
