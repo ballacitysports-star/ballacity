@@ -57,13 +57,35 @@ export const TABS: TabDef[] = [
   },
 ];
 
-/** Index of the tab owning `pathname`, or -1 when the route is not a tab. */
-export function tabIndexForPath(pathname: string): number {
-  return TABS.findIndex((t) => t.match(pathname));
+/** Guardian base accounts browse normally but manage family activity here. */
+export const PARENT_TABS: TabDef[] = [
+  TABS[0],
+  TABS[1],
+  TABS[2],
+  {
+    to: "/guardian",
+    label: "Kids",
+    match: (p) => p === "/guardian" || p.startsWith("/guardian/"),
+  },
+  {
+    to: "/parent",
+    label: "Parent Center",
+    match: (p) => p === "/parent" || p.startsWith("/parent/"),
+  },
+  TABS[4],
+];
+
+export function tabsForMode(parentMode = false): TabDef[] {
+  return parentMode ? PARENT_TABS : TABS;
 }
 
-export function isTabPath(pathname: string): boolean {
-  return tabIndexForPath(pathname) !== -1;
+/** Index of the tab owning `pathname`, or -1 when the route is not a tab. */
+export function tabIndexForPath(pathname: string, tabs: TabDef[] = TABS): number {
+  return tabs.findIndex((t) => t.match(pathname));
+}
+
+export function isTabPath(pathname: string, tabs: TabDef[] = TABS): boolean {
+  return tabIndexForPath(pathname, tabs) !== -1;
 }
 
 /**
@@ -72,12 +94,16 @@ export function isTabPath(pathname: string): boolean {
  * Direction is the finger's travel: dragging left ("left") advances to the
  * next tab, the way a horizontally paged surface behaves.
  */
-export function adjacentTab(pathname: string, direction: "left" | "right"): string | null {
-  const index = tabIndexForPath(pathname);
+export function adjacentTab(
+  pathname: string,
+  direction: "left" | "right",
+  tabs: TabDef[] = TABS,
+): string | null {
+  const index = tabIndexForPath(pathname, tabs);
   if (index === -1) return null;
   const next = direction === "left" ? index + 1 : index - 1;
-  if (next < 0 || next >= TABS.length) return null;
-  return TABS[next]!.to;
+  if (next < 0 || next >= tabs.length) return null;
+  return tabs[next]?.to ?? null;
 }
 
 /** How far from the left edge a drag must start to count as a back gesture. */
@@ -189,12 +215,22 @@ export function resolveSwipeIntent(input: {
    * is not on screen.
    */
   tabsEnabled?: boolean;
+  tabs?: TabDef[];
 }): SwipeIntent {
-  const { pathname, startX, dx, velocity, viewportWidth, canGoBack, tabsEnabled = true } = input;
+  const {
+    pathname,
+    startX,
+    dx,
+    velocity,
+    viewportWidth,
+    canGoBack,
+    tabsEnabled = true,
+    tabs = TABS,
+  } = input;
   if (!shouldCommitSwipe(dx, velocity, viewportWidth)) return { kind: "none" };
 
-  if (tabsEnabled && isTabPath(pathname)) {
-    const to = adjacentTab(pathname, dx < 0 ? "left" : "right");
+  if (tabsEnabled && isTabPath(pathname, tabs)) {
+    const to = adjacentTab(pathname, dx < 0 ? "left" : "right", tabs);
     return to ? { kind: "tab", to } : { kind: "none" };
   }
 

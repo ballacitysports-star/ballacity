@@ -8,6 +8,7 @@ import {
   shouldCommitSwipe,
   shouldIgnoreGesture,
   TABS,
+  PARENT_TABS,
   tabIndexForPath,
 } from "./navigation-gestures";
 
@@ -57,6 +58,19 @@ describe("tab resolution", () => {
     expect(isTabPath("/games/abc")).toBe(false);
     expect(isTabPath("/settings")).toBe(false);
   });
+
+  it("uses family destinations in Parent Mode", () => {
+    expect(PARENT_TABS.map((tab) => tab.to)).toEqual([
+      "/feed",
+      "/players",
+      "/teams",
+      "/guardian",
+      "/parent",
+      "/notifications",
+    ]);
+    expect(PARENT_TABS[tabIndexForPath("/guardian", PARENT_TABS)]?.to).toBe("/guardian");
+    expect(PARENT_TABS[tabIndexForPath("/parent/consent/abc", PARENT_TABS)]?.to).toBe("/parent");
+  });
 });
 
 describe("adjacentTab", () => {
@@ -76,6 +90,11 @@ describe("adjacentTab", () => {
 
   it("returns null for a route that is not a tab", () => {
     expect(adjacentTab("/games/abc", "left")).toBeNull();
+  });
+
+  it("steps through guardian destinations in Parent Mode", () => {
+    expect(adjacentTab("/teams", "left", PARENT_TABS)).toBe("/guardian");
+    expect(adjacentTab("/guardian", "left", PARENT_TABS)).toBe("/parent");
   });
 });
 

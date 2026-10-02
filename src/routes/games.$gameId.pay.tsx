@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
+import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
 import {
   type GamePaymentSettings,
@@ -165,6 +166,7 @@ function PayPage() {
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const { isParentMode } = useParentMode();
   const userId = user?.id ?? null;
   const hasGame = !!game;
   // Live roster + spots — updates in real time as others join/leave while
@@ -218,6 +220,10 @@ function PayPage() {
   useEffect(() => {
     if (!loading && !userId) nav({ to: "/auth" });
   }, [loading, userId, nav]);
+
+  useEffect(() => {
+    if (isParentMode) nav({ to: "/guardian", replace: true });
+  }, [isParentMode, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
     if (!userId) return;

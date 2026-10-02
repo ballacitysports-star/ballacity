@@ -11,6 +11,7 @@ import {
 } from "@/lib/recaps";
 import { deleteReel, setReelHidden } from "@/lib/reels.functions";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 /**
  * Per-reel manage controls for the profile card: hide/show and delete.
@@ -116,6 +117,7 @@ export function GameRecapPanel({
   /** Reload callback fired after hide/show/delete so lists stay fresh. */
   onChanged?: () => void;
 }) {
+  const { isParentMode } = useParentMode();
   const gameId = game.id;
   const gameTitle = game.title;
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
@@ -148,13 +150,15 @@ export function GameRecapPanel({
     <div className="px-4 py-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">Highlight reel</p>
-        <Link
-          to="/reels"
-          search={{ game: gameId, title: gameTitle, upload: "" }}
-          className="text-xs font-medium text-lime"
-        >
-          {latest ? "Open in Reels" : "Create one"}
-        </Link>
+        {(latest || !isParentMode) && (
+          <Link
+            to="/reels"
+            search={{ game: gameId, title: gameTitle, upload: "" }}
+            className="text-xs font-medium text-lime"
+          >
+            {latest ? "Open in Reels" : "Create one"}
+          </Link>
+        )}
       </div>
 
       {latest ? (

@@ -5,6 +5,7 @@ import {
   isTabPath,
   resolveSwipeIntent,
   shouldIgnoreGesture,
+  type TabDef,
   type SwipeIntent,
 } from "@/lib/navigation-gestures";
 
@@ -24,8 +25,13 @@ import {
  */
 
 /** Only the left edge arms a back gesture, so mid-screen drags stay free. */
-function armedForRoute(pathname: string, startX: number, tabsEnabled: boolean): boolean {
-  if (tabsEnabled && isTabPath(pathname)) return true;
+function armedForRoute(
+  pathname: string,
+  startX: number,
+  tabsEnabled: boolean,
+  tabs?: TabDef[],
+): boolean {
+  if (tabsEnabled && isTabPath(pathname, tabs)) return true;
   return startX <= EDGE_ZONE_PX;
 }
 
@@ -45,6 +51,8 @@ type Options = {
   onCommit: (intent: SwipeIntent) => void;
   /** Whether tab paging applies; false for a signed-out visitor. */
   tabsEnabled?: boolean;
+  /** The same ordered tabs rendered by the bottom bar. */
+  tabs?: TabDef[];
   /** Skip entirely — e.g. on desktop, or while a modal owns the screen. */
   disabled?: boolean;
 };
@@ -74,6 +82,7 @@ export function useSwipeNavigation({
   canGoBack,
   onCommit,
   tabsEnabled = true,
+  tabs,
   disabled,
 }: Options) {
   const [state, setState] = useState<SwipeState>(IDLE);
@@ -100,7 +109,7 @@ export function useSwipeNavigation({
       // Mouse drags are left alone: text selection and click-drag stay normal.
       if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
       if (gesture.current) return;
-      if (!armedForRoute(pathname, event.clientX, tabsEnabled)) return;
+      if (!armedForRoute(pathname, event.clientX, tabsEnabled, tabs)) return;
       if (shouldIgnoreGesture(event.target as never, isHorizontallyScrollable as never)) return;
 
       const now = Date.now();
@@ -115,7 +124,7 @@ export function useSwipeNavigation({
         locked: null,
       };
     },
-    [disabled, pathname, tabsEnabled],
+    [disabled, pathname, tabs, tabsEnabled],
   );
 
   const onPointerMove = useCallback(
@@ -162,11 +171,12 @@ export function useSwipeNavigation({
         viewportWidth: width,
         canGoBack,
         tabsEnabled,
+        tabs,
       });
 
       setState({ dx, active: true, intent: intent.kind });
     },
-    [canGoBack, pathname, reset, tabsEnabled],
+    [canGoBack, pathname, reset, tabs, tabsEnabled],
   );
 
   const onPointerUp = useCallback(
@@ -185,6 +195,7 @@ export function useSwipeNavigation({
           viewportWidth: width,
           canGoBack,
           tabsEnabled,
+          tabs,
         });
         if (intent.kind !== "none") {
           reset();
@@ -194,7 +205,7 @@ export function useSwipeNavigation({
       }
       reset();
     },
-    [canGoBack, onCommit, pathname, reset, tabsEnabled],
+    [canGoBack, onCommit, pathname, reset, tabs, tabsEnabled],
   );
 
   return {
