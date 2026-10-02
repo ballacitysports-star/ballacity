@@ -126,6 +126,9 @@ export function teamRosterErrorMessage(err: unknown): string {
     return "That invitation expired. Ask the team to send a new one.";
   if (raw.includes("CHILD_ACTIVITY_LOCKED"))
     return "A parent or guardian has paused team activity on this account.";
+  if (raw.includes("WAIVER_REQUIRED")) return "Sign the team's waiver before joining.";
+  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
+    return "A parent or guardian must approve this invite first.";
   if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
   if (raw.includes("NOT_A_MEMBER")) return "That player isn't on the roster.";
   if (raw.includes("duplicate key")) return "That player already has a pending invitation.";
