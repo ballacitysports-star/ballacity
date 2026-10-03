@@ -94,12 +94,12 @@ export function TeamEventsCalendar<T extends CalendarEvent>({ events, summaries,
           return <Button key={key} variant="ghost" aria-pressed={selected === key} aria-current={today === key ? "date" : undefined}
             aria-label={`${key}, ${entries.length} events${entries.length ? `, ${rsvps} RSVPs${waiverRequired && !summaryLoading && !summaryError ? `, ${missing} missing waivers` : ""}` : ""}`}
             onClick={() => setSelected(key)}
-            className={`h-20 min-w-0 flex-col justify-start gap-1 overflow-hidden whitespace-normal rounded-none border-b border-border px-0.5 py-2 sm:h-28 sm:px-2 ${selected === key ? "bg-accent ring-1 ring-inset ring-primary" : ""}`}>
+            className={`h-20 min-w-0 flex-col justify-start gap-0.5 overflow-hidden whitespace-normal rounded-none border-b border-border px-0.5 py-1.5 sm:h-28 sm:gap-1 sm:px-2 sm:py-2 ${selected === key ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""}`}>
             <span className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs ${key === today ? "bg-primary text-primary-foreground" : ""}`}>{Number(key.slice(8, 10))}</span>
             {entries.length > 0 && <>
               <span className="hidden w-full truncate text-left text-[11px] font-semibold sm:block">{entries[0].title}</span>
               <span className="text-[10px] font-semibold text-lime sm:hidden">{entries.length} {entries.length === 1 ? "event" : "events"}</span>
-              <span className="text-[10px] text-muted-foreground">{rsvps} going{entries.length > 1 ? ` · +${entries.length - 1}` : ""}</span>
+              <span className="whitespace-nowrap text-[10px] text-muted-foreground">{rsvps} going{entries.length > 1 && <span className="hidden sm:inline"> · +{entries.length - 1}</span>}</span>
               {waiverRequired && missing > 0 && !summaryLoading && !summaryError && <span className="hidden text-[10px] text-coral sm:block">{missing} unsigned</span>}
             </>}
           </Button>;
