@@ -84,6 +84,13 @@ function ManageTeam() {
       <header>
         <h1 className="page-title">Manage team</h1>
         <p className="page-subtitle">Roster, invitations and ownership for {teamName}.</p>
+        <Link
+          to="/teams/$teamId/events"
+          params={{ teamId }}
+          className="mt-3 inline-flex rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground"
+        >
+          Tryouts &amp; camps
+        </Link>
       </header>
 
       <Tabs defaultValue="roster">
