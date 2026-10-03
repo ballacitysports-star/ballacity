@@ -33,6 +33,7 @@ export type ChildTryout = {
   location: string | null;
   attended: boolean | null;
   score: number | null;
+  notes: string | null;
 };
 export type ChildInvite = {
   id: string;
@@ -134,15 +135,15 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
     const rsvps = (rs.data ?? []) as { id: string; post_id: string; team_id: string; user_id: string }[];
     const [tp, ev] = await Promise.all([
       rsvps.length
-        ? supabaseAdmin.from("team_posts").select("id,title,event_date,location").in("id", [...new Set(rsvps.map((r) => r.post_id))])
+        ? supabaseAdmin.from("team_posts").select("id,title,event_date,location,share_scores,share_notes").in("id", [...new Set(rsvps.map((r) => r.post_id))])
         : Promise.resolve({ data: [] as never[] }),
       rsvps.length
-        ? supabaseAdmin.from("tryout_evaluations").select("rsvp_id,attended,score").in("rsvp_id", rsvps.map((r) => r.id))
+        ? supabaseAdmin.from("tryout_evaluations").select("rsvp_id,attended,score,notes").in("rsvp_id", rsvps.map((r) => r.id))
         : Promise.resolve({ data: [] as never[] }),
     ]);
     for (const r of rsvps) if (!teamIds.includes(r.team_id)) teamIds.push(r.team_id);
-    const postById = new Map(((tp.data ?? []) as { id: string; title: string | null; event_date: string | null; location: string | null }[]).map((x) => [x.id, x]));
-    const evalById = new Map(((ev.data ?? []) as { rsvp_id: string; attended: boolean | null; score: number | null }[]).map((x) => [x.rsvp_id, x]));
+    const postById = new Map(((tp.data ?? []) as { id: string; title: string | null; event_date: string | null; location: string | null; share_scores: boolean; share_notes: boolean }[]).map((x) => [x.id, x]));
+    const evalById = new Map(((ev.data ?? []) as { rsvp_id: string; attended: boolean | null; score: number | null; notes: string | null }[]).map((x) => [x.rsvp_id, x]));
     const gameIds = [
       ...new Set([...(gp.data ?? []).map((r) => r.game_id), ...(jr.data ?? []).map((r) => r.game_id)]),
     ];
@@ -258,7 +259,9 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
               rsvpId: r.id, postId: r.post_id, teamId: r.team_id,
               teamName: teamName.get(r.team_id) ?? "Team",
               title: p.title, eventDate: p.event_date, location: p.location,
-              attended: e?.attended ?? null, score: e?.score ?? null,
+              attended: e?.attended ?? null,
+              score: p.share_scores ? (e?.score ?? null) : null,
+              notes: p.share_notes ? (e?.notes || null) : null,
             };
           })
           .sort((a, b) => (a.eventDate ?? "").localeCompare(b.eventDate ?? "")),

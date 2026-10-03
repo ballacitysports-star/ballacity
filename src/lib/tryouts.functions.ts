@@ -494,3 +494,56 @@ export const inviteParentToTryout = createServerFn({ method: "POST" })
       return { ok: false as const, error: "Couldn't send the email. Try again." };
     }
   });
+
+/** Manager-only: read whether scores/notes are shared with players & parents for a tryout. */
+export const getTryoutSharing = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1), postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: p } = await supabaseAdmin.from("team_posts").select("share_scores,share_notes")
+      .eq("id", data.postId).eq("team_id", data.teamId).maybeSingle();
+    return { shareScores: p?.share_scores ?? true, shareNotes: p?.share_notes ?? false };
+  });
+
+export const setTryoutSharing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    teamId: z.string().min(1), postId: z.string().uuid(),
+    shareScores: z.boolean().optional(), shareNotes: z.boolean().optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can change this.");
+    const patch: { share_scores?: boolean; share_notes?: boolean } = {};
+    if (data.shareScores !== undefined) patch.share_scores = data.shareScores;
+    if (data.shareNotes !== undefined) patch.share_notes = data.shareNotes;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("team_posts").update(patch).eq("id", data.postId).eq("team_id", data.teamId);
+    if (error) throw new Error("Couldn't save sharing settings.");
+    return { ok: true };
+  });
+
+/** The caller's own result for a tryout, stripped per the team's sharing settings. */
+export const getMyTryoutResult = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r } = await supabaseAdmin.from("tryout_rsvps").select("id")
+      .eq("post_id", data.postId).eq("user_id", context.userId).eq("status", "registered").maybeSingle();
+    if (!r) return null;
+    const [{ data: p }, { data: e }] = await Promise.all([
+      supabaseAdmin.from("team_posts").select("share_scores,share_notes").eq("id", data.postId).maybeSingle(),
+      supabaseAdmin.from("tryout_evaluations").select("attended,score,notes").eq("rsvp_id", r.id).maybeSingle(),
+    ]);
+    return {
+      attended: (e?.attended ?? null) as boolean | null,
+      score: p?.share_scores ? ((e?.score ?? null) as number | null) : null,
+      notes: p?.share_notes ? ((e?.notes || null) as string | null) : null,
+      scoresShared: !!p?.share_scores,
+      notesShared: !!p?.share_notes,
+    };
+  });

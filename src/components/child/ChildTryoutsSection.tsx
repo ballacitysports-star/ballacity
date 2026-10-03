@@ -21,9 +21,10 @@ export function ChildTryoutsSection({ kids, multi }: { kids: ChildActivity[]; mu
         {r.t.attended != null && (
           <p className="text-xs text-muted-foreground">{r.t.attended ? "Attended" : "Did not attend"}</p>
         )}
+        {r.t.notes && <p className="mt-1 text-xs italic">Coach: {r.t.notes}</p>}
       </div>
       <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
-        {r.t.score != null ? `${r.t.score}/10` : "Not scored"}
+        {r.t.score != null ? `${r.t.score}/10` : "No score shared"}
       </span>
     </Link>
   );

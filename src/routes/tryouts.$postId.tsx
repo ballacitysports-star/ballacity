@@ -6,7 +6,9 @@ import { CalendarClock, MapPin, Users, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { RsvpDialog } from "@/components/tryouts/TryoutsSection";
-import { getTryout } from "@/lib/tryouts.functions";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getTryout, getMyTryoutResult } from "@/lib/tryouts.functions";
 
 const tryoutQuery = (postId: string) =>
   queryOptions({ queryKey: ["tryouts", "one", postId], queryFn: () => getTryout({ data: { postId } }) });
@@ -97,7 +99,24 @@ function TryoutPage() {
           {passed ? "This event has passed" : left === 0 ? "Full" : user ? "Apply now" : "Sign in to apply"}
         </Button>
       </div>
+      {user && <MyResult postId={t.id} />}
       {open && <RsvpDialog tryout={t} onClose={() => setOpen(false)} />}
     </main>
+  );
+}
+
+function MyResult({ postId }: { postId: string }) {
+  const fn = useServerFn(getMyTryoutResult);
+  const q = useQuery({ queryKey: ["my-tryout-result", postId], queryFn: () => fn({ data: { postId } }) });
+  const r = q.data;
+  if (!r || (r.score == null && !r.notes && r.attended == null)) return null;
+  return (
+    <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+      <h2 className="font-display text-lg font-semibold">Your result</h2>
+      {r.attended != null && <p className="mt-1 text-sm text-muted-foreground">{r.attended ? "Attended" : "Did not attend"}</p>}
+      {r.score != null && <p className="mt-2 text-2xl font-bold">{r.score}/10</p>}
+      {r.notes && <p className="mt-2 text-sm italic">Coach: {r.notes}</p>}
+      {!r.scoresShared && <p className="mt-2 text-xs text-muted-foreground">The team hasn't shared scores for this tryout.</p>}
+    </div>
   );
 }
