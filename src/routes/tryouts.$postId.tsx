@@ -51,7 +51,7 @@ function TryoutPage() {
   if (!t)
     return (
       <div className="page-shell py-16 text-center">
-        <p className="font-semibold">This {t?.kind === "clinic" ? "camp" : "tryout"} is no longer available.</p>
+        <p className="font-semibold">This event is no longer available.</p>
         <Link to="/" className="mt-3 inline-block text-sm underline">Browse other tryouts &amp; camps</Link>
       </div>
     );
