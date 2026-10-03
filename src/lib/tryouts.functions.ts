@@ -384,6 +384,67 @@ export const emailTryoutApplicants = createServerFn({ method: "POST" })
     return { sent, skipped, failed };
   });
 
+/** Manager-only: email a printable roster (name, position, jersey) to each player's parent/guardian (or the player). */
+export const emailRosterPrintout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1), postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can email the roster.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: post } = await supabaseAdmin
+      .from("team_posts").select("id,title,event_date,location,team_id,teams!inner(name)")
+      .eq("id", data.postId).eq("team_id", data.teamId).maybeSingle();
+    if (!post) throw new Error("Tryout not found.");
+    const { data: members } = await supabaseAdmin
+      .from("team_members").select("user_id,jersey_number,position")
+      .eq("team_id", data.teamId).order("jersey_number", { ascending: true, nullsFirst: false });
+    const rows = members ?? [];
+    if (!rows.length) return { sent: 0, skipped: 0, failed: 0 };
+    const ids = rows.map((m) => m.user_id);
+    const [{ data: profs }, { data: links }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id,display_name,username").in("id", ids),
+      supabaseAdmin.from("guardian_links").select("parent_user_id,child_user_id")
+        .in("child_user_id", ids).in("status", ["active", "verified"]),
+    ]);
+    const names = new Map((profs ?? []).map((p: any) => [p.id, p.display_name ?? p.username ?? "Player"]));
+    const guardianOf = new Map((links ?? []).map((l: any) => [l.child_user_id, l.parent_user_id]));
+    const p: any = post;
+    const when = p.event_date
+      ? new Date(p.event_date).toLocaleString("en-US", {
+          weekday: "short", month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short",
+        })
+      : undefined;
+    const players = rows.map((m) => ({
+      name: names.get(m.user_id) ?? "Player",
+      position: m.position ?? undefined,
+      jersey: m.jersey_number ?? null,
+    }));
+    const { sendTemplateEmail } = await import("@/lib/email-templates/send-email");
+    let sent = 0, skipped = 0, failed = 0;
+    for (const m of rows) {
+      const recipientId = guardianOf.get(m.user_id) ?? m.user_id;
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(recipientId);
+      const email = u?.user?.email;
+      if (!email) { skipped++; continue; }
+      try {
+        const res = await sendTemplateEmail("team-roster-print", email, {
+          templateData: {
+            teamName: p.teams?.name, tryoutTitle: p.title, when,
+            location: p.location ?? undefined, players,
+          },
+          idempotencyKey: `roster-print-${p.id}-${recipientId}`,
+        });
+        if (res.sent) sent++; else skipped++;
+      } catch (e) {
+        console.error("roster printout send failed", e);
+        failed++;
+      }
+    }
+    return { sent, skipped, failed };
+  });
+
 /** Manager-only: roster with birth year/position plus tryout ranking for every member and applicant. */
 export const getRosterBoard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
