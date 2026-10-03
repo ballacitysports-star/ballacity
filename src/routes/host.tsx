@@ -42,6 +42,28 @@ function HostDashboard() {
     nav({ to: "/host", search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }), replace: true });
 
   const [games, setGames] = useState<HostedGame[] | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const shareGame = async (g: HostedGame) => {
+    const url = `${window.location.origin}/games/${g.id}`;
+    const text = `Join my game "${g.title}" on ballaCity — ${formatGameWhen({ date: g.date })}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: g.title, text, url });
+        return;
+      } catch {
+        /* user cancelled or share unsupported — fall through to copy */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy this invite link:", url);
+    }
+    setCopiedId(g.id);
+    toast.success("Invite link copied — send it to your players");
+    setTimeout(() => setCopiedId((c) => (c === g.id ? null : c)), 2000);
+  };
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
