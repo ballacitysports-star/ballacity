@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarRange, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatGameWhen } from "@/lib/format";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
+import { HostGamesCalendar } from "@/components/games/HostGamesCalendar";
 
 export const Route = createFileRoute("/host")({
   head: () =>
@@ -37,8 +38,9 @@ function HostDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const search = Route.useSearch();
-  const tab: "games" | "payments" = search.tab === "payments" ? "payments" : "games";
-  const setTab = (v: "games" | "payments") =>
+  const tab: "games" | "calendar" | "payments" =
+    search.tab === "payments" ? "payments" : search.tab === "calendar" ? "calendar" : "games";
+  const setTab = (v: "games" | "calendar" | "payments") =>
     nav({ to: "/host", search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }), replace: true });
 
   const [games, setGames] = useState<HostedGame[] | null>(null);
@@ -120,6 +122,14 @@ function HostDashboard() {
           <CalendarDays className="h-4 w-4" /> Games
         </button>
         <button
+          onClick={() => setTab("calendar")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-colors ${
+            tab === "calendar" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+          }`}
+        >
+          <CalendarRange className="h-4 w-4" /> Calendar
+        </button>
+        <button
           onClick={() => setTab("payments")}
           className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-colors ${
             tab === "payments" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
@@ -131,6 +141,8 @@ function HostDashboard() {
 
       {tab === "payments" ? (
         <UnpaidPlayersPanel />
+      ) : tab === "calendar" ? (
+        <HostGamesCalendar games={games ?? []} />
       ) : games === null ? (
         <div className="p-4 text-sm text-muted-foreground">Loading…</div>
       ) : games.length === 0 ? (
