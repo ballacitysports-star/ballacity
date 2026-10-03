@@ -28,6 +28,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
   paymentTypeMeta,
+  resolvePaymentDeepLink,
   getGamePaymentSettings,
   listPaymentMethodsForHost,
   uploadProofScreenshot,
@@ -109,9 +110,19 @@ function markExternalPaymentOpened(gameId: string, methodId: string) {
   }
 }
 
-function launchExternalPayment(url: string) {
+function launchExternalPayment(url: string, copyText?: string | null) {
+  if (copyText && typeof navigator !== "undefined" && navigator.clipboard) {
+    void navigator.clipboard
+      .writeText(copyText)
+      .then(() => toast.success(`Copied ${copyText}`))
+      .catch(() => {});
+  }
   const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
   if (!externalWindow) window.location.assign(url);
+}
+
+function feeLabel(fee: number | null | undefined) {
+  return fee && fee > 0 ? `$${Number(fee).toFixed(2).replace(/\.00$/, "")}` : "";
 }
 
 export const Route = createFileRoute("/games/$gameId/pay")({
@@ -666,6 +677,8 @@ function PayPage() {
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
+              const fee = settings.entry_fee ?? game.price;
+              const link = resolvePaymentDeepLink(m, fee, game.title);
               return (
                 <div
                   key={m.id}
@@ -685,19 +698,19 @@ function PayPage() {
                       </div>
                     </div>
                   </button>
-                  {m.payment_url ? (
+                  {link.url ? (
                     <button
                       type="button"
                       onClick={() => {
                         setPicked(m);
                         markExternalPaymentOpened(game.id, m.id);
-                        launchExternalPayment(m.payment_url as string);
+                        launchExternalPayment(link.url as string, link.copyText);
                       }}
                       className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Open ${meta.name} in a new tab`}
-                      aria-label={`Open ${meta.name} in a new tab to pay`}
+                      title={`Pay in ${meta.name}`}
+                      aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Open
+                      <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
                     </button>
                   ) : (
                     <button
