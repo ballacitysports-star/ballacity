@@ -191,7 +191,7 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
           </h2>
           <Link
             to="/teams/$teamId/manage"
-            search={{ tab: "rsvps" }}
+            params={{ teamId }}
             className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
           >
             RSVPs &amp; waivers
