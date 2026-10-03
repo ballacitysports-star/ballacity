@@ -199,8 +199,6 @@ function Landing() {
               </Link>
             </div>
           </div>
-
-        </div>
         </div>
       </section>
 
