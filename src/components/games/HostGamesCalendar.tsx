@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { dateKeyInZone, monthGridKeys, monthLabel, WEEKDAY_LABELS } from "@/lib/datetime";
 import { formatGameWhen } from "@/lib/format";
@@ -35,9 +34,8 @@ function GameCard({ game }: { game: HostCalendarGame }) {
   const cancelled = !!game.cancelled_at;
   const paid = Number(game.price) > 0;
   return (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId: game.id }}
+    <a
+      href={`/games/${game.id}`}
       className={`block rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-lime/40 ${
         cancelled ? "opacity-60" : ""
       }`}
