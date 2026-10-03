@@ -9,6 +9,7 @@ import { RosterTab } from "@/components/team/manage/RosterTab";
 import { InvitesTab } from "@/components/team/manage/InvitesTab";
 import { SettingsTab } from "@/components/team/manage/SettingsTab";
 import { WaiverTab } from "@/components/team/manage/WaiverTab";
+import { RsvpsTab } from "@/components/team/manage/RsvpsTab";
 
 export const Route = createFileRoute("/teams/$teamId/manage")({
   head: () =>
@@ -88,12 +89,16 @@ function ManageTeam() {
       <Tabs defaultValue="roster">
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="roster">Roster</TabsTrigger>
+          <TabsTrigger value="rsvps">RSVPs &amp; waivers</TabsTrigger>
           <TabsTrigger value="invites">Invitations</TabsTrigger>
           <TabsTrigger value="waiver">Waiver</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="roster" className="pt-4">
           <RosterTab teamId={teamId} teamName={teamName} />
+        </TabsContent>
+        <TabsContent value="rsvps" className="pt-4">
+          <RsvpsTab teamId={teamId} />
         </TabsContent>
         <TabsContent value="invites" className="pt-4">
           <InvitesTab teamId={teamId} teamName={teamName} />
