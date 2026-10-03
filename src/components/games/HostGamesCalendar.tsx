@@ -64,7 +64,7 @@ function GameCard({ game }: { game: HostCalendarGame }) {
           {cancelled ? "Cancelled" : paid ? `Paid · ${gameFeeLabel(game.price)}` : "Free"}
         </span>
       </div>
-    </Link>
+    </a>
   );
 }
 
