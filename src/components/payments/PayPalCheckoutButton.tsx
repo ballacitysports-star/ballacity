@@ -14,7 +14,7 @@ function loadSdk(clientId: string, merchantId: string): Promise<void> {
   if (!sdkPromise) {
     sdkPromise = new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&merchant-id=${encodeURIComponent(merchantId)}`;
+      s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&merchant-id=${encodeURIComponent(merchantId)}&enable-funding=card,venmo&components=buttons`;
       s.onload = () => resolve();
       s.onerror = () => {
         sdkPromise = null;
@@ -82,15 +82,18 @@ export function PayPalCheckoutButton(props: {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">Pay {props.feeLabel} with PayPal</div>
+        <div className="text-sm font-semibold">Pay {props.feeLabel} — PayPal or card</div>
         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
           Instant confirmation
         </span>
       </div>
-      <div ref={ref} aria-label="Pay with PayPal" />
-      {!ready && <div className="py-3 text-center text-xs text-muted-foreground">Loading PayPal…</div>}
+      <p className="mb-2 text-xs text-muted-foreground">
+        No PayPal account? Tap <span className="font-semibold text-foreground">Debit or Credit Card</span> below.
+      </p>
+      <div ref={ref} aria-label="Pay with PayPal or card" />
+      {!ready && <div className="py-3 text-center text-xs text-muted-foreground">Loading checkout…</div>}
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
-        Goes straight to the host's PayPal — no proof upload needed.
+        Goes straight to the host — no proof upload needed.
       </p>
     </div>
   );
