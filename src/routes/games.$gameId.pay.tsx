@@ -48,6 +48,8 @@ import {
   type PaymentState,
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
+import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
+import { getPayPalCheckoutConfig } from "@/lib/paypal.functions";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -192,6 +194,7 @@ function PayPage() {
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
