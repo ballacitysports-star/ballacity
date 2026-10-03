@@ -346,13 +346,15 @@ function PlayerCardPage() {
             </div>
           </div>
         )}
-        <Link
-          to="/players/$userId"
-          params={{ userId }}
-          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold"
-        >
-          See {p.displayName}'s full profile
-        </Link>
+        {!p.isMinor && (
+          <Link
+            to="/players/$userId"
+            params={{ userId }}
+            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold"
+          >
+            See {p.displayName}'s full profile
+          </Link>
+        )}
       </section>
     </div>
   );
