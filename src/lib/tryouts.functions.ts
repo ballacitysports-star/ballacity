@@ -268,3 +268,50 @@ export const getTryout = createServerFn({ method: "GET" })
       teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
     };
   });
+
+/** Manager-only: applicants for one tryout with attendance, score and notes. */
+export const getTryoutResults = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1), postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rsvps } = await supabaseAdmin
+      .from("tryout_rsvps").select("id,user_id,registered_by,status,created_at")
+      .eq("team_id", data.teamId).eq("post_id", data.postId).eq("status", "registered");
+    const rows = rsvps ?? [];
+    const ids = rows.map((r) => r.user_id);
+    const [profiles, evals, members] = await Promise.all([
+      ids.length ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids) : Promise.resolve({ data: [] as any[] }),
+      context.supabase.from("tryout_evaluations").select("rsvp_id,attended,score,notes").eq("post_id", data.postId),
+      ids.length ? supabaseAdmin.from("team_members").select("user_id").eq("team_id", data.teamId).in("user_id", ids) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const prof = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
+    const ev = new Map((evals.data ?? []).map((e: any) => [e.rsvp_id, e]));
+    const mem = new Set((members.data ?? []).map((m: any) => m.user_id));
+    return rows.map((r) => {
+      const p: any = prof.get(r.user_id);
+      const e: any = ev.get(r.id);
+      return {
+        rsvpId: r.id, userId: r.user_id, name: p?.display_name ?? p?.username ?? "Player", avatar: (p?.avatar_url ?? null) as string | null,
+        byGuardian: r.registered_by !== r.user_id, isMember: mem.has(r.user_id), appliedAt: r.created_at,
+        attended: !!e?.attended, score: (e?.score ?? null) as number | null, notes: (e?.notes ?? "") as string,
+      };
+    });
+  });
+
+export const saveTryoutEvaluation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    teamId: z.string().min(1), postId: z.string().uuid(), rsvpId: z.string().uuid(),
+    attended: z.boolean(), score: z.number().int().min(1).max(10).nullable(), notes: z.string().max(1000),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("tryout_evaluations").upsert({
+      rsvp_id: data.rsvpId, post_id: data.postId, team_id: data.teamId, attended: data.attended,
+      score: data.score, notes: data.notes || null, updated_by: context.userId, updated_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false as const, error: "Couldn't save. Only team managers can score tryouts." };
+    return { ok: true as const };
+  });
