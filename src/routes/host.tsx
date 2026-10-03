@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatGameWhen } from "@/lib/format";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
+import { HostGamesCalendar } from "@/components/games/HostGamesCalendar";
 
 export const Route = createFileRoute("/host")({
   head: () =>
