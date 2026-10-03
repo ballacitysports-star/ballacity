@@ -133,8 +133,8 @@ function Landing() {
         <div className="page-shell flex items-center justify-between py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">
-              Features
+            <a href="#availability" className="hover:text-foreground">
+              Get found
             </a>
             <a href="#sports" className="hover:text-foreground">
               Sports
