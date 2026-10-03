@@ -217,6 +217,48 @@ export async function deletePaymentMethod(id: string) {
   if (error) throw error;
 }
 
+// ----- Host PayPal checkout connection -----
+export type HostPayPalAccount = {
+  host_id: string;
+  merchant_id: string;
+  email: string | null;
+  connected_at: string;
+};
+
+export async function getMyPayPalAccount(): Promise<HostPayPalAccount | null> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await supabase
+    .from("host_paypal_accounts")
+    .select("*")
+    .eq("host_id", u.user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as HostPayPalAccount) ?? null;
+}
+
+export async function saveMyPayPalAccount(merchantId: string, email?: string | null) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Sign in to connect PayPal.");
+  const clean = merchantId.trim();
+  if (!/^[A-Za-z0-9]{3,64}$/.test(clean)) {
+    throw new Error("Enter your PayPal Merchant ID (13 letters/numbers, from your PayPal business settings).");
+  }
+  const { error } = await supabase.from("host_paypal_accounts").upsert({
+    host_id: u.user.id,
+    merchant_id: clean,
+    email: email?.trim() || null,
+  });
+  if (error) throw error;
+}
+
+export async function disconnectMyPayPalAccount() {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return;
+  const { error } = await supabase.from("host_paypal_accounts").delete().eq("host_id", u.user.id);
+  if (error) throw error;
+}
+
 // ----- Game settings -----
 export async function getGamePaymentSettings(gameId: string): Promise<GamePaymentSettings | null> {
   const { data, error } = await supabase

@@ -149,15 +149,14 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       reviewed_at: new Date().toISOString(),
     });
 
-    // Notify the host (in-app + email), non-blocking.
+    // Notify the host in-app, non-blocking.
     try {
-      const { createNotification } = await import("@/lib/notifications.server");
-      await createNotification({
-        userId: order.host_id,
+      await supabaseAdmin.from("notifications").insert({
+        user_id: order.host_id,
         type: "payment_submitted",
         title: "PayPal payment received",
         body: `A player paid $${(order.amount_cents / 100).toFixed(2)} via PayPal checkout.`,
-        data: { gameId: order.game_id },
+        link: `/games/${order.game_id}`,
       });
     } catch (e) {
       console.error("[paypal] host notification failed", e);
