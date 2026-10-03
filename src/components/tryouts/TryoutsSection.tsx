@@ -94,7 +94,7 @@ export function TryoutsSection() {
   );
 }
 
-function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
+export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const ctxFn = useServerFn(getTryoutRsvpContext);
