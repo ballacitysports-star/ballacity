@@ -192,3 +192,59 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
       })),
     };
   });
+
+/** Manager-only: every team invite with response + guardian + waiver status. */
+export const getTeamInviteTracker = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", {
+      _team: data.teamId,
+      _user: context.userId,
+    });
+    if (!isManager) throw new Error("Only owners, managers and coaches can view invites.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [inv, waiver] = await Promise.all([
+      supabaseAdmin
+        .from("team_invites")
+        .select("id,invitee_id,role,status,expires_at,responded_at,created_at,guardian_approved_at")
+        .eq("team_id", data.teamId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabaseAdmin.from("team_waivers").select("id,version").eq("team_id", data.teamId).eq("published", true).maybeSingle(),
+    ]);
+    const rows = inv.data ?? [];
+    const ids = [...new Set(rows.map((r) => r.invitee_id))];
+    const [profiles, sigs, guardians] = await Promise.all([
+      ids.length ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids) : Promise.resolve({ data: [] as any[] }),
+      waiver.data && ids.length
+        ? supabaseAdmin.from("team_waiver_signatures").select("signer_user_id,signed_by").eq("waiver_id", waiver.data.id).in("signer_user_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+      ids.length ? supabaseAdmin.from("guardian_links").select("child_id").eq("status", "active").in("child_id", ids) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const p = new Map((profiles.data ?? []).map((x: any) => [x.id, x]));
+    const s = new Map((sigs.data ?? []).map((x: any) => [x.signer_user_id, !!x.signed_by]));
+    const minors = new Set((guardians.data ?? []).map((g: any) => g.child_id));
+    const now = Date.now();
+    return {
+      waiverVersion: waiver.data?.version ?? null,
+      invites: rows.map((r) => {
+        const pr: any = p.get(r.invitee_id);
+        const expired = r.status === "pending" && r.expires_at && new Date(r.expires_at).getTime() < now;
+        return {
+          id: r.id,
+          userId: r.invitee_id,
+          name: pr?.display_name ?? pr?.username ?? "Player",
+          avatar: (pr?.avatar_url as string | null) ?? null,
+          role: r.role as string,
+          status: (expired ? "expired" : r.status) as string,
+          sentAt: r.created_at,
+          respondedAt: r.responded_at,
+          needsGuardian: minors.has(r.invitee_id),
+          guardianApproved: !!r.guardian_approved_at,
+          waiverSigned: s.has(r.invitee_id),
+          waiverByGuardian: s.get(r.invitee_id) ?? false,
+        };
+      }),
+    };
+  });
