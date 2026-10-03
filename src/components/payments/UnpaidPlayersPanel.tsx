@@ -38,7 +38,7 @@ export function UnpaidPlayersPanel() {
       const list = games ?? [];
       if (!list.length) return alive && setRows([]);
       const ids = list.map((g) => g.id);
-      const [{ data: parts }, { data: subs }] = await Promise.all([
+      const [{ data: partRows }, { data: subs }, { data: approved }] = await Promise.all([
         supabase.from("game_participants").select("game_id, user_id").in("game_id", ids),
         supabase
           .from("payment_submissions")
@@ -46,7 +46,19 @@ export function UnpaidPlayersPanel() {
           .eq("host_id", me)
           .in("game_id", ids)
           .order("submitted_at", { ascending: false }),
+        supabase
+          .from("join_requests")
+          .select("game_id, player_id")
+          .eq("status", "approved")
+          .in("game_id", ids),
       ]);
+      const seen = new Set((partRows ?? []).map((p) => `${p.game_id}:${p.user_id}`));
+      const parts = [
+        ...(partRows ?? []),
+        ...(approved ?? [])
+          .filter((r) => !seen.has(`${r.game_id}:${r.player_id}`))
+          .map((r) => ({ game_id: r.game_id, user_id: r.player_id })),
+      ];
       const status = new Map<string, string>();
       for (const s of subs ?? []) {
         const k = `${s.game_id}:${s.player_id}`;

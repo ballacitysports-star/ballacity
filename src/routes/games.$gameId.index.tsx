@@ -1643,14 +1643,18 @@ function GameDetail() {
                     {myReq.status === "pending"
                       ? "Waiting for host approval"
                       : myReq.status === "approved"
-                        ? "You're approved — see you there!"
+                        ? isPaid && !isPaymentVerified
+                          ? "Approved — payment due"
+                          : "You're approved — see you there!"
                         : "Request declined"}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {myReq.status === "pending"
                       ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
                       : myReq.status === "approved"
-                        ? "The host approved your request. You're on the roster."
+                        ? isPaid && !isPaymentVerified
+                          ? `Payment due: pay $${fee} to the host to lock in your spot. You'll be added to the roster once it's confirmed.`
+                          : "The host approved your request. You're on the roster."
                         : capReached
                           ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
                           : cooldownMs > 0
@@ -4566,18 +4570,7 @@ function HostRequestRow({
     const rollback = onOptimistic(req.id, status);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await createNotification({
-        user_id: req.player_id,
-        type: status === "approved" ? "join_approved" : "join_declined",
-        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
-        body:
-          status === "approved"
-            ? "The host approved your request."
-            : reason
-              ? `The host declined your request: ${reason}`
-              : "The host declined your request.",
-        link: `/games/${req.game_id}`,
-      });
+      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
       toast.success(status === "approved" ? "Approved" : "Declined");
     } catch (e: any) {
       rollback();
@@ -4707,18 +4700,7 @@ function HostPendingChip({
     setOpen(false);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await createNotification({
-        user_id: req.player_id,
-        type: status === "approved" ? "join_approved" : "join_declined",
-        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
-        body:
-          status === "approved"
-            ? "The host approved your request."
-            : reason
-              ? `The host declined your request: ${reason}`
-              : "The host declined your request.",
-        link: `/games/${req.game_id}`,
-      });
+      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
     } catch (e: any) {
       rollback();
@@ -4825,4 +4807,36 @@ function HostPendingChip({
       )}
     </div>
   );
+}
+
+async function notifyJoinReview(
+  playerId: string,
+  gameId: string,
+  gameTitle: string,
+  status: "approved" | "rejected",
+  reason?: string | null,
+) {
+  let fee = 0;
+  if (status === "approved") {
+    const { data } = await supabase.from("hosted_games").select("price").eq("id", gameId).maybeSingle();
+    fee = Number(data?.price ?? 0);
+  }
+  const paid = status === "approved" && fee > 0;
+  await createNotification({
+    user_id: playerId,
+    type: status === "approved" ? "join_approved" : "join_declined",
+    title: paid
+      ? `Request approved — payment due for ${gameTitle}`
+      : status === "approved"
+        ? `You're in: ${gameTitle}`
+        : `Request declined: ${gameTitle}`,
+    body: paid
+      ? `Pay $${fee} to the host to secure your spot. You'll be added to the roster once payment is confirmed.`
+      : status === "approved"
+        ? "The host approved your request."
+        : reason
+          ? `The host declined your request: ${reason}`
+          : "The host declined your request.",
+    link: paid ? `/games/${gameId}/pay` : `/games/${gameId}`,
+  });
 }
