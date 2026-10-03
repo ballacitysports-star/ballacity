@@ -129,6 +129,47 @@ export function paymentTypeMeta(t: string) {
   return PAYMENT_TYPES.find((p) => p.id === t) ?? PAYMENT_TYPES[PAYMENT_TYPES.length - 1];
 }
 
+/**
+ * Builds a 1-tap pay link with the host, amount and game title pre-filled
+ * where the provider supports it. Falls back to the host's saved link.
+ * `copyText` is the handle/contact copied to the clipboard on launch.
+ */
+export function resolvePaymentDeepLink(
+  method: Pick<PaymentMethod, "payment_type" | "username" | "payment_url" | "contact_info">,
+  fee: number | null | undefined,
+  gameTitle: string,
+): { url: string | null; copyText: string | null } {
+  const amount = fee && fee > 0 ? (Math.round(fee * 100) / 100).toString() : "";
+  const handle = (method.username ?? "").trim().replace(/^[@$]/, "");
+  const safe = /^[A-Za-z0-9._-]{1,60}$/.test(handle) ? handle : "";
+  const note = encodeURIComponent(`BallaCity: ${gameTitle}`.slice(0, 120));
+  const copyText = method.username?.trim() || method.contact_info?.trim() || null;
+  switch (method.payment_type) {
+    case "venmo":
+      if (safe)
+        return {
+          url: `https://venmo.com/?txn=pay&recipients=${encodeURIComponent(safe)}${amount ? `&amount=${amount}` : ""}&note=${note}`,
+          copyText,
+        };
+      break;
+    case "cashapp":
+      if (safe)
+        return {
+          url: `https://cash.app/$${encodeURIComponent(safe)}${amount ? `/${amount}` : ""}`,
+          copyText,
+        };
+      break;
+    case "paypal":
+      if (safe)
+        return {
+          url: `https://paypal.me/${encodeURIComponent(safe)}${amount ? `/${amount}USD` : ""}`,
+          copyText,
+        };
+      break;
+  }
+  return { url: method.payment_url ?? null, copyText };
+}
+
 // ----- Host payment methods -----
 export async function listMyPaymentMethods(): Promise<PaymentMethod[]> {
   const { data: u } = await supabase.auth.getUser();
