@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarRange, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -37,8 +37,9 @@ function HostDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const search = Route.useSearch();
-  const tab: "games" | "payments" = search.tab === "payments" ? "payments" : "games";
-  const setTab = (v: "games" | "payments") =>
+  const tab: "games" | "calendar" | "payments" =
+    search.tab === "payments" ? "payments" : search.tab === "calendar" ? "calendar" : "games";
+  const setTab = (v: "games" | "calendar" | "payments") =>
     nav({ to: "/host", search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }), replace: true });
 
   const [games, setGames] = useState<HostedGame[] | null>(null);
