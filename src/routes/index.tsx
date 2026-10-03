@@ -1,6 +1,15 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
-import { ArrowRight, CalendarClock, MapPin, Search, UserPlus } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  ClipboardList,
+  Dumbbell,
+  MapPin,
+  Search,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE } from "@/lib/sample-data";
@@ -327,6 +336,81 @@ function Landing() {
         >
           Post your availability <ArrowRight className="h-4 w-4" />
         </Link>
+      </section>
+
+      {/* Teams, coaches & trainers */}
+      <section id="for-teams" className="page-shell py-16" aria-labelledby="for-teams-heading">
+        <div className="mb-8">
+          <h2 id="for-teams-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Built for teams, coaches &amp; trainers
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Recruit players, run your roster and fill your sessions — all in one place.
+          </p>
+        </div>
+        <ul className="grid md:grid-cols-3 gap-4">
+          {[
+            {
+              icon: Users,
+              title: "For teams",
+              points: [
+                "Find local players who are looking for a team",
+                "Send roster invites and track who's in",
+                "Collect signed waivers — parents sign for minors",
+              ],
+              cta: { to: "/teams/create", label: "Create a team" },
+            },
+            {
+              icon: ClipboardList,
+              title: "For coaches",
+              points: [
+                "Browse available players by sport, skill and distance",
+                "Invite players with a personal note",
+                "Parents of young players can message you directly",
+              ],
+              cta: { to: "/players", label: "Find players" },
+            },
+            {
+              icon: Dumbbell,
+              title: "For trainers",
+              points: [
+                "Get discovered by athletes and parents nearby",
+                "Host clinics, sessions and open runs",
+                "Collect fees directly — no platform cut",
+              ],
+              cta: { to: "/trainers/create", label: "Become a trainer" },
+            },
+          ].map((c) => {
+            const Icon = c.icon;
+            return (
+              <li
+                key={c.title}
+                className="flex flex-col rounded-3xl border border-border bg-surface p-6"
+              >
+                <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-display text-xl font-semibold">{c.title}</h3>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {c.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span aria-hidden className="text-lime">
+                        ✓
+                      </span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to={c.cta.to}
+                  className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-lime hover:underline"
+                >
+                  {c.cta.label} <ArrowRight className="h-4 w-4" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {/* Trending */}
