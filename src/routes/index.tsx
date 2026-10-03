@@ -358,7 +358,7 @@ function Landing() {
                 "Send roster invites and track who's in",
                 "Collect signed waivers — parents sign for minors",
               ],
-              cta: { to: "/teams/create", label: "Create a team" },
+              cta: { to: "/teams/create" as const, label: "Create a team" },
             },
             {
               icon: ClipboardList,
@@ -368,7 +368,7 @@ function Landing() {
                 "Invite players with a personal note",
                 "Parents of young players can message you directly",
               ],
-              cta: { to: "/players", label: "Find players" },
+              cta: { to: "/players" as const, label: "Find players" },
             },
             {
               icon: Dumbbell,
@@ -378,7 +378,7 @@ function Landing() {
                 "Host clinics, sessions and open runs",
                 "Collect fees directly — no platform cut",
               ],
-              cta: { to: "/trainers/create", label: "Become a trainer" },
+              cta: { to: "/trainers/create" as const, label: "Become a trainer" },
             },
           ].map((c) => {
             const Icon = c.icon;
