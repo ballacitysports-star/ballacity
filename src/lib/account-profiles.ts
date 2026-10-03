@@ -54,7 +54,7 @@ export const myProfilesKey = (userId: string | null | undefined) => [
 ];
 
 async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
-  const [{ data: rows }, { data: me }] = await Promise.all([
+  const [{ data: rows }, { data: me }, { data: myTeams }, { data: myOrgs }] = await Promise.all([
     supabase
       .from("account_profiles")
       .select("id, kind, ref_id, created_at")
@@ -65,9 +65,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       .select(
         "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id, account_type",
       )
-
       .eq("id", userId)
       .maybeSingle(),
+    supabase.from("teams").select("id, kind").eq("owner_id", userId),
+    supabase.from("trainer_orgs").select("id").eq("owner_id", userId),
   ]);
 
   const list = (rows ?? []) as {
@@ -75,6 +76,26 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     kind: string;
     ref_id: string | null;
   }[];
+
+  // Self-heal: every team/coach/gym the user owns must appear as a profile,
+  // even if its account_profiles row was never written.
+  const owned: { kind: "team" | "trainer" | "gym"; ref: string }[] = [
+    ...((myTeams ?? []) as { id: string; kind: string }[]).map((t) => ({
+      kind: (t.kind === "coach" ? "trainer" : "team") as "team" | "trainer",
+      ref: t.id,
+    })),
+    ...((myOrgs ?? []) as { id: string }[]).map((o) => ({ kind: "gym" as const, ref: String(o.id) })),
+  ];
+  for (const o of owned) {
+    if (list.some((r) => r.ref_id === o.ref && r.kind === o.kind)) continue;
+    const { data: inserted } = await supabase
+      .from("account_profiles")
+      .insert({ user_id: userId, kind: o.kind, ref_id: o.ref } as never)
+      .select("id")
+      .maybeSingle();
+    const id = (inserted as { id?: string } | null)?.id ?? `local-${o.kind}-${o.ref}`;
+    list.push({ id, kind: o.kind, ref_id: o.ref });
+  }
 
   const teamRefs = list
     .filter((r) => (r.kind === "team" || r.kind === "trainer") && r.ref_id)
