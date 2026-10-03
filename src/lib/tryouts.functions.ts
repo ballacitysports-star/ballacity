@@ -152,3 +152,43 @@ export const listMyManagedTeams = createServerFn({ method: "GET" })
       .in("role", ["owner", "manager", "coach"]);
     return (data ?? []).map((r: any) => ({ id: r.team_id as string, name: r.teams?.name as string }));
   });
+
+/** Manager-only: team roster + tryout RSVPs with waiver status. */
+export const getTeamRosterOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", {
+      _team: data.teamId,
+      _user: context.userId,
+    });
+    if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [members, posts, rsvps, waiver] = await Promise.all([
+      supabaseAdmin.from("team_members").select("user_id,role,jersey_number,position").eq("team_id", data.teamId),
+      supabaseAdmin.from("team_posts").select("id,title,kind,event_date,spots_max,spots_taken").eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).order("event_date", { ascending: false }),
+      supabaseAdmin.from("tryout_rsvps").select("post_id,user_id,registered_by,status,created_at").eq("team_id", data.teamId),
+      supabaseAdmin.from("team_waivers").select("id,version").eq("team_id", data.teamId).eq("published", true).maybeSingle(),
+    ]);
+    const ids = [...new Set([...(members.data ?? []).map((m) => m.user_id), ...(rsvps.data ?? []).map((r) => r.user_id)])];
+    const [profiles, sigs] = await Promise.all([
+      ids.length ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids) : Promise.resolve({ data: [] as any[] }),
+      waiver.data && ids.length
+        ? supabaseAdmin.from("team_waiver_signatures").select("signer_user_id,signed_by,signed_at").eq("waiver_id", waiver.data.id).in("signer_user_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const name = new Map((profiles.data ?? []).map((p: any) => [p.id, { name: p.display_name ?? p.username ?? "Player", avatar: p.avatar_url as string | null }]));
+    const sig = new Map((sigs.data ?? []).map((s: any) => [s.signer_user_id, { signedAt: s.signed_at as string, byGuardian: !!s.signed_by }]));
+    const person = (id: string) => ({ userId: id, ...(name.get(id) ?? { name: "Player", avatar: null }), waiver: sig.get(id) ?? null });
+    return {
+      waiverVersion: waiver.data?.version ?? null,
+      members: (members.data ?? []).map((m) => ({ ...person(m.user_id), role: m.role, jersey: m.jersey_number, position: m.position })),
+      events: (posts.data ?? []).map((p) => ({
+        id: p.id, title: p.title, kind: p.kind, eventDate: p.event_date, spotsMax: p.spots_max, spotsTaken: p.spots_taken ?? 0,
+        rsvps: (rsvps.data ?? []).filter((r) => r.post_id === p.id).map((r) => ({
+          ...person(r.user_id), status: r.status, byGuardian: r.registered_by !== r.user_id, at: r.created_at,
+          isMember: (members.data ?? []).some((m) => m.user_id === r.user_id),
+        })),
+      })),
+    };
+  });
