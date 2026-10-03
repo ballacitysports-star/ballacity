@@ -20,6 +20,19 @@ export type ChildActivity = {
   invites: ChildInvite[];
   waivers: ChildWaiver[];
   updates: TeamUpdate[];
+  tryouts: ChildTryout[];
+};
+/** A child's tryout sign-up. Score is shared with guardians; coach notes never are. */
+export type ChildTryout = {
+  rsvpId: string;
+  postId: string;
+  teamId: string;
+  teamName: string;
+  title: string | null;
+  eventDate: string | null;
+  location: string | null;
+  attended: boolean | null;
+  score: number | null;
 };
 export type ChildInvite = {
   id: string;
@@ -113,6 +126,23 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
             .limit(30)
         : Promise.resolve({ data: [] as never[] }),
     ]);
+    const rs = await supabaseAdmin
+      .from("tryout_rsvps")
+      .select("id,post_id,team_id,user_id,status")
+      .in("user_id", ids)
+      .neq("status", "cancelled");
+    const rsvps = (rs.data ?? []) as { id: string; post_id: string; team_id: string; user_id: string }[];
+    const [tp, ev] = await Promise.all([
+      rsvps.length
+        ? supabaseAdmin.from("team_posts").select("id,title,event_date,location").in("id", [...new Set(rsvps.map((r) => r.post_id))])
+        : Promise.resolve({ data: [] as never[] }),
+      rsvps.length
+        ? supabaseAdmin.from("tryout_evaluations").select("rsvp_id,attended,score").in("rsvp_id", rsvps.map((r) => r.id))
+        : Promise.resolve({ data: [] as never[] }),
+    ]);
+    for (const r of rsvps) if (!teamIds.includes(r.team_id)) teamIds.push(r.team_id);
+    const postById = new Map(((tp.data ?? []) as { id: string; title: string | null; event_date: string | null; location: string | null }[]).map((x) => [x.id, x]));
+    const evalById = new Map(((ev.data ?? []) as { rsvp_id: string; attended: boolean | null; score: number | null }[]).map((x) => [x.rsvp_id, x]));
     const gameIds = [
       ...new Set([...(gp.data ?? []).map((r) => r.game_id), ...(jr.data ?? []).map((r) => r.game_id)]),
     ];
@@ -219,6 +249,19 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
             eventDate: p.event_date,
             createdAt: p.created_at,
           })),
+        tryouts: rsvps
+          .filter((r) => r.user_id === k.child_user_id && postById.has(r.post_id))
+          .map((r) => {
+            const p = postById.get(r.post_id)!;
+            const e = evalById.get(r.id);
+            return {
+              rsvpId: r.id, postId: r.post_id, teamId: r.team_id,
+              teamName: teamName.get(r.team_id) ?? "Team",
+              title: p.title, eventDate: p.event_date, location: p.location,
+              attended: e?.attended ?? null, score: e?.score ?? null,
+            };
+          })
+          .sort((a, b) => (a.eventDate ?? "").localeCompare(b.eventDate ?? "")),
       };
     });
   });
