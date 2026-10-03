@@ -12,8 +12,10 @@ import {
   ShieldCheck,
   ExternalLink,
   UserCheck,
+  BellRing,
 } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
+import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -63,9 +65,9 @@ function PaymentsHub() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const search = Route.useSearch();
-  const tab: "methods" | "verify" | "requests" =
-    search.tab === "verify" || search.tab === "requests" ? search.tab : "methods";
-  const setTab = (v: "methods" | "verify" | "requests") =>
+  const tab: "methods" | "verify" | "requests" | "unpaid" =
+    search.tab === "verify" || search.tab === "requests" || search.tab === "unpaid" ? search.tab : "methods";
+  const setTab = (v: "methods" | "verify" | "requests" | "unpaid") =>
     nav({
       to: "/payments",
       search: (p: any) => ({ ...p, tab: v === "methods" ? "" : v }),
@@ -118,12 +120,21 @@ function PaymentsHub() {
         >
           Requests
         </TabBtn>
+        <TabBtn
+          active={tab === "unpaid"}
+          onClick={() => setTab("unpaid")}
+          icon={<BellRing className="h-4 w-4" />}
+        >
+          Unpaid
+        </TabBtn>
       </div>
 
       {tab === "methods" ? (
         <MethodsPanel />
       ) : tab === "verify" ? (
         <VerifyPanel />
+      ) : tab === "unpaid" ? (
+        <UnpaidPlayersPanel />
       ) : (
         <RequestsPanel />
       )}
