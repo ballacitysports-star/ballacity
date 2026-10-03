@@ -354,6 +354,7 @@ function Landing() {
               icon: Users,
               title: "For teams",
               points: [
+                "Post tryouts, camps and open runs",
                 "Find local players who are looking for a team",
                 "Send roster invites and track who's in",
                 "Collect signed waivers — parents sign for minors",
@@ -364,6 +365,7 @@ function Landing() {
               icon: ClipboardList,
               title: "For coaches",
               points: [
+                "Announce open tryouts to athletes nearby",
                 "Browse available players by sport, skill and distance",
                 "Invite players with a personal note",
                 "Parents of young players can message you directly",
@@ -375,7 +377,7 @@ function Landing() {
               title: "For trainers",
               points: [
                 "Get discovered by athletes and parents nearby",
-                "Host clinics, sessions and open runs",
+                "Host private sessions, group clinics and skill workouts",
                 "Collect fees directly — no platform cut",
               ],
               cta: { to: "/trainers/create" as const, label: "Become a trainer" },
