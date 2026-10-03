@@ -418,7 +418,7 @@ function ContactGuardianButton({ childId, childName }: { childId: string; childN
       const { getOrCreateDirectConversation, sendMessage } = await import("@/lib/messages");
       const convoId = await getOrCreateDirectConversation(guardianId as string);
       try {
-        await sendMessage?.(convoId, `Inquiry regarding ${childName}`);
+        await sendMessage(convoId, `Inquiry regarding ${childName}`);
       } catch {
         /* intro line is optional */
       }
