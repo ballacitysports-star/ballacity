@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { RosterTab } from "@/components/team/manage/RosterTab";
+import { DashboardTab } from "@/components/team/manage/DashboardTab";
 import { InviteTracker } from "@/components/team/manage/InviteTracker";
 import { InvitesTab } from "@/components/team/manage/InvitesTab";
 import { SettingsTab } from "@/components/team/manage/SettingsTab";
@@ -101,14 +102,18 @@ function ManageTeam() {
         </Link>
       </header>
 
-      <Tabs defaultValue="roster">
+      <Tabs defaultValue="dashboard">
         <TabsList className="h-auto flex-wrap">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="roster">Roster</TabsTrigger>
           <TabsTrigger value="rsvps">RSVPs &amp; waivers</TabsTrigger>
           <TabsTrigger value="invites">Invitations</TabsTrigger>
           <TabsTrigger value="waiver">Waiver</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+        <TabsContent value="dashboard" className="pt-4">
+          <DashboardTab teamId={teamId} teamName={teamName} />
+        </TabsContent>
         <TabsContent value="roster" className="pt-4">
           <RosterTab teamId={teamId} teamName={teamName} />
         </TabsContent>
