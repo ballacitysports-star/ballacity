@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
-import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
+import { ArrowRight, CalendarClock, MapPin, Search, UserPlus } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE } from "@/lib/sample-data";
@@ -31,6 +31,10 @@ const FAQS = [
   {
     q: "Can I host my own game?",
     a: "Yes. Set the sport, place, time and number of players, and your game appears for nearby players in about a minute.",
+  },
+  {
+    q: "How do teams and coaches find me?",
+    a: "Post your availability on the Players tab — your sport, skill level and when you're free. Teams and coaches browse available players and send invites straight to you.",
   },
   {
     q: "Is it safe for young players?",
@@ -129,8 +133,8 @@ function Landing() {
         <div className="page-shell flex items-center justify-between py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">
-              Features
+            <a href="#availability" className="hover:text-foreground">
+              Get found
             </a>
             <a href="#sports" className="hover:text-foreground">
               Sports
@@ -165,8 +169,8 @@ function Landing() {
               style={{ "--enter-delay": "120ms" } as CSSProperties}
               className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
             >
-              Join local pickup basketball, soccer, baseball, pickleball and more. Discover games,
-              teams, trainers and gyms in your area — or host your own run in about a minute.
+              Join local pickup basketball, soccer, baseball, pickleball and more — or host your
+              own run in about a minute.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
@@ -272,56 +276,57 @@ function Landing() {
         </ol>
       </section>
 
-      {/* Features */}
-      <section id="features" className="page-shell py-16">
-        <h2 className="font-display text-3xl md:text-4xl font-bold mb-10">
-          Built for players, not paperwork.
-        </h2>
-        <div className="grid md:grid-cols-3 gap-4">
+      {/* Availability */}
+      <section
+        id="availability"
+        className="page-shell py-16"
+        aria-labelledby="availability-heading"
+      >
+        <div className="mb-8">
+          <h2 id="availability-heading" className="font-display text-3xl md:text-4xl font-bold">
+            List your availability — let teams find you.
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Post when you're free to play, and teams and coaches can find you and invite you
+            directly.
+          </p>
+        </div>
+        <ol className="grid md:grid-cols-3 gap-4">
           {[
             {
-              icon: Zap,
-              title: "Join in 15 seconds",
-              body: "Tap a game, claim a spot. No back-and-forth in group chats.",
-              color: "lime",
+              icon: CalendarClock,
+              title: "Post your availability",
+              body: "List your sport, skill level and when you're free to play.",
             },
             {
-              icon: Users,
-              title: "Real community",
-              body: "Reliability scores and sportsmanship ratings keep games great.",
-              color: "coral",
+              icon: Search,
+              title: "Teams and coaches find you",
+              body: "They browse available players by sport, skill and distance.",
             },
             {
-              icon: Video,
-              title: "AI highlight reels",
-              body: "Upload raw footage. Get cinematic clips ready for Reels & TikTok.",
-              color: "lime",
+              icon: UserPlus,
+              title: "Invites come to you",
+              body: "Accept an invite and you're on the roster.",
             },
-            {
-              icon: MapPin,
-              title: "Map-first discovery",
-              body: "See every pickup game on a live map of your neighborhood.",
-              color: "coral",
-            },
-          ].map((f, i) => {
-            const Icon = f.icon;
+          ].map((s) => {
+            const Icon = s.icon;
             return (
-              <div
-                key={f.title}
-                style={{ "--enter-delay": `${i * 50}ms` } as CSSProperties}
-                className="enter-up rounded-3xl border border-border bg-surface p-6"
-              >
-                <div
-                  className={`inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 ${f.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"}`}
-                >
+              <li key={s.title} className="rounded-3xl border border-border bg-surface p-6">
+                <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display text-xl font-semibold">{f.title}</h3>
-                <p className="text-muted-foreground mt-1.5 text-sm">{f.body}</p>
-              </div>
+                <h3 className="font-display text-xl font-semibold">{s.title}</h3>
+                <p className="text-muted-foreground mt-1.5 text-sm">{s.body}</p>
+              </li>
             );
           })}
-        </div>
+        </ol>
+        <Link
+          to="/players"
+          className="mt-8 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+        >
+          Post your availability <ArrowRight className="h-4 w-4" />
+        </Link>
       </section>
 
       {/* Trending */}
