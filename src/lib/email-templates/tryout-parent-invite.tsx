@@ -10,28 +10,31 @@ interface Props {
   when?: string;
   location?: string;
   tryoutUrl?: string;
+  kind?: string;
   inviterName?: string;
 }
 
-const TryoutParentInviteEmail = ({ parentName, childName, teamName, title, when, location, tryoutUrl, inviterName }: Props) => {
+const TryoutParentInviteEmail = ({ parentName, childName, teamName, title, when, location, tryoutUrl, inviterName, kind }: Props) => {
   const team = teamName || "A team";
+  const camp = kind === "clinic";
+  const noun = camp ? "camp" : "tryout";
   return (
     <Html lang="en" dir="ltr">
       <Head />
-      <Preview>{`${team} invited ${childName || "your player"} to ${title || "a tryout"}`}</Preview>
+      <Preview>{`${team} invited ${childName || "your player"} to ${title || `a ${noun}`}`}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>{title || "Tryout invite"}</Heading>
+          <Heading style={h1}>{title || (camp ? "Camp invite" : "Tryout invite")}</Heading>
           <Text style={text}>
             {parentName ? `Hi ${parentName}, ` : "Hi, "}
-            {inviterName ? `${inviterName} from ` : ""}{team} invited {childName || "your player"} to try out on BallaCity.
+            {inviterName ? `${inviterName} from ` : ""}{team} invited {childName || "your player"} {camp ? "to join their camp on BallaCity." : "to try out on BallaCity."}
           </Text>
           {when ? <Text style={detail}><strong>When:</strong> {when}</Text> : null}
           {location ? <Text style={detail}><strong>Where:</strong> {location}</Text> : null}
           <Text style={text}>
-            Create a free BallaCity parent account, add your child, and apply from the tryout page.
+            Create a free BallaCity parent account, add your child, and apply from the {noun} page.
           </Text>
-          {tryoutUrl ? <Button style={button} href={tryoutUrl}>View tryout &amp; sign up</Button> : null}
+          {tryoutUrl ? <Button style={button} href={tryoutUrl}>View {noun} &amp; sign up</Button> : null}
           <Text style={footer}>You got this because a team manager entered your email. If it wasn't meant for you, you can ignore it.</Text>
         </Container>
       </Body>
@@ -41,7 +44,7 @@ const TryoutParentInviteEmail = ({ parentName, childName, teamName, title, when,
 
 export const template = {
   component: TryoutParentInviteEmail,
-  subject: (d: Record<string, any>) => `${d.teamName || "A team"} invited ${d.childName || "your player"} to ${d.title || "a tryout"}`,
+  subject: (d: Record<string, any>) => `${d.teamName || "A team"} invited ${d.childName || "your player"} to ${d.title || (d.kind === "clinic" ? "a camp" : "a tryout")}`,
   displayName: "Tryout invite (new parent)",
   previewData: {
     parentName: "Sam", childName: "Jordan", teamName: "Balacity", title: "BallaCity 14U Tryouts",

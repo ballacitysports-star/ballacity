@@ -16,7 +16,7 @@ const tryoutQuery = (postId: string) =>
 export const Route = createFileRoute("/tryouts/$postId")({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(tryoutQuery(params.postId)),
   head: ({ loaderData }) => {
-    const title = loaderData ? `${loaderData.title} — ${loaderData.teamName} tryout sign-up | BallaCity` : "Tryout sign-up | BallaCity";
+    const title = loaderData ? `${loaderData.title} — ${loaderData.teamName} ${loaderData.kind === "clinic" ? "camp" : "tryout"} sign-up | BallaCity` : "Tryout sign-up | BallaCity";
     const desc = loaderData
       ? `Apply for a spot at ${loaderData.teamName}'s ${loaderData.kind === "tryout" ? "tryout" : "camp"}. Parents can sign up their child and sign the team waiver in one step.`
       : "Sign up for a team tryout or camp on BallaCity.";
@@ -51,8 +51,8 @@ function TryoutPage() {
   if (!t)
     return (
       <div className="page-shell py-16 text-center">
-        <p className="font-semibold">This tryout is no longer available.</p>
-        <Link to="/" className="mt-3 inline-block text-sm underline">Browse other tryouts</Link>
+        <p className="font-semibold">This {t?.kind === "clinic" ? "camp" : "tryout"} is no longer available.</p>
+        <Link to="/" className="mt-3 inline-block text-sm underline">Browse other tryouts &amp; camps</Link>
       </div>
     );
 
