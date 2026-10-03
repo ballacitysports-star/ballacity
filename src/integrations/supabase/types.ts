@@ -3644,6 +3644,47 @@ export type Database = {
           },
         ]
       }
+      tryout_evaluations: {
+        Row: {
+          attended: boolean
+          notes: string | null
+          post_id: string
+          rsvp_id: string
+          score: number | null
+          team_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          attended?: boolean
+          notes?: string | null
+          post_id: string
+          rsvp_id: string
+          score?: number | null
+          team_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          attended?: boolean
+          notes?: string | null
+          post_id?: string
+          rsvp_id?: string
+          score?: number | null
+          team_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tryout_evaluations_rsvp_id_fkey"
+            columns: ["rsvp_id"]
+            isOneToOne: true
+            referencedRelation: "tryout_rsvps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tryout_rsvps: {
         Row: {
           created_at: string

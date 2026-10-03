@@ -141,13 +141,22 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="section-eyebrow text-muted-foreground">Upcoming tryouts &amp; camps</h2>
-          <Link
-            to="/teams/$teamId/events"
-            params={{ teamId }}
-            className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
-          >
-            Manage events
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              to="/teams/$teamId/tryouts"
+              params={{ teamId }}
+              className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
+            >
+              Run tryouts
+            </Link>
+            <Link
+              to="/teams/$teamId/events"
+              params={{ teamId }}
+              className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
+            >
+              Manage events
+            </Link>
+          </div>
         </div>
         {upcomingEvents.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
