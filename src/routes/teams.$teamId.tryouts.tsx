@@ -5,10 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, ShieldCheck, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/UserAvatar";
-import { getTeamRosterOverview, getTryoutResults, saveTryoutEvaluation } from "@/lib/tryouts.functions";
+import { getTeamRosterOverview, getTryoutResults, saveTryoutEvaluation, getTryoutSharing, setTryoutSharing } from "@/lib/tryouts.functions";
 
 export const Route = createFileRoute("/teams/$teamId/tryouts")({
   ssr: false,
@@ -119,6 +120,7 @@ function Results({ teamId, postId }: { teamId: string; postId: string }) {
           <Link to="/teams/$teamId/invite-parent" params={{ teamId }} className="inline-flex items-center rounded-md border border-border px-3 text-xs font-bold text-muted-foreground">Invite parent</Link>
         </div>
       </div>
+      <SharingControls teamId={teamId} postId={postId} />
       {rows.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No applicants yet.</p>
       ) : view === "checkin" ? (
@@ -186,5 +188,35 @@ function EvalRow({ row, teamId, postId }: { row: Row; teamId: string; postId: st
         onBlur={() => notes !== row.notes && persist({ notes })}
       />
     </li>
+  );
+}
+
+function SharingControls({ teamId, postId }: { teamId: string; postId: string }) {
+  const getFn = useServerFn(getTryoutSharing);
+  const setFn = useServerFn(setTryoutSharing);
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["tryout-sharing", postId], queryFn: () => getFn({ data: { teamId, postId } }) });
+  const update = async (patch: { shareScores?: boolean; shareNotes?: boolean }) => {
+    try {
+      await setFn({ data: { teamId, postId, ...patch } });
+      qc.setQueryData(["tryout-sharing", postId], { ...q.data, ...patch });
+      toast.success("Sharing updated");
+    } catch {
+      toast.error("Couldn't update sharing.");
+    }
+  };
+  if (!q.data) return null;
+  return (
+    <div className="mb-3 space-y-2 rounded-2xl border border-border bg-card p-3 text-sm">
+      <label className="flex items-center justify-between gap-3">
+        <span>Share scores with players &amp; parents</span>
+        <Switch checked={q.data.shareScores} onCheckedChange={(v) => update({ shareScores: v })} aria-label="Share scores with players and parents" />
+      </label>
+      <label className="flex items-center justify-between gap-3">
+        <span>Share coach notes with players &amp; parents</span>
+        <Switch checked={q.data.shareNotes} onCheckedChange={(v) => update({ shareNotes: v })} aria-label="Share coach notes with players and parents" />
+      </label>
+      <p className="text-xs text-muted-foreground">Each player and their parent see only their own result. Rankings and other applicants stay private.</p>
+    </div>
   );
 }

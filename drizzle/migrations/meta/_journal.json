@@ -120,6 +120,13 @@
       "when": 1791058782634,
       "tag": "0016_team_roster_details",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791060201287,
+      "tag": "0017_tryout_share_settings",
+      "breakpoints": true
     }
   ]
 }

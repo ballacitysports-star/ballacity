@@ -3039,6 +3039,8 @@ export type Database = {
           pinned: boolean
           place_id: string | null
           price: number | null
+          share_notes: boolean
+          share_scores: boolean
           spots_max: number | null
           spots_taken: number
           team_id: string
@@ -3060,6 +3062,8 @@ export type Database = {
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          share_notes?: boolean
+          share_scores?: boolean
           spots_max?: number | null
           spots_taken?: number
           team_id: string
@@ -3081,6 +3085,8 @@ export type Database = {
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          share_notes?: boolean
+          share_scores?: boolean
           spots_max?: number | null
           spots_taken?: number
           team_id?: string
