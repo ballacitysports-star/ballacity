@@ -177,6 +177,25 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                       {waived}/{going.length} waivers signed
                     </p>
                   )}
+                  {going.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {going.map((r) => (
+                        <li key={r.userId} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex items-center gap-2">
+                            <UserAvatar src={r.avatar} name={r.name} size="xs" />
+                            <span className="font-medium">{r.name}</span>
+                            {r.byGuardian && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-lime/15 px-1.5 py-0.5 text-[10px] font-semibold text-lime">
+                                <ShieldCheck className="h-3 w-3" /> Parent applied
+                              </span>
+                            )}
+                            {!r.isMember && <span className="text-[10px] text-muted-foreground">new</span>}
+                          </span>
+                          <span className="text-muted-foreground">{new Date(r.at).toLocaleDateString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}
