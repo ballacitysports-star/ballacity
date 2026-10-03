@@ -91,7 +91,7 @@ function GuardianDashboard() {
         <span className="section-eyebrow">Guardian Dashboard</span>
       </div>
       <h1 className="mt-2 page-title">Your kids' activity</h1>
-      <p className="mt-2 page-subtitle">Teams and games for the children linked to your account.</p>
+      <p className="mt-2 page-subtitle">Invites, waivers, team updates and games for the children linked to your account.</p>
       <Link to="/parent" className="mt-2 inline-block text-xs font-semibold text-primary underline">
         Settings, approvals and safety → Parent Center
       </Link>
