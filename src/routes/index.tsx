@@ -199,39 +199,6 @@ function Landing() {
               </Link>
             </div>
           </div>
-
-          <div
-            style={{ "--enter-delay": "100ms" } as CSSProperties}
-            className="enter-pop relative mx-auto w-[300px] md:w-[340px]"
-          >
-            {/* Phone frame */}
-            <div className="relative rounded-[2.5rem] border-[10px] border-surface-2 bg-background shadow-2xl glow-coral overflow-hidden">
-              <img
-                src={HERO_IMAGE}
-                alt="ballaCity app showing a local pickup basketball game with open spots"
-                className="h-[560px] w-full object-cover"
-              />
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-semibold">
-                  🏀 Basketball
-                </span>
-                <span className="rounded-full bg-coral-gradient px-2.5 py-1 text-[10px] font-bold text-white">
-                  2 spots left
-                </span>
-              </div>
-              <div className="absolute bottom-5 left-4 right-4 space-y-2">
-                <h3 className="font-display text-xl font-bold leading-tight">
-                  Friday Night Run · 5v5
-                </h3>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 text-coral" /> Tompkins Square · 0.8 mi
-                </div>
-                <button className="w-full rounded-2xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
-                  Join game
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
