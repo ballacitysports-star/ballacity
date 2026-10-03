@@ -182,7 +182,7 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                       {going.map((r) => (
                         <li key={r.userId} className="flex items-center justify-between gap-2 text-xs">
                           <span className="flex items-center gap-2">
-                            <UserAvatar src={r.avatar} name={r.name} size="xs" />
+                            <UserAvatar avatarUrl={r.avatar} name={r.name} size="xs" />
                             <span className="font-medium">{r.name}</span>
                             {r.byGuardian && (
                               <span className="inline-flex items-center gap-0.5 rounded-full bg-lime/15 px-1.5 py-0.5 text-[10px] font-semibold text-lime">
