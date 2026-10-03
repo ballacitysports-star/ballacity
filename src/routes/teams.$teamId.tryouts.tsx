@@ -15,9 +15,9 @@ export const Route = createFileRoute("/teams/$teamId/tryouts")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Tryout schedule & results | BallaCity" },
-      { name: "description", content: "Run your team's tryouts: track attendance, score and rank applicants." },
-      { property: "og:title", content: "Tryout schedule & results | BallaCity" },
+      { title: "Tryout & camp check-in | BallaCity" },
+      { name: "description", content: "Run your team's tryouts and camps: track attendance, score and rank applicants." },
+      { property: "og:title", content: "Tryout & camp check-in | BallaCity" },
       { property: "og:description", content: "Track tryout attendance and rank applicants." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -32,16 +32,17 @@ function TryoutResultsPage() {
   const rosterFn = useServerFn(getTeamRosterOverview);
   const roster = useQuery({ queryKey: ["team-roster-overview", teamId], queryFn: () => rosterFn({ data: { teamId } }) });
   const [postId, setPostId] = useState<string | null>(null);
+  const [kind, setKind] = useState<"tryout" | "clinic">("tryout");
 
   const events = (roster.data?.events ?? [])
-    .filter((e) => e.eventDate)
+    .filter((e) => e.eventDate && e.kind === kind)
     .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime());
   useEffect(() => {
-    if (!postId && events.length) {
+    if ((!postId || !events.some((e) => e.id === postId)) && events.length) {
       const next = events.find((e) => new Date(e.eventDate!).getTime() >= Date.now() - 864e5) ?? events[events.length - 1];
       setPostId(next.id);
     }
-  }, [events.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [events.length, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main className="page-shell max-w-3xl py-6">
@@ -49,10 +50,24 @@ function TryoutResultsPage() {
         <ArrowLeft className="h-4 w-4" /> Manage team
       </Link>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-display text-2xl font-bold">Tryout schedule &amp; results</h1>
+        <h1 className="font-display text-2xl font-bold">{kind === "clinic" ? "Camp check-in & scoring" : "Tryout schedule & results"}</h1>
         <Link to="/teams/$teamId/season" params={{ teamId }} className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
           Season
         </Link>
+      </div>
+
+      <div className="mt-4 flex gap-2" role="tablist">
+        {(["tryout", "clinic"] as const).map((k) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={kind === k}
+            onClick={() => setKind(k)}
+            className={`rounded-full px-3 py-1 text-xs font-bold ${kind === k ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+          >
+            {k === "tryout" ? "Tryouts" : "Camps"}
+          </button>
+        ))}
       </div>
 
       {roster.isLoading ? (
@@ -61,7 +76,7 @@ function TryoutResultsPage() {
         <p className="mt-6 text-sm text-coral">Only owners, managers and coaches can view this page.</p>
       ) : events.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No tryouts yet. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post one</Link>.
+          No {kind === "clinic" ? "camps" : "tryouts"} yet. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post one</Link>.
         </p>
       ) : (
         <>
