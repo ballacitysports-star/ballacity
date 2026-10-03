@@ -188,13 +188,19 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
     return {
       waiverVersion: waiver.data?.version ?? null,
       members: (members.data ?? []).map((m) => ({ ...person(m.user_id), role: m.role, jersey: m.jersey_number, position: m.position })),
-      events: (posts.data ?? []).map((p) => ({
-        id: p.id, title: p.title, kind: p.kind, eventDate: p.event_date, spotsMax: p.spots_max, spotsTaken: p.spots_taken ?? 0,
-        rsvps: (rsvps.data ?? []).filter((r) => r.post_id === p.id).map((r) => ({
-          ...person(r.user_id), status: r.status, byGuardian: r.registered_by !== r.user_id, at: r.created_at,
-          isMember: (members.data ?? []).some((m) => m.user_id === r.user_id),
-        })),
-      })),
+      events: (posts.data ?? []).map((p) => {
+        const eventRsvps = (rsvps.data ?? []).filter((r) => r.post_id === p.id);
+        const applied = eventRsvps.filter((r) => r.status === "registered").length;
+        const attended = attendedByPost.get(p.id) ?? 0;
+        return {
+          id: p.id, title: p.title, kind: p.kind, eventDate: p.event_date, spotsMax: p.spots_max, spotsTaken: p.spots_taken ?? 0,
+          applied, attended, turnoutPct: applied > 0 ? Math.round((attended / applied) * 100) : null,
+          rsvps: eventRsvps.map((r) => ({
+            ...person(r.user_id), status: r.status, byGuardian: r.registered_by !== r.user_id, at: r.created_at,
+            isMember: (members.data ?? []).some((m) => m.user_id === r.user_id),
+          })),
+        };
+      }),
     };
   });
 
