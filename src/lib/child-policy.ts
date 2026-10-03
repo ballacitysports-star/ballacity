@@ -737,6 +737,8 @@ export type ChildControls = {
    * curfew for this minor. Off by default — the curfew is the safe state.
    */
   notificationCurfewLifted: boolean;
+  /** Guardian-authorised public player card. Off by default. */
+  publicProfile: boolean;
 };
 
 export const DEFAULT_CHILD_CONTROLS: ChildControls = {
@@ -748,6 +750,7 @@ export const DEFAULT_CHILD_CONTROLS: ChildControls = {
   gameParticipation: true,
   notifications: true,
   notificationCurfewLifted: false,
+  publicProfile: false,
 };
 
 export function parseChildControls(row: unknown): ChildControls {
@@ -768,6 +771,7 @@ export function parseChildControls(row: unknown): ChildControls {
     gameParticipation: bool(r["game_participation"], d.gameParticipation),
     notifications: bool(r["notifications"], d.notifications),
     notificationCurfewLifted: bool(r["notification_curfew_lifted"], d.notificationCurfewLifted),
+    publicProfile: bool(r["public_profile"], d.publicProfile),
   };
 }
 

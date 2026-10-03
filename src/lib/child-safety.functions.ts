@@ -526,6 +526,7 @@ export const updateChildControls = createServerFn({ method: "POST" })
           game_participation: z.boolean().optional(),
           notifications: z.boolean().optional(),
           notification_curfew_lifted: z.boolean().optional(),
+          public_profile: z.boolean().optional(),
         }),
       })
       .parse(d),
