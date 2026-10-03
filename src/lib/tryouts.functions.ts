@@ -485,6 +485,7 @@ export const getRosterBoard = createServerFn({ method: "GET" })
       .filter((t: any) => t.event_date && new Date(t.event_date).getTime() >= Date.now())
       .sort((a: any, b: any) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())[0] ?? null;
     return {
+      upcomingTryout: upcomingTryout ? { id: (upcomingTryout as any).id as string, title: (upcomingTryout as any).title as string } : null,
       members: (members.data ?? []).map((m) => ({
         ...person(m.user_id), role: m.role as string, jersey: m.jersey_number, position: m.position ?? "", birthYear: by.get(m.user_id) ?? null,
       })),
