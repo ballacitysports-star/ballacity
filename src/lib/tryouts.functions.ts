@@ -458,7 +458,7 @@ export const getRosterBoard = createServerFn({ method: "GET" })
       context.supabase.from("team_roster_details").select("user_id,birth_year").eq("team_id", data.teamId),
       supabaseAdmin.from("tryout_rsvps").select("id,user_id,post_id").eq("team_id", data.teamId).eq("status", "registered"),
       context.supabase.from("tryout_evaluations").select("rsvp_id,attended,score").eq("team_id", data.teamId),
-      supabaseAdmin.from("team_posts").select("id,title").eq("team_id", data.teamId).eq("kind", "tryout"),
+      supabaseAdmin.from("team_posts").select("id,title,event_date,location").eq("team_id", data.teamId).eq("kind", "tryout"),
     ]);
     const postTitle = new Map((posts.data ?? []).map((p) => [p.id, p.title]));
     const ev = new Map((evals.data ?? []).map((e: any) => [e.rsvp_id, e]));
@@ -481,6 +481,9 @@ export const getRosterBoard = createServerFn({ method: "GET" })
       return { userId: id, name: p?.display_name ?? p?.username ?? "Player", avatar: (p?.avatar_url ?? null) as string | null, tryout: best.get(id) ?? null };
     };
     const memberSet = new Set(memberIds);
+    const upcomingTryout = (posts.data ?? [])
+      .filter((t: any) => t.event_date && new Date(t.event_date).getTime() >= Date.now())
+      .sort((a: any, b: any) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())[0] ?? null;
     return {
       members: (members.data ?? []).map((m) => ({
         ...person(m.user_id), role: m.role as string, jersey: m.jersey_number, position: m.position ?? "", birthYear: by.get(m.user_id) ?? null,
