@@ -15,10 +15,10 @@ export const Route = createFileRoute("/teams/$teamId/invite-parent")({
   }),
   head: () => ({
     meta: [
-      { title: "Invite a parent to a tryout | BallaCity" },
-      { name: "description", content: "Email a tryout invite to a parent who isn't on BallaCity yet." },
-      { property: "og:title", content: "Invite a parent to a tryout | BallaCity" },
-      { property: "og:description", content: "Send parents a link to your team's tryout sign-up page." },
+      { title: "Invite a parent to a tryout or camp | BallaCity" },
+      { name: "description", content: "Email a tryout or camp invite to a parent who isn't on BallaCity yet." },
+      { property: "og:title", content: "Invite a parent to a tryout or camp | BallaCity" },
+      { property: "og:description", content: "Send parents a link to your team's tryout or camp sign-up page." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -46,7 +46,7 @@ function InviteParentPage() {
 
   const onSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postId) return toast.error("Pick a tryout.");
+    if (!postId) return toast.error("Pick a tryout or camp.");
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return toast.error("Enter a valid email.");
     setBusy(true);
     const r = await send({ data: { teamId, postId, email: email.trim(), parentName: parentName || undefined, childName: childName || undefined } })
@@ -54,7 +54,7 @@ function InviteParentPage() {
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
     if (r.sent) toast.success(`Invite sent to ${email.trim()}`);
-    else toast.info("This parent was already invited to this tryout.");
+    else toast.info("This parent was already invited to this event.");
     setSentTo((s) => [email.trim(), ...s]);
     setEmail(""); setParentName(""); setChildName("");
   };
@@ -66,7 +66,7 @@ function InviteParentPage() {
       </Link>
       <h1 className="mt-2 font-display text-2xl font-bold">Invite a parent</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Email a parent who isn't on BallaCity yet. They get the tryout details and a link to sign up and apply for their child.
+        Email a parent who isn't on BallaCity yet. They get the event details and a link to sign up and apply for their child.
       </p>
 
       {roster.isLoading ? (
@@ -75,16 +75,16 @@ function InviteParentPage() {
         <p className="mt-6 text-sm text-coral">Only owners, managers and coaches can send invites.</p>
       ) : events.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No upcoming tryouts. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post one</Link> first.
+          No upcoming tryouts or camps. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post one</Link> first.
         </p>
       ) : (
         <form onSubmit={onSend} className="mt-6 space-y-3 rounded-2xl border border-border bg-surface p-4">
           <label className="block text-sm font-semibold">
-            Tryout
+            Tryout or camp
             <select value={postId} onChange={(e) => setPostId(e.target.value)} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
-                  {ev.title} — {new Date(ev.eventDate!).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {ev.kind === "clinic" ? "Camp" : "Tryout"}: {ev.title} — {new Date(ev.eventDate!).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 </option>
               ))}
             </select>
@@ -106,7 +106,7 @@ function InviteParentPage() {
           <Button type="submit" disabled={busy} className="w-full">
             <Mail className="mr-2 h-4 w-4" /> {busy ? "Sending…" : "Send invite"}
           </Button>
-          <p className="text-xs text-muted-foreground">Each parent gets one email per tryout, even if you send again.</p>
+          <p className="text-xs text-muted-foreground">Each parent gets one email per event, even if you send again.</p>
         </form>
       )}
 

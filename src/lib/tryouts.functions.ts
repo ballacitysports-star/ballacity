@@ -370,7 +370,7 @@ export const emailTryoutApplicants = createServerFn({ method: "POST" })
       try {
         const res = await sendTemplateEmail("tryout-invite", email, {
           templateData: {
-            playerName: names.get(r.user_id), teamName: p.teams?.name, title: p.title, when, location, mapsUrl,
+            playerName: names.get(r.user_id), teamName: p.teams?.name, title: p.title, kind: (p as any).kind, when, location, mapsUrl,
             tryoutUrl: `https://ballacity.com/tryouts/${p.id}`, byGuardian: recipientId !== r.user_id,
           },
           idempotencyKey: `tryout-invite-${r.id}`,
@@ -531,7 +531,7 @@ export const inviteParentToTryout = createServerFn({ method: "POST" })
     if (!isManager) return { ok: false as const, error: "Only owners, managers and coaches can send invites." };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: post } = await supabaseAdmin
-      .from("team_posts").select("id,title,event_date,location,teams!inner(name)")
+      .from("team_posts").select("id,kind,title,event_date,location,teams!inner(name)")
       .eq("id", data.postId).eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).maybeSingle();
     if (!post) return { ok: false as const, error: "Tryout not found." };
     const p: any = post;
