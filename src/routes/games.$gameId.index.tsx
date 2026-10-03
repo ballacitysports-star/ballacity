@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
 import { Navigation } from "lucide-react";
 import { OpenInMaps } from "@/components/OpenInMaps";
+import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -2394,6 +2395,21 @@ function GameDetail() {
         <div
           className={`page-shell mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
         >
+          {!game.cancelledAt &&
+            game.status !== "cancelled" &&
+            !game.completedAt &&
+            Math.abs(new Date(game.date).getTime() - Date.now()) < 24 * 60 * 60 * 1000 && (
+              <GameDayActionSheet
+                gameId={game.id}
+                gameTitle={game.title}
+                startsAt={game.date}
+                isPaid={isPaid}
+                hostId={user?.id ?? ""}
+                roster={liveRoster}
+                busyId={attendanceBusy}
+                onMarkAttendance={(id, v) => void handleAttendance(id, v)}
+              />
+            )}
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
