@@ -282,21 +282,25 @@ export const getTryoutResults = createServerFn({ method: "GET" })
       .eq("team_id", data.teamId).eq("post_id", data.postId).eq("status", "registered");
     const rows = rsvps ?? [];
     const ids = rows.map((r) => r.user_id);
-    const [profiles, evals, members] = await Promise.all([
+    const [profiles, evals, members, details] = await Promise.all([
       ids.length ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids) : Promise.resolve({ data: [] as any[] }),
       context.supabase.from("tryout_evaluations").select("rsvp_id,attended,score,notes").eq("post_id", data.postId),
-      ids.length ? supabaseAdmin.from("team_members").select("user_id").eq("team_id", data.teamId).in("user_id", ids) : Promise.resolve({ data: [] as any[] }),
+      ids.length ? supabaseAdmin.from("team_members").select("user_id,position").eq("team_id", data.teamId).in("user_id", ids) : Promise.resolve({ data: [] as any[] }),
+      ids.length ? context.supabase.from("team_roster_details").select("user_id,birth_year").eq("team_id", data.teamId).in("user_id", ids) : Promise.resolve({ data: [] as any[] }),
     ]);
     const prof = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
     const ev = new Map((evals.data ?? []).map((e: any) => [e.rsvp_id, e]));
-    const mem = new Set((members.data ?? []).map((m: any) => m.user_id));
+    const mem = new Map((members.data ?? []).map((m: any) => [m.user_id, m]));
+    const by = new Map((details.data ?? []).map((d: any) => [d.user_id, d.birth_year as number | null]));
     return rows.map((r) => {
       const p: any = prof.get(r.user_id);
       const e: any = ev.get(r.id);
+      const m: any = mem.get(r.user_id);
       return {
         rsvpId: r.id, userId: r.user_id, name: p?.display_name ?? p?.username ?? "Player", avatar: (p?.avatar_url ?? null) as string | null,
         byGuardian: r.registered_by !== r.user_id, isMember: mem.has(r.user_id), appliedAt: r.created_at,
         attended: !!e?.attended, score: (e?.score ?? null) as number | null, notes: (e?.notes ?? "") as string,
+        birthYear: (by.get(r.user_id) ?? null) as number | null, position: (m?.position ?? "") as string,
       };
     });
   });
