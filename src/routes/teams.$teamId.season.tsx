@@ -25,12 +25,17 @@ function SeasonPage() {
   const fn = useServerFn(getTeamRosterOverview);
   const roster = useQuery({ queryKey: ["team-roster-overview", teamId], queryFn: () => fn({ data: { teamId } }) });
 
+  const [filter, setFilter] = useState<"all" | "tryout" | "clinic">("all");
   const now = Date.now();
   const events = (roster.data?.events ?? [])
     .filter((e) => e.eventDate)
+    .filter((e) => filter === "all" || e.kind === filter)
     .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime());
   const upcoming = events.filter((e) => new Date(e.eventDate!).getTime() >= now - 864e5);
   const past = events.filter((e) => new Date(e.eventDate!).getTime() < now - 864e5).reverse();
+  const totApplied = past.reduce((s, e) => s + (e.applied ?? 0), 0);
+  const totAttended = past.reduce((s, e) => s + (e.attended ?? 0), 0);
+  const label = filter === "clinic" ? "camps" : filter === "tryout" ? "tryouts" : "tryouts or camps";
 
   return (
     <main className="page-shell max-w-3xl py-6">
@@ -44,8 +49,22 @@ function SeasonPage() {
           params={{ teamId }}
           className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
         >
-          <Plus className="h-3 w-3" /> Add event
+          <Plus className="h-3 w-3" /> {filter === "clinic" ? "Add camp" : "Add event"}
         </Link>
+      </div>
+
+      <div className="mt-4 flex gap-2" role="tablist">
+        {(["all", "tryout", "clinic"] as const).map((k) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={filter === k}
+            onClick={() => setFilter(k)}
+            className={`rounded-full px-3 py-1 text-xs font-bold ${filter === k ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+          >
+            {k === "all" ? "All" : k === "tryout" ? "Tryouts" : "Camps"}
+          </button>
+        ))}
       </div>
 
       {roster.isLoading ? (
@@ -54,10 +73,16 @@ function SeasonPage() {
         <p className="mt-6 text-sm text-coral">Only owners, managers and coaches can view this page.</p>
       ) : events.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No tryouts or camps yet. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post your first one</Link> to start planning the season.
+          No {label} yet. <Link to="/teams/$teamId/events" params={{ teamId }} className="underline">Post your first one</Link> to start planning the season.
         </p>
       ) : (
         <>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <Stat n={upcoming.length} l="Upcoming" />
+            <Stat n={upcoming.reduce((s, e) => s + (e.applied ?? 0), 0)} l="Signed up" />
+            <Stat n={totApplied ? `${Math.round((totAttended / totApplied) * 100)}%` : "—"} l="Past turnout" />
+          </div>
+
           <h2 className="section-eyebrow mt-6 mb-2 text-muted-foreground">Upcoming ({upcoming.length})</h2>
           {upcoming.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">Nothing scheduled — add a tryout or camp to plan ahead.</p>
@@ -87,12 +112,25 @@ function SeasonPage() {
 
 type Event = NonNullable<Awaited<ReturnType<typeof getTeamRosterOverview>>["events"]>[number];
 
+function Stat({ n, l }: { n: number | string; l: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-2">
+      <p className="font-display text-lg font-bold">{n}</p>
+      <p className="text-[11px] text-muted-foreground">{l}</p>
+    </div>
+  );
+}
+
 function SeasonRow({ teamId, event: e, past = false }: { teamId: string; event: Event; past?: boolean }) {
   const date = new Date(e.eventDate!);
   return (
     <li className={`rounded-2xl border border-border bg-surface p-3 ${past ? "opacity-70" : ""}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold">{e.title}</p>
+        <p className="text-sm font-semibold">
+          <span className="mr-2 rounded-full bg-lime/15 px-2 py-0.5 text-[11px] font-bold text-lime">{e.kind === "clinic" ? "Camp" : "Tryout"}</span>
+          {e.title}
+        </p>
+
         <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <CalendarDays className="h-3 w-3" />
           {date.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
