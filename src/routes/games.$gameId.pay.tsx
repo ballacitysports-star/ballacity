@@ -763,7 +763,7 @@ function PayPage() {
           game_id={game.id}
           game_title={game.title}
           fee={settings?.entry_fee ?? game.price}
-          host_id={settings?.host_id ?? game.host_id}
+          host_id={settings!.host_id}
           method={picked}
           extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
