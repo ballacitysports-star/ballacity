@@ -164,12 +164,17 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
     });
     if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [members, posts, rsvps, waiver] = await Promise.all([
+    const [members, posts, rsvps, waiver, evals] = await Promise.all([
       supabaseAdmin.from("team_members").select("user_id,role,jersey_number,position").eq("team_id", data.teamId),
       supabaseAdmin.from("team_posts").select("id,title,kind,event_date,spots_max,spots_taken").eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).order("event_date", { ascending: false }),
-      supabaseAdmin.from("tryout_rsvps").select("post_id,user_id,registered_by,status,created_at").eq("team_id", data.teamId),
+      supabaseAdmin.from("tryout_rsvps").select("id,post_id,user_id,registered_by,status,created_at").eq("team_id", data.teamId),
       supabaseAdmin.from("team_waivers").select("id,version").eq("team_id", data.teamId).eq("published", true).maybeSingle(),
+      context.supabase.from("tryout_evaluations").select("rsvp_id,post_id,attended").eq("team_id", data.teamId),
     ]);
+    const attendedByPost = new Map<string, number>();
+    for (const e of evals.data ?? []) {
+      if (e.attended) attendedByPost.set(e.post_id, (attendedByPost.get(e.post_id) ?? 0) + 1);
+    }
     const ids = [...new Set([...(members.data ?? []).map((m) => m.user_id), ...(rsvps.data ?? []).map((r) => r.user_id)])];
     const [profiles, sigs] = await Promise.all([
       ids.length ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids) : Promise.resolve({ data: [] as any[] }),
