@@ -10,6 +10,9 @@ import { getTeamRosterOverview, inviteParentToTryout } from "@/lib/tryouts.funct
 
 export const Route = createFileRoute("/teams/$teamId/invite-parent")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>): { postId?: string } => ({
+    postId: typeof s.postId === "string" ? s.postId : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Invite a parent to a tryout | BallaCity" },
@@ -32,7 +35,8 @@ function InviteParentPage() {
   const events = (roster.data?.events ?? [])
     .filter((e) => e.eventDate && new Date(e.eventDate).getTime() >= Date.now() - 864e5)
     .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime());
-  const [postId, setPostId] = useState("");
+  const { postId: initialPostId } = Route.useSearch();
+  const [postId, setPostId] = useState(initialPostId ?? "");
   const [email, setEmail] = useState("");
   const [parentName, setParentName] = useState("");
   const [childName, setChildName] = useState("");

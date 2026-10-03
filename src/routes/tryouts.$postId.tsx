@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarClock, MapPin, Users, ShieldCheck } from "lucide-react";
+import { CalendarClock, MapPin, Users, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { RsvpDialog } from "@/components/tryouts/TryoutsSection";
@@ -39,6 +40,11 @@ function TryoutPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [isManager, setIsManager] = useState(false);
+  useEffect(() => {
+    if (!user || !t) return setIsManager(false);
+    supabase.rpc("is_team_manager", { _team: t.teamId, _user: user.id }).then(({ data }) => setIsManager(!!data));
+  }, [user?.id, t?.teamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!t)
     return (
@@ -70,6 +76,15 @@ function TryoutPage() {
         {left != null && <p className="flex items-center gap-2"><Users className="h-4 w-4" />{left === 0 ? "Full" : `${left} of ${t.spotsMax} spots left`}</p>}
         <p>{t.price ? `Fee: $${t.price}` : "Free"}</p>
       </div>
+      {isManager && !passed && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline" className="rounded-full">
+            <Link to="/teams/$teamId/invite-parent" params={{ teamId: t.teamId }} search={{ postId: t.id }}>
+              <Mail className="mr-1 h-4 w-4" /> Invite parent
+            </Link>
+          </Button>
+        </div>
+      )}
       {t.body && <p className="mt-6 whitespace-pre-wrap">{t.body}</p>}
 
       <div className="mt-8 rounded-2xl border border-border bg-card p-5">
