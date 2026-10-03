@@ -368,3 +368,68 @@ export const emailTryoutApplicants = createServerFn({ method: "POST" })
     }
     return { sent, skipped, failed };
   });
+
+/** Manager-only: roster with birth year/position plus tryout ranking for every member and applicant. */
+export const getRosterBoard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [members, details, rsvps, evals, posts] = await Promise.all([
+      supabaseAdmin.from("team_members").select("user_id,role,jersey_number,position").eq("team_id", data.teamId),
+      context.supabase.from("team_roster_details").select("user_id,birth_year").eq("team_id", data.teamId),
+      supabaseAdmin.from("tryout_rsvps").select("id,user_id,post_id").eq("team_id", data.teamId).eq("status", "registered"),
+      context.supabase.from("tryout_evaluations").select("rsvp_id,attended,score").eq("team_id", data.teamId),
+      supabaseAdmin.from("team_posts").select("id,title").eq("team_id", data.teamId).eq("kind", "tryout"),
+    ]);
+    const postTitle = new Map((posts.data ?? []).map((p) => [p.id, p.title]));
+    const ev = new Map((evals.data ?? []).map((e: any) => [e.rsvp_id, e]));
+    const best = new Map<string, { score: number | null; attended: boolean; tryout: string }>();
+    for (const r of rsvps.data ?? []) {
+      const e: any = ev.get(r.id);
+      const cur = best.get(r.user_id);
+      const score = (e?.score ?? null) as number | null;
+      if (!cur || (score ?? -1) > (cur.score ?? -1)) best.set(r.user_id, { score, attended: !!e?.attended, tryout: postTitle.get(r.post_id) ?? "Tryout" });
+    }
+    const memberIds = (members.data ?? []).map((m) => m.user_id);
+    const ids = [...new Set([...memberIds, ...best.keys()])];
+    const { data: profs } = ids.length
+      ? await supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids)
+      : { data: [] as any[] };
+    const prof = new Map((profs ?? []).map((p: any) => [p.id, p]));
+    const by = new Map((details.data ?? []).map((d: any) => [d.user_id, d.birth_year as number | null]));
+    const person = (id: string) => {
+      const p: any = prof.get(id);
+      return { userId: id, name: p?.display_name ?? p?.username ?? "Player", avatar: (p?.avatar_url ?? null) as string | null, tryout: best.get(id) ?? null };
+    };
+    const memberSet = new Set(memberIds);
+    return {
+      members: (members.data ?? []).map((m) => ({
+        ...person(m.user_id), role: m.role as string, jersey: m.jersey_number, position: m.position ?? "", birthYear: by.get(m.user_id) ?? null,
+      })),
+      prospects: [...best.keys()].filter((id) => !memberSet.has(id)).map(person)
+        .sort((a, b) => (b.tryout?.score ?? -1) - (a.tryout?.score ?? -1)),
+    };
+  });
+
+export const saveRosterDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    teamId: z.string().min(1), userId: z.string().uuid(),
+    birthYear: z.number().int().min(1940).max(2030).nullable(), position: z.string().trim().max(40),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) return { ok: false as const, error: "Only team managers can edit the roster." };
+    const { error } = await context.supabase.from("team_roster_details").upsert({
+      team_id: data.teamId, user_id: data.userId, birth_year: data.birthYear, updated_by: context.userId, updated_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false as const, error: "Couldn't save birth year." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: e2 } = await supabaseAdmin.from("team_members").update({ position: data.position || null })
+      .eq("team_id", data.teamId).eq("user_id", data.userId);
+    if (e2) return { ok: false as const, error: "Couldn't save position." };
+    return { ok: true as const };
+  });
