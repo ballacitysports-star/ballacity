@@ -60,10 +60,17 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
             invited you as {ROLE_META[inv.role].label.toLowerCase()}
           </div>
           {inv.message && <p className="mt-1 text-xs text-muted-foreground">“{inv.message}”</p>}
+          {inv.needsGuardian && (
+            <p className="mt-2 text-xs font-semibold text-muted-foreground">
+              {inv.guardianApproved
+                ? "✓ Your guardian approved — you can accept now."
+                : "Waiting for your parent or guardian to approve in their Parent Center."}
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              disabled={respond.isPending}
+              disabled={respond.isPending || (inv.needsGuardian && !inv.guardianApproved)}
               onClick={() => void accept(inv.id, inv.teamId ?? "", inv.teamName ?? "the team")}
               className="flex-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
             >

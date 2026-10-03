@@ -78,6 +78,9 @@ export type TeamInvite = {
   status: "pending" | "accepted" | "declined" | "cancelled" | "expired";
   expiresAt: string;
   createdAt: string;
+  /** Invitee view only: whether a guardian must approve before accepting. */
+  needsGuardian?: boolean;
+  guardianApproved?: boolean;
   /** Present for roster/invitee views once the profile join resolves. */
   displayName?: string;
   username?: string | null;
@@ -251,7 +254,7 @@ export function useMyTeamInvites() {
       const { data, error } = await supabase
         .from("team_invites")
         .select(
-          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at",
+          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at, guardian_approved_at",
         )
         .eq("invitee_id", user!.id)
         .eq("status", "pending")
@@ -259,6 +262,13 @@ export function useMyTeamInvites() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as Record<string, any>[];
+      const { data: links } = await supabase
+        .from("guardian_links")
+        .select("id")
+        .eq("child_user_id", user!.id)
+        .eq("status", "active")
+        .limit(1);
+      const hasGuardian = (links ?? []).length > 0;
       const teamIds = [...new Set(rows.map((r) => String(r["team_id"])))];
       const names = new Map<string, string>();
       if (teamIds.length) {
@@ -278,6 +288,8 @@ export function useMyTeamInvites() {
         expiresAt: String(r["expires_at"]),
         createdAt: String(r["created_at"]),
         teamName: names.get(String(r["team_id"])) ?? "A team",
+        needsGuardian: hasGuardian,
+        guardianApproved: !!r["guardian_approved_at"],
       }));
     },
     enabled: !!user,
