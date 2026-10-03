@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarClock, Loader2, MapPin, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
+import { ArrowLeft, CalendarClock, CalendarDays, List, Loader2, MapPin, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,12 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { createTeamPost, deleteTeamPost, updateTeamPost } from "@/lib/team-posts.functions";
+import { getTeamRosterOverview } from "@/lib/tryouts.functions";
+import { TeamEventsCalendar, EventWaiverStatus } from "@/components/team/TeamEventsCalendar";
 
 export const Route = createFileRoute("/teams/$teamId/events")({
   head: () =>
     pageHead({
       title: "Tryouts & camps — ballaCity",
-      description: "Create and edit your team's tryout and camp announcements.",
+      description: "Manage team tryouts and camps with a calendar of events, RSVPs and signed waivers.",
       noindex: true,
     }),
   ssr: false,
@@ -52,6 +54,18 @@ function TeamEventsPage() {
   const del = useServerFn(deleteTeamPost);
   const [editing, setEditing] = useState<EventRow | "new" | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const overviewFn = useServerFn(getTeamRosterOverview);
+  const overview = useQuery({
+    queryKey: ["team-roster-overview", teamId],
+    queryFn: () => overviewFn({ data: { teamId } }),
+    enabled: perms.canInvite,
+    refetchInterval: 20_000,
+  });
+  const summaries = new Map((overview.data?.events ?? []).map((event) => {
+    const registered = event.rsvps.filter((rsvp) => rsvp.status === "registered");
+    return [event.id, { going: registered.length, signed: registered.filter((rsvp) => rsvp.waiver).length }];
+  }));
 
   const team = useQuery({
     queryKey: ["team-name", teamId],
@@ -103,13 +117,15 @@ function TeamEventsPage() {
       await del({ data: { id: e.id } });
       toast.success("Event deleted");
       qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: ["team-roster-overview", teamId] });
     } catch {
       toast.error("Couldn't delete the event.");
     }
   };
 
   const Card = ({ e }: { e: EventRow }) => {
-    const left = e.spots_max != null ? Math.max(e.spots_max - (e.spots_taken ?? 0), 0) : null;
+    const going = summaries.get(e.id)?.going ?? e.spots_taken ?? 0;
+    const left = e.spots_max != null ? Math.max(e.spots_max - going, 0) : null;
     return (
       <li className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
@@ -125,7 +141,8 @@ function TeamEventsPage() {
         <div className="mt-2 space-y-1 text-sm text-muted-foreground">
           <p className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />{e.event_date ? new Date(e.event_date).toLocaleString() : "Date TBA"}</p>
           {e.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{e.location}</p>}
-          <p className="flex items-center gap-2"><Users className="h-4 w-4" />{e.spots_taken ?? 0} going{e.spots_max ? ` · ${left} spots left` : ""} · {e.price ? `$${e.price}` : "Free"}</p>
+          <p className="flex items-center gap-2"><Users className="h-4 w-4" />{going} going{e.spots_max ? ` · ${left} spots left` : ""} · {e.price ? `$${e.price}` : "Free"}</p>
+          <EventWaiverStatus summary={summaries.get(e.id)} required={!!overview.data?.waiverVersion} loading={overview.isPending} error={overview.isError} />
         </div>
       </li>
     );
@@ -144,7 +161,13 @@ function TeamEventsPage() {
         <Button onClick={() => setEditing("new")}><Plus className="mr-1 h-4 w-4" /> New event</Button>
       </header>
 
-      <section>
+      <div className="flex items-center gap-1 border-b border-border pb-3" role="group" aria-label="Event view">
+        <Button size="sm" variant={view === "calendar" ? "default" : "ghost"} aria-pressed={view === "calendar"} onClick={() => setView("calendar")}><CalendarDays />Calendar</Button>
+        <Button size="sm" variant={view === "list" ? "default" : "ghost"} aria-pressed={view === "list"} onClick={() => setView("list")}><List />List</Button>
+      </div>
+      {events.isError ? <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-coral">Couldn't load events.<Button variant="outline" size="sm" onClick={() => events.refetch()}>Retry</Button></div> : view === "calendar" ? (
+        events.isPending ? <p className="text-sm text-muted-foreground">Loading events…</p> : <TeamEventsCalendar events={all} summaries={summaries} waiverRequired={!!overview.data?.waiverVersion} summaryLoading={overview.isPending} summaryError={overview.isError} renderEvent={(e) => <Card key={e.id} e={e} />} />
+      ) : <><section>
         <h2 className="mb-3 flex items-center gap-2 section-eyebrow text-muted-foreground">
           <span className="h-2 w-2 animate-pulse rounded-full bg-lime" /> Upcoming · {upcoming.length}
         </h2>
@@ -165,6 +188,8 @@ function TeamEventsPage() {
           {showPast && <ul className="mt-3 space-y-3 opacity-70">{past.map((e) => <Card key={e.id} e={e} />)}</ul>}
         </section>
       )}
+      </>}
+      {overview.isError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">Couldn't load RSVP and waiver details.<Button variant="outline" size="sm" onClick={() => overview.refetch()}>Retry details</Button></div>}
 
       {editing && (
         <EventDialog
@@ -174,6 +199,7 @@ function TeamEventsPage() {
           onSaved={() => {
             qc.invalidateQueries({ queryKey: key });
             qc.invalidateQueries({ queryKey: ["tryouts", "upcoming"] });
+            qc.invalidateQueries({ queryKey: ["team-roster-overview", teamId] });
           }}
         />
       )}
