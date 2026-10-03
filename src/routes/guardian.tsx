@@ -1,4 +1,5 @@
 import { ParentPortalSections } from "@/components/child/ParentPortalSections";
+import { ChildTryoutsSection } from "@/components/child/ChildTryoutsSection";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -166,6 +167,7 @@ function GuardianDashboard() {
             </div>
           </section>
 
+          <ChildTryoutsSection kids={shown} multi={multi} />
           <ParentPortalSections kids={shown} multi={multi} onSigned={() => q.refetch()} />
 
           <section className="mt-6">
