@@ -137,6 +137,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         }
         throw new Error(insErr.message);
       }
+      {
+        const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
+        await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
+      }
       return {
         ok: true,
         changed: true,
@@ -188,6 +192,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       };
     }
 
+    if (next === "verified") {
+      const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
+      await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
+    }
     return {
       ok: true,
       changed: true,

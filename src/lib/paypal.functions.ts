@@ -149,6 +149,11 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       reviewed_at: new Date().toISOString(),
     });
 
+    {
+      const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
+      await addPaidPlayerToRoster(order.game_id, order.player_id).catch(() => {});
+    }
+
     // Notify the host in-app, non-blocking.
     try {
       await supabaseAdmin.from("notifications").insert({
