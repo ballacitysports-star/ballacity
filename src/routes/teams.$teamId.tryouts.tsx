@@ -119,7 +119,9 @@ function Results({ teamId, postId }: { teamId: string; postId: string }) {
               <UserAvatar avatarUrl={r.avatar} name={r.name} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{r.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{r.attended ? "Attended" : "No-show"}{r.notes ? ` · ${r.notes}` : ""}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {[r.birthYear ? `Born ${r.birthYear}` : null, r.position || null, r.attended ? "Attended" : "No-show", r.notes || null].filter(Boolean).join(" · ")}
+                </p>
               </div>
               <span className="text-lg font-extrabold">{r.score ?? "—"}<span className="text-xs text-muted-foreground">/10</span></span>
             </li>
