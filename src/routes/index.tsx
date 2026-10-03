@@ -23,6 +23,7 @@ import { clearStartHint, isAccountType, routeForSetup, startSetupOf } from "@/li
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
+import { TryoutsSection } from "@/components/tryouts/TryoutsSection";
 
 const FAQS = [
   {
@@ -303,6 +304,8 @@ function Landing() {
           Post your availability <ArrowRight className="h-4 w-4" />
         </Link>
       </section>
+
+      <TryoutsSection />
 
       {/* Teams, coaches & trainers */}
       <section id="for-teams" className="page-shell py-16" aria-labelledby="for-teams-heading">

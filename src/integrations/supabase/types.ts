@@ -3644,6 +3644,61 @@ export type Database = {
           },
         ]
       }
+      tryout_rsvps: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          registered_by: string
+          status: string
+          team_id: string
+          user_id: string
+          waiver_signature_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          registered_by: string
+          status?: string
+          team_id: string
+          user_id: string
+          waiver_signature_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          registered_by?: string
+          status?: string
+          team_id?: string
+          user_id?: string
+          waiver_signature_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tryout_rsvps_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "team_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tryout_rsvps_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tryout_rsvps_waiver_signature_id_fkey"
+            columns: ["waiver_signature_id"]
+            isOneToOne: false
+            referencedRelation: "team_waiver_signatures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_blocks: {
         Row: {
           blocked_id: string
@@ -3842,6 +3897,10 @@ export type Database = {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
+      cancel_tryout_rsvp: {
+        Args: { _on_behalf_of?: string; _post_id: string }
+        Returns: undefined
+      }
       child_features_locked: { Args: { _user: string }; Returns: boolean }
       child_game_participation_allowed: {
         Args: { _user: string }
@@ -3983,6 +4042,16 @@ export type Database = {
           contact_name: string
           contact_phone: string
           relationship: string
+        }[]
+      }
+      get_tryout_waiver: {
+        Args: { _post_id: string }
+        Returns: {
+          content: string
+          id: string
+          team_id: string
+          title: string
+          version: string
         }[]
       }
       guardian_approve_join_request: {
@@ -4350,6 +4419,15 @@ export type Database = {
       revoke_parental_consent: {
         Args: { _child: string; _reason: string }
         Returns: undefined
+      }
+      rsvp_tryout: {
+        Args: {
+          _attested?: boolean
+          _on_behalf_of?: string
+          _post_id: string
+          _waiver_id?: string
+        }
+        Returns: string
       }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
