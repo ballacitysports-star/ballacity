@@ -762,10 +762,10 @@ function PayPage() {
         <PaymentInstructionsAndProof
           game_id={game.id}
           game_title={game.title}
-          fee={settings.entry_fee ?? game.price}
-          host_id={settings.host_id}
+          fee={settings?.entry_fee ?? game.price}
+          host_id={settings?.host_id ?? game.host_id}
           method={picked}
-          extraInstructions={settings.payment_instructions}
+          extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             // Do NOT join the roster yet — player is only added after the
