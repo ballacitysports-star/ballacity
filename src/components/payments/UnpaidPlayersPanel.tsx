@@ -134,7 +134,7 @@ export function UnpaidPlayersPanel() {
             <Link to="/games/$gameId" params={{ gameId: r.gameId }} className="min-w-0">
               <div className="truncate text-sm font-semibold">{r.title}</div>
               <div className="text-xs text-muted-foreground">
-                {formatGameWhen(r.date)} · ${r.price} each
+                {formatGameWhen({ date: r.date })} · ${r.price} each
               </div>
             </Link>
             <button
