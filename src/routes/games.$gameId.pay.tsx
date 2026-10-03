@@ -706,7 +706,7 @@ function PayPage() {
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
-              const fee = settings.entry_fee ?? game.price;
+              const fee = settings?.entry_fee ?? game.price;
               const link = resolvePaymentDeepLink(m, fee, game.title);
               return (
                 <div
