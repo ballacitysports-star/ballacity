@@ -144,6 +144,13 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
           <h2 className="section-eyebrow text-muted-foreground">Upcoming tryouts &amp; camps</h2>
           <div className="flex gap-2">
             <Link
+              to="/teams/$teamId/season"
+              params={{ teamId }}
+              className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
+            >
+              Season
+            </Link>
+            <Link
               to="/teams/$teamId/roster"
               params={{ teamId }}
               className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"

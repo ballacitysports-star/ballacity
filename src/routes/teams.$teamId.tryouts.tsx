@@ -47,7 +47,12 @@ function TryoutResultsPage() {
       <Link to="/teams/$teamId/manage" params={{ teamId }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4" /> Manage team
       </Link>
-      <h1 className="mt-2 font-display text-2xl font-bold">Tryout schedule &amp; results</h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-display text-2xl font-bold">Tryout schedule &amp; results</h1>
+        <Link to="/teams/$teamId/season" params={{ teamId }} className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
+          Season
+        </Link>
+      </div>
 
       {roster.isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
