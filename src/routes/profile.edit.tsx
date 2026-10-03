@@ -546,21 +546,38 @@ function EditProfile() {
       </Section>
 
       <Section title="Payments">
-        <Link
-          to="/payments"
-          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
-            <CreditCard className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm">Payments</div>
-            <div className="text-xs text-muted-foreground">
-              Manage payout methods & verify player payments
+        <div className="space-y-2">
+          <Link
+            to="/host"
+            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+              <CreditCard className="h-5 w-5" />
             </div>
-          </div>
-          <div className="text-lime text-xs font-bold">→</div>
-        </Link>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-sm">Host dashboard</div>
+              <div className="text-xs text-muted-foreground">
+                Your games, unpaid players & payment reminders
+              </div>
+            </div>
+            <div className="text-lime text-xs font-bold">→</div>
+          </Link>
+          <Link
+            to="/payments"
+            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+              <CreditCard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-sm">Payments</div>
+              <div className="text-xs text-muted-foreground">
+                Manage payout methods & verify player payments
+              </div>
+            </div>
+            <div className="text-lime text-xs font-bold">→</div>
+          </Link>
+        </div>
       </Section>
 
 
