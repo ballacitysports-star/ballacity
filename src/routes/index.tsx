@@ -3,7 +3,7 @@ import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/
 import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
-import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
+import { HERO_IMAGE } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
@@ -13,6 +13,30 @@ import { readLastVisited } from "@/lib/last-visited";
 import { clearStartHint, isAccountType, routeForSetup, startSetupOf } from "@/lib/account-type";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
+import { SPORT_GUIDES } from "@/lib/sports-guide";
+
+const FAQS = [
+  {
+    q: "How do I find pickup games near me?",
+    a: "Open ballaCity, allow location or pick your city, and browse open games by sport, skill level and distance. Tap a game to see the time, place and open spots.",
+  },
+  {
+    q: "Do I need a team to join?",
+    a: "No. Pickup games are built for individual players. Request a spot and the host balances teams when everyone arrives.",
+  },
+  {
+    q: "Is ballaCity free?",
+    a: "Yes, finding and joining games is free. Some hosts charge a small fee for court or field costs, which is shown on the game before you join.",
+  },
+  {
+    q: "Can I host my own game?",
+    a: "Yes. Set the sport, place, time and number of players, and your game appears for nearby players in about a minute.",
+  },
+  {
+    q: "Is it safe for young players?",
+    a: "Players under 18 need a parent or guardian, who can approve team invites and game requests from their Parent Center.",
+  },
+];
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -133,16 +157,16 @@ function Landing() {
               style={{ "--enter-delay": "50ms" } as CSSProperties}
               className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
-              Pickup sports.
+              Find pickup games
               <br />
-              <span className="text-lime">On demand.</span>
+              <span className="text-lime">near you.</span>
             </h1>
             <p
               style={{ "--enter-delay": "120ms" } as CSSProperties}
               className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
             >
-              Find a game in 15 seconds. Host your court. Build a crew. From hoops to pickleball —
-              ballaCity connects the players around you.
+              Join local pickup basketball, soccer, baseball, pickleball and more. Discover games,
+              teams, trainers and gyms in your area — or host your own run in about a minute.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
@@ -171,7 +195,7 @@ function Landing() {
             <div className="relative rounded-[2.5rem] border-[10px] border-surface-2 bg-background shadow-2xl glow-coral overflow-hidden">
               <img
                 src={HERO_IMAGE}
-                alt="ballaCity app preview"
+                alt="ballaCity app showing a local pickup basketball game with open spots"
                 className="h-[560px] w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
@@ -200,27 +224,52 @@ function Landing() {
       </section>
 
       {/* Sports */}
-      <section id="sports" className="page-shell py-16">
-        <div className="flex items-end justify-between gap-4 mb-6">
-          <div>
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Every sport. One app.</h2>
-            <p className="text-muted-foreground mt-1">
-              From the cage to the court — find your run.
-            </p>
-          </div>
+      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
+        <div className="mb-6">
+          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Pickup games for every sport
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
+          </p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {SPORTS.map((s, i) => (
-            <div
-              key={s.name}
-              style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
-              className="enter-up group rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
-            >
-              <div className="text-3xl mb-2">{s.emoji}</div>
-              <div className="font-semibold">{s.name}</div>
-            </div>
+        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {SPORT_GUIDES.map((g, i) => (
+            <li key={g.slug}>
+              <Link
+                to="/guide/$sport"
+                params={{ sport: g.slug }}
+                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
+                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+              >
+                <span aria-hidden className="block text-3xl mb-2">
+                  {g.emoji}
+                </span>
+                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
+      </section>
+
+      {/* How it works */}
+      <section id="how" className="page-shell py-16" aria-labelledby="how-heading">
+        <h2 id="how-heading" className="font-display text-3xl md:text-4xl font-bold mb-8">
+          How to join a pickup game
+        </h2>
+        <ol className="grid md:grid-cols-3 gap-4">
+          {[
+            ["Find a game nearby", "Browse open games by sport, skill level and distance on a live map."],
+            ["Grab your spot", "Request to join in a tap. The host confirms and you get the details."],
+            ["Show up and play", "Meet your crew at the court or field. Rate the run and play again."],
+          ].map(([t, b], i) => (
+            <li key={t} className="rounded-3xl border border-border bg-surface p-6">
+              <span className="font-display text-2xl font-bold text-lime">{i + 1}</span>
+              <h3 className="mt-2 font-display text-xl font-semibold">{t}</h3>
+              <p className="text-muted-foreground mt-1.5 text-sm">{b}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* Features */}
@@ -308,6 +357,32 @@ function Landing() {
         )}
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="page-shell-prose py-16" aria-labelledby="faq-heading">
+        <h2 id="faq-heading" className="font-display text-3xl md:text-4xl font-bold mb-6">
+          Pickup sports questions
+        </h2>
+        <div className="space-y-3">
+          {FAQS.map((f) => (
+            <details key={f.q} className="rounded-2xl border border-border bg-surface p-5">
+              <summary className="cursor-pointer font-semibold">{f.q}</summary>
+              <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
+            </details>
+          ))}
+        </div>
+        <p className="mt-6 text-sm text-muted-foreground">
+          More tips in our{" "}
+          <Link to="/guide" className="text-lime hover:underline">
+            Sports Guide
+          </Link>{" "}
+          and{" "}
+          <Link to="/blog/how-to-find-pickup-soccer-games" className="text-lime hover:underline">
+            how to find pickup soccer games
+          </Link>
+          .
+        </p>
+      </section>
+
       {/* CTA */}
 
       <section className="page-shell pb-24">
@@ -334,6 +409,12 @@ function Landing() {
         <div className="page-shell py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <Logo size={22} />
           <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <Link to="/guide" className="hover:text-foreground">
+              Sports Guide
+            </Link>
+            <Link to="/orgs" className="hover:text-foreground">
+              Teams & Gyms
+            </Link>
             <Link to="/terms" className="hover:text-foreground">
               Terms of Service
             </Link>
