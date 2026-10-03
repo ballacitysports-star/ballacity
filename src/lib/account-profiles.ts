@@ -166,6 +166,31 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     });
   }
 
+  // Every account has a base personal profile. If its account_profiles row is
+  // missing (older accounts), try to restore it and otherwise synthesize it so
+  // the profile switcher and "Add a profile" options never disappear.
+  if (profile && !profiles.some((p) => p.kind === "player")) {
+    let id: string | null = null;
+    const { data: inserted } = await supabase
+      .from("account_profiles")
+      .insert({ user_id: userId, kind: "player" } as never)
+      .select("id")
+      .maybeSingle();
+    id = (inserted as { id?: string } | null)?.id ?? null;
+    if (!id) id = profile.active_profile_id ?? `local-player-${userId}`;
+    const name = profile.display_name || "My profile";
+    profiles.push({
+      id,
+      kind: "player",
+      refId: null,
+      name,
+      handle: profile.username ?? null,
+      avatarUrl: profile.avatar_url ?? null,
+      avatarFallback: profile.avatar_initials || initials(name),
+      href: { to: "/profile" },
+    });
+  }
+
   // Player profile always first.
   profiles.sort((a, b) => (a.kind === "player" ? -1 : b.kind === "player" ? 1 : 0));
 
