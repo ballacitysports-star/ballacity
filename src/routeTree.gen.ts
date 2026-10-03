@@ -16,6 +16,7 @@ import { Route as CommunityGuidelinesRouteImport } from './routes/community-guid
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as GuardianRouteImport } from './routes/guardian'
+import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -144,6 +145,11 @@ const CookiesRoute = CookiesRouteImport.update({
 const GuardianRoute = GuardianRouteImport.update({
   id: '/guardian',
   path: '/guardian',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HostRoute = HostRouteImport.update({
+  id: '/host',
+  path: '/host',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -636,6 +642,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -739,6 +746,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -843,6 +851,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -948,6 +957,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1051,6 +1061,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1154,6 +1165,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1259,6 +1271,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   GuardianRoute: typeof GuardianRoute
+  HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1392,6 +1405,13 @@ declare module '@tanstack/react-router' {
       path: '/guardian'
       fullPath: '/guardian'
       preLoaderRoute: typeof GuardianRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/host': {
+      id: '/host'
+      path: '/host'
+      fullPath: '/host'
+      preLoaderRoute: typeof HostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -2114,6 +2134,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   GuardianRoute: GuardianRoute,
+  HostRoute: HostRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
