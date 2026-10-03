@@ -3097,6 +3097,38 @@ export type Database = {
           },
         ]
       }
+      team_roster_details: {
+        Row: {
+          birth_year: number | null
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          birth_year?: number | null
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          birth_year?: number | null
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_roster_details_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_waiver_signatures: {
         Row: {
           created_at: string
