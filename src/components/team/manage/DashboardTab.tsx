@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { getTeamInviteTracker, getTeamRosterOverview } from "@/lib/tryouts.functions";
 import { WaiverBadge } from "./WaiverBadge";
+import { EmailApplicantsButton } from "./EmailApplicantsButton";
 
 function StatCard({
   icon,
@@ -205,6 +206,8 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                       ))}
                     </ul>
                   )}
+                  <EmailApplicantsButton teamId={teamId} postId={e.id} count={going.length} />
+
                 </li>
               );
             })}

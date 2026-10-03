@@ -315,3 +315,56 @@ export const saveTryoutEvaluation = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, error: "Couldn't save. Only team managers can score tryouts." };
     return { ok: true as const };
   });
+
+/** Manager-only: email each applicant (or the parent who applied) a tryout invite. */
+export const emailTryoutApplicants = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ teamId: z.string().min(1), postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) throw new Error("Only owners, managers and coaches can email applicants.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: post } = await supabaseAdmin
+      .from("team_posts").select("id,title,event_date,location,team_id,teams!inner(name)")
+      .eq("id", data.postId).eq("team_id", data.teamId).maybeSingle();
+    if (!post) throw new Error("Tryout not found.");
+    const { data: rsvps } = await supabaseAdmin
+      .from("tryout_rsvps").select("id,user_id,registered_by")
+      .eq("post_id", data.postId).eq("team_id", data.teamId).eq("status", "registered");
+    const rows = rsvps ?? [];
+    if (!rows.length) return { sent: 0, skipped: 0, failed: 0 };
+    const ids = [...new Set(rows.map((r) => r.user_id))];
+    const { data: profs } = await supabaseAdmin.from("profiles").select("id,display_name,username").in("id", ids);
+    const names = new Map((profs ?? []).map((p: any) => [p.id, p.display_name ?? p.username ?? undefined]));
+    const p: any = post;
+    const when = p.event_date
+      ? new Date(p.event_date).toLocaleString("en-US", {
+          weekday: "short", month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short",
+        })
+      : undefined;
+    const location = p.location ?? undefined;
+    const mapsUrl = location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}` : undefined;
+    const { sendTemplateEmail } = await import("@/lib/email-templates/send-email");
+    let sent = 0, skipped = 0, failed = 0;
+    for (const r of rows) {
+      const recipientId = r.registered_by ?? r.user_id;
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(recipientId);
+      const email = u?.user?.email;
+      if (!email) { skipped++; continue; }
+      try {
+        const res = await sendTemplateEmail("tryout-invite", email, {
+          templateData: {
+            playerName: names.get(r.user_id), teamName: p.teams?.name, title: p.title, when, location, mapsUrl,
+            tryoutUrl: `https://ballacity.com/tryouts/${p.id}`, byGuardian: recipientId !== r.user_id,
+          },
+          idempotencyKey: `tryout-invite-${r.id}`,
+        });
+        if (res.sent) sent++; else skipped++;
+      } catch (e) {
+        console.error("tryout invite send failed", e);
+        failed++;
+      }
+    }
+    return { sent, skipped, failed };
+  });
