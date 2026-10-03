@@ -81,6 +81,7 @@ import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
+import { Route as TryoutsPostIdRouteImport } from './routes/tryouts.$postId'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
@@ -469,6 +470,11 @@ const TrainersCreateRoute = TrainersCreateRouteImport.update({
   path: '/trainers/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TryoutsPostIdRoute = TryoutsPostIdRouteImport.update({
+  id: '/tryouts/$postId',
+  path: '/tryouts/$postId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -666,6 +672,7 @@ export interface FileRoutesByFullPath {
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
@@ -763,6 +770,7 @@ export interface FileRoutesByTo {
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin': typeof AdminIndexRoute
   '/guide': typeof GuideIndexRoute
   '/messages': typeof MessagesIndexRoute
@@ -863,6 +871,7 @@ export interface FileRoutesById {
   '/safety_/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
@@ -963,6 +972,7 @@ export interface FileRouteTypes {
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin/'
     | '/guide/'
     | '/messages/'
@@ -1060,6 +1070,7 @@ export interface FileRouteTypes {
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin'
     | '/guide'
     | '/messages'
@@ -1159,6 +1170,7 @@ export interface FileRouteTypes {
     | '/safety_/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin/'
     | '/guide/'
     | '/messages/'
@@ -1249,6 +1261,7 @@ export interface RootRouteChildren {
   SafetyChildrenRoute: typeof SafetyChildrenRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
+  TryoutsPostIdRoute: typeof TryoutsPostIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   GuideIndexRoute: typeof GuideIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
@@ -1784,6 +1797,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainersCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tryouts/$postId': {
+      id: '/tryouts/$postId'
+      path: '/tryouts/$postId'
+      fullPath: '/tryouts/$postId'
+      preLoaderRoute: typeof TryoutsPostIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -2065,6 +2085,7 @@ const rootRouteChildren: RootRouteChildren = {
   SafetyChildrenRoute: SafetyChildrenRoute,
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
+  TryoutsPostIdRoute: TryoutsPostIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   GuideIndexRoute: GuideIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,

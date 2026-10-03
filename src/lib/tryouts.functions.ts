@@ -248,3 +248,23 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
       }),
     };
   });
+
+/** Public: a single tryout/camp for its sign-up page. */
+export const getTryout = createServerFn({ method: "GET" })
+  .inputValidator((i) => z.object({ postId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }): Promise<TryoutListing | null> => {
+    const { data: r, error } = await publicClient()
+      .from("team_posts")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
+      .eq("id", data.postId)
+      .in("kind", ["tryout", "clinic"])
+      .is("hidden_at", null)
+      .maybeSingle();
+    if (error || !r) return null;
+    const x: any = r;
+    return {
+      id: x.id, kind: x.kind, title: x.title, body: x.body ?? "", eventDate: x.event_date,
+      location: x.location, price: x.price, spotsMax: x.spots_max, spotsTaken: x.spots_taken ?? 0,
+      teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
+    };
+  });

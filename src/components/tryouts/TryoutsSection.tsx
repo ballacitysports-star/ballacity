@@ -70,7 +70,9 @@ export function TryoutsSection() {
                   <span className="rounded-full bg-lime/15 px-2 py-0.5 font-semibold text-lime">{KIND_LABEL[t.kind]}</span>
                   <span className="text-muted-foreground">{t.price ? `$${t.price}` : "Free"}</span>
                 </div>
-                <h3 className="mt-3 font-display text-lg font-semibold">{t.title}</h3>
+                <h3 className="mt-3 font-display text-lg font-semibold">
+                  <Link to="/tryouts/$postId" params={{ postId: t.id }} className="hover:underline">{t.title}</Link>
+                </h3>
                 <Link to="/teams/$teamId" params={{ teamId: t.teamId }} className="text-sm text-muted-foreground hover:underline">
                   {t.teamName}
                 </Link>
@@ -94,7 +96,7 @@ export function TryoutsSection() {
   );
 }
 
-function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
+export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const ctxFn = useServerFn(getTryoutRsvpContext);
