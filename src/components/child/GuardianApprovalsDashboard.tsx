@@ -78,7 +78,7 @@ export function GuardianApprovalsDashboard() {
         onSuccess: () =>
           toast.success(
             approve
-              ? `Approved — ${childName.split(" ")[0]} can now accept.`
+              ? `Approved — ${childName.split(" ")[0]} is now on the team.`
               : `Declined ${what}.`,
           ),
         onError: (e) => toast.error(guardianApprovalError(e)),

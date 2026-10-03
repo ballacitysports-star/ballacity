@@ -38,6 +38,9 @@ const ERRORS: Record<string, string> = {
   REQUEST_NOT_PENDING: "This request was already answered.",
   INVITE_NOT_FOUND: "That invite no longer exists.",
   REQUEST_NOT_FOUND: "That request no longer exists.",
+  WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
+  INVITE_EXPIRED: "This invite has expired. Ask the team for a new one.",
+  CHILD_ACTIVITY_LOCKED: "Your child's activity is paused, so they can't join right now.",
   AUTH_REQUIRED: "Please sign in again.",
 };
 
@@ -129,6 +132,8 @@ export function useGuardianDecision() {
   const done = () => {
     qc.invalidateQueries({ queryKey: ["guardian-approvals"] });
     qc.invalidateQueries({ queryKey: ["guardian-children"] });
+    qc.invalidateQueries({ queryKey: ["team-invites"] });
+    qc.invalidateQueries({ queryKey: ["team-members"] });
   };
   const invite = useMutation({
     mutationFn: async (v: { id: string; approve: boolean }) => {
