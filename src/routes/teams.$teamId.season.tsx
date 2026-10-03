@@ -105,7 +105,7 @@ function SeasonRow({ teamId, event: e, past = false }: { teamId: string; event: 
         )}
       </p>
       <div className="mt-2 flex gap-2">
-        <Link to="/teams/$teamId/tryouts" params={{ teamId }} search={{ post: e.id }} className="text-xs font-bold text-primary underline">
+        <Link to="/teams/$teamId/tryouts" params={{ teamId }} className="text-xs font-bold text-primary underline">
           {past ? "Results" : "Check-in & score"}
         </Link>
         <Link to="/teams/$teamId/events" params={{ teamId }} className="text-xs font-bold text-muted-foreground underline">
