@@ -141,3 +141,39 @@ export const deleteTeamPost = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const updateTeamPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        kind: z.enum(["tryout", "clinic"]),
+        title: z.string().trim().min(1).max(120),
+        body: z.string().max(4000).optional(),
+        eventDate: z.string().datetime().nullable(),
+        location: z.string().max(200).nullable(),
+        price: z.number().int().min(0).max(100000).nullable(),
+        spotsMax: z.number().int().min(1).max(500).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("team_posts")
+      .update({
+        kind: data.kind,
+        title: data.title,
+        body: data.body ?? "",
+        event_date: data.eventDate,
+        location: data.location,
+        price: data.price,
+        spots_max: data.spotsMax,
+      })
+      .eq("id", data.id)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("You can't edit this post.");
+    return { ok: true };
+  });
