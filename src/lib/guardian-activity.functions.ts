@@ -17,6 +17,38 @@ export type ChildActivity = {
   teams: ChildTeam[];
   upcoming: ChildGame[];
   recent: ChildGame[];
+  invites: ChildInvite[];
+  waivers: ChildWaiver[];
+  updates: TeamUpdate[];
+};
+export type ChildInvite = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  guardianApproved: boolean;
+};
+export type ChildWaiver = {
+  teamId: string;
+  teamName: string;
+  waiverId: string;
+  title: string;
+  version: string;
+  content: string;
+  signedAt: string | null;
+  signedByGuardian: boolean;
+};
+export type TeamUpdate = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  kind: string;
+  title: string | null;
+  body: string | null;
+  eventDate: string | null;
+  createdAt: string;
 };
 
 /**
@@ -51,7 +83,36 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
         .in("player_id", ids)
         .eq("status", "pending"),
     ]);
-    const teamIds = [...new Set((tm.data ?? []).map((r) => r.team_id))];
+    const inv = await supabaseAdmin
+      .from("team_invites")
+      .select("id,team_id,invitee_id,role,status,created_at,guardian_approved_at")
+      .in("invitee_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const memberTeamIds = [...new Set((tm.data ?? []).map((r) => r.team_id))];
+    const teamIds = [...new Set([...memberTeamIds, ...(inv.data ?? []).map((r) => r.team_id)])];
+    const [wv, sg, posts] = await Promise.all([
+      teamIds.length
+        ? supabaseAdmin
+            .from("team_waivers")
+            .select("id,team_id,title,version,content")
+            .in("team_id", teamIds)
+            .eq("published", true)
+        : Promise.resolve({ data: [] as never[] }),
+      supabaseAdmin
+        .from("team_waiver_signatures")
+        .select("waiver_id,signer_user_id,signed_by,signed_at")
+        .in("signer_user_id", ids),
+      memberTeamIds.length
+        ? supabaseAdmin
+            .from("team_posts")
+            .select("id,team_id,kind,title,body,event_date,created_at")
+            .in("team_id", memberTeamIds)
+            .is("hidden_at", null)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve({ data: [] as never[] }),
+    ]);
     const gameIds = [
       ...new Set([...(gp.data ?? []).map((r) => r.game_id), ...(jr.data ?? []).map((r) => r.game_id)]),
     ];
@@ -89,6 +150,9 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
         ...(gp.data ?? []).filter((r) => r.user_id === k.child_user_id).map((r) => mk(r.game_id, "joined")),
         ...(jr.data ?? []).filter((r) => r.player_id === k.child_user_id).map((r) => mk(r.game_id, "requested")),
       ].filter((g): g is ChildGame => !!g);
+      const kidTeams = new Set(
+        (tm.data ?? []).filter((r) => r.user_id === k.child_user_id).map((r) => r.team_id),
+      );
       const upcoming = all
         .filter((g) => new Date(g.date).getTime() >= now)
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -111,6 +175,50 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
           })),
         upcoming,
         recent,
+        invites: (inv.data ?? [])
+          .filter((r) => r.invitee_id === k.child_user_id)
+          .map((r) => ({
+            id: r.id,
+            teamId: r.team_id,
+            teamName: teamName.get(r.team_id) ?? "Team",
+            role: String(r.role),
+            status: String(r.status),
+            createdAt: r.created_at,
+            guardianApproved: !!r.guardian_approved_at,
+          })),
+        waivers: ((wv.data ?? []) as { id: string; team_id: string; title: string; version: string; content: string }[])
+          .filter((w) => kidTeams.has(w.team_id))
+          .map((w) => {
+            const sig = (sg.data ?? []).find(
+              (x) => x.waiver_id === w.id && x.signer_user_id === k.child_user_id,
+            );
+            return {
+              teamId: w.team_id,
+              teamName: teamName.get(w.team_id) ?? "Team",
+              waiverId: w.id,
+              title: w.title,
+              version: w.version,
+              content: w.content,
+              signedAt: sig?.signed_at ?? null,
+              signedByGuardian: !!sig && !!sig.signed_by && sig.signed_by !== k.child_user_id,
+            };
+          }),
+        updates: ((posts.data ?? []) as {
+          id: string; team_id: string; kind: string; title: string | null; body: string | null;
+          event_date: string | null; created_at: string;
+        }[])
+          .filter((p) => kidTeams.has(p.team_id))
+          .slice(0, 10)
+          .map((p) => ({
+            id: p.id,
+            teamId: p.team_id,
+            teamName: teamName.get(p.team_id) ?? "Team",
+            kind: p.kind,
+            title: p.title,
+            body: p.body,
+            eventDate: p.event_date,
+            createdAt: p.created_at,
+          })),
       };
     });
   });
