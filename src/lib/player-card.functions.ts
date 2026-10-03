@@ -20,6 +20,8 @@ export type PlayerCardData = {
     bio: string | null;
     city: string | null;
     sport: string | null;
+    /** Guardian-authorised minor: contact goes to the guardian, no live schedule. */
+    isMinor: boolean;
   } | null;
   games: PlayerCardGame[];
   stats: {
@@ -98,6 +100,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
     const prof = profRes.data as any | null;
     if (!prof || prof.suspended_at) return empty;
 
+    const { data: cohortRaw } = await supabaseAdmin.rpc("age_cohort_of" as never, { _user: data.userId } as never);
+    const isMinor = ["child_under_13", "teen_13_15", "teen_16_17"].includes(cohortRaw as unknown as string);
+
     const hosted = showGames
       ? ((hostedRes.data ?? []) as any[])
           .filter((g) => g.is_private !== true)
@@ -134,6 +139,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         location: (g.location as string) ?? null,
         role: g.role as "host" | "player",
       }))
+      // Minors: never publish where they will be — past games only, no venue.
+      .filter((g) => !isMinor || new Date(g.date ?? 0).getTime() <= Date.now())
+      .map((g) => (isMinor ? { ...g, location: null } : g))
       .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
       .slice(0, 30);
 
@@ -158,6 +166,7 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         bio: (prof.bio as string) ?? null,
         city: (prof.city as string) ?? null,
         sport: showSports ? ((prof.sport as string) ?? null) : null,
+        isMinor,
       },
       games,
       stats: {
