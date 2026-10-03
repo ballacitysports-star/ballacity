@@ -211,7 +211,6 @@ function Landing() {
                 alt="ballaCity app showing a local pickup basketball game with open spots"
                 className="h-[560px] w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
                 <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-semibold">
                   🏀 Basketball
