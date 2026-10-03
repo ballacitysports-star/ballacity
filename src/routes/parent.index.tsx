@@ -268,6 +268,34 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             highlights. Exact location and birthdate stay private, and inquiries go to you — never
             to your child.
           </p>
+          <p className="mt-2 text-xs font-semibold">
+            Status:{" "}
+            <span className={c.publicProfile ? "text-lime" : "text-muted-foreground"}>
+              {c.publicProfile ? "Public on the web" : "Private"}
+            </span>
+          </p>
+          {c.publicProfile ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/player-card/$userId" params={{ userId: childUserId }}>
+                  View public card
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const url = `${window.location.origin}/player-card/${childUserId}`;
+                  navigator.clipboard
+                    .writeText(url)
+                    .then(() => toast.success("Link copied"))
+                    .catch(() => toast.error("Could not copy link"));
+                }}
+              >
+                Copy link
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
           Overnight notifications are off by default: between midnight and 6am in their local time

@@ -200,14 +200,25 @@ function PlayerCardPage() {
             )}
           </p>
           {p.bio && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{p.bio}</p>}
-          <Link
-            to="/players/$userId"
-            params={{ userId }}
-            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-lime px-4 py-2.5 text-sm font-bold text-background"
-          >
-            View full profile <ExternalLink className="h-4 w-4" />
-          </Link>
-          {p.isMinor && <ContactGuardianButton childId={userId} childName={p.displayName} />}
+          {p.isMinor ? (
+            <>
+              <span className="mt-2 inline-flex items-center rounded-full bg-lime/15 px-2.5 py-1 text-xs font-bold text-lime">
+                Guardian-authorized athlete
+              </span>
+              <ContactGuardianButton childId={userId} childName={p.displayName} />
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                Birthdate, exact location and upcoming venues are kept private.
+              </p>
+            </>
+          ) : (
+            <Link
+              to="/players/$userId"
+              params={{ userId }}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-lime px-4 py-2.5 text-sm font-bold text-background"
+            >
+              View full profile <ExternalLink className="h-4 w-4" />
+            </Link>
+          )}
         </div>
       </header>
 
