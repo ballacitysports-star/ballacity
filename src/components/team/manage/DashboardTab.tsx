@@ -13,7 +13,9 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { UserAvatar } from "@/components/UserAvatar";
 import { getTeamInviteTracker, getTeamRosterOverview } from "@/lib/tryouts.functions";
+import { WaiverBadge } from "./WaiverBadge";
 
 function StatCard({
   icon,
