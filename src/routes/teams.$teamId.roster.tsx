@@ -2,12 +2,12 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Trophy, UserPlus } from "lucide-react";
+import { ArrowLeft, Mail, Trophy, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
-import { getRosterBoard, saveRosterDetails } from "@/lib/tryouts.functions";
+import { emailRosterPrintout, getRosterBoard, saveRosterDetails } from "@/lib/tryouts.functions";
 import { teamRosterErrorMessage, useTeamRosterActions } from "@/lib/team-roster";
 
 export const Route = createFileRoute("/teams/$teamId/roster")({
@@ -75,9 +75,20 @@ function RosterPage() {
   const { teamId } = Route.useParams();
   const qc = useQueryClient();
   const boardFn = useServerFn(getRosterBoard);
+  const emailFn = useServerFn(emailRosterPrintout);
   const board = useQuery({ queryKey: ["roster-board", teamId], queryFn: () => boardFn({ data: { teamId } }) });
   const { invite } = useTeamRosterActions(teamId);
+  const [emailing, setEmailing] = useState(false);
   const refresh = () => qc.invalidateQueries({ queryKey: ["roster-board", teamId] });
+
+  const onEmailRoster = async (postId: string, title: string) => {
+    setEmailing(true);
+    const r = await emailFn({ data: { teamId, postId } })
+      .catch(() => null);
+    setEmailing(false);
+    if (!r) return toast.error("Couldn't send the roster emails. Try again.");
+    toast.success(`Printable roster emailed for ${title}: ${r.sent} sent${r.skipped ? `, ${r.skipped} skipped` : ""}${r.failed ? `, ${r.failed} failed` : ""}.`);
+  };
 
   const onInvite = (userId: string, name: string) =>
     invite.mutate({ userId, role: "player" }, {
@@ -92,9 +103,17 @@ function RosterPage() {
       </Link>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-2xl font-bold">Roster</h1>
-        <Link to="/teams/$teamId/tryouts" params={{ teamId }} className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
-          Tryout rankings
-        </Link>
+        <div className="flex items-center gap-2">
+          {board.data?.upcomingTryout ? (
+            <Button size="sm" variant="outline" disabled={emailing}
+              onClick={() => onEmailRoster(board.data!.upcomingTryout!.id, board.data!.upcomingTryout!.title)}>
+              <Mail className="mr-1 h-4 w-4" /> Email printable roster
+            </Button>
+          ) : null}
+          <Link to="/teams/$teamId/tryouts" params={{ teamId }} className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
+            Tryout rankings
+          </Link>
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">Birth years are only visible to owners, managers and coaches.</p>
 
