@@ -3,7 +3,7 @@ import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/
 import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
-import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
+import { HERO_IMAGE } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
