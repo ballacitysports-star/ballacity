@@ -246,6 +246,29 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             />
           </div>
         ))}
+        <div className="rounded-xl border border-border bg-background p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold">Public recruitment profile</span>
+            <Switch
+              checked={c.publicProfile}
+              onCheckedChange={(next) => {
+                if (
+                  next &&
+                  !window.confirm(
+                    "As this child's parent/guardian, you consent to showing their player card, stats and highlight videos publicly on the web. Exact location, birthdate and upcoming game venues stay private, and all inquiries come to you. You can turn this off anytime.",
+                  )
+                )
+                  return;
+                set({ public_profile: next });
+              }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Let coaches, recruiters and scouts view this athlete's player card, stats and
+            highlights. Exact location and birthdate stay private, and inquiries go to you — never
+            to your child.
+          </p>
+        </div>
         <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
           Overnight notifications are off by default: between midnight and 6am in their local time
           we hold push alerts until morning. The alert still appears in the app straight away.
