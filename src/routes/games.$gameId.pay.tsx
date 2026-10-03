@@ -48,6 +48,8 @@ import {
   type PaymentState,
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
+import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
+import { getPayPalCheckoutConfig } from "@/lib/paypal.functions";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -192,6 +194,7 @@ function PayPage() {
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
@@ -307,6 +310,16 @@ function PayPage() {
           setMethods(all);
         } else {
           setMethods([]);
+        }
+
+        // PayPal checkout config is optional; failure never blocks the pay UI.
+        try {
+          const cfg = await getPayPalCheckoutConfig({ data: { gameId } });
+          if (!cancelled && cfg.clientId && cfg.merchantId) {
+            setPaypalCfg({ clientId: cfg.clientId, merchantId: cfg.merchantId });
+          }
+        } catch {
+          /* PayPal not configured — one-tap buttons remain */
         }
 
         // Payment settings + host payment methods are the critical path for
@@ -664,7 +677,7 @@ function PayPage() {
             Retry
           </button>
         </div>
-      ) : !settings || methods.length === 0 ? (
+      ) : (!settings || methods.length === 0) && !paypalCfg ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -673,11 +686,27 @@ function PayPage() {
         </div>
       ) : !picked ? (
         <div>
-          <h2 className="text-sm font-semibold mb-2">How do you want to pay?</h2>
+          {paypalCfg && settings && (
+            <div className="mb-4">
+              <PayPalCheckoutButton
+                gameId={game.id}
+                clientId={paypalCfg.clientId}
+                merchantId={paypalCfg.merchantId}
+                feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+                onPaid={async () => {
+                  const subs = await listMySubmissionsForGame(game.id);
+                  setMySubs(subs);
+                }}
+              />
+            </div>
+          )}
+          <h2 className="text-sm font-semibold mb-2">
+            {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
+          </h2>
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
-              const fee = settings.entry_fee ?? game.price;
+              const fee = settings?.entry_fee ?? game.price;
               const link = resolvePaymentDeepLink(m, fee, game.title);
               return (
                 <div
@@ -733,10 +762,10 @@ function PayPage() {
         <PaymentInstructionsAndProof
           game_id={game.id}
           game_title={game.title}
-          fee={settings.entry_fee ?? game.price}
-          host_id={settings.host_id}
+          fee={settings?.entry_fee ?? game.price}
+          host_id={settings!.host_id}
           method={picked}
-          extraInstructions={settings.payment_instructions}
+          extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             // Do NOT join the roster yet — player is only added after the

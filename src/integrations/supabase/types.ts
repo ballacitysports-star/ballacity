@@ -1150,6 +1150,27 @@ export type Database = {
         }
         Relationships: []
       }
+      host_paypal_accounts: {
+        Row: {
+          connected_at: string
+          email: string | null
+          host_id: string
+          merchant_id: string
+        }
+        Insert: {
+          connected_at?: string
+          email?: string | null
+          host_id: string
+          merchant_id: string
+        }
+        Update: {
+          connected_at?: string
+          email?: string | null
+          host_id?: string
+          merchant_id?: string
+        }
+        Relationships: []
+      }
       hosted_games: {
         Row: {
           all_day: boolean
@@ -2270,6 +2291,56 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: false
             referencedRelation: "payment_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paypal_orders: {
+        Row: {
+          amount_cents: number
+          capture_id: string | null
+          captured_at: string | null
+          created_at: string
+          currency: string
+          game_id: string
+          host_id: string
+          id: string
+          order_id: string
+          player_id: string
+          status: string
+        }
+        Insert: {
+          amount_cents: number
+          capture_id?: string | null
+          captured_at?: string | null
+          created_at?: string
+          currency?: string
+          game_id: string
+          host_id: string
+          id?: string
+          order_id: string
+          player_id: string
+          status?: string
+        }
+        Update: {
+          amount_cents?: number
+          capture_id?: string | null
+          captured_at?: string | null
+          created_at?: string
+          currency?: string
+          game_id?: string
+          host_id?: string
+          id?: string
+          order_id?: string
+          player_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paypal_orders_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
             referencedColumns: ["id"]
           },
         ]
@@ -4098,6 +4169,12 @@ export type Database = {
           payment_type: string
           payment_url: string
           username: string
+        }[]
+      }
+      get_game_host_paypal: {
+        Args: { _game_id: string }
+        Returns: {
+          merchant_id: string
         }[]
       }
       get_host_payment_methods: {
