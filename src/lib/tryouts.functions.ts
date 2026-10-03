@@ -437,3 +437,49 @@ export const saveRosterDetails = createServerFn({ method: "POST" })
     if (e2) return { ok: false as const, error: "Couldn't save position." };
     return { ok: true as const };
   });
+
+/** Manager-only: email a tryout link to a parent who may not have a BallaCity account yet. */
+export const inviteParentToTryout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      teamId: z.string().min(1),
+      postId: z.string().uuid(),
+      email: z.string().trim().toLowerCase().email().max(254),
+      parentName: z.string().trim().max(80).optional(),
+      childName: z.string().trim().max(80).optional(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isManager } = await context.supabase.rpc("is_team_manager", { _team: data.teamId, _user: context.userId });
+    if (!isManager) return { ok: false as const, error: "Only owners, managers and coaches can send invites." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: post } = await supabaseAdmin
+      .from("team_posts").select("id,title,event_date,location,teams!inner(name)")
+      .eq("id", data.postId).eq("team_id", data.teamId).eq("kind", "tryout").maybeSingle();
+    if (!post) return { ok: false as const, error: "Tryout not found." };
+    const p: any = post;
+    const { data: me } = await supabaseAdmin.from("profiles").select("display_name,username").eq("id", context.userId).maybeSingle();
+    const when = p.event_date
+      ? new Date(p.event_date).toLocaleString("en-US", {
+          weekday: "short", month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short",
+        })
+      : undefined;
+    const { sendTemplateEmail } = await import("@/lib/email-templates/send-email");
+    try {
+      const res = await sendTemplateEmail("tryout-parent-invite", data.email, {
+        templateData: {
+          parentName: data.parentName || undefined, childName: data.childName || undefined,
+          teamName: p.teams?.name, title: p.title, when, location: p.location ?? undefined,
+          tryoutUrl: `https://ballacity.com/tryouts/${p.id}`,
+          inviterName: (me as any)?.display_name ?? (me as any)?.username ?? undefined,
+        },
+        idempotencyKey: `tryout-parent-invite-${p.id}-${data.email}`,
+      });
+      return { ok: true as const, sent: !!res.sent };
+    } catch (e) {
+      console.error("parent tryout invite failed", e);
+      return { ok: false as const, error: "Couldn't send the email. Try again." };
+    }
+  });

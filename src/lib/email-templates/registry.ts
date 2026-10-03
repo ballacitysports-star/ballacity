@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { template as guardianApprovalTemplate } from './guardian-approval'
 import { template as tryoutInviteTemplate } from './tryout-invite'
+import { template as tryoutParentInviteTemplate } from './tryout-parent-invite'
 
 export interface TemplateEntry {
   component: ComponentType<any>
@@ -22,4 +23,5 @@ export interface TemplateEntry {
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'guardian-approval': guardianApprovalTemplate,
   'tryout-invite': tryoutInviteTemplate,
+  'tryout-parent-invite': tryoutParentInviteTemplate,
 }
