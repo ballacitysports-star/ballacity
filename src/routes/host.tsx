@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, MapPin, Users, Wallet, BellRing } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
