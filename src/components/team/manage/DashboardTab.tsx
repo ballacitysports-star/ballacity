@@ -95,6 +95,8 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
     .filter((e) => e.eventDate && new Date(e.eventDate).getTime() >= now)
     .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime());
   const signedCount = members.filter((m) => m.waiver).length;
+  const unsignedMembers = members.filter((m) => !m.waiver);
+  const signedMembers = members.filter((m) => m.waiver);
   const waiting = inv.filter((i) => i.status === "pending");
   const needsGuardian = waiting.filter((i) => i.needsGuardian && !i.guardianApproved).length;
   const joined = inv.filter((i) => i.status === "accepted").length;
