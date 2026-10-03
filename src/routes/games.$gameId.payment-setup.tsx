@@ -8,10 +8,14 @@ import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import {
   type PaymentMethod,
+  type HostPayPalAccount,
   paymentTypeMeta,
   listMyPaymentMethods,
   getMyGamePaymentSettings,
   upsertGamePaymentSettings,
+  getMyPayPalAccount,
+  saveMyPayPalAccount,
+  disconnectMyPayPalAccount,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -64,6 +68,10 @@ function SetupPage() {
   const [instructions, setInstructions] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [paypal, setPaypal] = useState<HostPayPalAccount | null>(null);
+  const [paypalMerchantId, setPaypalMerchantId] = useState("");
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalSaving, setPaypalSaving] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -72,7 +80,16 @@ function SetupPage() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [m, s] = await Promise.all([listMyPaymentMethods(), getMyGamePaymentSettings(game.id)]);
+      const [m, s, pp] = await Promise.all([
+        listMyPaymentMethods(),
+        getMyGamePaymentSettings(game.id),
+        getMyPayPalAccount(),
+      ]);
+      if (pp) {
+        setPaypal(pp);
+        setPaypalMerchantId(pp.merchant_id);
+        setPaypalEmail(pp.email ?? "");
+      }
       setMethods(m.filter((x) => x.is_enabled));
       if (s) {
         setFee(String(s.entry_fee));
