@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { RosterTab } from "@/components/team/manage/RosterTab";
+import { InviteTracker } from "@/components/team/manage/InviteTracker";
 import { InvitesTab } from "@/components/team/manage/InvitesTab";
 import { SettingsTab } from "@/components/team/manage/SettingsTab";
 import { WaiverTab } from "@/components/team/manage/WaiverTab";
@@ -91,6 +92,13 @@ function ManageTeam() {
         >
           Tryouts &amp; camps
         </Link>
+        <Link
+          to="/teams/$teamId/invites"
+          params={{ teamId }}
+          className="ml-2 mt-3 inline-flex rounded-full border border-border px-4 py-2 text-xs font-bold"
+        >
+          Roster invites
+        </Link>
       </header>
 
       <Tabs defaultValue="roster">
@@ -109,6 +117,7 @@ function ManageTeam() {
         </TabsContent>
         <TabsContent value="invites" className="pt-4">
           <InvitesTab teamId={teamId} teamName={teamName} />
+          <div className="pt-6"><InviteTracker teamId={teamId} /></div>
         </TabsContent>
         <TabsContent value="waiver" className="pt-4">
           <WaiverTab teamId={teamId} teamName={teamName} />

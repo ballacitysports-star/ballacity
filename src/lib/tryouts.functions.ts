@@ -220,11 +220,11 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
       waiver.data && ids.length
         ? supabaseAdmin.from("team_waiver_signatures").select("signer_user_id,signed_by").eq("waiver_id", waiver.data.id).in("signer_user_id", ids)
         : Promise.resolve({ data: [] as any[] }),
-      ids.length ? supabaseAdmin.from("guardian_links").select("child_id").eq("status", "active").in("child_id", ids) : Promise.resolve({ data: [] as any[] }),
+      ids.length ? supabaseAdmin.from("guardian_links").select("child_user_id").eq("status", "active").in("child_user_id", ids) : Promise.resolve({ data: [] as any[] }),
     ]);
     const p = new Map((profiles.data ?? []).map((x: any) => [x.id, x]));
     const s = new Map((sigs.data ?? []).map((x: any) => [x.signer_user_id, !!x.signed_by]));
-    const minors = new Set((guardians.data ?? []).map((g: any) => g.child_id));
+    const minors = new Set((guardians.data ?? []).map((g: any) => g.child_user_id));
     const now = Date.now();
     return {
       waiverVersion: waiver.data?.version ?? null,
