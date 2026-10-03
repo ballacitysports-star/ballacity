@@ -677,7 +677,7 @@ function PayPage() {
             Retry
           </button>
         </div>
-      ) : !settings || methods.length === 0 ? (
+      ) : (!settings || methods.length === 0) && !paypalCfg ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -686,7 +686,23 @@ function PayPage() {
         </div>
       ) : !picked ? (
         <div>
-          <h2 className="text-sm font-semibold mb-2">How do you want to pay?</h2>
+          {paypalCfg && settings && (
+            <div className="mb-4">
+              <PayPalCheckoutButton
+                gameId={game.id}
+                clientId={paypalCfg.clientId}
+                merchantId={paypalCfg.merchantId}
+                feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+                onPaid={async () => {
+                  const subs = await listMySubmissionsForGame(game.id);
+                  setMySubs(subs);
+                }}
+              />
+            </div>
+          )}
+          <h2 className="text-sm font-semibold mb-2">
+            {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
+          </h2>
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
