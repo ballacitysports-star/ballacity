@@ -72,7 +72,10 @@ function TryoutResultsPage() {
                   >
                     <p className="text-xs text-muted-foreground">{new Date(e.eventDate!).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{past ? " · done" : ""}</p>
                     <p className="text-sm font-semibold">{e.title}</p>
-                    <p className="text-xs text-muted-foreground">{going} applied</p>
+                    <p className="text-xs text-muted-foreground">
+                      {going} applied
+                      {e.turnoutPct != null && <span className="font-semibold text-foreground"> · {e.turnoutPct}% turnout</span>}
+                    </p>
                   </button>
                 </li>
               );
@@ -100,7 +103,10 @@ function Results({ teamId, postId }: { teamId: string; postId: string }) {
   return (
     <section className="mt-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{attended}/{rows.length} attended</p>
+        <p className="text-sm text-muted-foreground">
+          {attended}/{rows.length} attended
+          {rows.length > 0 && <span className="font-semibold text-foreground"> · {Math.round((attended / rows.length) * 100)}% turnout</span>}
+        </p>
         <div className="flex gap-1">
           <Button size="sm" variant={view === "checkin" ? "default" : "outline"} onClick={() => setView("checkin")}>Check-in &amp; score</Button>
           <Button size="sm" variant={view === "rank" ? "default" : "outline"} onClick={() => setView("rank")}><Trophy className="mr-1 h-4 w-4" />Rankings</Button>
