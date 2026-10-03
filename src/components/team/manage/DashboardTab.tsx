@@ -182,6 +182,11 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                     <p className="text-xs text-muted-foreground">
                       {new Date(e.eventDate!).toLocaleDateString()} · {going.length}
                       {e.spotsMax ? `/${e.spotsMax}` : ""} going
+                      {e.turnoutPct != null && (
+                        <span className="ml-1 font-semibold text-foreground">
+                          · {e.turnoutPct}% turnout ({e.attended}/{e.applied} attended)
+                        </span>
+                      )}
                     </p>
                   </div>
                   {waiverVersion && going.length > 0 && (
