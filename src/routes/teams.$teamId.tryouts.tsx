@@ -104,6 +104,7 @@ function Results({ teamId, postId }: { teamId: string; postId: string }) {
         <div className="flex gap-1">
           <Button size="sm" variant={view === "checkin" ? "default" : "outline"} onClick={() => setView("checkin")}>Check-in &amp; score</Button>
           <Button size="sm" variant={view === "rank" ? "default" : "outline"} onClick={() => setView("rank")}><Trophy className="mr-1 h-4 w-4" />Rankings</Button>
+          <Link to="/teams/$teamId/roster" params={{ teamId }} className="inline-flex items-center rounded-md border border-border px-3 text-xs font-bold text-muted-foreground">Roster</Link>
         </div>
       </div>
       {rows.length === 0 ? (
