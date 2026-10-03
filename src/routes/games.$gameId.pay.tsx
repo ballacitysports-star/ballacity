@@ -312,6 +312,16 @@ function PayPage() {
           setMethods([]);
         }
 
+        // PayPal checkout config is optional; failure never blocks the pay UI.
+        try {
+          const cfg = await getPayPalCheckoutConfig({ data: { gameId } });
+          if (!cancelled && cfg.clientId && cfg.merchantId) {
+            setPaypalCfg({ clientId: cfg.clientId, merchantId: cfg.merchantId });
+          }
+        } catch {
+          /* PayPal not configured — one-tap buttons remain */
+        }
+
         // Payment settings + host payment methods are the critical path for
         // rendering the pay UI. User-specific status is helpful, but should
         // never blank the screen or show the payment-service retry if a
