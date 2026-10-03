@@ -525,6 +525,9 @@ export type Database = {
           messaging: string
           notification_curfew_lifted: boolean
           notifications: boolean
+          public_profile: boolean
+          public_profile_authorized_at: string | null
+          public_profile_authorized_by: string | null
           social_discovery: boolean
           updated_at: string
           updated_by: string | null
@@ -539,6 +542,9 @@ export type Database = {
           messaging?: string
           notification_curfew_lifted?: boolean
           notifications?: boolean
+          public_profile?: boolean
+          public_profile_authorized_at?: string | null
+          public_profile_authorized_by?: string | null
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -553,6 +559,9 @@ export type Database = {
           messaging?: string
           notification_curfew_lifted?: boolean
           notifications?: boolean
+          public_profile?: boolean
+          public_profile_authorized_at?: string | null
+          public_profile_authorized_by?: string | null
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -4261,6 +4270,7 @@ export type Database = {
           consent_recorded: boolean
         }[]
       }
+      public_minor_guardian: { Args: { _child: string }; Returns: string }
       public_privacy_flags: {
         Args: { _ids: string[] }
         Returns: {
