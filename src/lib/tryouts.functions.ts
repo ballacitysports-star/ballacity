@@ -456,7 +456,7 @@ export const inviteParentToTryout = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: post } = await supabaseAdmin
       .from("team_posts").select("id,title,event_date,location,teams!inner(name)")
-      .eq("id", data.postId).eq("team_id", data.teamId).eq("kind", "tryout").maybeSingle();
+      .eq("id", data.postId).eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).maybeSingle();
     if (!post) return { ok: false as const, error: "Tryout not found." };
     const p: any = post;
     const { data: me } = await supabaseAdmin.from("profiles").select("display_name,username").eq("id", context.userId).maybeSingle();
