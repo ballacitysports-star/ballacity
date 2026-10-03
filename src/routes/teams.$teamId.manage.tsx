@@ -100,6 +100,13 @@ function ManageTeam() {
         >
           Roster invites
         </Link>
+        <Link
+          to="/teams/$teamId/waiver"
+          params={{ teamId }}
+          className="ml-2 mt-3 inline-flex rounded-full border border-border px-4 py-2 text-xs font-bold"
+        >
+          Waiver
+        </Link>
       </header>
 
       <Tabs defaultValue="dashboard">

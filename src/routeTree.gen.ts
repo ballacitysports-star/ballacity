@@ -97,6 +97,7 @@ import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit
 import { Route as TeamsTeamIdEventsRouteImport } from './routes/teams.$teamId.events'
 import { Route as TeamsTeamIdInvitesRouteImport } from './routes/teams.$teamId.invites'
 import { Route as TeamsTeamIdManageRouteImport } from './routes/teams.$teamId.manage'
+import { Route as TeamsTeamIdWaiverRouteImport } from './routes/teams.$teamId.waiver'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
@@ -549,6 +550,11 @@ const TeamsTeamIdManageRoute = TeamsTeamIdManageRouteImport.update({
   path: '/teams/$teamId/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdWaiverRoute = TeamsTeamIdWaiverRouteImport.update({
+  id: '/teams/$teamId/waiver',
+  path: '/teams/$teamId/waiver',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
   id: '/trainers/$trainerId/',
   path: '/trainers/$trainerId/',
@@ -678,6 +684,7 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
   '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -774,6 +781,7 @@ export interface FileRoutesByTo {
   '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
   '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
@@ -873,6 +881,7 @@ export interface FileRoutesById {
   '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
   '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -972,6 +981,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/events'
     | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -1068,6 +1078,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/events'
     | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
     | '/orgs/$orgId'
@@ -1166,6 +1177,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/events'
     | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -1253,6 +1265,7 @@ export interface RootRouteChildren {
   TeamsTeamIdEventsRoute: typeof TeamsTeamIdEventsRoute
   TeamsTeamIdInvitesRoute: typeof TeamsTeamIdInvitesRoute
   TeamsTeamIdManageRoute: typeof TeamsTeamIdManageRoute
+  TeamsTeamIdWaiverRoute: typeof TeamsTeamIdWaiverRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
@@ -1883,6 +1896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdManageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId/waiver': {
+      id: '/teams/$teamId/waiver'
+      path: '/teams/$teamId/waiver'
+      fullPath: '/teams/$teamId/waiver'
+      preLoaderRoute: typeof TeamsTeamIdWaiverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trainers/$trainerId/': {
       id: '/trainers/$trainerId/'
       path: '/trainers/$trainerId'
@@ -2061,6 +2081,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdEventsRoute: TeamsTeamIdEventsRoute,
   TeamsTeamIdInvitesRoute: TeamsTeamIdInvitesRoute,
   TeamsTeamIdManageRoute: TeamsTeamIdManageRoute,
+  TeamsTeamIdWaiverRoute: TeamsTeamIdWaiverRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,

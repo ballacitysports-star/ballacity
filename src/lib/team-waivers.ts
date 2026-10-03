@@ -161,6 +161,56 @@ export function useCreateAndPublishWaiver(teamId: string) {
   });
 }
 
+/** Create or update an unpublished draft. Returns the draft id. */
+export function useSaveWaiverDraft(teamId: string) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (v: { id?: string | null; version: string; title: string; content: string }) => {
+      const row = { version: v.version.trim(), title: v.title.trim(), content: v.content.trim() };
+      if (v.id) {
+        const { error } = await db
+          .from("team_waivers")
+          .update(row)
+          .eq("id", v.id)
+          .is("published_at", null);
+        if (error) throw error;
+        return v.id;
+      }
+      const { data, error } = await db
+        .from("team_waivers")
+        .insert({ ...row, team_id: teamId, created_by: user!.id })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["team-waiver"] }),
+  });
+}
+
+export function usePublishWaiverDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.rpc("publish_team_waiver", { _id: id });
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["team-waiver"] }),
+  });
+}
+
+export function useDeleteWaiverDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.from("team_waivers").delete().eq("id", id).is("published_at", null);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["team-waiver"] }),
+  });
+}
+
 export function useSignWaiver() {
   const qc = useQueryClient();
   return useMutation({
