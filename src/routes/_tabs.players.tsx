@@ -112,6 +112,8 @@ import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { Shield } from "lucide-react";
+import { InviteToTeamDialog, useMyRecruitingTeams } from "@/components/players/InviteToTeamDialog";
 
 type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
 
@@ -1072,6 +1074,8 @@ function AvailabilityCard({
 }) {
   const navigate = useNavigate();
   const when = formatWindow(a);
+  const { teams: recruitingTeams } = useMyRecruitingTeams();
+  const [teamInviteOpen, setTeamInviteOpen] = useState(false);
   const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
     ? (a.author_links as ProfileLink[])
     : [];
@@ -1281,6 +1285,24 @@ function AvailabilityCard({
           </>
         )}
       </div>
+
+      {!isMine && recruitingTeams.length > 0 && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-2 w-full rounded-full border-lime/50"
+          onClick={() => setTeamInviteOpen(true)}
+        >
+          <Shield className="h-4 w-4 mr-1" /> Invite to team
+        </Button>
+      )}
+      {teamInviteOpen && (
+        <InviteToTeamDialog
+          playerId={a.user_id}
+          playerName={a.author_name}
+          onClose={() => setTeamInviteOpen(false)}
+        />
+      )}
 
       <div className="mt-2 flex items-center gap-3">
         <Link

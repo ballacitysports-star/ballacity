@@ -26,7 +26,7 @@ export const ROLE_META: Record<TeamRole, { label: string; blurb: string; emoji: 
 };
 
 /** Roles the server treats as team management (mirrors `is_team_manager`). */
-const MANAGER_ROLES: TeamRole[] = ["owner", "manager", "coach"];
+export const MANAGER_ROLES: TeamRole[] = ["owner", "manager", "coach"];
 /** Roles allowed to change another member's role (mirrors `team_set_member_role`). */
 const ROLE_ADMIN_ROLES: TeamRole[] = ["owner", "manager"];
 
