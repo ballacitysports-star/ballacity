@@ -186,6 +186,75 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
 
       <section>
         <div className="mb-3 flex items-center justify-between">
+          <h2 className="section-eyebrow text-muted-foreground">
+            <FileSignature className="mr-1 inline h-4 w-4" /> Waiver status
+          </h2>
+          <Link
+            to="/teams/$teamId/manage"
+            search={{ tab: "rsvps" }}
+            className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
+          >
+            RSVPs &amp; waivers
+          </Link>
+        </div>
+        {!waiverVersion ? (
+          <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            No waiver published yet. Publish one from the Waiver tab to start collecting signatures.
+          </p>
+        ) : members.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            No players on the roster yet.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {unsignedMembers.length > 0 && (
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-coral">
+                  Still need it · {unsignedMembers.length}
+                </p>
+                <ul className="space-y-2">
+                  {unsignedMembers.map((m) => (
+                    <li key={m.userId} className="flex items-center gap-3 rounded-2xl border border-coral/30 bg-surface p-3">
+                      <UserAvatar avatarUrl={m.avatar} initials={null} name={m.name} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{m.name}</p>
+                        <p className="text-[11px] text-muted-foreground capitalize">
+                          {m.role}{m.jersey ? ` · #${m.jersey}` : ""}
+                        </p>
+                      </div>
+                      <WaiverBadge waiver={m.waiver} required />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {signedMembers.length > 0 && (
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-lime">
+                  Signed · {signedMembers.length}
+                </p>
+                <ul className="space-y-2">
+                  {signedMembers.map((m) => (
+                    <li key={m.userId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                      <UserAvatar avatarUrl={m.avatar} initials={null} name={m.name} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{m.name}</p>
+                        <p className="text-[11px] text-muted-foreground capitalize">
+                          {m.role}{m.jersey ? ` · #${m.jersey}` : ""} · signed {new Date(m.waiver!.signedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <WaiverBadge waiver={m.waiver} required />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
           <h2 className="section-eyebrow text-muted-foreground">Pending invites</h2>
           <Link
             to="/teams/$teamId/invites"
