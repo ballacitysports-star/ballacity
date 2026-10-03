@@ -13,7 +13,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const searchPlayersForTeam = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { teamId: string; q: string }) =>
-    z.object({ teamId: z.string().uuid(), q: z.string().min(1).max(80) }).parse(d),
+    // Team ids are slugs like "t-name-xxxx", not UUIDs.
+    z.object({ teamId: z.string().min(1).max(120), q: z.string().min(1).max(80) }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { data: isManager, error: roleErr } = await context.supabase.rpc("is_team_manager", {
