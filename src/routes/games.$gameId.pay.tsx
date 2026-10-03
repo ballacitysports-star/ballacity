@@ -1412,7 +1412,7 @@ function PaymentInstructionsAndProof({
             aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
+            <ExternalLink className="h-4 w-4" /> Pay {feeLabel(fee)} in {meta.name}
           </button>
         )}
         {(method.instructions || extraInstructions) && (
