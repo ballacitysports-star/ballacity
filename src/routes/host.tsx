@@ -121,6 +121,14 @@ function HostDashboard() {
           <CalendarDays className="h-4 w-4" /> Games
         </button>
         <button
+          onClick={() => setTab("calendar")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-colors ${
+            tab === "calendar" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+          }`}
+        >
+          <CalendarRange className="h-4 w-4" /> Calendar
+        </button>
+        <button
           onClick={() => setTab("payments")}
           className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-colors ${
             tab === "payments" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
@@ -132,6 +140,8 @@ function HostDashboard() {
 
       {tab === "payments" ? (
         <UnpaidPlayersPanel />
+      ) : tab === "calendar" ? (
+        <HostGamesCalendar games={games ?? []} />
       ) : games === null ? (
         <div className="p-4 text-sm text-muted-foreground">Loading…</div>
       ) : games.length === 0 ? (
