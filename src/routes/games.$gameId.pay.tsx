@@ -733,6 +733,7 @@ function PayPage() {
         <PaymentInstructionsAndProof
           game_id={game.id}
           game_title={game.title}
+          fee={settings.entry_fee ?? game.price}
           host_id={settings.host_id}
           method={picked}
           extraInstructions={settings.payment_instructions}
@@ -1138,6 +1139,7 @@ function PaymentReportLink({ hostId, gameId }: { hostId: string; gameId: string 
 function PaymentInstructionsAndProof({
   game_id,
   game_title,
+  fee,
   host_id,
   method,
   extraInstructions,
@@ -1146,6 +1148,7 @@ function PaymentInstructionsAndProof({
 }: {
   game_id: string;
   game_title: string;
+  fee?: number | null;
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
@@ -1164,7 +1167,8 @@ function PaymentInstructionsAndProof({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
-  const [paidAmount, setPaidAmount] = useState("");
+  const [paidAmount, setPaidAmount] = useState(() => (fee && fee > 0 ? String(fee) : ""));
+  const deepLink = resolvePaymentDeepLink(method, fee, game_title);
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1197,7 +1201,7 @@ function PaymentInstructionsAndProof({
   const handleOpenExternal = () => {
     setOpened(true);
     markExternalPaymentOpened(game_id, method.id);
-    if (method.payment_url) launchExternalPayment(method.payment_url);
+    if (deepLink.url) launchExternalPayment(deepLink.url, deepLink.copyText);
     // Give the new tab a beat to open, then scroll the proof form into view
     // so the user sees the return steps as soon as they come back.
     window.setTimeout(resumeAtProof, 300);
@@ -1401,7 +1405,7 @@ function PaymentInstructionsAndProof({
         </div>
         {method.username && <Field label="Send to" value={method.username} />}
         {method.contact_info && <Field label="Contact" value={method.contact_info} />}
-        {method.payment_url && (
+        {deepLink.url && (
           <button
             type="button"
             onClick={handleOpenExternal}
@@ -1423,7 +1427,7 @@ function PaymentInstructionsAndProof({
             How to pay
           </div>
           <ol className="list-decimal pl-4 space-y-1 text-foreground/90">
-            {method.payment_url ? (
+            {deepLink.url ? (
               <li>
                 Tap <span className="font-semibold">Open {meta.name} to pay</span> above — it opens
                 in a new tab.
