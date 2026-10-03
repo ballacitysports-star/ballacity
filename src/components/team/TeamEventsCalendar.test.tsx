@@ -15,7 +15,7 @@ const events = [
 describe("Team event calendar", () => {
   it("groups multiple events using the viewer date and retains undated events", () => {
     const grouped = groupCalendarEvents(events);
-    expect(grouped.get(dateKeyInZone(events[0].event_date))).toHaveLength(2);
+    expect(grouped.get(dateKeyInZone(events[0].event_date ?? ""))).toHaveLength(2);
     expect(grouped.get("")?.[0].id).toBe("tba");
     const boundary = { ...events[0], event_date: "2026-10-01T00:30:00Z" };
     expect(groupCalendarEvents([boundary]).has(dateKeyInZone(boundary.event_date))).toBe(true);
