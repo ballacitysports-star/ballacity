@@ -1,24 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, FileSignature, Loader2, X } from "lucide-react";
+import { FileSignature, Loader2 } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { getTeamRosterOverview } from "@/lib/tryouts.functions";
-
-type Waiver = { signedAt: string; byGuardian: boolean } | null;
-
-function WaiverBadge({ waiver, required }: { waiver: Waiver; required: boolean }) {
-  if (!required) return <span className="text-[11px] text-muted-foreground">No waiver</span>;
-  return waiver ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[11px] font-bold text-lime">
-      <Check className="h-3 w-3" /> Signed{waiver.byGuardian ? " by guardian" : ""}
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-coral/15 px-2 py-0.5 text-[11px] font-bold text-coral">
-      <X className="h-3 w-3" /> Not signed
-    </span>
-  );
-}
+import { WaiverBadge } from "./WaiverBadge";
 
 export function RsvpsTab({ teamId }: { teamId: string }) {
   const fn = useServerFn(getTeamRosterOverview);
