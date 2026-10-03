@@ -31,6 +31,7 @@ import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { GuardianTeamContactAction } from "@/components/team/GuardianTeamContactAction";
 import { useTeamPermissions } from "@/lib/team-roster";
+import { SignTeamWaiverCard } from "@/components/team/SignTeamWaiverCard";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
@@ -493,7 +494,12 @@ function TeamPage() {
         )}
 
         {/* Roster tab */}
-        {tab === "roster" && <TeamRosterPanel teamId={org.id} teamName={org.name} />}
+        {tab === "roster" && (
+          <>
+            <SignTeamWaiverCard teamId={org.id} teamName={org.name} />
+            <TeamRosterPanel teamId={org.id} teamName={org.name} />
+          </>
+        )}
 
         {/* About tab */}
         {tab === "about" && (
