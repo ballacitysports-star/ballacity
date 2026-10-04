@@ -126,6 +126,8 @@ export const rsvpTryout = createServerFn({ method: "POST" })
       _attested: data.attested,
     });
     if (error) return { ok: false as const, error: friendly(error.message) };
+    const { notifyTryoutSignup } = await import("./tryout-alerts.server");
+    await notifyTryoutSignup({ postId: data.postId, actorId: context.userId, attendeeId: data.onBehalfOf ?? context.userId, action: "registered" });
     return { ok: true as const };
   });
 
@@ -138,6 +140,8 @@ export const cancelTryoutRsvp = createServerFn({ method: "POST" })
       _on_behalf_of: data.onBehalfOf as any,
     });
     if (error) return { ok: false as const, error: friendly(error.message) };
+    const { notifyTryoutSignup } = await import("./tryout-alerts.server");
+    await notifyTryoutSignup({ postId: data.postId, actorId: context.userId, attendeeId: data.onBehalfOf ?? context.userId, action: "cancelled" });
     return { ok: true as const };
   });
 
