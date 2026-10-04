@@ -151,10 +151,15 @@ export function PostDetailsDialog({
           )}
 
           <div className="mt-5 flex gap-2">
-            {isEvent && (
-              <button className="flex-1 rounded-full bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime">
+            {isEvent && (post.kind === "tryout" || post.kind === "clinic") && (
+              <Link
+                to="/tryouts/$postId"
+                params={{ postId: post.id }}
+                onClick={() => onOpenChange(false)}
+                className="flex-1 rounded-full bg-lime-gradient py-2.5 text-center text-sm font-bold text-primary-foreground glow-lime"
+              >
                 {post.kind === "tryout" ? "Apply" : "RSVP"}
-              </button>
+              </Link>
             )}
             <button
               onClick={handleShare}

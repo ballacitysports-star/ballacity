@@ -449,6 +449,8 @@ const PUBLIC_ROUTES = [
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
+  // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
+  "/tryouts",
 ];
 const TAB_PATHS = [
   "/feed",
