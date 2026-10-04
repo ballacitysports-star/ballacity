@@ -35,7 +35,8 @@ export function TryoutsSection() {
   const [active, setActive] = useState<TryoutListing | null>(null);
   const [posting, setPosting] = useState(false);
 
-  const requireAuth = (fn: () => void) => (user ? fn() : navigate({ to: "/auth" }));
+  const requireAuth = (fn: () => void) =>
+    user ? fn() : navigate({ to: "/auth", search: { next: "/#tryouts" } as any });
 
   return (
     <section id="tryouts" className="page-shell py-16" aria-labelledby="tryouts-heading">
@@ -172,6 +173,9 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                       <span>{onBehalf ? "I am this child's parent or legal guardian and agree to this waiver on their behalf." : "I have read and agree to this waiver."}</span>
                     </label>
                   </div>
+                )}
+                {needsWaiver && !agree && (
+                  <p className="text-xs font-semibold text-coral">Check the waiver box above to continue.</p>
                 )}
                 <Button className="w-full" disabled={busy || (needsWaiver && !agree)} onClick={submit}>
                   {needsWaiver ? "Sign waiver & RSVP" : "RSVP"}
