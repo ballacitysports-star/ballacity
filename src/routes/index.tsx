@@ -62,8 +62,8 @@ export const Route = createFileRoute("/")({
       description: SITE_DESCRIPTION,
       image: ogImageUrl({
         kind: "page",
-        title: "Pickup games, teams & trainers near you",
-        subtitle: "Find a game, grab your spot, and play today.",
+        title: "Find games. Join teams.",
+        subtitle: "Your city's sports network — pickup, tryouts, trainers and facilities.",
         meta: ["Basketball", "Soccer", "Baseball"],
       }),
       jsonLd: [
@@ -229,33 +229,37 @@ function Landing() {
         </div>
       </section>
 
-      {/* Sports */}
-      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
-        <div className="mb-6">
-          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Pickup games for every sport
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
-          </p>
+      {/* Trending */}
+      <section id="trending" className="page-shell py-16">
+        <div className="flex items-end justify-between mb-6">
+          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+          <Link
+            to="/feed"
+            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
+          >
+            See all <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {SPORT_GUIDES.map((g, i) => (
-            <li key={g.slug}>
-              <Link
-                to="/guide/$sport"
-                params={{ sport: g.slug }}
-                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
-                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
-              >
-                <span aria-hidden className="block text-3xl mb-2">
-                  {g.emoji}
-                </span>
-                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {trending.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+            <p className="font-semibold">No games posted near you yet.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Be the first to put one on the board — hosting takes about a minute.
+            </p>
+            <Link
+              to="/create"
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+            >
+              Host a game <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {trending.map((g, i) => (
+              <GameCard key={g.id} game={g} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* How it works */}
@@ -477,43 +481,39 @@ function Landing() {
         </div>
       </section>
 
-      {/* Trending */}
-      <section id="trending" className="page-shell py-16">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link
-            to="/feed"
-            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
-          >
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
+      {/* Sports */}
+      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
+        <div className="mb-6">
+          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Pickup games for every sport
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
+          </p>
         </div>
-        {trending.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
-            <p className="font-semibold">No games posted near you yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Be the first to put one on the board — hosting takes about a minute.
-            </p>
-            <Link
-              to="/create"
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
-            >
-              Host a game <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trending.map((g, i) => (
-              <GameCard key={g.id} game={g} index={i} />
-            ))}
-          </div>
-        )}
+        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {SPORT_GUIDES.map((g, i) => (
+            <li key={g.slug}>
+              <Link
+                to="/guide/$sport"
+                params={{ sport: g.slug }}
+                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
+                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+              >
+                <span aria-hidden className="block text-3xl mb-2">
+                  {g.emoji}
+                </span>
+                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* FAQ */}
       <section id="faq" className="page-shell-prose py-16" aria-labelledby="faq-heading">
         <h2 id="faq-heading" className="font-display text-3xl md:text-4xl font-bold mb-6">
-          Pickup sports questions
+          Common questions
         </h2>
         <div className="space-y-3">
           {FAQS.map((f) => (
