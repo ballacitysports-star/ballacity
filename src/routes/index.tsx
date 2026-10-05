@@ -158,12 +158,6 @@ function Landing() {
               Facilities
             </a>
           </nav>
-          <Link
-            to="/feed"
-            className="inline-flex items-center gap-1.5 rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
-          >
-            Open app <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
       </header>
 
