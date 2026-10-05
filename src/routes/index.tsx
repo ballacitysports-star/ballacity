@@ -145,14 +145,17 @@ function Landing() {
         <div className="page-shell flex items-center justify-between py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
+            <a href="#trending" className="hover:text-foreground">
+              Games
+            </a>
+            <a href="#tryouts" className="hover:text-foreground">
+              Tryouts
+            </a>
             <a href="#availability" className="hover:text-foreground">
               Get found
             </a>
-            <a href="#sports" className="hover:text-foreground">
-              Sports
-            </a>
-            <a href="#trending" className="hover:text-foreground">
-              Trending
+            <a href="#for-facilities" className="hover:text-foreground">
+              Facilities
             </a>
           </nav>
           <Link
@@ -167,22 +170,22 @@ function Landing() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 grid-noise opacity-30" />
-        <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
-          <div>
+        <div className="relative page-shell pt-12 pb-16 md:pt-20 md:pb-24">
+          <div className="max-w-3xl">
             <h1
               style={{ "--enter-delay": "50ms" } as CSSProperties}
               className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
-              Find pickup games
+              Find games. Join teams.
               <br />
-              <span className="text-lime">near you.</span>
+              <span className="text-lime">Your city's sports network.</span>
             </h1>
             <p
               style={{ "--enter-delay": "120ms" } as CSSProperties}
-              className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
+              className="enter-up mt-5 max-w-xl text-lg text-muted-foreground"
             >
-              Join local pickup basketball, soccer, baseball, pickleball and more — or host your
-              own run in about a minute.
+              Pickup runs, team tryouts and camps, trainers and local facilities — plus a place to
+              post your availability so coaches can find you.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
@@ -201,6 +204,27 @@ function Landing() {
                 Host a game
               </Link>
             </div>
+            <nav
+              aria-label="Explore ballaCity"
+              style={{ "--enter-delay": "240ms" } as CSSProperties}
+              className="enter-up mt-8 flex flex-wrap gap-2"
+            >
+              {[
+                ["#trending", "🏀 Pickup games"],
+                ["#tryouts", "📋 Tryouts & camps"],
+                ["#availability", "🙋 Get found"],
+                ["#for-teams", "🧢 Teams & trainers"],
+                ["#for-facilities", "🏢 Gyms & facilities"],
+              ].map(([href, label]) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
           </div>
         </div>
       </section>
