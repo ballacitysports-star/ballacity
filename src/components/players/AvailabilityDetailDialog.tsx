@@ -176,5 +176,6 @@ export function AvailabilityDetailDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }
