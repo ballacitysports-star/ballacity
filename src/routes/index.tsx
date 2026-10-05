@@ -62,8 +62,8 @@ export const Route = createFileRoute("/")({
       description: SITE_DESCRIPTION,
       image: ogImageUrl({
         kind: "page",
-        title: "Pickup games, teams & trainers near you",
-        subtitle: "Find a game, grab your spot, and play today.",
+        title: "Find games. Join teams.",
+        subtitle: "Your city's sports network — pickup, tryouts, trainers and facilities.",
         meta: ["Basketball", "Soccer", "Baseball"],
       }),
       jsonLd: [
@@ -145,14 +145,17 @@ function Landing() {
         <div className="page-shell flex items-center justify-between py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
+            <a href="#trending" className="hover:text-foreground">
+              Games
+            </a>
+            <a href="#tryouts" className="hover:text-foreground">
+              Tryouts
+            </a>
             <a href="#availability" className="hover:text-foreground">
               Get found
             </a>
-            <a href="#sports" className="hover:text-foreground">
-              Sports
-            </a>
-            <a href="#trending" className="hover:text-foreground">
-              Trending
+            <a href="#for-facilities" className="hover:text-foreground">
+              Facilities
             </a>
           </nav>
           <Link
@@ -167,22 +170,22 @@ function Landing() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 grid-noise opacity-30" />
-        <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
-          <div>
+        <div className="relative page-shell pt-12 pb-16 md:pt-20 md:pb-24">
+          <div className="max-w-3xl">
             <h1
               style={{ "--enter-delay": "50ms" } as CSSProperties}
               className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
-              Find pickup games
+              Find games. Join teams.
               <br />
-              <span className="text-lime">near you.</span>
+              <span className="text-lime">Your city's sports network.</span>
             </h1>
             <p
               style={{ "--enter-delay": "120ms" } as CSSProperties}
-              className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
+              className="enter-up mt-5 max-w-xl text-lg text-muted-foreground"
             >
-              Join local pickup basketball, soccer, baseball, pickleball and more — or host your
-              own run in about a minute.
+              Pickup runs, team tryouts and camps, trainers and local facilities — plus a place to
+              post your availability so coaches can find you.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
@@ -201,37 +204,62 @@ function Landing() {
                 Host a game
               </Link>
             </div>
+            <nav
+              aria-label="Explore ballaCity"
+              style={{ "--enter-delay": "240ms" } as CSSProperties}
+              className="enter-up mt-8 flex flex-wrap gap-2"
+            >
+              {[
+                ["#trending", "🏀 Pickup games"],
+                ["#tryouts", "📋 Tryouts & camps"],
+                ["#availability", "🙋 Get found"],
+                ["#for-teams", "🧢 Teams & trainers"],
+                ["#for-facilities", "🏢 Gyms & facilities"],
+              ].map(([href, label]) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
           </div>
         </div>
       </section>
 
-      {/* Sports */}
-      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
-        <div className="mb-6">
-          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Pickup games for every sport
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
-          </p>
+      {/* Trending */}
+      <section id="trending" className="page-shell py-16">
+        <div className="flex items-end justify-between mb-6">
+          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+          <Link
+            to="/feed"
+            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
+          >
+            See all <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {SPORT_GUIDES.map((g, i) => (
-            <li key={g.slug}>
-              <Link
-                to="/guide/$sport"
-                params={{ sport: g.slug }}
-                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
-                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
-              >
-                <span aria-hidden className="block text-3xl mb-2">
-                  {g.emoji}
-                </span>
-                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {trending.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+            <p className="font-semibold">No games posted near you yet.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Be the first to put one on the board — hosting takes about a minute.
+            </p>
+            <Link
+              to="/create"
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+            >
+              Host a game <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {trending.map((g, i) => (
+              <GameCard key={g.id} game={g} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* How it works */}
@@ -453,43 +481,39 @@ function Landing() {
         </div>
       </section>
 
-      {/* Trending */}
-      <section id="trending" className="page-shell py-16">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link
-            to="/feed"
-            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
-          >
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
+      {/* Sports */}
+      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
+        <div className="mb-6">
+          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Pickup games for every sport
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
+          </p>
         </div>
-        {trending.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
-            <p className="font-semibold">No games posted near you yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Be the first to put one on the board — hosting takes about a minute.
-            </p>
-            <Link
-              to="/create"
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
-            >
-              Host a game <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trending.map((g, i) => (
-              <GameCard key={g.id} game={g} index={i} />
-            ))}
-          </div>
-        )}
+        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {SPORT_GUIDES.map((g, i) => (
+            <li key={g.slug}>
+              <Link
+                to="/guide/$sport"
+                params={{ sport: g.slug }}
+                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
+                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+              >
+                <span aria-hidden className="block text-3xl mb-2">
+                  {g.emoji}
+                </span>
+                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* FAQ */}
       <section id="faq" className="page-shell-prose py-16" aria-labelledby="faq-heading">
         <h2 id="faq-heading" className="font-display text-3xl md:text-4xl font-bold mb-6">
-          Pickup sports questions
+          Common questions
         </h2>
         <div className="space-y-3">
           {FAQS.map((f) => (

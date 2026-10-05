@@ -10,9 +10,9 @@ export const SITE_URL = "https://ballacity.com";
 export const SITE_NAME = "ballaCity";
 /** The site’s own title and description. Pages either use these verbatim or
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */
-export const SITE_TITLE = "BallaCity | Find & Join Local Pickup Sports Games";
+export const SITE_TITLE = "BallaCity | Find Games, Join Teams — Your City's Sports Network";
 export const SITE_DESCRIPTION =
-  "Find and join pickup baseball, basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity and grab your spot fast.";
+  "Find pickup games, team tryouts and camps, trainers and gyms near you. Post your availability so coaches can find you — basketball, soccer, baseball, pickleball and more.";
 
 
 type MetaTag = Record<string, string>;
