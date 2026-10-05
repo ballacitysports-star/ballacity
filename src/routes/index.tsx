@@ -2,7 +2,9 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
 import {
   ArrowRight,
+  Building2,
   CalendarClock,
+  ShieldCheck,
   ClipboardList,
   Dumbbell,
   MapPin,
@@ -382,6 +384,73 @@ function Landing() {
             );
           })}
         </ul>
+      </section>
+
+      {/* Gyms & facilities */}
+      <section
+        id="for-facilities"
+        className="page-shell py-16"
+        aria-labelledby="for-facilities-heading"
+      >
+        <div className="rounded-3xl border border-border bg-surface p-6 md:p-10">
+          <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
+            <Building2 className="h-5 w-5" />
+          </div>
+          <h2 id="for-facilities-heading" className="font-display text-3xl md:text-4xl font-bold">
+            For gyms &amp; facilities
+          </h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl">
+            Put your courts, fields and training space in front of local players, parents,
+            teams and trainers.
+          </p>
+          <ul className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                icon: MapPin,
+                title: "Get discovered",
+                body: "A listing with your address, hours, photos and amenities, shown to players nearby.",
+              },
+              {
+                icon: CalendarClock,
+                title: "Host more play",
+                body: "Your venue becomes the home for pickup runs, tryouts, camps and clinics.",
+              },
+              {
+                icon: Dumbbell,
+                title: "Work with trainers",
+                body: "Local trainers can list your facility as where they run their sessions.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Build trust",
+                body: "Claim your listing, keep details accurate and collect reviews from players.",
+              },
+            ].map((f) => {
+              const Icon = f.icon;
+              return (
+                <li key={f.title} className="rounded-2xl border border-border bg-background/40 p-5">
+                  <Icon className="h-5 w-5 text-lime" />
+                  <h3 className="font-display text-lg font-semibold mt-3">{f.title}</h3>
+                  <p className="text-muted-foreground mt-1 text-sm">{f.body}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              to="/orgs/create"
+              className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+            >
+              List your facility <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/orgs"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
+            >
+              Explore facilities
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* Trending */}
