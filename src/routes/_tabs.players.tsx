@@ -1291,6 +1291,7 @@ function AvailabilityCard({
           <Shield className="h-4 w-4 mr-1" /> Invite to team
         </Button>
       )}
+      {guardianFallback.dialog}
       {teamInviteOpen && (
         <InviteToTeamDialog
           playerId={a.user_id}

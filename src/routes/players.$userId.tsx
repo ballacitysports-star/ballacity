@@ -335,6 +335,7 @@ function PlayerProfilePage() {
 
   return (
     <div className="page-shell-flush pb-28">
+      {guardianFallback.dialog}
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
         bannerOverlay={
