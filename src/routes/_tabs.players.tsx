@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1080,14 +1081,8 @@ function AvailabilityCard({
     ? (a.author_links as ProfileLink[])
     : [];
 
-  const handleMessage = async () => {
-    try {
-      const id = await getOrCreateDirectConversation(a.user_id);
-      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) {
-      toast.error(describeMessagingError(e));
-    }
-  };
+  const guardianFallback = useMessageOrGuardian();
+  const handleMessage = () => guardianFallback.startMessage(a.user_id, a.author_name);
 
   const handleDelete = async () => {
     if (!confirm("Remove this availability post?")) return;
@@ -1296,6 +1291,7 @@ function AvailabilityCard({
           <Shield className="h-4 w-4 mr-1" /> Invite to team
         </Button>
       )}
+      {guardianFallback.dialog}
       {teamInviteOpen && (
         <InviteToTeamDialog
           playerId={a.user_id}

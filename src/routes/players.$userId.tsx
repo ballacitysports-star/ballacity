@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -210,6 +211,7 @@ function PlayerProfilePage() {
   const [shareOpen, setShareOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
+  const guardianFallback = useMessageOrGuardian();
   const unit = useDistanceUnit();
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
@@ -266,10 +268,7 @@ function PlayerProfilePage() {
     }
     setOpening(true);
     try {
-      const id = await getOrCreateDirectConversation(userId);
-      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) {
-      toast.error(describeMessagingError(e));
+      await guardianFallback.startMessage(userId, profile?.display_name ?? "this player");
     } finally {
       setOpening(false);
     }
@@ -336,6 +335,7 @@ function PlayerProfilePage() {
 
   return (
     <div className="page-shell-flush pb-28">
+      {guardianFallback.dialog}
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
         bannerOverlay={
