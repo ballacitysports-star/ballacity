@@ -1,3 +1,4 @@
+import { VenueBadge } from "@/components/venue/VenueBadge";
 import { ageRequirementLabel } from "@/lib/game-age";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import type { CSSProperties } from "react";
@@ -189,6 +190,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
+          {game.orgId && (
+            <div className="flex min-w-0">
+              <VenueBadge orgId={game.orgId} />
+            </div>
+          )}
           {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
             <div className="flex flex-wrap gap-1">
               {Object.entries(game.positionsNeeded)

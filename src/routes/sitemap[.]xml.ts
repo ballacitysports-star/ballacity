@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 import { SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDE_SLUGS } from "@/lib/sports-guide";
-
+import { facilitySitemapEntries } from "@/lib/org-seo";
 
 interface SitemapEntry {
   path: string;
   changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority?: string;
+  /** YYYY-MM-DD of the last real change. */
+  lastmod?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ const ENTRIES: SitemapEntry[] = [
       priority: "0.7",
     }),
   ),
+
 
 
 
@@ -72,7 +75,24 @@ export const Route = createFileRoute("/sitemap.xml")({
           // is the safe direction.
         }
 
-        const entries = ENTRIES.filter(
+        // Public facility pages, so search engines can find each gym without
+        // having to crawl through the directory. Hidden facilities are
+        // excluded explicitly because this reads with the service role.
+        let facilityEntries: SitemapEntry[] = [];
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data } = await supabaseAdmin
+            .from("trainer_orgs")
+            .select("id, updated_at")
+            .is("hidden_at", null)
+            .order("updated_at", { ascending: false })
+            .limit(5000);
+          facilityEntries = facilitySitemapEntries(data ?? []);
+        } catch {
+          // A read failure must not break the sitemap; omitting gyms is safe.
+        }
+
+        const entries = [...ENTRIES, ...facilityEntries].filter(
           (e) =>
             (e.path !== "/shop" || merchEnabled) && (e.path !== "/plans" || subscriptionsEnabled),
         );
@@ -81,6 +101,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           [
             `  <url>`,
             `    <loc>${SITE_URL}${e.path}</loc>`,
+            e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>` : null,
             e.changefreq ? `    <changefreq>${e.changefreq}</changefreq>` : null,
             e.priority ? `    <priority>${e.priority}</priority>` : null,
             `  </url>`,

@@ -26,8 +26,37 @@ export function HoursEditor({
     onChange(next);
   }
 
+  function applyPreset(kind: "daily" | "weekdays" | "always") {
+    const next: OrgHours = {};
+    for (let d = 0; d < 7; d++) {
+      if (kind === "always") next[String(d)] = { open24: true };
+      else if (kind === "weekdays" && (d === 0 || d === 6)) next[String(d)] = { closed: true };
+      else next[String(d)] = { ranges: [{ open: "09:00", close: "21:00" }] };
+    }
+    onChange(next);
+  }
+
   return (
     <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-semibold text-muted-foreground">Quick set:</span>
+        {(
+          [
+            ["daily", "Daily 9 AM – 9 PM"],
+            ["weekdays", "Weekdays only"],
+            ["always", "Open 24/7"],
+          ] as const
+        ).map(([kind, label]) => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => applyPreset(kind)}
+            className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-lime/60 hover:text-foreground"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {WEEKDAYS.map((label, day) => {
         const d = dayHours(value, day);
         const range = d.ranges?.[0] ?? { open: "09:00", close: "21:00" };

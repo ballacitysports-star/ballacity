@@ -21,6 +21,9 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
+import { buildFacilityJsonLd } from "@/lib/org-seo";
+import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
+import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +40,7 @@ import { toast } from "sonner";
 import {
   getTrainerOrg,
   getTrainerOrgContact,
+  getMyOrgAccess,
   listJoinRequestsForOrg,
   reviewJoinRequest,
   listMyTrainerProfiles,
@@ -63,9 +67,10 @@ export const Route = createFileRoute("/orgs/$orgId/")({
     const name = org?.name ?? "Gym";
     return pageHead({
       path: `/orgs/${params.orgId}`,
-      title: `${name} — Gym on ballaCity`,
+      title: `${name} — ${org?.category || "Gym"} on ballaCity`,
       description: (
-        org?.bio || `${name} on ballaCity: hours, amenities, trainers, and member reviews.`
+        org?.bio ||
+        `${name}${org?.city ? ` in ${org.city}` : ""} on ballaCity: hours, amenities, upcoming runs, and how to book a court.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "venue",
@@ -74,15 +79,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
         meta: [org?.city, "Hours & amenities", "Member reviews"],
       }),
       noindex: !org,
-      jsonLd: org
-        ? {
-            "@context": "https://schema.org",
-            "@type": "SportsActivityLocation",
-            name: org.name,
-            address: org.address ?? org.city ?? undefined,
-            url: `https://ballacity.com/orgs/${params.orgId}`,
-          }
-        : undefined,
+      jsonLd: org ? buildFacilityJsonLd({ ...org, id: params.orgId }) : undefined,
     });
   },
   loader: async ({ params }) => {
@@ -143,7 +140,6 @@ function OrgPage() {
   const members = (data?.members ?? []) as Array<{
     id: string;
     trainer_id: string;
-    user_id: string;
     role: string;
     teams?: {
       id: string;
@@ -154,10 +150,15 @@ function OrgPage() {
       sports: string[] | null;
     } | null;
   }>;
-  const myMembership = auth.user ? members.find((m) => m.user_id === auth.user!.id) : null;
+  // The public roster carries no user ids, so the viewer's own standing comes
+  // from a signed-in lookup (owner/admin by role or ownership).
+  const access = useQuery({
+    queryKey: ["my-org-access", orgId, auth.user?.id ?? "anon"],
+    queryFn: () => getMyOrgAccess({ data: { orgId } }),
+    enabled: !!auth.user,
+  });
   const isOwner = !!auth.user && !!org && org.owner_id === auth.user.id;
-  const isAdmin =
-    isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
+  const isAdmin = isOwner || !!access.data?.isAdmin;
 
   const gymReviews = useGymReviews(orgId);
   const reviewSummary = summarizeGymReviews(gymReviews.data ?? []);
@@ -200,6 +201,10 @@ function OrgPage() {
       {org.owner_id === null && (
         <ClaimListingCard subjectType="gym" subjectId={orgId} name={org.name} />
       )}
+
+      <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
+
+      {isAdmin && <CourtInquiriesSection orgId={orgId} />}
 
       <div id="gym-reviews">
         <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />
@@ -288,7 +293,7 @@ function MembershipCta({
   members,
 }: {
   orgId: string;
-  members: Array<{ trainer_id: string; user_id: string; role: string }>;
+  members: Array<{ trainer_id: string; role: string }>;
 }) {
   const auth = useAuth();
   const qc = useQueryClient();
@@ -308,9 +313,7 @@ function MembershipCta({
   const owned = myTrainers.data ?? [];
   const ownedIds = new Set(owned.map((t) => t.id));
 
-  const myMember = signedIn
-    ? members.find((m) => m.user_id === auth.user!.id && ownedIds.has(m.trainer_id))
-    : undefined;
+  const myMember = signedIn ? members.find((m) => ownedIds.has(m.trainer_id)) : undefined;
 
   const invites = useQuery({
     queryKey: ["my-invites-for-org", orgId, owned.map((t) => t.id).join(",")],
@@ -581,9 +584,12 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
-  const members = useQuery({
-    queryKey: ["org-members", orgId],
-    queryFn: () => listOrgMembers({ data: { orgId } }),
+  // The member list is only visible to members and admins, so "am I already a
+  // member?" is answered from the viewer's own row instead.
+  const access = useQuery({
+    queryKey: ["my-org-access", orgId, auth.user?.id ?? "anon"],
+    queryFn: () => getMyOrgAccess({ data: { orgId } }),
+    enabled: !!auth.user,
   });
   const myReq = useQuery({
     queryKey: ["my-org-member-request", orgId],
@@ -592,7 +598,7 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
   });
 
   if (!auth.user) return null;
-  const isMember = (members.data ?? []).some((m) => m.user_id === auth.user!.id);
+  const isMember = !!access.data?.isMember;
   if (isMember) {
     return (
       <div className="flex items-center gap-2">
@@ -608,6 +614,7 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
               await leaveOrgMembership({ data: { orgId } });
               toast.success("Left gym");
               qc.invalidateQueries({ queryKey: ["org-members", orgId] });
+              qc.invalidateQueries({ queryKey: ["my-org-access", orgId] });
               qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Failed");

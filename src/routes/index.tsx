@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
 import { TryoutsSection } from "@/components/tryouts/TryoutsSection";
+import { FeaturedFacilityTrainer } from "@/components/landing/FeaturedFacilityTrainer";
 
 const FAQS = [
   {
@@ -458,6 +459,7 @@ function Landing() {
               );
             })}
           </ul>
+          <FeaturedFacilityTrainer />
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               to="/orgs/create"

@@ -28,6 +28,13 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeAddress, reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
+import { getOrgEventContext, listMyManagedOrgs } from "@/lib/trainer-orgs.functions";
+import {
+  defaultFacilityEventTitle,
+  facilityEventKindLabel,
+  isFacilityEventKind,
+  type FacilityEventKind,
+} from "@/lib/facility-events";
 import { useQuery } from "@tanstack/react-query";
 import { useMyProfiles } from "@/lib/account-profiles";
 
@@ -77,11 +84,27 @@ export const Route = createFileRoute("/_tabs/create")({
       description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
       noindex: true,
     }),
+  // `orgId` / `kind` come from a facility page's "Post event / open run"
+  // action. The org is re-verified server-side before anything is pre-filled.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { orgId?: string; kind?: FacilityEventKind } => ({
+    orgId:
+      typeof search.orgId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.orgId)
+        ? search.orgId
+        : undefined,
+    kind: isFacilityEventKind(search.kind) ? search.kind : undefined,
+  }),
   component: Create,
 });
 
 function Create() {
   const nav = useNavigate();
+  const { orgId: orgIdParam, kind: eventKind = "run" } = Route.useSearch();
+  // The facility this run is hosted at: from the facility page link, or picked
+  // in the "Host at a facility" selector.
+  const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const { can: canFeature } = useMyChildStatus();
@@ -209,6 +232,51 @@ function Create() {
   const geocode = useServerFn(geocodeAddress);
   // Real venue coordinates, used to compute each viewer's distance to the game.
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Facility event: only an owner/admin of the facility gets its location,
+  // address and org id pre-filled (checked on the server, not just the UI).
+  const fetchOrgContext = useServerFn(getOrgEventContext);
+  const fetchManagedOrgs = useServerFn(listMyManagedOrgs);
+  const managedOrgsQuery = useQuery({
+    queryKey: ["my-managed-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchManagedOrgs(),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const managedOrgs = managedOrgsQuery.data ?? [];
+  const orgContextQuery = useQuery({
+    queryKey: ["org-event-context", facilityId, user?.id ?? "anon"],
+    queryFn: () => fetchOrgContext({ data: { orgId: facilityId! } }),
+    enabled: !!facilityId && !!user,
+    staleTime: 60_000,
+  });
+  const postingOrg = orgContextQuery.data?.canPost ? orgContextQuery.data.org : null;
+  // Which facility's details were last filled in, and the title we generated,
+  // so switching facilities refreshes them without clobbering a typed title.
+  const prefilledForRef = useRef<string | null>(null);
+  const autoTitleRef = useRef("");
+  useEffect(() => {
+    if (!postingOrg) {
+      prefilledForRef.current = null;
+      return;
+    }
+    if (prefilledForRef.current === postingOrg.id) return;
+    prefilledForRef.current = postingOrg.id;
+    // The facility's venue wins over the GPS / profile-city auto-fill.
+    locationEditedRef.current = true;
+    setLocation(postingOrg.address || postingOrg.name);
+    setCoords(
+      postingOrg.lat != null && postingOrg.lng != null
+        ? { lat: postingOrg.lat, lng: postingOrg.lng }
+        : null,
+    );
+    const nextTitle = defaultFacilityEventTitle(eventKind, postingOrg.name);
+    setTitle((cur) => (!cur || cur === autoTitleRef.current ? nextTitle : cur));
+    autoTitleRef.current = nextTitle;
+    const amenities = postingOrg.amenities.join(" ").toLowerCase();
+    if (/indoor|hardwood/.test(amenities)) setIndoor(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postingOrg]);
   useEffect(() => {
     if (locationEditedRef.current) return;
     if (location.trim()) return;
@@ -359,14 +427,77 @@ function Create() {
   return (
     <div className="page-shell-content pt-6">
       <div className="flex items-center gap-3 mb-5">
-        <Link
-          to="/feed"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="page-title">Host a game</h1>
+        {orgIdParam ? (
+          <Link
+            to="/orgs/$orgId"
+            params={{ orgId: orgIdParam }}
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        ) : (
+          <Link
+            to="/feed"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        )}
+        <h1 className="page-title">{postingOrg ? "Post an event" : "Host a game"}</h1>
       </div>
+
+      {facilityId && orgContextQuery.isLoading && (
+        <div className="mb-4 h-14 animate-pulse rounded-2xl bg-surface" />
+      )}
+      {postingOrg && (
+        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-lime/30 bg-lime/10 px-4 py-3 text-xs">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-lime" />
+          <div className="min-w-0">
+            <div className="font-bold text-foreground">
+              {facilityEventKindLabel(eventKind)} at {postingOrg.name}
+            </div>
+            <div className="text-muted-foreground">
+              It will be listed on the facility page. Location and address are pre-filled — you can
+              still change any detail below.
+            </div>
+          </div>
+        </div>
+      )}
+      {facilityId && orgContextQuery.data && !orgContextQuery.data.canPost && (
+        <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-xs text-coral">
+          Only a facility&apos;s owner or admins can post events for it. You can still host this as
+          a regular game.
+        </div>
+      )}
+      {facilityId && orgContextQuery.isError && (
+        <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-xs text-coral">
+          Couldn&apos;t load that facility, so it won&apos;t be attached to this game.
+        </div>
+      )}
+
+      {managedOrgs.length > 0 && (
+        <label className="mb-4 block rounded-2xl border border-border bg-surface p-4">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Host at a facility
+          </span>
+          <select
+            value={facilityId ?? ""}
+            onChange={(e) => setFacilityId(e.target.value || null)}
+            className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60"
+          >
+            <option value="">Not at a listed facility</option>
+            {managedOrgs.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+                {o.city ? ` · ${o.city}` : ""}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1.5 block text-[11px] text-muted-foreground">
+            Fills in the address and map pin, and lists the run on the facility&apos;s page.
+          </span>
+        </label>
+      )}
 
       {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
         <AvailabilityPromptBanner className="mb-4" />
@@ -376,6 +507,10 @@ function Create() {
         onSubmit={async (e) => {
           e.preventDefault();
           if (publishing) return;
+          if (facilityId && orgContextQuery.isLoading) {
+            toast.error("Still loading the facility details — try again in a moment.");
+            return;
+          }
           if (!user) {
             toast.error("Sign in to host a game");
             nav({ to: "/auth", search: { redirect: "/create" } as any });
@@ -487,7 +622,7 @@ function Create() {
                 minAge,
                 maxAge,
                 teamId: selectedAffiliation?.id,
-                orgId: undefined,
+                orgId: postingOrg?.id,
                 seriesId,
                 endsAt: plan.endIso,
                 allDay: plan.allDay,
@@ -592,9 +727,7 @@ function Create() {
                           {(a.name || "?").slice(0, 1).toUpperCase()}
                         </span>
                         <span className="truncate max-w-[10rem]">{a.name}</span>
-                        <span className="micro-label opacity-70">
-                          {affiliationShortLabel(a)}
-                        </span>
+                        <span className="micro-label opacity-70">{affiliationShortLabel(a)}</span>
                       </button>
                     );
                   })}

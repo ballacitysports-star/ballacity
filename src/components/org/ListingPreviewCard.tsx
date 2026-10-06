@@ -1,5 +1,15 @@
-import { Building2, MapPin, Phone, Globe, Navigation, Share2, Star } from "lucide-react";
-import { resolveOpenState, type OrgHours } from "@/lib/org-hours";
+import { Building2, Clock, MapPin, Phone, Globe, Navigation, Share2, Star } from "lucide-react";
+import { VenueMapPreview } from "@/components/VenueMapPreview";
+import {
+  WEEKDAYS,
+  dayHours,
+  formatDayHours,
+  hasAnyHours,
+  localNow,
+  resolveOpenState,
+  type OrgHours,
+} from "@/lib/org-hours";
+import { courtCountFromAmenities, courtCountLabel } from "@/lib/org-listing";
 
 export type ListingPreview = {
   name: string;
@@ -15,6 +25,8 @@ export type ListingPreview = {
   amenities: string[];
   hours: OrgHours;
   timezone?: string | null;
+  geo?: { lat: number; lng: number } | null;
+  placeId?: string | null;
   verified?: boolean;
   rating?: number | null;
   reviewCount?: number;
@@ -35,6 +47,9 @@ export function ListingPreviewCard({
 }) {
   const strip = [v.coverUrl, ...v.photos].filter(Boolean);
   const open = resolveOpenState(v.hours, v.timezone);
+  const today = localNow(v.timezone).day;
+  const courts = courtCountFromAmenities(v.amenities);
+  const chips = v.amenities.filter((a) => courtCountFromAmenities([a]) === null);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
@@ -92,9 +107,9 @@ export function ListingPreviewCard({
                 className={
                   open.status === "open"
                     ? open.closingSoon
-                      ? "font-semibold text-amber-500"
-                      : "font-semibold text-lime"
-                    : "font-semibold text-muted-foreground"
+                      ? "rounded-full bg-amber-500/15 px-2 py-0.5 font-bold text-amber-500"
+                      : "rounded-full bg-lime/15 px-2 py-0.5 font-bold text-lime"
+                    : "rounded-full bg-secondary px-2 py-0.5 font-bold text-muted-foreground"
                 }
               >
                 {open.status === "open"
@@ -120,6 +135,36 @@ export function ListingPreviewCard({
           </div>
         )}
 
+        {hasAnyHours(v.hours) && (
+          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <Clock className="h-3 w-3" /> Weekly hours
+            </div>
+            <ul className="space-y-0.5 text-[11px]">
+              {WEEKDAYS.map((label, d) => (
+                <li
+                  key={label}
+                  className={`flex justify-between gap-3 ${d === today ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                >
+                  <span>{label.slice(0, 3)}</span>
+                  <span>{formatDayHours(dayHours(v.hours, d))}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {v.geo && (
+          <div className="overflow-hidden rounded-xl border border-border/60">
+            <VenueMapPreview
+              address={v.address || v.name}
+              lat={v.geo.lat}
+              lng={v.geo.lng}
+              placeId={v.placeId || undefined}
+            />
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-1.5 pt-1">
           {[
             { icon: Navigation, label: "Directions" },
@@ -136,13 +181,23 @@ export function ListingPreviewCard({
           ))}
         </div>
 
-        {v.amenities.length > 0 && (
+        {(courts || chips.length > 0) && (
           <div className="flex flex-wrap gap-1 pt-1">
-            {v.amenities.slice(0, 6).map((a) => (
+            {courts ? (
+              <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[11px] font-semibold text-lime">
+                {courtCountLabel(courts)}
+              </span>
+            ) : null}
+            {chips.slice(0, 10).map((a) => (
               <span key={a} className="rounded-full bg-secondary px-2 py-0.5 text-[11px]">
                 {a}
               </span>
             ))}
+            {chips.length > 10 && (
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                +{chips.length - 10} more
+              </span>
+            )}
           </div>
         )}
       </div>

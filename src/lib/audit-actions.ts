@@ -62,6 +62,8 @@ export const AUDIT_ACTIONS = {
   "listing.delete_unclaimed": { label: "Unclaimed listing deleted", category: "content" },
   "listing.claim_approve": { label: "Listing claim approved", category: "content" },
   "listing.claim_deny": { label: "Listing claim denied", category: "content" },
+  "listing.feature": { label: "Facility featured", category: "content" },
+  "listing.unfeature": { label: "Facility unfeatured", category: "content" },
 
   // Reports
   "report.resolve": { label: "Report resolved", category: "reports" },
