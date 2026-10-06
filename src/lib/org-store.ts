@@ -179,7 +179,8 @@ function orgToInsert(org: Org) {
     rating_max: org.ratingMax ?? null,
     distances: org.distances ?? [],
     session_types: org.sessionTypes ?? [],
-    age_groups: org.ageGroups ?? [],
+    // Only sent when set, so profiles that don't use it never depend on the column.
+    ...(org.ageGroups?.length ? { age_groups: org.ageGroups } : {}),
     availability_slots: org.kind === "coach" ? (org.availabilitySlots ?? []) : [],
     availability_overrides: org.kind === "coach" ? (org.availabilityOverrides ?? []) : [],
     availability_rules: org.kind === "coach" ? (org.availabilityRules ?? []) : [],

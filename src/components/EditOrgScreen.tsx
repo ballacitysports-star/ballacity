@@ -441,7 +441,12 @@ export function EditOrgScreen({ org }: { org: Org }) {
       credentials: kind === "coach" ? credentials : undefined,
       ratePerHour: kind === "coach" ? rate : undefined,
       sessionTypes: kind === "coach" ? sessionTypes : undefined,
-      ageGroups: kind === "coach" ? ageGroups : undefined,
+      // Only written when changed, so saving a profile never depends on this column
+      // unless the coach actually edits their age groups.
+      ageGroups:
+        kind === "coach" && ageGroups.join() !== (org.ageGroups ?? []).join()
+          ? ageGroups
+          : undefined,
       skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
       availabilitySlots:
         kind === "coach"
