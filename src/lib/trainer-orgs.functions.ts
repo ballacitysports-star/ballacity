@@ -12,6 +12,12 @@ import {
   type FeaturedTrainer,
   type TrainerCandidate,
 } from "./featured-trainer";
+import {
+  firstVisibleOrgLink,
+  toPublicRoster,
+  type PublicRosterMember,
+  type RawRosterRow,
+} from "./org-roster";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -169,6 +175,27 @@ export const listMyOrgs = createServerFn({ method: "GET" })
 const ORG_PUBLIC_COLUMNS =
   "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone";
 
+/**
+ * A facility's trainers for its public page. Reads `trainer_org_members` with
+ * the service role (anonymous and non-member reads are blocked by RLS on
+ * purpose, because the table carries user ids), so what comes back is limited
+ * to public trainer fields: no user ids, and hidden trainer profiles are
+ * dropped. Callers must have already confirmed the facility is publicly
+ * visible.
+ */
+async function listPublicOrgRoster(orgId: string): Promise<PublicRosterMember[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("trainer_org_members")
+    .select(
+      "id,trainer_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports,hidden_at)",
+    )
+    .eq("org_id", orgId)
+    .order("joined_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return toPublicRoster((data ?? []) as unknown as RawRosterRow[]);
+}
+
 export const getTrainerOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
@@ -180,14 +207,36 @@ export const getTrainerOrg = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!org) return null;
-    const { data: members } = await sb
-      .from("trainer_org_members")
-      .select(
-        "id,trainer_id,user_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports)",
-      )
-      .eq("org_id", data.id)
-      .order("joined_at", { ascending: true });
-    return { org, members: members ?? [] };
+    // The roster is public on the gym page, but `trainer_org_members` is
+    // locked down in the database (it holds user ids), so it is read here with
+    // the service role and returned without them.
+    const members = await listPublicOrgRoster(data.id);
+    return { org, members };
+  });
+
+/**
+ * The signed-in viewer's own standing at a facility. The public roster no
+ * longer carries user ids, so the page asks this instead of searching the
+ * roster for the viewer.
+ */
+export const getMyOrgAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error } = await context.supabase.rpc("is_trainer_org_admin", {
+      _org: data.orgId,
+      _user: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    // Own row only: RLS lets a user read their own membership.
+    const { data: member, error: memberErr } = await context.supabase
+      .from("org_members")
+      .select("id")
+      .eq("org_id", data.orgId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (memberErr) throw new Error(memberErr.message);
+    return { isAdmin: !!isAdmin, isMember: !!member };
   });
 
 // Contact details are only readable by signed-in users.
@@ -488,26 +537,33 @@ export const leaveTrainerOrg = createServerFn({ method: "POST" })
 export const getTrainerOrgForTrainer = createServerFn({ method: "GET" })
   .inputValidator((d: { trainerId: string }) => z.object({ trainerId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
-    const sb = publicClient();
-    const { data: rows, error } = await sb
+    // Service role: see listPublicOrgRoster. Hidden facilities are skipped and
+    // no user ids are returned.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
       .from("trainer_org_members")
-      .select("role, org:org_id(id,name,handle,avatar,city,verified)")
+      .select("role, org:org_id(id,name,handle,avatar,city,verified,hidden_at)")
       .eq("trainer_id", data.trainerId)
-      .limit(1);
+      .order("joined_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return rows?.[0] ?? null;
+    return firstVisibleOrgLink(
+      (rows ?? []) as unknown as Parameters<typeof firstVisibleOrgLink>[0],
+    );
   });
 
 export const listTrainerIdsForOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
+    // Only for publicly visible facilities (anonymous RLS hides removed ones).
     const sb = publicClient();
-    const { data: rows, error } = await sb
-      .from("trainer_org_members")
-      .select("trainer_id")
-      .eq("org_id", data.orgId);
-    if (error) throw new Error(error.message);
-    return (rows ?? []).map((r) => r.trainer_id as string);
+    const { data: org } = await sb
+      .from("trainer_orgs")
+      .select("id")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (!org) return [] as string[];
+    const roster = await listPublicOrgRoster(data.orgId);
+    return roster.map((m) => m.trainer_id);
   });
 
 export const listMyTrainerProfiles = createServerFn({ method: "GET" })
