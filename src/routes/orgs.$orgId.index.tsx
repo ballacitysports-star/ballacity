@@ -21,6 +21,7 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
+import { buildFacilityJsonLd } from "@/lib/org-seo";
 import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
 import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
@@ -66,9 +67,10 @@ export const Route = createFileRoute("/orgs/$orgId/")({
     const name = org?.name ?? "Gym";
     return pageHead({
       path: `/orgs/${params.orgId}`,
-      title: `${name} — Gym on ballaCity`,
+      title: `${name} — ${org?.category || "Gym"} on ballaCity`,
       description: (
-        org?.bio || `${name} on ballaCity: hours, amenities, trainers, and member reviews.`
+        org?.bio ||
+        `${name}${org?.city ? ` in ${org.city}` : ""} on ballaCity: hours, amenities, upcoming runs, and how to book a court.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "venue",
@@ -77,15 +79,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
         meta: [org?.city, "Hours & amenities", "Member reviews"],
       }),
       noindex: !org,
-      jsonLd: org
-        ? {
-            "@context": "https://schema.org",
-            "@type": "SportsActivityLocation",
-            name: org.name,
-            address: org.address ?? org.city ?? undefined,
-            url: `https://ballacity.com/orgs/${params.orgId}`,
-          }
-        : undefined,
+      jsonLd: org ? buildFacilityJsonLd({ ...org, id: params.orgId }) : undefined,
     });
   },
   loader: async ({ params }) => {

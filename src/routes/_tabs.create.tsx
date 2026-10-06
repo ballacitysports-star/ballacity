@@ -28,7 +28,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeAddress, reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
-import { getOrgEventContext } from "@/lib/trainer-orgs.functions";
+import { getOrgEventContext, listMyManagedOrgs } from "@/lib/trainer-orgs.functions";
 import {
   defaultFacilityEventTitle,
   facilityEventKindLabel,
@@ -102,6 +102,9 @@ export const Route = createFileRoute("/_tabs/create")({
 function Create() {
   const nav = useNavigate();
   const { orgId: orgIdParam, kind: eventKind = "run" } = Route.useSearch();
+  // The facility this run is hosted at: from the facility page link, or picked
+  // in the "Host at a facility" selector.
+  const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const { can: canFeature } = useMyChildStatus();
@@ -233,24 +236,43 @@ function Create() {
   // Facility event: only an owner/admin of the facility gets its location,
   // address and org id pre-filled (checked on the server, not just the UI).
   const fetchOrgContext = useServerFn(getOrgEventContext);
+  const fetchManagedOrgs = useServerFn(listMyManagedOrgs);
+  const managedOrgsQuery = useQuery({
+    queryKey: ["my-managed-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchManagedOrgs(),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const managedOrgs = managedOrgsQuery.data ?? [];
   const orgContextQuery = useQuery({
-    queryKey: ["org-event-context", orgIdParam, user?.id ?? "anon"],
-    queryFn: () => fetchOrgContext({ data: { orgId: orgIdParam! } }),
-    enabled: !!orgIdParam && !!user,
+    queryKey: ["org-event-context", facilityId, user?.id ?? "anon"],
+    queryFn: () => fetchOrgContext({ data: { orgId: facilityId! } }),
+    enabled: !!facilityId && !!user,
     staleTime: 60_000,
   });
   const postingOrg = orgContextQuery.data?.canPost ? orgContextQuery.data.org : null;
-  const orgPrefilledRef = useRef(false);
+  // Which facility's details were last filled in, and the title we generated,
+  // so switching facilities refreshes them without clobbering a typed title.
+  const prefilledForRef = useRef<string | null>(null);
+  const autoTitleRef = useRef("");
   useEffect(() => {
-    if (!postingOrg || orgPrefilledRef.current) return;
-    orgPrefilledRef.current = true;
+    if (!postingOrg) {
+      prefilledForRef.current = null;
+      return;
+    }
+    if (prefilledForRef.current === postingOrg.id) return;
+    prefilledForRef.current = postingOrg.id;
     // The facility's venue wins over the GPS / profile-city auto-fill.
     locationEditedRef.current = true;
     setLocation(postingOrg.address || postingOrg.name);
-    if (postingOrg.lat != null && postingOrg.lng != null) {
-      setCoords({ lat: postingOrg.lat, lng: postingOrg.lng });
-    }
-    setTitle((cur) => cur || defaultFacilityEventTitle(eventKind, postingOrg.name));
+    setCoords(
+      postingOrg.lat != null && postingOrg.lng != null
+        ? { lat: postingOrg.lat, lng: postingOrg.lng }
+        : null,
+    );
+    const nextTitle = defaultFacilityEventTitle(eventKind, postingOrg.name);
+    setTitle((cur) => (!cur || cur === autoTitleRef.current ? nextTitle : cur));
+    autoTitleRef.current = nextTitle;
     const amenities = postingOrg.amenities.join(" ").toLowerCase();
     if (/indoor|hardwood/.test(amenities)) setIndoor(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,7 +446,7 @@ function Create() {
         <h1 className="page-title">{postingOrg ? "Post an event" : "Host a game"}</h1>
       </div>
 
-      {orgIdParam && orgContextQuery.isLoading && (
+      {facilityId && orgContextQuery.isLoading && (
         <div className="mb-4 h-14 animate-pulse rounded-2xl bg-surface" />
       )}
       {postingOrg && (
@@ -441,16 +463,40 @@ function Create() {
           </div>
         </div>
       )}
-      {orgIdParam && orgContextQuery.data && !orgContextQuery.data.canPost && (
+      {facilityId && orgContextQuery.data && !orgContextQuery.data.canPost && (
         <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-xs text-coral">
           Only a facility&apos;s owner or admins can post events for it. You can still host this as
           a regular game.
         </div>
       )}
-      {orgIdParam && orgContextQuery.isError && (
+      {facilityId && orgContextQuery.isError && (
         <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-xs text-coral">
           Couldn&apos;t load that facility, so it won&apos;t be attached to this game.
         </div>
+      )}
+
+      {managedOrgs.length > 0 && (
+        <label className="mb-4 block rounded-2xl border border-border bg-surface p-4">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Host at a facility
+          </span>
+          <select
+            value={facilityId ?? ""}
+            onChange={(e) => setFacilityId(e.target.value || null)}
+            className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60"
+          >
+            <option value="">Not at a listed facility</option>
+            {managedOrgs.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+                {o.city ? ` · ${o.city}` : ""}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1.5 block text-[11px] text-muted-foreground">
+            Fills in the address and map pin, and lists the run on the facility&apos;s page.
+          </span>
+        </label>
       )}
 
       {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
@@ -461,7 +507,7 @@ function Create() {
         onSubmit={async (e) => {
           e.preventDefault();
           if (publishing) return;
-          if (orgIdParam && orgContextQuery.isLoading) {
+          if (facilityId && orgContextQuery.isLoading) {
             toast.error("Still loading the facility details — try again in a moment.");
             return;
           }

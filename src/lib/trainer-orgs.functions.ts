@@ -256,6 +256,39 @@ export const getTrainerOrgContact = createServerFn({ method: "GET" })
     return { phone: row?.phone ?? null, email: row?.email ?? null };
   });
 
+/**
+ * Facilities the signed-in user owns or administers (by membership role), for
+ * the "host at a facility" picker. Only these can be attached to a run; the
+ * `hosted_games` trigger enforces it again regardless of what the client sends.
+ */
+export const listMyManagedOrgs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [owned, memberships] = await Promise.all([
+      context.supabase.from("trainer_orgs").select("id,name,city").eq("owner_id", context.userId),
+      context.supabase
+        .from("trainer_org_members")
+        .select("org_id")
+        .eq("user_id", context.userId)
+        .in("role", ["owner", "admin"]),
+    ]);
+    if (owned.error) throw new Error(owned.error.message);
+    if (memberships.error) throw new Error(memberships.error.message);
+
+    const byId = new Map<string, { id: string; name: string; city: string | null }>();
+    for (const o of owned.data ?? []) byId.set(o.id, o);
+    const extraIds = (memberships.data ?? []).map((m) => m.org_id).filter((id) => !byId.has(id));
+    if (extraIds.length > 0) {
+      const { data, error } = await context.supabase
+        .from("trainer_orgs")
+        .select("id,name,city")
+        .in("id", extraIds);
+      if (error) throw new Error(error.message);
+      for (const o of data ?? []) byId.set(o.id, o);
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
 // Pre-fill data for "Post an event" from a facility page. Only owners/admins
 // get `canPost: true` (checked here and again by the `hosted_games` trigger),
 // so a crafted `?orgId=` link cannot attach a game to someone else's facility.
