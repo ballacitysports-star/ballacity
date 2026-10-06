@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { matchesOrgQuery } from "@/lib/org-search";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -297,13 +298,7 @@ function TrainersPage() {
         if (avail === "soon") return availabilityScore(o) <= 2;
         return cadenceMatches(o, avail);
       })
-      .filter((o) =>
-        q
-          ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
-              .toLowerCase()
-              .includes(q.toLowerCase())
-          : true,
-      );
+      .filter((o) => matchesOrgQuery(o, q));
     const withDist = filtered
       .map((rawOrg) => {
         // Real review stats replace a missing (or stale) rating.
