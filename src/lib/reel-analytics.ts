@@ -182,7 +182,8 @@ export function normalizeAdvancedAnalytics(
       : [];
 
   let scout: ScoutReport | null = null;
-  const s = src.scout && typeof src.scout === "object" ? (src.scout as Record<string, unknown>) : null;
+  const s =
+    src.scout && typeof src.scout === "object" ? (src.scout as Record<string, unknown>) : null;
   if (full && s) {
     const tier = RECRUITING_TIERS.find((t) => t.toLowerCase() === str(s.tier, 40).toLowerCase());
     const quote = str(s.quote, 400);
