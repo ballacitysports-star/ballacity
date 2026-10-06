@@ -29,6 +29,7 @@ import {
 } from "@/lib/org-hours";
 import { bookingHref, directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
 import { CourtInquiryDialog } from "@/components/org/CourtInquiryDialog";
+import { postFacilityEventSearch } from "@/lib/facility-events";
 import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 
@@ -282,6 +283,13 @@ export function OrgListingHeader({
             </div>
             {isAdmin && (
               <div className="flex shrink-0 flex-col gap-2">
+                <Link
+                  to="/create"
+                  search={postFacilityEventSearch(org.id)}
+                  className="rounded-full bg-lime px-3 py-1.5 text-center text-xs font-bold text-primary-foreground hover:opacity-90"
+                >
+                  Host a run here
+                </Link>
                 <Link
                   to="/orgs/$orgId/edit"
                   params={{ orgId: org.id }}
