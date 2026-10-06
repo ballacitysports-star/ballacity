@@ -23,6 +23,7 @@ import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
 import { buildFacilityJsonLd } from "@/lib/org-seo";
 import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
+import { FacilityTryoutsSection } from "@/components/org/FacilityTryoutsSection";
 import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
@@ -203,6 +204,8 @@ function OrgPage() {
       )}
 
       <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
+
+      <FacilityTryoutsSection orgId={orgId} />
 
       {isAdmin && <CourtInquiriesSection orgId={orgId} />}
 

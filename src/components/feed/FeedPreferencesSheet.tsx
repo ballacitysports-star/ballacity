@@ -349,8 +349,8 @@ export function FeedPreferencesBody() {
         <div className="space-y-2">
           {(
             [
-              ["showUrgent", "Needs players now"],
-              ["showForYou", '"For you" list'],
+              ["showUrgent", "Happening soon & needs players"],
+              ["showForYou", "All upcoming runs"],
             ] as const
           ).map(([k, label]) => (
             <button
