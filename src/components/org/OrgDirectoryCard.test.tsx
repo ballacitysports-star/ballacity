@@ -68,6 +68,17 @@ describe("OrgDirectoryCard", () => {
     expect(screen.getByTestId("inquiry").textContent).toBe("inquiry for Peak Courts");
   });
 
+  it("prefers the dedicated booking URL over the website", () => {
+    render(
+      <OrgDirectoryCard
+        org={row({ website: "peakcourts.com", booking_url: "courtreserve.com/peak" })}
+        now={new Date()}
+      />,
+    );
+    const link = screen.getByRole("link", { name: /book court/i }) as HTMLAnchorElement;
+    expect(link.href).toBe("https://courtreserve.com/peak");
+  });
+
   it("opens the in-app inquiry dialog when there is no booking URL", () => {
     render(<OrgDirectoryCard org={row({ website: null })} now={new Date()} />);
     expect(screen.queryByRole("link", { name: /book court/i })).toBeNull();

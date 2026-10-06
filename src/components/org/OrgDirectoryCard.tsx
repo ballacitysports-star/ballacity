@@ -4,7 +4,7 @@ import { CalendarPlus, Star, ExternalLink, MapPin, ShieldCheck } from "lucide-re
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { CourtInquiryDialog } from "@/components/org/CourtInquiryDialog";
 import { describeOpenBadge, parseHours, type OpenBadge } from "@/lib/org-hours";
-import { highlightAmenities, websiteHref } from "@/lib/org-listing";
+import { bookingHref, highlightAmenities } from "@/lib/org-listing";
 
 export type OrgDirectoryRow = {
   id: string;
@@ -22,6 +22,7 @@ export type OrgDirectoryRow = {
   hours: unknown;
   timezone: string | null;
   website: string | null;
+  booking_url?: string | null;
   verified: boolean | null;
   featured_at?: string | null;
 };
@@ -49,7 +50,7 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
   const thumbs = photos.slice(1, 4);
   const badge = describeOpenBadge(parseHours(org.hours), org.timezone, now);
   const { tags, more } = highlightAmenities(org.amenities);
-  const bookingUrl = websiteHref(org.website);
+  const bookingUrl = bookingHref(org);
   const featured = !!org.featured_at;
   const place = [org.address, org.city].filter(Boolean).join(" · ") || null;
 

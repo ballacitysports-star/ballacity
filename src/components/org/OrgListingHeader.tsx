@@ -14,6 +14,8 @@ import {
   Mail,
   ChevronDown,
   Star,
+  CalendarPlus,
+  ExternalLink,
 } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import {
@@ -25,7 +27,8 @@ import {
   parseHours,
   resolveOpenState,
 } from "@/lib/org-hours";
-import { directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
+import { bookingHref, directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
+import { CourtInquiryDialog } from "@/components/org/CourtInquiryDialog";
 import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 
@@ -36,6 +39,7 @@ export type OrgListingRow = {
   bio: string | null;
   city: string | null;
   website: string | null;
+  booking_url?: string | null;
   avatar: string | null;
   avatar_url: string | null;
   cover_url: string | null;
@@ -106,6 +110,7 @@ export function OrgListingHeader({
   const [hoursOpen, setHoursOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => {
     setAvatarFailed(false);
@@ -126,6 +131,7 @@ export function OrgListingHeader({
   const tel = telHref(org.phone);
   const site = websiteHref(org.website);
   const mail = emailHref(org.email);
+  const book = bookingHref(org);
 
   return (
     <>
@@ -150,6 +156,14 @@ export function OrgListingHeader({
           ],
         }}
       />
+      {inquiryOpen && (
+        <CourtInquiryDialog
+          orgId={org.id}
+          orgName={org.name}
+          open={inquiryOpen}
+          onOpenChange={setInquiryOpen}
+        />
+      )}
       <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
         {photos.length > 0 ? (
           <div className="flex gap-1 overflow-x-auto">
@@ -285,6 +299,38 @@ export function OrgListingHeader({
               </div>
             )}
           </div>
+
+          {!isAdmin && (
+            <div className="flex flex-wrap items-center gap-2">
+              {book ? (
+                <>
+                  <a
+                    href={book}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground glow-lime"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Book court
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setInquiryOpen(true)}
+                    className="rounded-full border border-border px-4 py-3 text-xs font-semibold text-muted-foreground hover:border-lime/60 hover:text-foreground"
+                  >
+                    Send inquiry
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setInquiryOpen(true)}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground glow-lime"
+                >
+                  <CalendarPlus className="h-4 w-4" /> Book court
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {directions && <ActionButton icon={Navigation} label="Directions" href={directions} />}

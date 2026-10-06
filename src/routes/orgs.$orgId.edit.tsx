@@ -134,6 +134,7 @@ function EditOrg() {
         photos?: string[] | null;
         hours?: unknown;
         timezone?: string | null;
+        booking_url?: string | null;
       };
       const geo = orgQ.data.geo as { lat?: number; lng?: number } | null;
       setValue({
@@ -142,6 +143,7 @@ function EditOrg() {
         city: orgQ.data.city ?? "",
         bio: orgQ.data.bio ?? "",
         website: orgQ.data.website ?? "",
+        bookingUrl: row.booking_url ?? "",
         address: orgQ.data.address ?? "",
         placeId: orgQ.data.place_id ?? "",
         geo: geo?.lat && geo?.lng ? { lat: geo.lat, lng: geo.lng } : null,
@@ -175,6 +177,7 @@ function EditOrg() {
         bio: v.bio.trim() || null,
         city: v.city.trim() || null,
         website: websiteHref(v.website) ?? (v.website.trim() || null),
+        bookingUrl: websiteHref(v.bookingUrl) ?? (v.bookingUrl.trim() || null),
         address: v.address.trim() || null,
         placeId: v.placeId || null,
         geo: v.geo,

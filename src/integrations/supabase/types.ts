@@ -1932,8 +1932,9 @@ export type Database = {
           requested_date: string
           requester_id: string
           sport: string
-          start_time: string
+          start_time: string | null
           status: string
+          time_slot: string
           updated_at: string
         }
         Insert: {
@@ -1949,8 +1950,9 @@ export type Database = {
           requested_date: string
           requester_id: string
           sport: string
-          start_time: string
+          start_time?: string | null
           status?: string
+          time_slot?: string
           updated_at?: string
         }
         Update: {
@@ -1966,8 +1968,9 @@ export type Database = {
           requested_date?: string
           requester_id?: string
           sport?: string
-          start_time?: string
+          start_time?: string | null
           status?: string
+          time_slot?: string
           updated_at?: string
         }
         Relationships: [
@@ -3676,6 +3679,7 @@ export type Database = {
           avatar: string | null
           avatar_url: string | null
           bio: string | null
+          booking_url: string | null
           category: string | null
           city: string | null
           claimed_at: string | null
@@ -3706,6 +3710,7 @@ export type Database = {
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          booking_url?: string | null
           category?: string | null
           city?: string | null
           claimed_at?: string | null
@@ -3736,6 +3741,7 @@ export type Database = {
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          booking_url?: string | null
           category?: string | null
           city?: string | null
           claimed_at?: string | null

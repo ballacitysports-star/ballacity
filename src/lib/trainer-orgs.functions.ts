@@ -42,7 +42,7 @@ const handleRe = /^[a-z0-9_-]{3,40}$/;
 // Columns the public directory needs to render a facility card. All are
 // anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
-  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,verified,owner_id,featured_at";
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
 
 // Escape characters that are special inside an ilike pattern.
 function likePattern(term: string): string {
@@ -176,7 +176,7 @@ export const listMyOrgs = createServerFn({ method: "GET" })
 // the database revokes them from the `anon` role so contact details cannot be
 // scraped from every gym listing, so selecting "*" here would fail for guests.
 const ORG_PUBLIC_COLUMNS =
-  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone";
+  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone,booking_url";
 
 /**
  * A facility's trainers for its public page. Reads `trainer_org_members` with
@@ -616,6 +616,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       avatarUrl?: string;
       coverUrl?: string;
       website?: string;
+      bookingUrl?: string;
       address?: string;
       placeId?: string;
       geo?: { lat: number; lng: number } | null;
@@ -637,6 +638,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
           avatarUrl: z.string().url().max(1000).optional(),
           coverUrl: z.string().url().max(1000).optional(),
           website: z.string().url().max(300).optional(),
+          bookingUrl: z.string().url().max(300).optional(),
           address: z.string().max(300).optional(),
           placeId: z.string().max(200).optional(),
           geo: geoSchema,
@@ -664,6 +666,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         avatar_url: data.avatarUrl ?? null,
         cover_url: data.coverUrl ?? null,
         website: data.website ?? null,
+        booking_url: data.bookingUrl ?? null,
         address: data.address ?? null,
         place_id: data.placeId ?? null,
         geo: data.geo ?? null,
@@ -711,6 +714,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
       bio?: string | null;
       city?: string | null;
       website?: string | null;
+      bookingUrl?: string | null;
       avatar?: string | null;
       avatarUrl?: string | null;
       coverUrl?: string | null;
@@ -733,6 +737,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           bio: z.string().max(2000).nullable().optional(),
           city: z.string().max(120).nullable().optional(),
           website: z.string().url().max(300).nullable().optional(),
+          bookingUrl: z.string().url().max(300).nullable().optional(),
           avatar: z.string().max(10).nullable().optional(),
           avatarUrl: z.string().url().max(1000).nullable().optional(),
           coverUrl: z.string().url().max(1000).nullable().optional(),
@@ -756,6 +761,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.bio !== undefined) patch.bio = data.bio;
     if (data.city !== undefined) patch.city = data.city;
     if (data.website !== undefined) patch.website = data.website;
+    if (data.bookingUrl !== undefined) patch.booking_url = data.bookingUrl;
     if (data.avatar !== undefined) patch.avatar = data.avatar;
     if (data.avatarUrl !== undefined) patch.avatar_url = data.avatarUrl;
     if (data.coverUrl !== undefined) patch.cover_url = data.coverUrl;

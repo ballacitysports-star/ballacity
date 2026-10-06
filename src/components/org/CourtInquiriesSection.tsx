@@ -72,7 +72,7 @@ export function CourtInquiriesSection({ orgId }: { orgId: string }) {
                     {r.player_count === 1 ? "" : "s"}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {formatInquiryWhen(r.requested_date, r.start_time, r.duration_min)}
+                    {formatInquiryWhen(r.requested_date, r.start_time, r.duration_min, r.time_slot)}
                   </div>
                 </div>
                 {r.status !== "pending" && (

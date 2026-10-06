@@ -362,3 +362,14 @@ export function highlightAmenities(
   const tags = [...(courts ? [courtCountLabel(courts)] : []), ...ranked].slice(0, max);
   return { tags, more: Math.max(0, (courts ? 1 : 0) + ranked.length - tags.length) };
 }
+
+/**
+ * Where "Book court" should send a player: the facility's dedicated booking
+ * link, else its website, else null (the in-app inquiry is used instead).
+ */
+export function bookingHref(org: {
+  booking_url?: string | null;
+  website?: string | null;
+}): string | null {
+  return websiteHref(org.booking_url) ?? websiteHref(org.website);
+}

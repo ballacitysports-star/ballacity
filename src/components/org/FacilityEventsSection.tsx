@@ -17,6 +17,18 @@ import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useJoinGate } from "@/lib/live-status";
 import type { Game } from "@/lib/sample-data";
 
+const SPORT_EMOJI: Record<string, string> = {
+  Basketball: "🏀",
+  Soccer: "⚽",
+  Pickleball: "🏓",
+  Volleyball: "🏐",
+  Tennis: "🎾",
+  Football: "🏈",
+  Baseball: "⚾",
+  Softball: "🥎",
+  Running: "🏃",
+};
+
 const KIND_TONE: Record<FacilityEventKind, string> = {
   run: "bg-lime/15 text-lime",
   open_court: "bg-sky-500/15 text-sky-400",
@@ -65,7 +77,10 @@ function EventRow({ game }: { game: Game }) {
             >
               {facilityEventKindLabel(kind)}
             </span>
-            <h3 className="truncate font-display text-sm font-bold">{game.title}</h3>
+            <h3 className="truncate font-display text-sm font-bold">
+              <span aria-hidden>{SPORT_EMOJI[game.sport] ?? "🏅"} </span>
+              {game.title}
+            </h3>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1" suppressHydrationWarning>
@@ -77,6 +92,7 @@ function EventRow({ game }: { game: Game }) {
               {spotsLeft > 0 ? `${spotsLeft} of ${game.maxPlayers} spots left` : "Full"}
             </span>
             <span>{game.skill}</span>
+            <span className="truncate">Hosted by {game.host.name}</span>
           </div>
         </Link>
         <Link
@@ -139,7 +155,7 @@ export function FacilityEventsSection({
             search={postFacilityEventSearch(orgId)}
             className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90"
           >
-            <Plus className="h-3.5 w-3.5" /> Post event / open run
+            <Plus className="h-3.5 w-3.5" /> Host a run here
           </Link>
         )}
       </div>

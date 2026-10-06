@@ -40,7 +40,8 @@ export const submitCourtInquiry = createServerFn({ method: "POST" })
         sport: data.sport,
         court_type: data.courtType,
         requested_date: data.date,
-        start_time: data.startTime,
+        time_slot: data.timeSlot,
+        start_time: data.timeSlot === "custom" ? (data.startTime ?? null) : null,
         duration_min: data.durationMin,
         player_count: data.playerCount,
         notes: data.notes || null,
@@ -63,7 +64,12 @@ export const submitCourtInquiry = createServerFn({ method: "POST" })
         ),
       );
       if (managers.size > 0) {
-        const when = formatInquiryWhen(data.date, data.startTime, data.durationMin);
+        const when = formatInquiryWhen(
+          data.date,
+          data.startTime ?? null,
+          data.durationMin,
+          data.timeSlot,
+        );
         await supabaseAdmin.from("notifications").insert(
           [...managers].map((user_id) => ({
             user_id,
@@ -96,7 +102,7 @@ export const listOrgCourtInquiries = createServerFn({ method: "GET" })
     const { data: rows, error } = await context.supabase
       .from("org_court_inquiries")
       .select(
-        "id,requester_id,sport,court_type,requested_date,start_time,duration_min,player_count,notes,status,created_at",
+        "id,requester_id,sport,court_type,requested_date,start_time,time_slot,duration_min,player_count,notes,status,created_at",
       )
       .eq("org_id", data.orgId)
       .order("status", { ascending: true })

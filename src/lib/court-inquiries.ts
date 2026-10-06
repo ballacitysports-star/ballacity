@@ -1,12 +1,36 @@
 import { z } from "zod";
 import { formatTime } from "@/lib/org-hours";
 
+/** Sports a court inquiry can be for. */
+export const INQUIRY_SPORTS = [
+  "Basketball",
+  "Volleyball",
+  "Pickleball",
+  "Soccer",
+  "Other",
+] as const;
+
+/** Court / area the player wants. */
 export const COURT_TYPES = [
-  { value: "any", label: "Any court" },
-  { value: "indoor", label: "Indoor" },
-  { value: "outdoor", label: "Outdoor" },
+  { value: "any", label: "No preference" },
+  { value: "full_court", label: "Full court" },
+  { value: "half_court", label: "Half court" },
+  { value: "turf", label: "Turf" },
+  { value: "cage", label: "Cage" },
 ] as const;
 export type CourtType = (typeof COURT_TYPES)[number]["value"];
+
+/** Older inquiries used indoor/outdoor; keep their labels readable. */
+const LEGACY_COURT_LABELS: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor" };
+
+/** A rough part of the day, or an exact start time. */
+export const TIME_SLOTS = [
+  { value: "morning", label: "Morning", hint: "before noon" },
+  { value: "afternoon", label: "Afternoon", hint: "noon – 5 PM" },
+  { value: "evening", label: "Evening", hint: "after 5 PM" },
+  { value: "custom", label: "Specific time", hint: "" },
+] as const;
+export type TimeSlot = (typeof TIME_SLOTS)[number]["value"];
 
 export const INQUIRY_DURATIONS = [
   { min: 60, label: "1 hour" },
@@ -34,16 +58,22 @@ export function isRequestableDate(date: string, now: number = Date.now()): boole
   return date >= isoDay(new Date(now - DAY_MS)) && date <= isoDay(new Date(now + 366 * DAY_MS));
 }
 
-export const courtInquirySchema = z.object({
-  orgId: z.string().uuid(),
-  sport: z.string().trim().min(1, "Pick a sport").max(40),
-  courtType: z.enum(["any", "indoor", "outdoor"]),
-  date: z.string().refine((d) => isRequestableDate(d), "Pick a date from today onward"),
-  startTime: z.string().regex(TIME_RE, "Pick a start time"),
-  durationMin: z.number().int().min(30).max(480),
-  playerCount: z.number().int().min(1, "At least 1 player").max(200),
-  notes: z.string().trim().max(500).optional(),
-});
+export const courtInquirySchema = z
+  .object({
+    orgId: z.string().uuid(),
+    sport: z.enum(INQUIRY_SPORTS, { message: "Pick a sport" }),
+    courtType: z.enum(["any", "full_court", "half_court", "turf", "cage"]),
+    date: z.string().refine((d) => isRequestableDate(d), "Pick a date from today onward"),
+    timeSlot: z.enum(["morning", "afternoon", "evening", "custom"]),
+    startTime: z.string().regex(TIME_RE, "Pick a start time").optional(),
+    durationMin: z.number().int().min(30).max(480),
+    playerCount: z.number().int().min(1, "At least 1 player").max(200),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .refine((v) => (v.timeSlot === "custom" ? !!v.startTime : !v.startTime), {
+    message: "Pick a start time",
+    path: ["startTime"],
+  });
 export type CourtInquiryInput = z.infer<typeof courtInquirySchema>;
 
 /** First validation error message, or null when the form is valid. */
@@ -53,7 +83,11 @@ export function validateCourtInquiry(v: unknown): string | null {
 }
 
 export function courtTypeLabel(t: string): string {
-  return COURT_TYPES.find((c) => c.value === t)?.label ?? "Any court";
+  return COURT_TYPES.find((c) => c.value === t)?.label ?? LEGACY_COURT_LABELS[t] ?? "No preference";
+}
+
+export function timeSlotLabel(slot: string): string {
+  return TIME_SLOTS.find((t) => t.value === slot)?.label ?? "Specific time";
 }
 
 export function durationLabel(min: number): string {
@@ -63,8 +97,16 @@ export function durationLabel(min: number): string {
   return Number.isInteger(h) ? `${h} hour${h === 1 ? "" : "s"}` : `${min} min`;
 }
 
-/** "Sat, Oct 10 · 6 PM · 2 hours" for a stored inquiry (time may be "HH:MM:SS"). */
-export function formatInquiryWhen(date: string, startTime: string, durationMin: number): string {
+/**
+ * "Sat, Oct 10 · Evening · 2 hours" or "Sat, Oct 10 · 6 PM · 2 hours" for a
+ * stored inquiry (an exact time may arrive as "HH:MM:SS").
+ */
+export function formatInquiryWhen(
+  date: string,
+  startTime: string | null,
+  durationMin: number,
+  timeSlot: string = "custom",
+): string {
   const d = new Date(`${date}T00:00:00Z`);
   const day = Number.isNaN(d.getTime())
     ? date
@@ -74,5 +116,9 @@ export function formatInquiryWhen(date: string, startTime: string, durationMin: 
         day: "numeric",
         timeZone: "UTC",
       });
-  return `${day} · ${formatTime(startTime.slice(0, 5))} · ${durationLabel(durationMin)}`;
+  const when =
+    timeSlot !== "custom" || !startTime
+      ? timeSlotLabel(timeSlot)
+      : formatTime(startTime.slice(0, 5));
+  return `${day} · ${when} · ${durationLabel(durationMin)}`;
 }

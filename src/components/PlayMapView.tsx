@@ -1,3 +1,4 @@
+import { VenueBadge } from "@/components/venue/VenueBadge";
 import { MediaImage } from "@/components/MediaImage";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -194,6 +195,7 @@ type ActiveGame = {
   date: string;
   maxPlayers: number;
   joined: number;
+  orgId?: string;
 };
 
 function DefaultGameCard({ game }: { game: ActiveGame }) {
@@ -222,6 +224,11 @@ function DefaultGameCard({ game }: { game: ActiveGame }) {
           <MapPin className="h-3.5 w-3.5" />
           <span className="truncate">{game.location}</span>
         </div>
+        {game.orgId && (
+          <div className="mt-1 flex min-w-0">
+            <VenueBadge orgId={game.orgId} />
+          </div>
+        )}
         <div className="flex items-center justify-between mt-1.5">
           <span className="text-xs">{formatGameWhen(game)}</span>
           <SpotsPill spotsLeft={spotsLeft} />

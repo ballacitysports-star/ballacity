@@ -38,6 +38,7 @@ export type OrgFormValue = {
   city: string;
   bio: string;
   website: string;
+  bookingUrl: string;
   address: string;
   placeId: string;
   geo: { lat: number; lng: number } | null;
@@ -59,6 +60,7 @@ export function emptyOrgForm(): OrgFormValue {
     city: "",
     bio: "",
     website: "",
+    bookingUrl: "",
     address: "",
     placeId: "",
     geo: null,
@@ -102,6 +104,8 @@ export function validateOrgForm(v: OrgFormValue): string | null {
     return "Handle must be 3–40 chars: a–z, 0–9, - or _.";
   if (v.website.trim() && !websiteHref(v.website))
     return "Enter a valid website (e.g. example.com).";
+  if (v.bookingUrl.trim() && !websiteHref(v.bookingUrl))
+    return "Enter a valid booking link (e.g. courtreserve.com/yourgym).";
   if (v.phone && !isValidPhone(v.phone)) return "Phone number looks invalid.";
   if (v.email && !EMAIL_RE.test(v.email.trim())) return "Email looks invalid.";
   if (v.timezone.trim() && !isValidTimezone(v.timezone.trim()))
@@ -598,6 +602,20 @@ export function OrgForm({
               placeholder="example.com"
               className={inputCls}
             />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Booking URL</span>
+            <input
+              value={value.bookingUrl}
+              onChange={(e) => patch({ bookingUrl: e.target.value })}
+              placeholder="courtreserve.com/yourgym"
+              className={inputCls}
+            />
+            <span className="block text-[11px] text-muted-foreground">
+              Where players reserve a court (CourtReserve, Mindbody, your own page). &ldquo;Book
+              court&rdquo; opens it in a new tab. Leave it empty to receive court inquiries in
+              ballaCity instead — no fees either way.
+            </span>
           </label>
         </Section>
 

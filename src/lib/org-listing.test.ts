@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { describeOpenBadge, formatDayHours, parseHours, resolveOpenState } from "@/lib/org-hours";
 import {
   ORG_AMENITIES,
+  bookingHref,
   highlightAmenities,
   suggestHandle,
   courtCountFromAmenities,
@@ -269,5 +270,27 @@ describe("describeOpenBadge", () => {
       headline: "Hours not set",
       detail: null,
     });
+  });
+});
+
+describe("bookingHref", () => {
+  it("prefers the dedicated booking link over the website", () => {
+    expect(bookingHref({ booking_url: "courtreserve.com/peak", website: "peak.com" })).toBe(
+      "https://courtreserve.com/peak",
+    );
+  });
+
+  it("falls back to the website, then to nothing (in-app inquiry)", () => {
+    expect(bookingHref({ booking_url: null, website: "peak.com" })).toBe("https://peak.com/");
+    expect(bookingHref({ booking_url: "  ", website: "peak.com" })).toBe("https://peak.com/");
+    expect(bookingHref({ booking_url: null, website: null })).toBeNull();
+    expect(bookingHref({})).toBeNull();
+  });
+
+  it("never links an unsafe booking URL, and then uses the website", () => {
+    expect(bookingHref({ booking_url: "javascript:alert(1)", website: "peak.com" })).toBe(
+      "https://peak.com/",
+    );
+    expect(bookingHref({ booking_url: "javascript:alert(1)" })).toBeNull();
   });
 });

@@ -13,13 +13,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { SPORTS } from "@/lib/sample-data";
 import { submitCourtInquiry } from "@/lib/court-inquiries.functions";
 import {
   COURT_TYPES,
   INQUIRY_DURATIONS,
+  INQUIRY_SPORTS,
+  TIME_SLOTS,
   validateCourtInquiry,
   type CourtType,
+  type TimeSlot,
 } from "@/lib/court-inquiries";
 
 const fieldCls =
@@ -52,6 +54,7 @@ export function CourtInquiryDialog({
   const [sport, setSport] = useState<string>("Basketball");
   const [courtType, setCourtType] = useState<CourtType>("any");
   const [date, setDate] = useState(todayLocal());
+  const [timeSlot, setTimeSlot] = useState<TimeSlot>("evening");
   const [startTime, setStartTime] = useState("18:00");
   const [durationMin, setDurationMin] = useState(120);
   const [playerCount, setPlayerCount] = useState(10);
@@ -67,7 +70,8 @@ export function CourtInquiryDialog({
     sport,
     courtType,
     date,
-    startTime,
+    timeSlot,
+    startTime: timeSlot === "custom" ? startTime : undefined,
     durationMin,
     playerCount,
     notes: notes.trim() || undefined,
@@ -124,15 +128,15 @@ export function CourtInquiryDialog({
                   onChange={(e) => setSport(e.target.value)}
                   className={fieldCls}
                 >
-                  {SPORTS.map((s) => (
-                    <option key={s.name} value={s.name}>
-                      {s.name}
+                  {INQUIRY_SPORTS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="space-y-1">
-                <span className="text-xs font-semibold text-muted-foreground">Court type</span>
+                <span className="text-xs font-semibold text-muted-foreground">Court / area</span>
                 <select
                   value={courtType}
                   onChange={(e) => setCourtType(e.target.value as CourtType)}
@@ -146,26 +150,45 @@ export function CourtInquiryDialog({
                 </select>
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1">
-                <span className="text-xs font-semibold text-muted-foreground">Date</span>
-                <input
-                  type="date"
-                  value={date}
-                  min={todayLocal()}
-                  onChange={(e) => setDate(e.target.value)}
-                  className={fieldCls}
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs font-semibold text-muted-foreground">Start time</span>
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold text-muted-foreground">Date</span>
+              <input
+                type="date"
+                value={date}
+                min={todayLocal()}
+                onChange={(e) => setDate(e.target.value)}
+                className={fieldCls}
+              />
+            </label>
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-muted-foreground">Preferred time</span>
+              <div role="group" aria-label="Preferred time" className="flex flex-wrap gap-1.5">
+                {TIME_SLOTS.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    aria-pressed={timeSlot === t.value}
+                    onClick={() => setTimeSlot(t.value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      timeSlot === t.value
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                    {t.hint && timeSlot === t.value ? ` · ${t.hint}` : ""}
+                  </button>
+                ))}
+              </div>
+              {timeSlot === "custom" && (
                 <input
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className={fieldCls}
+                  aria-label="Start time"
+                  className={`${fieldCls} mt-1.5`}
                 />
-              </label>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="space-y-1">
@@ -202,7 +225,7 @@ export function CourtInquiryDialog({
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}
                 rows={3}
-                placeholder="Rental rate, recurring weekly, equipment needed…"
+                placeholder="e.g. Team practice for 12 players, or a pickup scrimmage"
                 className={fieldCls}
               />
             </label>
