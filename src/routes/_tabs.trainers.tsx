@@ -33,15 +33,26 @@ import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { useQuery } from "@tanstack/react-query";
 import { listTrainerIdsForOrg, listTrainerOrgs } from "@/lib/trainer-orgs.functions";
+import {
+  TRAINER_RATE_OPTIONS,
+  compareByRateAsc,
+  compareByRatingDesc,
+  matchesMaxRate,
+  parseMaxRate,
+  withReviewStats,
+} from "@/lib/trainer-directory";
+import { useTrainerDirectoryData } from "@/lib/trainer-directory-data";
 
 import { Slider } from "@/components/ui/slider";
 
-type SortBy = "nearest" | "soonest" | "followers" | "name";
+type SortBy = "nearest" | "soonest" | "followers" | "rate" | "rating" | "name";
 
 const TRAINER_SORTS = [
   { value: "nearest" as const, label: "Nearest" },
   { value: "soonest" as const, label: "Soonest available" },
   { value: "followers" as const, label: "Most followers" },
+  { value: "rating" as const, label: "Top rated" },
+  { value: "rate" as const, label: "Lowest rate" },
   { value: "name" as const, label: "Name A–Z" },
 ];
 
@@ -90,6 +101,7 @@ const trainersSearchSchema = z.object({
   venue: fallback(z.string(), "").default(""),
   orgId: fallback(z.string(), "").default(""),
   radius: fallback(z.coerce.number().min(0).max(200), 0).default(0),
+  maxRate: fallback(z.coerce.number().min(0).max(1000), 0).default(0),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
@@ -125,6 +137,7 @@ function TrainersPage() {
     venue: "",
     orgId: "",
     radius: 0,
+    maxRate: 0,
     avail: "any",
     sort: "nearest",
     view: "list",
@@ -138,8 +151,13 @@ function TrainersPage() {
   const venue: string = search.venue || "";
   const orgId: string = search.orgId || "";
   const radius: number = Number(search.radius) || 0;
+  const maxRate = parseMaxRate(search.maxRate);
   const sortBy: SortBy =
-    search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
+    search.sort === "soonest" ||
+    search.sort === "followers" ||
+    search.sort === "rate" ||
+    search.sort === "rating" ||
+    search.sort === "name"
       ? search.sort
       : "nearest";
   const avail: Avail =
@@ -185,6 +203,7 @@ function TrainersPage() {
   const setRadius = (v: number) => updateSearch({ radius: v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
+  const setMaxRate = (v: string) => updateSearch({ maxRate: parseMaxRate(v) });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
@@ -216,6 +235,12 @@ function TrainersPage() {
   }, []);
 
   const orgs = useAllOrgs();
+
+  // Real ratings and the facility each trainer works at, fetched once for the
+  // whole page (not per card).
+  const { ratings, facilities } = useTrainerDirectoryData(
+    orgs.filter((o) => o.kind === "coach").map((o) => o.id),
+  );
 
   // Real-time availability change indicator
   const trainerSig = useMemo(
@@ -253,6 +278,7 @@ function TrainersPage() {
     const byOrg = orgId ? byVenue.filter((o) => orgMemberIds.has(o.id)) : byVenue;
     const filtered = byOrg
       .filter((o) => matchesSportList(o.sports, sports))
+      .filter((o) => matchesMaxRate(o.ratePerHour, maxRate))
       .filter((o) => {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
@@ -273,7 +299,9 @@ function TrainersPage() {
           : true,
       );
     const withDist = filtered
-      .map((o) => {
+      .map((rawOrg) => {
+        // Real review stats replace a missing (or stale) rating.
+        const o = withReviewStats(rawOrg, ratings.get(rawOrg.id));
         let minKm: number | null = null;
         if (coords && (o.venueGeo?.length ?? 0) > 0) {
           for (const g of o.venueGeo ?? []) {
@@ -303,10 +331,26 @@ function TrainersPage() {
       }
       if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
       if (sortBy === "followers") return b.o.followers - a.o.followers;
+      if (sortBy === "rating") return compareByRatingDesc(a.o, b.o) || a.dist - b.dist;
+      if (sortBy === "rate") return compareByRateAsc(a.o, b.o) || a.dist - b.dist;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sports, specialty, venue, orgId, orgMemberIds, q, sortBy, avail, radiusKm, coords]);
+  }, [
+    orgs,
+    sports,
+    specialty,
+    venue,
+    orgId,
+    orgMemberIds,
+    q,
+    sortBy,
+    avail,
+    radiusKm,
+    coords,
+    maxRate,
+    ratings,
+  ]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
@@ -458,6 +502,7 @@ function TrainersPage() {
             (venue ? 1 : 0) +
             (orgId ? 1 : 0) +
             (radius > 0 ? 1 : 0) +
+            (maxRate > 0 ? 1 : 0) +
             (avail !== "any" ? 1 : 0) +
             (sortBy !== "nearest" ? 1 : 0);
           const specialties = sports.length
@@ -482,6 +527,7 @@ function TrainersPage() {
                   venue: "",
                   orgId: "",
                   radius: 0,
+                  maxRate: 0,
                   avail: "any",
                   sort: "nearest",
                 })
@@ -620,6 +666,20 @@ function TrainersPage() {
                     )}
                   </FilterSection>
 
+                  <FilterSection
+                    label="Hourly rate"
+                    hint={maxRate > 0 ? `Up to $${maxRate}/hr` : "Any rate"}
+                  >
+                    <ChipRow
+                      value={String(maxRate)}
+                      onChange={setMaxRate}
+                      options={TRAINER_RATE_OPTIONS.map((o) => ({
+                        value: o.value,
+                        label: o.label,
+                      }))}
+                    />
+                  </FilterSection>
+
                   <FilterSection label="Availability">
                     <ChipRow
                       value={avail}
@@ -671,7 +731,12 @@ function TrainersPage() {
               const cardSearch = venueOffered ? { venue } : undefined;
               return (
                 <div key={o.id} className="relative">
-                  <OrgCard org={o} index={i} search={cardSearch} />
+                  <OrgCard
+                    org={o}
+                    index={i}
+                    search={cardSearch}
+                    facility={facilities[o.id] ?? null}
+                  />
                   <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
                     <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
                       {distLabel}
