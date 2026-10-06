@@ -34,6 +34,7 @@ import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
 import { kmToMi, formatDistance } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
@@ -570,6 +571,8 @@ function PlayerProfilePage() {
 
         <PlayerOrgsSection userId={userId} />
 
+        <PlayerPassportSection userId={userId} enabled={!!user} />
+
         <PublicReelsSection userId={userId} />
 
         {/* Open availability */}
@@ -788,9 +791,7 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
             <Building2 className="h-3.5 w-3.5" />
             <span className="truncate max-w-[160px]">{o.name}</span>
             {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="micro-label text-muted-foreground">
-              {r.role}
-            </span>
+            <span className="micro-label text-muted-foreground">{r.role}</span>
           </Link>
         );
       })}
