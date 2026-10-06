@@ -741,6 +741,38 @@ export type Database = {
         }
         Relationships: []
       }
+      game_late_drops: {
+        Row: {
+          dropped_at: string
+          game_id: string
+          id: string
+          minutes_before_start: number
+          user_id: string
+        }
+        Insert: {
+          dropped_at?: string
+          game_id: string
+          id?: string
+          minutes_before_start: number
+          user_id: string
+        }
+        Update: {
+          dropped_at?: string
+          game_id?: string
+          id?: string
+          minutes_before_start?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_late_drops_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_participants: {
         Row: {
           attendance_marked_at: string | null
@@ -837,9 +869,12 @@ export type Database = {
       }
       game_position_waitlist: {
         Row: {
+          claimed_at: string | null
           created_at: string
           game_id: string
           id: string
+          offer_expires_at: string | null
+          offered_at: string | null
           position: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -847,9 +882,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          claimed_at?: string | null
           created_at?: string
           game_id: string
           id?: string
+          offer_expires_at?: string | null
+          offered_at?: string | null
           position: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -857,9 +895,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          claimed_at?: string | null
           created_at?: string
           game_id?: string
           id?: string
+          offer_expires_at?: string | null
+          offered_at?: string | null
           position?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -4130,6 +4171,10 @@ export type Database = {
         Args: { _user: string }
         Returns: boolean
       }
+      claim_waitlist_offer: {
+        Args: { _entry_id: string; _user: string }
+        Returns: Json
+      }
       clear_age_review: {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
@@ -4212,6 +4257,10 @@ export type Database = {
         Returns: string
       }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
+      decline_waitlist_offer: {
+        Args: { _entry_id: string; _user: string }
+        Returns: Json
+      }
       default_profile_visibility_for: {
         Args: { _user: string }
         Returns: string
@@ -4514,6 +4563,15 @@ export type Database = {
           status: string
         }[]
       }
+      my_waitlist_ranks: {
+        Args: { _game_id: string }
+        Returns: {
+          entry_id: string
+          queue_position: string
+          queue_rank: number
+          queue_total: number
+        }[]
+      }
       notify_guardians: {
         Args: {
           _body: string
@@ -4545,6 +4603,14 @@ export type Database = {
           verified_review_count: number
         }[]
       }
+      player_reliability: {
+        Args: { _user: string }
+        Returns: {
+          games_attended: number
+          late_drops: number
+          no_shows: number
+        }[]
+      }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
         Args: { _ids: string[] }
@@ -4554,6 +4620,7 @@ export type Database = {
         }[]
       }
       profile_visibility_of: { Args: { _user: string }; Returns: string }
+      promote_next_waitlist_player: { Args: { _game_id: string }; Returns: Json }
       provision_managed_child: {
         Args: {
           _attested?: boolean

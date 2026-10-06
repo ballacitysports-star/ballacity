@@ -641,6 +641,9 @@ export async function hostRemoveParticipant(params: {
       () => undefined,
       () => undefined,
     );
+  // The freed spot goes to the next waitlisted player.
+  const { promoteWaitlistSafely } = await import("@/lib/waitlist-store");
+  await promoteWaitlistSafely(gameId);
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {

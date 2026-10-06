@@ -3,6 +3,7 @@ import { Check, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PlayerReliabilityBadge } from "@/components/games/PlayerReliabilityBadge";
 import { createNotification } from "@/lib/notifications";
 import { reviewWaitlistEntry, type WaitlistEntry, type WaitlistStatus } from "@/lib/waitlist-store";
 
@@ -45,6 +46,20 @@ export function WaitlistStatusPill({ status }: { status: WaitlistStatus }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-lime/20 px-2 py-0.5 text-[10px] font-bold text-lime">
         <Check className="h-3 w-3" /> Approved
+      </span>
+    );
+  }
+  if (status === "offered") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-lime/20 px-2 py-0.5 text-[10px] font-bold text-lime">
+        <Clock className="h-3 w-3" /> Spot offered
+      </span>
+    );
+  }
+  if (status === "expired") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+        <X className="h-3 w-3" /> Offer expired
       </span>
     );
   }
@@ -136,7 +151,10 @@ export function WaitlistManager({
                 avatarUrl={p?.avatar_url ?? undefined}
                 size="sm"
               />
-              <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm">{name}</span>
+                {isHost && <PlayerReliabilityBadge userId={e.userId} className="mt-0.5" />}
+              </div>
               {isHost && e.status === "waiting" ? (
                 <div className="flex items-center gap-1">
                   <button

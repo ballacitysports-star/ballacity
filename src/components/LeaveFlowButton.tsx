@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { LogOut, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +16,7 @@ import {
 import { useMyFlowStatus, isUuid, type PlayerFlowStatus } from "@/lib/game-flow-status";
 import { cancelMyJoinRequest, withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
+import { isLateDrop, lateDropWarning } from "@/lib/late-drop";
 import { supabase } from "@/integrations/supabase/client";
 
 export type LeaveFlowVariant = "link" | "danger";
@@ -114,8 +116,25 @@ export function LeaveFlowButton({
   const [busy, setBusy] = useState(false);
 
   const action = actionFor(status);
+  // Only a player actually on the roster can late-drop; fetch the start time
+  // when they open the confirmation rather than on every render.
+  const { data: timing } = useQuery({
+    queryKey: ["game-start", gameId],
+    enabled: open && action === "leave" && isUuid(gameId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("hosted_games")
+        .select("date, all_day")
+        .eq("id", gameId)
+        .maybeSingle();
+      return data;
+    },
+  });
   if (!action) return null;
   const copy = COPY[action];
+  const lateDrop =
+    action === "leave" && !!timing && isLateDrop({ startsAt: timing.date, allDay: timing.all_day });
 
   const run = async () => {
     setBusy(true);
@@ -170,6 +189,14 @@ export function LeaveFlowButton({
           <AlertDialogHeader>
             <AlertDialogTitle>{copy.title}</AlertDialogTitle>
             <AlertDialogDescription>{copy.description(gameTitle)}</AlertDialogDescription>
+            {lateDrop && timing && (
+              <p
+                role="alert"
+                className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] leading-relaxed text-amber-600 dark:text-amber-400"
+              >
+                {lateDropWarning(timing.date)}
+              </p>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Keep my spot</AlertDialogCancel>

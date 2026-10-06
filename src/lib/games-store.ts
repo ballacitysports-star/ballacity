@@ -186,12 +186,19 @@ export function leaveGame(id: string) {
       .delete()
       .eq("game_id", id)
       .eq("user_id", uid);
-    if (error && wasJoined) {
-      // Roll back optimistic local removal on real failure.
-      joined.add(id);
-      saveJoinedGames();
-      emit();
+    if (error) {
+      if (wasJoined) {
+        // Roll back optimistic local removal on real failure.
+        joined.add(id);
+        saveJoinedGames();
+        emit();
+      }
+      return;
     }
+    // The freed spot goes to the next waitlisted player (auto-join on free runs,
+    // a timed offer on paid / approval runs) so it is never stranded.
+    const { promoteWaitlistSafely } = await import("@/lib/waitlist-store");
+    await promoteWaitlistSafely(id);
   })();
 }
 

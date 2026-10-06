@@ -43,7 +43,9 @@ export function MyWaitlistCard() {
         </span>
         <div>
           <h2 className="section-eyebrow text-foreground">My waitlist</h2>
-          <p className="text-[10px] text-muted-foreground">Approval status from each host</p>
+          <p className="text-[10px] text-muted-foreground">
+            Your place in line and any spot offers
+          </p>
         </div>
       </div>
       <div className="space-y-2">
@@ -58,11 +60,13 @@ export function MyWaitlistCard() {
               <div className="truncate text-sm font-semibold">{titles[e.gameId] ?? "Game"}</div>
               <div className="text-[11px] text-muted-foreground">
                 {e.position}
-                {e.status === "approved"
+                {e.status === "approved" || e.status === "offered"
                   ? " · spot offered — open the game to claim it"
                   : e.status === "declined"
                     ? " · host declined this request"
-                    : " · waiting for the host"}
+                    : e.status === "expired"
+                      ? " · the offer ran out and moved to the next player"
+                      : " · waiting for a spot to open"}
               </div>
             </div>
             <WaitlistStatusPill status={e.status} />

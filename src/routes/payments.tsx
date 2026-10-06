@@ -37,6 +37,7 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
+import { PlayerReliabilityBadge } from "@/components/games/PlayerReliabilityBadge";
 import { formatGameWhen } from "@/lib/format";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -737,6 +738,7 @@ function RequestsPanel() {
                 <div className="text-[11px] text-muted-foreground mt-1">
                   Player ID: {r.player_id.slice(0, 8)}… · {new Date(r.created_at).toLocaleString()}
                 </div>
+                <PlayerReliabilityBadge userId={r.player_id} className="mt-1.5" />
                 {r.message && <p className="text-xs mt-2 italic">"{r.message}"</p>}
               </div>
               <span

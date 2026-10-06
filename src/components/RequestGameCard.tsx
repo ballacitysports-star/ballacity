@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Clock, Check, X as XIcon, Clock as ClockIcon } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PlayerReliabilityBadge } from "@/components/games/PlayerReliabilityBadge";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
@@ -258,6 +259,9 @@ function RequestGameCardInner({
                     ? "Approved — you're on the roster."
                     : "Declined by host."}
             </p>
+            {isHost && isPending && (
+              <PlayerReliabilityBadge userId={request.player_id} className="mt-1" />
+            )}
             <RequestTimeline request={request} />
           </div>
           {isPending && (
