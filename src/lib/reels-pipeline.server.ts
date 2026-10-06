@@ -14,11 +14,7 @@ import { DEFAULT_AI_PROVIDER, type AiProviderConfig } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import type { AiMessagePart } from "@/lib/ai/provider";
-import {
-  analyticsAudience,
-  analyticsText,
-  normalizeAdvancedAnalytics,
-} from "@/lib/reel-analytics";
+import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
 
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
@@ -77,11 +73,11 @@ async function callLovableAIParts(
 
 /** Same as `callLovableAIParts`, but also reports which model answered. */
 async function callLovableAIPartsWithModel(
-  parts: Array<Record<string, any>>,
+  parts: Array<Record<string, unknown>>,
   system: string,
   ctx: StepCtx,
   pickModel?: (p: AiProviderConfig) => string,
-): Promise<{ data: any; model: string }> {
+): Promise<{ data: unknown; model: string }> {
   const providerConfig = ctx.session?.config.provider ?? DEFAULT_AI_PROVIDER;
   const request = {
     system,
@@ -453,7 +449,7 @@ const STEP_RUNNERS: Record<
         `What the footage shows: ${progress.analysis.summary}`,
         progress.analysis.quality_note ? `Footage quality: ${progress.analysis.quality_note}` : "",
         (progress.timeline ?? []).length
-          ? `Play-by-play: ${(progress.timeline ?? []).map((e: any) => `${e.t}s ${e.label}`).join("; ")}`
+          ? `Play-by-play: ${(progress.timeline ?? []).map((e: { t: number; label: string }) => `${e.t}s ${e.label}`).join("; ")}`
           : "",
         `Frames in order: ${stamps}.`,
         "Grade this athlete's performance on the clip.",
