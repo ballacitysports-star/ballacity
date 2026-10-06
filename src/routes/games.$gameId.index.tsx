@@ -86,7 +86,14 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
-import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
+import {
+  useGameWaitlist,
+  joinWaitlist,
+  leaveWaitlist,
+  promoteWaitlistSafely,
+} from "@/lib/waitlist-store";
+import { WaitlistStatusCard } from "@/components/games/WaitlistStatusCard";
+import { isLateDrop, lateDropWarning } from "@/lib/late-drop";
 import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
 import {
   Sheet,
@@ -449,6 +456,18 @@ function GameDetail() {
   const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
+
+  // Sweep the waitlist once per visit: the host and waitlisted players are the
+  // ones who notice a stranded spot or a lapsed offer, and the server call is
+  // idempotent (it does nothing unless a spot is open or an offer expired).
+  const waitlistSweptRef = useRef(false);
+  const hasWaitlistActivity =
+    waitlistEntries.length > 0 && (isHost || waitlistEntries.some((w) => w.userId === user?.id));
+  useEffect(() => {
+    if (!hasWaitlistActivity || waitlistSweptRef.current) return;
+    waitlistSweptRef.current = true;
+    void promoteWaitlistSafely(gameId);
+  }, [hasWaitlistActivity, gameId]);
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -2017,8 +2036,8 @@ function GameDetail() {
             {viewerGate.waitlistOpen && (
               <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
                 {viewerGate.reason} You can still join a waitlist below: pick the position you want
-                and your name is listed there as “waiting”. Waitlist spots appear on this position
-                chip for everyone, and the host pulls from it when a spot frees up.
+                and your name is listed there as “waiting”. When a spot frees up, the next player in
+                line is promoted automatically.
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -2129,63 +2148,33 @@ function GameDetail() {
                           <WaitlistStatusPill status={mineHere.status} />
                         ) : null;
                       })()}
-                    {viewerOnWaitlist && !isHost && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await leaveWaitlist(game.id, name);
-                            toast(`Removed from the ${name} waitlist.`);
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Could not leave waitlist.");
-                          }
-                        }}
-                        aria-label={`Leave ${name} waitlist`}
-                        className="rounded-full border border-coral bg-coral px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
-                      >
-                        Leave waitlist
-                      </button>
-                    )}
+                    {viewerOnWaitlist &&
+                      !isHost &&
+                      !posWaitlist.some((w) => w.userId === user!.id && w.status === "offered") && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await leaveWaitlist(game.id, name);
+                              toast(`Removed from the ${name} waitlist.`);
+                            } catch (e: any) {
+                              toast.error(e.message ?? "Could not leave waitlist.");
+                            }
+                          }}
+                          aria-label={`Leave ${name} waitlist`}
+                          className="rounded-full border border-coral bg-coral px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
+                        >
+                          Leave waitlist
+                        </button>
+                      )}
                   </div>
                 );
               })}
             </div>
 
-            {(() => {
-              if (!user || isHost) return null;
-              const mine = waitlistEntries.filter((w) => w.userId === user.id);
-              if (mine.length === 0) return null;
-              return (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-coral/40 bg-coral/5 px-3 py-2">
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    You’re on the waitlist for{" "}
-                    <span className="font-semibold text-foreground">
-                      {mine.map((w) => w.position).join(", ")}
-                    </span>
-                    . We’ll notify you if a spot opens up.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await Promise.all(mine.map((w) => leaveWaitlist(game.id, w.position)));
-                        toast(
-                          mine.length > 1
-                            ? "Removed from all waitlists for this game."
-                            : `Removed from the ${mine[0]!.position} waitlist.`,
-                        );
-                      } catch (e: any) {
-                        toast.error(e.message ?? "Could not leave waitlist.");
-                      }
-                    }}
-                    aria-label={mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
-                    className="rounded-full border border-coral bg-coral px-3 py-1.5 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
-                  >
-                    {mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
-                  </button>
-                </div>
-              );
-            })()}
+            {user && !isHost && (
+              <WaitlistStatusCard gameId={game.id} entries={waitlistEntries} userId={user.id} />
+            )}
           </div>
         )}
 
@@ -3029,6 +3018,15 @@ function GameDetail() {
                 ? "Your spot will open up for someone else. You can rejoin if there's still space."
                 : "You'll be added to the roster. You can leave later if plans change."}
             </AlertDialogDescription>
+            {confirmAction === "leave" &&
+              isLateDrop({ startsAt: game.date, allDay: game.allDay }) && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] leading-relaxed text-amber-600 dark:text-amber-400"
+                >
+                  {lateDropWarning(game.date)}
+                </p>
+              )}
           </AlertDialogHeader>
           {confirmAction === "join" && (
             <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
