@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
 import { Navigation } from "lucide-react";
@@ -2393,6 +2394,7 @@ function GameDetail() {
                 : "Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved."}
             </p>
           )}
+          <RosterRecruitPanel roster={liveRoster} meId={meId} />
         </div>
       </div>
 
