@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Building2, CalendarPlus, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
+import { CalendarPlus, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { CourtInquiryDialog } from "@/components/org/CourtInquiryDialog";
 import { describeOpenBadge, parseHours, type OpenBadge } from "@/lib/org-hours";
@@ -25,11 +25,11 @@ export type OrgDirectoryRow = {
   verified: boolean | null;
 };
 
-const BADGE_TONE: Record<OpenBadge["tone"], string> = {
-  open: "bg-lime/15 text-lime",
-  closing: "bg-amber-500/15 text-amber-500",
-  closed: "bg-secondary text-muted-foreground",
-  unknown: "bg-secondary text-muted-foreground",
+const BADGE_TEXT: Record<OpenBadge["tone"], string> = {
+  open: "text-lime",
+  closing: "text-amber-500",
+  closed: "text-muted-foreground",
+  unknown: "text-muted-foreground",
 };
 
 // Distinguishes rentals, studios and complexes at a glance.
@@ -66,8 +66,21 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="grid h-full w-full place-items-center">
-              <Building2 className="h-8 w-8 text-muted-foreground" />
+            <div className="grid h-full w-full place-items-center bg-lime-gradient">
+              {org.avatar_url ? (
+                <img
+                  src={org.avatar_url}
+                  alt=""
+                  className="h-16 w-16 rounded-2xl border-2 border-background/40 object-cover"
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="font-display text-4xl font-bold text-primary-foreground/90"
+                >
+                  {org.name.slice(0, 2).toUpperCase()}
+                </span>
+              )}
             </div>
           )}
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5">
@@ -80,11 +93,14 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
             ) : (
               <span />
             )}
-            {org.verified && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 text-[11px] font-bold text-lime backdrop-blur">
-                <ShieldCheck className="h-3 w-3" /> Verified
-              </span>
-            )}
+            <span
+              className={`inline-flex max-w-[62%] items-center gap-1 rounded-full bg-background/85 px-2.5 py-1 text-[11px] backdrop-blur ${BADGE_TEXT[badge.tone]}`}
+            >
+              <span className="shrink-0 font-bold">{badge.headline}</span>
+              {badge.detail && (
+                <span className="truncate font-medium text-foreground/80">{badge.detail}</span>
+              )}
+            </span>
           </div>
           {photos.length > 1 && (
             <span className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
@@ -111,19 +127,19 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
 
         <div className="space-y-2 p-3">
           <div>
-            <h2 className="truncate font-display text-base font-bold">{org.name}</h2>
+            <h2 className="flex items-center gap-1.5 font-display text-base font-bold">
+              <span className="truncate">{org.name}</span>
+              {org.verified && (
+                <ShieldCheck className="h-4 w-4 shrink-0 text-lime" aria-label="Verified" />
+              )}
+            </h2>
+            <div className="truncate text-xs text-muted-foreground">@{org.handle}</div>
             {place && (
               <div className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
                 <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-lime" />
                 <span className="line-clamp-1">{place}</span>
               </div>
             )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className={`rounded-full px-2 py-0.5 font-bold ${BADGE_TONE[badge.tone]}`}>
-              {badge.headline}
-            </span>
-            {badge.detail && <span className="text-muted-foreground">{badge.detail}</span>}
           </div>
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1">

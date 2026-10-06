@@ -46,7 +46,8 @@ describe("OrgDirectoryCard", () => {
   it("shows photos, category, location, live hours and amenity tags", () => {
     render(<OrgDirectoryCard org={row()} now={new Date("2026-10-06T12:00:00Z")} />);
     expect(screen.getByText("Court rental")).toBeTruthy();
-    expect(screen.getByText("Verified")).toBeTruthy();
+    expect(screen.getByLabelText("Verified")).toBeTruthy();
+    expect(screen.getByText("@peak")).toBeTruthy();
     expect(screen.getByText("3 photos")).toBeTruthy();
     expect(screen.getByText("123 Main St · Austin")).toBeTruthy();
     expect(screen.getByText("Open now")).toBeTruthy();
@@ -78,6 +79,21 @@ describe("OrgDirectoryCard", () => {
     render(<OrgDirectoryCard org={row({ website: "javascript:alert(1)" })} now={new Date()} />);
     expect(screen.queryByRole("link", { name: /book court/i })).toBeNull();
     expect(screen.getByRole("button", { name: /book court/i })).toBeTruthy();
+  });
+
+  it("puts the live status on the banner and falls back to the brand mark without photos", () => {
+    const { container } = render(
+      <OrgDirectoryCard
+        org={row({ cover_url: null, photos: null, avatar_url: null })}
+        now={new Date("2026-10-06T12:00:00Z")}
+      />,
+    );
+    // Status badge is inside the banner (the 16:9 box), not the card body.
+    const banner = container.querySelector(".aspect-\\[16\\/9\\]") as HTMLElement;
+    expect(banner.textContent).toContain("Open now");
+    expect(banner.textContent).toContain("Court rental");
+    // No photo: gradient banner with the facility's initials.
+    expect(banner.querySelector(".bg-lime-gradient")?.textContent).toBe("PE");
   });
 
   it("shows a placeholder and unset hours for a bare listing", () => {
