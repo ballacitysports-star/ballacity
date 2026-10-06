@@ -4668,12 +4668,12 @@ export type Database = {
         }
         Returns: string
       }
-      set_game_hidden_from_org: {
-        Args: { _game: string; _hidden: boolean }
-        Returns: undefined
-      }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
+        Returns: undefined
+      }
+      set_game_hidden_from_org: {
+        Args: { _game: string; _hidden: boolean }
         Returns: undefined
       }
       set_my_birthday: {
