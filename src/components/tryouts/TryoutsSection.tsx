@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import {
   listUpcomingTryouts,
   getTryoutRsvpContext,
@@ -189,12 +190,20 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   );
 }
 
-function PostTryoutDialog({ onClose }: { onClose: () => void }) {
+export function PostTryoutDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const teamsFn = useServerFn(listMyManagedTeams);
   const create = useServerFn(createTeamPost);
   const { data: teams } = useQuery({ queryKey: ["tryouts", "my-teams"], queryFn: () => teamsFn() });
   const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "" });
+  // Picking the venue from the suggestions (not just typing) records its place,
+  // which is what ties the tryout to a facility's profile page.
+  const [place, setPlace] = useState<{
+    placeId: string;
+    lat: number;
+    lng: number;
+    formattedAddress: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const teamId = f.teamId || teams?.[0]?.id || "";
 
@@ -207,6 +216,10 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
           teamId, kind: f.kind, title: f.title.trim(), body: f.body,
           eventDate: new Date(f.date).toISOString(),
           location: f.location || null,
+          placeId: place?.placeId ?? null,
+          formattedAddress: place?.formattedAddress ?? null,
+          lat: place?.lat ?? null,
+          lng: place?.lng ?? null,
           spotsMax: f.spots ? Number(f.spots) : null,
           price: f.price ? Number(f.price) : null,
         },
@@ -247,7 +260,22 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
             </div>
             <Input placeholder="Title (e.g. U14 fall tryouts)" maxLength={120} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
             <Input type="datetime-local" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
-            <Input placeholder="Location" value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} />
+            <LocationAutocomplete
+              value={f.location}
+              onChange={(v) => {
+                setF((cur) => ({ ...cur, location: v }));
+                setPlace(null);
+              }}
+              placeholder="Venue or address"
+              onPick={(full, placeId, geo) => {
+                setF((cur) => ({ ...cur, location: full }));
+                setPlace(
+                  geo && placeId
+                    ? { placeId, lat: geo.lat, lng: geo.lng, formattedAddress: geo.formattedAddress ?? full }
+                    : null,
+                );
+              }}
+            />
             <div className="flex gap-2">
               <Input type="number" min={1} placeholder="Spots (optional)" value={f.spots} onChange={(e) => setF({ ...f, spots: e.target.value })} />
               <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
