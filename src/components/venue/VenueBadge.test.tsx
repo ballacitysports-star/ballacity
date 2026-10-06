@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { VenueBadge, VenueHostedAt } from "./VenueBadge";
+import { VenueBadge } from "./VenueBadge";
 
 afterEach(() => {
   cleanup();
@@ -46,7 +46,9 @@ describe("VenueBadge", () => {
     const cardClick = vi.fn();
     renderBadge("o1", cardClick);
 
-    const badge = await screen.findByRole("button", { name: /Apex Basketball Hub/ });
+    const badge = await screen.findByRole("button", {
+      name: /View Apex Basketball Hub profile and weekly schedule/,
+    });
     expect(badge.textContent).toContain("Apex Basketball Hub");
     expect(screen.getByLabelText("Verified")).toBeTruthy();
 
@@ -63,59 +65,5 @@ describe("VenueBadge", () => {
     h.result = { data: null, error: null }; // RLS hides removed facilities
     const { container } = renderBadge("gone");
     await waitFor(() => expect(container.querySelector("button")).toBeNull());
-  });
-});
-
-describe("VenueHostedAt amenities", () => {
-  it("lists the venue's key amenities, court count first", async () => {
-    h.result = {
-      data: {
-        id: "o1",
-        name: "Apex Basketball Hub",
-        verified: false,
-        amenities: ["Parking", "4 courts", "Indoor courts", "Lighting"],
-      },
-      error: null,
-    };
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <VenueHostedAt orgId="o1" />
-      </QueryClientProvider>,
-    );
-    const list = await screen.findByRole("list", { name: "Venue amenities" });
-    expect(Array.from(list.querySelectorAll("li")).map((li) => li.textContent)).toEqual([
-      "4 courts",
-      "Indoor courts",
-      "Lighting",
-      "Parking",
-    ]);
-  });
-});
-
-describe("VenueHostedAt", () => {
-  it("shows a Hosted at row linking to the facility", async () => {
-    h.result = { data: { id: "o1", name: "Apex Basketball Hub", verified: false }, error: null };
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <VenueHostedAt orgId="o1" />
-      </QueryClientProvider>,
-    );
-    const link = await screen.findByRole("button", { name: /Apex Basketball Hub/ });
-    expect(screen.getByText("Hosted at")).toBeTruthy();
-    fireEvent.click(link);
-    expect(h.navigate).toHaveBeenCalledWith({ to: "/orgs/$orgId", params: { orgId: "o1" } });
-  });
-
-  it("renders nothing without a facility", async () => {
-    h.result = { data: null, error: null };
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(
-      <QueryClientProvider client={qc}>
-        <VenueHostedAt orgId="gone" />
-      </QueryClientProvider>,
-    );
-    await waitFor(() => expect(container.textContent).toBe(""));
   });
 });

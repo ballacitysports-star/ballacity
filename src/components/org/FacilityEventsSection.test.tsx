@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Game } from "@/lib/sample-data";
 
@@ -11,17 +11,26 @@ vi.mock("@tanstack/react-router", () => ({
     to,
     params,
     search,
+    ...rest
   }: {
     children: ReactNode;
     to: string;
     params?: Record<string, string>;
     search?: Record<string, string>;
+    "aria-label"?: string;
   }) => {
     let href = to;
     for (const [k, v] of Object.entries(params ?? {})) href = href.replace(`$${k}`, v);
     if (search) href += `?${new URLSearchParams(search).toString()}`;
-    return <a href={href}>{children}</a>;
+    return (
+      <a href={href} aria-label={rest["aria-label"]}>
+        {children}
+      </a>
+    );
   },
+}));
+vi.mock("@/components/UserAvatar", () => ({
+  UserAvatarById: ({ name }: { name?: string }) => <span data-testid="host-avatar">{name}</span>,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/games-store", () => ({ useIsJoined: () => false }));
@@ -41,10 +50,11 @@ vi.mock("@/lib/hosted-games-store", () => ({
 const { FacilityEventsSection } = await import("./FacilityEventsSection");
 
 const future = new Date(Date.now() + 86_400_000).toISOString();
-function game(id: string, title: string, orgOfficial: boolean): Game {
+function game(id: string, title: string, orgOfficial: boolean, sport = "Basketball"): Game {
   return {
     id,
-    sport: "Basketball",
+    hostUserId: `host-${id}`,
+    sport,
     title,
     host: { name: "Host", username: "@host", avatar: "H", rating: 5 },
     date: future,
@@ -101,5 +111,34 @@ describe("FacilityEventsSection", () => {
     expect(screen.queryByRole("button", { name: "Hide Apex Open Run from this page" })).toBeNull();
     fireEvent.click(hide);
     await vi.waitFor(() => expect(hideGameFromOrg).toHaveBeenCalledWith("g2", true));
+  });
+
+  it("filters the schedule by sport and links each host's profile", async () => {
+    games.push(
+      game("g1", "Hoops night", false, "Basketball"),
+      game("g2", "Spike session", false, "Volleyball"),
+    );
+    renderSection(false);
+    expect(await screen.findByText("Hoops night")).toBeTruthy();
+    expect(screen.getByText("Spike session")).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("link", { name: "View Host's profile" })
+        .map((a) => a.getAttribute("href")),
+    ).toEqual(["/players/host-g1", "/players/host-g2"]);
+
+    const group = screen.getByRole("group", { name: "Filter by sport" });
+    fireEvent.click(within(group).getByRole("button", { name: /Volleyball/ }));
+    expect(screen.queryByText("Hoops night")).toBeNull();
+    expect(screen.getByText("Spike session")).toBeTruthy();
+    fireEvent.click(within(group).getByRole("button", { name: /All sports/ }));
+    expect(screen.getByText("Hoops night")).toBeTruthy();
+  });
+
+  it("hides the sport filter when a facility only hosts one sport", async () => {
+    games.push(game("g1", "Hoops night", false), game("g2", "More hoops", false));
+    renderSection(false);
+    await screen.findByText("Hoops night");
+    expect(screen.queryByRole("group", { name: "Filter by sport" })).toBeNull();
   });
 });

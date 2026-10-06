@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { GameBreadcrumbs } from "@/components/venue/GameBreadcrumbs";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
@@ -1388,6 +1389,8 @@ function GameDetail() {
         </div>
       </div>
 
+      <GameBreadcrumbs orgId={game.orgId} gameTitle={game.title} />
+
       {/* Multi-day series: switch between sessions */}
       {game.seriesId && (
         <div className="page-shell mt-4">
@@ -1805,7 +1808,12 @@ function GameDetail() {
               </span>
             </div>
           </OpenInMaps>
-          <VenueHostedAt orgId={game.orgId} />
+          <VenueHostedAt
+            orgId={game.orgId}
+            gameId={game.id}
+            official={game.orgOfficial}
+            indoor={game.indoor}
+          />
         </div>
 
         {/* Host */}

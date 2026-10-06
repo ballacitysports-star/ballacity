@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BadgeCheck, CalendarDays, Clock, EyeOff, MapPin, Plus, Users } from "lucide-react";
+import { UserAvatarById } from "@/components/UserAvatar";
 import { fetchHostedGamesForOrg, hideGameFromOrg } from "@/lib/hosted-games-store";
 import {
   FACILITY_EVENT_KINDS,
@@ -76,6 +77,21 @@ function EventRow({
   return (
     <li>
       <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-background p-3">
+        {game.hostUserId && (
+          <Link
+            to="/players/$userId"
+            params={{ userId: game.hostUserId }}
+            aria-label={`View ${game.host.name}'s profile`}
+            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-lime"
+          >
+            <UserAvatarById
+              userId={game.hostUserId}
+              initials={game.host.avatar}
+              name={game.host.name}
+              size="sm"
+            />
+          </Link>
+        )}
         <Link
           to="/games/$gameId"
           params={{ gameId: game.id }}
@@ -110,6 +126,7 @@ function EventRow({
               <Users className="h-3 w-3 text-lime" />
               {spotsLeft > 0 ? `${spotsLeft} of ${game.maxPlayers} spots left` : "Full"}
             </span>
+            <span className="font-semibold text-foreground">{game.sport}</span>
             <span>{game.skill}</span>
             <span className="truncate">Hosted by {game.host.name}</span>
           </div>
@@ -153,6 +170,7 @@ export function FacilityEventsSection({
   canPost: boolean;
 }) {
   const [filter, setFilter] = useState<FacilityEventKind | "all">("all");
+  const [sport, setSport] = useState<string>("all");
   const qc = useQueryClient();
   const hide = useMutation({
     mutationFn: (gameId: string) => hideGameFromOrg(gameId, true),
@@ -178,8 +196,17 @@ export function FacilityEventsSection({
     for (const g of upcoming) c[classifyFacilityEvent(g)] += 1;
     return c;
   }, [upcoming]);
-  const shown =
-    filter === "all" ? upcoming : upcoming.filter((g) => classifyFacilityEvent(g) === filter);
+  const sports = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const g of upcoming) n.set(g.sport, (n.get(g.sport) ?? 0) + 1);
+    return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [upcoming]);
+  // A sport filter that no longer matches anything (the run was hidden or
+  // started) falls back to "all" instead of showing an empty list.
+  const activeSport = sports.some(([s]) => s === sport) ? sport : "all";
+  const shown = upcoming
+    .filter((g) => filter === "all" || classifyFacilityEvent(g) === filter)
+    .filter((g) => activeSport === "all" || g.sport === activeSport);
 
   return (
     <section id="facility-events" className="rounded-2xl border border-border/60 bg-surface p-4">
@@ -236,6 +263,26 @@ export function FacilityEventsSection({
                 {c.plural} · {c.n}
               </button>
             ))}
+        </div>
+      )}
+
+      {sports.length > 1 && (
+        <div role="group" aria-label="Filter by sport" className="mb-3 flex flex-wrap gap-1.5">
+          {[["all", upcoming.length] as const, ...sports].map(([s, n]) => (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={activeSport === s}
+              onClick={() => setSport(s)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                activeSport === s
+                  ? "border border-lime/40 bg-lime/15 text-lime"
+                  : "border border-border text-muted-foreground"
+              }`}
+            >
+              {s === "all" ? "All sports" : `${SPORT_EMOJI[s] ?? "🏅"} ${s}`} · {n}
+            </button>
+          ))}
         </div>
       )}
 
