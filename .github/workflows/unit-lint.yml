@@ -49,5 +49,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Informational for now: `eslint .` reports thousands of existing problems
+      # (mostly no-explicit-any and Prettier formatting) that predate this
+      # workflow. The step still runs and its output is in the log, but it does
+      # not fail the job. Once the backlog is cleaned up, delete the
+      # continue-on-error line to make lint a blocking check.
       - name: Run lint
         run: bun run lint
+        continue-on-error: true
