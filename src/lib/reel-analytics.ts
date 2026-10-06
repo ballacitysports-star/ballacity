@@ -131,7 +131,7 @@ export function normalizeAdvancedAnalytics(
     now?: Date;
   } = {},
 ): AdvancedAnalytics | null {
-  const src = raw && typeof raw === "object" ? (raw as Record<string, any>) : {};
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const ratingsSrc =
     src.ratings && typeof src.ratings === "object" ? (src.ratings as Record<string, unknown>) : {};
 
@@ -153,7 +153,7 @@ export function normalizeAdvancedAnalytics(
   const cap = opts.duration && opts.duration > 0 ? opts.duration : Infinity;
   const biomechanics: BiomechanicsCue[] = Array.isArray(src.biomechanics)
     ? src.biomechanics
-        .map((c: any) => {
+        .map((c: Record<string, unknown> | null) => {
           const t = parseCueTime(c?.t ?? c?.timestamp ?? c?.at);
           return {
             t: t == null ? NaN : Math.round(Math.min(cap, t) * 100) / 100,
@@ -172,7 +172,7 @@ export function normalizeAdvancedAnalytics(
   const comps: ProComp[] =
     full && Array.isArray(src.comps)
       ? src.comps
-          .map((c: any) => ({
+          .map((c: Record<string, unknown> | null) => ({
             name: str(c?.name, 60),
             match: score(c?.match ?? c?.similarity) ?? 0,
             why: str(c?.why, 200),
@@ -182,7 +182,8 @@ export function normalizeAdvancedAnalytics(
       : [];
 
   let scout: ScoutReport | null = null;
-  const s = src.scout && typeof src.scout === "object" ? (src.scout as Record<string, any>) : null;
+  const s =
+    src.scout && typeof src.scout === "object" ? (src.scout as Record<string, unknown>) : null;
   if (full && s) {
     const tier = RECRUITING_TIERS.find((t) => t.toLowerCase() === str(s.tier, 40).toLowerCase());
     const quote = str(s.quote, 400);
@@ -241,9 +242,7 @@ export function analyticsGrounding(a: AdvancedAnalytics | null | undefined): str
     a.comps.length
       ? `Style comps: ${a.comps.map((c) => `${c.name} (${c.match}% style match)`).join(", ")}`
       : "",
-    a.scout
-      ? `Scout report — tier: ${a.scout.tier}; drills: ${a.scout.drills.join("; ")}`
-      : "",
+    a.scout ? `Scout report — tier: ${a.scout.tier}; drills: ${a.scout.drills.join("; ")}` : "",
     a.confidence ? `Analytics confidence: ${a.confidence}` : "",
   ]
     .filter(Boolean)

@@ -70,11 +70,11 @@ export const listMyAiAnalyses = createServerFn({ method: "GET" })
       deletable: r.status !== "processing",
       hasAnalysis: Boolean(
         r.ai_title ||
-          r.ai_caption ||
-          r.ai_analysis ||
-          r.ai_coaching ||
-          r.ai_advanced_analytics ||
-          r.ai_moments,
+        r.ai_caption ||
+        r.ai_analysis ||
+        r.ai_coaching ||
+        r.ai_advanced_analytics ||
+        r.ai_moments,
       ),
     }));
   });
