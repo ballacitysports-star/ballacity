@@ -145,6 +145,13 @@ function TrainerPage() {
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
+  // `?modal=book` (e.g. from the landing page's featured trainer) opens the
+  // booking sheet. Owners can't book themselves, so they just see their page.
+  const bookModal = search.modal === "book";
+  useEffect(() => {
+    if (mounted && bookModal && !canEdit) setBookOpen(true);
+  }, [mounted, bookModal, canEdit]);
+
   const qc = useQueryClient();
   const orgLinkQuery = useQuery({
     queryKey: ["trainer-org-for-trainer", org.id],
@@ -718,7 +725,10 @@ function TrainerPage() {
         open={bookOpen}
         onOpenChange={(v) => {
           setBookOpen(v);
-          if (!v) setBookPrefill(null);
+          if (!v) {
+            setBookPrefill(null);
+            if (bookModal) navigate({ to: ".", search: { ...search, modal: "" }, replace: true });
+          }
         }}
         prefill={bookPrefill}
       />

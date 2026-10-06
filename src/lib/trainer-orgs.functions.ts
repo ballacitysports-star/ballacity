@@ -6,6 +6,12 @@ import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
 import { parseHours } from "./org-hours";
 import { MAX_ORG_AMENITIES } from "./org-listing";
+import {
+  pickFeaturedTrainer,
+  summarizeRatings,
+  type FeaturedTrainer,
+  type TrainerCandidate,
+} from "./featured-trainer";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -65,6 +71,85 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+/**
+ * The real trainer to spotlight on the landing page: a claimed, bookable
+ * trainer who is a member of a facility, preferring basketball / multi-sport.
+ * Returns null when nobody qualifies (the page then shows a labeled example).
+ *
+ * `trainer_org_members` is not readable by anonymous visitors (it carries user
+ * ids), so the link is read with the service role. Because that bypasses RLS,
+ * the public-visibility rules are applied explicitly here (hidden trainers and
+ * facilities, private/flagged reviews) and the result carries no user ids.
+ */
+export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).handler(
+  async (): Promise<FeaturedTrainer | null> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: links, error } = await supabaseAdmin
+      .from("trainer_org_members")
+      .select(
+        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
+      )
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    type Row = {
+      org: { id: string; name: string; city: string | null; hidden_at: string | null } | null;
+      teams: {
+        id: string;
+        kind: string | null;
+        owner_id: string | null;
+        name: string;
+        avatar: string | null;
+        city: string | null;
+        sports: string[] | null;
+        verified: boolean | null;
+        rate_per_hour: number | null;
+        session_types: string[] | null;
+        tagline: string | null;
+        bio: string | null;
+        availability_slots: unknown;
+        availability_rules: unknown;
+        hidden_at: string | null;
+      } | null;
+    };
+    const candidates: TrainerCandidate[] = [];
+    for (const row of (links ?? []) as unknown as Row[]) {
+      const t = row.teams;
+      if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
+      candidates.push({
+        id: t.id,
+        kind: t.kind,
+        ownerId: t.owner_id,
+        name: t.name,
+        avatar: t.avatar,
+        city: t.city,
+        sports: t.sports ?? [],
+        verified: !!t.verified,
+        ratePerHour: t.rate_per_hour,
+        sessionTypes: t.session_types ?? [],
+        tagline: t.tagline,
+        bio: t.bio,
+        availabilitySlots: t.availability_slots,
+        availabilityRules: t.availability_rules,
+        facility: { id: row.org.id, name: row.org.name, city: row.org.city },
+      });
+    }
+    if (candidates.length === 0) return null;
+
+    const { data: reviews } = await supabaseAdmin
+      .from("reviews")
+      .select("reviewee_id, rating")
+      .eq("reviewee_kind", "trainer")
+      .eq("is_private", false)
+      .eq("flagged", false)
+      .in(
+        "reviewee_id",
+        candidates.map((c) => c.id),
+      );
+    return pickFeaturedTrainer(candidates, summarizeRatings(reviews ?? []));
+  },
+);
 
 export const listMyOrgs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
