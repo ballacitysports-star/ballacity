@@ -1,3 +1,4 @@
+import { VenueHostedAt } from "@/components/venue/VenueBadge";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
 import { Navigation } from "lucide-react";
@@ -1803,6 +1804,7 @@ function GameDetail() {
               </span>
             </div>
           </OpenInMaps>
+          <VenueHostedAt orgId={game.orgId} />
         </div>
 
         {/* Host */}

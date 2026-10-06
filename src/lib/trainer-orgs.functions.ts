@@ -13,6 +13,7 @@ import {
   type TrainerCandidate,
 } from "./featured-trainer";
 import {
+  facilityByTrainer,
   firstVisibleOrgLink,
   toPublicRoster,
   type PublicRosterMember,
@@ -585,6 +586,28 @@ export const getTrainerOrgForTrainer = createServerFn({ method: "GET" })
     return firstVisibleOrgLink(
       (rows ?? []) as unknown as Parameters<typeof firstVisibleOrgLink>[0],
     );
+  });
+
+/**
+ * Which facility each listed trainer works at, for the trainers directory.
+ * One query for the whole page. Same rules as the other roster reads: service
+ * role because the table is locked down, public fields only, no user ids,
+ * hidden facilities skipped.
+ */
+export const listFacilitiesForTrainers = createServerFn({ method: "GET" })
+  .inputValidator((d: { trainerIds: string[] }) =>
+    z.object({ trainerIds: z.array(z.string().min(1).max(100)).max(300) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    if (data.trainerIds.length === 0) return {} as Record<string, { id: string; name: string }>;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("trainer_org_members")
+      .select("trainer_id, org:org_id(id,name,hidden_at)")
+      .in("trainer_id", data.trainerIds)
+      .order("joined_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return facilityByTrainer((rows ?? []) as unknown as Parameters<typeof facilityByTrainer>[0]);
   });
 
 export const listTrainerIdsForOrg = createServerFn({ method: "GET" })

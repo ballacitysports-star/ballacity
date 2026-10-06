@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { firstVisibleOrgLink, toPublicRoster, type RawRosterRow } from "@/lib/org-roster";
+import {
+  facilityByTrainer,
+  firstVisibleOrgLink,
+  toPublicRoster,
+  type RawRosterRow,
+} from "@/lib/org-roster";
 
 const team = (over = {}) => ({
   id: "t1",
@@ -77,5 +82,25 @@ describe("firstVisibleOrgLink", () => {
     expect(
       firstVisibleOrgLink([{ role: "member", org: org({ hidden_at: "2026-10-01T00:00:00Z" }) }]),
     ).toBeNull();
+  });
+});
+
+describe("facilityByTrainer", () => {
+  const o = (id: string, name: string, hidden_at: string | null = null) => ({
+    id,
+    name,
+    hidden_at,
+  });
+
+  it("maps each trainer to their first visible facility, public fields only", () => {
+    const map = facilityByTrainer([
+      { trainer_id: "t1", org: o("hidden", "Closed Gym", "2026-10-01T00:00:00Z") },
+      { trainer_id: "t1", org: o("a", "Apex") },
+      { trainer_id: "t1", org: o("b", "Other") },
+      { trainer_id: "t2", org: null },
+      { trainer_id: "t3", org: o("c", "Peak") },
+    ]);
+    expect(map).toEqual({ t1: { id: "a", name: "Apex" }, t3: { id: "c", name: "Peak" } });
+    expect(JSON.stringify(map)).not.toContain("hidden_at");
   });
 });

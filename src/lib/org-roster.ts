@@ -96,3 +96,24 @@ export function firstVisibleOrgLink(
   }
   return null;
 }
+
+type RawTrainerFacilityRow = {
+  trainer_id: string;
+  org: { id: string; name: string; hidden_at?: string | null } | null;
+};
+
+/**
+ * The facility each trainer works at, for the trainers directory: the first
+ * visible one per trainer (rows should arrive oldest membership first). Public
+ * fields only, so no user ids, and hidden facilities are skipped.
+ */
+export function facilityByTrainer(
+  rows: readonly RawTrainerFacilityRow[],
+): Record<string, { id: string; name: string }> {
+  const out: Record<string, { id: string; name: string }> = {};
+  for (const r of rows) {
+    if (!r.org || r.org.hidden_at || out[r.trainer_id]) continue;
+    out[r.trainer_id] = { id: r.org.id, name: r.org.name };
+  }
+  return out;
+}
