@@ -414,6 +414,8 @@ export type Org = {
   ratingMax?: string;
   distances?: string[];
   sessionTypes?: string[];
+  /** Age groups a coach works with (see `lib/age-groups`). Empty = not specified. */
+  ageGroups?: string[];
   /** IANA timezone the trainer's schedule is anchored to (e.g. "America/New_York"). */
   timezone?: string;
   availabilitySlots?: {

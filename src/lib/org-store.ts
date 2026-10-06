@@ -43,6 +43,7 @@ type TeamRow = {
   rating_max: string | null;
   distances: string[] | null;
   session_types: string[] | null;
+  age_groups?: string[] | null;
   availability_slots: unknown;
   availability_overrides: unknown;
   availability_rules: unknown;
@@ -120,6 +121,7 @@ function rowToOrg(row: TeamRow): Org {
     ratingMax: row.rating_max ?? undefined,
     distances: row.distances ?? [],
     sessionTypes: row.session_types ?? [],
+    ageGroups: row.age_groups ?? [],
     availabilitySlots:
       kind === "coach" && Array.isArray(row.availability_slots)
         ? (row.availability_slots as Org["availabilitySlots"])
@@ -177,6 +179,7 @@ function orgToInsert(org: Org) {
     rating_max: org.ratingMax ?? null,
     distances: org.distances ?? [],
     session_types: org.sessionTypes ?? [],
+    age_groups: org.ageGroups ?? [],
     availability_slots: org.kind === "coach" ? (org.availabilitySlots ?? []) : [],
     availability_overrides: org.kind === "coach" ? (org.availabilityOverrides ?? []) : [],
     availability_rules: org.kind === "coach" ? (org.availabilityRules ?? []) : [],
@@ -342,6 +345,7 @@ export async function updateOrg(
   if (patch.ratingMax !== undefined) mapped.rating_max = patch.ratingMax ?? null;
   if (patch.distances !== undefined) mapped.distances = patch.distances ?? [];
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
+  if (patch.ageGroups !== undefined) mapped.age_groups = patch.ageGroups ?? [];
   if (patch.availabilitySlots !== undefined)
     mapped.availability_slots = patch.availabilitySlots ?? [];
   if (patch.availabilityOverrides !== undefined)
