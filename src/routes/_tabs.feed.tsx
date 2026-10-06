@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { DiscoverCategoryPills, DiscoverResults } from "@/components/feed/DiscoverResults";
+import { isDiscoverCategory, type DiscoverCategory } from "@/lib/discover-categories";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSearch, Loader2, RefreshCw, Search } from "lucide-react";
@@ -67,6 +69,7 @@ const feedSearchSchema = z.object({
   free: fallback(z.boolean().optional(), undefined).default(undefined),
   paid: fallback(z.boolean().optional(), undefined).default(undefined),
   tab: fallback(z.string(), "upcoming").default("upcoming"),
+  cat: fallback(z.string(), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -88,6 +91,11 @@ function Feed() {
   const [tab, setTab] = useState<"upcoming" | "archive">(
     search.tab === "archive" ? "archive" : "upcoming",
   );
+  // Discover category: pickup runs (the game feed) or teams / gyms / trainers.
+  const [cat, setCat] = useState<DiscoverCategory>(
+    isDiscoverCategory(search.cat) ? search.cat : "all",
+  );
+  const entityCat = cat === "teams" || cat === "gyms" || cat === "trainers" ? cat : null;
 
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
@@ -214,6 +222,7 @@ function Feed() {
     if (viewMode !== "list") next.view = viewMode;
     if (density !== "grid") next.density = density;
     if (tab !== "upcoming") next.tab = tab;
+    if (cat !== "all") next.cat = cat;
     for (const [k, defKey, urlKey] of [
       ["showUrgent", "showUrgent", "urgent"],
       ["showForYou", "showForYou", "foryou"],
@@ -238,7 +247,7 @@ function Feed() {
       console.warn("feed url sync skipped", e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, density, tab, authUser]);
+  }, [q, prefs, positionFilter, viewMode, density, tab, cat, authUser]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
@@ -628,10 +637,14 @@ function Feed() {
         </p>
       </motion.div>
 
+      <DiscoverCategoryPills value={cat} onChange={setCat} />
+
       <div
         role="tablist"
         aria-label="Game timeframe"
-        className="mb-4 inline-flex rounded-full border border-border bg-surface p-1"
+        className={`mb-4 inline-flex rounded-full border border-border bg-surface p-1 ${
+          entityCat ? "hidden" : ""
+        }`}
       >
         {(
           [
@@ -659,14 +672,16 @@ function Feed() {
         })}
       </div>
 
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={(v) => switchView(v)}
-        density={density}
-        onDensityChange={(d) => switchDensity(d)}
-      />
+      {!entityCat && (
+        <ViewDensityToggle
+          view={viewMode}
+          onViewChange={(v) => switchView(v)}
+          density={density}
+          onDensityChange={(d) => switchDensity(d)}
+        />
+      )}
 
-      {viewMode === "map" ? (
+      {viewMode === "map" && !entityCat ? (
         <PlayMapView
           items={filtered}
           getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
@@ -677,7 +692,7 @@ function Feed() {
             <FilterBar
               q={q}
               onQChange={setQ}
-              searchPlaceholder="Search games, courts, players"
+              searchPlaceholder="Search runs, teams, gyms, trainers"
               activeFilterCount={activeFilterCount}
               create={{ to: "/create", label: "Create game" }}
               sheetTitle="Feed filters"
@@ -741,172 +756,150 @@ function Feed() {
               )}
           </div>
 
-          {teamPosts.length > 0 && (
-            <section className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="section-eyebrow text-muted-foreground">From teams</h2>
-                <Link to="/teams" className="text-xs font-semibold text-lime">
-                  See all
-                </Link>
-              </div>
-              {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
-                geoStatus !== "unsupported" &&
-                (!coords || locationRemembered) && (
-                  <div className="mb-2">
-                    <button
-                      type="button"
-                      onClick={handleLocationTap}
-                      title={locationExplanation}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-                    >
-                      <MapPin className="h-3.5 w-3.5 text-coral" />
-                      {geoStatus === "prompting"
-                        ? "Locating…"
-                        : locationRemembered
-                          ? "Using your last known location — refresh"
-                          : geoStatus === "denied"
-                            ? "Location blocked — tap to retry"
-                            : "Use my location to sort and filter by distance"}
-                    </button>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
-                    <LocationAccessDialog
-                      open={locationDialogOpen}
-                      onOpenChange={setLocationDialogOpen}
-                    />
-                  </div>
-                )}
-              {hiddenByDistance > 0 && (
-                <p className="mb-2 text-xs text-muted-foreground">
-                  {hiddenByDistance} hidden beyond{" "}
-                  {formatDistance(prefs.maxDistanceMi, distanceUnit)}
-                </p>
-              )}
-              {unlocatableCount > 0 && (
-                <p className="mb-2 text-xs text-coral/80">
-                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable
-                  home court — still shown below
-                </p>
-              )}
-              <div className="flex flex-col gap-3">
-                {nearbyTeamPosts.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No team posts within {formatDistance(prefs.maxDistanceMi, distanceUnit)} of you.
-                  </p>
-                )}
-                {nearbyTeamPosts.map((p, i) => {
-                  const orgPost: OrgPost = {
-                    id: p.id,
-                    kind: p.kind as PostKind,
-                    title: p.title,
-                    body: p.body,
-                    date: p.eventDate ?? p.createdAt,
-                    postedAt: p.createdAt,
-                    location: p.location ?? undefined,
-                    price: p.price ?? undefined,
-                    pinned: p.pinned,
-                  };
-                  return (
-                    <div key={p.id}>
-                      <Link
-                        to="/teams/$teamId"
-                        params={{ teamId: p.teamId }}
-                        className="mb-1 flex items-center gap-2 text-xs font-semibold"
-                      >
-                        <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
-                          {(p.teamName || "?").slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="truncate">{p.teamName}</span>
-                        {p.teamSports?.[0] && (
-                          <span className="text-muted-foreground">· {p.teamSports[0]}</span>
-                        )}
-                        {p.distanceMi != null && (
-                          <span className="ml-auto shrink-0 text-muted-foreground">
-                            {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
-                          </span>
-                        )}
-                        {coords && p.geoStatus !== "valid" && (
-                          <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-coral/80">
-                            <MapPinOff className="h-3 w-3" />
-                            Location unavailable
-                          </span>
-                        )}
-                      </Link>
-                      <PostCard
-                        post={orgPost}
-                        index={i}
-                        onClick={() =>
-                          setOpenPost({
-                            post: orgPost,
-                            team: {
-                              id: p.teamId,
-                              name: p.teamName ?? "",
-                              sport: p.teamSports?.[0],
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  );
-                })}
-                {teamPostsQuery.hasNextPage && (
-                  <div className="flex justify-center pt-1">
-                    <button
-                      type="button"
-                      onClick={() => teamPostsQuery.fetchNextPage()}
-                      disabled={teamPostsQuery.isFetchingNextPage}
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                    >
-                      {teamPostsQuery.isFetchingNextPage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" /> Loading
-                        </>
-                      ) : (
-                        "Load more"
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {q ? (
-            <>
-              <h2 className="section-eyebrow text-muted-foreground mb-2">
-                {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-              </h2>
-              <div className={listContainerClass}>
-                {refreshing && filtered.length === 0
-                  ? renderSkeletons(density === "list" ? 6 : 3)
-                  : visible.map((g, i) => renderGame(g, i))}
-                {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                {!refreshing && filtered.length === 0 && (
-                  <EmptyState
-                    className={emptyColSpan}
-                    icon={<Search className="h-6 w-6" aria-hidden />}
-                    title={`No games match "${q}"`}
-                    description="Try a shorter search, or a different sport or city name."
-                  />
-                )}
-              </div>
-              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-            </>
+          {entityCat ? (
+            <DiscoverResults cat={entityCat} q={q} sports={chipSelected} />
           ) : (
             <>
-              {prefs.sections.showUrgent && urgent.length > 0 && (
-                <div className="mb-6">
+              {cat === "all" && teamPosts.length > 0 && (
+                <section className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
-                    <span className="text-xs text-muted-foreground">{urgent.length} games</span>
+                    <h2 className="section-eyebrow text-muted-foreground">From teams</h2>
+                    <Link to="/teams" className="text-xs font-semibold text-lime">
+                      See all
+                    </Link>
                   </div>
-                  <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
-                </div>
+                  {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
+                    geoStatus !== "unsupported" &&
+                    (!coords || locationRemembered) && (
+                      <div className="mb-2">
+                        <button
+                          type="button"
+                          onClick={handleLocationTap}
+                          title={locationExplanation}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                        >
+                          <MapPin className="h-3.5 w-3.5 text-coral" />
+                          {geoStatus === "prompting"
+                            ? "Locating…"
+                            : locationRemembered
+                              ? "Using your last known location — refresh"
+                              : geoStatus === "denied"
+                                ? "Location blocked — tap to retry"
+                                : "Use my location to sort and filter by distance"}
+                        </button>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {locationExplanation}
+                        </p>
+                        <LocationAccessDialog
+                          open={locationDialogOpen}
+                          onOpenChange={setLocationDialogOpen}
+                        />
+                      </div>
+                    )}
+                  {hiddenByDistance > 0 && (
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      {hiddenByDistance} hidden beyond{" "}
+                      {formatDistance(prefs.maxDistanceMi, distanceUnit)}
+                    </p>
+                  )}
+                  {unlocatableCount > 0 && (
+                    <p className="mb-2 text-xs text-coral/80">
+                      {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no
+                      mappable home court — still shown below
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-3">
+                    {nearbyTeamPosts.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No team posts within {formatDistance(prefs.maxDistanceMi, distanceUnit)} of
+                        you.
+                      </p>
+                    )}
+                    {nearbyTeamPosts.map((p, i) => {
+                      const orgPost: OrgPost = {
+                        id: p.id,
+                        kind: p.kind as PostKind,
+                        title: p.title,
+                        body: p.body,
+                        date: p.eventDate ?? p.createdAt,
+                        postedAt: p.createdAt,
+                        location: p.location ?? undefined,
+                        price: p.price ?? undefined,
+                        pinned: p.pinned,
+                      };
+                      return (
+                        <div key={p.id}>
+                          <Link
+                            to="/teams/$teamId"
+                            params={{ teamId: p.teamId }}
+                            className="mb-1 flex items-center gap-2 text-xs font-semibold"
+                          >
+                            <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
+                              {(p.teamName || "?").slice(0, 1).toUpperCase()}
+                            </span>
+                            <span className="truncate">{p.teamName}</span>
+                            {p.teamSports?.[0] && (
+                              <span className="text-muted-foreground">· {p.teamSports[0]}</span>
+                            )}
+                            {p.distanceMi != null && (
+                              <span className="ml-auto shrink-0 text-muted-foreground">
+                                {formatDistance(
+                                  p.distanceMi,
+                                  distanceUnit,
+                                  p.distanceMi < 10 ? 1 : 0,
+                                )}
+                              </span>
+                            )}
+                            {coords && p.geoStatus !== "valid" && (
+                              <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-coral/80">
+                                <MapPinOff className="h-3 w-3" />
+                                Location unavailable
+                              </span>
+                            )}
+                          </Link>
+                          <PostCard
+                            post={orgPost}
+                            index={i}
+                            onClick={() =>
+                              setOpenPost({
+                                post: orgPost,
+                                team: {
+                                  id: p.teamId,
+                                  name: p.teamName ?? "",
+                                  sport: p.teamSports?.[0],
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                    {teamPostsQuery.hasNextPage && (
+                      <div className="flex justify-center pt-1">
+                        <button
+                          type="button"
+                          onClick={() => teamPostsQuery.fetchNextPage()}
+                          disabled={teamPostsQuery.isFetchingNextPage}
+                          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                        >
+                          {teamPostsQuery.isFetchingNextPage ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                            </>
+                          ) : (
+                            "Load more"
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
               )}
 
-              {(tab === "archive" || prefs.sections.showForYou) && (
+              {q ? (
                 <>
                   <h2 className="section-eyebrow text-muted-foreground mb-2">
-                    {tab === "archive" ? "Recently finished" : "For you"}
+                    {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
                   </h2>
                   <div className={listContainerClass}>
                     {refreshing && filtered.length === 0
@@ -916,25 +909,71 @@ function Feed() {
                     {!refreshing && filtered.length === 0 && (
                       <EmptyState
                         className={emptyColSpan}
-                        icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
-                        title={
-                          tab === "archive"
-                            ? "No finished games match your filters"
-                            : "No games match your filters"
-                        }
-                        description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
-                        action={
-                          <button
-                            onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                            className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                          >
-                            Clear filters
-                          </button>
-                        }
+                        icon={<Search className="h-6 w-6" aria-hidden />}
+                        title={`No games match "${q}"`}
+                        description="Try a shorter search, or a different sport or city name."
                       />
                     )}
                   </div>
                   <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+                  {cat === "all" && (
+                    <div className="mt-6">
+                      <DiscoverResults cat="all" q={q} sports={chipSelected} onSeeAll={setCat} />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {prefs.sections.showUrgent && urgent.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
+                        <span className="text-xs text-muted-foreground">{urgent.length} games</span>
+                      </div>
+                      <div className={listContainerClass}>
+                        {urgent.map((g, i) => renderGame(g, i))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(tab === "archive" || prefs.sections.showForYou) && (
+                    <>
+                      <h2 className="section-eyebrow text-muted-foreground mb-2">
+                        {tab === "archive" ? "Recently finished" : "For you"}
+                      </h2>
+                      <div className={listContainerClass}>
+                        {refreshing && filtered.length === 0
+                          ? renderSkeletons(density === "list" ? 6 : 3)
+                          : visible.map((g, i) => renderGame(g, i))}
+                        {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+                        {!refreshing && filtered.length === 0 && (
+                          <EmptyState
+                            className={emptyColSpan}
+                            icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
+                            title={
+                              tab === "archive"
+                                ? "No finished games match your filters"
+                                : "No games match your filters"
+                            }
+                            description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                            action={
+                              <button
+                                onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                                className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                              >
+                                Clear filters
+                              </button>
+                            }
+                          />
+                        )}
+                      </div>
+                      <InfiniteSentinel
+                        ref={sentinelRef}
+                        hasMore={hasMore}
+                        total={filtered.length}
+                      />
+                    </>
+                  )}
                 </>
               )}
             </>

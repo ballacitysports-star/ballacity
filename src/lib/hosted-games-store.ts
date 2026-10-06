@@ -100,6 +100,7 @@ type DbRow = {
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
   org_id?: string | null;
+  org_official?: boolean | null;
   series_id?: string | null;
   min_players?: number | null;
   allow_waitlist?: boolean | null;
@@ -165,6 +166,7 @@ function rowToGame(r: DbRow): Game {
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
     teamId: r.team_id ?? undefined,
     orgId: r.org_id ?? undefined,
+    orgOfficial: r.org_id ? !!r.org_official : undefined,
     seriesId: r.series_id ?? null,
     endsAt: r.ends_at ?? null,
     allDay: !!r.all_day,
@@ -427,11 +429,24 @@ export async function fetchHostedGamesForOrg(orgId: string): Promise<Game[]> {
     .eq("org_id", orgId)
     .eq("is_private", false)
     .is("hidden_at", null)
+    .is("org_hidden_at", null)
     .is("cancelled_at", null)
     .order("date", { ascending: true })
     .limit(100);
   if (error) throw error;
   return ((data as DbRow[] | null) ?? []).map(rowToGame);
+}
+
+/**
+ * Facility owners/admins hide (or restore) a game from their facility page.
+ * The RPC re-checks admin rights; the game itself stays live for its host.
+ */
+export async function hideGameFromOrg(gameId: string, hidden: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_game_hidden_from_org", {
+    _game: gameId,
+    _hidden: hidden,
+  });
+  if (error) throw error;
 }
 
 export function getHostedGame(id: string): Game | undefined {

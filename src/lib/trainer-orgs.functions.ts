@@ -290,29 +290,32 @@ export const listMyManagedOrgs = createServerFn({ method: "GET" })
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
 
-// Pre-fill data for "Post an event" from a facility page. Only owners/admins
-// get `canPost: true` (checked here and again by the `hosted_games` trigger),
-// so a crafted `?orgId=` link cannot attach a game to someone else's facility.
+// Pre-fill data for "Host a run here" on a facility page. Any signed-in host
+// may list a public run at a facility; `official` (owner/admin) only drives
+// the UI. The `hosted_games` trigger decides `org_official` itself, so a
+// crafted `?orgId=` link cannot make a community run look official.
 export const getOrgEventContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", {
-      _org: data.orgId,
-      _user: context.userId,
-    });
-    if (adminErr) throw new Error(adminErr.message);
-    if (!isAdmin) return { canPost: false as const, org: null };
-    const { data: org, error } = await context.supabase
-      .from("trainer_orgs")
-      .select("id,name,address,city,geo,amenities")
-      .eq("id", data.orgId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!org) return { canPost: false as const, org: null };
+    const [adminRes, orgRes] = await Promise.all([
+      context.supabase.rpc("is_trainer_org_admin", {
+        _org: data.orgId,
+        _user: context.userId,
+      }),
+      context.supabase
+        .from("trainer_orgs")
+        .select("id,name,address,city,geo,amenities")
+        .eq("id", data.orgId)
+        .maybeSingle(),
+    ]);
+    if (adminRes.error) throw new Error(adminRes.error.message);
+    if (orgRes.error) throw new Error(orgRes.error.message);
+    const org = orgRes.data;
+    if (!org) return { official: false, org: null };
     const geo = org.geo as { lat?: number; lng?: number } | null;
     return {
-      canPost: true as const,
+      official: !!adminRes.data,
       org: {
         id: org.id,
         name: org.name,

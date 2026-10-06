@@ -1206,7 +1206,10 @@ export type Database = {
           min_age: number | null
           min_players: number
           neighborhood: string
+          org_hidden_at: string | null
+          org_hidden_by: string | null
           org_id: string | null
+          org_official: boolean
           positions_needed: Json
           price: number
           reminder_offsets: number[]
@@ -1257,7 +1260,10 @@ export type Database = {
           min_age?: number | null
           min_players?: number
           neighborhood?: string
+          org_hidden_at?: string | null
+          org_hidden_by?: string | null
           org_id?: string | null
+          org_official?: boolean
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -1308,7 +1314,10 @@ export type Database = {
           min_age?: number | null
           min_players?: number
           neighborhood?: string
+          org_hidden_at?: string | null
+          org_hidden_by?: string | null
           org_id?: string | null
+          org_official?: boolean
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -4658,6 +4667,10 @@ export type Database = {
           _waiver_id?: string
         }
         Returns: string
+      }
+      set_game_hidden_from_org: {
+        Args: { _game: string; _hidden: boolean }
+        Returns: undefined
       }
       set_child_controls: {
         Args: { _child: string; _controls: Json }

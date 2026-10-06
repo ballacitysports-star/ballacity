@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Clock, MapPin, Plus, Users } from "lucide-react";
-import { fetchHostedGamesForOrg } from "@/lib/hosted-games-store";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { BadgeCheck, CalendarDays, Clock, EyeOff, MapPin, Plus, Users } from "lucide-react";
+import { fetchHostedGamesForOrg, hideGameFromOrg } from "@/lib/hosted-games-store";
 import {
   FACILITY_EVENT_KINDS,
   classifyFacilityEvent,
@@ -36,7 +37,16 @@ const KIND_TONE: Record<FacilityEventKind, string> = {
   tournament: "bg-coral/15 text-coral",
 };
 
-function EventRow({ game }: { game: Game }) {
+function EventRow({
+  game,
+  onHide,
+  hiding,
+}: {
+  game: Game;
+  /** Facility admins only: hide a community run from this page. */
+  onHide?: () => void;
+  hiding?: boolean;
+}) {
   const joinedByMe = useIsJoined(game.id);
   const liveCount = useLiveParticipantCount(game.id);
   const joinedCount = Math.min(
@@ -77,6 +87,15 @@ function EventRow({ game }: { game: Game }) {
             >
               {facilityEventKindLabel(kind)}
             </span>
+            {game.orgOfficial ? (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">
+                <BadgeCheck className="h-3 w-3" /> Official
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                Community run
+              </span>
+            )}
             <h3 className="truncate font-display text-sm font-bold">
               <span aria-hidden>{SPORT_EMOJI[game.sport] ?? "🏅"} </span>
               {game.title}
@@ -102,6 +121,18 @@ function EventRow({ game }: { game: Game }) {
         >
           {cta}
         </Link>
+        {onHide && !game.orgOfficial && (
+          <button
+            type="button"
+            onClick={onHide}
+            disabled={hiding}
+            aria-label={`Hide ${game.title} from this page`}
+            title="Hide from our page"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground hover:text-coral disabled:opacity-50"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </li>
   );
@@ -110,17 +141,27 @@ function EventRow({ game }: { game: Game }) {
 /**
  * Upcoming runs, clinics, tournaments and open-court sessions hosted at a
  * facility. Anyone can browse; "Join" opens the game page, which runs the
- * normal approval / payment / age checks. Managers also get a post action.
+ * normal approval / payment / age checks. Any player can host a community run
+ * here; managers post official events and can hide community runs.
  */
 export function FacilityEventsSection({
   orgId,
   canPost,
 }: {
   orgId: string;
-  /** Owner or admin of the facility. The server re-checks before posting. */
+  /** Owner or admin of the facility. The server re-checks every write. */
   canPost: boolean;
 }) {
   const [filter, setFilter] = useState<FacilityEventKind | "all">("all");
+  const qc = useQueryClient();
+  const hide = useMutation({
+    mutationFn: (gameId: string) => hideGameFromOrg(gameId, true),
+    onSuccess: () => {
+      toast.success("Hidden from your facility page");
+      qc.invalidateQueries({ queryKey: ["org-events", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Couldn't hide that run"),
+  });
   const q = useQuery({
     queryKey: ["org-events", orgId],
     queryFn: () => fetchHostedGamesForOrg(orgId),
@@ -149,15 +190,24 @@ export function FacilityEventsSection({
             <span className="text-xs font-normal text-muted-foreground">({upcoming.length})</span>
           )}
         </h2>
-        {canPost && (
+        <div className="flex items-center gap-2">
+          {canPost && (
+            <Link
+              to="/create"
+              search={postFacilityEventSearch(orgId, "open_court")}
+              className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime hover:bg-lime/20"
+            >
+              <BadgeCheck className="h-3.5 w-3.5" /> Post official event
+            </Link>
+          )}
           <Link
             to="/create"
-            search={postFacilityEventSearch(orgId)}
+            search={postFacilityEventSearch(orgId, "run")}
             className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" /> Host a run here
           </Link>
-        )}
+        </div>
       </div>
 
       {upcoming.length > 0 && (
@@ -208,13 +258,18 @@ export function FacilityEventsSection({
           <p className="text-xs text-muted-foreground">
             {canPost
               ? "Post an open run or session so players can find and join it here."
-              : "Check back soon — runs, clinics and tournaments posted here will show up."}
+              : "Be the first — host a pickup run here and it will show up for everyone."}
           </p>
         </div>
       ) : (
         <ul className="space-y-2">
           {shown.map((g) => (
-            <EventRow key={g.id} game={g} />
+            <EventRow
+              key={g.id}
+              game={g}
+              onHide={canPost ? () => hide.mutate(g.id) : undefined}
+              hiding={hide.isPending && hide.variables === g.id}
+            />
           ))}
         </ul>
       )}

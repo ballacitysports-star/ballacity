@@ -103,6 +103,8 @@ export type Game = {
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
+  /** Posted by the facility's owner/admins (vs. a community run tagged there). */
+  orgOfficial?: boolean;
   /** Shared id linking sessions of one multi-day event. */
   seriesId?: string | null;
   /** Total sessions in the series (set when the feed collapses a series to one card). */

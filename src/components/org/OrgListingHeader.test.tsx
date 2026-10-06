@@ -56,9 +56,10 @@ describe("OrgListingHeader host action", () => {
     expect(screen.queryByRole("button", { name: /book court/i })).toBeNull();
   });
 
-  it("shows visitors Book court instead, and no host action", () => {
+  it("shows visitors Book court and a community Host a run here action", () => {
     render(<OrgListingHeader org={org} memberCount={0} isAdmin={false} isOwner={false} />);
-    expect(screen.queryByRole("link", { name: "Host a run here" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Host a run here" })).toBeTruthy();
+    expect(hrefs()).toContain("/create?orgId=org-1&kind=run");
     expect(screen.getByRole("button", { name: /book court/i })).toBeTruthy();
   });
 });
