@@ -84,8 +84,8 @@ export const Route = createFileRoute("/_tabs/create")({
       description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
       noindex: true,
     }),
-  // `orgId` / `kind` come from a facility page's "Post event / open run"
-  // action. The org is re-verified server-side before anything is pre-filled.
+  // `orgId` / `kind` come from a facility page's "Host a run here" action.
+  // The org is looked up server-side before anything is pre-filled.
   validateSearch: (
     search: Record<string, unknown>,
   ): { orgId?: string; kind?: FacilityEventKind } => ({
@@ -101,7 +101,7 @@ export const Route = createFileRoute("/_tabs/create")({
 
 function Create() {
   const nav = useNavigate();
-  const { orgId: orgIdParam, kind: eventKind = "run" } = Route.useSearch();
+  const { orgId: orgIdParam, kind: requestedKind = "run" } = Route.useSearch();
   // The facility this run is hosted at: from the facility page link, or picked
   // in the "Host at a facility" selector.
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
@@ -233,8 +233,9 @@ function Create() {
   // Real venue coordinates, used to compute each viewer's distance to the game.
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Facility event: only an owner/admin of the facility gets its location,
-  // address and org id pre-filled (checked on the server, not just the UI).
+  // Facility run: any signed-in host can list a public run at a facility.
+  // Owners/admins post official events; everyone else posts a community run
+  // (the `hosted_games` trigger sets `org_official`, not this page).
   const fetchOrgContext = useServerFn(getOrgEventContext);
   const fetchManagedOrgs = useServerFn(listMyManagedOrgs);
   const managedOrgsQuery = useQuery({
@@ -250,7 +251,10 @@ function Create() {
     enabled: !!facilityId && !!user,
     staleTime: 60_000,
   });
-  const postingOrg = orgContextQuery.data?.canPost ? orgContextQuery.data.org : null;
+  const postingOrg = orgContextQuery.data?.org ?? null;
+  const postingOfficial = !!orgContextQuery.data?.official;
+  // Tournaments, clinics and open-court sessions are the facility's own events.
+  const eventKind: FacilityEventKind = postingOfficial ? requestedKind : "run";
   // Which facility's details were last filled in, and the title we generated,
   // so switching facilities refreshes them without clobbering a typed title.
   const prefilledForRef = useRef<string | null>(null);
@@ -443,7 +447,9 @@ function Create() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
         )}
-        <h1 className="page-title">{postingOrg ? "Post an event" : "Host a game"}</h1>
+        <h1 className="page-title">
+          {postingOrg && postingOfficial ? "Post an event" : "Host a game"}
+        </h1>
       </div>
 
       {facilityId && orgContextQuery.isLoading && (
@@ -454,19 +460,21 @@ function Create() {
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-lime" />
           <div className="min-w-0">
             <div className="font-bold text-foreground">
-              {facilityEventKindLabel(eventKind)} at {postingOrg.name}
+              {postingOfficial
+                ? `${facilityEventKindLabel(eventKind)} at ${postingOrg.name}`
+                : `Community run at ${postingOrg.name}`}
             </div>
             <div className="text-muted-foreground">
-              It will be listed on the facility page. Location and address are pre-filled — you can
-              still change any detail below.
+              {priv && !postingOfficial
+                ? "Private games aren't listed on the facility page. Make it public to list it there."
+                : `Your run will be listed on ${postingOrg.name}'s page. Location and address are pre-filled — you can still change any detail below.`}
             </div>
           </div>
         </div>
       )}
-      {facilityId && orgContextQuery.data && !orgContextQuery.data.canPost && (
+      {facilityId && orgContextQuery.data && !orgContextQuery.data.org && (
         <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-xs text-coral">
-          Only a facility&apos;s owner or admins can post events for it. You can still host this as
-          a regular game.
+          That facility isn&apos;t available, so it won&apos;t be attached to this game.
         </div>
       )}
       {facilityId && orgContextQuery.isError && (
@@ -622,7 +630,8 @@ function Create() {
                 minAge,
                 maxAge,
                 teamId: selectedAffiliation?.id,
-                orgId: postingOrg?.id,
+                // Only public runs can be listed at someone else's facility.
+                orgId: postingOrg && (postingOfficial || !priv) ? postingOrg.id : undefined,
                 seriesId,
                 endsAt: plan.endIso,
                 allDay: plan.allDay,

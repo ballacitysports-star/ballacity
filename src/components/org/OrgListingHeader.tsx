@@ -337,6 +337,13 @@ export function OrgListingHeader({
                   <CalendarPlus className="h-4 w-4" /> Book court
                 </button>
               )}
+              <Link
+                to="/create"
+                search={postFacilityEventSearch(org.id, "run")}
+                className="rounded-full border border-lime/40 bg-lime/10 px-4 py-3 text-xs font-bold text-lime hover:bg-lime/20"
+              >
+                Host a run here
+              </Link>
             </div>
           )}
 
