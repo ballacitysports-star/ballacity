@@ -66,6 +66,33 @@ describe("VenueBadge", () => {
   });
 });
 
+describe("VenueHostedAt amenities", () => {
+  it("lists the venue's key amenities, court count first", async () => {
+    h.result = {
+      data: {
+        id: "o1",
+        name: "Apex Basketball Hub",
+        verified: false,
+        amenities: ["Parking", "4 courts", "Indoor courts", "Lighting"],
+      },
+      error: null,
+    };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <VenueHostedAt orgId="o1" />
+      </QueryClientProvider>,
+    );
+    const list = await screen.findByRole("list", { name: "Venue amenities" });
+    expect(Array.from(list.querySelectorAll("li")).map((li) => li.textContent)).toEqual([
+      "4 courts",
+      "Indoor courts",
+      "Lighting",
+      "Parking",
+    ]);
+  });
+});
+
 describe("VenueHostedAt", () => {
   it("shows a Hosted at row linking to the facility", async () => {
     h.result = { data: { id: "o1", name: "Apex Basketball Hub", verified: false }, error: null };
