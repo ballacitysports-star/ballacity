@@ -77,7 +77,7 @@ export const Route = createFileRoute("/api/public/reels/process")({
               .update({
                 status: "failed",
                 error_message:
-                  "AI analysis is turned off for this account (check Settings → Privacy, or ask your parent/guardian).",
+                  "AI analysis is turned off for this account (check Settings → AI & Video Privacy, or ask your parent/guardian).",
               })
               .eq("id", r.id);
             continue;

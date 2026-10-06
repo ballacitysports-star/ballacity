@@ -31,7 +31,7 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   FEATURE_DISABLED: "This AI feature is turned off right now. Try again later.",
   SUBSCRIPTION_REQUIRED: "This feature needs a subscription.",
   CONSENT_REQUIRED:
-    "AI processing is turned off for your account. You can turn it on in Settings → Privacy.",
+    "AI processing is turned off for your account. You can turn it on in Settings → AI & Video Privacy.",
   PARENT_APPROVAL_REQUIRED:
     "A parent or guardian needs to allow AI features for this account first.",
   QUOTA_EXCEEDED: "You've used your AI allowance for now. It resets shortly.",

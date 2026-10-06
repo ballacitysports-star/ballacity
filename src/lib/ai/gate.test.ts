@@ -39,6 +39,8 @@ function baseConfig(): AiConfig {
 function makeAdmin(script: {
   childLocked?: boolean;
   consented?: boolean;
+  /** The guardian's `child_controls.ai_analysis`; undefined means no row. */
+  guardianAiAnalysis?: boolean;
   cohort?: string;
   reserve?: { allowed: boolean; reason?: string; job_id?: string };
 }) {
@@ -66,6 +68,14 @@ function makeAdmin(script: {
           return Promise.resolve({ error: null });
         },
         update: () => chain,
+        maybeSingle: () =>
+          Promise.resolve({
+            data:
+              table === "child_controls" && script.guardianAiAnalysis !== undefined
+                ? { ai_analysis: script.guardianAiAnalysis }
+                : null,
+            error: null,
+          }),
         then: (res: any) => Promise.resolve({ data: [], error: null }).then(res),
       };
       return chain;
@@ -157,6 +167,40 @@ describe("gate order", () => {
       "CONSENT_REQUIRED",
     );
     expect(noConsent.calls).not.toContain("ai_reserve_quota");
+  });
+
+  it("tells a minor whose guardian already allowed AI to turn on their own switch", async () => {
+    // Guardian control on, but the member's own switch is off: ai_analysis_allowed
+    // is false. Pointing at a parent here sends them to the wrong person.
+    const ownSwitchOff = makeAdmin({
+      consented: false,
+      cohort: "child_under_13",
+      guardianAiAnalysis: true,
+    });
+    expect(
+      await codeOf(assertAiAllowed({ admin: ownSwitchOff, userId: "u1" }, "reel_pipeline")),
+    ).toBe("CONSENT_REQUIRED");
+    expect(ownSwitchOff.calls).not.toContain("ai_reserve_quota");
+  });
+
+  it("still asks for a parent when the guardian has not allowed AI", async () => {
+    for (const guardianAiAnalysis of [false, undefined]) {
+      const admin = makeAdmin({ consented: false, cohort: "teen_13_15", guardianAiAnalysis });
+      expect(await codeOf(assertAiAllowed({ admin, userId: "u1" }, "reel_pipeline"))).toBe(
+        "PARENT_APPROVAL_REQUIRED",
+      );
+      expect(admin.calls).not.toContain("ai_reserve_quota");
+    }
+  });
+
+  it("keeps the parent wording when the guardian lookup fails", async () => {
+    const admin: any = makeAdmin({ consented: false, cohort: "child_under_13" });
+    admin.from = () => {
+      throw new Error("db down");
+    };
+    expect(await codeOf(assertAiAllowed({ admin, userId: "u1" }, "reel_pipeline"))).toBe(
+      "PARENT_APPROVAL_REQUIRED",
+    );
   });
 
   it("checks the cohort allowance before reserving quota", async () => {

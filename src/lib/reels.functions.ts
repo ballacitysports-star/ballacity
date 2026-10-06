@@ -15,7 +15,7 @@ async function assertAiProcessingAllowed(context: { supabase: any; userId: strin
   if (error) throw new Error(error.message);
   if (allowed !== true) {
     throw new Error(
-      "AI video processing is turned off. Enable it in Settings → Privacy — for a child account, a parent or guardian controls this.",
+      "AI video processing is turned off. Enable it in Settings → AI & Video Privacy — for a child account, a parent or guardian controls this.",
     );
   }
 }
