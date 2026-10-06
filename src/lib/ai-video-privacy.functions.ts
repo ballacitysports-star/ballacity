@@ -24,7 +24,7 @@ export type AiAnalysisSummary = {
 };
 
 const SELECT =
-  "id,title,status,created_at,completed_at,ai_sport,ai_title,ai_caption,ai_hashtags,ai_coaching,ai_analysis,ai_moments,ai_transcript";
+  "id,title,status,created_at,completed_at,ai_sport,ai_title,ai_caption,ai_hashtags,ai_coaching,ai_advanced_analytics,ai_analysis,ai_moments,ai_transcript";
 
 function toNotes(coaching: unknown): string[] {
   if (Array.isArray(coaching)) {
@@ -69,7 +69,12 @@ export const listMyAiAnalyses = createServerFn({ method: "GET" })
       coachingNotes: toNotes(r.ai_coaching),
       deletable: r.status !== "processing",
       hasAnalysis: Boolean(
-        r.ai_title || r.ai_caption || r.ai_analysis || r.ai_coaching || r.ai_moments,
+        r.ai_title ||
+          r.ai_caption ||
+          r.ai_analysis ||
+          r.ai_coaching ||
+          r.ai_advanced_analytics ||
+          r.ai_moments,
       ),
     }));
   });
@@ -113,6 +118,7 @@ export const deleteMyAiAnalysis = createServerFn({ method: "POST" })
         ai_analysis: null,
         ai_caption: null,
         ai_coaching: null,
+        ai_advanced_analytics: null,
         ai_edit_plan: null,
         ai_hashtags: null,
         ai_moments: null,
@@ -122,6 +128,8 @@ export const deleteMyAiAnalysis = createServerFn({ method: "POST" })
         ai_title: null,
         ai_transcript: null,
         suggested_clip: null,
+        // The pipeline's working copy holds the same analysis (and analytics).
+        step_progress: null,
         audio_path: null,
         frame_paths: null,
         frame_times: null,

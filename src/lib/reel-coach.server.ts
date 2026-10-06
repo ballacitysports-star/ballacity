@@ -9,10 +9,11 @@
 import { DEFAULT_AI_PROVIDER } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
+import { analyticsGrounding } from "@/lib/reel-analytics";
 import { reelStyleDirectives } from "@/lib/reel-style";
 
 export const REEL_COACH_COLUMNS =
-  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,ai_overlays,ai_timeline,ai_edit_plan,ai_coaching,ai_transcript,suggested_clip,game_title,status,style_prefs";
+  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,ai_overlays,ai_timeline,ai_edit_plan,ai_coaching,ai_advanced_analytics,ai_transcript,suggested_clip,game_title,status,style_prefs";
 
 export type ReelOverlay = {
   /** Where the text should appear, e.g. "0:03" or "the dunk". */
@@ -61,6 +62,7 @@ export function buildReelGrounding(r: Record<string, any>): string {
           r.ai_coaching.notes ?? []
         ).join("; ")} | drills: ${(r.ai_coaching.drills ?? []).join("; ")}`
       : "",
+    analyticsGrounding(r.ai_advanced_analytics),
     r.ai_transcript?.text ? `Spoken audio: ${String(r.ai_transcript.text).slice(0, 600)}` : "",
     r.suggested_clip?.start != null
       ? `Suggested clip window: ${r.suggested_clip.start}s to ${r.suggested_clip.end}s`
