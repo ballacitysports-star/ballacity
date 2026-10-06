@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { highlightAmenities } from "@/lib/org-listing";
+import { VenueHubCard } from "@/components/venue/VenueHubCard";
 
 /**
  * Display name of the registered facility a game is hosted at. Public data
@@ -59,7 +59,7 @@ export function FacilityLink({
         e.stopPropagation();
         navigate({ to: "/orgs/$orgId", params: { orgId } });
       }}
-      aria-label={`${name} — view facility`}
+      aria-label={`View ${name} profile and weekly schedule`}
       className={`inline-flex max-w-full items-center gap-1 rounded-full border border-lime/30 bg-lime/10 px-2 py-0.5 text-[11px] font-semibold text-lime hover:bg-lime/20 ${className}`}
     >
       <Building2 className="h-3 w-3 shrink-0" />
@@ -86,35 +86,19 @@ export function VenueBadge({
 }
 
 /**
- * "Hosted at <facility>" row for a game's detail page, with a nudge to the
- * facility profile (hours, photos, amenities). Renders nothing when the game
- * isn't at a registered facility or the facility is no longer public.
+ * Game detail page "Hosted at" section. Delegates to the venue hub card, which
+ * adds the facility's live hours, other runs this week and booking actions.
  */
-export function VenueHostedAt({ orgId }: { orgId: string | null | undefined }) {
-  const q = useFacilityName(orgId);
-  const org = q.data;
-  if (!orgId || !org) return null;
-  const { tags, more } = highlightAmenities(org.amenities, 6);
-  return (
-    <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span>Hosted at</span>
-        <FacilityLink orgId={org.id} name={org.name} verified={org.verified} />
-        <span>See hours, photos &amp; amenities</span>
-      </div>
-      {tags.length > 0 && (
-        <ul aria-label="Venue amenities" className="flex flex-wrap gap-1">
-          {tags.map((t) => (
-            <li
-              key={t}
-              className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-foreground"
-            >
-              {t}
-            </li>
-          ))}
-          {more > 0 && <li className="px-1 py-0.5 text-[11px]">+{more} more</li>}
-        </ul>
-      )}
-    </div>
-  );
+export function VenueHostedAt({
+  orgId,
+  gameId,
+  official,
+  indoor,
+}: {
+  orgId: string | null | undefined;
+  gameId?: string;
+  official?: boolean;
+  indoor?: boolean;
+}) {
+  return <VenueHubCard orgId={orgId} gameId={gameId} official={official} indoor={indoor} />;
 }

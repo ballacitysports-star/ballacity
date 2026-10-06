@@ -40,6 +40,7 @@ import { useMyProfiles } from "@/lib/account-profiles";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { FacilityMatcher } from "@/components/venue/FacilityMatcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useDefaultSports } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
@@ -483,7 +484,7 @@ function Create() {
         </div>
       )}
 
-      {managedOrgs.length > 0 && (
+      {managedOrgs.length > 0 && (!facilityId || managedOrgs.some((o) => o.id === facilityId)) && (
         <label className="mb-4 block rounded-2xl border border-border bg-surface p-4">
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Host at a facility
@@ -857,6 +858,14 @@ function Create() {
               }}
               placeholder="Search court, park or venue"
             />
+            {!(facilityId && !postingOrg && orgContextQuery.isLoading) && (
+              <FacilityMatcher
+                location={location}
+                linked={postingOrg ? { id: postingOrg.id, name: postingOrg.name } : null}
+                onLink={setFacilityId}
+                onUnlink={() => setFacilityId(null)}
+              />
+            )}
             {profile?.city && (
               <p className="px-1 text-[11px] text-muted-foreground">
                 Pre-filled from your profile city — refine with search above.
