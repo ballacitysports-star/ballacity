@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { highlightAmenities } from "@/lib/org-listing";
 
 /**
  * Display name of the registered facility a game is hosted at. Public data
@@ -17,11 +18,18 @@ export function useFacilityName(orgId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trainer_orgs")
-        .select("id,name,verified")
+        .select("id,name,verified,amenities")
         .eq("id", orgId!)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data ? { id: data.id, name: data.name, verified: !!data.verified } : null;
+      return data
+        ? {
+            id: data.id,
+            name: data.name,
+            verified: !!data.verified,
+            amenities: (data.amenities ?? []) as string[],
+          }
+        : null;
     },
   });
 }
@@ -86,11 +94,27 @@ export function VenueHostedAt({ orgId }: { orgId: string | null | undefined }) {
   const q = useFacilityName(orgId);
   const org = q.data;
   if (!orgId || !org) return null;
+  const { tags, more } = highlightAmenities(org.amenities, 6);
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-      <span>Hosted at</span>
-      <FacilityLink orgId={org.id} name={org.name} verified={org.verified} />
-      <span>See hours, photos &amp; amenities</span>
+    <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span>Hosted at</span>
+        <FacilityLink orgId={org.id} name={org.name} verified={org.verified} />
+        <span>See hours, photos &amp; amenities</span>
+      </div>
+      {tags.length > 0 && (
+        <ul aria-label="Venue amenities" className="flex flex-wrap gap-1">
+          {tags.map((t) => (
+            <li
+              key={t}
+              className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-foreground"
+            >
+              {t}
+            </li>
+          ))}
+          {more > 0 && <li className="px-1 py-0.5 text-[11px]">+{more} more</li>}
+        </ul>
+      )}
     </div>
   );
 }
