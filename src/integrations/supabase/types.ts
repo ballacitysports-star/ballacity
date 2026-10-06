@@ -1918,6 +1918,68 @@ export type Database = {
         }
         Relationships: []
       }
+      org_court_inquiries: {
+        Row: {
+          court_type: string
+          created_at: string
+          duration_min: number
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          player_count: number
+          requested_date: string
+          requester_id: string
+          sport: string
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          court_type?: string
+          created_at?: string
+          duration_min: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          player_count: number
+          requested_date: string
+          requester_id: string
+          sport: string
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          court_type?: string
+          created_at?: string
+          duration_min?: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          player_count?: number
+          requested_date?: string
+          requester_id?: string
+          sport?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_court_inquiries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_member_requests: {
         Row: {
           created_at: string
