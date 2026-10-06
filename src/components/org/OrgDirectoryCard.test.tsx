@@ -96,6 +96,15 @@ describe("OrgDirectoryCard", () => {
     expect(banner.querySelector(".bg-lime-gradient")?.textContent).toBe("PE");
   });
 
+  it("marks featured facilities and leaves others unmarked", () => {
+    const { rerender } = render(
+      <OrgDirectoryCard org={row({ featured_at: "2026-10-01T00:00:00Z" })} now={new Date()} />,
+    );
+    expect(screen.getByText("Featured")).toBeTruthy();
+    rerender(<OrgDirectoryCard org={row({ featured_at: null })} now={new Date()} />);
+    expect(screen.queryByText("Featured")).toBeNull();
+  });
+
   it("shows a placeholder and unset hours for a bare listing", () => {
     render(
       <OrgDirectoryCard

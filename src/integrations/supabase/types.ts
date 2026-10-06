@@ -3682,6 +3682,7 @@ export type Database = {
           cover_url: string | null
           created_at: string
           email: string | null
+          featured_at: string | null
           geo: Json | null
           handle: string
           hidden_at: string | null
@@ -3711,6 +3712,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           geo?: Json | null
           handle: string
           hidden_at?: string | null
@@ -3740,6 +3742,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           geo?: Json | null
           handle?: string
           hidden_at?: string | null

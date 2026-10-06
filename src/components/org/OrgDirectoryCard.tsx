@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CalendarPlus, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
+import { CalendarPlus, Star, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { CourtInquiryDialog } from "@/components/org/CourtInquiryDialog";
 import { describeOpenBadge, parseHours, type OpenBadge } from "@/lib/org-hours";
@@ -23,6 +23,7 @@ export type OrgDirectoryRow = {
   timezone: string | null;
   website: string | null;
   verified: boolean | null;
+  featured_at?: string | null;
 };
 
 const BADGE_TEXT: Record<OpenBadge["tone"], string> = {
@@ -49,10 +50,15 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
   const badge = describeOpenBadge(parseHours(org.hours), org.timezone, now);
   const { tags, more } = highlightAmenities(org.amenities);
   const bookingUrl = websiteHref(org.website);
+  const featured = !!org.featured_at;
   const place = [org.address, org.city].filter(Boolean).join(" · ") || null;
 
   return (
-    <li className="overflow-hidden rounded-2xl border border-border bg-surface transition-colors hover:border-lime/40">
+    <li
+      className={`overflow-hidden rounded-2xl border bg-surface transition-colors hover:border-lime/40 ${
+        featured ? "border-lime/50" : "border-border"
+      }`}
+    >
       <Link to="/orgs/$orgId" params={{ orgId: org.id }} className="block">
         <div className="relative aspect-[16/9] bg-secondary/40">
           {hero ? (
@@ -102,6 +108,11 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
               )}
             </span>
           </div>
+          {featured && (
+            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+              <Star className="h-3 w-3 fill-current" /> Featured
+            </span>
+          )}
           {photos.length > 1 && (
             <span className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
               {photos.length} photos

@@ -42,7 +42,7 @@ const handleRe = /^[a-z0-9_-]{3,40}$/;
 // Columns the public directory needs to render a facility card. All are
 // anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
-  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,verified,owner_id";
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,verified,owner_id,featured_at";
 
 // Escape characters that are special inside an ilike pattern.
 function likePattern(term: string): string {
@@ -65,6 +65,9 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
     let query = sb
       .from("trainer_orgs")
       .select(ORG_DIRECTORY_COLUMNS)
+      // Hand-picked featured facilities first (most recently featured on top),
+      // then newest.
+      .order("featured_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(100);
     if (data.search?.trim()) query = query.ilike("name", likePattern(data.search.trim()));
