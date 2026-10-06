@@ -42,6 +42,7 @@ import {
   withReviewStats,
 } from "@/lib/trainer-directory";
 import { useTrainerDirectoryData } from "@/lib/trainer-directory-data";
+import { AGE_GROUPS, matchesAgeGroup, parseAgeGroup, type AgeGroupId } from "@/lib/age-groups";
 
 import { Slider } from "@/components/ui/slider";
 
@@ -102,6 +103,7 @@ const trainersSearchSchema = z.object({
   orgId: fallback(z.string(), "").default(""),
   radius: fallback(z.coerce.number().min(0).max(200), 0).default(0),
   maxRate: fallback(z.coerce.number().min(0).max(1000), 0).default(0),
+  age: fallback(z.string(), "").default(""),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
@@ -138,6 +140,7 @@ function TrainersPage() {
     orgId: "",
     radius: 0,
     maxRate: 0,
+    age: "",
     avail: "any",
     sort: "nearest",
     view: "list",
@@ -152,6 +155,7 @@ function TrainersPage() {
   const orgId: string = search.orgId || "";
   const radius: number = Number(search.radius) || 0;
   const maxRate = parseMaxRate(search.maxRate);
+  const ageGroup = parseAgeGroup(search.age);
   const sortBy: SortBy =
     search.sort === "soonest" ||
     search.sort === "followers" ||
@@ -204,6 +208,7 @@ function TrainersPage() {
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
   const setMaxRate = (v: string) => updateSearch({ maxRate: parseMaxRate(v) });
+  const setAgeGroup = (v: AgeGroupId | "") => updateSearch({ age: v });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
@@ -279,6 +284,7 @@ function TrainersPage() {
     const filtered = byOrg
       .filter((o) => matchesSportList(o.sports, sports))
       .filter((o) => matchesMaxRate(o.ratePerHour, maxRate))
+      .filter((o) => matchesAgeGroup(o.ageGroups, ageGroup))
       .filter((o) => {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
@@ -349,6 +355,7 @@ function TrainersPage() {
     radiusKm,
     coords,
     maxRate,
+    ageGroup,
     ratings,
   ]);
 
@@ -441,7 +448,15 @@ function TrainersPage() {
                   mode: t.id,
                   // reset trainer-only filters when switching
                   ...(t.id === "gyms"
-                    ? { sport: "", specialty: "", venue: "", orgId: "", avail: "any", radius: 0 }
+                    ? {
+                        sport: "",
+                        specialty: "",
+                        venue: "",
+                        orgId: "",
+                        avail: "any",
+                        radius: 0,
+                        age: "",
+                      }
                     : {}),
                 })
               }
@@ -503,6 +518,7 @@ function TrainersPage() {
             (orgId ? 1 : 0) +
             (radius > 0 ? 1 : 0) +
             (maxRate > 0 ? 1 : 0) +
+            (ageGroup ? 1 : 0) +
             (avail !== "any" ? 1 : 0) +
             (sortBy !== "nearest" ? 1 : 0);
           const specialties = sports.length
@@ -528,6 +544,7 @@ function TrainersPage() {
                   orgId: "",
                   radius: 0,
                   maxRate: 0,
+                  age: "",
                   avail: "any",
                   sort: "nearest",
                 })
@@ -677,6 +694,20 @@ function TrainersPage() {
                         value: o.value,
                         label: o.label,
                       }))}
+                    />
+                  </FilterSection>
+
+                  <FilterSection
+                    label="Age group"
+                    hint="Only trainers who listed an age group are shown"
+                  >
+                    <ChipRow<AgeGroupId | "">
+                      value={ageGroup}
+                      onChange={setAgeGroup}
+                      options={[
+                        { value: "", label: "Any age" },
+                        ...AGE_GROUPS.map((g) => ({ value: g.id, label: g.label })),
+                      ]}
                     />
                   </FilterSection>
 

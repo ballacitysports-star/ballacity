@@ -73,6 +73,9 @@ const TeamShape = z.object({
   rating_max: z.string().max(20).nullable().optional(),
   distances: z.array(z.string().max(40)).default([]),
   session_types: z.array(z.string().max(40)).default([]),
+  // No `.default()`: on a partial patch it could reset the stored value, and
+  // inserts fall back to the column default.
+  age_groups: z.array(z.enum(["youth", "teen", "adult"])).optional(),
   timezone: z.string().max(60).optional(),
   availability_slots: z
     .array(

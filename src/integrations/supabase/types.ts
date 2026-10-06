@@ -3373,6 +3373,7 @@ export type Database = {
         Row: {
           accent: string
           achievements: string[]
+          age_groups: string[]
           availability_overrides: Json
           availability_rules: Json
           availability_slots: Json
@@ -3424,6 +3425,7 @@ export type Database = {
         Insert: {
           accent?: string
           achievements?: string[]
+          age_groups?: string[]
           availability_overrides?: Json
           availability_rules?: Json
           availability_slots?: Json
@@ -3475,6 +3477,7 @@ export type Database = {
         Update: {
           accent?: string
           achievements?: string[]
+          age_groups?: string[]
           availability_overrides?: Json
           availability_rules?: Json
           availability_slots?: Json
