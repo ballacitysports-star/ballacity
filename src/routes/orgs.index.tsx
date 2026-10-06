@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Building2, MapPin, Plus, Search } from "lucide-react";
+import { Building2, Plus, Search } from "lucide-react";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 import { OrgDirectoryCard, type OrgDirectoryRow } from "@/components/org/OrgDirectoryCard";
-import { ORG_CATEGORIES } from "@/lib/org-listing";
-import { parseHours, resolveOpenState } from "@/lib/org-hours";
+import { OrgFilterPills } from "@/components/org/OrgFilterPills";
+import { applyDirectoryFilters, type DirectoryFilterId } from "@/lib/org-directory-filters";
 
 export const Route = createFileRoute("/orgs/")({
   head: () =>
@@ -29,12 +29,9 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 function OrgsIndex() {
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
-  const [category, setCategory] = useState("");
-  const [openOnly, setOpenOnly] = useState(false);
-  const debouncedName = useDebounced(name, 250);
-  const debouncedCity = useDebounced(city, 250);
+  const [text, setText] = useState("");
+  const [selected, setSelected] = useState<ReadonlySet<DirectoryFilterId>>(new Set());
+  const q = useDebounced(text.trim(), 250);
 
   // Re-evaluate "open now" as the clock moves.
   const [now, setNow] = useState(() => new Date());
@@ -44,28 +41,24 @@ function OrgsIndex() {
   }, []);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["orgs-index", debouncedName, debouncedCity, category],
-    queryFn: () =>
-      listTrainerOrgs({
-        data: {
-          search: debouncedName || undefined,
-          city: debouncedCity || undefined,
-          category: category || undefined,
-        },
-      }),
+    queryKey: ["orgs-index", q],
+    queryFn: () => listTrainerOrgs({ data: { q: q || undefined } }),
   });
 
   const all = useMemo(() => (data ?? []) as unknown as OrgDirectoryRow[], [data]);
-  const rows = useMemo(
-    () =>
-      openOnly
-        ? all.filter(
-            (o) => resolveOpenState(parseHours(o.hours), o.timezone, now).status === "open",
-          )
-        : all,
-    [all, openOnly, now],
-  );
-  const filtered = !!(debouncedName || debouncedCity || category || openOnly);
+  const rows = useMemo(() => applyDirectoryFilters(all, selected, now), [all, selected, now]);
+  const filtered = !!q || selected.size > 0;
+
+  const toggle = (id: DirectoryFilterId) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const clearAll = () => {
+    setSelected(new Set());
+    setText("");
+  };
 
   return (
     <div className="page-shell-content pt-4 pb-40 space-y-4">
@@ -84,58 +77,22 @@ function OrgsIndex() {
         </Link>
       </header>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Search by name"
-            aria-label="Search facilities by name"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="City or address"
-            aria-label="Filter facilities by city or address"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+      <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Search by name, city or address"
+          aria-label="Search facilities"
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          aria-pressed={openOnly}
-          onClick={() => setOpenOnly((v) => !v)}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            openOnly
-              ? "border border-lime/40 bg-lime/15 text-lime"
-              : "border border-border text-muted-foreground"
-          }`}
-        >
-          Open now
-        </button>
-        {["", ...ORG_CATEGORIES].map((c) => (
-          <button
-            key={c || "all"}
-            type="button"
-            aria-pressed={category === c}
-            onClick={() => setCategory(c)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              category === c
-                ? "border border-lime/40 bg-lime/15 text-lime"
-                : "border border-border text-muted-foreground"
-            }`}
-          >
-            {c || "All"}
-          </button>
-        ))}
-      </div>
+      <OrgFilterPills
+        selected={selected}
+        onToggle={toggle}
+        onClear={() => setSelected(new Set())}
+      />
 
       {isLoading ? (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
@@ -159,20 +116,29 @@ function OrgsIndex() {
             <Building2 className="h-4 w-4 text-lime" />{" "}
             {filtered ? "No facilities match those filters." : "No gyms yet."}
           </div>
-          {!filtered && (
-            <div className="mt-3">
+          <div className="mt-3">
+            {filtered ? (
+              <button type="button" onClick={clearAll} className="text-lime font-semibold">
+                Clear filters
+              </button>
+            ) : (
               <Link to="/orgs/create" className="text-lime font-semibold hover:underline">
                 Create the first one →
               </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((o) => (
-            <OrgDirectoryCard key={o.id} org={o} now={now} />
-          ))}
-        </ul>
+        <>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {rows.length} {rows.length === 1 ? "facility" : "facilities"}
+          </p>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {rows.map((o) => (
+              <OrgDirectoryCard key={o.id} org={o} now={now} />
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

@@ -50,30 +50,30 @@ function likePattern(term: string): string {
 }
 
 export const listTrainerOrgs = createServerFn({ method: "GET" })
-  .inputValidator((d: { search?: string; city?: string; category?: string } | undefined) =>
+  .inputValidator((d: { search?: string; q?: string } | undefined) =>
     z
       .object({
+        // `search` matches the name only (used by the org pickers); `q` is the
+        // directory search and also matches city and street address.
         search: z.string().max(80).optional(),
-        city: z.string().max(80).optional(),
-        category: z.string().max(60).optional(),
+        q: z.string().max(80).optional(),
       })
       .parse(d ?? {}),
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    let q = sb
+    let query = sb
       .from("trainer_orgs")
       .select(ORG_DIRECTORY_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(100);
-    if (data.search?.trim()) q = q.ilike("name", likePattern(data.search.trim()));
-    if (data.city?.trim()) {
-      // City or street address, so "Austin" and "123 Main" both find a venue.
-      const pat = likePattern(data.city.trim()).replace(/[,()"]/g, " ");
-      q = q.or(`city.ilike.${pat},address.ilike.${pat}`);
+    if (data.search?.trim()) query = query.ilike("name", likePattern(data.search.trim()));
+    if (data.q?.trim()) {
+      // Commas, parentheses and quotes are separators inside an or() group.
+      const pat = likePattern(data.q.trim()).replace(/[,()"]/g, " ");
+      query = query.or(`name.ilike.${pat},city.ilike.${pat},address.ilike.${pat}`);
     }
-    if (data.category?.trim()) q = q.eq("category", data.category.trim());
-    const { data: rows, error } = await q;
+    const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
