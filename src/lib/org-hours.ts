@@ -227,6 +227,36 @@ export function resolveOpenState(
   return { status: "closed", closingSoon: false, until: null, label: "Closed" };
 }
 
+export type OpenBadge = {
+  tone: "open" | "closing" | "closed" | "unknown";
+  /** Short headline, e.g. "Open now" or "Closing soon". */
+  headline: string;
+  /** Supporting detail, e.g. "Closes at 10 PM" or "Opens tomorrow 6 AM". */
+  detail: string | null;
+};
+
+/**
+ * Directory-card wording for a facility's live hours, in the facility's own
+ * timezone: "Open now · Closes at 10 PM", "Closing soon · Closes at 9 PM",
+ * "Closed · Opens tomorrow 6 AM".
+ */
+export function describeOpenBadge(
+  hours: OrgHours | null | undefined,
+  timezone?: string | null,
+  now: Date = new Date(),
+): OpenBadge {
+  const s = resolveOpenState(hours, timezone, now);
+  if (s.status === "unknown") return { tone: "unknown", headline: "Hours not set", detail: null };
+  if (s.status === "open") {
+    const closes = s.until ? `Closes at ${formatTime(s.until)}` : "Open 24 hours";
+    return s.closingSoon
+      ? { tone: "closing", headline: "Closing soon", detail: closes }
+      : { tone: "open", headline: "Open now", detail: closes };
+  }
+  const opens = s.label.replace(/^Closed · o/, "O");
+  return { tone: "closed", headline: "Closed", detail: opens === "Closed" ? null : opens };
+}
+
 /** Detect the viewer's timezone, used as the default for new gyms. */
 export function detectTimezone(): string {
   try {

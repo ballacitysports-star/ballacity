@@ -22,6 +22,7 @@ import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListin
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
 import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
+import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
 import { Button } from "@/components/ui/button";
@@ -203,6 +204,8 @@ function OrgPage() {
       )}
 
       <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
+
+      {isAdmin && <CourtInquiriesSection orgId={orgId} />}
 
       <div id="gym-reviews">
         <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />

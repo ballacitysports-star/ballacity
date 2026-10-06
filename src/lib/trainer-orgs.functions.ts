@@ -27,16 +27,40 @@ function publicClient() {
 
 const handleRe = /^[a-z0-9_-]{3,40}$/;
 
+// Columns the public directory needs to render a facility card. All are
+// anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
+const ORG_DIRECTORY_COLUMNS =
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,verified,owner_id";
+
+// Escape characters that are special inside an ilike pattern.
+function likePattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 export const listTrainerOrgs = createServerFn({ method: "GET" })
-  .inputValidator((d: { search?: string } | undefined) => d ?? {})
+  .inputValidator((d: { search?: string; city?: string; category?: string } | undefined) =>
+    z
+      .object({
+        search: z.string().max(80).optional(),
+        city: z.string().max(80).optional(),
+        category: z.string().max(60).optional(),
+      })
+      .parse(d ?? {}),
+  )
   .handler(async ({ data }) => {
     const sb = publicClient();
     let q = sb
       .from("trainer_orgs")
-      .select("id,name,handle,avatar,avatar_url,cover_url,city,bio,verified,owner_id")
+      .select(ORG_DIRECTORY_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(100);
-    if (data.search) q = q.ilike("name", `%${data.search}%`);
+    if (data.search?.trim()) q = q.ilike("name", likePattern(data.search.trim()));
+    if (data.city?.trim()) {
+      // City or street address, so "Austin" and "123 Main" both find a venue.
+      const pat = likePattern(data.city.trim()).replace(/[,()"]/g, " ");
+      q = q.or(`city.ilike.${pat},address.ilike.${pat}`);
+    }
+    if (data.category?.trim()) q = q.eq("category", data.category.trim());
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];

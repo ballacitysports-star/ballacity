@@ -326,3 +326,39 @@ export function suggestHandle(name: string): string {
     .slice(0, 40)
     .replace(/-+$/g, "");
 }
+
+/** Amenities worth showing first on a directory card, in priority order. */
+const HIGHLIGHT_AMENITIES = [
+  "Hardwood courts",
+  "Indoor courts",
+  "Outdoor courts",
+  "Outdoor cages",
+  "Turf field",
+  "Sport court (synthetic)",
+  "Lighting",
+  "Parking",
+  "Ball rentals",
+  "Scoreboards",
+  "Air conditioning",
+  "Lockers",
+] as const;
+
+/**
+ * Pick the amenity tags for a directory card: the court count first, then the
+ * highest-priority features the facility actually has. `more` is how many
+ * further amenities were left off.
+ */
+export function highlightAmenities(
+  amenities: readonly string[] | null | undefined,
+  max = 5,
+): { tags: string[]; more: number } {
+  const list = (amenities ?? []).filter(Boolean);
+  const courts = courtCountFromAmenities(list);
+  const rest = list.filter((a) => courtCountFromAmenities([a]) === null);
+  const ranked = [
+    ...HIGHLIGHT_AMENITIES.filter((a) => rest.includes(a)),
+    ...rest.filter((a) => !(HIGHLIGHT_AMENITIES as readonly string[]).includes(a)),
+  ];
+  const tags = [...(courts ? [courtCountLabel(courts)] : []), ...ranked].slice(0, max);
+  return { tags, more: Math.max(0, (courts ? 1 : 0) + ranked.length - tags.length) };
+}

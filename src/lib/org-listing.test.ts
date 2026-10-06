@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { formatDayHours, parseHours, resolveOpenState } from "@/lib/org-hours";
+import { describeOpenBadge, formatDayHours, parseHours, resolveOpenState } from "@/lib/org-hours";
 import {
   ORG_AMENITIES,
+  highlightAmenities,
   suggestHandle,
   courtCountFromAmenities,
   withCourtCount,
@@ -207,5 +208,66 @@ describe("suggestHandle", () => {
     expect(suggestHandle("  Café Hoops!! ")).toBe("cafe-hoops");
     expect(suggestHandle("A".repeat(60))).toHaveLength(40);
     expect(suggestHandle("???")).toBe("");
+  });
+});
+
+describe("highlightAmenities", () => {
+  it("leads with the court count, then priority features", () => {
+    const r = highlightAmenities(["Wi-Fi", "Parking", "4 courts", "Lighting", "Indoor courts"]);
+    expect(r.tags).toEqual(["4 courts", "Indoor courts", "Lighting", "Parking", "Wi-Fi"]);
+    expect(r.more).toBe(0);
+  });
+
+  it("caps the tags and reports how many were left off", () => {
+    const r = highlightAmenities(
+      ["Indoor courts", "Outdoor courts", "Turf field", "Lighting", "Parking", "Lockers", "Wi-Fi"],
+      4,
+    );
+    expect(r.tags).toEqual(["Indoor courts", "Outdoor courts", "Turf field", "Lighting"]);
+    expect(r.more).toBe(3);
+  });
+
+  it("handles missing amenities", () => {
+    expect(highlightAmenities(null)).toEqual({ tags: [], more: 0 });
+  });
+});
+
+describe("describeOpenBadge", () => {
+  // 2026-10-06 is a Tuesday. Hours Mon–Sun 06:00–22:00 in UTC.
+  const hours = Object.fromEntries(
+    [0, 1, 2, 3, 4, 5, 6].map((d) => [String(d), { ranges: [{ open: "06:00", close: "22:00" }] }]),
+  );
+
+  it("shows open now with the closing time", () => {
+    const b = describeOpenBadge(hours, "UTC", new Date("2026-10-06T15:00:00Z"));
+    expect(b).toEqual({ tone: "open", headline: "Open now", detail: "Closes at 10 PM" });
+  });
+
+  it("flags closing soon within the last hour", () => {
+    const b = describeOpenBadge(hours, "UTC", new Date("2026-10-06T21:15:00Z"));
+    expect(b.tone).toBe("closing");
+    expect(b.headline).toBe("Closing soon");
+    expect(b.detail).toBe("Closes at 10 PM");
+  });
+
+  it("shows when a closed facility opens next, in its own timezone", () => {
+    const late = describeOpenBadge(hours, "UTC", new Date("2026-10-06T23:30:00Z"));
+    expect(late).toEqual({ tone: "closed", headline: "Closed", detail: "Opens tomorrow 6 AM" });
+    // 23:30 UTC is 19:30 in New York → still open there.
+    expect(
+      describeOpenBadge(hours, "America/New_York", new Date("2026-10-06T23:30:00Z")).tone,
+    ).toBe("open");
+  });
+
+  it("handles 24h and unset hours", () => {
+    const all = { "2": { open24: true } };
+    expect(describeOpenBadge(all, "UTC", new Date("2026-10-06T03:00:00Z")).detail).toBe(
+      "Open 24 hours",
+    );
+    expect(describeOpenBadge({}, "UTC")).toEqual({
+      tone: "unknown",
+      headline: "Hours not set",
+      detail: null,
+    });
   });
 });
