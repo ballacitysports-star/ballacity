@@ -415,6 +415,25 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
   return game;
 }
 
+/**
+ * Public, non-cancelled games tied to a facility (`hosted_games.org_id`).
+ * A direct query rather than the global store so the facility page does not
+ * depend on the whole feed having hydrated.
+ */
+export async function fetchHostedGamesForOrg(orgId: string): Promise<Game[]> {
+  const { data, error } = await supabase
+    .from("hosted_games")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("is_private", false)
+    .is("hidden_at", null)
+    .is("cancelled_at", null)
+    .order("date", { ascending: true })
+    .limit(100);
+  if (error) throw error;
+  return ((data as DbRow[] | null) ?? []).map(rowToGame);
+}
+
 export function getHostedGame(id: string): Game | undefined {
   loadLocal();
   return cache.find((g) => g.id === id);

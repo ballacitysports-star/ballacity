@@ -4,6 +4,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
+import { parseHours } from "./org-hours";
+import { MAX_ORG_AMENITIES } from "./org-listing";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -91,6 +93,40 @@ export const getTrainerOrgContact = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { phone: row?.phone ?? null, email: row?.email ?? null };
+  });
+
+// Pre-fill data for "Post an event" from a facility page. Only owners/admins
+// get `canPost: true` (checked here and again by the `hosted_games` trigger),
+// so a crafted `?orgId=` link cannot attach a game to someone else's facility.
+export const getOrgEventContext = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", {
+      _org: data.orgId,
+      _user: context.userId,
+    });
+    if (adminErr) throw new Error(adminErr.message);
+    if (!isAdmin) return { canPost: false as const, org: null };
+    const { data: org, error } = await context.supabase
+      .from("trainer_orgs")
+      .select("id,name,address,city,geo,amenities")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!org) return { canPost: false as const, org: null };
+    const geo = org.geo as { lat?: number; lng?: number } | null;
+    return {
+      canPost: true as const,
+      org: {
+        id: org.id,
+        name: org.name,
+        address: org.address ?? org.city ?? "",
+        lat: typeof geo?.lat === "number" ? geo.lat : null,
+        lng: typeof geo?.lng === "number" ? geo.lng : null,
+        amenities: ((org as { amenities?: string[] | null }).amenities ?? []) as string[],
+      },
+    };
   });
 
 export const createTrainerOrg = createServerFn({ method: "POST" })
@@ -439,7 +475,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
           phone: z.string().max(40).optional(),
           email: z.string().email().max(200).optional(),
           category: z.string().max(60).optional(),
-          amenities: z.array(z.string().max(60)).max(30).optional(),
+          amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
           hours: z.record(z.string(), z.unknown()).optional(),
           timezone: z.string().max(80).optional(),
@@ -468,7 +504,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         category: data.category ?? null,
         amenities: data.amenities ?? [],
         photos: data.photos ?? [],
-        hours: data.hours ?? {},
+        hours: parseHours(data.hours ?? {}),
         timezone: data.timezone ?? null,
       } as never)
       .select("id")
@@ -538,7 +574,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           phone: z.string().max(40).nullable().optional(),
           email: z.string().email().max(200).nullable().optional(),
           category: z.string().max(60).nullable().optional(),
-          amenities: z.array(z.string().max(60)).max(30).optional(),
+          amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
           hours: z.record(z.string(), z.unknown()).optional(),
           timezone: z.string().max(80).nullable().optional(),
@@ -564,7 +600,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.category !== undefined) extra.category = data.category;
     if (data.amenities !== undefined) extra.amenities = data.amenities;
     if (data.photos !== undefined) extra.photos = data.photos;
-    if (data.hours !== undefined) extra.hours = data.hours;
+    if (data.hours !== undefined) extra.hours = parseHours(data.hours);
     if (data.timezone !== undefined) extra.timezone = data.timezone;
     const { error } = await context.supabase.from("trainer_orgs").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);

@@ -21,6 +21,7 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
+import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,8 @@ function OrgPage() {
       {org.owner_id === null && (
         <ClaimListingCard subjectType="gym" subjectId={orgId} name={org.name} />
       )}
+
+      <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
 
       <div id="gym-reviews">
         <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />

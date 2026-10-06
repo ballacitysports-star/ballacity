@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { formatDayHours, parseHours, resolveOpenState } from "@/lib/org-hours";
 import {
+  ORG_AMENITIES,
+  suggestHandle,
+  courtCountFromAmenities,
+  withCourtCount,
   directionsHref,
   emailHref,
   isDialable,
@@ -148,5 +152,60 @@ describe("listing strength", () => {
     });
     expect(full.percent).toBe(100);
     expect(full.missing).toHaveLength(0);
+  });
+});
+
+describe("court count amenity", () => {
+  it("reads and writes the count as a readable amenity entry", () => {
+    expect(courtCountFromAmenities(["Parking", "4 courts"])).toBe(4);
+    expect(courtCountFromAmenities(["1 court"])).toBe(1);
+    expect(courtCountFromAmenities(["Parking"])).toBe(null);
+    expect(withCourtCount(["Parking"], 3)).toEqual(["3 courts", "Parking"]);
+    expect(withCourtCount(["2 courts", "Parking"], 1)).toEqual(["1 court", "Parking"]);
+    expect(withCourtCount(["2 courts", "Parking"], 0)).toEqual(["Parking"]);
+    expect(withCourtCount(["Parking"], 500)).toEqual(["99 courts", "Parking"]);
+  });
+
+  it("does not count the court total toward the 3-amenity checklist item", () => {
+    const base = {
+      name: "Peak",
+      handle: "peak",
+      category: "Gym",
+      address: "123 Main St",
+      phone: "",
+      email: "",
+      website: "",
+      bio: "",
+      hours: {},
+      photos: [],
+      avatarUrl: "",
+      coverUrl: "",
+    };
+    const done = (amenities: string[]) =>
+      scoreListing({ ...base, amenities }).items.find((i) => i.id === "amenities")!.done;
+    expect(done(["4 courts", "Lighting", "Parking"])).toBe(false);
+    expect(done(["4 courts", "Lighting", "Parking", "Showers"])).toBe(true);
+  });
+
+  it("offers the expanded court and equipment amenities", () => {
+    for (const a of [
+      "Hardwood courts",
+      "Outdoor cages",
+      "Lighting",
+      "Ball rentals",
+      "Scoreboards",
+    ]) {
+      expect(ORG_AMENITIES).toContain(a);
+    }
+    expect(new Set(ORG_AMENITIES).size).toBe(ORG_AMENITIES.length);
+  });
+});
+
+describe("suggestHandle", () => {
+  it("slugifies facility names into valid handles", () => {
+    expect(suggestHandle("Peak Gym & Courts")).toBe("peak-gym-courts");
+    expect(suggestHandle("  Café Hoops!! ")).toBe("cafe-hoops");
+    expect(suggestHandle("A".repeat(60))).toHaveLength(40);
+    expect(suggestHandle("???")).toBe("");
   });
 });
