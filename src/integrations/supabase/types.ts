@@ -987,6 +987,7 @@ export type Database = {
       }
       highlight_reels: {
         Row: {
+          ai_advanced_analytics: Json | null
           ai_analysis: Json | null
           ai_caption: string | null
           ai_coaching: Json | null
@@ -1027,6 +1028,7 @@ export type Database = {
           video_path: string
         }
         Insert: {
+          ai_advanced_analytics?: Json | null
           ai_analysis?: Json | null
           ai_caption?: string | null
           ai_coaching?: Json | null
@@ -1067,6 +1069,7 @@ export type Database = {
           video_path: string
         }
         Update: {
+          ai_advanced_analytics?: Json | null
           ai_analysis?: Json | null
           ai_caption?: string | null
           ai_coaching?: Json | null

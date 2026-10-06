@@ -65,6 +65,7 @@ import { getBillingEnvironment } from "@/lib/stripe";
 import { formatFullDay } from "@/lib/datetime";
 import { createPortalSession } from "@/utils/payments.functions";
 import { freeTierFor } from "@/lib/catalog";
+import type { AdvancedAnalytics } from "@/lib/reel-analytics";
 import {
   recapAttempt,
   recapProgress,
@@ -130,6 +131,7 @@ type Reel = {
     confidence?: string;
   } | null;
   ai_transcript?: { text?: string } | null;
+  ai_advanced_analytics?: AdvancedAnalytics | null;
   style_prefs?: Record<string, any> | null;
   hidden_at?: string | null;
 };
@@ -458,6 +460,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           editPlan={reel.ai_edit_plan ?? null}
           coaching={reel.ai_coaching ?? null}
           transcript={reel.ai_transcript?.text ?? null}
+          analytics={reel.ai_advanced_analytics ?? null}
+          title={reel.ai_title || reel.title}
         />
       )}
 

@@ -39,7 +39,7 @@ const TOOLS = [
     function: {
       name: "get_reel_details",
       description:
-        "Full AI analysis of this reel: play-by-play timeline, planned cut list, coaching report, spoken transcript, current copy.",
+        "Full AI analysis of this reel: play-by-play timeline, planned cut list, coaching report, Pro Analytics (0-100 ratings, timestamped biomechanics cues, archetype, scout report), spoken transcript, current copy.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -134,6 +134,7 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
         timeline: r.ai_timeline ?? [],
         edit_plan: r.ai_edit_plan ?? null,
         coaching: r.ai_coaching ?? null,
+        pro_analytics: r.ai_advanced_analytics ?? null,
         transcript: r.ai_transcript?.text ?? null,
         overlays: r.ai_overlays ?? [],
       };
@@ -314,6 +315,7 @@ export async function runReelCoachAgent(
         "You help the athlete improve this reel: captions, titles, hashtags, on-screen text, which moments to feature, the cut list, technique, and how to film better next time.",
         "Use your tools to look things up instead of guessing. Call apply_copy or apply_edit_plan ONLY when the athlete clearly asks you to apply, save, or use something — otherwise just propose it in chat.",
         "After applying a change, say plainly what you changed.",
+        "When the athlete asks about their Pro Analytics ratings or mechanics, ground the answer in the stored ratings and timestamped biomechanics cues, cite the timestamp (e.g. 0:03), and give one or two drills that would raise the weakest rating. Ratings are AI estimates from one clip — present them that way.",
         "Be concrete and brief (max 140 words). Never invent scores, stats, opponents, or player names.",
         "Here is what is already known about the reel:",
         buildReelGrounding(ctx.reel) || "No AI analysis is available for this reel yet.",

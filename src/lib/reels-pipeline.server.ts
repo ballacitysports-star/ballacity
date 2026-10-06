@@ -10,10 +10,15 @@
  */
 
 import { reelStyleDirectives } from "@/lib/reel-style";
-import { DEFAULT_AI_PROVIDER } from "@/lib/ai/config";
+import { DEFAULT_AI_PROVIDER, type AiProviderConfig } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import type { AiMessagePart } from "@/lib/ai/provider";
+import {
+  analyticsAudience,
+  analyticsText,
+  normalizeAdvancedAnalytics,
+} from "@/lib/reel-analytics";
 
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
@@ -25,6 +30,7 @@ export const STEPS = [
   "timeline",
   "editplan",
   "coach",
+  "analytics",
   "metadata",
   "hashtags",
   "thumbnail",
@@ -64,14 +70,44 @@ async function callLovableAIParts(
   parts: Array<Record<string, any>>,
   system: string,
   ctx: StepCtx,
+  pickModel?: (p: AiProviderConfig) => string,
 ): Promise<any> {
-  const request = { system, prompt: "", parts: parts as AiMessagePart[] };
+  return (await callLovableAIPartsWithModel(parts, system, ctx, pickModel)).data;
+}
+
+/** Same as `callLovableAIParts`, but also reports which model answered. */
+async function callLovableAIPartsWithModel(
+  parts: Array<Record<string, any>>,
+  system: string,
+  ctx: StepCtx,
+  pickModel?: (p: AiProviderConfig) => string,
+): Promise<{ data: any; model: string }> {
+  const providerConfig = ctx.session?.config.provider ?? DEFAULT_AI_PROVIDER;
+  const request = {
+    system,
+    prompt: "",
+    parts: parts as AiMessagePart[],
+    model: pickModel ? pickModel(providerConfig) : undefined,
+  };
   if (ctx.session) {
     const out = await runAiCall(ctx.session, (provider) => provider.generateStructured(request));
-    return out.data;
+    return { data: out.data, model: out.model };
   }
   const provider = createLovableGatewayProvider(DEFAULT_AI_PROVIDER);
-  return (await provider.generateStructured(request)).data;
+  const out = await provider.generateStructured(request);
+  return { data: out.data, model: out.model };
+}
+
+/** Evenly spread picks of up to `max` captured frames, with their timestamps. */
+function sampleFrames(reel: Reel, max: number) {
+  const all = reel.frame_paths ?? [];
+  const times = reel.frame_times ?? [];
+  const stride = Math.max(1, Math.ceil(all.length / max));
+  const picked: { path: string; t: number | null; index: number }[] = [];
+  for (let i = 0; i < all.length; i += stride) {
+    picked.push({ path: all[i], t: times[i] ?? null, index: i + 1 });
+  }
+  return picked;
 }
 
 /** Downloads a storage object and returns it as a base64 data URL for the gateway. */
@@ -131,13 +167,8 @@ const STEP_RUNNERS: Record<
   analyze: async (reel, _p, ctx) => {
     const { supabaseAdmin } = ctx;
     // Denser sampling: up to 10 frames, spread across whatever the browser captured.
-    const all = reel.frame_paths ?? [];
     const times = reel.frame_times ?? [];
-    const stride = Math.max(1, Math.ceil(all.length / 10));
-    const picked: { path: string; t: number | null; index: number }[] = [];
-    for (let i = 0; i < all.length; i += stride) {
-      picked.push({ path: all[i], t: times[i] ?? null, index: i + 1 });
-    }
+    const picked = sampleFrames(reel, 10);
 
     const images: { url: string; t: number | null; index: number }[] = [];
     for (const p of picked) {
@@ -170,6 +201,7 @@ const STEP_RUNNERS: Record<
         "Use the frame timestamps given in the prompt for `t` (seconds). Max 8 moments. Never invent scores or player names.",
       ].join(" "),
       ctx,
+      (p) => p.visionModel,
     );
     const frameTime = (frame: number) => {
       const im = images[Math.max(0, Math.min(images.length - 1, frame - 1))];
@@ -390,6 +422,84 @@ const STEP_RUNNERS: Record<
     return { coaching };
   },
 
+  /**
+   * Pro Analytics: a second, denser look at the footage (up to 16 frames) that
+   * grades the athlete 0–100, ties biomechanics cues to timestamps, and writes
+   * a playstyle archetype, style comps and a scout report. Runs on the
+   * configurable `analyticsModel`. It does not depend on the reel's style, so a
+   * restyle keeps the stored result instead of paying for it again. A bonus:
+   * any failure leaves the reel without analytics rather than failing it.
+   */
+  analytics: async (reel, progress, ctx) => {
+    if (progress.advanced_analytics) return {};
+    if (!progress.analysis?.summary) return { advanced_analytics: null };
+    try {
+      const images: { url: string; t: number | null }[] = [];
+      for (const p of sampleFrames(reel, 16)) {
+        const url = await frameDataUrl(ctx.supabaseAdmin, reel.user_id, p.path);
+        if (url) images.push({ url, t: p.t });
+      }
+      if (images.length === 0) return { advanced_analytics: null };
+
+      // No session (batch worker) means the age is unknown: development feedback only.
+      const cohort = ctx.session?.cohort ?? null;
+      const full = analyticsAudience(cohort) === "full";
+      const stamps = images
+        .map((im, i) => `frame ${i + 1}${im.t != null ? ` @ ${im.t}s` : ""}`)
+        .join(", ");
+      const context = [
+        `Sport: ${progress.sport ?? "unknown"}.`,
+        progress.duration ? `Clip length: about ${Math.round(progress.duration)}s.` : "",
+        `What the footage shows: ${progress.analysis.summary}`,
+        progress.analysis.quality_note ? `Footage quality: ${progress.analysis.quality_note}` : "",
+        (progress.timeline ?? []).length
+          ? `Play-by-play: ${(progress.timeline ?? []).map((e: any) => `${e.t}s ${e.label}`).join("; ")}`
+          : "",
+        `Frames in order: ${stamps}.`,
+        "Grade this athlete's performance on the clip.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const { data: out, model } = await callLovableAIPartsWithModel(
+        [
+          { type: "text", text: context },
+          ...images.map((im) => ({ type: "image_url", image_url: { url: im.url } })),
+        ],
+        [
+          "You are a player-development analyst and biomechanics coach reviewing amateur sports footage. Respond ONLY with JSON:",
+          '{"sport":"basketball","ratings":{"overall":72,"mechanics":70,"explosiveness":75,"iq":68,"execution":74},',
+          '"biomechanics":[{"t":2.0,"area":"Base|Hips|Core|Arms|Release|Follow-through|Footwork|Balance","cue":"one line tied to that moment","kind":"strength|fix"}],',
+          '"archetype":"short playstyle label, e.g. Slashing Playmaker",',
+          full
+            ? '"comps":[{"name":"professional athlete","match":70,"why":"the specific movement or habit they share"}],"scout":{"tier":"Developing|High School JV|High School Varsity|Club Elite|College Prospect","strengths":["..."],"drills":["..."],"quote":"two sentences"},'
+            : "",
+          '"confidence":"one line on how much the footage supports these grades"}',
+          "Rules: ratings are integers 0-100 judged against the athlete's apparent level, where 50 is solid for that level; overall reflects the whole clip, not an average.",
+          "3 to 6 biomechanics cues, `t` in seconds taken from the frame timestamps, each under 140 characters, describing only what a frame actually shows.",
+          full
+            ? "comps: 1 or 2 professional athletes whose movement pattern or decision habits resemble this clip; `match` is a style resemblance 0-100, never a claim about talent. scout: strengths are the top 3 qualities visible on tape, exactly 2 drills, quote is 2 sentences in a scout's voice."
+            : "",
+          "Comment only on technique, movement and decisions — never on body shape, weight, appearance, or anything not athletic. Keep every note constructive. Never invent scores, stats, names of people in the clip, or details the frames don't show. If the footage is too short, far, or blurry to judge, keep ratings conservative near 50 and say so in `confidence`.",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        ctx,
+        (p) => p.analyticsModel,
+      );
+      return {
+        advanced_analytics: normalizeAdvancedAnalytics(out, {
+          cohort,
+          duration: progress.duration ?? null,
+          sport: progress.sport ?? null,
+          model,
+        }),
+      };
+    } catch {
+      return { advanced_analytics: null };
+    }
+  },
+
   metadata: async (reel, progress, ctx) => {
     const context = progress.analysis?.summary
       ? `What the footage shows: ${progress.analysis.summary}. Detected sport: ${progress.sport ?? "unknown"}. Key moments: ${(
@@ -467,6 +577,8 @@ export const CAPTURED_MEDIA_KEYS = [
   "analysis",
   "suggested_clip",
   "transcript",
+  // Style-independent, so a restyle reuses it instead of re-grading the footage.
+  "advanced_analytics",
 ] as const;
 
 export function prepareStyleRegen(progress: Record<string, any> | null) {
@@ -551,6 +663,7 @@ async function screenReelOutput(
             " ",
           )
         : "",
+      ai_advanced_analytics: analyticsText(progress.advanced_analytics),
     },
   });
 
@@ -558,6 +671,7 @@ async function screenReelOutput(
   if (moderated.blocked.includes("ai_caption")) progress.ai_caption = "";
   if (moderated.blocked.includes("ai_hashtags")) progress.ai_hashtags = [];
   if (moderated.blocked.includes("ai_coaching")) progress.coaching = null;
+  if (moderated.blocked.includes("ai_advanced_analytics")) progress.advanced_analytics = null;
 
   // Frame safety on the frames already sampled at upload time.
   const framePaths = (reel.frame_paths ?? []).slice(0, 3);
@@ -709,6 +823,7 @@ export async function processReel(
         ai_timeline: progress.timeline ?? [],
         ai_edit_plan: progress.edit_plan ?? null,
         ai_coaching: progress.coaching ?? null,
+        ai_advanced_analytics: progress.advanced_analytics ?? null,
         ai_transcript: progress.transcript ?? null,
         completed_at: new Date().toISOString(),
         error_message: null,
