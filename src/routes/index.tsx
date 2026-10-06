@@ -145,20 +145,28 @@ function Landing() {
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/60 border-b border-border">
         <div className="page-shell flex items-center justify-between py-3">
           <Logo />
-          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-            <a href="#trending" className="hover:text-foreground">
-              Games
-            </a>
-            <a href="#tryouts" className="hover:text-foreground">
-              Tryouts
-            </a>
-            <a href="#availability" className="hover:text-foreground">
-              Get found
-            </a>
-            <a href="#for-facilities" className="hover:text-foreground">
-              Facilities
-            </a>
-          </nav>
+          <div className="flex items-center gap-5">
+            <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
+              <a href="#trending" className="hover:text-foreground">
+                Games
+              </a>
+              <a href="#tryouts" className="hover:text-foreground">
+                Tryouts
+              </a>
+              <a href="#availability" className="hover:text-foreground">
+                Get found
+              </a>
+              <a href="#for-facilities" className="hover:text-foreground">
+                Facilities
+              </a>
+            </nav>
+            <Link
+              to="/auth"
+              className="rounded-full border border-border bg-surface px-4 py-1.5 text-sm font-semibold text-foreground hover:border-lime/50 hover:text-lime transition-colors"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </header>
 
