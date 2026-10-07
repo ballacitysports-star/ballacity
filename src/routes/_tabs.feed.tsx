@@ -3,7 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSearch, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Bell, List, MessageCircle, MapPin, Map as MapIcon } from "lucide-react";
+import { Bell, MessageCircle, MapPin, X } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -14,9 +14,9 @@ import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
 import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
 import { FilterBar } from "@/components/FilterBar";
-import { FeedPreferencesBody, FeedViewsRow } from "@/components/feed/FeedPreferencesSheet";
+import { FeedPreferencesBody } from "@/components/feed/FeedPreferencesSheet";
 import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
-import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
+import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import {
@@ -358,12 +358,21 @@ function Feed() {
     (prefs.preferredSports.length > 0 ? 1 : 0) +
     (prefs.maxDistanceMi != null ? 1 : 0) +
     (tab === "archive" ? 1 : 0) +
+    (positionFilter ? 1 : 0) +
     Object.entries(prefs.sections).filter(
       ([k, v]) =>
         k !== "showForYou" &&
         k in DEFAULT_PREFS.sections &&
         v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
+  // Settings that live in the filter sheet but change what the feed shows;
+  // surfaced as removable chips so they're never hidden state.
+  const modeChips: { label: string; clear: () => void }[] = [];
+  if (tab === "archive")
+    modeChips.push({ label: "Finished games", clear: () => setTab("upcoming") });
+  if (viewMode === "map") modeChips.push({ label: "Map view", clear: () => switchView("list") });
+  if (positionFilter)
+    modeChips.push({ label: positionFilter, clear: () => setPositionFilter(null) });
   // Label for the status line's location action; null once a fresh fix is held.
   const locationActionLabel =
     geoStatus === "unsupported"
@@ -509,7 +518,7 @@ function Feed() {
         progress={indicatorProgress}
         refreshing={refreshing}
       />
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-3">
         <Logo />
         <div className="flex items-center gap-2">
           <Link
@@ -530,50 +539,35 @@ function Feed() {
         </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 text-sm">
-        {tab === "archive" ? (
-          <>
-            <span className="font-semibold">Finished games · {filtered.length}</span>
-            <button
-              type="button"
-              onClick={() => setTab("upcoming")}
-              className="font-semibold text-lime"
-            >
-              Back to upcoming
-            </button>
-          </>
+      <div className="mb-2 flex items-center gap-2 text-sm">
+        <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" aria-hidden />
+        {userCityToken ? (
+          <Link to="/profile/edit" className="truncate font-semibold">
+            {profile?.city}
+          </Link>
         ) : (
-          <>
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" aria-hidden />
-            {userCityToken ? (
-              <Link to="/profile/edit" className="truncate font-semibold">
-                {profile?.city}
-              </Link>
-            ) : (
-              <Link to="/profile/edit" className="font-semibold text-lime">
-                Set your city
-              </Link>
-            )}
-            <span className="shrink-0 text-muted-foreground">
-              · {filtered.length} {filtered.length === 1 ? "run" : "runs"}
-            </span>
-            {locationActionLabel && (
-              <button
-                type="button"
-                onClick={handleLocationTap}
-                title={locationExplanation}
-                className="ml-auto shrink-0 font-semibold text-lime"
-              >
-                {locationActionLabel}
-              </button>
-            )}
-          </>
+          <Link to="/profile/edit" className="font-semibold text-lime">
+            Set your city
+          </Link>
+        )}
+        <span className="shrink-0 text-muted-foreground">
+          · {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+        </span>
+        {locationActionLabel && (
+          <button
+            type="button"
+            onClick={handleLocationTap}
+            title={locationExplanation}
+            className="ml-auto shrink-0 font-semibold text-lime"
+          >
+            {locationActionLabel}
+          </button>
         )}
         <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
       </div>
 
       <>
-        <div className="relative mb-4">
+        <div className="relative">
           <FilterBar
             q={q}
             onQChange={setQ}
@@ -588,27 +582,16 @@ function Feed() {
                 finishedCount={finishedCount}
                 density={density}
                 onDensityChange={switchDensity}
+                view={viewMode}
+                onViewChange={switchView}
+                position={positionFilter}
+                onPositionChange={setPositionFilter}
               />
-            }
-            rightExtra={
-              <button
-                type="button"
-                onClick={() => switchView(viewMode === "map" ? "list" : "map")}
-                aria-label={viewMode === "map" ? "Show list view" : "Show map view"}
-                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border bg-surface ${
-                  viewMode === "map" ? "border-lime text-lime" : "border-border"
-                }`}
-              >
-                {viewMode === "map" ? (
-                  <List className="h-4 w-4" />
-                ) : (
-                  <MapIcon className="h-4 w-4" />
-                )}
-              </button>
             }
             onReset={() => {
               setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
               setTab("upcoming");
+              setPositionFilter(null);
             }}
           />
           {q && suggestions.length > 0 && (
@@ -627,46 +610,26 @@ function Feed() {
           )}
         </div>
 
-        {prefs.savedViews.length > 0 && (
-          <div className="mb-3">
-            <FeedViewsRow compact />
+        <div className="mb-3">
+          <SportChips multi selected={chipSelected} onSelect={setChipSport} />
+        </div>
+
+        {modeChips.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {modeChips.map(({ label, clear }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={clear}
+                aria-label={`Clear ${label}`}
+                className="inline-flex items-center gap-1 rounded-full border border-lime bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+              >
+                {label}
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            ))}
           </div>
         )}
-
-        <div className="mb-5">
-          <SportChips multi selected={chipSelected} onSelect={setChipSport} />
-          {chipSelected.length === 1 &&
-            POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
-              <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-                <button
-                  onClick={() => setPositionFilter(null)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                    !positionFilter
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  Any position
-                </button>
-                {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
-                  const active = positionFilter === p;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPositionFilter(active ? null : p)}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                        active
-                          ? "border-lime bg-lime text-primary-foreground"
-                          : "border-border bg-surface text-foreground hover:border-lime/40"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-        </div>
 
         {viewMode === "map" ? (
           <PlayMapView
@@ -675,58 +638,47 @@ function Feed() {
           />
         ) : (
           <>
-            {q ? (
-              <>
-                <h2 className="section-eyebrow text-muted-foreground mb-2">
-                  {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-                </h2>
-                <div className={listContainerClass}>
-                  {refreshing && filtered.length === 0
-                    ? renderSkeletons(density === "list" ? 6 : 3)
-                    : visible.map((g, i) => renderGame(g, i))}
-                  {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                  {!refreshing && filtered.length === 0 && (
-                    <EmptyState
-                      className={emptyColSpan}
-                      icon={<Search className="h-6 w-6" aria-hidden />}
-                      title={`No games match "${q}"`}
-                      description="Try a shorter search, or a different sport or city name."
-                    />
-                  )}
-                </div>
-                <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-              </>
-            ) : (
-              <>
-                <div className={listContainerClass}>
-                  {refreshing && filtered.length === 0
-                    ? renderSkeletons(density === "list" ? 6 : 3)
-                    : visible.map((g, i) => renderGame(g, i))}
-                  {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                  {!refreshing && filtered.length === 0 && (
-                    <EmptyState
-                      className={emptyColSpan}
-                      icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
-                      title={
-                        tab === "archive"
-                          ? "No finished games match your filters"
-                          : "No games match your filters"
-                      }
-                      description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
-                      action={
-                        <button
-                          onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                        >
-                          Clear filters
-                        </button>
-                      }
-                    />
-                  )}
-                </div>
-                <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-              </>
-            )}
+            <div className={listContainerClass}>
+              {refreshing && filtered.length === 0
+                ? renderSkeletons(density === "list" ? 6 : 3)
+                : visible.map((g, i) => renderGame(g, i))}
+              {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+              {!refreshing && filtered.length === 0 && (
+                <EmptyState
+                  className={emptyColSpan}
+                  icon={
+                    q ? (
+                      <Search className="h-6 w-6" aria-hidden />
+                    ) : (
+                      <CalendarSearch className="h-6 w-6" aria-hidden />
+                    )
+                  }
+                  title={
+                    q
+                      ? `No games match "${q}"`
+                      : tab === "archive"
+                        ? "No finished games match your filters"
+                        : "No games match your filters"
+                  }
+                  description={
+                    q
+                      ? "Try a shorter search, or a different sport or city name."
+                      : "Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                  }
+                  action={
+                    q ? undefined : (
+                      <button
+                        onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                        className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                      >
+                        Clear filters
+                      </button>
+                    )
+                  }
+                />
+              )}
+            </div>
+            <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
           </>
         )}
       </>

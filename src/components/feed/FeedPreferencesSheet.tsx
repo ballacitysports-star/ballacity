@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Bookmark, BookmarkPlus, Check, Trash2, X } from "lucide-react";
 import { FilterSection } from "@/components/FilterSheet";
 import { SortSection } from "@/components/filters/SortSection";
-import { SPORTS, type Sport } from "@/lib/sample-data";
+import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { distancePresets } from "@/lib/distance";
 import {
   useFeedPrefs,
@@ -191,12 +191,20 @@ export function FeedPreferencesBody({
   finishedCount = 0,
   density,
   onDensityChange,
+  view,
+  onViewChange,
+  position,
+  onPositionChange,
 }: {
   tab?: "upcoming" | "archive";
   onTabChange?: (t: "upcoming" | "archive") => void;
   finishedCount?: number;
   density?: "grid" | "list";
   onDensityChange?: (d: "grid" | "list") => void;
+  view?: "list" | "map";
+  onViewChange?: (v: "list" | "map") => void;
+  position?: string | null;
+  onPositionChange?: (p: string | null) => void;
 } = {}) {
   const prefs = useFeedPrefs();
   const profile = useMyProfile();
@@ -230,6 +238,27 @@ export function FeedPreferencesBody({
       <FilterSection label="My views">
         <FeedViewsRow />
       </FilterSection>
+
+      {view && onViewChange && (
+        <FilterSection label="View">
+          <div
+            className="flex gap-1 rounded-full border border-border bg-surface p-1"
+            role="tablist"
+          >
+            {(["list", "map"] as const).map((v) => (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => onViewChange(v)}
+                className={segment(view === v)}
+              >
+                {v === "list" ? "List" : "Map"}
+              </button>
+            ))}
+          </div>
+        </FilterSection>
+      )}
 
       {tab && onTabChange && (
         <FilterSection label="Show">
@@ -349,6 +378,31 @@ export function FeedPreferencesBody({
         </div>
       </FilterSection>
 
+      {onPositionChange &&
+        prefs.preferredSports.length === 1 &&
+        (POSITIONS_BY_SPORT[prefs.preferredSports[0]]?.length ?? 0) > 0 && (
+          <FilterSection label="Narrow results · Position">
+            <div className="flex flex-wrap gap-2">
+              {POSITIONS_BY_SPORT[prefs.preferredSports[0]].map((p) => {
+                const active = position === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => onPositionChange(active ? null : p)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+          </FilterSection>
+        )}
+
       <FilterSection label="Narrow results · Price">
         <Segmented<FeedMoneyFilter>
           value={prefs.moneyFilter}
@@ -431,6 +485,7 @@ export function FeedPreferencesBody({
         onClick={() => {
           setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
           onTabChange?.("upcoming");
+          onPositionChange?.(null);
         }}
         className="mt-2 w-full rounded-full border border-border bg-surface px-4 py-2.5 text-xs font-bold text-coral"
       >
