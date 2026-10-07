@@ -185,7 +185,19 @@ export function FeedViewsRow({ compact = false }: { compact?: boolean }) {
  * (Narrow results), what reorders them (Order), and what only changes the
  * layout (Feed layout).
  */
-export function FeedPreferencesBody() {
+export function FeedPreferencesBody({
+  tab,
+  onTabChange,
+  finishedCount = 0,
+  density,
+  onDensityChange,
+}: {
+  tab?: "upcoming" | "archive";
+  onTabChange?: (t: "upcoming" | "archive") => void;
+  finishedCount?: number;
+  density?: "grid" | "list";
+  onDensityChange?: (d: "grid" | "list") => void;
+} = {}) {
   const prefs = useFeedPrefs();
   const profile = useMyProfile();
   const hasCity = Boolean(profile?.city?.trim());
@@ -205,17 +217,45 @@ export function FeedPreferencesBody() {
     });
   };
 
-  const toggleSection = (k: keyof typeof sections) => {
-    const next = { ...sections, [k]: !sections[k] };
-    if (!next.showForYou && !next.showUrgent) return; // never hide everything
-    patch({ sections: next });
-  };
+  const toggleUrgentPin = () =>
+    patch({ sections: { ...sections, showUrgent: !sections.showUrgent } });
+
+  const segment = (active: boolean) =>
+    `flex-1 rounded-full px-3 py-2 text-xs font-bold transition-colors ${
+      active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+    }`;
 
   return (
     <>
       <FilterSection label="My views">
         <FeedViewsRow />
       </FilterSection>
+
+      {tab && onTabChange && (
+        <FilterSection label="Show">
+          <div
+            className="flex gap-1 rounded-full border border-border bg-surface p-1"
+            role="tablist"
+          >
+            <button
+              role="tab"
+              aria-selected={tab === "upcoming"}
+              onClick={() => onTabChange("upcoming")}
+              className={segment(tab === "upcoming")}
+            >
+              Upcoming
+            </button>
+            <button
+              role="tab"
+              aria-selected={tab === "archive"}
+              onClick={() => onTabChange("archive")}
+              className={segment(tab === "archive")}
+            >
+              Finished games{finishedCount ? ` (${finishedCount})` : ""}
+            </button>
+          </div>
+        </FilterSection>
+      )}
 
       <FilterSection label="Narrow results · Sports">
         <div className="flex flex-wrap gap-2">
@@ -347,32 +387,51 @@ export function FeedPreferencesBody() {
           These only change what the feed shows — they never filter games out.
         </p>
         <div className="space-y-2">
-          {(
-            [
-              ["showUrgent", "Needs players now"],
-              ["showForYou", '"For you" list'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => toggleSection(k)}
-              className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
+          <button
+            onClick={toggleUrgentPin}
+            className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
+          >
+            <span>Pin "Needs players now" runs to the top</span>
+            <span
+              className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections.showUrgent ? "bg-lime" : "bg-secondary"}`}
             >
-              <span>{label}</span>
               <span
-                className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections[k] ? "bg-lime" : "bg-secondary"}`}
+                className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections.showUrgent ? "translate-x-4" : ""}`}
+              />
+            </span>
+          </button>
+          {density && onDensityChange && (
+            <div
+              className="flex gap-1 rounded-full border border-border bg-surface p-1"
+              role="tablist"
+              aria-label="Card size"
+            >
+              <button
+                role="tab"
+                aria-selected={density === "grid"}
+                onClick={() => onDensityChange("grid")}
+                className={segment(density === "grid")}
               >
-                <span
-                  className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections[k] ? "translate-x-4" : ""}`}
-                />
-              </span>
-            </button>
-          ))}
+                Cards
+              </button>
+              <button
+                role="tab"
+                aria-selected={density === "list"}
+                onClick={() => onDensityChange("list")}
+                className={segment(density === "list")}
+              >
+                Compact
+              </button>
+            </div>
+          )}
         </div>
       </FilterSection>
 
       <button
-        onClick={() => setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })}
+        onClick={() => {
+          setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
+          onTabChange?.("upcoming");
+        }}
         className="mt-2 w-full rounded-full border border-border bg-surface px-4 py-2.5 text-xs font-bold text-coral"
       >
         Clear all filters

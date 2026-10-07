@@ -3,8 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSearch, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Bell, MessageCircle, MapPin } from "lucide-react";
-import { ViewDensityToggle } from "@/components/ViewDensityToggle";
+import { Bell, List, MessageCircle, MapPin, Map as MapIcon } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -34,7 +33,6 @@ import { useUserLocation } from "@/lib/geo";
 import { gameDistanceMi } from "@/lib/game-distance";
 
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
-import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
@@ -307,6 +305,12 @@ function Feed() {
         .sort((a, b) => {
           // Archive lists the most recently finished games first.
           if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
+          // "Needs players now" runs float to the top (their card carries the badge).
+          if (prefs.sections.showUrgent) {
+            const ua = a.urgent && a.joined < a.maxPlayers ? 0 : 1;
+            const ub = b.urgent && b.joined < b.maxPlayers ? 0 : 1;
+            if (ua !== ub) return ua - ub;
+          }
           if (prefs.sortBy === "nearest") {
             // Nearest first; prefer local city, then distanceMi, then date.
             const la = isLocal(a) ? 0 : 1;
@@ -349,16 +353,30 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-  const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
-
-  const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
   const finishedCount = useMemo(() => onlyFinishedGames([...hosted, ...GAMES]).length, [hosted]);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
     (prefs.maxDistanceMi != null ? 1 : 0) +
+    (tab === "archive" ? 1 : 0) +
     Object.entries(prefs.sections).filter(
-      ([k, v]) => k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
+      ([k, v]) =>
+        k !== "showForYou" &&
+        k in DEFAULT_PREFS.sections &&
+        v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
+  // Label for the status line's location action; null once a fresh fix is held.
+  const locationActionLabel =
+    geoStatus === "unsupported"
+      ? null
+      : geoStatus === "prompting"
+        ? "Locating…"
+        : locationRemembered
+          ? "Refresh location"
+          : geoStatus === "denied"
+            ? "Retry location"
+            : !coords
+              ? "Use my location"
+              : null;
 
   // Infinite scroll: paginate the main filtered list. Page size scales with
   // viewport so tablets/desktops fill their wider grids in one batch.
@@ -512,237 +530,206 @@ function Feed() {
         </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
-        <p className="page-subtitle inline-flex items-center gap-1">
-          {userCityToken ? (
-            <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
-              {filtered.length} games
-            </>
-          ) : (
-            <>
-              {filtered.length} games ·{" "}
-              <Link to="/profile/edit" className="text-lime font-semibold">
-                Set your city
-              </Link>{" "}
-              for nearby
-            </>
-          )}
-        </p>
-      </motion.div>
-
-      <div
-        role="tablist"
-        aria-label="Game timeframe"
-        className="mb-4 inline-flex rounded-full border border-border bg-surface p-1"
-      >
-        {(
-          [
-            { id: "upcoming", label: "Upcoming" },
-            { id: "archive", label: `Archive${finishedCount ? ` (${finishedCount})` : ""}` },
-          ] as const
-        ).map((t) => {
-          const active = tab === t.id;
-          return (
+      <div className="mb-3 flex items-center gap-2 text-sm">
+        {tab === "archive" ? (
+          <>
+            <span className="font-semibold">Finished games · {filtered.length}</span>
             <button
-              key={t.id}
               type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.id)}
-              className={`inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
-                active
-                  ? "bg-lime text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              onClick={() => setTab("upcoming")}
+              className="font-semibold text-lime"
             >
-              {t.label}
+              Back to upcoming
             </button>
-          );
-        })}
+          </>
+        ) : (
+          <>
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" aria-hidden />
+            {userCityToken ? (
+              <Link to="/profile/edit" className="truncate font-semibold">
+                {profile?.city}
+              </Link>
+            ) : (
+              <Link to="/profile/edit" className="font-semibold text-lime">
+                Set your city
+              </Link>
+            )}
+            <span className="shrink-0 text-muted-foreground">
+              · {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+            </span>
+            {locationActionLabel && (
+              <button
+                type="button"
+                onClick={handleLocationTap}
+                title={locationExplanation}
+                className="ml-auto shrink-0 font-semibold text-lime"
+              >
+                {locationActionLabel}
+              </button>
+            )}
+          </>
+        )}
+        <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
       </div>
 
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={(v) => switchView(v)}
-        density={density}
-        onDensityChange={(d) => switchDensity(d)}
-      />
-
-      {viewMode === "map" ? (
-        <PlayMapView
-          items={filtered}
-          getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
-        />
-      ) : (
-        <>
-          <div className="relative mb-4">
-            <FilterBar
-              q={q}
-              onQChange={setQ}
-              searchPlaceholder="Search pickup runs"
-              activeFilterCount={activeFilterCount}
-              create={{ to: "/create", label: "Create game" }}
-              sheetTitle="Feed filters"
-              sheet={<FeedPreferencesBody />}
-              onReset={() => setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })}
-            />
-            {q && suggestions.length > 0 && (
-              <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
-                {suggestions.map((s, idx) => (
-                  <button
-                    key={`${s.label}-${idx}`}
-                    onClick={() => setQ(s.label)}
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
-                  >
-                    <div className="font-semibold truncate">{s.label}</div>
-                    <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {prefs.savedViews.length > 0 && (
-            <div className="mb-3">
-              <FeedViewsRow compact />
+      <>
+        <div className="relative mb-4">
+          <FilterBar
+            q={q}
+            onQChange={setQ}
+            searchPlaceholder="Search pickup runs"
+            activeFilterCount={activeFilterCount}
+            create={{ to: "/create", label: "Create game" }}
+            sheetTitle="Feed filters"
+            sheet={
+              <FeedPreferencesBody
+                tab={tab}
+                onTabChange={setTab}
+                finishedCount={finishedCount}
+                density={density}
+                onDensityChange={switchDensity}
+              />
+            }
+            rightExtra={
+              <button
+                type="button"
+                onClick={() => switchView(viewMode === "map" ? "list" : "map")}
+                aria-label={viewMode === "map" ? "Show list view" : "Show map view"}
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border bg-surface ${
+                  viewMode === "map" ? "border-lime text-lime" : "border-border"
+                }`}
+              >
+                {viewMode === "map" ? (
+                  <List className="h-4 w-4" />
+                ) : (
+                  <MapIcon className="h-4 w-4" />
+                )}
+              </button>
+            }
+            onReset={() => {
+              setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
+              setTab("upcoming");
+            }}
+          />
+          {q && suggestions.length > 0 && (
+            <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+              {suggestions.map((s, idx) => (
+                <button
+                  key={`${s.label}-${idx}`}
+                  onClick={() => setQ(s.label)}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
+                >
+                  <div className="font-semibold truncate">{s.label}</div>
+                  <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
+                </button>
+              ))}
             </div>
           )}
+        </div>
 
-          <div className="mb-5">
-            <SportChips multi selected={chipSelected} onSelect={setChipSport} />
-            {chipSelected.length === 1 &&
-              POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-                  <button
-                    onClick={() => setPositionFilter(null)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                      !positionFilter
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    Any position
-                  </button>
-                  {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
-                    const active = positionFilter === p;
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => setPositionFilter(active ? null : p)}
-                        className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                          active
-                            ? "border-lime bg-lime text-primary-foreground"
-                            : "border-border bg-surface text-foreground hover:border-lime/40"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+        {prefs.savedViews.length > 0 && (
+          <div className="mb-3">
+            <FeedViewsRow compact />
           </div>
+        )}
 
-          {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
-            geoStatus !== "unsupported" &&
-            (!coords || locationRemembered) && (
-              <div className="mb-4">
+        <div className="mb-5">
+          <SportChips multi selected={chipSelected} onSelect={setChipSport} />
+          {chipSelected.length === 1 &&
+            POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
+              <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
                 <button
-                  type="button"
-                  onClick={handleLocationTap}
-                  title={locationExplanation}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setPositionFilter(null)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    !positionFilter
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
                 >
-                  <MapPin className="h-3.5 w-3.5 text-coral" />
-                  {geoStatus === "prompting"
-                    ? "Locating…"
-                    : locationRemembered
-                      ? "Using your last known location — refresh"
-                      : geoStatus === "denied"
-                        ? "Location blocked — tap to retry"
-                        : "Use my location to sort and filter by distance"}
+                  Any position
                 </button>
-                <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
-                <LocationAccessDialog
-                  open={locationDialogOpen}
-                  onOpenChange={setLocationDialogOpen}
-                />
+                {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
+                  const active = positionFilter === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPositionFilter(active ? null : p)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                        active
+                          ? "border-lime bg-lime text-primary-foreground"
+                          : "border-border bg-surface text-foreground hover:border-lime/40"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
               </div>
             )}
+        </div>
 
-          {q ? (
-            <>
-              <h2 className="section-eyebrow text-muted-foreground mb-2">
-                {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-              </h2>
-              <div className={listContainerClass}>
-                {refreshing && filtered.length === 0
-                  ? renderSkeletons(density === "list" ? 6 : 3)
-                  : visible.map((g, i) => renderGame(g, i))}
-                {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                {!refreshing && filtered.length === 0 && (
-                  <EmptyState
-                    className={emptyColSpan}
-                    icon={<Search className="h-6 w-6" aria-hidden />}
-                    title={`No games match "${q}"`}
-                    description="Try a shorter search, or a different sport or city name."
-                  />
-                )}
-              </div>
-              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-            </>
-          ) : (
-            <>
-              {prefs.sections.showUrgent && urgent.length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
-                    <span className="text-xs text-muted-foreground">{urgent.length} games</span>
-                  </div>
-                  <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
+        {viewMode === "map" ? (
+          <PlayMapView
+            items={filtered}
+            getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
+          />
+        ) : (
+          <>
+            {q ? (
+              <>
+                <h2 className="section-eyebrow text-muted-foreground mb-2">
+                  {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
+                </h2>
+                <div className={listContainerClass}>
+                  {refreshing && filtered.length === 0
+                    ? renderSkeletons(density === "list" ? 6 : 3)
+                    : visible.map((g, i) => renderGame(g, i))}
+                  {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+                  {!refreshing && filtered.length === 0 && (
+                    <EmptyState
+                      className={emptyColSpan}
+                      icon={<Search className="h-6 w-6" aria-hidden />}
+                      title={`No games match "${q}"`}
+                      description="Try a shorter search, or a different sport or city name."
+                    />
+                  )}
                 </div>
-              )}
-
-              {(tab === "archive" || prefs.sections.showForYou) && (
-                <>
-                  <h2 className="section-eyebrow text-muted-foreground mb-2">
-                    {tab === "archive" ? "Recently finished" : "For you"}
-                  </h2>
-                  <div className={listContainerClass}>
-                    {refreshing && filtered.length === 0
-                      ? renderSkeletons(density === "list" ? 6 : 3)
-                      : visible.map((g, i) => renderGame(g, i))}
-                    {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                    {!refreshing && filtered.length === 0 && (
-                      <EmptyState
-                        className={emptyColSpan}
-                        icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
-                        title={
-                          tab === "archive"
-                            ? "No finished games match your filters"
-                            : "No games match your filters"
-                        }
-                        description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
-                        action={
-                          <button
-                            onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                            className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                          >
-                            Clear filters
-                          </button>
-                        }
-                      />
-                    )}
-                  </div>
-                  <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-                </>
-              )}
-            </>
-          )}
-        </>
-      )}
+                <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+              </>
+            ) : (
+              <>
+                <div className={listContainerClass}>
+                  {refreshing && filtered.length === 0
+                    ? renderSkeletons(density === "list" ? 6 : 3)
+                    : visible.map((g, i) => renderGame(g, i))}
+                  {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+                  {!refreshing && filtered.length === 0 && (
+                    <EmptyState
+                      className={emptyColSpan}
+                      icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
+                      title={
+                        tab === "archive"
+                          ? "No finished games match your filters"
+                          : "No games match your filters"
+                      }
+                      description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                      action={
+                        <button
+                          onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                        >
+                          Clear filters
+                        </button>
+                      }
+                    />
+                  )}
+                </div>
+                <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+              </>
+            )}
+          </>
+        )}
+      </>
     </div>
   );
 }
