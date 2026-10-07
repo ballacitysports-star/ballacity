@@ -135,6 +135,7 @@ import {
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
@@ -2657,6 +2658,17 @@ function GameDetail() {
                 .filter((r) => r.status === "approved")
                 .filter((r) => (rosterHydrated ? liveIds.has(r.player_id) : true));
               const approvedIds = new Set(approvedReqs.map((r) => r.player_id));
+              // On a paid game a player isn't a participant until their payment
+              // is verified, so an approved-but-unpaid player is (correctly)
+              // missing from the live roster. Show them in their own group so
+              // the host can see who still owes the fee and nudge them, without
+              // counting them as confirmed.
+              const awaitingPaymentReqs =
+                isPaid && rosterHydrated
+                  ? hostRequests
+                      .filter((r) => r.status === "approved")
+                      .filter((r) => !liveIds.has(r.player_id))
+                  : [];
               // Realtime participants that aren't already surfaced via an
               // approved join request. Falls back to placeholder rows only
               // while hydrating and the cached count says there should be
@@ -2813,6 +2825,31 @@ function GameDetail() {
                       </>
                     )}
                   </div>
+
+                  {awaitingPaymentReqs.length > 0 && (
+                    <div className="mt-4">
+                      <h2 className="section-eyebrow text-amber-500 mb-2">
+                        Awaiting payment · {awaitingPaymentReqs.length}
+                      </h2>
+                      <p className="mb-2 text-[11px] text-muted-foreground">
+                        Approved, but their spot isn't locked until you confirm their payment.
+                      </p>
+                      <div className="space-y-2">
+                        {awaitingPaymentReqs.map((r) => (
+                          <RosterPlayerRow
+                            key={r.id}
+                            req={r}
+                            gameTitle={game.title}
+                            feeRequired={isPaid}
+                            fee={fee}
+                            holdMinutes={settings?.payment_hold_minutes ?? null}
+                            gameStartsAt={game.date}
+                            onOptimistic={applyOptimisticReview}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               );
             })()}
@@ -2943,6 +2980,10 @@ function GameDetail() {
                       >
                         <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
                       </Link>
+                      {/* Approved but not paid yet: a way out without opening the pay page. */}
+                      <div className="mt-1.5 text-center">
+                        <LeaveFlowButton gameId={game.id} gameTitle={game.title} variant="link" />
+                      </div>
                     </motion.div>
                   );
                 }

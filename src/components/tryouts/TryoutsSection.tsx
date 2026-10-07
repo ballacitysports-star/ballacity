@@ -15,6 +15,7 @@ import {
   getTryoutRsvpContext,
   rsvpTryout,
   cancelTryoutRsvp,
+  listMyTryoutRegistrations,
   listMyManagedTeams,
   type TryoutListing,
 } from "@/lib/tryouts.functions";
@@ -34,6 +35,7 @@ export function TryoutsSection() {
   const { data = [], isLoading } = useQuery({ queryKey: ["tryouts", "upcoming"], queryFn: () => list() });
   const [active, setActive] = useState<TryoutListing | null>(null);
   const [posting, setPosting] = useState(false);
+  const mine = useMyTryoutRegistrations();
 
   const requireAuth = (fn: () => void) =>
     user ? fn() : navigate({ to: "/auth", search: { next: "/#tryouts" } as any });
@@ -82,9 +84,15 @@ export function TryoutsSection() {
                   {t.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{t.location}</p>}
                   {left != null && <p className="flex items-center gap-2"><Users className="h-4 w-4" />{left === 0 ? "Full" : `${left} spots left`}</p>}
                 </div>
-                <Button className="mt-4 rounded-full" variant="secondary" disabled={left === 0} onClick={() => requireAuth(() => setActive(t))}>
-                  {left === 0 ? "Full" : "RSVP"}
-                </Button>
+                {mine.has(t.id) ? (
+                  <Button className="mt-4 rounded-full" variant="outline" onClick={() => requireAuth(() => setActive(t))}>
+                    Registered ✓ · Manage
+                  </Button>
+                ) : (
+                  <Button className="mt-4 rounded-full" variant="secondary" disabled={left === 0} onClick={() => requireAuth(() => setActive(t))}>
+                    {left === 0 ? "Full" : "RSVP"}
+                  </Button>
+                )}
               </li>
             );
           })}
@@ -95,6 +103,18 @@ export function TryoutsSection() {
       {posting && <PostTryoutDialog onClose={() => setPosting(false)} />}
     </section>
   );
+}
+
+/** Ids of the events the signed-in user (or a linked child) is registered for. */
+export function useMyTryoutRegistrations(): Set<string> {
+  const { user } = useAuth();
+  const fn = useServerFn(listMyTryoutRegistrations);
+  const { data } = useQuery({
+    queryKey: ["tryouts", "mine", user?.id ?? null],
+    queryFn: () => fn(),
+    enabled: !!user,
+  });
+  return new Set(data ?? []);
 }
 
 export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
@@ -108,6 +128,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const [who, setWho] = useState<string>("me");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const target = who === "me" ? user?.id : who;
   const onBehalf = who === "me" ? null : who;
@@ -117,6 +138,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ctxKey });
     qc.invalidateQueries({ queryKey: ["tryouts", "upcoming"] });
+    qc.invalidateQueries({ queryKey: ["tryouts", "mine"] });
   };
 
   const submit = async () => {
@@ -133,6 +155,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.success("Registration cancelled");
+    setConfirmingCancel(false);
     refresh();
   };
 
@@ -151,7 +174,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
             {ctx.children.length > 0 && (
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Who's attending?</label>
-                <select className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" value={who} onChange={(e) => { setWho(e.target.value); setAgree(false); }}>
+                <select className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" value={who} onChange={(e) => { setWho(e.target.value); setAgree(false); setConfirmingCancel(false); }}>
                   <option value="me">Me</option>
                   {ctx.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -160,7 +183,23 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
             {isRegistered ? (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-lime">Registered ✓</p>
-                <Button variant="outline" disabled={busy} onClick={doCancel}>Cancel registration</Button>
+                {confirmingCancel ? (
+                  <div className="space-y-3 rounded-lg border border-coral/40 bg-coral/10 p-3">
+                    <p className="text-sm">
+                      Cancel {onBehalf ? `${ctx.children.find((c) => c.id === onBehalf)?.name ?? "your child"}'s` : "your"} spot
+                      at {tryout.title}? {tryout.teamName} will be told and the spot opens up for someone else.
+                      {tryout.price ? " If you already paid the team, ask them about a refund." : ""}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(false)}>Keep my spot</Button>
+                      <Button variant="destructive" disabled={busy} onClick={doCancel}>
+                        {busy ? "Cancelling…" : "Yes, cancel"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(true)}>Cancel registration</Button>
+                )}
               </div>
             ) : (
               <>

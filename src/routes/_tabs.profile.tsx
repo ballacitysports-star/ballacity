@@ -33,11 +33,12 @@ import {
   listMyJoinRequests,
   listHostJoinRequests,
   cancelMyJoinRequest,
-  withdrawMyApprovedJoinRequest,
   reviewJoinRequest,
   type JoinRequest,
 } from "@/lib/payments";
-import { leaveGame } from "@/lib/games-store";
+import { withdrawFromGame } from "@/lib/leave-game";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { MySignups } from "@/components/profile/MySignups";
 import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -663,8 +664,7 @@ function PlayerProfile() {
                             const prev = myRequests;
                             setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
                             try {
-                              await withdrawMyApprovedJoinRequest(r.game_id);
-                              leaveGame(r.game_id);
+                              await withdrawFromGame(r.game_id, g.title);
                               toast("You withdrew from the game.");
                             } catch (e: any) {
                               setMyRequests(prev);
@@ -719,6 +719,11 @@ function PlayerProfile() {
           )}
         </section>
 
+        {/* Tryouts, camps and trainer sessions — cancellable from here */}
+        <div className={activeTab === "games" ? "" : "hidden"}>
+          <MySignups />
+        </div>
+
         {/* Pickup / Playing */}
         <section className={`mt-6 ${activeTab === "games" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -742,7 +747,15 @@ function PlayerProfile() {
               items={upcomingGroups.playing}
               pageSize={6}
               keyFor={(g) => g.id}
-              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderItem={(g, i) => (
+                <div>
+                  <GameCard game={g} index={i} />
+                  {/* Cancel / withdraw / leave, whichever fits where they are in the flow. */}
+                  <div className="mt-1.5 text-right">
+                    <LeaveFlowButton gameId={g.id} gameTitle={g.title} variant="link" />
+                  </div>
+                </div>
+              )}
               renderSkeleton={() => <GameCardSkeleton />}
               resetKey="playing"
             />

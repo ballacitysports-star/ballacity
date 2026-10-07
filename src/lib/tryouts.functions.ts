@@ -103,6 +103,90 @@ export const getTryoutRsvpContext = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Signed-in: ids of the tryouts/camps the caller, or a child they're linked to,
+ * is registered for. Lets the listing and event page show "Registered" and a
+ * way to cancel without opening the RSVP dialog first.
+ */
+export const listMyTryoutRegistrations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<string[]> => {
+    const sb = context.supabase;
+    const kids = await sb.rpc("guardian_children_overview");
+    const ids = [
+      context.userId,
+      ...((kids.data ?? []) as any[]).map((k) => k.child_user_id as string),
+    ];
+    const { data } = await sb
+      .from("tryout_rsvps")
+      .select("post_id")
+      .in("user_id", ids)
+      .eq("status", "registered");
+    return [...new Set((data ?? []).map((r) => r.post_id as string))];
+  });
+
+export type MyTryoutSignup = {
+  postId: string;
+  kind: "tryout" | "clinic";
+  title: string;
+  eventDate: string | null;
+  location: string | null;
+  price: number | null;
+  teamName: string;
+  /** Who is registered: the caller, or a child they're linked to. */
+  attendeeId: string;
+  attendeeName: string;
+  isChild: boolean;
+};
+
+/**
+ * Signed-in: upcoming tryouts/camps the caller, or a linked child, is
+ * registered for — enough to list them and cancel each one.
+ */
+export const listMyTryoutSignups = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MyTryoutSignup[]> => {
+    const sb = context.supabase;
+    const kids = await sb.rpc("guardian_children_overview");
+    const children = ((kids.data ?? []) as any[]).map((k) => ({
+      id: k.child_user_id as string,
+      name: (k.display_name as string | null) ?? "Child",
+    }));
+    const nameOf = new Map<string, string>([[context.userId, "You"], ...children.map((c) => [c.id, c.name] as [string, string])]);
+    const { data: rsvps } = await sb
+      .from("tryout_rsvps")
+      .select("post_id,user_id")
+      .in("user_id", [...nameOf.keys()])
+      .eq("status", "registered");
+    const rows = rsvps ?? [];
+    if (rows.length === 0) return [];
+    const { data: posts } = await publicClient()
+      .from("team_posts")
+      .select("id,kind,title,event_date,location,price,teams!inner(name)")
+      .in("id", [...new Set(rows.map((r) => r.post_id as string))])
+      .is("hidden_at", null)
+      .gte("event_date", new Date().toISOString());
+    const byId = new Map((posts ?? []).map((p: any) => [p.id as string, p]));
+    return rows
+      .filter((r) => byId.has(r.post_id as string))
+      .map((r) => {
+        const p: any = byId.get(r.post_id as string);
+        return {
+          postId: p.id,
+          kind: p.kind,
+          title: p.title,
+          eventDate: p.event_date,
+          location: p.location,
+          price: p.price,
+          teamName: p.teams?.name ?? "Team",
+          attendeeId: r.user_id as string,
+          attendeeName: nameOf.get(r.user_id as string) ?? "Player",
+          isChild: r.user_id !== context.userId,
+        };
+      })
+      .sort((a, b) => +new Date(a.eventDate ?? 0) - +new Date(b.eventDate ?? 0));
+  });
+
 const ERRORS: Record<string, string> = {
   TRYOUT_FULL: "This event is full.",
   ALREADY_REGISTERED: "Already registered.",

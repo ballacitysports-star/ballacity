@@ -140,11 +140,17 @@ export async function listMyTrainerRequests(
 }
 
 export async function cancelTrainerSessionRequest(id: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(TABLE as any)
     .update({ status: "cancelled" } as any)
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  // RLS filters rows the caller can't change instead of erroring, so an empty
+  // result means nothing was cancelled (already completed, or not theirs).
+  if (!data || data.length === 0) {
+    throw new Error("This session can't be cancelled anymore.");
+  }
 }
 
 export async function respondToTrainerSessionRequest(

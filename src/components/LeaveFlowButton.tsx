@@ -15,7 +15,7 @@ import {
 import { useMyFlowStatus, isUuid, type PlayerFlowStatus } from "@/lib/game-flow-status";
 import { cancelMyJoinRequest, withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
-import { supabase } from "@/integrations/supabase/client";
+import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
 
 export type LeaveFlowVariant = "link" | "danger";
 
@@ -77,22 +77,6 @@ const COPY: Record<
   },
 };
 
-async function clearPendingSubmissions(gameId: string) {
-  try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    await supabase
-      .from("payment_submissions")
-      .delete()
-      .eq("game_id", gameId)
-      .eq("player_id", uid)
-      .eq("status", "pending");
-  } catch {
-    /* best effort */
-  }
-}
-
 export function LeaveFlowButton({
   gameId,
   gameTitle,
@@ -126,9 +110,11 @@ export function LeaveFlowButton({
         await clearPendingSubmissions(gameId);
         await withdrawMyApprovedJoinRequest(gameId);
         leaveGame(gameId);
+        void notifyHostOfLeave(gameId, gameTitle);
       } else {
         await withdrawMyApprovedJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
+        void notifyHostOfLeave(gameId, gameTitle);
       }
       toast.success(copy.success);
       setOpen(false);
