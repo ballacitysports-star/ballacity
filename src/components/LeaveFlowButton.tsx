@@ -15,8 +15,7 @@ import {
 import { useMyFlowStatus, isUuid, type PlayerFlowStatus } from "@/lib/game-flow-status";
 import { cancelMyJoinRequest, withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
-import { supabase } from "@/integrations/supabase/client";
-import { createNotification } from "@/lib/notifications";
+import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
 
 export type LeaveFlowVariant = "link" | "danger";
 
@@ -77,51 +76,6 @@ const COPY: Record<
     error: "Could not leave the game.",
   },
 };
-
-async function clearPendingSubmissions(gameId: string) {
-  try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    await supabase
-      .from("payment_submissions")
-      .delete()
-      .eq("game_id", gameId)
-      .eq("player_id", uid)
-      .eq("status", "pending");
-  } catch {
-    /* best effort */
-  }
-}
-
-/**
- * Tell the host a player gave up an approved or confirmed spot, matching what
- * the game page's own leave path does. Best effort — never blocks the leave.
- */
-async function notifyHostOfLeave(gameId: string, fallbackTitle: string) {
-  try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid || !isUuid(gameId)) return;
-    const [{ data: game }, { data: me }] = await Promise.all([
-      supabase.from("hosted_games").select("host_id,title").eq("id", gameId).maybeSingle(),
-      supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle(),
-    ]);
-    const hostId = (game as { host_id?: string } | null)?.host_id;
-    if (!hostId || hostId === uid) return;
-    const title = (game as { title?: string } | null)?.title ?? fallbackTitle;
-    const who = (me as { display_name?: string } | null)?.display_name || "A player";
-    await createNotification({
-      user_id: hostId,
-      type: "participant_left",
-      title: `${who} left ${title}`,
-      body: "Their spot is open again.",
-      link: `/games/${gameId}`,
-    });
-  } catch {
-    /* best effort */
-  }
-}
 
 export function LeaveFlowButton({
   gameId,
