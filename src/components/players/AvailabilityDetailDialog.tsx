@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import {
   Calendar,
@@ -51,16 +52,12 @@ export function AvailabilityDetailDialog({
   const navigate = useNavigate();
   const when = formatAvailabilityWindow(a);
 
-  const handleMessage = async () => {
-    try {
-      const id = await getOrCreateDirectConversation(a.user_id);
-      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) {
-      toast.error(describeMessagingError(e));
-    }
-  };
+  const guardianFallback = useMessageOrGuardian();
+  const handleMessage = () => guardianFallback.startMessage(a.user_id, a.author_name);
 
   return (
+    <>
+    {guardianFallback.dialog}
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
@@ -179,5 +176,6 @@ export function AvailabilityDetailDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

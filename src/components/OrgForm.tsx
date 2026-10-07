@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, MapPin, Minus, Plus, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
@@ -9,13 +9,18 @@ import { HoursEditor } from "@/components/org/HoursEditor";
 import { PhotoGalleryEditor } from "@/components/org/PhotoGalleryEditor";
 import { ProfileStrengthMeter } from "@/components/org/ProfileStrengthMeter";
 import { ListingPreviewCard } from "@/components/org/ListingPreviewCard";
-import { detectTimezone, emptyHours, type OrgHours } from "@/lib/org-hours";
+import { detectTimezone, emptyHours, resolveOpenState, type OrgHours } from "@/lib/org-hours";
 import {
-  ORG_AMENITIES,
+  MAX_COURT_COUNT,
+  MAX_ORG_AMENITIES,
+  ORG_AMENITY_GROUPS,
   ORG_CATEGORIES,
+  courtCountFromAmenities,
   isValidPhone,
   scoreListing,
+  suggestHandle,
   websiteHref,
+  withCourtCount,
 } from "@/lib/org-listing";
 import { autocompletePlaces, getPlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 
@@ -33,6 +38,7 @@ export type OrgFormValue = {
   city: string;
   bio: string;
   website: string;
+  bookingUrl: string;
   address: string;
   placeId: string;
   geo: { lat: number; lng: number } | null;
@@ -54,6 +60,7 @@ export function emptyOrgForm(): OrgFormValue {
     city: "",
     bio: "",
     website: "",
+    bookingUrl: "",
     address: "",
     placeId: "",
     geo: null,
@@ -70,6 +77,25 @@ export function emptyOrgForm(): OrgFormValue {
 }
 
 const HANDLE_RE = /^[a-z0-9_-]{3,40}$/;
+
+function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function supportedTimezones(): string[] {
+  try {
+    const fn = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
+      .supportedValuesOf;
+    return fn ? fn("timeZone") : [];
+  } catch {
+    return [];
+  }
+}
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateOrgForm(v: OrgFormValue): string | null {
@@ -78,8 +104,13 @@ export function validateOrgForm(v: OrgFormValue): string | null {
     return "Handle must be 3–40 chars: a–z, 0–9, - or _.";
   if (v.website.trim() && !websiteHref(v.website))
     return "Enter a valid website (e.g. example.com).";
+  if (v.bookingUrl.trim() && !websiteHref(v.bookingUrl))
+    return "Enter a valid booking link (e.g. courtreserve.com/yourgym).";
   if (v.phone && !isValidPhone(v.phone)) return "Phone number looks invalid.";
   if (v.email && !EMAIL_RE.test(v.email.trim())) return "Email looks invalid.";
+  if (v.timezone.trim() && !isValidTimezone(v.timezone.trim()))
+    return "Timezone isn't recognized (e.g. America/New_York).";
+  if (v.amenities.length > MAX_ORG_AMENITIES) return `Pick at most ${MAX_ORG_AMENITIES} amenities.`;
   return null;
 }
 
@@ -139,6 +170,14 @@ export function OrgForm({
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
   const timerRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
+
+  const handleAutoRef = useRef(!value.handle);
+  const courtCount = courtCountFromAmenities(value.amenities);
+  const timezones = useMemo(() => supportedTimezones(), []);
+  const openNow = useMemo(
+    () => resolveOpenState(value.hours, value.timezone),
+    [value.hours, value.timezone],
+  );
 
   const strength = useMemo(
     () =>
@@ -213,7 +252,7 @@ export function OrgForm({
   };
 
   const handleNameChange = (v: string) => {
-    patch({ name: v });
+    patch(handleAutoRef.current ? { name: v, handle: suggestHandle(v) } : { name: v });
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => queryNameSuggestions(v), 250);
   };
@@ -224,6 +263,7 @@ export function OrgForm({
       name: s.primary,
       address: fallbackAddress,
       placeId: s.id,
+      ...(handleAutoRef.current ? { handle: suggestHandle(s.primary) } : {}),
     });
     setNameOpen(false);
     setNameSuggestions([]);
@@ -238,6 +278,7 @@ export function OrgForm({
           placeId: s.id,
           geo: { lat: d.lat, lng: d.lng },
           category: value.category || "Gym",
+          ...(handleAutoRef.current ? { handle: suggestHandle(s.primary) } : {}),
         });
       })
       .catch((e) => {
@@ -261,6 +302,8 @@ export function OrgForm({
         amenities: value.amenities,
         hours: value.hours,
         timezone: value.timezone,
+        geo: value.geo,
+        placeId: value.placeId,
       }}
       compact
     />
@@ -362,6 +405,14 @@ export function OrgForm({
               placeholder="Street address"
             />
           </label>
+          {!value.geo && (
+            <p className="flex items-start gap-1.5 rounded-xl border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime" />
+              {value.address
+                ? "Pick your address from the suggestions to pin it on the map — that's how players find and get directions to you."
+                : "Add your street address to pin the facility on the map."}
+            </p>
+          )}
           {value.geo && value.address && (
             <div className="overflow-hidden rounded-xl border border-border">
               <VenueMapPreview
@@ -374,81 +425,50 @@ export function OrgForm({
           )}
         </Section>
 
-        <Section id="org-contact" title="Contact">
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">Phone</span>
-            <input
-              value={value.phone}
-              onChange={(e) => patch({ phone: e.target.value })}
-              inputMode="tel"
-              placeholder="(555) 123-4567"
-              className={inputCls}
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">Public email</span>
-            <input
-              value={value.email}
-              onChange={(e) => patch({ email: e.target.value })}
-              inputMode="email"
-              placeholder="hello@yourgym.com"
-              className={inputCls}
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">Website</span>
-            <input
-              value={value.website}
-              onChange={(e) => patch({ website: e.target.value })}
-              placeholder="example.com"
-              className={inputCls}
-            />
-          </label>
-        </Section>
-
-        <Section id="org-hours" title="Hours">
+        <Section id="org-hours" title="Hours & status">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs">
+            <span className="font-semibold text-muted-foreground">Shows to visitors as</span>
+            <span
+              className={`rounded-full px-2 py-0.5 font-bold ${
+                openNow.status === "open"
+                  ? openNow.closingSoon
+                    ? "bg-amber-500/15 text-amber-500"
+                    : "bg-lime/15 text-lime"
+                  : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              {openNow.status === "open"
+                ? "Open now"
+                : openNow.status === "closed"
+                  ? "Closed"
+                  : "Hours not set"}
+            </span>
+            {openNow.status !== "unknown" && (
+              <span className="text-muted-foreground">
+                {openNow.label.replace(/^(Open|Closed) · /, "")}
+              </span>
+            )}
+          </div>
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">Timezone</span>
             <input
               value={value.timezone}
               onChange={(e) => patch({ timezone: e.target.value })}
+              list="org-timezones"
               placeholder="America/New_York"
               className={inputCls}
             />
+            <datalist id="org-timezones">
+              {timezones.map((tz) => (
+                <option key={tz} value={tz} />
+              ))}
+            </datalist>
           </label>
           <p className="text-[11px] text-muted-foreground">
-            Each day can have its own hours — set a different open and close time per day, or mark a
-            day closed or open 24 hours.
+            Pick a quick preset or set each day on its own — different open and close times per day,
+            closed, or open 24 hours. Open/closed updates live from these hours.
           </p>
           <HoursEditor value={value.hours} onChange={(h) => patch({ hours: h })} />
-        </Section>
-
-        <Section id="org-amenities" title="Amenities">
-          <div className="flex flex-wrap gap-1.5">
-            {ORG_AMENITIES.map((a) => {
-              const on = value.amenities.includes(a);
-              return (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() =>
-                    patch({
-                      amenities: on
-                        ? value.amenities.filter((x) => x !== a)
-                        : [...value.amenities, a],
-                    })
-                  }
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    on
-                      ? "bg-lime/15 text-lime border border-lime/40"
-                      : "border border-border text-muted-foreground"
-                  }`}
-                >
-                  {a}
-                </button>
-              );
-            })}
-          </div>
         </Section>
 
         <Section id="org-photos" title="Photos">
@@ -484,6 +504,121 @@ export function OrgForm({
           </div>
         </Section>
 
+        <Section id="org-amenities" title="Courts & amenities">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2">
+            <div>
+              <div className="text-sm font-semibold">Number of courts</div>
+              <div className="text-[11px] text-muted-foreground">
+                How many courts or fields players can use at once.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Fewer courts"
+                disabled={!courtCount}
+                onClick={() =>
+                  patch({ amenities: withCourtCount(value.amenities, (courtCount ?? 0) - 1) })
+                }
+                className="grid h-8 w-8 place-items-center rounded-full border border-border disabled:opacity-40"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <span className="w-8 text-center text-sm font-bold tabular-nums">
+                {courtCount ?? 0}
+              </span>
+              <button
+                type="button"
+                aria-label="More courts"
+                disabled={(courtCount ?? 0) >= MAX_COURT_COUNT}
+                onClick={() =>
+                  patch({ amenities: withCourtCount(value.amenities, (courtCount ?? 0) + 1) })
+                }
+                className="grid h-8 w-8 place-items-center rounded-full border border-border disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          {ORG_AMENITY_GROUPS.map((group) => (
+            <div key={group.id} className="space-y-1.5">
+              <div className="text-xs font-semibold text-muted-foreground">{group.label}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {group.items.map((a) => {
+                  const on = value.amenities.includes(a);
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        patch({
+                          amenities: on
+                            ? value.amenities.filter((x) => x !== a)
+                            : [...value.amenities, a],
+                        })
+                      }
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        on
+                          ? "bg-lime/15 text-lime border border-lime/40"
+                          : "border border-border text-muted-foreground"
+                      }`}
+                    >
+                      {a}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        <Section id="org-contact" title="Contact">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Phone</span>
+            <input
+              value={value.phone}
+              onChange={(e) => patch({ phone: e.target.value })}
+              inputMode="tel"
+              placeholder="(555) 123-4567"
+              className={inputCls}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Public email</span>
+            <input
+              value={value.email}
+              onChange={(e) => patch({ email: e.target.value })}
+              inputMode="email"
+              placeholder="hello@yourgym.com"
+              className={inputCls}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Website</span>
+            <input
+              value={value.website}
+              onChange={(e) => patch({ website: e.target.value })}
+              placeholder="example.com"
+              className={inputCls}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Booking URL</span>
+            <input
+              value={value.bookingUrl}
+              onChange={(e) => patch({ bookingUrl: e.target.value })}
+              placeholder="courtreserve.com/yourgym"
+              className={inputCls}
+            />
+            <span className="block text-[11px] text-muted-foreground">
+              Where players reserve a court (CourtReserve, Mindbody, your own page). &ldquo;Book
+              court&rdquo; opens it in a new tab. Leave it empty to receive court inquiries in
+              ballaCity instead — no fees either way.
+            </span>
+          </label>
+        </Section>
+
         <Section id="org-about" title="About">
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">Handle</span>
@@ -491,9 +626,10 @@ export function OrgForm({
               <span className="text-sm text-muted-foreground">@</span>
               <input
                 value={value.handle}
-                onChange={(e) =>
-                  patch({ handle: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "") })
-                }
+                onChange={(e) => {
+                  handleAutoRef.current = false;
+                  patch({ handle: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "") });
+                }}
                 placeholder="peakgym"
                 className="flex-1 bg-transparent py-2 text-sm outline-none"
               />

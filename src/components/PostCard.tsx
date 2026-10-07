@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { useNavigate } from "@tanstack/react-router";
 
 /**
  * Instagram-style feed card. Preserves every existing datum on OrgPost
@@ -39,6 +40,7 @@ export function PostCard({
   const fillPct = post.spots ? Math.round((post.spots.taken / post.spots.max) * 100) : 0;
   const spotsLeft = post.spots ? post.spots.max - post.spots.taken : 0;
 
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -207,7 +209,14 @@ export function PostCard({
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={stop}
+                onClick={(e) => {
+                  stop(e);
+                  if (post.kind === "tryout" || post.kind === "clinic") {
+                    navigate({ to: "/tryouts/$postId", params: { postId: post.id } });
+                  } else {
+                    onClick?.();
+                  }
+                }}
                 className="flex-1 rounded-lg bg-foreground py-2 text-sm font-semibold text-background"
               >
                 {post.kind === "tryout" ? "Apply" : "RSVP"}

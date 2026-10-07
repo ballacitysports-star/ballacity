@@ -21,9 +21,12 @@ import { ConsentTrail } from "@/components/child/ConsentTrail";
 import { AddMinorPanel } from "@/components/child/AddMinorPanel";
 import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
+import { GuardianApprovalsDashboard } from "@/components/child/GuardianApprovalsDashboard";
+import { GuardianProfileCard } from "@/components/child/GuardianProfileCard";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
+import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -243,6 +246,57 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             />
           </div>
         ))}
+        <div className="rounded-xl border border-border bg-background p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold">Public recruitment profile</span>
+            <Switch
+              checked={c.publicProfile}
+              onCheckedChange={(next) => {
+                if (
+                  next &&
+                  !window.confirm(
+                    "As this child's parent/guardian, you consent to showing their player card, stats and highlight videos publicly on the web. Exact location, birthdate and upcoming game venues stay private, and all inquiries come to you. You can turn this off anytime.",
+                  )
+                )
+                  return;
+                set({ public_profile: next });
+              }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Let coaches, recruiters and scouts view this athlete's player card, stats and
+            highlights. Exact location and birthdate stay private, and inquiries go to you — never
+            to your child.
+          </p>
+          <p className="mt-2 text-xs font-semibold">
+            Status:{" "}
+            <span className={c.publicProfile ? "text-lime" : "text-muted-foreground"}>
+              {c.publicProfile ? "Public on the web" : "Private"}
+            </span>
+          </p>
+          {c.publicProfile ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/player-card/$userId" params={{ userId: childUserId }}>
+                  View public card
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const url = `${window.location.origin}/player-card/${childUserId}`;
+                  navigator.clipboard
+                    .writeText(url)
+                    .then(() => toast.success("Link copied"))
+                    .catch(() => toast.error("Could not copy link"));
+                }}
+              >
+                Copy link
+              </Button>
+            </div>
+          ) : null}
+        </div>
         <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
           Overnight notifications are off by default: between midnight and 6am in their local time
           we hold push alerts until morning. The alert still appears in the app straight away.
@@ -373,16 +427,24 @@ function ParentCenterPage() {
 
   return (
     <main className="page-shell-content pt-6 pb-24">
-      <div className="flex items-center gap-2 text-primary">
-        <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="section-eyebrow">Parent Center</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-primary">
+          <ShieldCheck className="h-5 w-5" aria-hidden />
+          <span className="section-eyebrow">Parent Center</span>
+        </div>
+        <ProfileSwitcher />
       </div>
       <h1 className="mt-2 page-title">Your family</h1>
       <p className="mt-2 page-subtitle">
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>
+      <Link to="/guardian" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+        See your kids' teams and games → Guardian Dashboard
+      </Link>
 
+      <GuardianProfileCard />
+      <GuardianApprovalsDashboard />
       <FamilyApprovalsPanel />
 
       <section className="mt-5 rounded-2xl border border-primary/40 bg-primary/5 p-4">

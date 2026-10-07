@@ -4,15 +4,19 @@ import { motion } from "framer-motion";
 import { ShieldCheck, Star, Users } from "lucide-react";
 import type { Org } from "@/lib/sample-data";
 import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
+import { FacilityLink } from "@/components/venue/VenueBadge";
 
 export function OrgCard({
   org,
   index = 0,
   search,
+  facility,
 }: {
   org: Org;
   index?: number;
   search?: Record<string, unknown>;
+  /** The facility this trainer works at, when known. */
+  facility?: { id: string; name: string } | null;
 }) {
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => {
@@ -91,11 +95,21 @@ export function OrgCard({
 
           <p className="mt-2 text-sm text-foreground/85 line-clamp-2">{org.tagline}</p>
 
+          {org.kind === "coach" && facility && (
+            <div className="mt-2 flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 text-[11px] text-muted-foreground">Trains at</span>
+              <FacilityLink orgId={facility.id} name={facility.name} />
+            </div>
+          )}
+
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <Users className="h-3.5 w-3.5 text-lime" />
               {org.followers.toLocaleString()}
             </span>
+            {org.kind === "coach" && org.ratePerHour ? (
+              <span className="font-semibold text-foreground">${org.ratePerHour}/hr</span>
+            ) : null}
             {org.kind === "coach" && org.rating && (
               <span className="inline-flex items-center gap-1">
                 <Star className="h-3.5 w-3.5 text-coral" />

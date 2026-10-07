@@ -1,3 +1,4 @@
+import { VenueBadge } from "@/components/venue/VenueBadge";
 import { ageRequirementLabel } from "@/lib/game-age";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import type { CSSProperties } from "react";
@@ -19,6 +20,7 @@ import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { GameDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -33,6 +35,7 @@ const sportEmoji: Record<string, string> = {
 };
 
 export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
+  const { isParentMode } = useParentMode();
   const joinedByMe = useIsJoined(game.id);
   const liveCount = useLiveParticipantCount(game.id);
   const baseJoined = liveCount ?? game.joined;
@@ -187,6 +190,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
+          {game.orgId && (
+            <div className="flex min-w-0">
+              <VenueBadge orgId={game.orgId} />
+            </div>
+          )}
           {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
             <div className="flex flex-wrap gap-1">
               {Object.entries(game.positionsNeeded)
@@ -277,7 +285,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </div>
           </div>
           {!joinedByMe && <JoinBlockedReason gate={gate} waitlistHint />}
-          {!joinedByMe && flowStatus === "none" && gate.waitlistOpen && (
+          {!isParentMode && !joinedByMe && flowStatus === "none" && gate.waitlistOpen && (
             <button
               type="button"
               onClick={(e) => {

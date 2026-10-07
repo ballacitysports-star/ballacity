@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -56,6 +56,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validateVideoSize } from "@/lib/video-validation";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
@@ -64,6 +65,7 @@ import { getBillingEnvironment } from "@/lib/stripe";
 import { formatFullDay } from "@/lib/datetime";
 import { createPortalSession } from "@/utils/payments.functions";
 import { freeTierFor } from "@/lib/catalog";
+import type { AdvancedAnalytics } from "@/lib/reel-analytics";
 import {
   recapAttempt,
   recapProgress,
@@ -129,6 +131,7 @@ type Reel = {
     confidence?: string;
   } | null;
   ai_transcript?: { text?: string } | null;
+  ai_advanced_analytics?: AdvancedAnalytics | null;
   style_prefs?: Record<string, any> | null;
   hidden_at?: string | null;
 };
@@ -457,6 +460,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           editPlan={reel.ai_edit_plan ?? null}
           coaching={reel.ai_coaching ?? null}
           transcript={reel.ai_transcript?.text ?? null}
+          analytics={reel.ai_advanced_analytics ?? null}
+          title={reel.ai_title || reel.title}
         />
       )}
 
@@ -567,6 +572,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
 
 function ReelsPage() {
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
+  const navigate = useNavigate();
   const { can: canChildFeature } = useMyChildStatus();
   const uploadDecision = canChildFeature("video_upload");
   const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
@@ -605,6 +612,9 @@ function ReelsPage() {
   // game, otherwise the athlete's first profile sport.
   const { sports: profileSports, loaded: profileLoaded } = useDefaultSports();
   const [gameSport, setGameSport] = useState<string | null>(null);
+  useEffect(() => {
+    if (isParentMode) navigate({ to: "/highlights", replace: true });
+  }, [isParentMode, navigate]);
   useEffect(() => {
     if (!gameId) {
       setGameSport(null);

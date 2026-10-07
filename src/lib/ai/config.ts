@@ -66,6 +66,8 @@ export type AiProviderConfig = {
   provider: string;
   textModel: string;
   visionModel: string;
+  /** Multimodal model for the Pro Analytics synthesis (ratings, biomechanics, scout report). */
+  analyticsModel: string;
   audioModel: string;
   moderationTextModel: string;
   moderationImageModel: string;
@@ -181,6 +183,7 @@ export const DEFAULT_AI_PROVIDER: AiProviderConfig = {
   provider: "lovable",
   textModel: "google/gemini-3-flash-preview",
   visionModel: "google/gemini-3-flash-preview",
+  analyticsModel: "google/gemini-2.5-pro",
   audioModel: "google/gemini-3-flash-preview",
   moderationTextModel: "google/gemini-2.5-flash-lite",
   moderationImageModel: "google/gemini-2.5-flash-lite",
@@ -190,6 +193,7 @@ export const DEFAULT_AI_PROVIDER: AiProviderConfig = {
 export const DEFAULT_AI_PRICING: AiPricingConfig = {
   models: {
     "google/gemini-3-flash-preview": { inputCentsPerMTok: 30, outputCentsPerMTok: 250 },
+    "google/gemini-2.5-pro": { inputCentsPerMTok: 125, outputCentsPerMTok: 1000 },
     "google/gemini-2.5-flash-lite": { inputCentsPerMTok: 10, outputCentsPerMTok: 40 },
     "google/gemini-2.5-flash-image": { inputCentsPerMTok: 30, outputCentsPerMTok: 250 },
   },
@@ -280,6 +284,7 @@ export function parseAiProvider(raw: unknown): AiProviderConfig {
     provider: str("provider"),
     textModel: str("textModel"),
     visionModel: str("visionModel"),
+    analyticsModel: str("analyticsModel"),
     audioModel: str("audioModel"),
     moderationTextModel: str("moderationTextModel"),
     moderationImageModel: str("moderationImageModel"),

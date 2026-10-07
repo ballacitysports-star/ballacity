@@ -1,7 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, Shield, Clapperboard, Heart } from "lucide-react";
+import { Home, Users, Shield, Clapperboard, Heart, CalendarDays, ShieldCheck } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
-import { TABS } from "@/lib/navigation-gestures";
+import { tabsForMode } from "@/lib/navigation-gestures";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 type NavItem = {
   to: string;
@@ -24,20 +25,22 @@ const presentation: Record<string, Pick<NavItem, "icon" | "render">> = {
   "/teams": { icon: Shield },
   "/highlights": { icon: Clapperboard },
   "/notifications": { icon: Heart },
+  "/guardian": { icon: CalendarDays },
+  "/parent": { icon: ShieldCheck },
   "/profile": {
     render: (active) => <MyAvatar ringWhenActive active={active} />,
   },
 };
 
-const items: NavItem[] = TABS.map((tab) => ({
-  to: tab.to,
-  label: tab.label,
-  match: tab.match,
-  ...presentation[tab.to],
-}));
-
 export function BottomNav() {
   const { pathname } = useLocation();
+  const { isParentMode } = useParentMode();
+  const items: NavItem[] = tabsForMode(isParentMode).map((tab) => ({
+    to: tab.to,
+    label: tab.label,
+    match: tab.match,
+    ...presentation[tab.to],
+  }));
 
   const PUBLIC_PATHS = ["/auth", "/reset-password"];
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

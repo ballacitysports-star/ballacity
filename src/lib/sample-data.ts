@@ -103,6 +103,8 @@ export type Game = {
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
+  /** Posted by the facility's owner/admins (vs. a community run tagged there). */
+  orgOfficial?: boolean;
   /** Shared id linking sessions of one multi-day event. */
   seriesId?: string | null;
   /** Total sessions in the series (set when the feed collapses a series to one card). */
@@ -414,6 +416,8 @@ export type Org = {
   ratingMax?: string;
   distances?: string[];
   sessionTypes?: string[];
+  /** Age groups a coach works with (see `lib/age-groups`). Empty = not specified. */
+  ageGroups?: string[];
   /** IANA timezone the trainer's schedule is anchored to (e.g. "America/New_York"). */
   timezone?: string;
   availabilitySlots?: {

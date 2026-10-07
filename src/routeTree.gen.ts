@@ -15,6 +15,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
+import { Route as GuardianRouteImport } from './routes/guardian'
+import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -80,6 +82,7 @@ import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
+import { Route as TryoutsPostIdRouteImport } from './routes/tryouts.$postId'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
@@ -93,7 +96,14 @@ import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.membe
 import { Route as ParentConsentTokenRouteImport } from './routes/parent.consent.$token'
 import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
+import { Route as TeamsTeamIdEventsRouteImport } from './routes/teams.$teamId.events'
+import { Route as TeamsTeamIdInviteParentRouteImport } from './routes/teams.$teamId.invite-parent'
+import { Route as TeamsTeamIdInvitesRouteImport } from './routes/teams.$teamId.invites'
 import { Route as TeamsTeamIdManageRouteImport } from './routes/teams.$teamId.manage'
+import { Route as TeamsTeamIdRosterRouteImport } from './routes/teams.$teamId.roster'
+import { Route as TeamsTeamIdSeasonRouteImport } from './routes/teams.$teamId.season'
+import { Route as TeamsTeamIdTryoutsRouteImport } from './routes/teams.$teamId.tryouts'
+import { Route as TeamsTeamIdWaiverRouteImport } from './routes/teams.$teamId.waiver'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
@@ -130,6 +140,16 @@ const ContactRoute = ContactRouteImport.update({
 const CookiesRoute = CookiesRouteImport.update({
   id: '/cookies',
   path: '/cookies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuardianRoute = GuardianRouteImport.update({
+  id: '/guardian',
+  path: '/guardian',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HostRoute = HostRouteImport.update({
+  id: '/host',
+  path: '/host',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -460,6 +480,11 @@ const TrainersCreateRoute = TrainersCreateRouteImport.update({
   path: '/trainers/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TryoutsPostIdRoute = TryoutsPostIdRouteImport.update({
+  id: '/tryouts/$postId',
+  path: '/tryouts/$postId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -526,9 +551,44 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   path: '/teams/$teamId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdEventsRoute = TeamsTeamIdEventsRouteImport.update({
+  id: '/teams/$teamId/events',
+  path: '/teams/$teamId/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdInviteParentRoute = TeamsTeamIdInviteParentRouteImport.update({
+  id: '/teams/$teamId/invite-parent',
+  path: '/teams/$teamId/invite-parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdInvitesRoute = TeamsTeamIdInvitesRouteImport.update({
+  id: '/teams/$teamId/invites',
+  path: '/teams/$teamId/invites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsTeamIdManageRoute = TeamsTeamIdManageRouteImport.update({
   id: '/teams/$teamId/manage',
   path: '/teams/$teamId/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdRosterRoute = TeamsTeamIdRosterRouteImport.update({
+  id: '/teams/$teamId/roster',
+  path: '/teams/$teamId/roster',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdSeasonRoute = TeamsTeamIdSeasonRouteImport.update({
+  id: '/teams/$teamId/season',
+  path: '/teams/$teamId/season',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdTryoutsRoute = TeamsTeamIdTryoutsRouteImport.update({
+  id: '/teams/$teamId/tryouts',
+  path: '/teams/$teamId/tryouts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsTeamIdWaiverRoute = TeamsTeamIdWaiverRouteImport.update({
+  id: '/teams/$teamId/waiver',
+  path: '/teams/$teamId/waiver',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
@@ -581,6 +641,8 @@ export interface FileRoutesByFullPath {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -641,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
@@ -656,7 +719,14 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
+  '/teams/$teamId/invite-parent': typeof TeamsTeamIdInviteParentRoute
+  '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/roster': typeof TeamsTeamIdRosterRoute
+  '/teams/$teamId/season': typeof TeamsTeamIdSeasonRoute
+  '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -675,6 +745,8 @@ export interface FileRoutesByTo {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -734,6 +806,7 @@ export interface FileRoutesByTo {
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin': typeof AdminIndexRoute
   '/guide': typeof GuideIndexRoute
   '/messages': typeof MessagesIndexRoute
@@ -749,7 +822,14 @@ export interface FileRoutesByTo {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
+  '/teams/$teamId/invite-parent': typeof TeamsTeamIdInviteParentRoute
+  '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/roster': typeof TeamsTeamIdRosterRoute
+  '/teams/$teamId/season': typeof TeamsTeamIdSeasonRoute
+  '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
@@ -770,6 +850,8 @@ export interface FileRoutesById {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/guardian': typeof GuardianRoute
+  '/host': typeof HostRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -830,6 +912,7 @@ export interface FileRoutesById {
   '/safety_/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
@@ -845,7 +928,14 @@ export interface FileRoutesById {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/events': typeof TeamsTeamIdEventsRoute
+  '/teams/$teamId/invite-parent': typeof TeamsTeamIdInviteParentRoute
+  '/teams/$teamId/invites': typeof TeamsTeamIdInvitesRoute
   '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
+  '/teams/$teamId/roster': typeof TeamsTeamIdRosterRoute
+  '/teams/$teamId/season': typeof TeamsTeamIdSeasonRoute
+  '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
+  '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -866,6 +956,8 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -926,6 +1018,7 @@ export interface FileRouteTypes {
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin/'
     | '/guide/'
     | '/messages/'
@@ -941,7 +1034,14 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/events'
+    | '/teams/$teamId/invite-parent'
+    | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/roster'
+    | '/teams/$teamId/season'
+    | '/teams/$teamId/tryouts'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -960,6 +1060,8 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1019,6 +1121,7 @@ export interface FileRouteTypes {
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin'
     | '/guide'
     | '/messages'
@@ -1034,7 +1137,14 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/events'
+    | '/teams/$teamId/invite-parent'
+    | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/roster'
+    | '/teams/$teamId/season'
+    | '/teams/$teamId/tryouts'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
     | '/orgs/$orgId'
@@ -1054,6 +1164,8 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/guardian'
+    | '/host'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1114,6 +1226,7 @@ export interface FileRouteTypes {
     | '/safety_/children'
     | '/teams/create'
     | '/trainers/create'
+    | '/tryouts/$postId'
     | '/admin/'
     | '/guide/'
     | '/messages/'
@@ -1129,7 +1242,14 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/events'
+    | '/teams/$teamId/invite-parent'
+    | '/teams/$teamId/invites'
     | '/teams/$teamId/manage'
+    | '/teams/$teamId/roster'
+    | '/teams/$teamId/season'
+    | '/teams/$teamId/tryouts'
+    | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -1150,6 +1270,8 @@ export interface RootRouteChildren {
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
+  GuardianRoute: typeof GuardianRoute
+  HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1200,6 +1322,7 @@ export interface RootRouteChildren {
   SafetyChildrenRoute: typeof SafetyChildrenRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
+  TryoutsPostIdRoute: typeof TryoutsPostIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   GuideIndexRoute: typeof GuideIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
@@ -1213,7 +1336,14 @@ export interface RootRouteChildren {
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
   ParentConsentTokenRoute: typeof ParentConsentTokenRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
+  TeamsTeamIdEventsRoute: typeof TeamsTeamIdEventsRoute
+  TeamsTeamIdInviteParentRoute: typeof TeamsTeamIdInviteParentRoute
+  TeamsTeamIdInvitesRoute: typeof TeamsTeamIdInvitesRoute
   TeamsTeamIdManageRoute: typeof TeamsTeamIdManageRoute
+  TeamsTeamIdRosterRoute: typeof TeamsTeamIdRosterRoute
+  TeamsTeamIdSeasonRoute: typeof TeamsTeamIdSeasonRoute
+  TeamsTeamIdTryoutsRoute: typeof TeamsTeamIdTryoutsRoute
+  TeamsTeamIdWaiverRoute: typeof TeamsTeamIdWaiverRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
@@ -1268,6 +1398,20 @@ declare module '@tanstack/react-router' {
       path: '/cookies'
       fullPath: '/cookies'
       preLoaderRoute: typeof CookiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guardian': {
+      id: '/guardian'
+      path: '/guardian'
+      fullPath: '/guardian'
+      preLoaderRoute: typeof GuardianRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/host': {
+      id: '/host'
+      path: '/host'
+      fullPath: '/host'
+      preLoaderRoute: typeof HostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -1725,6 +1869,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainersCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tryouts/$postId': {
+      id: '/tryouts/$postId'
+      path: '/tryouts/$postId'
+      fullPath: '/tryouts/$postId'
+      preLoaderRoute: typeof TryoutsPostIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -1816,11 +1967,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId/events': {
+      id: '/teams/$teamId/events'
+      path: '/teams/$teamId/events'
+      fullPath: '/teams/$teamId/events'
+      preLoaderRoute: typeof TeamsTeamIdEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/invite-parent': {
+      id: '/teams/$teamId/invite-parent'
+      path: '/teams/$teamId/invite-parent'
+      fullPath: '/teams/$teamId/invite-parent'
+      preLoaderRoute: typeof TeamsTeamIdInviteParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/invites': {
+      id: '/teams/$teamId/invites'
+      path: '/teams/$teamId/invites'
+      fullPath: '/teams/$teamId/invites'
+      preLoaderRoute: typeof TeamsTeamIdInvitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/$teamId/manage': {
       id: '/teams/$teamId/manage'
       path: '/teams/$teamId/manage'
       fullPath: '/teams/$teamId/manage'
       preLoaderRoute: typeof TeamsTeamIdManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/roster': {
+      id: '/teams/$teamId/roster'
+      path: '/teams/$teamId/roster'
+      fullPath: '/teams/$teamId/roster'
+      preLoaderRoute: typeof TeamsTeamIdRosterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/season': {
+      id: '/teams/$teamId/season'
+      path: '/teams/$teamId/season'
+      fullPath: '/teams/$teamId/season'
+      preLoaderRoute: typeof TeamsTeamIdSeasonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/tryouts': {
+      id: '/teams/$teamId/tryouts'
+      path: '/teams/$teamId/tryouts'
+      fullPath: '/teams/$teamId/tryouts'
+      preLoaderRoute: typeof TeamsTeamIdTryoutsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/waiver': {
+      id: '/teams/$teamId/waiver'
+      path: '/teams/$teamId/waiver'
+      fullPath: '/teams/$teamId/waiver'
+      preLoaderRoute: typeof TeamsTeamIdWaiverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trainers/$trainerId/': {
@@ -1933,6 +2133,8 @@ const rootRouteChildren: RootRouteChildren = {
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
+  GuardianRoute: GuardianRoute,
+  HostRoute: HostRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
@@ -1984,6 +2186,7 @@ const rootRouteChildren: RootRouteChildren = {
   SafetyChildrenRoute: SafetyChildrenRoute,
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
+  TryoutsPostIdRoute: TryoutsPostIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   GuideIndexRoute: GuideIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
@@ -1997,7 +2200,14 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
   ParentConsentTokenRoute: ParentConsentTokenRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
+  TeamsTeamIdEventsRoute: TeamsTeamIdEventsRoute,
+  TeamsTeamIdInviteParentRoute: TeamsTeamIdInviteParentRoute,
+  TeamsTeamIdInvitesRoute: TeamsTeamIdInvitesRoute,
   TeamsTeamIdManageRoute: TeamsTeamIdManageRoute,
+  TeamsTeamIdRosterRoute: TeamsTeamIdRosterRoute,
+  TeamsTeamIdSeasonRoute: TeamsTeamIdSeasonRoute,
+  TeamsTeamIdTryoutsRoute: TeamsTeamIdTryoutsRoute,
+  TeamsTeamIdWaiverRoute: TeamsTeamIdWaiverRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,

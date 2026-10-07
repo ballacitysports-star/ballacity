@@ -44,6 +44,7 @@ import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
+import { ageGroupLabel, normalizeAgeGroups } from "@/lib/age-groups";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 export const Route = createFileRoute("/trainers/$trainerId/")({
@@ -144,6 +145,13 @@ function TrainerPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
+
+  // `?modal=book` (e.g. from the landing page's featured trainer) opens the
+  // booking sheet. Owners can't book themselves, so they just see their page.
+  const bookModal = search.modal === "book";
+  useEffect(() => {
+    if (mounted && bookModal && !canEdit) setBookOpen(true);
+  }, [mounted, bookModal, canEdit]);
 
   const qc = useQueryClient();
   const orgLinkQuery = useQuery({
@@ -424,6 +432,21 @@ function TrainerPage() {
                       className="rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
                     >
                       {s}
+                    </span>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {normalizeAgeGroups(org.ageGroups).length > 0 && (
+              <Section title="Coaches ages">
+                <div className="flex flex-wrap gap-2">
+                  {normalizeAgeGroups(org.ageGroups).map((id) => (
+                    <span
+                      key={id}
+                      className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                    >
+                      {ageGroupLabel(id)}
                     </span>
                   ))}
                 </div>
@@ -718,7 +741,10 @@ function TrainerPage() {
         open={bookOpen}
         onOpenChange={(v) => {
           setBookOpen(v);
-          if (!v) setBookPrefill(null);
+          if (!v) {
+            setBookPrefill(null);
+            if (bookModal) navigate({ to: ".", search: { ...search, modal: "" }, replace: true });
+          }
         }}
         prefill={bookPrefill}
       />

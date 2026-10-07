@@ -1,3 +1,4 @@
+import { VenueBadge } from "@/components/venue/VenueBadge";
 import { MediaImage } from "@/components/MediaImage";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
@@ -105,6 +106,11 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
               {joinedCount}/{game.maxPlayers}
             </span>
           </div>
+          {game.orgId && (
+            <div className="mt-1 flex min-w-0">
+              <VenueBadge orgId={game.orgId} />
+            </div>
+          )}
         </div>
 
         <span

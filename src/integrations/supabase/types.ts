@@ -525,6 +525,9 @@ export type Database = {
           messaging: string
           notification_curfew_lifted: boolean
           notifications: boolean
+          public_profile: boolean
+          public_profile_authorized_at: string | null
+          public_profile_authorized_by: string | null
           social_discovery: boolean
           updated_at: string
           updated_by: string | null
@@ -539,6 +542,9 @@ export type Database = {
           messaging?: string
           notification_curfew_lifted?: boolean
           notifications?: boolean
+          public_profile?: boolean
+          public_profile_authorized_at?: string | null
+          public_profile_authorized_by?: string | null
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -553,6 +559,9 @@ export type Database = {
           messaging?: string
           notification_curfew_lifted?: boolean
           notifications?: boolean
+          public_profile?: boolean
+          public_profile_authorized_at?: string | null
+          public_profile_authorized_by?: string | null
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -978,6 +987,7 @@ export type Database = {
       }
       highlight_reels: {
         Row: {
+          ai_advanced_analytics: Json | null
           ai_analysis: Json | null
           ai_caption: string | null
           ai_coaching: Json | null
@@ -1018,6 +1028,7 @@ export type Database = {
           video_path: string
         }
         Insert: {
+          ai_advanced_analytics?: Json | null
           ai_analysis?: Json | null
           ai_caption?: string | null
           ai_coaching?: Json | null
@@ -1058,6 +1069,7 @@ export type Database = {
           video_path: string
         }
         Update: {
+          ai_advanced_analytics?: Json | null
           ai_analysis?: Json | null
           ai_caption?: string | null
           ai_coaching?: Json | null
@@ -1141,6 +1153,27 @@ export type Database = {
         }
         Relationships: []
       }
+      host_paypal_accounts: {
+        Row: {
+          connected_at: string
+          email: string | null
+          host_id: string
+          merchant_id: string
+        }
+        Insert: {
+          connected_at?: string
+          email?: string | null
+          host_id: string
+          merchant_id: string
+        }
+        Update: {
+          connected_at?: string
+          email?: string | null
+          host_id?: string
+          merchant_id?: string
+        }
+        Relationships: []
+      }
       hosted_games: {
         Row: {
           all_day: boolean
@@ -1176,7 +1209,10 @@ export type Database = {
           min_age: number | null
           min_players: number
           neighborhood: string
+          org_hidden_at: string | null
+          org_hidden_by: string | null
           org_id: string | null
+          org_official: boolean
           positions_needed: Json
           price: number
           reminder_offsets: number[]
@@ -1227,7 +1263,10 @@ export type Database = {
           min_age?: number | null
           min_players?: number
           neighborhood?: string
+          org_hidden_at?: string | null
+          org_hidden_by?: string | null
           org_id?: string | null
+          org_official?: boolean
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -1278,7 +1317,10 @@ export type Database = {
           min_age?: number | null
           min_players?: number
           neighborhood?: string
+          org_hidden_at?: string | null
+          org_hidden_by?: string | null
           org_id?: string | null
+          org_official?: boolean
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -1374,6 +1416,8 @@ export type Database = {
           attempt_count: number
           created_at: string
           game_id: string
+          guardian_approved_at: string | null
+          guardian_approved_by: string | null
           host_id: string
           id: string
           idempotency_key: string
@@ -1388,6 +1432,8 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           game_id: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           host_id: string
           id?: string
           idempotency_key: string
@@ -1402,6 +1448,8 @@ export type Database = {
           attempt_count?: number
           created_at?: string
           game_id?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           host_id?: string
           id?: string
           idempotency_key?: string
@@ -1882,6 +1930,71 @@ export type Database = {
         }
         Relationships: []
       }
+      org_court_inquiries: {
+        Row: {
+          court_type: string
+          created_at: string
+          duration_min: number
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          player_count: number
+          requested_date: string
+          requester_id: string
+          sport: string
+          start_time: string | null
+          status: string
+          time_slot: string
+          updated_at: string
+        }
+        Insert: {
+          court_type?: string
+          created_at?: string
+          duration_min: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          player_count: number
+          requested_date: string
+          requester_id: string
+          sport: string
+          start_time?: string | null
+          status?: string
+          time_slot?: string
+          updated_at?: string
+        }
+        Update: {
+          court_type?: string
+          created_at?: string
+          duration_min?: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          player_count?: number
+          requested_date?: string
+          requester_id?: string
+          sport?: string
+          start_time?: string | null
+          status?: string
+          time_slot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_court_inquiries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_member_requests: {
         Row: {
           created_at: string
@@ -2259,6 +2372,56 @@ export type Database = {
           },
         ]
       }
+      paypal_orders: {
+        Row: {
+          amount_cents: number
+          capture_id: string | null
+          captured_at: string | null
+          created_at: string
+          currency: string
+          game_id: string
+          host_id: string
+          id: string
+          order_id: string
+          player_id: string
+          status: string
+        }
+        Insert: {
+          amount_cents: number
+          capture_id?: string | null
+          captured_at?: string | null
+          created_at?: string
+          currency?: string
+          game_id: string
+          host_id: string
+          id?: string
+          order_id: string
+          player_id: string
+          status?: string
+        }
+        Update: {
+          amount_cents?: number
+          capture_id?: string | null
+          captured_at?: string | null
+          created_at?: string
+          currency?: string
+          game_id?: string
+          host_id?: string
+          id?: string
+          order_id?: string
+          player_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paypal_orders_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_availabilities: {
         Row: {
           city: string | null
@@ -2537,6 +2700,9 @@ export type Database = {
           created_at: string
           default_profile_id: string | null
           display_name: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           graduating_class: number | null
           id: string
           jurisdiction: string
@@ -2567,6 +2733,9 @@ export type Database = {
           created_at?: string
           default_profile_id?: string | null
           display_name?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           graduating_class?: number | null
           id: string
           jurisdiction?: string
@@ -2597,6 +2766,9 @@ export type Database = {
           created_at?: string
           default_profile_id?: string | null
           display_name?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           graduating_class?: number | null
           id?: string
           jurisdiction?: string
@@ -2906,6 +3078,8 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          guardian_approved_at: string | null
+          guardian_approved_by: string | null
           id: string
           invited_by: string
           invitee_id: string
@@ -2919,6 +3093,8 @@ export type Database = {
         Insert: {
           created_at?: string
           expires_at?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           id?: string
           invited_by: string
           invitee_id: string
@@ -2932,6 +3108,8 @@ export type Database = {
         Update: {
           created_at?: string
           expires_at?: string
+          guardian_approved_at?: string | null
+          guardian_approved_by?: string | null
           id?: string
           invited_by?: string
           invitee_id?: string
@@ -3009,6 +3187,8 @@ export type Database = {
           pinned: boolean
           place_id: string | null
           price: number | null
+          share_notes: boolean
+          share_scores: boolean
           spots_max: number | null
           spots_taken: number
           team_id: string
@@ -3030,6 +3210,8 @@ export type Database = {
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          share_notes?: boolean
+          share_scores?: boolean
           spots_max?: number | null
           spots_taken?: number
           team_id: string
@@ -3051,6 +3233,8 @@ export type Database = {
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          share_notes?: boolean
+          share_scores?: boolean
           spots_max?: number | null
           spots_taken?: number
           team_id?: string
@@ -3067,10 +3251,141 @@ export type Database = {
           },
         ]
       }
+      team_roster_details: {
+        Row: {
+          birth_year: number | null
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          birth_year?: number | null
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          birth_year?: number | null
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_roster_details_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_waiver_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          signed_at: string
+          signed_by: string | null
+          signer_user_id: string
+          team_id: string
+          user_agent: string | null
+          waiver_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_user_id: string
+          team_id: string
+          user_agent?: string | null
+          waiver_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_user_id?: string
+          team_id?: string
+          user_agent?: string | null
+          waiver_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_waiver_signatures_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_waiver_signatures_waiver_id_fkey"
+            columns: ["waiver_id"]
+            isOneToOne: false
+            referencedRelation: "team_waivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_waivers: {
+        Row: {
+          archived_at: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          published: boolean
+          published_at: string | null
+          team_id: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          archived_at?: string | null
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          team_id: string
+          title?: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          archived_at?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          team_id?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_waivers_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           accent: string
           achievements: string[]
+          age_groups: string[]
           availability_overrides: Json
           availability_rules: Json
           availability_slots: Json
@@ -3122,6 +3437,7 @@ export type Database = {
         Insert: {
           accent?: string
           achievements?: string[]
+          age_groups?: string[]
           availability_overrides?: Json
           availability_rules?: Json
           availability_slots?: Json
@@ -3173,6 +3489,7 @@ export type Database = {
         Update: {
           accent?: string
           achievements?: string[]
+          age_groups?: string[]
           availability_overrides?: Json
           availability_rules?: Json
           availability_slots?: Json
@@ -3377,12 +3694,14 @@ export type Database = {
           avatar: string | null
           avatar_url: string | null
           bio: string | null
+          booking_url: string | null
           category: string | null
           city: string | null
           claimed_at: string | null
           cover_url: string | null
           created_at: string
           email: string | null
+          featured_at: string | null
           geo: Json | null
           handle: string
           hidden_at: string | null
@@ -3406,12 +3725,14 @@ export type Database = {
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          booking_url?: string | null
           category?: string | null
           city?: string | null
           claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           geo?: Json | null
           handle: string
           hidden_at?: string | null
@@ -3435,12 +3756,14 @@ export type Database = {
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          booking_url?: string | null
           category?: string | null
           city?: string | null
           claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           geo?: Json | null
           handle?: string
           hidden_at?: string | null
@@ -3512,6 +3835,102 @@ export type Database = {
             columns: ["trainer_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tryout_evaluations: {
+        Row: {
+          attended: boolean
+          notes: string | null
+          post_id: string
+          rsvp_id: string
+          score: number | null
+          team_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          attended?: boolean
+          notes?: string | null
+          post_id: string
+          rsvp_id: string
+          score?: number | null
+          team_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          attended?: boolean
+          notes?: string | null
+          post_id?: string
+          rsvp_id?: string
+          score?: number | null
+          team_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tryout_evaluations_rsvp_id_fkey"
+            columns: ["rsvp_id"]
+            isOneToOne: true
+            referencedRelation: "tryout_rsvps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tryout_rsvps: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          registered_by: string
+          status: string
+          team_id: string
+          user_id: string
+          waiver_signature_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          registered_by: string
+          status?: string
+          team_id: string
+          user_id: string
+          waiver_signature_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          registered_by?: string
+          status?: string
+          team_id?: string
+          user_id?: string
+          waiver_signature_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tryout_rsvps_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "team_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tryout_rsvps_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tryout_rsvps_waiver_signature_id_fkey"
+            columns: ["waiver_signature_id"]
+            isOneToOne: false
+            referencedRelation: "team_waiver_signatures"
             referencedColumns: ["id"]
           },
         ]
@@ -3714,6 +4133,10 @@ export type Database = {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
+      cancel_tryout_rsvp: {
+        Args: { _on_behalf_of?: string; _post_id: string }
+        Returns: undefined
+      }
       child_features_locked: { Args: { _user: string }; Returns: boolean }
       child_game_participation_allowed: {
         Args: { _user: string }
@@ -3834,6 +4257,12 @@ export type Database = {
           username: string
         }[]
       }
+      get_game_host_paypal: {
+        Args: { _game_id: string }
+        Returns: {
+          merchant_id: string
+        }[]
+      }
       get_host_payment_methods: {
         Args: { _host_id: string }
         Returns: {
@@ -3849,6 +4278,32 @@ export type Database = {
         }[]
       }
       get_my_birthday: { Args: never; Returns: string }
+      get_my_emergency_contact: {
+        Args: never
+        Returns: {
+          contact_name: string
+          contact_phone: string
+          relationship: string
+        }[]
+      }
+      get_tryout_waiver: {
+        Args: { _post_id: string }
+        Returns: {
+          content: string
+          id: string
+          team_id: string
+          title: string
+          version: string
+        }[]
+      }
+      guardian_approve_join_request: {
+        Args: { _approve?: boolean; _request: string }
+        Returns: undefined
+      }
+      guardian_approve_team_invite: {
+        Args: { _approve?: boolean; _invite: string }
+        Returns: undefined
+      }
       guardian_children_overview: {
         Args: never
         Returns: {
@@ -4126,6 +4581,7 @@ export type Database = {
           consent_recorded: boolean
         }[]
       }
+      public_minor_guardian: { Args: { _child: string }; Returns: string }
       public_privacy_flags: {
         Args: { _ids: string[] }
         Returns: {
@@ -4160,6 +4616,7 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      publish_team_waiver: { Args: { _id: string }; Returns: string }
       record_session_heartbeat: {
         Args: { _timezone?: string }
         Returns: string
@@ -4205,8 +4662,21 @@ export type Database = {
         Args: { _child: string; _reason: string }
         Returns: undefined
       }
+      rsvp_tryout: {
+        Args: {
+          _attested?: boolean
+          _on_behalf_of?: string
+          _post_id: string
+          _waiver_id?: string
+        }
+        Returns: string
+      }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
+        Returns: undefined
+      }
+      set_game_hidden_from_org: {
+        Args: { _game: string; _hidden: boolean }
         Returns: undefined
       }
       set_my_birthday: {
@@ -4223,6 +4693,15 @@ export type Database = {
         Returns: boolean
       }
       shares_team: { Args: { _a: string; _b: string }; Returns: boolean }
+      sign_team_waiver: {
+        Args: {
+          _attested?: boolean
+          _on_behalf_of?: string
+          _team_id: string
+          _waiver_id: string
+        }
+        Returns: string
+      }
       submit_listing_claim: {
         Args: {
           _evidence?: string

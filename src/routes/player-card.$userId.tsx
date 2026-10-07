@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Clapperboard, MapPin, BarChart3, ExternalLink } from "lucide-react";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -199,13 +200,25 @@ function PlayerCardPage() {
             )}
           </p>
           {p.bio && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{p.bio}</p>}
-          <Link
-            to="/players/$userId"
-            params={{ userId }}
-            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-lime px-4 py-2.5 text-sm font-bold text-background"
-          >
-            View full profile <ExternalLink className="h-4 w-4" />
-          </Link>
+          {p.isMinor ? (
+            <>
+              <span className="mt-2 inline-flex items-center rounded-full bg-lime/15 px-2.5 py-1 text-xs font-bold text-lime">
+                Guardian-authorized athlete
+              </span>
+              <ContactGuardianButton childId={userId} childName={p.displayName} />
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                Birthdate, exact location and upcoming venues are kept private.
+              </p>
+            </>
+          ) : (
+            <Link
+              to="/players/$userId"
+              params={{ userId }}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-lime px-4 py-2.5 text-sm font-bold text-background"
+            >
+              View full profile <ExternalLink className="h-4 w-4" />
+            </Link>
+          )}
         </div>
       </header>
 
@@ -333,13 +346,15 @@ function PlayerCardPage() {
             </div>
           </div>
         )}
-        <Link
-          to="/players/$userId"
-          params={{ userId }}
-          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold"
-        >
-          See {p.displayName}'s full profile
-        </Link>
+        {!p.isMinor && (
+          <Link
+            to="/players/$userId"
+            params={{ userId }}
+            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold"
+          >
+            See {p.displayName}'s full profile
+          </Link>
+        )}
       </section>
     </div>
   );
@@ -394,5 +409,52 @@ function EmptyBlock({ text }: { text: string }) {
     <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
       {text}
     </div>
+  );
+}
+
+function ContactGuardianButton({ childId, childName }: { childId: string; childName: string }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const onClick = async () => {
+    setBusy(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      const { data: guardianId, error } = await supabase.rpc("public_minor_guardian", {
+        _child: childId,
+      });
+      if (error || !guardianId) throw new Error("Guardian contact isn't available right now.");
+      const { getOrCreateDirectConversation, sendMessage } = await import("@/lib/messages");
+      const convoId = await getOrCreateDirectConversation(guardianId as string);
+      try {
+        await sendMessage(convoId, `Inquiry regarding ${childName}`);
+      } catch {
+        /* intro line is optional */
+      }
+      navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not contact guardian.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+      >
+        {busy ? "Opening…" : "Contact guardian"}
+      </button>
+      <p className="mt-1 text-center text-xs text-muted-foreground">
+        This athlete is a minor. Messages go to their parent/guardian. Sign-in required.
+      </p>
+    </>
   );
 }

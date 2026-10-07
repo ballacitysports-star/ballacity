@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, MapPin } from "lucide-
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { SESSION_TYPES } from "@/lib/sport-config";
+import { AgeGroupPicker } from "@/components/AgeGroupPicker";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
@@ -58,6 +59,7 @@ type Draft = {
   skillMin: number;
   skillMax: number;
   sessionTypes: string[];
+  ageGroups: string[];
   credentials: string[];
   venues: VenueEntry[];
   primaryVenueIdx: number;
@@ -121,6 +123,7 @@ function initialDraft(): Draft {
     skillMin: 1,
     skillMax: 3,
     sessionTypes: [],
+    ageGroups: [],
     credentials: [],
     venues: [],
     primaryVenueIdx: 0,
@@ -331,6 +334,7 @@ export function CreateTrainerWizard() {
     ratePerHour: draft.rate,
     skillRange: { min: draft.skillMin, max: draft.skillMax },
     sessionTypes: draft.sessionTypes,
+    ageGroups: draft.ageGroups,
     venueAddresses: verifiedVenueAddresses,
     verifiedVenues: verifiedVenueAddresses.map((a) => a.toLowerCase()),
     venueGeo: verifiedVenues
@@ -593,6 +597,13 @@ export function CreateTrainerWizard() {
                         : [...d.sessionTypes, v],
                     }))
                   }
+                />
+              </Section>
+
+              <Section title="Age groups you coach (optional)">
+                <AgeGroupPicker
+                  selected={draft.ageGroups}
+                  onChange={(next) => setDraft((d) => ({ ...d, ageGroups: next }))}
                 />
               </Section>
 

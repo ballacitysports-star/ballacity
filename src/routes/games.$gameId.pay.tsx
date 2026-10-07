@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
+import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
 import {
   type GamePaymentSettings,
@@ -27,6 +28,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
   paymentTypeMeta,
+  resolvePaymentDeepLink,
   getGamePaymentSettings,
   listPaymentMethodsForHost,
   uploadProofScreenshot,
@@ -46,6 +48,8 @@ import {
   type PaymentState,
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
+import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
+import { getPayPalCheckoutConfig } from "@/lib/paypal.functions";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -108,9 +112,19 @@ function markExternalPaymentOpened(gameId: string, methodId: string) {
   }
 }
 
-function launchExternalPayment(url: string) {
+function launchExternalPayment(url: string, copyText?: string | null) {
+  if (copyText && typeof navigator !== "undefined" && navigator.clipboard) {
+    void navigator.clipboard
+      .writeText(copyText)
+      .then(() => toast.success(`Copied ${copyText}`))
+      .catch(() => {});
+  }
   const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
   if (!externalWindow) window.location.assign(url);
+}
+
+function feeLabel(fee: number | null | undefined) {
+  return fee && fee > 0 ? `$${Number(fee).toFixed(2).replace(/\.00$/, "")}` : "";
 }
 
 export const Route = createFileRoute("/games/$gameId/pay")({
@@ -165,6 +179,7 @@ function PayPage() {
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const { isParentMode } = useParentMode();
   const userId = user?.id ?? null;
   const hasGame = !!game;
   // Live roster + spots — updates in real time as others join/leave while
@@ -179,6 +194,7 @@ function PayPage() {
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
@@ -218,6 +234,10 @@ function PayPage() {
   useEffect(() => {
     if (!loading && !userId) nav({ to: "/auth" });
   }, [loading, userId, nav]);
+
+  useEffect(() => {
+    if (isParentMode) nav({ to: "/guardian", replace: true });
+  }, [isParentMode, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
     if (!userId) return;
@@ -290,6 +310,16 @@ function PayPage() {
           setMethods(all);
         } else {
           setMethods([]);
+        }
+
+        // PayPal checkout config is optional; failure never blocks the pay UI.
+        try {
+          const cfg = await getPayPalCheckoutConfig({ data: { gameId } });
+          if (!cancelled && cfg.clientId && cfg.merchantId) {
+            setPaypalCfg({ clientId: cfg.clientId, merchantId: cfg.merchantId });
+          }
+        } catch {
+          /* PayPal not configured — one-tap buttons remain */
         }
 
         // Payment settings + host payment methods are the critical path for
@@ -647,7 +677,7 @@ function PayPage() {
             Retry
           </button>
         </div>
-      ) : !settings || methods.length === 0 ? (
+      ) : (!settings || methods.length === 0) && !paypalCfg ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -656,10 +686,28 @@ function PayPage() {
         </div>
       ) : !picked ? (
         <div>
-          <h2 className="text-sm font-semibold mb-2">How do you want to pay?</h2>
+          {paypalCfg && settings && (
+            <div className="mb-4">
+              <PayPalCheckoutButton
+                gameId={game.id}
+                clientId={paypalCfg.clientId}
+                merchantId={paypalCfg.merchantId}
+                feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+                onPaid={async () => {
+                  const subs = await listMySubmissionsForGame(game.id);
+                  setMySubs(subs);
+                }}
+              />
+            </div>
+          )}
+          <h2 className="text-sm font-semibold mb-2">
+            {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
+          </h2>
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
+              const fee = settings?.entry_fee ?? game.price;
+              const link = resolvePaymentDeepLink(m, fee, game.title);
               return (
                 <div
                   key={m.id}
@@ -679,19 +727,19 @@ function PayPage() {
                       </div>
                     </div>
                   </button>
-                  {m.payment_url ? (
+                  {link.url ? (
                     <button
                       type="button"
                       onClick={() => {
                         setPicked(m);
                         markExternalPaymentOpened(game.id, m.id);
-                        launchExternalPayment(m.payment_url as string);
+                        launchExternalPayment(link.url as string, link.copyText);
                       }}
                       className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Open ${meta.name} in a new tab`}
-                      aria-label={`Open ${meta.name} in a new tab to pay`}
+                      title={`Pay in ${meta.name}`}
+                      aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Open
+                      <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
                     </button>
                   ) : (
                     <button
@@ -714,9 +762,10 @@ function PayPage() {
         <PaymentInstructionsAndProof
           game_id={game.id}
           game_title={game.title}
-          host_id={settings.host_id}
+          fee={settings?.entry_fee ?? game.price}
+          host_id={settings!.host_id}
           method={picked}
-          extraInstructions={settings.payment_instructions}
+          extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             // Do NOT join the roster yet — player is only added after the
@@ -1119,6 +1168,7 @@ function PaymentReportLink({ hostId, gameId }: { hostId: string; gameId: string 
 function PaymentInstructionsAndProof({
   game_id,
   game_title,
+  fee,
   host_id,
   method,
   extraInstructions,
@@ -1127,6 +1177,7 @@ function PaymentInstructionsAndProof({
 }: {
   game_id: string;
   game_title: string;
+  fee?: number | null;
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
@@ -1145,7 +1196,8 @@ function PaymentInstructionsAndProof({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
-  const [paidAmount, setPaidAmount] = useState("");
+  const [paidAmount, setPaidAmount] = useState(() => (fee && fee > 0 ? String(fee) : ""));
+  const deepLink = resolvePaymentDeepLink(method, fee, game_title);
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1178,7 +1230,7 @@ function PaymentInstructionsAndProof({
   const handleOpenExternal = () => {
     setOpened(true);
     markExternalPaymentOpened(game_id, method.id);
-    if (method.payment_url) launchExternalPayment(method.payment_url);
+    if (deepLink.url) launchExternalPayment(deepLink.url, deepLink.copyText);
     // Give the new tab a beat to open, then scroll the proof form into view
     // so the user sees the return steps as soon as they come back.
     window.setTimeout(resumeAtProof, 300);
@@ -1347,6 +1399,23 @@ function PaymentInstructionsAndProof({
         notes: parsed.data.notes || null,
       });
       toast.success("Submitted — host will verify shortly.");
+      // Alert the host (in-app + push, and email) without blocking the player.
+      void (async () => {
+        try {
+          const { createNotification } = await import("@/lib/notifications");
+          await createNotification({
+            user_id: host_id,
+            type: "payment_submitted",
+            title: "Payment proof to review",
+            body: `$${parsed.data.paidAmount} via ${meta.name} for ${game_title}`,
+            link: `/games/${game_id}`,
+          });
+          const { emailHostPaymentSubmitted } = await import("@/lib/payment-alerts.functions");
+          await emailHostPaymentSubmitted({ data: { gameId: game_id } });
+        } catch (e) {
+          console.warn("host payment alert failed", e);
+        }
+      })();
       try {
         window.sessionStorage.removeItem(resumeKey);
       } catch {
@@ -1382,14 +1451,14 @@ function PaymentInstructionsAndProof({
         </div>
         {method.username && <Field label="Send to" value={method.username} />}
         {method.contact_info && <Field label="Contact" value={method.contact_info} />}
-        {method.payment_url && (
+        {deepLink.url && (
           <button
             type="button"
             onClick={handleOpenExternal}
             aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
+            <ExternalLink className="h-4 w-4" /> Pay {feeLabel(fee)} in {meta.name}
           </button>
         )}
         {(method.instructions || extraInstructions) && (
@@ -1404,7 +1473,7 @@ function PaymentInstructionsAndProof({
             How to pay
           </div>
           <ol className="list-decimal pl-4 space-y-1 text-foreground/90">
-            {method.payment_url ? (
+            {deepLink.url ? (
               <li>
                 Tap <span className="font-semibold">Open {meta.name} to pay</span> above — it opens
                 in a new tab.

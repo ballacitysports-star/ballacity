@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, Loader2, Plus, Users } from "lucide-react";
+import { Building2, Loader2, Plus, Star, Users } from "lucide-react";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +29,9 @@ import {
   listUnclaimedListings,
   createUnclaimedListing,
   listPendingClaims,
+  listFeaturableOrgs,
   reviewClaim,
+  setOrgFeatured,
   type ListingSubjectType,
 } from "@/lib/listings.functions";
 
@@ -103,6 +105,9 @@ function ListingsPage() {
             <TabsTrigger value="unclaimed" className="flex-1">
               Unclaimed
             </TabsTrigger>
+            <TabsTrigger value="featured" className="flex-1">
+              Featured
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="queue" className="mt-4">
             <ClaimsQueue />
@@ -112,6 +117,9 @@ function ListingsPage() {
           </TabsContent>
           <TabsContent value="unclaimed" className="mt-4">
             <UnclaimedList />
+          </TabsContent>
+          <TabsContent value="featured" className="mt-4">
+            <FeaturedGyms />
           </TabsContent>
         </Tabs>
       </div>
@@ -462,6 +470,73 @@ function UnclaimedList() {
             </CardContent>
           </Card>
         ))
+      )}
+    </div>
+  );
+}
+
+function FeaturedGyms() {
+  const qc = useQueryClient();
+  const list = useServerFn(listFeaturableOrgs);
+  const setFeatured = useServerFn(setOrgFeatured);
+  const [search, setSearch] = useState("");
+  const { data, isLoading } = useQuery({
+    queryKey: ["featurable-orgs", search],
+    queryFn: () => list({ data: { search: search || undefined } }),
+  });
+  const toggle = useMutation({
+    mutationFn: (v: { orgId: string; featured: boolean }) => setFeatured({ data: v }),
+    onSuccess: (_r, v) => {
+      toast.success(v.featured ? "Featured" : "Removed from featured");
+      qc.invalidateQueries({ queryKey: ["featurable-orgs"] });
+      qc.invalidateQueries({ queryKey: ["orgs-index"] });
+    },
+    onError: (e) => toast.error(listingErrorMessage(e)),
+  });
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Featured gyms show first in the gyms directory with a Featured badge.{" "}
+        {data ? `${data.featuredCount} of ${data.max} featured.` : null}
+      </p>
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name, handle or city"
+      />
+      {isLoading ? (
+        <Loading />
+      ) : !data?.orgs.length ? (
+        <Empty>No gyms found.</Empty>
+      ) : (
+        data.orgs.map((o) => {
+          const on = !!o.featuredAt;
+          return (
+            <Card key={o.id}>
+              <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate font-semibold">{o.name}</span>
+                    {on && <Badge className="shrink-0">Featured</Badge>}
+                  </div>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">
+                    {[`@${o.handle}`, o.city].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={on ? "secondary" : "default"}
+                  disabled={toggle.isPending}
+                  onClick={() => toggle.mutate({ orgId: o.id, featured: !on })}
+                >
+                  <Star className="mr-1 h-3.5 w-3.5" /> {on ? "Unfeature" : "Feature"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })
       )}
     </div>
   );

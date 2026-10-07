@@ -8,10 +8,14 @@ import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import {
   type PaymentMethod,
+  type HostPayPalAccount,
   paymentTypeMeta,
   listMyPaymentMethods,
   getMyGamePaymentSettings,
   upsertGamePaymentSettings,
+  getMyPayPalAccount,
+  saveMyPayPalAccount,
+  disconnectMyPayPalAccount,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -64,6 +68,10 @@ function SetupPage() {
   const [instructions, setInstructions] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [paypal, setPaypal] = useState<HostPayPalAccount | null>(null);
+  const [paypalMerchantId, setPaypalMerchantId] = useState("");
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalSaving, setPaypalSaving] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -72,7 +80,16 @@ function SetupPage() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [m, s] = await Promise.all([listMyPaymentMethods(), getMyGamePaymentSettings(game.id)]);
+      const [m, s, pp] = await Promise.all([
+        listMyPaymentMethods(),
+        getMyGamePaymentSettings(game.id),
+        getMyPayPalAccount(),
+      ]);
+      if (pp) {
+        setPaypal(pp);
+        setPaypalMerchantId(pp.merchant_id);
+        setPaypalEmail(pp.email ?? "");
+      }
       setMethods(m.filter((x) => x.is_enabled));
       if (s) {
         setFee(String(s.entry_fee));
@@ -125,6 +142,89 @@ function SetupPage() {
           <div className="text-xs text-muted-foreground">{game.title}</div>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+        <div>
+          <div className="text-sm font-semibold">PayPal checkout (in-app)</div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Let players pay inside BallaCity — money goes straight to your PayPal account and
+            they're marked paid automatically. Find your Merchant ID in PayPal → Account settings →
+            Business information.
+          </p>
+        </div>
+        {paypal ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold flex items-center gap-1.5">
+                <Check className="h-4 w-4 text-lime" /> Connected
+              </div>
+              <div className="text-xs text-muted-foreground truncate">
+                Merchant {paypal.merchant_id}
+                {paypal.email ? ` · ${paypal.email}` : ""}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={paypalSaving}
+              onClick={async () => {
+                setPaypalSaving(true);
+                try {
+                  await disconnectMyPayPalAccount();
+                  setPaypal(null);
+                  setPaypalMerchantId("");
+                  setPaypalEmail("");
+                  toast.success("PayPal disconnected");
+                } catch (e: any) {
+                  toast.error(e.message);
+                } finally {
+                  setPaypalSaving(false);
+                }
+              }}
+              className="text-xs font-semibold text-coral"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <input
+              value={paypalMerchantId}
+              onChange={(e) => setPaypalMerchantId(e.target.value)}
+              placeholder="PayPal Merchant ID (e.g. ABC123DEF456G)"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              maxLength={64}
+            />
+            <input
+              value={paypalEmail}
+              onChange={(e) => setPaypalEmail(e.target.value)}
+              placeholder="PayPal account email (optional)"
+              type="email"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              maxLength={200}
+            />
+            <button
+              type="button"
+              disabled={paypalSaving || !paypalMerchantId.trim()}
+              onClick={async () => {
+                setPaypalSaving(true);
+                try {
+                  await saveMyPayPalAccount(paypalMerchantId, paypalEmail);
+                  const saved = await getMyPayPalAccount();
+                  setPaypal(saved);
+                  toast.success("PayPal connected — players can now pay in-app");
+                } catch (e: any) {
+                  toast.error(e.message);
+                } finally {
+                  setPaypalSaving(false);
+                }
+              }}
+              className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {paypalSaving ? "Connecting…" : "Connect PayPal"}
+            </button>
+          </div>
+        )}
+      </section>
 
       <section>
         <Label>Entry fee</Label>

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
 import { kmToMi, formatDistance } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
@@ -210,6 +212,7 @@ function PlayerProfilePage() {
   const [shareOpen, setShareOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
+  const guardianFallback = useMessageOrGuardian();
   const unit = useDistanceUnit();
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
@@ -266,10 +269,7 @@ function PlayerProfilePage() {
     }
     setOpening(true);
     try {
-      const id = await getOrCreateDirectConversation(userId);
-      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) {
-      toast.error(describeMessagingError(e));
+      await guardianFallback.startMessage(userId, profile?.display_name ?? "this player");
     } finally {
       setOpening(false);
     }
@@ -336,6 +336,7 @@ function PlayerProfilePage() {
 
   return (
     <div className="page-shell-flush pb-28">
+      {guardianFallback.dialog}
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
         bannerOverlay={
@@ -570,6 +571,8 @@ function PlayerProfilePage() {
 
         <PlayerOrgsSection userId={userId} />
 
+        <PlayerPassportSection userId={userId} enabled={!!user} />
+
         <PublicReelsSection userId={userId} />
 
         {/* Open availability */}
@@ -788,9 +791,7 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
             <Building2 className="h-3.5 w-3.5" />
             <span className="truncate max-w-[160px]">{o.name}</span>
             {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="micro-label text-muted-foreground">
-              {r.role}
-            </span>
+            <span className="micro-label text-muted-foreground">{r.role}</span>
           </Link>
         );
       })}

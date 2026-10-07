@@ -44,6 +44,7 @@ import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
+import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -126,6 +127,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "theme-color", content: "#0B0F17" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "BallaCity" },
     ],
     scripts: [
       {
@@ -147,6 +153,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -441,6 +449,8 @@ const PUBLIC_ROUTES = [
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
+  // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
+  "/tryouts",
 ];
 const TAB_PATHS = [
   "/feed",
@@ -909,6 +919,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <ManagedSessionBanner />
       {children}
       <BottomNav />
+      <PwaInstallPrompt />
     </>
   );
 }

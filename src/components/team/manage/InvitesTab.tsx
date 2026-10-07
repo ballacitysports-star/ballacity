@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Clock, Loader2, Mail, UserPlus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Clock, Loader2, Mail, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -27,9 +28,16 @@ export function InvitesTab({ teamId, teamName }: { teamId: string; teamName: str
         <h2 className="inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
           <Mail className="h-4 w-4" /> Pending · {rows.length}
         </h2>
-        <Button size="sm" onClick={() => setInviteOpen(true)}>
-          <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Invite
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/players">
+              <Search className="mr-1.5 h-3.5 w-3.5" /> Find available players
+            </Link>
+          </Button>
+          <Button size="sm" onClick={() => setInviteOpen(true)}>
+            <UserPlus className="mr-1.5 h-3.5 w-3.5" /> Invite
+          </Button>
+        </div>
       </div>
 
       {invites.isLoading && (

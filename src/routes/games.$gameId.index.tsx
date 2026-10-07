@@ -1,8 +1,14 @@
+import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
+import { Navigation } from "lucide-react";
+import { OpenInMaps } from "@/components/OpenInMaps";
+import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
+import { trackEvent } from "@/lib/analytics";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -157,6 +163,7 @@ import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -294,6 +301,9 @@ function formatCooldownLabel(ms: number): string {
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
+  useEffect(() => {
+    trackEvent("view_game", { game_id: gameId });
+  }, [gameId]);
   const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
   const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
 
@@ -326,6 +336,7 @@ function GameDetail() {
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
   const myProfile = useMyProfile(user);
   const { can: canChildFeature } = useMyChildStatus();
   const participationDecision = canChildFeature("game_participation");
@@ -1634,14 +1645,18 @@ function GameDetail() {
                     {myReq.status === "pending"
                       ? "Waiting for host approval"
                       : myReq.status === "approved"
-                        ? "You're approved — see you there!"
+                        ? isPaid && !isPaymentVerified
+                          ? "Approved — payment due"
+                          : "You're approved — see you there!"
                         : "Request declined"}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {myReq.status === "pending"
                       ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
                       : myReq.status === "approved"
-                        ? "The host approved your request. You're on the roster."
+                        ? isPaid && !isPaymentVerified
+                          ? `Payment due: pay $${fee} to the host to lock in your spot. You'll be added to the roster once it's confirmed.`
+                          : "The host approved your request. You're on the roster."
                         : capReached
                           ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
                           : cooldownMs > 0
@@ -1775,12 +1790,22 @@ function GameDetail() {
               <MapPin className="h-5 w-5" />
             </div>
           </div>
-          <div className="p-4">
-            <div className="font-semibold">{game.location}</div>
-            <div className="text-sm text-muted-foreground">
-              {game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}
+          <OpenInMaps address={[game.location, game.neighborhood].filter(Boolean).join(", ")}>
+            <div className="flex items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold underline-offset-2 hover:underline">
+                  {game.location}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}
+                </div>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-semibold text-lime">
+                <Navigation className="h-3.5 w-3.5" /> Directions
+              </span>
             </div>
-          </div>
+          </OpenInMaps>
+          <VenueHostedAt orgId={game.orgId} />
         </div>
 
         {/* Host */}
@@ -2005,6 +2030,7 @@ function GameDetail() {
                 const posWaitlist = waitlistEntries.filter((w) => w.position === name);
                 const viewerOnWaitlist = !!user && posWaitlist.some((w) => w.userId === user.id);
                 const canJoinAs =
+                  !isParentMode &&
                   !isFull &&
                   !isHost &&
                   !isConfirmed &&
@@ -2016,6 +2042,7 @@ function GameDetail() {
                   spotsLeft > 0 &&
                   !!user;
                 const canWaitlist =
+                  !isParentMode &&
                   (isFull || viewerGate.waitlistOpen) &&
                   !isHost &&
                   !isConfirmed &&
@@ -2367,6 +2394,7 @@ function GameDetail() {
                 : "Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved."}
             </p>
           )}
+          <RosterRecruitPanel roster={liveRoster} meId={meId} />
         </div>
       </div>
 
@@ -2375,6 +2403,21 @@ function GameDetail() {
         <div
           className={`page-shell mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
         >
+          {!game.cancelledAt &&
+            game.status !== "cancelled" &&
+            !game.completedAt &&
+            Math.abs(new Date(game.date).getTime() - Date.now()) < 24 * 60 * 60 * 1000 && (
+              <GameDayActionSheet
+                gameId={game.id}
+                gameTitle={game.title}
+                startsAt={game.date}
+                isPaid={isPaid}
+                hostId={user?.id ?? ""}
+                roster={liveRoster}
+                busyId={attendanceBusy}
+                onMarkAttendance={(id, v) => void handleAttendance(id, v)}
+              />
+            )}
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
@@ -2739,7 +2782,7 @@ function GameDetail() {
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto w-[min(100%,28rem)]">
-          {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
+          {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
           )}
           {ageNotice && !isConfirmed && !isApproved && (
@@ -2793,7 +2836,7 @@ function GameDetail() {
             >
               <MessageCircle className="h-5 w-5" />
             </button>
-            {!isHost &&
+            {!isParentMode && !isHost &&
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
@@ -4531,18 +4574,7 @@ function HostRequestRow({
     const rollback = onOptimistic(req.id, status);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await createNotification({
-        user_id: req.player_id,
-        type: status === "approved" ? "join_approved" : "join_declined",
-        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
-        body:
-          status === "approved"
-            ? "The host approved your request."
-            : reason
-              ? `The host declined your request: ${reason}`
-              : "The host declined your request.",
-        link: `/games/${req.game_id}`,
-      });
+      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
       toast.success(status === "approved" ? "Approved" : "Declined");
     } catch (e: any) {
       rollback();
@@ -4672,18 +4704,7 @@ function HostPendingChip({
     setOpen(false);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await createNotification({
-        user_id: req.player_id,
-        type: status === "approved" ? "join_approved" : "join_declined",
-        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
-        body:
-          status === "approved"
-            ? "The host approved your request."
-            : reason
-              ? `The host declined your request: ${reason}`
-              : "The host declined your request.",
-        link: `/games/${req.game_id}`,
-      });
+      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
     } catch (e: any) {
       rollback();
@@ -4790,4 +4811,36 @@ function HostPendingChip({
       )}
     </div>
   );
+}
+
+async function notifyJoinReview(
+  playerId: string,
+  gameId: string,
+  gameTitle: string,
+  status: "approved" | "rejected",
+  reason?: string | null,
+) {
+  let fee = 0;
+  if (status === "approved") {
+    const { data } = await supabase.from("hosted_games").select("price").eq("id", gameId).maybeSingle();
+    fee = Number(data?.price ?? 0);
+  }
+  const paid = status === "approved" && fee > 0;
+  await createNotification({
+    user_id: playerId,
+    type: status === "approved" ? "join_approved" : "join_declined",
+    title: paid
+      ? `Request approved — payment due for ${gameTitle}`
+      : status === "approved"
+        ? `You're in: ${gameTitle}`
+        : `Request declined: ${gameTitle}`,
+    body: paid
+      ? `Pay $${fee} to the host to secure your spot. You'll be added to the roster once payment is confirmed.`
+      : status === "approved"
+        ? "The host approved your request."
+        : reason
+          ? `The host declined your request: ${reason}`
+          : "The host declined your request.",
+    link: paid ? `/games/${gameId}/pay` : `/games/${gameId}`,
+  });
 }

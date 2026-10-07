@@ -5,10 +5,13 @@
  * - "Play the AI edit": the planned cut list rendered live in the player
  *   (segment-by-segment with per-segment pacing) — no video re-encoding
  * - Coaching report (strengths / fix / drills) and the spoken transcript
+ * - Pro analytics: ratings, tap-to-seek biomechanics cues, style comps, scout card
  */
 
 import { useEffect, useRef, useState } from "react";
 import { Film, ListVideo, MessageSquareQuote, Pause, Play, Dumbbell } from "lucide-react";
+import type { AdvancedAnalytics } from "@/lib/reel-analytics";
+import { ReelProAnalytics } from "./ReelProAnalytics";
 
 export type TimelineEntry = { t: number; label: string; note?: string };
 export type EditSegment = { start: number; end: number; pace?: string; why?: string };
@@ -33,12 +36,16 @@ export function ReelStudio({
   editPlan,
   coaching,
   transcript,
+  analytics,
+  title = "My highlight",
 }: {
   videoUrl: string;
   timeline?: TimelineEntry[];
   editPlan?: EditPlan | null;
   coaching?: Coaching | null;
   transcript?: string | null;
+  analytics?: AdvancedAnalytics | null;
+  title?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [segIndex, setSegIndex] = useState<number | null>(null);
@@ -101,6 +108,8 @@ export function ReelStudio({
         preload="metadata"
         className="w-full rounded-lg bg-black"
       />
+
+      {analytics && <ReelProAnalytics analytics={analytics} title={title} onSeek={jumpTo} />}
 
       {segments.length > 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-3">

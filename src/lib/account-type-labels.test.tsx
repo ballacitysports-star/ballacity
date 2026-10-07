@@ -210,9 +210,10 @@ describe("screen sources use canonical profile-type wording", () => {
     }
   });
 
-  it("feed renders the canonical 'From teams' heading, not 'From teams & clubs'", () => {
+  it("feed is pickup-only: no team posts or teams/gyms/trainers discovery", () => {
     const src = readSource("src/routes/_tabs.feed.tsx");
-    expect(src).toContain("From teams");
-    expect(src).not.toContain("From teams & clubs");
+    expect(src).not.toContain("From teams");
+    expect(src).not.toContain("DiscoverCategoryPills");
+    expect(src).not.toContain("DiscoverResults");
   });
 });

@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { assertModerator } from "@/lib/moderation.server";
 import { getAdmin, writeAudit } from "@/lib/superadmin.server";
+import { MAX_FEATURED_ORGS, canFeatureAnother } from "@/lib/featured-orgs";
 
 export type ListingSubjectType = "team" | "gym";
 
@@ -281,4 +282,100 @@ export const reviewClaim = createServerFn({ method: "POST" })
     });
 
     return { ok: true };
+  });
+
+export type FeaturableOrg = {
+  id: string;
+  name: string;
+  handle: string;
+  city: string | null;
+  featuredAt: string | null;
+};
+
+/** Gyms a moderator can feature, featured ones first. */
+export const listFeaturableOrgs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { search?: string } | undefined) =>
+    z.object({ search: z.string().max(120).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await assertModerator(context);
+    const admin = await getAdmin();
+    const search = (data.search ?? "").trim();
+    const like = `%${search.replace(/[\\%_]/g, (m) => `\\${m}`).replace(/[,()"]/g, " ")}%`;
+
+    let q = admin
+      .from("trainer_orgs")
+      .select("id, name, handle, city, featured_at")
+      .order("featured_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (search) q = q.or(`name.ilike.${like},handle.ilike.${like},city.ilike.${like}`);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const { count } = await admin
+      .from("trainer_orgs")
+      .select("id", { count: "exact", head: true })
+      .not("featured_at", "is", null);
+
+    return {
+      max: MAX_FEATURED_ORGS,
+      featuredCount: count ?? 0,
+      orgs: (rows ?? []).map((r): FeaturableOrg => ({
+        id: r.id,
+        name: r.name,
+        handle: r.handle,
+        city: r.city ?? null,
+        featuredAt: r.featured_at ?? null,
+      })),
+    };
+  });
+
+export const setOrgFeatured = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; featured: boolean }) =>
+    z.object({ orgId: z.string().uuid(), featured: z.boolean() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertModerator(context);
+    const admin = await getAdmin();
+
+    const { data: org, error: orgErr } = await admin
+      .from("trainer_orgs")
+      .select("id, name, featured_at")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    if (!org) throw new Error("Facility not found.");
+    if (!!org.featured_at === data.featured) return { ok: true, featuredAt: org.featured_at };
+
+    if (data.featured) {
+      const { count } = await admin
+        .from("trainer_orgs")
+        .select("id", { count: "exact", head: true })
+        .not("featured_at", "is", null);
+      if (!canFeatureAnother(count ?? 0)) {
+        throw new Error(
+          `You can feature up to ${MAX_FEATURED_ORGS} facilities. Unfeature one first.`,
+        );
+      }
+    }
+
+    const featuredAt = data.featured ? new Date().toISOString() : null;
+    const { error } = await admin
+      .from("trainer_orgs")
+      .update({ featured_at: featuredAt })
+      .eq("id", data.orgId);
+    if (error) throw new Error(error.message);
+
+    await writeAudit(admin, context.userId, {
+      action: data.featured ? "listing.feature" : "listing.unfeature",
+      targetType: "org",
+      targetId: data.orgId,
+      before: { featuredAt: org.featured_at },
+      after: { featuredAt },
+      metadata: { name: org.name },
+    });
+    return { ok: true, featuredAt };
   });

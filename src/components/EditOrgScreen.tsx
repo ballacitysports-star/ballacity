@@ -37,6 +37,7 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
 import { SESSION_TYPES } from "@/lib/sport-config";
+import { AgeGroupPicker } from "@/components/AgeGroupPicker";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -124,6 +125,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [credInput, setCredInput] = useState("");
   const [rate, setRate] = useState(org.ratePerHour ?? 75);
   const [sessionTypes, setSessionTypes] = useState<string[]>(org.sessionTypes ?? []);
+  const [ageGroups, setAgeGroups] = useState<string[]>(org.ageGroups ?? []);
   const [skillMin, setSkillMin] = useState<number>(org.skillRange?.min ?? 1);
   const [skillMax, setSkillMax] = useState<number>(org.skillRange?.max ?? 3);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
@@ -336,6 +338,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
     credentials: kind === "coach" ? credentials : undefined,
     ratePerHour: kind === "coach" ? rate : undefined,
     sessionTypes: kind === "coach" ? sessionTypes : undefined,
+    ageGroups: kind === "coach" ? ageGroups : undefined,
     skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : org.skillRange,
     availabilitySlots: kind === "coach" ? slots : undefined,
     availabilityOverrides: kind === "coach" ? overrides : undefined,
@@ -438,6 +441,12 @@ export function EditOrgScreen({ org }: { org: Org }) {
       credentials: kind === "coach" ? credentials : undefined,
       ratePerHour: kind === "coach" ? rate : undefined,
       sessionTypes: kind === "coach" ? sessionTypes : undefined,
+      // Only written when changed, so saving a profile never depends on this column
+      // unless the coach actually edits their age groups.
+      ageGroups:
+        kind === "coach" && ageGroups.join() !== (org.ageGroups ?? []).join()
+          ? ageGroups
+          : undefined,
       skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
       availabilitySlots:
         kind === "coach"
@@ -491,6 +500,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
       credentials,
       rate,
       sessionTypes,
+      ageGroups,
       skillMin,
       skillMax,
       slots,
@@ -801,6 +811,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   selected={sessionTypes}
                   onToggle={toggleSessionType}
                 />
+              </Section>
+
+              <Section title="Age groups you coach (optional)">
+                <AgeGroupPicker selected={ageGroups} onChange={setAgeGroups} />
               </Section>
 
               <Section title="Credentials">

@@ -26,7 +26,7 @@ export const ROLE_META: Record<TeamRole, { label: string; blurb: string; emoji: 
 };
 
 /** Roles the server treats as team management (mirrors `is_team_manager`). */
-const MANAGER_ROLES: TeamRole[] = ["owner", "manager", "coach"];
+export const MANAGER_ROLES: TeamRole[] = ["owner", "manager", "coach"];
 /** Roles allowed to change another member's role (mirrors `team_set_member_role`). */
 const ROLE_ADMIN_ROLES: TeamRole[] = ["owner", "manager"];
 
@@ -78,6 +78,9 @@ export type TeamInvite = {
   status: "pending" | "accepted" | "declined" | "cancelled" | "expired";
   expiresAt: string;
   createdAt: string;
+  /** Invitee view only: whether a guardian must approve before accepting. */
+  needsGuardian?: boolean;
+  guardianApproved?: boolean;
   /** Present for roster/invitee views once the profile join resolves. */
   displayName?: string;
   username?: string | null;
@@ -126,6 +129,9 @@ export function teamRosterErrorMessage(err: unknown): string {
     return "That invitation expired. Ask the team to send a new one.";
   if (raw.includes("CHILD_ACTIVITY_LOCKED"))
     return "A parent or guardian has paused team activity on this account.";
+  if (raw.includes("WAIVER_REQUIRED")) return "Sign the team's waiver before joining.";
+  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
+    return "A parent or guardian must approve this invite first.";
   if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
   if (raw.includes("NOT_A_MEMBER")) return "That player isn't on the roster.";
   if (raw.includes("duplicate key")) return "That player already has a pending invitation.";
@@ -248,7 +254,7 @@ export function useMyTeamInvites() {
       const { data, error } = await supabase
         .from("team_invites")
         .select(
-          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at",
+          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at, guardian_approved_at",
         )
         .eq("invitee_id", user!.id)
         .eq("status", "pending")
@@ -256,6 +262,13 @@ export function useMyTeamInvites() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as Record<string, any>[];
+      const { data: links } = await supabase
+        .from("guardian_links")
+        .select("id")
+        .eq("child_user_id", user!.id)
+        .eq("status", "active")
+        .limit(1);
+      const hasGuardian = (links ?? []).length > 0;
       const teamIds = [...new Set(rows.map((r) => String(r["team_id"])))];
       const names = new Map<string, string>();
       if (teamIds.length) {
@@ -275,6 +288,8 @@ export function useMyTeamInvites() {
         expiresAt: String(r["expires_at"]),
         createdAt: String(r["created_at"]),
         teamName: names.get(String(r["team_id"])) ?? "A team",
+        needsGuardian: hasGuardian,
+        guardianApproved: !!r["guardian_approved_at"],
       }));
     },
     enabled: !!user,

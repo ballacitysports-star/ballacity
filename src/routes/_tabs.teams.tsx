@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { matchesOrgQuery } from "@/lib/org-search";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -184,13 +185,7 @@ function TeamsPage() {
         if (avail === "recruiting") return isRecruiting(o);
         return cadenceMatches(o, avail);
       })
-      .filter((o) =>
-        q
-          ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
-              .toLowerCase()
-              .includes(q.toLowerCase())
-          : true,
-      );
+      .filter((o) => matchesOrgQuery(o, q));
     const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
     withDist.sort((a, b) => {
       if (sortBy === "nearest") return a.dist - b.dist;

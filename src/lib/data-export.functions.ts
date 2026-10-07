@@ -160,7 +160,7 @@ const CATEGORY_QUERIES: Record<
       table: "highlight_reels",
       column: "user_id",
       columns:
-        "id, title, ai_title, ai_caption, ai_hashtags, ai_sport, ai_analysis, ai_moments, ai_overlays, ai_timeline, ai_coaching, ai_transcript, style_prefs, created_at",
+        "id, title, ai_title, ai_caption, ai_hashtags, ai_sport, ai_analysis, ai_moments, ai_overlays, ai_timeline, ai_coaching, ai_advanced_analytics, ai_transcript, style_prefs, created_at",
     },
   ],
   safety: [

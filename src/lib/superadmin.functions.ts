@@ -357,6 +357,36 @@ export const superadminSuspendUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const superadminDeleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; reason?: string }) =>
+    z
+      .object({ userId: z.string().uuid(), reason: z.string().max(500).optional() })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    if (data.userId === context.userId) {
+      throw new Error("You cannot delete your own account here.");
+    }
+    const admin = await getAdmin();
+    const { data: before } = await admin
+      .from("profiles")
+      .select("display_name, username, account_type")
+      .eq("id", data.userId)
+      .maybeSingle();
+    const { purgeUserAccount } = await import("@/lib/account-purge.server");
+    await purgeUserAccount(data.userId);
+    await writeAudit(admin, context.userId, {
+      action: "user.delete",
+      targetType: "user",
+      targetId: data.userId,
+      reason: data.reason ?? null,
+      before,
+    });
+    return { ok: true };
+  });
+
 export const superadminUpdateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { userId: string; patch: Record<string, unknown>; reason?: string }) =>

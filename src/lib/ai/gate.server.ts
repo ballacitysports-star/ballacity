@@ -134,6 +134,35 @@ function isMinorCohort(cohort: AgeCohort): boolean {
   return cohort === "child_under_13" || cohort === "teen_13_15" || cohort === "teen_16_17";
 }
 
+/**
+ * Which message a consent denial should carry. The denial itself is already
+ * decided by `ai_analysis_allowed`; this only picks the wording.
+ *
+ * For a minor the guardian control and the member's own switch both have to be
+ * on. When the guardian has already allowed AI, the thing still blocking is the
+ * member's own switch, so telling them a parent must approve would point at the
+ * wrong person. Any doubt (lookup error, no row, guardian control off) keeps the
+ * parent wording, as before.
+ */
+async function consentDenial(
+  admin: any,
+  userId: string,
+  cohort: AgeCohort,
+): Promise<"PARENT_APPROVAL_REQUIRED" | "CONSENT_REQUIRED"> {
+  if (!isMinorCohort(cohort)) return "CONSENT_REQUIRED";
+  try {
+    const { data } = await admin
+      .from("child_controls")
+      .select("ai_analysis")
+      .eq("child_user_id", userId)
+      .maybeSingle();
+    if (data?.ai_analysis === true) return "CONSENT_REQUIRED";
+  } catch {
+    /* fall through to the parent wording */
+  }
+  return "PARENT_APPROVAL_REQUIRED";
+}
+
 /** Runs the gate and, when allowed, returns a session with a reserved job row. */
 export async function assertAiAllowed(
   ctx: AiGateContext,
@@ -164,9 +193,7 @@ export async function assertAiAllowed(
       .rpc("ai_analysis_allowed", { _user: ctx.userId })
       .then((r: any) => r.data === true)
       .catch(() => false);
-    if (!consented) {
-      throw new AiError(isMinorCohort(cohort) ? "PARENT_APPROVAL_REQUIRED" : "CONSENT_REQUIRED");
-    }
+    if (!consented) throw new AiError(await consentDenial(admin, ctx.userId, cohort));
 
     // (c) cohort allowance — default deny
     if (!cohortAllowed(flag, cohort)) {

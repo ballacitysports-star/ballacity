@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarSearch, Loader2, RefreshCw, Search } from "lucide-react";
+import { CalendarSearch, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Bell, MessageCircle, MapPin, MapPinOff } from "lucide-react";
+import { Bell, MessageCircle, MapPin } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -26,25 +26,17 @@ import {
   DEFAULT_PREFS,
   DEFAULT_FILTERS,
   useMyProfile,
-  useDistanceUnit,
   getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
 import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
-import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { useUserLocation } from "@/lib/geo";
 import { gameDistanceMi } from "@/lib/game-distance";
-import { formatDistance } from "@/lib/distance";
 
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
-import { listRecentTeamPosts } from "@/lib/team-posts.functions";
-import { PostCard } from "@/components/PostCard";
-import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
-import type { OrgPost, PostKind } from "@/lib/sample-data";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
@@ -74,7 +66,7 @@ export const Route = createFileRoute("/_tabs/feed")({
     pageHead({
       path: "/feed",
       title: "Pickup Sports Games Near You | BallaCity",
-      description: "Games, teams, and trainers picked for your sports, skill level, and distance.",
+      description: "Pickup runs picked for your sports, skill level, and distance.",
       noindex: true,
     }),
   validateSearch: zodValidator(feedSearchSchema),
@@ -137,7 +129,6 @@ function Feed() {
   const { user: authUser } = useAuth();
   useFeedPrefsSync();
   const profile = useMyProfile();
-  const distanceUnit = useDistanceUnit();
   const {
     coords,
     status: geoStatus,
@@ -254,90 +245,6 @@ function Feed() {
   // Chip row mirrors the multi-select made in the filter sheet. Tapping a
   // chip toggles that sport in/out of preferredSports; "All sports" clears.
   const chipSelected: string[] = prefs.preferredSports;
-
-  // Recent posts from teams (public read). Filtered by sport when the
-  // chip row has exactly one sport selected.
-  const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
-  const TEAM_POSTS_PAGE = 10;
-  const teamPostsSport = chipSelected.length === 1 ? chipSelected[0] : undefined;
-  const teamPostsQuery = useInfiniteQuery({
-    queryKey: ["feed-team-posts", teamPostsSport ?? "all"],
-    queryFn: ({ pageParam = 0 }) =>
-      fetchRecentTeamPosts({
-        data: {
-          limit: TEAM_POSTS_PAGE,
-          offset: pageParam as number,
-          sport: teamPostsSport,
-        },
-      }),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length < TEAM_POSTS_PAGE ? undefined : allPages.length * TEAM_POSTS_PAGE,
-    staleTime: 30_000,
-  });
-  const teamPosts = useMemo(() => (teamPostsQuery.data?.pages ?? []).flat(), [teamPostsQuery.data]);
-
-  // Distance-based home-court filtering: each team post carries the geocoded
-  // coordinates of its venue (home court). When the viewer has shared their
-  // location and set a distance cap, keep only posts whose court falls inside
-  // the radius, nearest first, and annotate each with its real distance.
-  // Posts with missing or invalid coordinates are never hidden; they're kept
-  // at the end of the list with a clear "location unavailable" status.
-  const validCoord = (lat: unknown, lng: unknown) =>
-    typeof lat === "number" &&
-    typeof lng === "number" &&
-    !Number.isNaN(lat) &&
-    !Number.isNaN(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180;
-
-  const nearbyTeamPosts = useMemo(() => {
-    const capMi = prefs.maxDistanceMi;
-    const withDist = teamPosts.map((p) => {
-      if (!validCoord(p.lat, p.lng)) {
-        const status = p.lat == null || p.lng == null ? "missing" : "invalid";
-        return {
-          ...p,
-          distanceMi: null as number | null,
-          geoStatus: status as "missing" | "invalid",
-        };
-      }
-      const km = coords
-        ? haversineKm(coords, { lat: p.lat as number, lng: p.lng as number })
-        : null;
-      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM, geoStatus: "valid" as const };
-    });
-    const inRange =
-      coords && capMi != null
-        ? withDist.filter(
-            (p) => p.geoStatus !== "valid" || (p.distanceMi != null && p.distanceMi <= capMi),
-          )
-        : withDist;
-    if (!coords || prefs.sortBy !== "nearest") return inRange;
-    return [...inRange].sort((a, b) => {
-      // Locatable posts first, then unlocatable; both groups sorted nearest-first.
-      if (a.geoStatus !== "valid" && b.geoStatus === "valid") return 1;
-      if (a.geoStatus === "valid" && b.geoStatus !== "valid") return -1;
-      return (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity);
-    });
-  }, [teamPosts, coords, prefs.maxDistanceMi, prefs.sortBy]);
-
-  const hiddenByDistance = useMemo(() => {
-    const capMi = prefs.maxDistanceMi;
-    if (!coords || capMi == null) return 0;
-    return teamPosts.filter((p) => {
-      if (!validCoord(p.lat, p.lng)) return false;
-      const mi = haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) * MI_PER_KM;
-      return mi > capMi;
-    }).length;
-  }, [teamPosts, coords, prefs.maxDistanceMi]);
-
-  const unlocatableCount = useMemo(() => {
-    if (!coords || prefs.maxDistanceMi == null) return 0;
-    return teamPosts.filter((p) => !validCoord(p.lat, p.lng)).length;
-  }, [teamPosts, coords, prefs.maxDistanceMi]);
 
   const setChipSport = (s: string | null) => {
     markSportChoice("feed");
@@ -457,9 +364,6 @@ function Feed() {
   // viewport so tablets/desktops fill their wider grids in one batch.
   const PAGE_SIZE = 12;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [openPost, setOpenPost] = useState<{ post: OrgPost; team: PostDetailsTeam | null } | null>(
-    null,
-  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const filterKey = `${tab}|${q}|${JSON.stringify(prefs)}|${hosted.length}`;
@@ -677,7 +581,7 @@ function Feed() {
             <FilterBar
               q={q}
               onQChange={setQ}
-              searchPlaceholder="Search games, courts, players"
+              searchPlaceholder="Search pickup runs"
               activeFilterCount={activeFilterCount}
               create={{ to: "/create", label: "Create game" }}
               sheetTitle="Feed filters"
@@ -741,134 +645,32 @@ function Feed() {
               )}
           </div>
 
-          {teamPosts.length > 0 && (
-            <section className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="section-eyebrow text-muted-foreground">From teams</h2>
-                <Link to="/teams" className="text-xs font-semibold text-lime">
-                  See all
-                </Link>
+          {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
+            geoStatus !== "unsupported" &&
+            (!coords || locationRemembered) && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleLocationTap}
+                  title={locationExplanation}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-coral" />
+                  {geoStatus === "prompting"
+                    ? "Locating…"
+                    : locationRemembered
+                      ? "Using your last known location — refresh"
+                      : geoStatus === "denied"
+                        ? "Location blocked — tap to retry"
+                        : "Use my location to sort and filter by distance"}
+                </button>
+                <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
+                <LocationAccessDialog
+                  open={locationDialogOpen}
+                  onOpenChange={setLocationDialogOpen}
+                />
               </div>
-              {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
-                geoStatus !== "unsupported" &&
-                (!coords || locationRemembered) && (
-                  <div className="mb-2">
-                    <button
-                      type="button"
-                      onClick={handleLocationTap}
-                      title={locationExplanation}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-                    >
-                      <MapPin className="h-3.5 w-3.5 text-coral" />
-                      {geoStatus === "prompting"
-                        ? "Locating…"
-                        : locationRemembered
-                          ? "Using your last known location — refresh"
-                          : geoStatus === "denied"
-                            ? "Location blocked — tap to retry"
-                            : "Use my location to sort and filter by distance"}
-                    </button>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
-                    <LocationAccessDialog
-                      open={locationDialogOpen}
-                      onOpenChange={setLocationDialogOpen}
-                    />
-                  </div>
-                )}
-              {hiddenByDistance > 0 && (
-                <p className="mb-2 text-xs text-muted-foreground">
-                  {hiddenByDistance} hidden beyond{" "}
-                  {formatDistance(prefs.maxDistanceMi, distanceUnit)}
-                </p>
-              )}
-              {unlocatableCount > 0 && (
-                <p className="mb-2 text-xs text-coral/80">
-                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable
-                  home court — still shown below
-                </p>
-              )}
-              <div className="flex flex-col gap-3">
-                {nearbyTeamPosts.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No team posts within {formatDistance(prefs.maxDistanceMi, distanceUnit)} of you.
-                  </p>
-                )}
-                {nearbyTeamPosts.map((p, i) => {
-                  const orgPost: OrgPost = {
-                    id: p.id,
-                    kind: p.kind as PostKind,
-                    title: p.title,
-                    body: p.body,
-                    date: p.eventDate ?? p.createdAt,
-                    postedAt: p.createdAt,
-                    location: p.location ?? undefined,
-                    price: p.price ?? undefined,
-                    pinned: p.pinned,
-                  };
-                  return (
-                    <div key={p.id}>
-                      <Link
-                        to="/teams/$teamId"
-                        params={{ teamId: p.teamId }}
-                        className="mb-1 flex items-center gap-2 text-xs font-semibold"
-                      >
-                        <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
-                          {(p.teamName || "?").slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="truncate">{p.teamName}</span>
-                        {p.teamSports?.[0] && (
-                          <span className="text-muted-foreground">· {p.teamSports[0]}</span>
-                        )}
-                        {p.distanceMi != null && (
-                          <span className="ml-auto shrink-0 text-muted-foreground">
-                            {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
-                          </span>
-                        )}
-                        {coords && p.geoStatus !== "valid" && (
-                          <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-coral/80">
-                            <MapPinOff className="h-3 w-3" />
-                            Location unavailable
-                          </span>
-                        )}
-                      </Link>
-                      <PostCard
-                        post={orgPost}
-                        index={i}
-                        onClick={() =>
-                          setOpenPost({
-                            post: orgPost,
-                            team: {
-                              id: p.teamId,
-                              name: p.teamName ?? "",
-                              sport: p.teamSports?.[0],
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  );
-                })}
-                {teamPostsQuery.hasNextPage && (
-                  <div className="flex justify-center pt-1">
-                    <button
-                      type="button"
-                      onClick={() => teamPostsQuery.fetchNextPage()}
-                      disabled={teamPostsQuery.isFetchingNextPage}
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                    >
-                      {teamPostsQuery.isFetchingNextPage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" /> Loading
-                        </>
-                      ) : (
-                        "Load more"
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
+            )}
 
           {q ? (
             <>
@@ -941,13 +743,6 @@ function Feed() {
           )}
         </>
       )}
-
-      <PostDetailsDialog
-        post={openPost?.post ?? null}
-        team={openPost?.team ?? null}
-        open={!!openPost}
-        onOpenChange={(o) => !o && setOpenPost(null)}
-      />
     </div>
   );
 }

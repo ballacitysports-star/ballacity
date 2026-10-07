@@ -4,6 +4,21 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
+import { parseHours } from "./org-hours";
+import { MAX_ORG_AMENITIES } from "./org-listing";
+import {
+  pickFeaturedTrainer,
+  summarizeRatings,
+  type FeaturedTrainer,
+  type TrainerCandidate,
+} from "./featured-trainer";
+import {
+  facilityByTrainer,
+  firstVisibleOrgLink,
+  toPublicRoster,
+  type PublicRosterMember,
+  type RawRosterRow,
+} from "./org-roster";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -25,20 +40,126 @@ function publicClient() {
 
 const handleRe = /^[a-z0-9_-]{3,40}$/;
 
+// Columns the public directory needs to render a facility card. All are
+// anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
+const ORG_DIRECTORY_COLUMNS =
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
+
+// Escape characters that are special inside an ilike pattern.
+function likePattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 export const listTrainerOrgs = createServerFn({ method: "GET" })
-  .inputValidator((d: { search?: string } | undefined) => d ?? {})
+  .inputValidator((d: { search?: string; q?: string } | undefined) =>
+    z
+      .object({
+        // `search` matches the name only (used by the org pickers); `q` is the
+        // directory search and also matches city and street address.
+        search: z.string().max(80).optional(),
+        q: z.string().max(80).optional(),
+      })
+      .parse(d ?? {}),
+  )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    let q = sb
+    let query = sb
       .from("trainer_orgs")
-      .select("id,name,handle,avatar,avatar_url,cover_url,city,bio,verified,owner_id")
+      .select(ORG_DIRECTORY_COLUMNS)
+      // Hand-picked featured facilities first (most recently featured on top),
+      // then newest.
+      .order("featured_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(100);
-    if (data.search) q = q.ilike("name", `%${data.search}%`);
-    const { data: rows, error } = await q;
+    if (data.search?.trim()) query = query.ilike("name", likePattern(data.search.trim()));
+    if (data.q?.trim()) {
+      // Commas, parentheses and quotes are separators inside an or() group.
+      const pat = likePattern(data.q.trim()).replace(/[,()"]/g, " ");
+      query = query.or(`name.ilike.${pat},city.ilike.${pat},address.ilike.${pat}`);
+    }
+    const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+/**
+ * The real trainer to spotlight on the landing page: a claimed, bookable
+ * trainer who is a member of a facility, preferring basketball / multi-sport.
+ * Returns null when nobody qualifies (the page then shows a labeled example).
+ *
+ * `trainer_org_members` is not readable by anonymous visitors (it carries user
+ * ids), so the link is read with the service role. Because that bypasses RLS,
+ * the public-visibility rules are applied explicitly here (hidden trainers and
+ * facilities, private/flagged reviews) and the result carries no user ids.
+ */
+export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).handler(
+  async (): Promise<FeaturedTrainer | null> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: links, error } = await supabaseAdmin
+      .from("trainer_org_members")
+      .select(
+        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
+      )
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    type Row = {
+      org: { id: string; name: string; city: string | null; hidden_at: string | null } | null;
+      teams: {
+        id: string;
+        kind: string | null;
+        owner_id: string | null;
+        name: string;
+        avatar: string | null;
+        city: string | null;
+        sports: string[] | null;
+        verified: boolean | null;
+        rate_per_hour: number | null;
+        session_types: string[] | null;
+        tagline: string | null;
+        bio: string | null;
+        availability_slots: unknown;
+        availability_rules: unknown;
+        hidden_at: string | null;
+      } | null;
+    };
+    const candidates: TrainerCandidate[] = [];
+    for (const row of (links ?? []) as unknown as Row[]) {
+      const t = row.teams;
+      if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
+      candidates.push({
+        id: t.id,
+        kind: t.kind,
+        ownerId: t.owner_id,
+        name: t.name,
+        avatar: t.avatar,
+        city: t.city,
+        sports: t.sports ?? [],
+        verified: !!t.verified,
+        ratePerHour: t.rate_per_hour,
+        sessionTypes: t.session_types ?? [],
+        tagline: t.tagline,
+        bio: t.bio,
+        availabilitySlots: t.availability_slots,
+        availabilityRules: t.availability_rules,
+        facility: { id: row.org.id, name: row.org.name, city: row.org.city },
+      });
+    }
+    if (candidates.length === 0) return null;
+
+    const { data: reviews } = await supabaseAdmin
+      .from("reviews")
+      .select("reviewee_id, rating")
+      .eq("reviewee_kind", "trainer")
+      .eq("is_private", false)
+      .eq("flagged", false)
+      .in(
+        "reviewee_id",
+        candidates.map((c) => c.id),
+      );
+    return pickFeaturedTrainer(candidates, summarizeRatings(reviews ?? []));
+  },
+);
 
 export const listMyOrgs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -56,7 +177,28 @@ export const listMyOrgs = createServerFn({ method: "GET" })
 // the database revokes them from the `anon` role so contact details cannot be
 // scraped from every gym listing, so selecting "*" here would fail for guests.
 const ORG_PUBLIC_COLUMNS =
-  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone";
+  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone,booking_url";
+
+/**
+ * A facility's trainers for its public page. Reads `trainer_org_members` with
+ * the service role (anonymous and non-member reads are blocked by RLS on
+ * purpose, because the table carries user ids), so what comes back is limited
+ * to public trainer fields: no user ids, and hidden trainer profiles are
+ * dropped. Callers must have already confirmed the facility is publicly
+ * visible.
+ */
+async function listPublicOrgRoster(orgId: string): Promise<PublicRosterMember[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("trainer_org_members")
+    .select(
+      "id,trainer_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports,hidden_at)",
+    )
+    .eq("org_id", orgId)
+    .order("joined_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return toPublicRoster((data ?? []) as unknown as RawRosterRow[]);
+}
 
 export const getTrainerOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
@@ -69,14 +211,36 @@ export const getTrainerOrg = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!org) return null;
-    const { data: members } = await sb
-      .from("trainer_org_members")
-      .select(
-        "id,trainer_id,user_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports)",
-      )
-      .eq("org_id", data.id)
-      .order("joined_at", { ascending: true });
-    return { org, members: members ?? [] };
+    // The roster is public on the gym page, but `trainer_org_members` is
+    // locked down in the database (it holds user ids), so it is read here with
+    // the service role and returned without them.
+    const members = await listPublicOrgRoster(data.id);
+    return { org, members };
+  });
+
+/**
+ * The signed-in viewer's own standing at a facility. The public roster no
+ * longer carries user ids, so the page asks this instead of searching the
+ * roster for the viewer.
+ */
+export const getMyOrgAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error } = await context.supabase.rpc("is_trainer_org_admin", {
+      _org: data.orgId,
+      _user: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    // Own row only: RLS lets a user read their own membership.
+    const { data: member, error: memberErr } = await context.supabase
+      .from("org_members")
+      .select("id")
+      .eq("org_id", data.orgId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (memberErr) throw new Error(memberErr.message);
+    return { isAdmin: !!isAdmin, isMember: !!member };
   });
 
 // Contact details are only readable by signed-in users.
@@ -91,6 +255,76 @@ export const getTrainerOrgContact = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { phone: row?.phone ?? null, email: row?.email ?? null };
+  });
+
+/**
+ * Facilities the signed-in user owns or administers (by membership role), for
+ * the "host at a facility" picker. Only these can be attached to a run; the
+ * `hosted_games` trigger enforces it again regardless of what the client sends.
+ */
+export const listMyManagedOrgs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [owned, memberships] = await Promise.all([
+      context.supabase.from("trainer_orgs").select("id,name,city").eq("owner_id", context.userId),
+      context.supabase
+        .from("trainer_org_members")
+        .select("org_id")
+        .eq("user_id", context.userId)
+        .in("role", ["owner", "admin"]),
+    ]);
+    if (owned.error) throw new Error(owned.error.message);
+    if (memberships.error) throw new Error(memberships.error.message);
+
+    const byId = new Map<string, { id: string; name: string; city: string | null }>();
+    for (const o of owned.data ?? []) byId.set(o.id, o);
+    const extraIds = (memberships.data ?? []).map((m) => m.org_id).filter((id) => !byId.has(id));
+    if (extraIds.length > 0) {
+      const { data, error } = await context.supabase
+        .from("trainer_orgs")
+        .select("id,name,city")
+        .in("id", extraIds);
+      if (error) throw new Error(error.message);
+      for (const o of data ?? []) byId.set(o.id, o);
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+// Pre-fill data for "Host a run here" on a facility page. Any signed-in host
+// may list a public run at a facility; `official` (owner/admin) only drives
+// the UI. The `hosted_games` trigger decides `org_official` itself, so a
+// crafted `?orgId=` link cannot make a community run look official.
+export const getOrgEventContext = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const [adminRes, orgRes] = await Promise.all([
+      context.supabase.rpc("is_trainer_org_admin", {
+        _org: data.orgId,
+        _user: context.userId,
+      }),
+      context.supabase
+        .from("trainer_orgs")
+        .select("id,name,address,city,geo,amenities")
+        .eq("id", data.orgId)
+        .maybeSingle(),
+    ]);
+    if (adminRes.error) throw new Error(adminRes.error.message);
+    if (orgRes.error) throw new Error(orgRes.error.message);
+    const org = orgRes.data;
+    if (!org) return { official: false, org: null };
+    const geo = org.geo as { lat?: number; lng?: number } | null;
+    return {
+      official: !!adminRes.data,
+      org: {
+        id: org.id,
+        name: org.name,
+        address: org.address ?? org.city ?? "",
+        lat: typeof geo?.lat === "number" ? geo.lat : null,
+        lng: typeof geo?.lng === "number" ? geo.lng : null,
+        amenities: ((org as { amenities?: string[] | null }).amenities ?? []) as string[],
+      },
+    };
   });
 
 export const createTrainerOrg = createServerFn({ method: "POST" })
@@ -343,26 +577,55 @@ export const leaveTrainerOrg = createServerFn({ method: "POST" })
 export const getTrainerOrgForTrainer = createServerFn({ method: "GET" })
   .inputValidator((d: { trainerId: string }) => z.object({ trainerId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
-    const sb = publicClient();
-    const { data: rows, error } = await sb
+    // Service role: see listPublicOrgRoster. Hidden facilities are skipped and
+    // no user ids are returned.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
       .from("trainer_org_members")
-      .select("role, org:org_id(id,name,handle,avatar,city,verified)")
+      .select("role, org:org_id(id,name,handle,avatar,city,verified,hidden_at)")
       .eq("trainer_id", data.trainerId)
-      .limit(1);
+      .order("joined_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return rows?.[0] ?? null;
+    return firstVisibleOrgLink(
+      (rows ?? []) as unknown as Parameters<typeof firstVisibleOrgLink>[0],
+    );
+  });
+
+/**
+ * Which facility each listed trainer works at, for the trainers directory.
+ * One query for the whole page. Same rules as the other roster reads: service
+ * role because the table is locked down, public fields only, no user ids,
+ * hidden facilities skipped.
+ */
+export const listFacilitiesForTrainers = createServerFn({ method: "GET" })
+  .inputValidator((d: { trainerIds: string[] }) =>
+    z.object({ trainerIds: z.array(z.string().min(1).max(100)).max(300) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    if (data.trainerIds.length === 0) return {} as Record<string, { id: string; name: string }>;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("trainer_org_members")
+      .select("trainer_id, org:org_id(id,name,hidden_at)")
+      .in("trainer_id", data.trainerIds)
+      .order("joined_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return facilityByTrainer((rows ?? []) as unknown as Parameters<typeof facilityByTrainer>[0]);
   });
 
 export const listTrainerIdsForOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
+    // Only for publicly visible facilities (anonymous RLS hides removed ones).
     const sb = publicClient();
-    const { data: rows, error } = await sb
-      .from("trainer_org_members")
-      .select("trainer_id")
-      .eq("org_id", data.orgId);
-    if (error) throw new Error(error.message);
-    return (rows ?? []).map((r) => r.trainer_id as string);
+    const { data: org } = await sb
+      .from("trainer_orgs")
+      .select("id")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (!org) return [] as string[];
+    const roster = await listPublicOrgRoster(data.orgId);
+    return roster.map((m) => m.trainer_id);
   });
 
 export const listMyTrainerProfiles = createServerFn({ method: "GET" })
@@ -412,6 +675,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       avatarUrl?: string;
       coverUrl?: string;
       website?: string;
+      bookingUrl?: string;
       address?: string;
       placeId?: string;
       geo?: { lat: number; lng: number } | null;
@@ -433,13 +697,14 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
           avatarUrl: z.string().url().max(1000).optional(),
           coverUrl: z.string().url().max(1000).optional(),
           website: z.string().url().max(300).optional(),
+          bookingUrl: z.string().url().max(300).optional(),
           address: z.string().max(300).optional(),
           placeId: z.string().max(200).optional(),
           geo: geoSchema,
           phone: z.string().max(40).optional(),
           email: z.string().email().max(200).optional(),
           category: z.string().max(60).optional(),
-          amenities: z.array(z.string().max(60)).max(30).optional(),
+          amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
           hours: z.record(z.string(), z.unknown()).optional(),
           timezone: z.string().max(80).optional(),
@@ -460,6 +725,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         avatar_url: data.avatarUrl ?? null,
         cover_url: data.coverUrl ?? null,
         website: data.website ?? null,
+        booking_url: data.bookingUrl ?? null,
         address: data.address ?? null,
         place_id: data.placeId ?? null,
         geo: data.geo ?? null,
@@ -468,7 +734,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         category: data.category ?? null,
         amenities: data.amenities ?? [],
         photos: data.photos ?? [],
-        hours: data.hours ?? {},
+        hours: parseHours(data.hours ?? {}),
         timezone: data.timezone ?? null,
       } as never)
       .select("id")
@@ -507,6 +773,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
       bio?: string | null;
       city?: string | null;
       website?: string | null;
+      bookingUrl?: string | null;
       avatar?: string | null;
       avatarUrl?: string | null;
       coverUrl?: string | null;
@@ -529,6 +796,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           bio: z.string().max(2000).nullable().optional(),
           city: z.string().max(120).nullable().optional(),
           website: z.string().url().max(300).nullable().optional(),
+          bookingUrl: z.string().url().max(300).nullable().optional(),
           avatar: z.string().max(10).nullable().optional(),
           avatarUrl: z.string().url().max(1000).nullable().optional(),
           coverUrl: z.string().url().max(1000).nullable().optional(),
@@ -538,7 +806,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           phone: z.string().max(40).nullable().optional(),
           email: z.string().email().max(200).nullable().optional(),
           category: z.string().max(60).nullable().optional(),
-          amenities: z.array(z.string().max(60)).max(30).optional(),
+          amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
           hours: z.record(z.string(), z.unknown()).optional(),
           timezone: z.string().max(80).nullable().optional(),
@@ -552,6 +820,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.bio !== undefined) patch.bio = data.bio;
     if (data.city !== undefined) patch.city = data.city;
     if (data.website !== undefined) patch.website = data.website;
+    if (data.bookingUrl !== undefined) patch.booking_url = data.bookingUrl;
     if (data.avatar !== undefined) patch.avatar = data.avatar;
     if (data.avatarUrl !== undefined) patch.avatar_url = data.avatarUrl;
     if (data.coverUrl !== undefined) patch.cover_url = data.coverUrl;
@@ -564,7 +833,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.category !== undefined) extra.category = data.category;
     if (data.amenities !== undefined) extra.amenities = data.amenities;
     if (data.photos !== undefined) extra.photos = data.photos;
-    if (data.hours !== undefined) extra.hours = data.hours;
+    if (data.hours !== undefined) extra.hours = parseHours(data.hours);
     if (data.timezone !== undefined) extra.timezone = data.timezone;
     const { error } = await context.supabase.from("trainer_orgs").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);

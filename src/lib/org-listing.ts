@@ -1,32 +1,126 @@
 import { hasAnyHours, type OrgHours } from "@/lib/org-hours";
 
-/** Primary business categories offered for gym listings. */
+/** Primary business categories offered for facility listings. */
 export const ORG_CATEGORIES = [
   "Gym",
-  "Fitness studio",
+  "Basketball gym",
+  "Indoor courts",
+  "Outdoor courts",
+  "Sports complex",
+  "Recreation center",
+  "Fieldhouse",
   "Training facility",
   "Court rental",
-  "Sports complex",
+  "Fitness studio",
   "Other",
 ] as const;
 
 export type OrgCategory = (typeof ORG_CATEGORIES)[number];
 
-/** Amenity chips shown on the listing. */
-export const ORG_AMENITIES = [
-  "Parking",
-  "Showers",
-  "Lockers",
-  "Indoor courts",
-  "Outdoor courts",
-  "Weight room",
-  "Turf field",
-  "Kids programs",
-  "Accessible entrance",
-  "Wi-Fi",
+/**
+ * Amenity chips, grouped so the editor can present courts, gear and
+ * facilities separately. The flat {@link ORG_AMENITIES} list is derived from
+ * this and stays the single source of truth for what can be stored.
+ */
+export const ORG_AMENITY_GROUPS = [
+  {
+    id: "courts",
+    label: "Courts & surfaces",
+    items: [
+      "Hardwood courts",
+      "Indoor courts",
+      "Outdoor courts",
+      "Outdoor cages",
+      "Turf field",
+      "Sport court (synthetic)",
+      "Full-court runs",
+      "Half courts",
+      "Pickleball courts",
+    ],
+  },
+  {
+    id: "gear",
+    label: "Gear & rentals",
+    items: [
+      "Ball rentals",
+      "Scoreboards",
+      "Shot clocks",
+      "Adjustable hoops",
+      "Shooting machines",
+      "Weight room",
+    ],
+  },
+  {
+    id: "facility",
+    label: "Facility",
+    items: [
+      "Lighting",
+      "Air conditioning",
+      "Spectator seating",
+      "Parking",
+      "Restrooms",
+      "Showers",
+      "Lockers",
+      "Concessions",
+      "Wi-Fi",
+      "Accessible entrance",
+    ],
+  },
+  {
+    id: "programs",
+    label: "Programs & bookings",
+    items: [
+      "Open runs",
+      "Court rentals",
+      "Leagues",
+      "Clinics & camps",
+      "Tournaments",
+      "Kids programs",
+      "Birthday parties",
+    ],
+  },
 ] as const;
 
-export type OrgAmenity = (typeof ORG_AMENITIES)[number];
+/** Amenity chips shown on the listing. */
+export const ORG_AMENITIES = ORG_AMENITY_GROUPS.flatMap((g) => g.items) as readonly string[];
+
+export type OrgAmenity = string;
+
+/** Most amenities a listing may carry (court count included). */
+export const MAX_ORG_AMENITIES = 60;
+
+const COURT_COUNT_RE = /^(\d{1,3}) courts?$/i;
+export const MAX_COURT_COUNT = 99;
+
+/** Display label for a court count, e.g. "1 court" / "4 courts". */
+export function courtCountLabel(n: number): string {
+  return `${n} ${n === 1 ? "court" : "courts"}`;
+}
+
+/**
+ * The court count lives in the amenities list as a readable "4 courts" entry,
+ * so it needs no extra column and still renders sensibly everywhere amenities
+ * are shown. Returns null when none is set.
+ */
+export function courtCountFromAmenities(
+  amenities: readonly string[] | null | undefined,
+): number | null {
+  for (const a of amenities ?? []) {
+    const m = COURT_COUNT_RE.exec(a.trim());
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
+/** Replace (or clear, when `count` is null/0) the court count entry. */
+export function withCourtCount(
+  amenities: readonly string[] | null | undefined,
+  count: number | null,
+): string[] {
+  const rest = (amenities ?? []).filter((a) => !COURT_COUNT_RE.test(a.trim()));
+  const n = count == null ? 0 : Math.min(MAX_COURT_COUNT, Math.max(0, Math.floor(count)));
+  return n > 0 ? [courtCountLabel(n), ...rest] : rest;
+}
 
 export type ListingCompleteness = {
   name: string;
@@ -117,7 +211,7 @@ export function scoreListing(v: ListingCompleteness): {
       label: "Pick at least 3 amenities",
       section: "org-amenities",
       weight: 5,
-      done: v.amenities.length >= 3,
+      done: v.amenities.filter((a) => !COURT_COUNT_RE.test(a.trim())).length >= 3,
     },
     { id: "logo", label: "Upload a logo", section: "org-photos", weight: 5, done: !!v.avatarUrl },
     {
@@ -219,4 +313,63 @@ export function directionsHref(opts: {
   const params = new URLSearchParams({ api: "1", destination: dest });
   if (opts.placeId) params.set("destination_place_id", opts.placeId);
   return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+/** Suggest a handle from a facility name, e.g. "Peak Gym & Courts" → "peak-gym-courts". */
+export function suggestHandle(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+}
+
+/** Amenities worth showing first on a directory card, in priority order. */
+const HIGHLIGHT_AMENITIES = [
+  "Hardwood courts",
+  "Indoor courts",
+  "Outdoor courts",
+  "Outdoor cages",
+  "Turf field",
+  "Sport court (synthetic)",
+  "Lighting",
+  "Parking",
+  "Ball rentals",
+  "Scoreboards",
+  "Air conditioning",
+  "Lockers",
+] as const;
+
+/**
+ * Pick the amenity tags for a directory card: the court count first, then the
+ * highest-priority features the facility actually has. `more` is how many
+ * further amenities were left off.
+ */
+export function highlightAmenities(
+  amenities: readonly string[] | null | undefined,
+  max = 5,
+): { tags: string[]; more: number } {
+  const list = (amenities ?? []).filter(Boolean);
+  const courts = courtCountFromAmenities(list);
+  const rest = list.filter((a) => courtCountFromAmenities([a]) === null);
+  const ranked = [
+    ...HIGHLIGHT_AMENITIES.filter((a) => rest.includes(a)),
+    ...rest.filter((a) => !(HIGHLIGHT_AMENITIES as readonly string[]).includes(a)),
+  ];
+  const tags = [...(courts ? [courtCountLabel(courts)] : []), ...ranked].slice(0, max);
+  return { tags, more: Math.max(0, (courts ? 1 : 0) + ranked.length - tags.length) };
+}
+
+/**
+ * Where "Book court" should send a player: the facility's dedicated booking
+ * link, else its website, else null (the in-app inquiry is used instead).
+ */
+export function bookingHref(org: {
+  booking_url?: string | null;
+  website?: string | null;
+}): string | null {
+  return websiteHref(org.booking_url) ?? websiteHref(org.website);
 }

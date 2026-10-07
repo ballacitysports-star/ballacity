@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -111,6 +112,9 @@ import {
 import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { useParentMode } from "@/hooks/use-parent-mode";
+import { Shield } from "lucide-react";
+import { InviteToTeamDialog, useMyRecruitingTeams } from "@/components/players/InviteToTeamDialog";
 
 type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
 
@@ -199,6 +203,7 @@ function migrateLegacyPlayersFilters() {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const { isParentMode } = useParentMode();
   const profile = useMyProfile(user);
   const hostedGames = useHostedGames();
 
@@ -545,7 +550,7 @@ function PlayersPage() {
       </motion.div>
 
       {/* Browse everyone's availability, or manage your own posts/requests. */}
-      <div className="mb-4 flex gap-2">
+      {!isParentMode && <div className="mb-4 flex gap-2">
         {(
           [
             { id: "browse", label: "Browse" },
@@ -565,9 +570,9 @@ function PlayersPage() {
             {t.label}
           </button>
         ))}
-      </div>
+      </div>}
 
-      {tab === "mine" ? (
+      {!isParentMode && tab === "mine" ? (
         <div className="space-y-3 pb-6">
           {!availGate.loading && !availGate.canPost && (
             <AvailabilityRequiredNotice
@@ -603,7 +608,7 @@ function PlayersPage() {
             searchPlaceholder="Search name, city, sport"
             activeFilterCount={activeFilterCount}
             sheetTitle="Filter players"
-            rightExtra={
+            rightExtra={isParentMode ? undefined : (
               <button
                 onClick={openPostFlow}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
@@ -611,7 +616,7 @@ function PlayersPage() {
               >
                 <Plus className="h-5 w-5" strokeWidth={2.5} />
               </button>
-            }
+            )}
             onReset={() => {
               markSportChoice("players");
               setSports([]);
@@ -692,7 +697,7 @@ function PlayersPage() {
                   : "Be the first — share when you're free and where you'll travel."
               }
               cta={
-                user ? (
+                isParentMode ? undefined : user ? (
                   <Button
                     onClick={openPostFlow}
                     className="rounded-full bg-lime-gradient text-primary-foreground"
@@ -744,7 +749,7 @@ function PlayersPage() {
         </>
       )}
 
-      <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
+      {!isParentMode && <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Post availability</DialogTitle>
@@ -757,9 +762,9 @@ function PlayersPage() {
             }}
           />
         </DialogContent>
-      </Dialog>
+      </Dialog>}
 
-      {(postOpen || editingPost) && (
+      {!isParentMode && (postOpen || editingPost) && (
         <PostAvailabilityDialog
           initial={editingPost}
           onClose={() => {
@@ -1070,18 +1075,14 @@ function AvailabilityCard({
 }) {
   const navigate = useNavigate();
   const when = formatWindow(a);
+  const { teams: recruitingTeams } = useMyRecruitingTeams();
+  const [teamInviteOpen, setTeamInviteOpen] = useState(false);
   const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
     ? (a.author_links as ProfileLink[])
     : [];
 
-  const handleMessage = async () => {
-    try {
-      const id = await getOrCreateDirectConversation(a.user_id);
-      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) {
-      toast.error(describeMessagingError(e));
-    }
-  };
+  const guardianFallback = useMessageOrGuardian();
+  const handleMessage = () => guardianFallback.startMessage(a.user_id, a.author_name);
 
   const handleDelete = async () => {
     if (!confirm("Remove this availability post?")) return;
@@ -1279,6 +1280,25 @@ function AvailabilityCard({
           </>
         )}
       </div>
+
+      {!isMine && recruitingTeams.length > 0 && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-2 w-full rounded-full border-lime/50"
+          onClick={() => setTeamInviteOpen(true)}
+        >
+          <Shield className="h-4 w-4 mr-1" /> Invite to team
+        </Button>
+      )}
+      {guardianFallback.dialog}
+      {teamInviteOpen && (
+        <InviteToTeamDialog
+          playerId={a.user_id}
+          playerName={a.author_name}
+          onClose={() => setTeamInviteOpen(false)}
+        />
+      )}
 
       <div className="mt-2 flex items-center gap-3">
         <Link
