@@ -29,7 +29,12 @@ COMMENT ON COLUMN public.game_payment_settings.payment_hold_minutes IS
 --   * by pg_cron below, when the extension is available;
 --   * by /api/public/payments/release-holds for an external scheduler.
 -- Returns the number of holds released.
-CREATE OR REPLACE FUNCTION public.release_expired_payment_holds(_game_id uuid DEFAULT NULL)
+--
+-- Game ids are text across these tables (hosted_games.id, join_requests.game_id
+-- and friends), so the parameter is text too. An earlier draft of this
+-- migration took a uuid; drop that signature so re-running stays clean.
+DROP FUNCTION IF EXISTS public.release_expired_payment_holds(uuid);
+CREATE OR REPLACE FUNCTION public.release_expired_payment_holds(_game_id text DEFAULT NULL)
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -132,8 +137,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.release_expired_payment_holds(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.release_expired_payment_holds(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.release_expired_payment_holds(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.release_expired_payment_holds(text) TO authenticated, service_role;
 
 -- Sweep every five minutes where pg_cron is installed. Environments without
 -- it rely on the lazy page sweep and the scheduler endpoint instead.
