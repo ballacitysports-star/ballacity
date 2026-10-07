@@ -33,88 +33,15 @@ export type TryoutListing = {
   teamId: string;
   teamName: string;
   teamAvatar: string | null;
-  teamVerified: boolean;
-  /** `teams.age_groups`, used to label the age division when the title has none. */
-  teamAgeGroups: string[];
   sports: string[];
-  /**
-   * Whether the team has a published waiver that RSVPs must sign. Only this
-   * flag is public; the waiver text stays behind the signed-in RSVP flow.
-   * `null` when the lookup failed, so the UI says nothing rather than guessing.
-   */
-  waiverRequired: boolean | null;
 };
-
-const TRYOUT_SELECT =
-  "id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports,verified,age_groups)";
-
-/** Team ids (of those given) with a published waiver. Null when it can't be read. */
-async function publishedWaiverTeamIds(teamIds: string[]): Promise<Set<string> | null> {
-  if (teamIds.length === 0) return new Set();
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("team_waivers")
-    .select("team_id")
-    .eq("published", true)
-    .in("team_id", teamIds);
-  if (error) {
-    console.error("publishedWaiverTeamIds", error.message);
-    return null;
-  }
-  return new Set((data ?? []).map((w) => w.team_id));
-}
-
-/** A `team_posts` row as returned by {@link TRYOUT_SELECT}. */
-export type TryoutRow = {
-  id: string;
-  kind: string;
-  title: string;
-  body: string | null;
-  event_date: string | null;
-  location: string | null;
-  price: number | null;
-  spots_max: number | null;
-  spots_taken: number | null;
-  team_id: string;
-  teams: {
-    name: string | null;
-    avatar: string | null;
-    sports: string[] | null;
-    verified: boolean | null;
-    age_groups: string[] | null;
-  } | null;
-};
-
-export function toTryoutListing(
-  r: TryoutRow,
-  waiverTeams: ReadonlySet<string> | null,
-): TryoutListing {
-  return {
-    id: r.id,
-    kind: r.kind as TryoutListing["kind"],
-    title: r.title,
-    body: r.body ?? "",
-    eventDate: r.event_date,
-    location: r.location,
-    price: r.price,
-    spotsMax: r.spots_max,
-    spotsTaken: r.spots_taken ?? 0,
-    teamId: r.team_id,
-    teamName: r.teams?.name ?? "Team",
-    teamAvatar: r.teams?.avatar ?? null,
-    teamVerified: !!r.teams?.verified,
-    teamAgeGroups: r.teams?.age_groups ?? [],
-    sports: r.teams?.sports ?? [],
-    waiverRequired: waiverTeams ? waiverTeams.has(r.team_id) : null,
-  };
-}
 
 /** Public: upcoming tryouts and camps across all visible teams. */
 export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
   async (): Promise<TryoutListing[]> => {
     const { data, error } = await publicClient()
       .from("team_posts")
-      .select(TRYOUT_SELECT)
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
       .gte("event_date", new Date().toISOString())
@@ -124,50 +51,23 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
       console.error("listUpcomingTryouts", error.message);
       return [];
     }
-    const rows = (data ?? []) as unknown as TryoutRow[];
-    const waiverTeams = await publishedWaiverTeamIds([...new Set(rows.map((r) => r.team_id))]);
-    return rows.map((r) => toTryoutListing(r, waiverTeams));
+    return (data ?? []).map((r: any) => ({
+      id: r.id,
+      kind: r.kind,
+      title: r.title,
+      body: r.body ?? "",
+      eventDate: r.event_date,
+      location: r.location,
+      price: r.price,
+      spotsMax: r.spots_max,
+      spotsTaken: r.spots_taken ?? 0,
+      teamId: r.team_id,
+      teamName: r.teams?.name ?? "Team",
+      teamAvatar: r.teams?.avatar ?? null,
+      sports: r.teams?.sports ?? [],
+    }));
   },
 );
-
-/**
- * Public: upcoming tryouts and camps held at a facility. A post belongs to a
- * facility when its venue was picked from the place search and resolves to the
- * same Google place as the facility's listing; free-text venues are never
- * guessed at. Hidden or unplaced facilities return nothing.
- */
-export const listFacilityTryouts = createServerFn({ method: "GET" })
-  .inputValidator((i) => z.object({ orgId: z.string().uuid() }).parse(i))
-  .handler(async ({ data }): Promise<TryoutListing[]> => {
-    const sb = publicClient();
-    const { data: org, error: orgError } = await sb
-      .from("trainer_orgs")
-      .select("place_id")
-      .eq("id", data.orgId)
-      .maybeSingle();
-    if (orgError) {
-      console.error("listFacilityTryouts org", orgError.message);
-      return [];
-    }
-    if (!org?.place_id) return [];
-
-    const { data: rows, error } = await sb
-      .from("team_posts")
-      .select(TRYOUT_SELECT)
-      .in("kind", ["tryout", "clinic"])
-      .is("hidden_at", null)
-      .eq("place_id", org.place_id)
-      .gte("event_date", new Date().toISOString())
-      .order("event_date", { ascending: true })
-      .limit(12);
-    if (error) {
-      console.error("listFacilityTryouts", error.message);
-      return [];
-    }
-    const posts = (rows ?? []) as unknown as TryoutRow[];
-    const waiverTeams = await publishedWaiverTeamIds([...new Set(posts.map((r) => r.team_id))]);
-    return posts.map((r) => toTryoutListing(r, waiverTeams));
-  });
 
 /** Signed-in: waiver (if any), my RSVPs, my linked children. */
 export const getTryoutRsvpContext = createServerFn({ method: "GET" })
@@ -370,14 +270,18 @@ export const getTryout = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<TryoutListing | null> => {
     const { data: r, error } = await publicClient()
       .from("team_posts")
-      .select(TRYOUT_SELECT)
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
       .eq("id", data.postId)
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
       .maybeSingle();
     if (error || !r) return null;
-    const row = r as unknown as TryoutRow;
-    return toTryoutListing(row, await publishedWaiverTeamIds([row.team_id]));
+    const x: any = r;
+    return {
+      id: x.id, kind: x.kind, title: x.title, body: x.body ?? "", eventDate: x.event_date,
+      location: x.location, price: x.price, spotsMax: x.spots_max, spotsTaken: x.spots_taken ?? 0,
+      teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
+    };
   });
 
 /** Manager-only: applicants for one tryout with attendance, score and notes. */

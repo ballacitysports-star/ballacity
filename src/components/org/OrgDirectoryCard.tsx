@@ -25,8 +25,6 @@ export type OrgDirectoryRow = {
   booking_url?: string | null;
   verified: boolean | null;
   featured_at?: string | null;
-  /** `{ lat, lng }` JSON when the facility was placed on the map. */
-  geo?: unknown;
 };
 
 const BADGE_TEXT: Record<OpenBadge["tone"], string> = {

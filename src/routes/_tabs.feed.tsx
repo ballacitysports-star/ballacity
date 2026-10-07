@@ -50,10 +50,6 @@ import type { OrgPost, PostKind } from "@/lib/sample-data";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
-import { HappeningSoonSection } from "@/components/dashboard/HappeningSoonSection";
-import { TryoutsCampsSection } from "@/components/dashboard/TryoutsCampsSection";
-import { NearbyFacilitiesSection } from "@/components/dashboard/NearbyFacilitiesSection";
-import { buildHappeningSoon } from "@/lib/curated-dashboard";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -458,34 +454,6 @@ function Feed() {
   const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
   const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
-
-  // The curated dashboard (Happening Soon, Tryouts & Camps, Nearby Courts)
-  // fronts the "All" category while browsing upcoming runs in list view. A
-  // search, the archive, the map and the per-category views keep their own
-  // layouts.
-  const dashboardOn = cat === "all" && tab === "upcoming" && !q && viewMode === "list";
-  // The view controls live in the "All upcoming runs" header when that list is
-  // on screen; otherwise they stay at the top so they are always reachable.
-  const controlsInListHeader = dashboardOn && prefs.sections.showForYou;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  // Built from the already-filtered feed so the viewer's sport, distance and
-  // price filters apply. Runs they joined or host have no spot left to fill.
-  const soon = useMemo(() => {
-    const mine = new Set(joinedSet);
-    if (authUser) {
-      for (const g of [...hosted, ...GAMES]) {
-        if (g.hostUserId === authUser.id) mine.add(g.id);
-      }
-    }
-    return buildHappeningSoon(filtered, { now, excludeIds: mine, viewer: coords });
-  }, [filtered, now, joinedSet, hosted, authUser, coords]);
-  // Facility cards count this week's runs from every public game, unfiltered,
-  // so a gym's activity doesn't change with the viewer's sport chips.
-  const allGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
   const finishedCount = useMemo(() => onlyFinishedGames([...hosted, ...GAMES]).length, [hosted]);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
@@ -704,7 +672,7 @@ function Feed() {
         })}
       </div>
 
-      {!entityCat && !controlsInListHeader && (
+      {!entityCat && (
         <ViewDensityToggle
           view={viewMode}
           onViewChange={(v) => switchView(v)}
@@ -753,9 +721,7 @@ function Feed() {
             </div>
           )}
 
-          {/* Sticky so the sport pills keep filtering the whole stream while the
-              dashboard sections and the runs feed scroll underneath. */}
-          <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-[clamp(0.75rem,4vw,2rem)] mb-4 bg-background/90 px-[clamp(0.75rem,4vw,2rem)] py-2 backdrop-blur">
+          <div className="mb-5">
             <SportChips multi selected={chipSelected} onSelect={setChipSport} />
             {chipSelected.length === 1 &&
               POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
@@ -794,14 +760,6 @@ function Feed() {
             <DiscoverResults cat={entityCat} q={q} sports={chipSelected} />
           ) : (
             <>
-              {dashboardOn && (
-                <>
-                  {prefs.sections.showUrgent && <HappeningSoonSection soon={soon} now={now} />}
-                  <TryoutsCampsSection sports={chipSelected} />
-                  <NearbyFacilitiesSection games={allGames} viewer={coords} unit={distanceUnit} />
-                </>
-              )}
-
               {cat === "all" && teamPosts.length > 0 && (
                 <section className="mb-6">
                   <div className="flex items-center justify-between mb-2">
@@ -966,7 +924,7 @@ function Feed() {
                 </>
               ) : (
                 <>
-                  {!dashboardOn && prefs.sections.showUrgent && urgent.length > 0 && (
+                  {prefs.sections.showUrgent && urgent.length > 0 && (
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-2">
                         <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
@@ -980,34 +938,9 @@ function Feed() {
 
                   {(tab === "archive" || prefs.sections.showForYou) && (
                     <>
-                      {controlsInListHeader ? (
-                        <section aria-labelledby="all-runs-heading">
-                          <div className="mb-2.5 flex items-center justify-between gap-3">
-                            <h2
-                              id="all-runs-heading"
-                              className="font-display text-lg font-bold leading-tight"
-                            >
-                              <span aria-hidden className="mr-1.5">
-                                📅
-                              </span>
-                              All Upcoming Runs
-                            </h2>
-                            <span className="text-xs text-muted-foreground">
-                              {filtered.length} {filtered.length === 1 ? "run" : "runs"}
-                            </span>
-                          </div>
-                          <ViewDensityToggle
-                            view={viewMode}
-                            onViewChange={(v) => switchView(v)}
-                            density={density}
-                            onDensityChange={(d) => switchDensity(d)}
-                          />
-                        </section>
-                      ) : (
-                        <h2 className="section-eyebrow text-muted-foreground mb-2">
-                          {tab === "archive" ? "Recently finished" : "All upcoming runs"}
-                        </h2>
-                      )}
+                      <h2 className="section-eyebrow text-muted-foreground mb-2">
+                        {tab === "archive" ? "Recently finished" : "For you"}
+                      </h2>
                       <div className={listContainerClass}>
                         {refreshing && filtered.length === 0
                           ? renderSkeletons(density === "list" ? 6 : 3)
