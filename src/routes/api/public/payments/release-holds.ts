@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { authorizeWorker } from "@/lib/worker-auth.server";
 
 /**
  * Releases approved-but-unpaid spots whose payment hold has run out, across
@@ -18,13 +19,7 @@ export const Route = createFileRoute("/api/public/payments/release-holds")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.REELS_WORKER_SECRET;
-        if (!secret) return json({ error: "worker secret not configured" }, 503);
-        const provided =
-          request.headers.get("x-worker-secret") ??
-          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-          "";
-        if (provided !== secret) return json({ error: "Unauthorized" }, 401);
+        if ((await authorizeWorker(request)) !== "ok") return json({ error: "Unauthorized" }, 401);
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data, error } = await supabaseAdmin.rpc("release_expired_payment_holds", {});

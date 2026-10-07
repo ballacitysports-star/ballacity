@@ -4042,6 +4042,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_worker_secret: { Args: { _provided: string }; Returns: boolean }
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
       admin_audit_log_facets: {
