@@ -205,11 +205,8 @@ export function FeedPreferencesBody() {
     });
   };
 
-  const toggleSection = (k: keyof typeof sections) => {
-    const next = { ...sections, [k]: !sections[k] };
-    if (!next.showForYou && !next.showUrgent) return; // never hide everything
-    patch({ sections: next });
-  };
+  const toggleUrgentPin = () =>
+    patch({ sections: { ...sections, showUrgent: !sections.showUrgent } });
 
   return (
     <>
@@ -347,27 +344,19 @@ export function FeedPreferencesBody() {
           These only change what the feed shows — they never filter games out.
         </p>
         <div className="space-y-2">
-          {(
-            [
-              ["showUrgent", "Needs players now"],
-              ["showForYou", '"For you" list'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => toggleSection(k)}
-              className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
+          <button
+            onClick={toggleUrgentPin}
+            className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
+          >
+            <span>Pin “Needs players now” runs to the top</span>
+            <span
+              className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections.showUrgent ? "bg-lime" : "bg-secondary"}`}
             >
-              <span>{label}</span>
               <span
-                className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections[k] ? "bg-lime" : "bg-secondary"}`}
-              >
-                <span
-                  className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections[k] ? "translate-x-4" : ""}`}
-                />
-              </span>
-            </button>
-          ))}
+                className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections.showUrgent ? "translate-x-4" : ""}`}
+              />
+            </span>
+          </button>
         </div>
       </FilterSection>
 

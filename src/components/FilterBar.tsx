@@ -18,6 +18,13 @@ export type FilterBarCreate = {
   label: string;
 };
 
+/** An active filter shown as a chip the user can remove in one tap. */
+export type FilterBarActiveChip = {
+  id: string;
+  label: string;
+  onRemove: () => void;
+};
+
 export function FilterBar({
   q,
   onQChange,
@@ -30,6 +37,7 @@ export function FilterBar({
   onReset,
   resetDisabled,
   rightExtra,
+  activeChips,
 }: {
   q: string;
   onQChange: (v: string) => void;
@@ -44,6 +52,8 @@ export function FilterBar({
   resetDisabled?: boolean;
   /** Optional slot rendered before the Create button (e.g. mode toggle) */
   rightExtra?: React.ReactNode;
+  /** When given, active filters are listed as removable chips beside "Clear all". */
+  activeChips?: FilterBarActiveChip[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -96,10 +106,25 @@ export function FilterBar({
       {/* When filters are on, say so in words next to a way out of them — the
           badge on the filter button alone left people hunting inside the sheet. */}
       {activeFilterCount > 0 && onReset && (
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          <span className="font-semibold text-lime">
-            {activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"} on
-          </span>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {activeChips && activeChips.length > 0 ? (
+            activeChips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={c.onRemove}
+                aria-label={`Remove filter: ${c.label}`}
+                className="inline-flex min-h-8 items-center gap-1 rounded-full border border-lime/40 bg-lime/10 pl-3 pr-2 font-semibold text-lime"
+              >
+                {c.label}
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            ))
+          ) : (
+            <span className="font-semibold text-lime">
+              {activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"} on
+            </span>
+          )}
           <button
             type="button"
             onClick={onReset}

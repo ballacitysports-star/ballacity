@@ -26,8 +26,11 @@ import {
   DEFAULT_PREFS,
   DEFAULT_FILTERS,
   useMyProfile,
+  useDistanceUnit,
   getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
+import { formatDistance } from "@/lib/distance";
+import { urgentFirst } from "@/lib/feed-order";
 import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserLocation } from "@/lib/geo";
@@ -129,6 +132,7 @@ function Feed() {
   const { user: authUser } = useAuth();
   useFeedPrefsSync();
   const profile = useMyProfile();
+  const distanceUnit = useDistanceUnit();
   const {
     coords,
     status: geoStatus,
@@ -277,6 +281,7 @@ function Feed() {
     setPositionFilter(null);
   };
 
+  const pinUrgent = tab === "upcoming" && prefs.sections.showUrgent;
   const filtered = useMemo(() => {
     // Collapse multi-day series first so one event never shows duplicate cards.
     const pool = collapseSeriesGames([...hosted, ...GAMES], tab);
@@ -324,6 +329,12 @@ function Feed() {
         .sort((a, b) => {
           // Archive lists the most recently finished games first.
           if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
+          // Runs that still need players come first (and keep their normal
+          // order within each group), instead of being repeated in a section.
+          if (pinUrgent) {
+            const pinned = urgentFirst(a, b);
+            if (pinned !== 0) return pinned;
+          }
           if (prefs.sortBy === "nearest") {
             // Nearest first; prefer local city, then distanceMi, then date.
             const la = isLocal(a) ? 0 : 1;
@@ -366,16 +377,39 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-  const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
-
-  const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
   const finishedCount = useMemo(() => onlyFinishedGames([...hosted, ...GAMES]).length, [hosted]);
-  const activeFilterCount =
-    (prefs.preferredSports.length > 0 ? 1 : 0) +
-    (prefs.maxDistanceMi != null ? 1 : 0) +
-    Object.entries(prefs.sections).filter(
-      ([k, v]) => k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
-    ).length;
+  // Filters other than sport (the sport pills already show theirs) as chips
+  // that can be removed in one tap. Layout toggles are not filters.
+  const activeChips = [
+    ...(prefs.maxDistanceMi != null
+      ? [
+          {
+            id: "distance",
+            label: `Within ${formatDistance(prefs.maxDistanceMi, distanceUnit)}`,
+            onRemove: () => setFeedPrefs({ ...prefs, maxDistanceMi: null }),
+          },
+        ]
+      : []),
+    ...(prefs.moneyFilter !== "all"
+      ? [
+          {
+            id: "price",
+            label: prefs.moneyFilter === "free" ? "Free only" : "Paid only",
+            onRemove: () => setFeedPrefs({ ...prefs, moneyFilter: "all" }),
+          },
+        ]
+      : []),
+    ...(prefs.mineFilter !== "all"
+      ? [
+          {
+            id: "mine",
+            label: prefs.mineFilter === "hosting" ? "Hosting" : "Joined",
+            onRemove: () => setFeedPrefs({ ...prefs, mineFilter: "all" }),
+          },
+        ]
+      : []),
+  ];
+  const activeFilterCount = (prefs.preferredSports.length > 0 ? 1 : 0) + activeChips.length;
 
   // Infinite scroll: paginate the main filtered list. Page size scales with
   // viewport so tablets/desktops fill their wider grids in one batch.
@@ -584,6 +618,7 @@ function Feed() {
               onQChange={setQ}
               searchPlaceholder="Search pickup runs"
               activeFilterCount={activeFilterCount}
+              activeChips={activeChips}
               create={{ to: "/create", label: "Create game" }}
               sheetTitle="Feed filters"
               sheet={<FeedPreferencesBody />}
@@ -701,17 +736,7 @@ function Feed() {
             </>
           ) : (
             <>
-              {prefs.sections.showUrgent && urgent.length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
-                    <span className="text-xs text-muted-foreground">{urgent.length} games</span>
-                  </div>
-                  <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
-                </div>
-              )}
-
-              {(tab === "archive" || prefs.sections.showForYou) && (
+              {
                 <>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="section-eyebrow text-muted-foreground">
@@ -758,18 +783,7 @@ function Feed() {
                   </div>
                   <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
                 </>
-              )}
-              {/* The list heading carries this link; keep archive reachable when
-                  that list is switched off in feed settings. */}
-              {tab === "upcoming" && !prefs.sections.showForYou && finishedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setTab("archive")}
-                  className="text-xs font-semibold text-lime"
-                >
-                  Finished ({finishedCount})
-                </button>
-              )}
+              }
             </>
           )}
         </>
