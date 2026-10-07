@@ -43,7 +43,7 @@ const handleRe = /^[a-z0-9_-]{3,40}$/;
 // Columns the public directory needs to render a facility card. All are
 // anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
-  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at,geo";
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
 
 // Escape characters that are special inside an ilike pattern.
 function likePattern(term: string): string {
