@@ -467,6 +467,22 @@ function Feed() {
   // The view controls live in the "All upcoming runs" header when that list is
   // on screen; otherwise they stay at the top so they are always reachable.
   const controlsInListHeader = dashboardOn && prefs.sections.showForYou;
+  // The headline names what is on screen: a parent browsing tryouts should not
+  // see a pickup-game title, and the game count only means something when the
+  // page is about games.
+  const pageTitle =
+    tab === "archive"
+      ? "Finished games."
+      : cat === "all"
+        ? "Discover."
+        : cat === "teams"
+          ? "Teams & tryouts."
+          : cat === "gyms"
+            ? "Gyms & courts."
+            : cat === "trainers"
+              ? "Trainers."
+              : "Tonight's run.";
+  const showRunCount = cat === "runs" || tab === "archive";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60_000);
@@ -650,16 +666,16 @@ function Feed() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
+        <h1 className="page-title">{pageTitle}</h1>
         <p className="page-subtitle inline-flex items-center gap-1">
           {userCityToken ? (
             <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
-              {filtered.length} games
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city}
+              {showRunCount ? ` · ${filtered.length} games` : ""}
             </>
           ) : (
             <>
-              {filtered.length} games ·{" "}
+              {showRunCount ? `${filtered.length} games · ` : ""}
               <Link to="/profile/edit" className="text-lime font-semibold">
                 Set your city
               </Link>{" "}
@@ -675,7 +691,7 @@ function Feed() {
         role="tablist"
         aria-label="Game timeframe"
         className={`mb-4 inline-flex rounded-full border border-border bg-surface p-1 ${
-          entityCat ? "hidden" : ""
+          entityCat || controlsInListHeader ? "hidden" : ""
         }`}
       >
         {(
@@ -992,8 +1008,17 @@ function Feed() {
                               </span>
                               All Upcoming Runs
                             </h2>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="flex items-center gap-3 text-xs text-muted-foreground">
                               {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+                              {finishedCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTab("archive")}
+                                  className="font-semibold text-lime"
+                                >
+                                  Finished ({finishedCount})
+                                </button>
+                              )}
                             </span>
                           </div>
                           <ViewDensityToggle
