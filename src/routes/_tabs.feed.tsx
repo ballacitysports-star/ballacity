@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarSearch, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, CalendarSearch, RefreshCw, Search, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Bell, MessageCircle, MapPin } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
@@ -140,6 +140,23 @@ function Feed() {
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   // A tap must always do something: fall back to manual entry when the browser
   // refuses to hand over a position.
+  // The prompt is shown once per session; dismissing it hides it until the next.
+  const [locPromptHidden, setLocPromptHidden] = useState(false);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("openrun:loc-prompt-hidden") === "1") setLocPromptHidden(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const dismissLocPrompt = () => {
+    setLocPromptHidden(true);
+    try {
+      sessionStorage.setItem("openrun:loc-prompt-hidden", "1");
+    } catch {
+      /* ignore */
+    }
+  };
   const handleLocationTap = async () => {
     if (geoStatus === "denied" || geoStatus === "unsupported" || locationError) {
       setLocationDialogOpen(true);
@@ -512,63 +529,47 @@ function Feed() {
         </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
-        <p className="page-subtitle inline-flex items-center gap-1">
-          {userCityToken ? (
-            <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
-              {filtered.length} games
-            </>
-          ) : (
-            <>
-              {filtered.length} games ·{" "}
-              <Link to="/profile/edit" className="text-lime font-semibold">
-                Set your city
-              </Link>{" "}
-              for nearby
-            </>
-          )}
-        </p>
-      </motion.div>
-
-      <div
-        role="tablist"
-        aria-label="Game timeframe"
-        className="mb-4 inline-flex rounded-full border border-border bg-surface p-1"
+      <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
+      {/* One slim row instead of a headline, a timeframe toggle and two toggle
+          groups: where you are on the left, the layout switch on the right. */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-4 flex items-center justify-between gap-3"
       >
-        {(
-          [
-            { id: "upcoming", label: "Upcoming" },
-            { id: "archive", label: `Archive${finishedCount ? ` (${finishedCount})` : ""}` },
-          ] as const
-        ).map((t) => {
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.id)}
-              className={`inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
-                active
-                  ? "bg-lime text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={(v) => switchView(v)}
-        density={density}
-        onDensityChange={(d) => switchDensity(d)}
-      />
+        {tab === "archive" ? (
+          <button
+            type="button"
+            onClick={() => setTab("upcoming")}
+            className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-lime"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to upcoming
+          </button>
+        ) : (
+          <p className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
+            {userCityToken ? (
+              <span className="truncate">
+                Nearest to <span className="font-semibold text-foreground">{profile?.city}</span>
+              </span>
+            ) : (
+              <span className="truncate">
+                <Link to="/profile/edit" className="font-semibold text-lime">
+                  Set your city
+                </Link>{" "}
+                for nearby
+              </span>
+            )}
+          </p>
+        )}
+        <ViewDensityToggle
+          variant="icons"
+          view={viewMode}
+          onViewChange={(v) => switchView(v)}
+          density={density}
+          onDensityChange={(d) => switchDensity(d)}
+        />
+      </motion.div>
 
       {viewMode === "map" ? (
         <PlayMapView
@@ -647,8 +648,9 @@ function Feed() {
 
           {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
             geoStatus !== "unsupported" &&
-            (!coords || locationRemembered) && (
-              <div className="mb-4">
+            (!coords || locationRemembered) &&
+            !locPromptHidden && (
+              <div className="mb-4 flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleLocationTap}
@@ -664,13 +666,17 @@ function Feed() {
                         ? "Location blocked — tap to retry"
                         : "Use my location to sort and filter by distance"}
                 </button>
-                <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
-                <LocationAccessDialog
-                  open={locationDialogOpen}
-                  onOpenChange={setLocationDialogOpen}
-                />
+                <button
+                  type="button"
+                  onClick={dismissLocPrompt}
+                  aria-label="Dismiss location prompt"
+                  className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
+          <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
 
           {q ? (
             <>
@@ -707,9 +713,23 @@ function Feed() {
 
               {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
-                  <h2 className="section-eyebrow text-muted-foreground mb-2">
-                    {tab === "archive" ? "Recently finished" : "For you"}
-                  </h2>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h2 className="section-eyebrow text-muted-foreground">
+                      {tab === "archive" ? "Recently finished" : "For you"}
+                    </h2>
+                    <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {filtered.length} {filtered.length === 1 ? "game" : "games"}
+                      {tab === "upcoming" && finishedCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setTab("archive")}
+                          className="font-semibold text-lime"
+                        >
+                          Finished ({finishedCount})
+                        </button>
+                      )}
+                    </span>
+                  </div>
                   <div className={listContainerClass}>
                     {refreshing && filtered.length === 0
                       ? renderSkeletons(density === "list" ? 6 : 3)
@@ -738,6 +758,17 @@ function Feed() {
                   </div>
                   <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
                 </>
+              )}
+              {/* The list heading carries this link; keep archive reachable when
+                  that list is switched off in feed settings. */}
+              {tab === "upcoming" && !prefs.sections.showForYou && finishedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTab("archive")}
+                  className="text-xs font-semibold text-lime"
+                >
+                  Finished ({finishedCount})
+                </button>
               )}
             </>
           )}
