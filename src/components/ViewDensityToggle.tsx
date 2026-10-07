@@ -19,6 +19,7 @@ export function ViewDensityToggle({
   onDensityChange,
   views = ["list", "map"],
   showDensity = true,
+  variant = "full",
 }: {
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
@@ -26,7 +27,50 @@ export function ViewDensityToggle({
   onDensityChange: (d: Density) => void;
   views?: ViewMode[];
   showDensity?: boolean;
+  /**
+   * "icons" folds view and density into one icon-only control (Grid, Compact,
+   * Map) that fits on a header row. Needs the default list + map views.
+   */
+  variant?: "full" | "icons";
 }) {
+  if (variant === "icons") {
+    const options = [
+      { id: "grid", label: "Grid view", Icon: LayoutGrid },
+      { id: "compact", label: "Compact view", Icon: Rows3 },
+      { id: "map", label: "Map view", Icon: MapIcon },
+    ] as const;
+    const current = view === "map" ? "map" : density === "list" ? "compact" : "grid";
+    const choose = (id: (typeof options)[number]["id"]) => {
+      if (id === "map") return onViewChange("map");
+      onViewChange("list");
+      onDensityChange(id === "compact" ? "list" : "grid");
+    };
+    return (
+      <div
+        role="group"
+        aria-label="Layout"
+        className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-surface p-0.5"
+      >
+        {options.map(({ id, label, Icon }) => {
+          const active = current === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-label={label}
+              aria-pressed={active}
+              onClick={() => choose(id)}
+              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${
+                active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   return (
     <div className="mb-4 flex items-center gap-2">
       <div
