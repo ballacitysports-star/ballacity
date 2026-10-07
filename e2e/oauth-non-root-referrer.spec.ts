@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubNewUserOnboarding } from "./helpers/server-fn";
 
 /**
  * OAuth returns where `document.referrer` is NOT `/` (e.g. user tapped a
@@ -55,8 +56,10 @@ async function primeAndLandOnAuth(page: Page) {
   }, NEXT_PATH);
   await page.waitForURL(/\/auth(?:[?#/].*)?$/, { timeout: 15_000 });
 
+  // Path only: /players writes its default filters into the query string
+  // (`/players?q=&sport=…`) before the click-through, and that is the referrer.
   const referrer = await page.evaluate(() => document.referrer);
-  expect(referrer.replace(/^https?:\/\/[^/]+/, "")).toBe(REFERRER_PATH);
+  expect(referrer.replace(/^https?:\/\/[^/]+/, "").split(/[?#]/)[0]).toBe(REFERRER_PATH);
 }
 
 async function emitOAuthSignedIn(page: Page, provider: string) {
@@ -92,6 +95,7 @@ test.describe("OAuth from /auth with non-root referrer", () => {
       const page = await context.newPage();
       try {
         await stubAccountType(page, null);
+        await stubNewUserOnboarding(page, provider);
         await primeAndLandOnAuth(page);
         await emitOAuthSignedIn(page, provider);
 

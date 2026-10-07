@@ -9,6 +9,87 @@ The last run that executed to completion and wrote a report.
 89 passed (50.9m)
 ```
 
+## Root causes found 2026-10-07 (fixed on this branch, not yet run)
+
+Found by reading the per-test errors of runs 191 (2026-10-01) and 288
+(2026-10-06) against the code. None of this has been through CI yet: every job
+on this branch since 2026-10-07 12:36 UTC was refused with "recent account
+payments have failed or your spending limit needs to be increased" (GitHub
+billing), and the app can't be run locally without dependencies.
+
+1. **Game page crashed on every cold deep link (app bug).** `GameDetail` in
+   `src/routes/games.$gameId.index.tsx` called `useMyAge`, `useJoinGate` and two
+   `useState`s *after* its `Loading…` / `Game not found` early returns. A deep
+   link renders `Loading…` first (the hosted-games store is empty until it
+   loads), then the game; the second render calls four more hooks, React throws
+   "Rendered more hooks than during the previous render", and the route shows
+   its error screen. That is the "invite-* routes time out before the game
+   landing state renders" cluster: banner, Join / Request / Pay host CTAs,
+   roster, status strip and `invite-expired-banner` all live on that page.
+   It only rendered when the game happened to be in `localStorage` already,
+   which is why `invite-deeplink-to-pay` passed once. The hooks now run before
+   the returns, and `useJoinGate` accepts a game that hasn't loaded.
+2. **e2e-player was stuck in Parent Mode (test pollution).** The onboarding
+   picker's Parent / Guardian tests let `supabase.auth.updateUser({ data: {
+   is_guardian: true } })` through to the real account, and `global-setup`
+   merged existing metadata, so the flag survived every later run. Parent Mode
+   sends `/profile` to `/parent` and `/games/$id/pay` to `/guardian`, and hides
+   the join and pay CTAs. Run 191 has no `/parent` redirects and run 288 has
+   them from its first `/profile` test, so the flag landed in between (run 191's
+   own Parent / Guardian tests passed late in that run). The spec now stubs that
+   update, and `global-setup` writes `is_guardian: false` and
+   `account_type: player` every run.
+3. **"Updated legal documents" dialog over every tab route (missing fixture
+   data).** The 2026-09-01 Terms and Privacy versions are material, the
+   fixture accounts never accepted them, and `LegalReacceptGate` covers the
+   tabs and intercepts clicks. The four `filterbar-persistence` failures in run
+   288 name the dialog in their call logs; the `trainers-*` timeouts are likely
+   the same but their logs don't say. `global-setup` now records acceptance of
+   the bundled and published versions for the fixture accounts.
+4. **OAuth "new user" specs could never reach the picker (spec drift).** They
+   stubbed only the client's `profiles?select=account_type` read, but the app
+   asks the `getOnboardingStatus` server fn first, and the server reads the
+   real fixture profile, which has a type. supabase-js emits `SIGNED_IN` when
+   it restores the stored session on load, so the root handler sent the
+   "new" user to the saved `next` or the feed. One spec stubbed the server fn
+   at `/n/…onboarding…`, a URL the app no longer uses. All four specs now use
+   `e2e/helpers/server-fn.ts`. `oauth-non-root-referrer` also compared the full
+   referrer, which now carries the `/players` default filters; it compares the
+   path. The app itself is fine for real users: the repo's latest
+   `handle_new_user` (`20260912150000`) leaves `account_type` NULL for social
+   sign-ups, so the server reports `needsOnboarding`, *if* that migration is
+   applied to the backend in question.
+5. **Pay specs asserted copy that isn't in the app.** "Pay host using" and
+   "host hasn't configured payment yet" appear nowhere in the repo's history
+   (it starts 2026-09-07). The screen says "How do you want to pay?" (or "Or pay
+   another way" with PayPal) and "Host hasn't set up payment yet".
+
+Still open, not understood from logs alone:
+
+- The invite specs that seed a notification and open it from `/notifications`
+  (`invite-notification-cta`, `invite-pay-and-join*`, `invite-request-tampered`,
+  `invite-request-to-join`, `invite-expired`) fail before they reach the game
+  page: the seeded row never shows, or the seeding `page.evaluate` hangs for the
+  whole test. Fix 1 only helps them once they get past that.
+- `invite-fallback-params` "unknown gameId → Game not found" fails in both runs,
+  and that path adds no hooks, so fix 1 doesn't explain it.
+
+- `onboarding-null-account-type` route-gate tests passed in run 191 and failed
+  in run 288 (picker heading not shown); TanStack Start moved from 1.168.50 to
+  1.168.60 in between.
+- `social-login-identity-cases` (3 tests) ended on `/auth` in run 288 only;
+  `google-vendor-rejection` signup cases and `oauth-empty-referrer` "returning
+  user with stashed next" fail in both runs.
+- `image-orientation` o6/o8 and `boot-recovery` are unrelated to sessions.
+- `managed-child` adds a real child under e2e-host and deletes it in `finally`
+  through the UI; if that cleanup fails, e2e-host counts as a guardian.
+- The run takes about an hour and the stored session is good for about an
+  hour (run 288: tests 11:52–12:53, session minted ~11:52). Any growth pushes
+  the last specs past token expiry.
+- Hooks after early returns also exist in `profile.edit.tsx`,
+  `messages.index.tsx` and `messages.$conversationId.tsx`, but only behind
+  signed-out branches `AuthGate` never mounts, so they don't fire today.
+
 ## Update 2026-10-01: Actions is back, and there are two newer real runs
 
 | | job | code under test | result |

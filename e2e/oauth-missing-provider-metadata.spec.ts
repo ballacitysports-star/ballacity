@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubNewUserOnboarding } from "./helpers/server-fn";
 
 /**
  * Regression: an OAuth return where the session omits provider metadata
@@ -52,24 +53,11 @@ async function stubBackend(page: Page, serverProvider: "google" | "apple") {
     await route.fallback();
   });
 
-  // Intercept the TanStack server-fn dispatch (`/n/…`) for onboarding status
-  // and return a payload that mirrors the admin-API path: the caller has no
-  // client provider metadata, but the backend still classifies them as social
-  // and requiring onboarding.
-  await page.route(/\/n\/.*onboarding.*/i, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        result: {
-          needsOnboarding: true,
-          isSocial: true,
-          provider: serverProvider,
-          accountType: null,
-        },
-      }),
-    });
-  });
+  // Answer `getOnboardingStatus` the way the admin-API path would: the caller
+  // has no client provider metadata, but the backend still classifies them as
+  // social and requiring onboarding. (This used to match `/n/…onboarding…`, a
+  // server-fn URL the app no longer uses, so the real server answered.)
+  await stubNewUserOnboarding(page, serverProvider);
 }
 
 async function primeStorage(page: Page) {

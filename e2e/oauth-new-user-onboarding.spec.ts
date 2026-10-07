@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubNewUserOnboarding } from "./helpers/server-fn";
 
 /**
  * A brand-new user signing in with Google or Apple (i.e. `profiles.account_type`
@@ -73,6 +74,7 @@ test.describe("OAuth new-user onboarding gate", () => {
       const page = await context.newPage();
       try {
         await stubNullAccountType(page);
+        await stubNewUserOnboarding(page, provider);
         await primeStorage(page, provider);
 
         // Simulate the provider callback returning to the app origin.
@@ -143,6 +145,8 @@ test.describe("OAuth new-user onboarding gate", () => {
     const page = await context.newPage();
     try {
       await stubNullAccountType(page);
+      // No social identity server-side either: the saved marker is the only signal.
+      await stubNewUserOnboarding(page, null);
       await primeStorage(page, "google");
       await page.goto("/", { waitUntil: "domcontentloaded" });
 

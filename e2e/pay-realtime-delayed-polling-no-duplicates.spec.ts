@@ -253,7 +253,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
 
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
 
   // No realtime channel should have joined (WS blocked).
   const joined = await page.evaluate(async () => {
@@ -270,7 +270,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   approved = true;
 
   await expect(gate).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({ timeout: 5_000 });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
   const flipElapsed = Date.now() - approvedAt;
   expect(flipElapsed, "polling should take at least a tick").toBeGreaterThan(1_000);
@@ -282,7 +282,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
 
   // UI stays approved, still no submission POSTs from the late frame.
   await page.waitForTimeout(400);
-  await expect(page.getByText(/pay host using/i)).toBeVisible();
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible();
   await expect(gate).toHaveCount(0);
   expect(posts.length, "no submission POSTs from late realtime frame").toBe(0);
   expect(createdRows.length).toBe(0);

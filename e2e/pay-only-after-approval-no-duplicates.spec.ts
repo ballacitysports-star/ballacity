@@ -194,7 +194,7 @@ test("pay is blocked while pending; after approval exactly one submission is cre
   // Approval gate is up, picker is not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /i have paid/i })).toHaveCount(0);
 
   // "Clicking Pay" while pending: there's no picker button to click, so
@@ -235,7 +235,7 @@ test("pay is blocked while pending; after approval exactly one submission is cre
 
   // Gate flips to picker.
   await expect(gate).toHaveCount(0, { timeout: 20_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({ timeout: 20_000 });
 
   // Pick the method → open the instructions/proof form.
   await page

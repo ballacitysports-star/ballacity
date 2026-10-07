@@ -174,9 +174,10 @@ test.describe("null account_type → account-type setup", () => {
 /**
  * Role picker: one selection right after sign-up, then straight to that role's
  * setup. Nothing on the fixture account changes: the account-type save is a
- * stubbed PATCH, and the age cohort is stubbed so the Parent / Guardian card does
- * not depend on the fixture's birth date. So this checks where each role goes,
- * not what the database does with the type.
+ * stubbed PATCH, the guardian flag is a stubbed auth update, and the age cohort
+ * is stubbed so the Parent / Guardian card does not depend on the fixture's
+ * birth date. So this checks where each role goes, not what the database does
+ * with the type.
  */
 
 /** Which server fn is this `_serverFn` request for? */
@@ -226,9 +227,40 @@ async function stubAccountTypeSave(page: Page): Promise<string[]> {
   return saved;
 }
 
+/**
+ * Swallow the guardian flag. Picking Parent / Guardian also calls
+ * `supabase.auth.updateUser({ data: { is_guardian: true } })`, and unstubbed
+ * that wrote to the shared e2e-player account for good: every later run saw a
+ * guardian, so /profile bounced to /parent and game pages hid their join and
+ * pay CTAs. Answer with the session user plus the requested metadata, so this
+ * page sees the update and the real account doesn't.
+ */
+async function stubUserMetadataSave(page: Page) {
+  const sessionUser = (JSON.parse(SESSION_JSON!) as { user: Record<string, unknown> }).user;
+  await page.route(/\/auth\/v1\/user(?:\?|$)/, async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.fallback();
+      return;
+    }
+    const body = (route.request().postDataJSON() ?? {}) as { data?: Record<string, unknown> };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...sessionUser,
+        user_metadata: {
+          ...((sessionUser.user_metadata as Record<string, unknown> | undefined) ?? {}),
+          ...(body.data ?? {}),
+        },
+      }),
+    });
+  });
+}
+
 async function openPicker(page: Page, cohort: "adult" | "teen_16_17" = "adult") {
   await stubNullAccountType(page);
   await stubAgeCohort(page, cohort);
+  await stubUserMetadataSave(page);
   const saved = await stubAccountTypeSave(page);
   await restoreSession(page);
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
@@ -363,6 +395,7 @@ test.describe("role picker: one selection, straight to that role's setup", () =>
     try {
       await stubNullAccountType(page);
       await stubAgeCohort(page, "adult");
+      await stubUserMetadataSave(page);
       const saved = await stubAccountTypeSave(page);
       await restoreSession(page);
       await page.goto("/onboarding/account-type", { waitUntil: "domcontentloaded" });
