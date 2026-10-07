@@ -46,6 +46,10 @@ export const Route = createFileRoute("/messages/$conversationId")({
       description: "A private ballaCity conversation.",
       noindex: true,
     }),
+  // `draft` pre-fills the composer (e.g. a host nudging a player from the game
+  // roster). It is never sent automatically — the user still taps Send.
+  validateSearch: (s: Record<string, unknown>): { draft?: string } =>
+    typeof s.draft === "string" && s.draft.trim() ? { draft: s.draft.slice(0, 1000) } : {},
   component: Thread,
 });
 
@@ -58,6 +62,7 @@ type Other = {
 
 function Thread() {
   const { conversationId } = Route.useParams();
+  const { draft } = Route.useSearch();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { can: canChildFeature } = useMyChildStatus();
@@ -66,7 +71,7 @@ function Thread() {
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [other, setOther] = useState<Other | null>(null);
   const [isRequest, setIsRequest] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(draft ?? "");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -227,6 +232,19 @@ function Thread() {
     isTypingRef.current = typing;
     channelRef.current?.track({ typing, at: Date.now() });
   };
+
+  // The draft lives in component state once loaded; drop it from the URL so a
+  // refresh after sending doesn't pre-fill the same message again.
+  useEffect(() => {
+    if (!draft) return;
+    navigate({
+      to: "/messages/$conversationId",
+      params: { conversationId },
+      search: {},
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTextChange = (v: string) => {
     setText(v);

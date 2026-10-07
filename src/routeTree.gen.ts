@@ -107,6 +107,7 @@ import { Route as TeamsTeamIdWaiverRouteImport } from './routes/teams.$teamId.wa
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
+import { Route as ApiPublicPaymentsReleaseHoldsRouteImport } from './routes/api/public/payments/release-holds'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
@@ -607,6 +608,12 @@ const ApiPublicNotificationsFlushRoute =
     path: '/api/public/notifications/flush',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsReleaseHoldsRoute =
+  ApiPublicPaymentsReleaseHoldsRouteImport.update({
+    id: '/api/public/payments/release-holds',
+    path: '/api/public/payments/release-holds',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -733,6 +740,7 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -836,6 +844,7 @@ export interface FileRoutesByTo {
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -942,6 +951,7 @@ export interface FileRoutesById {
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -1048,6 +1058,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1151,6 +1162,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId'
     | '/trainers/$trainerId'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1256,6 +1268,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1349,6 +1362,7 @@ export interface RootRouteChildren {
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
   ApiPublicNotificationsFlushRoute: typeof ApiPublicNotificationsFlushRoute
+  ApiPublicPaymentsReleaseHoldsRoute: typeof ApiPublicPaymentsReleaseHoldsRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
@@ -2044,6 +2058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNotificationsFlushRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/release-holds': {
+      id: '/api/public/payments/release-holds'
+      path: '/api/public/payments/release-holds'
+      fullPath: '/api/public/payments/release-holds'
+      preLoaderRoute: typeof ApiPublicPaymentsReleaseHoldsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -2213,6 +2234,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
   ApiPublicNotificationsFlushRoute: ApiPublicNotificationsFlushRoute,
+  ApiPublicPaymentsReleaseHoldsRoute: ApiPublicPaymentsReleaseHoldsRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,

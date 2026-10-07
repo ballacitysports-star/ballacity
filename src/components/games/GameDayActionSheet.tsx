@@ -10,8 +10,15 @@ type Props = {
   gameTitle: string;
   startsAt: string;
   isPaid: boolean;
+  /** Entry fee in dollars, used in the payment announcement copy. */
+  fee?: number;
   hostId: string;
   roster: LiveParticipant[];
+  /**
+   * Approved join requests. On approval-gated paid games a player can be
+   * approved before they hold a participant row, and they owe the fee too.
+   */
+  approvedPlayerIds?: string[];
   busyId: string | null;
   onMarkAttendance: (playerId: string, attended: boolean) => void;
 };
@@ -24,8 +31,10 @@ export function GameDayActionSheet({
   gameTitle,
   startsAt,
   isPaid,
+  fee = 0,
   hostId,
   roster,
+  approvedPlayerIds = [],
   busyId,
   onMarkAttendance,
 }: Props) {
@@ -33,6 +42,8 @@ export function GameDayActionSheet({
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [unpaidMsg, setUnpaidMsg] = useState<string | null>(null);
+  const [sendingUnpaid, setSendingUnpaid] = useState(false);
   const players = useMemo(() => roster.filter((p) => p.userId !== hostId), [roster, hostId]);
   const started = Date.now() >= new Date(startsAt).getTime();
 
@@ -58,6 +69,21 @@ export function GameDayActionSheet({
   }, [subs]);
 
   const unpaid = isPaid ? players.filter((p) => payStatus.get(p.userId) !== "verified") : [];
+  // Everyone who still owes the fee and hasn't sent proof yet: rostered
+  // players plus approved requests that aren't on the roster. Players with
+  // proof under review already paid — nudging them would be noise.
+  const owingIds = useMemo(() => {
+    if (!isPaid) return [] as string[];
+    const ids = new Set([...players.map((p) => p.userId), ...approvedPlayerIds]);
+    ids.delete(hostId);
+    return [...ids].filter((id) => {
+      const st = payStatus.get(id);
+      return st !== "verified" && st !== "pending";
+    });
+  }, [isPaid, players, approvedPlayerIds, hostId, payStatus]);
+  const defaultUnpaidMsg = `${owingIds.length} spot${owingIds.length === 1 ? "" : "s"} still awaiting payment. Please send your ${
+    fee > 0 ? `$${fee} ` : ""
+  }fee before kickoff or your spot may open to the waitlist.`;
   const checkedIn = players.filter((p) => p.attended !== null).length;
 
   const broadcast = async () => {
@@ -83,19 +109,27 @@ export function GameDayActionSheet({
     }
   };
 
-  const remindUnpaid = async () => {
-    await Promise.all(
-      unpaid.map((p) =>
-        createNotification({
-          user_id: p.userId,
-          type: "payment_reminder",
-          title: `Payment reminder · ${gameTitle}`.slice(0, 200),
-          body: "Please send your game fee and submit proof before kickoff.",
-          link: `/games/${gameId}/pay`,
-        }),
-      ),
-    );
-    toast.success(`Reminded ${unpaid.length} player${unpaid.length === 1 ? "" : "s"}.`);
+  const remindUnpaid = async (body: string) => {
+    const text = body.trim();
+    if (!text || owingIds.length === 0) return;
+    setSendingUnpaid(true);
+    try {
+      await Promise.all(
+        owingIds.map((id) =>
+          createNotification({
+            user_id: id,
+            type: "payment_reminder",
+            title: `Payment reminder · ${gameTitle}`.slice(0, 200),
+            body: text,
+            link: `/games/${gameId}/pay`,
+          }),
+        ),
+      );
+      toast.success(`Reminded ${owingIds.length} player${owingIds.length === 1 ? "" : "s"}.`);
+      setUnpaidMsg(null);
+    } finally {
+      setSendingUnpaid(false);
+    }
   };
 
   const Step = ({ done, label, detail }: { done: boolean; label: string; detail: string }) => (
@@ -179,14 +213,55 @@ export function GameDayActionSheet({
             </div>
           )}
 
-          {isPaid && unpaid.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void remindUnpaid()}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2 text-xs font-bold"
-            >
-              <DollarSign className="h-3.5 w-3.5" /> Remind {unpaid.length} unpaid
-            </button>
+          {isPaid && owingIds.length > 0 && (
+            <div className="space-y-1.5 rounded-xl border border-amber-500/40 bg-amber-500/5 p-2">
+              {unpaidMsg === null ? (
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={sendingUnpaid}
+                    onClick={() => void remindUnpaid(defaultUnpaidMsg)}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-2 text-xs font-bold disabled:opacity-50"
+                  >
+                    <DollarSign className="h-3.5 w-3.5" /> Remind {owingIds.length} unpaid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnpaidMsg(defaultUnpaidMsg)}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold"
+                  >
+                    Edit message
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={unpaidMsg}
+                    onChange={(e) => setUnpaidMsg(e.target.value.slice(0, MAX_BROADCAST))}
+                    rows={3}
+                    aria-label="Announcement to unpaid players"
+                    className="w-full resize-none rounded-lg border border-border bg-background p-2 text-xs"
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setUnpaidMsg(null)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sendingUnpaid || !unpaidMsg.trim()}
+                      onClick={() => void remindUnpaid(unpaidMsg)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-2 text-xs font-bold text-background disabled:opacity-50"
+                    >
+                      <Megaphone className="h-3.5 w-3.5" /> Send to {owingIds.length} unpaid
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           <div className="space-y-1.5">

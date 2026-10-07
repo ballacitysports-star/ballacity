@@ -26,6 +26,8 @@ export type GamePaymentSettings = {
   entry_fee: number;
   accepted_method_ids: string[];
   payment_deadline: string | null;
+  /** Minutes an approved player has to pay before the spot auto-releases. */
+  payment_hold_minutes?: number | null;
   refund_policy: string | null;
   payment_instructions: string | null;
   requires_approval: boolean;
@@ -292,6 +294,7 @@ export async function upsertGamePaymentSettings(input: {
   entry_fee: number;
   accepted_method_ids: string[];
   payment_deadline?: string | null;
+  payment_hold_minutes?: number | null;
   refund_policy?: string | null;
   payment_instructions?: string | null;
   requires_approval?: boolean;

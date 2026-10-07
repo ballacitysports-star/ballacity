@@ -791,6 +791,7 @@ export type Database = {
           host_id: string
           id: string
           payment_deadline: string | null
+          payment_hold_minutes: number | null
           payment_instructions: string | null
           payment_mode: string
           refund_policy: string | null
@@ -805,6 +806,7 @@ export type Database = {
           host_id: string
           id?: string
           payment_deadline?: string | null
+          payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
@@ -819,6 +821,7 @@ export type Database = {
           host_id?: string
           id?: string
           payment_deadline?: string | null
+          payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
@@ -4039,6 +4042,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_worker_secret: { Args: { _provided: string }; Returns: boolean }
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
       admin_audit_log_facets: {
@@ -4629,6 +4633,10 @@ export type Database = {
         }[]
       }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
+      release_expired_payment_holds: {
+        Args: { _game_id?: string }
+        Returns: number
+      }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
