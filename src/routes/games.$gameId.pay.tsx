@@ -1907,15 +1907,15 @@ function PayApprovalIndicator({
     >
   > = {
     requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
-    payment_pending: { label: "Payment due", tone: "warn", icon: "clock" },
-    payment_submitted: { label: "Payment sent — waiting on host", tone: "info", icon: "clock" },
+    payment_pending: { label: "Approved · Pay host to lock your spot", tone: "warn", icon: "clock" },
+    payment_submitted: { label: "Verifying with host", tone: "info", icon: "clock" },
     payment_rejected: { label: "Payment declined — resubmit", tone: "bad", icon: "x" },
     payment_verified: {
-      label: "Payment confirmed — you're on the roster",
+      label: "You're in! Payment confirmed",
       tone: "ok",
       icon: "shield",
     },
-    confirmed: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
+    confirmed: { label: "You're in! Payment confirmed", tone: "ok", icon: "shield" },
     rejected: { label: "Request declined", tone: "bad", icon: "x" },
   };
 
