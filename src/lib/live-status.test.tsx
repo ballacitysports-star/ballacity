@@ -48,6 +48,19 @@ describe("useJoinGate / useLiveStatus stability", () => {
     expect(result.current.locked).toBe(true);
   });
 
+  it("accepts a game that hasn't loaded yet, then resolves it once it arrives", () => {
+    // The game page calls this before its loading / not-found returns, so the
+    // first render of a deep link passes `undefined`.
+    const { result, rerender } = renderHook(
+      ({ game }: { game: Game | undefined }) => useJoinGate(game, { spotsLeft: 0 }),
+      { initialProps: { game: undefined as Game | undefined } },
+    );
+    expect(result.current.locked).toBe(false);
+    rerender({ game: makeGame() });
+    expect(result.current.joinState).toBe("roster_full");
+    expect(result.current.locked).toBe(true);
+  });
+
   it("keeps live status stable across re-renders with a new game object", () => {
     const { result, rerender } = renderHook(() => useLiveStatus(makeGame()));
     expect(result.current).toBe("scheduled");
