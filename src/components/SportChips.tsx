@@ -1,10 +1,12 @@
 import { SPORTS } from "@/lib/sample-data";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 
 export function SportChips({
   selected,
   onSelect,
   multi = false,
+  trailing,
 }: {
   /** Single sport, list of sports (multi-select), or null/empty for "All". */
   selected?: string | string[] | null;
@@ -16,6 +18,8 @@ export function SportChips({
   onSelect?: (sport: string | null) => void;
   /** Chips toggle sports in and out of a multi-sport selection. */
   multi?: boolean;
+  /** Pinned after the scrolling chips (e.g. a Map toggle) so it never scrolls away. */
+  trailing?: ReactNode;
 }) {
   const selectedList = Array.isArray(selected) ? selected : selected ? [selected] : [];
   const selectedSet = new Set(selectedList);
@@ -29,11 +33,13 @@ export function SportChips({
     "shrink-0 snap-start inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors";
   const on = "border-lime bg-lime text-primary-foreground";
 
-  return (
+  const chips = (
     <div
       role="group"
       aria-label="Filter by sport"
-      className="flex snap-x gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
+      className={`flex snap-x gap-2 overflow-x-auto scrollbar-hide pb-1 ${
+        trailing ? "min-w-0 flex-1 -ml-4 pl-4" : "-mx-4 px-4"
+      }`}
     >
       <button
         onClick={() => onSelect?.(null)}
@@ -63,6 +69,14 @@ export function SportChips({
           </motion.button>
         );
       })}
+    </div>
+  );
+
+  if (!trailing) return chips;
+  return (
+    <div className="flex items-start gap-2">
+      {chips}
+      {trailing}
     </div>
   );
 }

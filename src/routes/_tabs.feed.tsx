@@ -3,7 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSearch, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Bell, MessageCircle, MapPin, X } from "lucide-react";
+import { Bell, List, MessageCircle, MapPin, Map as MapIcon, X } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -370,7 +370,6 @@ function Feed() {
   const modeChips: { label: string; clear: () => void }[] = [];
   if (tab === "archive")
     modeChips.push({ label: "Finished games", clear: () => setTab("upcoming") });
-  if (viewMode === "map") modeChips.push({ label: "Map view", clear: () => switchView("list") });
   if (positionFilter)
     modeChips.push({ label: positionFilter, clear: () => setPositionFilter(null) });
   // Label for the status line's location action; null once a fresh fix is held.
@@ -582,8 +581,6 @@ function Feed() {
                 finishedCount={finishedCount}
                 density={density}
                 onDensityChange={switchDensity}
-                view={viewMode}
-                onViewChange={switchView}
                 position={positionFilter}
                 onPositionChange={setPositionFilter}
               />
@@ -611,7 +608,31 @@ function Feed() {
         </div>
 
         <div className="mb-3">
-          <SportChips multi selected={chipSelected} onSelect={setChipSport} />
+          <SportChips
+            multi
+            selected={chipSelected}
+            onSelect={setChipSport}
+            trailing={
+              <button
+                type="button"
+                onClick={() => switchView(viewMode === "map" ? "list" : "map")}
+                aria-pressed={viewMode === "map"}
+                aria-label={viewMode === "map" ? "Show list view" : "Show map view"}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                  viewMode === "map"
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-foreground hover:border-lime/40"
+                }`}
+              >
+                {viewMode === "map" ? (
+                  <List className="h-4 w-4" aria-hidden />
+                ) : (
+                  <MapIcon className="h-4 w-4" aria-hidden />
+                )}
+                {viewMode === "map" ? "List" : "Map"}
+              </button>
+            }
+          />
         </div>
 
         {modeChips.length > 0 && (

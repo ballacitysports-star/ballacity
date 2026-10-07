@@ -191,8 +191,6 @@ export function FeedPreferencesBody({
   finishedCount = 0,
   density,
   onDensityChange,
-  view,
-  onViewChange,
   position,
   onPositionChange,
 }: {
@@ -201,8 +199,6 @@ export function FeedPreferencesBody({
   finishedCount?: number;
   density?: "grid" | "list";
   onDensityChange?: (d: "grid" | "list") => void;
-  view?: "list" | "map";
-  onViewChange?: (v: "list" | "map") => void;
   position?: string | null;
   onPositionChange?: (p: string | null) => void;
 } = {}) {
@@ -238,27 +234,6 @@ export function FeedPreferencesBody({
       <FilterSection label="My views">
         <FeedViewsRow />
       </FilterSection>
-
-      {view && onViewChange && (
-        <FilterSection label="View">
-          <div
-            className="flex gap-1 rounded-full border border-border bg-surface p-1"
-            role="tablist"
-          >
-            {(["list", "map"] as const).map((v) => (
-              <button
-                key={v}
-                role="tab"
-                aria-selected={view === v}
-                onClick={() => onViewChange(v)}
-                className={segment(view === v)}
-              >
-                {v === "list" ? "List" : "Map"}
-              </button>
-            ))}
-          </div>
-        </FilterSection>
-      )}
 
       {tab && onTabChange && (
         <FilterSection label="Show">
