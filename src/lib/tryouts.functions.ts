@@ -39,6 +39,7 @@ export type TryoutListing = {
 /** Public: upcoming tryouts and camps across all visible teams. */
 export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
   async (): Promise<TryoutListing[]> => {
+    try {
     const { data, error } = await publicClient()
       .from("team_posts")
       .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
@@ -66,6 +67,10 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
       teamAvatar: r.teams?.avatar ?? null,
       sports: r.teams?.sports ?? [],
     }));
+    } catch (err) {
+      console.error("listUpcomingTryouts failed", err);
+      return [];
+    }
   },
 );
 
