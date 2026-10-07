@@ -39,6 +39,7 @@ import {
   Ban,
   UserCheck,
   UserX,
+  BellRing,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
@@ -2697,6 +2698,7 @@ function GameDetail() {
                             req={r}
                             gameTitle={game.title}
                             feeRequired={isPaid}
+                            fee={fee}
                             onOptimistic={applyOptimisticReview}
                           />
                         ))}
@@ -4019,14 +4021,17 @@ function RosterPlayerRow({
   req,
   gameTitle,
   feeRequired,
+  fee,
   onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
   feeRequired: boolean;
+  fee: number;
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("P");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -4339,16 +4344,50 @@ function RosterPlayerRow({
     }
   };
 
+  const remindToPay = async () => {
+    if (reminding) return;
+    setReminding(true);
+    try {
+      await createNotification({
+        user_id: req.player_id,
+        type: "payment_reminder",
+        title: `Payment reminder · ${gameTitle}`.slice(0, 200),
+        body: `Your $${fee} spot for ${gameTitle} is held. Tap here to pay the host.`,
+        link: `/games/${req.game_id}/pay`,
+      });
+      toast.success(`Reminder sent to ${name}.`);
+    } catch {
+      toast.error("Couldn't send reminder.");
+    } finally {
+      setReminding(false);
+    }
+  };
+
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
-  const paymentChip = !feeRequired
-    ? null
+  // One stage badge instead of a green "Approved" pill next to a payment chip:
+  // approval alone never reads as a confirmed, paid spot on fee games.
+  const stageBadge = !feeRequired
+    ? { label: "Approved", cls: "border-lime/40 bg-lime/10 text-lime", Icon: Check }
     : paymentStatus === "verified"
-      ? { label: "Paid", cls: "border-lime/40 bg-lime/10 text-lime" }
+      ? { label: "Spot Confirmed (Paid)", cls: "border-lime/40 bg-lime/10 text-lime", Icon: Check }
       : paymentStatus === "pending"
-        ? { label: "Payment pending", cls: "border-coral/40 bg-coral/10 text-coral" }
+        ? {
+            label: "Payment Proof Pending",
+            cls: "border-sky-500/40 bg-sky-500/10 text-sky-500",
+            Icon: CreditCard,
+          }
         : paymentStatus === "rejected"
-          ? { label: "Payment rejected", cls: "border-coral/50 bg-coral/15 text-coral" }
-          : { label: "Unpaid", cls: "border-border bg-secondary text-muted-foreground" };
+          ? {
+              label: "Approved · Payment Rejected",
+              cls: "border-coral/50 bg-coral/15 text-coral",
+              Icon: CreditCard,
+            }
+          : {
+              label: "Approved · Awaiting Payment",
+              cls: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+              Icon: Clock,
+            };
+  const canRemind = feeRequired && (paymentStatus === "none" || paymentStatus === "rejected");
 
   return (
     <div className="rounded-2xl border border-lime/30 bg-surface p-3">
@@ -4397,19 +4436,24 @@ function RosterPlayerRow({
           <Star className="h-3 w-3 text-muted-foreground" />
           Sportsmanship {fmt(sportsmanship)}
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
-          <Check className="h-3 w-3" /> Approved
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${stageBadge.cls}`}
+        >
+          <stageBadge.Icon className="h-3 w-3" /> {stageBadge.label}
         </span>
-        {paymentChip && (
-          <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${paymentChip.cls}`}
-          >
-            <CreditCard className="h-3 w-3" /> {paymentChip.label}
-          </span>
-        )}
       </div>
       {feeRequired && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {canRemind && (
+            <button
+              type="button"
+              onClick={remindToPay}
+              disabled={reminding || busy}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-500 disabled:opacity-50"
+            >
+              <BellRing className="h-3 w-3" /> Remind to Pay
+            </button>
+          )}
           {latestSub?.screenshot_path && (
             <button
               type="button"
