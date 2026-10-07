@@ -1,9 +1,61 @@
 name: E2E
 
+# Only changes that can alter what the browser sees start a run. One run is
+# about an hour of billed runner time, and the private-repo allowance is 2,000
+# minutes a month, so a docs commit must not spend any of it: in October the
+# BACKLOG and failure-log pushes alone were a meaningful share of the bill.
+#
+# What counts: app source, the specs and their fixtures, static assets, the
+# build scripts, the dependency and build config the dev server reads
+# (`.env.production` is loaded by vite.config.ts; `wrangler.jsonc` by the
+# Cloudflare plugin), and this file.
+#
+# What does not: markdown anywhere (including e2e/BACKLOG.md and
+# e2e/run92-failures.md), docs/, supabase/ (the suite never applies
+# migrations; the Unit & Lint workflow reads them), drizzle/, and other
+# workflows. For a pull request GitHub applies the filter to the whole PR
+# diff, not the last push, so a PR that already touches app code still runs on
+# every push; the saving is on doc-only PRs and doc-only pushes to main.
+#
+# `workflow_dispatch` is the way to run it anyway, for example after changing
+# the shared Supabase backend with no code change.
+#
+# Keep the two lists identical.
 on:
   pull_request:
+    paths:
+      - "src/**"
+      - "e2e/**"
+      - "!e2e/**/*.md"
+      - "public/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "playwright.config.ts"
+      - "wrangler.jsonc"
+      - ".env.production"
+      - ".github/workflows/e2e.yml"
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "e2e/**"
+      - "!e2e/**/*.md"
+      - "public/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "playwright.config.ts"
+      - "wrangler.jsonc"
+      - ".env.production"
+      - ".github/workflows/e2e.yml"
+  workflow_dispatch:
 
 # Two levels, because they solve different problems.
 #
