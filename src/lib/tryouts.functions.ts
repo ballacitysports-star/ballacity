@@ -103,6 +103,28 @@ export const getTryoutRsvpContext = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Signed-in: ids of the tryouts/camps the caller, or a child they're linked to,
+ * is registered for. Lets the listing and event page show "Registered" and a
+ * way to cancel without opening the RSVP dialog first.
+ */
+export const listMyTryoutRegistrations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<string[]> => {
+    const sb = context.supabase;
+    const kids = await sb.rpc("guardian_children_overview");
+    const ids = [
+      context.userId,
+      ...((kids.data ?? []) as any[]).map((k) => k.child_user_id as string),
+    ];
+    const { data } = await sb
+      .from("tryout_rsvps")
+      .select("post_id")
+      .in("user_id", ids)
+      .eq("status", "registered");
+    return [...new Set((data ?? []).map((r) => r.post_id as string))];
+  });
+
 const ERRORS: Record<string, string> = {
   TRYOUT_FULL: "This event is full.",
   ALREADY_REGISTERED: "Already registered.",

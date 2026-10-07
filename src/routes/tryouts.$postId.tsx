@@ -5,7 +5,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarClock, MapPin, Users, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { RsvpDialog } from "@/components/tryouts/TryoutsSection";
+import { RsvpDialog, useMyTryoutRegistrations } from "@/components/tryouts/TryoutsSection";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getTryout, getMyTryoutResult } from "@/lib/tryouts.functions";
@@ -43,6 +43,7 @@ function TryoutPage() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const myRegistrations = useMyTryoutRegistrations();
   useEffect(() => {
     if (!user || !t) return setIsManager(false);
     supabase.rpc("is_team_manager", { _team: t.teamId, _user: user.id }).then(({ data }) => setIsManager(!!data));
@@ -95,9 +96,15 @@ function TryoutPage() {
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           Parents can sign up a linked child and sign the team waiver on their behalf. The team sees your application on their dashboard.
         </p>
-        <Button className="mt-4 w-full rounded-full" disabled={left === 0 || passed} onClick={apply}>
-          {passed ? "This event has passed" : left === 0 ? "Full" : user ? "Apply now" : "Sign in to apply"}
-        </Button>
+        {t && myRegistrations.has(t.id) && !passed ? (
+          <Button className="mt-4 w-full rounded-full" variant="outline" onClick={apply}>
+            Registered ✓ · Manage or cancel
+          </Button>
+        ) : (
+          <Button className="mt-4 w-full rounded-full" disabled={left === 0 || passed} onClick={apply}>
+            {passed ? "This event has passed" : left === 0 ? "Full" : user ? "Apply now" : "Sign in to apply"}
+          </Button>
+        )}
       </div>
       {user && <MyResult postId={t.id} />}
       {open && <RsvpDialog tryout={t} onClose={() => setOpen(false)} />}

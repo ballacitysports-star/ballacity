@@ -33,6 +33,16 @@ import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availa
 import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
 import { Globe } from "lucide-react";
 import { NextAvailableList } from "@/components/NextAvailableList";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export type BookPrefill = {
   date?: string;
@@ -87,6 +97,7 @@ export function BookSessionSheet({
   const [mode, setMode] = useState<Mode>("form");
   const [existing, setExisting] = useState<TrainerSessionRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookings, setBookings] = useState<TrainerBookedSlot[]>([]);
 
@@ -271,10 +282,12 @@ export function BookSessionSheet({
 
   const cancel = async () => {
     if (!existing) return;
+    const wasAccepted = existing.status === "accepted";
     setSubmitting(true);
     try {
       await cancelTrainerSessionRequest(existing.id);
-      toast.success("Request cancelled");
+      toast.success(wasAccepted ? "Session cancelled" : "Request cancelled");
+      setConfirmCancel(false);
       onStatusChange?.();
       onOpenChange(false);
       setTimeout(reset, 250);
@@ -650,15 +663,24 @@ export function BookSessionSheet({
                   {submitting ? "Cancelling…" : "Cancel request"}
                 </button>
               ) : (
-                <button
-                  onClick={() => {
-                    onOpenChange(false);
-                    nav({ to: "/messages" });
-                  }}
-                  className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
-                >
-                  Open chat
-                </button>
+                <>
+                  <button
+                    onClick={() => setConfirmCancel(true)}
+                    disabled={submitting}
+                    className="flex-1 rounded-full border border-rose-500/50 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-300 disabled:opacity-60"
+                  >
+                    Cancel session
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenChange(false);
+                      nav({ to: "/messages" });
+                    }}
+                    className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
+                  >
+                    Open chat
+                  </button>
+                </>
               )}
             </>
           ) : mode === "sent" ? (
@@ -699,6 +721,30 @@ export function BookSessionSheet({
             </>
           )}
         </SheetFooter>
+        <AlertDialog open={confirmCancel} onOpenChange={(o) => !submitting && setConfirmCancel(o)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel this session?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {org.name} will be told you cancelled, and the time opens up for other players. If
+                you already paid them, sort out any refund with them directly.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={submitting}>Keep session</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={submitting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void cancel();
+                }}
+                className="bg-rose-500 text-white hover:bg-rose-500/90"
+              >
+                {submitting ? "Cancelling…" : "Cancel session"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

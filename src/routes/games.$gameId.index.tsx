@@ -135,6 +135,7 @@ import {
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
@@ -2943,6 +2944,10 @@ function GameDetail() {
                       >
                         <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
                       </Link>
+                      {/* Approved but not paid yet: a way out without opening the pay page. */}
+                      <div className="mt-1.5 text-center">
+                        <LeaveFlowButton gameId={game.id} gameTitle={game.title} variant="link" />
+                      </div>
                     </motion.div>
                   );
                 }
