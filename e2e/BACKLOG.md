@@ -27,7 +27,7 @@ What the two runs show:
 
 - **The fixture sign-in gap is closed.** `global-setup` now prints
   `Signed in e2e-player@lovable.test`, and the `fixture-auth-flows` specs pass.
-  Real sign-ins work against the E2E project.
+  Real sign-ins work against the E2E backend (when it is up — see below).
 - **The `invite=1` assertion fix does what it says, and is not sufficient.**
   `invite-request-happy-path` failed on `main` at `page.waitForURL` (the strict
   `=== "1"` check); with the fix it gets past that and fails later, at the invite
@@ -57,11 +57,12 @@ What the two runs show:
   run 191 failure will say which.
 - **Run 195 (`main`) and run 196 (this branch) are not measurements.** On
   2026-10-01 between 17:59 and 18:31 UTC every `global-setup` call to the E2E
-  Supabase project returned `Gateway Timeout` (upserting the four fixture
-  accounts, then the sign-in). With no session, the auth-required specs skip:
-  run 195 was 21 failed / 16 passed / 179 skipped of 216, run 196 was 21 / 16 /
-  178 of 215. That is the sandbox backend being unavailable, not a spec result;
-  `global-setup` logs it at the top of the run, so check there first.
+  backend (the one behind the `E2E_SUPABASE_*` secrets) returned `Gateway
+  Timeout` (upserting the four fixture accounts, then the sign-in). With no
+  session, the auth-required specs skip: run 195 was 21 failed / 16 passed / 179
+  skipped of 216, run 196 was 21 / 16 / 178 of 215. That is the E2E backend being
+  unavailable, not a spec result; `global-setup` logs it at the top of the run,
+  so check there first.
 - **Runs are not comparable one-to-one.** Different base, different test count
   (216 vs 196). `host-name-deeplink` and `invite-deeplink-to-pay` fail on `main`
   and pass in the PR re-run (same specs, which this PR does not touch).
@@ -72,6 +73,38 @@ What the two runs show:
   this branch merged with current `main` is the fair comparison; run 196 was
   meant to be that run and was lost to the backend outage described below, so it
   is still outstanding.
+
+## Update 2026-10-07: one healthy run on `main`, and the backend keeps flapping
+
+| | job | result |
+|---|---|---|
+| run 288 (`main`, 2026-10-06, ~11:45–12:53 UTC) | `112251111958` | 118 failed, 79 passed, 19 skipped, 216 total (1.0h) |
+| run 335 (`main`, 2026-10-07 03:21–03:35 UTC) | — | 19 failed, 17 passed, 180 skipped, 216 total — backend timeouts |
+| PR #17 re-run (2026-10-06 15:09–15:23 UTC) | `112341883239` | red, backend timeouts |
+
+- **Run 288 is the only recent measurement on a healthy backend.** Only 19 specs
+  skipped (the auth-required ones ran), so it is the fair baseline for `main`.
+  Its failures are not a backend artefact.
+- **29 `invite-*` tests across 19 spec files fail in run 288**, including the
+  deeplink, request and pay-and-join families and the ones this PR did not edit
+  (`invite-deeplink-join-cta`, `invite-fallback-params`, `invite-malformed-exp`,
+  `invite-request-idempotent-taps`, …). So the `invite=1` assertion was one
+  cause among several, and the remaining one(s) are not visible in a job log.
+  They need the Playwright traces — artifact `11170155125` (expires about
+  2026-10-08) or the later `11414886434` (expires 2026-10-13).
+- **`desktop-refresh-protected` fails on `main`** in run 288 (still asserts
+  `/discover`), as it did before this PR fixed it.
+- **The backend behind the `E2E_SUPABASE_*` secrets is unreliable.** `global-setup`
+  reported `Gateway Timeout` on every call during runs 195, 196 and 204
+  (2026-10-01), the PR re-run on 2026-10-06 and run 335 on 2026-10-07; run 288
+  was healthy. Every time it times out, ~180 of 216 specs skip and the
+  pass/fail counts mean nothing. Treat a run as a measurement only if
+  `global-setup` has no `Gateway Timeout` lines and the skip count is in the
+  teens, not the hundreds. The repo cannot fix this; whoever owns the secrets
+  has to look at that backend's Auth service.
+- **`bun install --frozen-lockfile` was briefly failing on `main`** because
+  `bun.lock` was out of sync with `package.json`. It has since been re-synced on
+  `main`; run 288 installed cleanly.
 
 ## Older notes (written while runners were down)
 
@@ -186,16 +219,17 @@ non-null `account_type` at signup makes every one of these assertions fail exact
 this way.
 
 `20260911001000` did precisely that — it changed `handle_new_user` to insert
-`COALESCE(_type, 'player')`. It was written for the dev/E2E project, where
+`COALESCE(_type, 'player')`. It was written for a backend where
 `account_type` is `NOT NULL`, and it is corrected by `20260912150000`, which drops
-that constraint and restores the NULL. Production was never affected;
-its `account_type` has always been nullable.
+that constraint and restores the NULL. The Lovable backend that serves the app was
+never affected; its `account_type` has always been nullable.
 
-So: **check whether the E2E project's `handle_new_user` coalesces, and if it does,
-apply `20260912150000` there.** Note this is unverified — run 92 predates
-`20260911001000` reaching that project, per the commit message on run 91, so the
-timing does not line up on its face and the cause may be unrelated. It is listed
-first because it is a one-query check with a known fix, not because it is likely.
+So: **check whether the backend the E2E secrets point at has a `handle_new_user`
+that coalesces, and if it does, apply `20260912150000` there.** Note this is
+unverified — run 92 predates `20260911001000` reaching that backend, per the commit
+message on run 91, so the timing does not line up on its face and the cause may be
+unrelated. It is listed first because it is a one-query check with a known fix, not
+because it is likely.
 
 ### Realtime cross-view — 7 files
 `join-cross-device-discover-spots`, `join-cross-device-roster`,
@@ -243,7 +277,7 @@ assertions.
    `toBeVisible` failures.
 2. **`invite-*` `waitForURL`.** Find out why the deeplink never lands before
    treating 30 downstream assertions as separate.
-3. **The OAuth `account_type` check.** One query against the E2E project.
+3. **The OAuth `account_type` check.** One query against the E2E backend.
 4. **`image-orientation`.** Self-contained and reproducible without a session.
 5. **`pay-screen-no-cross-host-leak` / `pay-screen-rpc-and-empty-state`.** Security
    assertions currently unenforced.
@@ -314,10 +348,11 @@ live bug, but it is unverified: nothing has re-run since 2026-09-11 12:02.
 Re-run the suite once Actions allocates a runner before assuming it's clear.
 
 **Not re-verified: the OAuth `account_type` coalesce question.** Still
-depends on live schema state on the E2E Supabase project
-(`olrbulvwexrkjcxddjxq`), which nothing in this repo can inspect or migrate —
-`.github/workflows/e2e.yml` never runs `supabase db push` against it (see
-`supabase/config.e2e.toml`). `20260912150000_account_type_nullable_preserve_onboarding.sql`
-is the correct fix and is already in `supabase/migrations/`; whether it has
-been applied to that project is an infra question for whoever holds its
-credentials, not something resolvable from the codebase.
+depends on live schema state on the backend that the `E2E_SUPABASE_*` repository
+secrets point at. Nothing in this repo can inspect or migrate it, and the secret
+values are masked in CI logs, so the repo does not say which backend that is.
+`.github/workflows/e2e.yml` never runs `supabase db push` against it.
+`20260912150000_account_type_nullable_preserve_onboarding.sql` is the correct fix
+and is already in `supabase/migrations/`; whether it has been applied there is a
+question for whoever holds the secrets, not something resolvable from the
+codebase.
