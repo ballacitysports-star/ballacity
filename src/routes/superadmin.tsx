@@ -50,10 +50,12 @@ function SuperadminPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["superadmin-check"],
     queryFn: () => check({}),
     enabled: authReady && hasSession,
+    retry: 2,
+    retryDelay: (n) => 800 * (n + 1),
   });
 
   useEffect(() => {
@@ -69,6 +71,17 @@ function SuperadminPage() {
 
   if (!authReady || isLoading)
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (isError)
+    return (
+      <div className="page-shell space-y-3 py-6">
+        <p className="text-sm text-muted-foreground">
+          We couldn't verify your access right now.
+        </p>
+        <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying…" : "Try again"}
+        </Button>
+      </div>
+    );
   if (!data?.isSuperadmin) return null;
 
   return (
