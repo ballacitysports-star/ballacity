@@ -69,6 +69,13 @@ export function describeFamilyActivity(entry: {
       return { title: "Family link invited", detail: relationshipDetail(ctx) };
     case "link.revoked":
       return { title: "Family link ended", detail: null };
+    case "family_post.link_created":
+      return {
+        title: "Private share link created",
+        detail: typeof ctx["days"] === "number" ? `Valid for ${ctx["days"]} days` : null,
+      };
+    case "family_post.link_revoked":
+      return { title: "Private share link turned off", detail: null };
     default:
       break;
   }

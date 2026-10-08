@@ -65,3 +65,14 @@ describe("describeFamilyActivity", () => {
     expect(describeFamilyActivity({ action: "controls.changed", context: null }).detail).toBeNull();
   });
 });
+
+describe("family post share links in the activity trail", () => {
+  it("describes creating and turning off a private link", () => {
+    expect(
+      describeFamilyActivity({ action: "family_post.link_created", context: { days: 14 } }),
+    ).toEqual({ title: "Private share link created", detail: "Valid for 14 days" });
+    expect(describeFamilyActivity({ action: "family_post.link_revoked" }).title).toBe(
+      "Private share link turned off",
+    );
+  });
+});
