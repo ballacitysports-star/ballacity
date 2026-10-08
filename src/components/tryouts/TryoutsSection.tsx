@@ -20,6 +20,13 @@ import {
   type TryoutListing,
 } from "@/lib/tryouts.functions";
 import { createTeamPost } from "@/lib/team-posts.functions";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import {
+  DEFAULT_REFUND_RULE,
+  normalizeRefundPolicy,
+  refundDisclaimer,
+  type RefundPolicy,
+} from "@/lib/refund-policy";
 import {
   CANCEL_CUTOFF_PRESETS,
   DEFAULT_CANCEL_CUTOFF_MIN,
@@ -136,6 +143,8 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [acceptedRefund, setAcceptedRefund] = useState(false);
+  const paid = Number(tryout.price ?? 0) > 0;
 
   const target = who === "me" ? user?.id : who;
   const onBehalf = who === "me" ? null : who;
@@ -228,7 +237,26 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                 {needsWaiver && !agree && (
                   <p className="text-xs font-semibold text-coral">Check the waiver box above to continue.</p>
                 )}
-                <Button className="w-full" disabled={busy || (needsWaiver && !agree)} onClick={submit}>
+                {paid && (
+                  <label className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                    <Checkbox
+                      checked={acceptedRefund}
+                      onCheckedChange={(v) => setAcceptedRefund(v === true)}
+                      aria-label="I understand the refund terms"
+                    />
+                    <span>
+                      {refundDisclaimer(
+                        normalizeRefundPolicy(tryout.refundRule, tryout.lateRefundPct),
+                        tryout.cancelCutoffMin,
+                      )}
+                    </span>
+                  </label>
+                )}
+                <Button
+                  className="w-full"
+                  disabled={busy || (needsWaiver && !agree) || (paid && !acceptedRefund)}
+                  onClick={submit}
+                >
                   {needsWaiver ? "Sign waiver & RSVP" : "RSVP"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
@@ -249,6 +277,7 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
   const create = useServerFn(createTeamPost);
   const { data: teams } = useQuery({ queryKey: ["tryouts", "my-teams"], queryFn: () => teamsFn() });
   const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "", cancelCutoff: String(DEFAULT_CANCEL_CUTOFF_MIN) });
+  const [refund, setRefund] = useState<RefundPolicy>({ rule: DEFAULT_REFUND_RULE, latePct: 0 });
   const [busy, setBusy] = useState(false);
   const teamId = f.teamId || teams?.[0]?.id || "";
 
@@ -264,6 +293,9 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
           spotsMax: f.spots ? Number(f.spots) : null,
           price: f.price ? Number(f.price) : null,
           cancelCutoffMin: Number(f.cancelCutoff) || 0,
+          ...(f.price && Number(f.price) > 0
+            ? { refundRule: refund.rule, lateRefundPct: refund.latePct }
+            : {}),
         },
       });
       toast.success("Posted! Players can now RSVP.");
@@ -320,6 +352,14 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
               </select>
               <span className="mt-1 block font-normal">Cancelling after this counts as late and lowers the player's reliability.</span>
             </label>
+            {f.price && Number(f.price) > 0 && (
+              <RefundPolicyFields
+                idPrefix="post-refund"
+                value={refund}
+                onChange={setRefund}
+                cutoffMin={Number(f.cancelCutoff) || 0}
+              />
+            )}
             <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
             <Button className="w-full" disabled={busy} onClick={submit}>Post</Button>
           </div>

@@ -12,6 +12,13 @@
  */
 
 import { LEGAL_REVIEW_LABEL, SAFETY_ACK_VERSION } from "@/lib/safety";
+import {
+  DEFAULT_REFUND_RULE,
+  normalizeRefundPolicy,
+  refundPolicySummary,
+  type RefundRule,
+} from "@/lib/refund-policy";
+import { DEFAULT_CANCEL_CUTOFF_MIN, normalizeCutoff } from "@/lib/cancel-window";
 
 export { LEGAL_REVIEW_LABEL, SAFETY_ACK_VERSION };
 
@@ -149,6 +156,13 @@ export type GamePolicy = {
   /** Entry fee in dollars; 0 = free. */
   entryFee: number;
   requiresApproval: boolean;
+  /** Structured refund rule; the time frame is the game's cancellation cutoff. */
+  refundRule: RefundRule;
+  /** Share refunded for late cancellations and no-shows (0 = fee kept). */
+  lateRefundPct: number;
+  /** Minutes before start that the refund rule's cutoff falls. */
+  cancelCutoffMin: number;
+  /** Optional extra refund notes from the host. */
   refundPolicy: string;
   gameRules: string;
 };
@@ -165,6 +179,9 @@ export function defaultGamePolicy(maxPlayers = 10): GamePolicy {
     allowWaitlist: true,
     entryFee: 0,
     requiresApproval: true,
+    refundRule: DEFAULT_REFUND_RULE,
+    lateRefundPct: 0,
+    cancelCutoffMin: DEFAULT_CANCEL_CUTOFF_MIN,
     refundPolicy: "",
     gameRules: "",
   };
@@ -189,6 +206,11 @@ export function normalizeGamePolicy(input: Partial<GamePolicy> | null | undefine
     allowWaitlist: input?.allowWaitlist ?? true,
     entryFee: Math.max(0, Number(input?.entryFee ?? 0) || 0),
     requiresApproval: input?.requiresApproval ?? true,
+    ...(() => {
+      const r = normalizeRefundPolicy(input?.refundRule, input?.lateRefundPct);
+      return { refundRule: r.rule, lateRefundPct: r.latePct };
+    })(),
+    cancelCutoffMin: normalizeCutoff(input?.cancelCutoffMin),
     refundPolicy: (input?.refundPolicy ?? "").trim(),
     gameRules: (input?.gameRules ?? "").trim(),
   };
@@ -212,10 +234,6 @@ export function validateGamePolicy(policy: GamePolicy): PolicyValidation {
   }
   if (policy.cancellationPolicy === "custom" && !policy.cancellationNotes.trim()) {
     return { ok: false, error: "Describe your custom cancellation policy." };
-  }
-  if (policy.entryFee > 0 && !policy.requiresApproval && !policy.refundPolicy.trim()) {
-    // Not fatal for publishing, but paid games should say something about refunds.
-    return { ok: false, error: "Add refund information for a paid game." };
   }
   return { ok: true };
 }
@@ -273,9 +291,16 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
       id: "refund",
       label: "Refunds",
       critical: true,
-      value:
-        policy.refundPolicy ||
-        "The host hasn't posted refund terms — ask before you pay, since ballaCity can't issue refunds.",
+      value: [
+        refundPolicySummary(
+          { rule: policy.refundRule, latePct: policy.lateRefundPct },
+          policy.cancelCutoffMin,
+        ),
+        policy.refundPolicy,
+        "Refunds come from the host directly — ballaCity can't hold or return money.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     });
   }
 

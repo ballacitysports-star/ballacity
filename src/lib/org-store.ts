@@ -50,6 +50,8 @@ type TeamRow = {
   availability_rules: unknown;
   timezone: string | null;
   cancel_cutoff_min?: number | null;
+  refund_rule?: string | null;
+  late_refund_pct?: number | null;
 };
 
 const myOrgIds = new Set<string>();
@@ -138,6 +140,8 @@ function rowToOrg(row: TeamRow): Org {
         : [],
     timezone: kind === "coach" ? (row.timezone ?? undefined) : undefined,
     cancelCutoffMin: kind === "coach" ? normalizeCutoff(row.cancel_cutoff_min) : undefined,
+    refundRule: kind === "coach" ? (row.refund_rule ?? "until_cutoff") : undefined,
+    lateRefundPct: kind === "coach" ? Number(row.late_refund_pct ?? 0) || 0 : undefined,
     upcoming: [],
     posts: [],
   };
@@ -359,6 +363,8 @@ export async function updateOrg(
   if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
   if (patch.cancelCutoffMin !== undefined)
     mapped.cancel_cutoff_min = normalizeCutoff(patch.cancelCutoffMin);
+  if (patch.refundRule !== undefined) mapped.refund_rule = patch.refundRule;
+  if (patch.lateRefundPct !== undefined) mapped.late_refund_pct = patch.lateRefundPct;
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;

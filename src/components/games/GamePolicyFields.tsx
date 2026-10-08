@@ -1,4 +1,5 @@
 import { Users, CalendarX, ListPlus, ScrollText, DollarSign } from "lucide-react";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
 import {
   CANCELLATION_POLICIES,
   MAX_GAME_PLAYERS,
@@ -176,18 +177,25 @@ export function GamePolicyFields({
           </p>
           {value.entryFee > 0 && (
             <>
+              <RefundPolicyFields
+                className="mt-3"
+                idPrefix={`${idPrefix}-refund-rule`}
+                value={{ rule: value.refundRule, latePct: value.lateRefundPct }}
+                onChange={(r) => onChange({ ...value, refundRule: r.rule, lateRefundPct: r.latePct })}
+                cutoffMin={value.cancelCutoffMin}
+              />
               <label
                 htmlFor={`${idPrefix}-refund`}
                 className="mt-3 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
               >
-                Refund information
+                Extra refund notes (optional)
               </label>
               <textarea
                 id={`${idPrefix}-refund`}
                 rows={2}
                 value={value.refundPolicy}
                 onChange={(e) => set("refundPolicy", e.target.value)}
-                placeholder="e.g. Full refund if you cancel 24h ahead, or if the game is called off."
+                placeholder="e.g. Rain-outs are refunded in full."
                 className="mt-1 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
               />
             </>

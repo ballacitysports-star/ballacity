@@ -28,6 +28,9 @@ export type GamePaymentSettings = {
   payment_deadline: string | null;
   /** Minutes an approved player has to pay before the spot auto-releases. */
   payment_hold_minutes?: number | null;
+  /** Structured refund rule (see lib/refund-policy). */
+  refund_rule?: string | null;
+  late_refund_pct?: number | null;
   refund_policy: string | null;
   payment_instructions: string | null;
   requires_approval: boolean;
@@ -89,7 +92,19 @@ export type PaymentSubmission = {
   disputed_by?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  /** Set when the refund policy has been applied (see lib/refund-policy). */
+  refund_status?: "owed" | "refunded" | "kept" | null;
+  refund_amount?: number | null;
+  refund_pct?: number | null;
+  refund_reason?: "player_cancelled" | "no_show" | "game_cancelled" | null;
+  refunded_at?: string | null;
 };
+
+/** Host confirms they sent a refund the policy says is owed. */
+export async function markRefundSent(submissionId: string) {
+  const { error } = await supabase.rpc("mark_refund_sent", { _submission: submissionId });
+  if (error) throw error;
+}
 
 export const PAYMENT_TYPES: {
   id: PaymentType;
@@ -295,6 +310,8 @@ export async function upsertGamePaymentSettings(input: {
   accepted_method_ids: string[];
   payment_deadline?: string | null;
   payment_hold_minutes?: number | null;
+  refund_rule?: string;
+  late_refund_pct?: number;
   refund_policy?: string | null;
   payment_instructions?: string | null;
   requires_approval?: boolean;

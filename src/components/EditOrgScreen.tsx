@@ -53,6 +53,8 @@ import { toast } from "sonner";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import { normalizeRefundPolicy, type RefundPolicy } from "@/lib/refund-policy";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -135,6 +137,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [rules, setRules] = useState<AvailabilityRule[]>(org.availabilityRules ?? []);
   const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
   const [cancelCutoff, setCancelCutoff] = useState<number>(normalizeCutoff(org.cancelCutoffMin));
+  const initialRefund = normalizeRefundPolicy(org.refundRule, org.lateRefundPct);
+  const [refund, setRefund] = useState<RefundPolicy>(initialRefund);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
@@ -470,6 +474,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
         kind === "coach" && cancelCutoff !== normalizeCutoff(org.cancelCutoffMin)
           ? cancelCutoff
           : undefined,
+      ...(kind === "coach" &&
+      (refund.rule !== initialRefund.rule || refund.latePct !== initialRefund.latePct)
+        ? { refundRule: refund.rule, lateRefundPct: refund.latePct }
+        : {}),
       venueAddresses:
         kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
@@ -1134,6 +1142,18 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     </option>
                   ))}
                 </select>
+              </Section>
+
+              <Section
+                title="Refunds"
+                hint="What players get back when they cancel or don't show up. Players agree to this before booking."
+              >
+                <RefundPolicyFields
+                  idPrefix="trainer-refund"
+                  value={refund}
+                  onChange={setRefund}
+                  cutoffMin={cancelCutoff}
+                />
               </Section>
 
               <Section

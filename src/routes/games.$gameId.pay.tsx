@@ -55,6 +55,11 @@ import { LegalNotice } from "@/components/LegalNotice";
 
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
+import {
+  normalizeRefundPolicy,
+  refundDisclaimer,
+  refundPolicySummary,
+} from "@/lib/refund-policy";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
@@ -766,6 +771,10 @@ function PayPage() {
           host_id={settings!.host_id}
           method={picked}
           extraInstructions={settings?.payment_instructions ?? null}
+          refundTerms={refundDisclaimer(
+            normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
+            game.cancelCutoffMin,
+          )}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             // Do NOT join the roster yet — player is only added after the
@@ -779,12 +788,16 @@ function PayPage() {
       )}
 
       {/* Footer: refund policy is collapsed by default; legal always shows */}
-      {settings?.refund_policy && (
-        <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
-          <summary className="cursor-pointer font-semibold">Refund policy</summary>
-          <p className="mt-2 text-muted-foreground">{settings.refund_policy}</p>
-        </details>
-      )}
+      <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
+        <summary className="cursor-pointer font-semibold">Refund policy</summary>
+        <p className="mt-2 text-muted-foreground">
+          {refundPolicySummary(
+            normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
+            game.cancelCutoffMin,
+          )}
+          {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
+        </p>
+      </details>
 
       <LegalNotice />
     </div>
@@ -1172,6 +1185,7 @@ function PaymentInstructionsAndProof({
   host_id,
   method,
   extraInstructions,
+  refundTerms,
   onCancel,
   onSubmitted,
 }: {
@@ -1181,6 +1195,8 @@ function PaymentInstructionsAndProof({
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
+  /** The refund disclaimer the player must accept before submitting payment. */
+  refundTerms: string;
   onCancel: () => void;
   onSubmitted: () => void;
 }) {
@@ -1197,6 +1213,7 @@ function PaymentInstructionsAndProof({
   const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
   const [paidAmount, setPaidAmount] = useState(() => (fee && fee > 0 ? String(fee) : ""));
+  const [acceptedRefundTerms, setAcceptedRefundTerms] = useState(false);
   const deepLink = resolvePaymentDeepLink(method, fee, game_title);
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
@@ -1630,10 +1647,19 @@ function PaymentInstructionsAndProof({
             </p>
           )}
         </div>
+        <label className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          <input
+            type="checkbox"
+            checked={acceptedRefundTerms}
+            onChange={(e) => setAcceptedRefundTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
+          />
+          <span>{refundTerms}</span>
+        </label>
         <PrimaryCTA
           type="button"
           onClick={() => void submitProof()}
-          disabled={uploadState === "uploading" || submitting}
+          disabled={uploadState === "uploading" || submitting || !acceptedRefundTerms}
           icon={<ShieldCheck className="h-4 w-4" />}
         >
           {submitting

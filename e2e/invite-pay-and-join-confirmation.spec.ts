@@ -216,6 +216,8 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
 
   // Submit proof without a file — no upload path, just an insert.
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
   await expect(submitBtn).toBeVisible({ timeout: 10_000 });
 
   const insertReq = page.waitForRequest(

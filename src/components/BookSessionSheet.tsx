@@ -33,6 +33,7 @@ import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availa
 import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
 import { Globe } from "lucide-react";
 import { NextAvailableList } from "@/components/NextAvailableList";
+import { normalizeRefundPolicy, refundDisclaimer } from "@/lib/refund-policy";
 import {
   cancelPolicyNote,
   isLateCancel,
@@ -104,6 +105,8 @@ export function BookSessionSheet({
   const [existing, setExisting] = useState<TrainerSessionRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [acceptedRefund, setAcceptedRefund] = useState(false);
+  const charges = Number(org.ratePerHour ?? 0) > 0;
   const [loading, setLoading] = useState(false);
   const [bookings, setBookings] = useState<TrainerBookedSlot[]>([]);
 
@@ -651,6 +654,22 @@ export function BookSessionSheet({
             <p className="text-[11px] text-muted-foreground">
               {cancelPolicyNote(org.cancelCutoffMin)}
             </p>
+            {charges && (
+              <label className="flex items-start gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                <input
+                  type="checkbox"
+                  checked={acceptedRefund}
+                  onChange={(e) => setAcceptedRefund(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
+                />
+                <span>
+                  {refundDisclaimer(
+                    normalizeRefundPolicy(org.refundRule, org.lateRefundPct),
+                    org.cancelCutoffMin,
+                  )}
+                </span>
+              </label>
+            )}
           </div>
         )}
 
@@ -720,8 +739,8 @@ export function BookSessionSheet({
               </button>
               <button
                 onClick={submit}
-                disabled={submitting || !canSubmit}
-                aria-disabled={submitting || !canSubmit}
+                disabled={submitting || !canSubmit || (charges && !acceptedRefund)}
+                aria-disabled={submitting || !canSubmit || (charges && !acceptedRefund)}
                 title={disabledReason}
                 className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-60 disabled:cursor-not-allowed"
               >

@@ -136,6 +136,7 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { normalizeRefundPolicy, refundPolicySummary } from "@/lib/refund-policy";
 import {
   CANCEL_CUTOFF_PRESETS,
   cancelPolicyNote,
@@ -484,6 +485,9 @@ function GameDetail() {
         allowWaitlist: game?.allowWaitlist ?? true,
         entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
         requiresApproval: settings ? !!settings.requires_approval : true,
+        refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
+        lateRefundPct: settings?.late_refund_pct ?? 0,
+        cancelCutoffMin: game?.cancelCutoffMin,
         refundPolicy: settings?.refund_policy ?? "",
         gameRules: game?.gameRules ?? "",
       }),
@@ -1539,6 +1543,40 @@ function GameDetail() {
             </div>
           ))}
 
+        {/* Refund status for a payment the refund policy has been applied to. */}
+        {!isHost &&
+          (() => {
+            const r = mySubs.find(
+              (x) => x.refund_status === "owed" || x.refund_status === "refunded" || x.refund_status === "kept",
+            );
+            if (!r) return null;
+            const amt = `$${Number(r.refund_amount ?? 0).toFixed(2)}`;
+            const copy =
+              r.refund_status === "owed"
+                ? {
+                    title: `Refund owed to you · ${amt}`,
+                    body: "The host has been told. They send it back directly in their payment app — ballaCity doesn't hold money.",
+                    cls: "border-amber-500/40 bg-amber-500/10",
+                  }
+                : r.refund_status === "refunded"
+                  ? {
+                      title: `Refund sent · ${amt}`,
+                      body: "The host marked your refund as sent. Check your payment app; if it hasn't arrived, message the host.",
+                      cls: "border-lime/40 bg-lime/10",
+                    }
+                  : {
+                      title: "Fee not refunded",
+                      body: "Under the host's refund policy, this fee was kept.",
+                      cls: "border-border bg-surface",
+                    };
+            return (
+              <div className={`rounded-2xl border p-4 ${copy.cls}`} role="status" aria-live="polite">
+                <div className="font-display text-sm font-bold">{copy.title}</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{copy.body}</p>
+              </div>
+            );
+          })()}
+
         {/* Payment-required banner (shows when approved-but-unpaid or payment rejected) */}
         {!isHost && (
           <PaymentRequiredBanner
@@ -2016,7 +2054,8 @@ function GameDetail() {
         </div>
 
         {/* Payment settings summary */}
-        {(settings?.payment_deadline ||
+        {(isPaid ||
+          settings?.payment_deadline ||
           settings?.refund_policy ||
           settings?.payment_instructions) && (
           <div className="rounded-3xl border border-border bg-surface p-4">
@@ -2033,11 +2072,17 @@ function GameDetail() {
                   </div>
                 </div>
               )}
-              {settings?.refund_policy && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
-                  <p className="text-sm leading-relaxed">{settings.refund_policy}</p>
-                </div>
+              {isPaid && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
+                <p className="text-sm leading-relaxed">
+                  {refundPolicySummary(
+                    normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
+                    game.cancelCutoffMin,
+                  )}
+                  {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
+                </p>
+              </div>
               )}
               {settings?.payment_instructions && (
                 <div>
@@ -3306,6 +3351,9 @@ function EditGameModal({
       allowWaitlist: game.allowWaitlist ?? true,
       entryFee: Number(settings?.entry_fee ?? game.price ?? 0) || 0,
       requiresApproval: settings ? !!settings.requires_approval : true,
+      refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
+      lateRefundPct: settings?.late_refund_pct ?? 0,
+      cancelCutoffMin: game.cancelCutoffMin,
       refundPolicy: settings?.refund_policy ?? "",
       gameRules: game.gameRules ?? "",
     }),
@@ -3481,6 +3529,9 @@ function EditGameModal({
             ? { payment_hold_minutes: pr > 0 ? paymentHoldMinutes : null }
             : {}),
           refund_policy: refundPolicy.trim() || null,
+          ...(pr > 0
+            ? { refund_rule: editPolicy.refundRule, late_refund_pct: editPolicy.lateRefundPct }
+            : {}),
           payment_instructions: paymentInstructions.trim() || null,
           requires_approval: requiresApproval,
         });
