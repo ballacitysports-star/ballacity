@@ -18,14 +18,35 @@ export type FamilyClipSummary = {
   via: FamilyClipVia;
 };
 
+/** The guardian's per-child opt-in for a reel's child. Off on any doubt. */
+async function childAllows(supabase: any, userId: string, reelId: string | undefined, kind: "link" | "team") {
+  if (!reelId) return true;
+  const { data: reel } = await supabase
+    .from("highlight_reels")
+    .select("subject_child_id")
+    .eq("id", reelId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const childId = (reel as { subject_child_id?: string | null } | null)?.subject_child_id;
+  if (!childId) return false;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.rpc("family_child_allows" as never, {
+    _child: childId,
+    _kind: kind,
+  } as never);
+  return data === true;
+}
+
 /** Whether choosing a team is switched on. Off on any doubt. */
 export const getTeamShareEnabled = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .inputValidator((input: { reelId?: string } | undefined) => ({ reelId: input?.reelId }))
+  .handler(async ({ data: input, context }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data } = await supabaseAdmin.rpc("family_team_share_enabled" as never);
-      return { enabled: data === true };
+      const allowed = data === true && (await childAllows(context.supabase, context.userId, input.reelId, "team"));
+      return { enabled: allowed };
     } catch {
       return { enabled: false };
     }
@@ -151,6 +172,82 @@ export const setChildFamilyView = createServerFn({ method: "POST" })
       context: { enabled: data.enabled },
     } as never);
     return { enabled: data.enabled };
+  });
+
+/** The guardian's two opt-ins for sharing clips of this child. Both default off. */
+export const getChildFamilySharing = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { childUserId: string }) => {
+    if (!input?.childUserId) throw new Error("childUserId is required");
+    return { childUserId: input.childUserId };
+  })
+  .handler(async ({ data, context }) => {
+    // Row-level security lets a guardian read their child's controls.
+    const { data: row } = await context.supabase
+      .from("child_controls")
+      .select("family_posts_link_sharing,family_posts_team_sharing")
+      .eq("child_user_id", data.childUserId)
+      .maybeSingle();
+    const r = row as { family_posts_link_sharing?: boolean; family_posts_team_sharing?: boolean } | null;
+    return { links: r?.family_posts_link_sharing === true, team: r?.family_posts_team_sharing === true };
+  });
+
+/**
+ * Turns private links or team sharing on or off for one child. Turning one off also
+ * ends what it allowed: active links are revoked and clips are taken off the team.
+ */
+export const setChildFamilySharing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { childUserId: string; kind: "link" | "team"; enabled: boolean }) => {
+    if (!input?.childUserId) throw new Error("childUserId is required");
+    if (input.kind !== "link" && input.kind !== "team") throw new Error("Unknown setting");
+    return { childUserId: input.childUserId, kind: input.kind, enabled: input.enabled === true };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ok } = await supabaseAdmin.rpc("is_guardian_of", {
+      _parent: context.userId,
+      _child: data.childUserId,
+    } as never);
+    if (ok !== true) throw new Error("Only a verified parent or guardian can change this.");
+
+    const column = data.kind === "link" ? "family_posts_link_sharing" : "family_posts_team_sharing";
+    const { error } = await supabaseAdmin
+      .from("child_controls")
+      .upsert({ child_user_id: data.childUserId, [column]: data.enabled } as never, {
+        onConflict: "child_user_id",
+      });
+    if (error) throw new Error(error.message);
+
+    if (!data.enabled) {
+      const { data: reels } = await supabaseAdmin
+        .from("highlight_reels")
+        .select("id")
+        .eq("subject_child_id", data.childUserId);
+      const ids = ((reels ?? []) as { id: string }[]).map((r) => r.id);
+      if (ids.length > 0) {
+        if (data.kind === "link") {
+          await supabaseAdmin
+            .from("family_post_links" as never)
+            .update({ revoked_at: new Date().toISOString() } as never)
+            .in("reel_id", ids)
+            .is("revoked_at", null);
+        } else {
+          await supabaseAdmin
+            .from("highlight_reels")
+            .update({ team_share_team_id: null } as never)
+            .in("id", ids);
+        }
+      }
+    }
+
+    await supabaseAdmin.from("family_audit_log").insert({
+      actor_user_id: context.userId,
+      child_user_id: data.childUserId,
+      action: "family_post.sharing_changed",
+      context: { kind: data.kind, enabled: data.enabled },
+    } as never);
+    return { ok: true };
   });
 
 /** The family clips the signed-in member may watch: their own, and their team's. */

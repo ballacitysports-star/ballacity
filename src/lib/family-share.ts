@@ -60,6 +60,7 @@ export function shareLinkStatus(
 
 const SHARE_ERRORS: Record<string, string> = {
   FAMILY_SHARE_OFF: "Sharing links aren't available yet.",
+  FAMILY_SHARE_NOT_ALLOWED: "Turn on private links for this child in the Parent area first.",
   FAMILY_SHARE_NOT_OWNER: "Only the parent who added this clip can share it.",
   FAMILY_POST_NOT_GUARDIAN:
     "Only a verified parent or guardian of this child can share their clip.",

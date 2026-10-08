@@ -25,8 +25,8 @@ export function FamilyPostAudience({ reelId }: { reelId: string }) {
   const setFn = useServerFn(setFamilyPostTeam);
 
   const { data: enabled } = useQuery({
-    queryKey: ["family-team-share-enabled"],
-    queryFn: () => enabledFn(),
+    queryKey: ["family-team-share-enabled", reelId],
+    queryFn: () => enabledFn({ data: { reelId } }),
     staleTime: 60_000,
   });
   const { data: choices, isFetching } = useQuery({

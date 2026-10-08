@@ -95,3 +95,20 @@ describe("family post share links in the activity trail", () => {
     );
   });
 });
+
+describe("family clip sharing toggles in the activity trail", () => {
+  it("words each switch", () => {
+    expect(
+      describeFamilyActivity({
+        action: "family_post.sharing_changed",
+        context: { kind: "team", enabled: true },
+      }).detail,
+    ).toBe("Team sharing turned on");
+    expect(
+      describeFamilyActivity({
+        action: "family_post.sharing_changed",
+        context: { kind: "link", enabled: false },
+      }).detail,
+    ).toBe("Private links turned off");
+  });
+});
