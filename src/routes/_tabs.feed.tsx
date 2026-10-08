@@ -93,7 +93,6 @@ function Feed() {
     }
   };
   // Card density is automatic: one column on phones, 2–3 on wider screens.
-  const density = "grid" as const;
   const listContainerClass = "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
   const emptyColSpan = "sm:col-span-2 lg:col-span-3";
   const renderGame = (g: (typeof GAMES)[number], i: number) => (
@@ -224,7 +223,7 @@ function Feed() {
       console.warn("feed url sync skipped", e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, density, tab, authUser]);
+  }, [q, prefs, positionFilter, viewMode, tab, authUser]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
@@ -351,7 +350,6 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-  const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
   const positionSport =
     chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0
