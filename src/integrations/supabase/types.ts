@@ -4755,6 +4755,7 @@ export type Database = {
           parent_id: string
         }[]
       }
+      guardian_cancel_child_game: { Args: { _child: string; _game: string }; Returns: string }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
       refund_pct_for: {
         Args: {
