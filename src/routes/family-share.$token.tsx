@@ -47,7 +47,7 @@ function FamilySharePage() {
 
   if (!data?.found) {
     return (
-      <main className="mx-auto grid min-h-dvh max-w-sm place-items-center p-6 text-center">
+      <main className="page-shell-narrow grid min-h-dvh place-items-center py-6 text-center">
         <div>
           <Lock className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden />
           <h1 className="mt-3 text-lg font-semibold">This link isn&apos;t available</h1>
@@ -62,7 +62,7 @@ function FamilySharePage() {
   const src = showOriginal && data.fallbackVideoUrl ? data.fallbackVideoUrl : data.videoUrl;
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl p-4">
+    <main className="page-shell-narrow min-h-dvh py-4">
       <p className="micro-label text-muted-foreground">Shared privately</p>
       <h1 className="mt-1 text-lg font-semibold">{data.title}</h1>
       <video
