@@ -1184,6 +1184,7 @@ export type Database = {
           arrive_early_min: number
           cancellation_notes: string | null
           cancellation_policy: string
+          cancel_cutoff_min: number
           cancellation_reason: string | null
           cancelled_at: string | null
           completed_at: string | null
@@ -1238,6 +1239,7 @@ export type Database = {
           arrive_early_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
+          cancel_cutoff_min?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -1292,6 +1294,7 @@ export type Database = {
           arrive_early_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
+          cancel_cutoff_min?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -3178,6 +3181,7 @@ export type Database = {
         Row: {
           author_id: string
           body: string
+          cancel_cutoff_min: number
           created_at: string
           event_date: string | null
           formatted_address: string | null
@@ -3201,6 +3205,7 @@ export type Database = {
         Insert: {
           author_id: string
           body?: string
+          cancel_cutoff_min?: number
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
@@ -3224,6 +3229,7 @@ export type Database = {
         Update: {
           author_id?: string
           body?: string
+          cancel_cutoff_min?: number
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
@@ -3399,6 +3405,7 @@ export type Database = {
           city: string
           claimed_at: string | null
           cover: string
+          cancel_cutoff_min: number
           created_at: string
           credentials: string[]
           distances: string[]
@@ -3451,6 +3458,7 @@ export type Database = {
           city?: string
           claimed_at?: string | null
           cover?: string
+          cancel_cutoff_min?: number
           created_at?: string
           credentials?: string[]
           distances?: string[]
@@ -3503,6 +3511,7 @@ export type Database = {
           city?: string
           claimed_at?: string | null
           cover?: string
+          cancel_cutoff_min?: number
           created_at?: string
           credentials?: string[]
           distances?: string[]

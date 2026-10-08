@@ -34,6 +34,12 @@ import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall
 import { Globe } from "lucide-react";
 import { NextAvailableList } from "@/components/NextAvailableList";
 import {
+  cancelPolicyNote,
+  isLateCancel,
+  lateCancelWarning,
+  sessionStart,
+} from "@/lib/cancel-window";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -642,6 +648,9 @@ export function BookSessionSheet({
                 </span>
               </div>
             ) : null}
+            <p className="text-[11px] text-muted-foreground">
+              {cancelPolicyNote(org.cancelCutoffMin)}
+            </p>
           </div>
         )}
 
@@ -730,6 +739,18 @@ export function BookSessionSheet({
                 you already paid them, sort out any refund with them directly.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {existing &&
+              isLateCancel(
+                sessionStart(existing.preferred_date, existing.preferred_start_time, trainerTz),
+                org.cancelCutoffMin,
+              ) && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
+                >
+                  {lateCancelWarning(org.cancelCutoffMin)}
+                </p>
+              )}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={submitting}>Keep session</AlertDialogCancel>
               <AlertDialogAction

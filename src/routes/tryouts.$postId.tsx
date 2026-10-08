@@ -9,6 +9,7 @@ import { RsvpDialog, useMyTryoutRegistrations } from "@/components/tryouts/Tryou
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getTryout, getMyTryoutResult } from "@/lib/tryouts.functions";
+import { cancelPolicyNote } from "@/lib/cancel-window";
 
 const tryoutQuery = (postId: string) =>
   queryOptions({ queryKey: ["tryouts", "one", postId], queryFn: () => getTryout({ data: { postId } }) });
@@ -78,6 +79,7 @@ function TryoutPage() {
         {t.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{t.location}</p>}
         {left != null && <p className="flex items-center gap-2"><Users className="h-4 w-4" />{left === 0 ? "Full" : `${left} of ${t.spotsMax} spots left`}</p>}
         <p>{t.price ? `Fee: $${t.price}` : "Free"}</p>
+        <p>{cancelPolicyNote(t.cancelCutoffMin)}</p>
       </div>
       {isManager && !passed && (
         <div className="mt-4 flex flex-wrap gap-2">

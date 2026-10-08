@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { ORGS, type Org, type OrgKind, type Sport } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
+import { normalizeCutoff } from "@/lib/cancel-window";
 
 type TeamRow = {
   id: string;
@@ -48,6 +49,7 @@ type TeamRow = {
   availability_overrides: unknown;
   availability_rules: unknown;
   timezone: string | null;
+  cancel_cutoff_min?: number | null;
 };
 
 const myOrgIds = new Set<string>();
@@ -135,6 +137,7 @@ function rowToOrg(row: TeamRow): Org {
         ? (row.availability_rules as Org["availabilityRules"])
         : [],
     timezone: kind === "coach" ? (row.timezone ?? undefined) : undefined,
+    cancelCutoffMin: kind === "coach" ? normalizeCutoff(row.cancel_cutoff_min) : undefined,
     upcoming: [],
     posts: [],
   };
@@ -354,6 +357,8 @@ export async function updateOrg(
   if (patch.availabilityRules !== undefined)
     mapped.availability_rules = patch.availabilityRules ?? [];
   if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
+  if (patch.cancelCutoffMin !== undefined)
+    mapped.cancel_cutoff_min = normalizeCutoff(patch.cancelCutoffMin);
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;

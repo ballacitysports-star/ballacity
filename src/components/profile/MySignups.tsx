@@ -21,6 +21,7 @@ import {
   listMyTryoutSignups,
   type MyTryoutSignup,
 } from "@/lib/tryouts.functions";
+import { isLateCancel, lateCancelWarning, sessionStart } from "@/lib/cancel-window";
 import {
   cancelTrainerSessionRequest,
   listMyTrainerRequests,
@@ -38,6 +39,8 @@ type Item = {
   to: { to: string; params?: Record<string, string> };
   /** Shown in the confirm dialog. */
   confirmText: string;
+  /** Set when cancelling now would be late; the warning to show. */
+  lateWarning: string | null;
   cancel: () => Promise<void>;
 };
 
@@ -88,13 +91,26 @@ export function MySignups() {
         (r) => r.status === "pending" || r.status === "accepted",
       );
       const ids = [...new Set(rows.map((r) => r.trainer_id))];
-      const names = new Map<string, string>();
+      type TrainerRow = {
+        id: string;
+        name: string;
+        timezone: string | null;
+        cancel_cutoff_min?: number | null;
+      };
+      const trainers = new Map<string, TrainerRow>();
       if (ids.length) {
-        const { data } = await supabase.from("teams").select("id,name").in("id", ids);
-        for (const t of (data ?? []) as Array<{ id: string; name: string }>)
-          names.set(t.id, t.name);
+        const { data } = await supabase.from("teams").select("*").in("id", ids);
+        for (const t of (data ?? []) as TrainerRow[]) trainers.set(t.id, t);
       }
-      return rows.map((r) => ({ row: r, trainerName: names.get(r.trainer_id) ?? "Trainer" }));
+      return rows.map((r) => {
+        const t = trainers.get(r.trainer_id);
+        return {
+          row: r,
+          trainerName: t?.name ?? "Trainer",
+          start: sessionStart(r.preferred_date, r.preferred_start_time, t?.timezone),
+          cutoff: t?.cancel_cutoff_min ?? null,
+        };
+      });
     },
   });
 
@@ -113,6 +129,9 @@ export function MySignups() {
       where: t.location,
       badge: "Registered",
       to: { to: "/tryouts/$postId", params: { postId: t.postId } },
+      lateWarning: isLateCancel(t.eventDate, t.cancelCutoffMin)
+        ? lateCancelWarning(t.cancelCutoffMin)
+        : null,
       confirmText: `${t.isChild ? `${t.attendeeName}'s` : "Your"} spot at ${t.title} will open up for someone else and ${t.teamName} will be told.${t.price ? " If you already paid the team, ask them about a refund." : ""}`,
       cancel: async () => {
         const r = await cancelTryout({
@@ -121,7 +140,7 @@ export function MySignups() {
         if (!r.ok) throw new Error(r.error);
       },
     })),
-    ...(sessions.data ?? []).map(({ row, trainerName }): Item => ({
+    ...(sessions.data ?? []).map(({ row, trainerName, start, cutoff }): Item => ({
       key: `session-${row.id}`,
       icon: "session",
       title: row.session_type || "Training session",
@@ -130,6 +149,9 @@ export function MySignups() {
       where: null,
       badge: row.status === "accepted" ? "Accepted" : "Pending",
       to: { to: "/trainers/$trainerId", params: { trainerId: row.trainer_id } },
+      // A pending request isn't holding a slot yet, so it can't be late.
+      lateWarning:
+        row.status === "accepted" && isLateCancel(start, cutoff) ? lateCancelWarning(cutoff) : null,
       confirmText:
         row.status === "accepted"
           ? `${trainerName} will be told you cancelled and the time opens up for other players. If you already paid them, sort out any refund with them directly.`
@@ -222,6 +244,14 @@ export function MySignups() {
             <AlertDialogTitle>Cancel {target?.title}?</AlertDialogTitle>
             <AlertDialogDescription>{target?.confirmText}</AlertDialogDescription>
           </AlertDialogHeader>
+          {target?.lateWarning && (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
+            >
+              {target.lateWarning}
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Keep it</AlertDialogCancel>
             <AlertDialogAction
