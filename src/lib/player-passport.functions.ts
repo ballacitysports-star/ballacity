@@ -35,7 +35,7 @@ export type PlayerPassport = {
   accolades: PassportAccolade[];
   upcomingRuns: PassportRun[];
   /** Null for minors or when the player hides games played. */
-  progress: AthleteProgress | null;
+  progress?: AthleteProgress | null;
 };
 
 const EMPTY: PlayerPassport = { teams: [], accolades: [], upcomingRuns: [], progress: null };
