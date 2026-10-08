@@ -95,3 +95,15 @@ describe("converter reachability preflight", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("privacy pass", () => {
+  it("drops tags, chapters and extra tracks, and keeps only the first video and audio", async () => {
+    const { PRIVACY_ARGS } = await freshModule();
+    const joined = PRIVACY_ARGS.join(" ");
+    expect(joined).toContain("-map_metadata -1");
+    expect(joined).toContain("-map_chapters -1");
+    expect(joined).toContain("-map 0:v:0");
+    expect(joined).toContain("-map 0:a:0?");
+    expect(joined).toContain("+bitexact");
+  });
+});

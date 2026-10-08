@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
 import {
   getChildFamilySharing,
   getChildFamilyView,
@@ -130,11 +131,7 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
         appears on the highlights feed, on a profile, or to other members.
       </p>
       {child.controls.aiAnalysis ? (
-        <Button asChild size="sm" variant="outline" className="mt-2">
-          <Link to="/reels" search={{ game: "", title: "", upload: "", child: child.childUserId }}>
-            Add a clip
-          </Link>
-        </Button>
+        <GuardianVideoUploadDialog childUserId={child.childUserId} className="mt-2" />
       ) : (
         <p className="mt-2 text-xs font-semibold text-amber-300">
           Turn on &ldquo;AI video analysis&rdquo; below first. Every clip is analysed by AI.

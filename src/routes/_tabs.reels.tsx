@@ -21,6 +21,7 @@ import { needsPlaybackConversion } from "@/lib/video-support";
 import {
   assertConverterReachable,
   convertToPlayableMp4,
+  stripVideoMetadata,
   ConverterUnavailableError,
 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
@@ -883,7 +884,8 @@ function ReelsPage() {
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(picked: File) {
+    let file = picked;
     // Never fall back to an ordinary (potentially public) reel when the link asked
     // for a family post but the guardian relationship can't be confirmed.
     if (childParam && !subjectChild) {
@@ -916,6 +918,26 @@ function ReelsPage() {
       // What the clip actually is (length, size, which way up). Measured here
       // because the server runtime has no ffprobe; kept so a viewer's player and
       // a later support question both have the facts.
+      // A clip of a child leaves this device without its location, device or
+      // creation-time tags. Done before anything is stored, and the original is
+      // never kept: if it cannot be cleaned, nothing is uploaded.
+      if (subjectChild) {
+        await assertConverterReachable();
+        const cleanId = toast.loading("Removing location and device info… 0%");
+        const clean = await stripVideoMetadata(file, (r) =>
+          toast.loading(`Removing location and device info… ${Math.round(r * 100)}%`, {
+            id: cleanId,
+          }),
+        );
+        toast.dismiss(cleanId);
+        if (!clean) {
+          throw new Error(
+            "We couldn't remove the location info from this clip, so nothing was uploaded. Try a shorter clip, or a desktop browser.",
+          );
+        }
+        file = clean;
+      }
+
       const originalProbe = await probeVideo(file);
 
       // Convert BEFORE storing anything. This ordering is the whole fix: the
