@@ -98,12 +98,15 @@ describe("converter reachability preflight", () => {
 
 describe("privacy pass", () => {
   it("drops tags, chapters and extra tracks, and keeps only the first video and audio", async () => {
-    const { PRIVACY_ARGS } = await freshModule();
-    const joined = PRIVACY_ARGS.join(" ");
-    expect(joined).toContain("-map_metadata -1");
-    expect(joined).toContain("-map_chapters -1");
-    expect(joined).toContain("-map 0:v:0");
-    expect(joined).toContain("-map 0:a:0?");
-    expect(joined).toContain("+bitexact");
+    // Read from source so the check does not depend on loading the converter.
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("./video-transcode.ts", import.meta.url), "utf8");
+    const block = src.slice(src.indexOf("export const PRIVACY_ARGS"), src.indexOf("const PRIVACY_PASSES"));
+    const flat = block.replace(/[\s",\[\];]+/g, " ");
+    expect(flat).toContain("-map_metadata -1");
+    expect(flat).toContain("-map_chapters -1");
+    expect(flat).toContain("-map 0:v:0");
+    expect(flat).toContain("-map 0:a:0?");
+    expect(flat).toContain("+bitexact");
   });
 });
