@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
+import { sanitizePostCopy } from "@/lib/reel-post";
 
 /**
  * AI/video processing is opt-out for adults (Settings → Privacy) and
@@ -339,6 +340,71 @@ export const applyReelCopy = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { updated: true, heldForReview: held.hidden };
+  });
+
+/**
+ * Posts a draft reel, saving the copy the member picked on the review card in
+ * the same step. New uploads start as drafts, visible only to their owner.
+ *
+ * Posting only clears `is_draft`. It never touches `hidden_at`, so a safety hold
+ * or moderation action keeps applying, and the audience rules (age, guardian
+ * lock) are still enforced by the database when anyone else reads the reel.
+ * The copy goes through the same safety screen as `applyReelCopy`: blocked copy
+ * stops the post, borderline copy posts but keeps the reel owner-only for review.
+ */
+export const postReel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      reelId: string;
+      title?: string;
+      caption?: string;
+      hashtags?: string[];
+      overlays?: { at: string; text: string }[];
+    }) => {
+      if (!input?.reelId) throw new Error("reelId is required");
+      return {
+        reelId: input.reelId,
+        copy: sanitizePostCopy({
+          title: input.title,
+          caption: input.caption,
+          hashtags: input.hashtags,
+          overlays: input.overlays,
+        }),
+      };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const { data: reel, error: readErr } = await context.supabase
+      .from("highlight_reels")
+      .select("id,status,is_draft")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!reel) throw new Error("Reel not found");
+    if ((reel as any).status !== "completed") {
+      throw new Error("This reel is still processing — post it once it's ready.");
+    }
+
+    const patch: Record<string, any> = { ...data.copy };
+    const held =
+      Object.keys(patch).length > 0
+        ? await screenUserCopy(context.userId, data.reelId, patch, "postReel")
+        : { blocked: false, hidden: false, message: "" };
+    if (held.blocked) throw new Error(held.message);
+
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update({
+        ...patch,
+        is_draft: false,
+        ...(held.hidden ? { hidden_at: new Date().toISOString() } : {}),
+      } as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { posted: true, heldForReview: held.hidden };
   });
 
 /**

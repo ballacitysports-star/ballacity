@@ -29,6 +29,7 @@ export const STEPS = [
   "analytics",
   "metadata",
   "hashtags",
+  "package",
   "thumbnail",
   "finalize",
 ] as const;
@@ -531,6 +532,50 @@ const STEP_RUNNERS: Record<
         ? out.hashtags.map((h: unknown) => String(h)).slice(0, 8)
         : [],
     };
+  },
+  /**
+   * The post package the member reviews before posting: three caption variants,
+   * on-screen text cards and hashtags, written from everything the earlier steps
+   * learned. Stored in step_progress (not on the reel) so nothing is applied
+   * until the member picks it. A bonus: any failure just means the review card
+   * shows the caption already written, and never fails the reel.
+   */
+  package: async (reel, progress, ctx) => {
+    if (!progress.analysis?.summary && !progress.ai_caption) return { package: null };
+    try {
+      const { generateReelPackage } = await import("@/lib/reel-coach.server");
+      const pkg = await generateReelPackage(
+        ctx.apiKey,
+        {
+          id: reel.id,
+          title: reel.title,
+          game_title: reel.game_title ?? null,
+          status: "completed",
+          style_prefs: reel.style_prefs ?? null,
+          ai_title: progress.ai_title ?? null,
+          ai_caption: progress.ai_caption ?? null,
+          ai_hashtags: progress.ai_hashtags ?? [],
+          ai_sport: progress.sport ?? null,
+          ai_analysis: progress.analysis ?? null,
+          ai_moments: progress.moments ?? [],
+          ai_timeline: progress.timeline ?? [],
+          ai_edit_plan: progress.edit_plan ?? null,
+          ai_coaching: progress.coaching ?? null,
+          ai_transcript: progress.transcript ?? null,
+          suggested_clip: progress.suggested_clip ?? null,
+        },
+        { session: ctx.session },
+      );
+      return {
+        package: {
+          captions: pkg.captions,
+          hashtags: pkg.hashtags,
+          overlays: pkg.overlays,
+        },
+      };
+    } catch {
+      return { package: null };
+    }
   },
   /** Real thumbnail: the browser captured frames at upload time. */
   thumbnail: async (reel, progress) => {
