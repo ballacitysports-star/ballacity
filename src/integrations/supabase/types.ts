@@ -519,6 +519,7 @@ export type Database = {
           ai_analysis: boolean
           child_user_id: string
           created_at: string
+          family_posts_child_view: boolean
           game_participation: boolean
           location_precision: string
           media_visibility: string
@@ -536,6 +537,7 @@ export type Database = {
           ai_analysis?: boolean
           child_user_id: string
           created_at?: string
+          family_posts_child_view?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string
@@ -553,6 +555,7 @@ export type Database = {
           ai_analysis?: boolean
           child_user_id?: string
           created_at?: string
+          family_posts_child_view?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string
@@ -1031,6 +1034,7 @@ export type Database = {
           step_progress: Json
           style_prefs: Json | null
           subject_child_id: string | null
+          team_share_team_id: string | null
           suggested_clip: Json | null
           thumbnail_path: string | null
           title: string
@@ -1074,6 +1078,7 @@ export type Database = {
           step_progress?: Json
           style_prefs?: Json | null
           subject_child_id?: string | null
+          team_share_team_id?: string | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string
@@ -1117,6 +1122,7 @@ export type Database = {
           step_progress?: Json
           style_prefs?: Json | null
           subject_child_id?: string | null
+          team_share_team_id?: string | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string

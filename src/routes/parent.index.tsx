@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { getChildFamilyView, setChildFamilyView } from "@/lib/family-clips.functions";
 import type { GuardianChild } from "@/lib/child-safety.functions";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Users } from "lucide-react";
@@ -85,7 +86,16 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
     queryFn: () => fetchEnabled(),
     staleTime: 60_000,
   });
-  if (!data?.enabled || child.cohort !== "child_under_13") return null;
+  const qc = useQueryClient();
+  const getViewFn = useServerFn(getChildFamilyView);
+  const setViewFn = useServerFn(setChildFamilyView);
+  const enabled = data?.enabled === true && child.cohort === "child_under_13";
+  const { data: view } = useQuery({
+    queryKey: ["child-family-view", child.childUserId],
+    queryFn: () => getViewFn({ data: { childUserId: child.childUserId } }),
+    enabled,
+  });
+  if (!enabled) return null;
   return (
     <div className="rounded-xl border border-border p-3">
       <div className="text-sm font-semibold">Add a clip of {child.displayName}</div>
@@ -104,6 +114,27 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
           Turn on &ldquo;AI video analysis&rdquo; below first. Every clip is analysed by AI.
         </p>
       )}
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold">{child.displayName} can watch these clips</div>
+          <p className="text-[11px] text-muted-foreground">
+            Read-only, on their own account. They can&apos;t edit, delete or share them.
+          </p>
+        </div>
+        <Switch
+          checked={view?.enabled ?? true}
+          onCheckedChange={async (v) => {
+            try {
+              await setViewFn({ data: { childUserId: child.childUserId, enabled: v } });
+              await qc.invalidateQueries({ queryKey: ["child-family-view", child.childUserId] });
+              toast.success("Setting saved");
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not save this setting");
+            }
+          }}
+          aria-label={`${child.displayName} can watch family clips`}
+        />
+      </div>
     </div>
   );
 }

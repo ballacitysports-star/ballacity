@@ -66,6 +66,25 @@ describe("describeFamilyActivity", () => {
   });
 });
 
+describe("family clip visibility in the activity trail", () => {
+  it("words team sharing and the child's view", () => {
+    expect(describeFamilyActivity({ action: "family_post.team_shared" }).title).toBe(
+      "Family clip shared with a team",
+    );
+    expect(describeFamilyActivity({ action: "family_post.team_unshared" }).title).toBe(
+      "Family clip made private again",
+    );
+    expect(
+      describeFamilyActivity({ action: "family_post.child_view_changed", context: { enabled: false } })
+        .detail,
+    ).toContain("no longer");
+    expect(
+      describeFamilyActivity({ action: "family_post.child_view_changed", context: { enabled: true } })
+        .detail,
+    ).toContain("can watch");
+  });
+});
+
 describe("family post share links in the activity trail", () => {
   it("describes creating and turning off a private link", () => {
     expect(

@@ -86,6 +86,7 @@ import {
 import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
+import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
 
 export const Route = createFileRoute("/_tabs/reels")({
   // `child` is optional so the existing links to this page need no change.
@@ -368,6 +369,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         />
       )}
 
+      {isDone && reel.subject_child_id && <FamilyPostAudience reelId={reel.id} />}
       {isDone && reel.subject_child_id && <FamilyShareLinks reelId={reel.id} />}
 
       {/* Secondary actions live in one menu; realtime patches the row after each change. */}

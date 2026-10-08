@@ -69,6 +69,15 @@ export function describeFamilyActivity(entry: {
       return { title: "Family link invited", detail: relationshipDetail(ctx) };
     case "link.revoked":
       return { title: "Family link ended", detail: null };
+    case "family_post.team_shared":
+      return { title: "Family clip shared with a team", detail: null };
+    case "family_post.team_unshared":
+      return { title: "Family clip made private again", detail: null };
+    case "family_post.child_view_changed":
+      return {
+        title: "Child's view of family clips changed",
+        detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
+      };
     case "family_post.link_created":
       return {
         title: "Private share link created",

@@ -26,6 +26,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SafetyRouteImport } from './routes/safety'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
@@ -197,6 +198,11 @@ const SafetyRoute = SafetyRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FamilyClipsRoute = FamilyClipsRouteImport.update({
+  id: '/family-clips',
+  path: '/family-clips',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -665,6 +671,7 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -771,6 +778,7 @@ export interface FileRoutesByTo {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -878,6 +886,7 @@ export interface FileRoutesById {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -986,6 +995,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
+    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1092,6 +1102,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
+    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1198,6 +1209,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
+    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1306,6 +1318,7 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SafetyRoute: typeof SafetyRoute
   SettingsRoute: typeof SettingsRoute
+  FamilyClipsRoute: typeof FamilyClipsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuperadminRoute: typeof SuperadminRoute
@@ -1502,6 +1515,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/family-clips': {
+      id: '/family-clips'
+      path: '/family-clips'
+      fullPath: '/family-clips'
+      preLoaderRoute: typeof FamilyClipsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -2185,6 +2205,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SafetyRoute: SafetyRoute,
   SettingsRoute: SettingsRoute,
+  FamilyClipsRoute: FamilyClipsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuperadminRoute: SuperadminRoute,
