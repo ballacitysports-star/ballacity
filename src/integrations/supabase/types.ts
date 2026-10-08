@@ -1014,6 +1014,7 @@ export type Database = {
           game_id: string | null
           game_title: string | null
           hidden_at: string | null
+          is_draft: boolean
           id: string
           last_step_at: string | null
           media_meta: Json | null
@@ -1055,6 +1056,7 @@ export type Database = {
           game_id?: string | null
           game_title?: string | null
           hidden_at?: string | null
+          is_draft?: boolean
           id?: string
           last_step_at?: string | null
           media_meta?: Json | null
@@ -1096,6 +1098,7 @@ export type Database = {
           game_id?: string | null
           game_title?: string | null
           hidden_at?: string | null
+          is_draft?: boolean
           id?: string
           last_step_at?: string | null
           media_meta?: Json | null

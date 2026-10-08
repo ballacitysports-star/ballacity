@@ -94,6 +94,7 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         .select("id", { count: "exact", head: true })
         .eq("user_id", data.userId)
         .eq("status", "completed")
+        .eq("is_draft", false)
         .is("hidden_at", null),
     ]);
 
