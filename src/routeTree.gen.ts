@@ -75,6 +75,7 @@ import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as ParentIndexRouteImport } from './routes/parent.index'
 import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$userId'
+import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$token'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
@@ -446,6 +447,11 @@ const PlayerCardUserIdRoute = PlayerCardUserIdRouteImport.update({
   path: '/player-card/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyShareTokenRoute = FamilyShareTokenRouteImport.update({
+  id: '/family-share/$token',
+  path: '/family-share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
@@ -703,6 +709,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -807,6 +814,7 @@ export interface FileRoutesByTo {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -914,6 +922,7 @@ export interface FileRoutesById {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -1021,6 +1030,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
+    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1125,6 +1135,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
+    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1231,6 +1242,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
+    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1328,6 +1340,7 @@ export interface RootRouteChildren {
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
+  FamilyShareTokenRoute: typeof FamilyShareTokenRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -1834,6 +1847,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayerCardUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family-share/$token': {
+      id: '/family-share/$token'
+      path: '/family-share/$token'
+      fullPath: '/family-share/$token'
+      preLoaderRoute: typeof FamilyShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/players/$userId': {
       id: '/players/$userId'
       path: '/players/$userId'
@@ -2200,6 +2220,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayerCardUserIdRoute: PlayerCardUserIdRoute,
+  FamilyShareTokenRoute: FamilyShareTokenRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,
