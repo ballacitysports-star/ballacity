@@ -85,6 +85,7 @@ import {
 import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
+import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
 
 export const Route = createFileRoute("/_tabs/reels")({
   // `child` is optional so the existing links to this page need no change.
@@ -366,6 +367,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           heldBySafety={!!reel.hidden_at}
         />
       )}
+
+      {isDone && reel.subject_child_id && <FamilyPostAudience reelId={reel.id} />}
 
       {/* Secondary actions live in one menu; realtime patches the row after each change. */}
       <div className="mt-2 flex items-center gap-2">

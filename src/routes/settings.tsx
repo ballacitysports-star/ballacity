@@ -28,6 +28,7 @@ import {
   Trash2,
   UserCog,
   BadgeCheck,
+  Users,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
@@ -197,6 +198,12 @@ const SECTIONS: Section[] = [
         label: "Privacy",
         description: "Profile & location visibility, messages, delete account",
         icon: Shield,
+      },
+      {
+        to: "/family-clips",
+        label: "Family clips",
+        description: "Clips a parent added of you or shared with your team",
+        icon: Users,
       },
       {
         to: "/account/ai-privacy",
