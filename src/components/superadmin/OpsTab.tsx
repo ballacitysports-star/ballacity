@@ -221,7 +221,7 @@ export function OpsTab() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Live queues</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-xs">
           <Queue
             title="Join requests"
             rows={queues.data?.joins ?? []}
@@ -231,11 +231,6 @@ export function OpsTab() {
             title="Position waitlist"
             rows={queues.data?.waitlist ?? []}
             render={(r: any) => `${r.game_id} · ${r.position} · ${r.status}`}
-          />
-          <Queue
-            title="Highlight reels"
-            rows={queues.data?.reels ?? []}
-            render={(r: any) => `${r.title} · ${r.status} (${r.processing_step})`}
           />
           <Queue
             title="Org member requests"
