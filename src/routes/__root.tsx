@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
+import { StaffBar } from "@/components/staff/StaffBar";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -428,6 +429,8 @@ function installStaleServerFnRecovery() {
 const PUBLIC_ROUTES = [
   "/",
   "/auth",
+  // Staff entry: signed-out visitors see the single sign-in button.
+  "/staff",
   "/reset-password",
   "/.lovable/oauth/consent",
   // Legal documents must be readable before/without signing in.
@@ -1074,6 +1077,7 @@ function RootComponent() {
       >
         <GlobalErrorBoundary scope="root">
           <AuthGate>
+            <StaffBar />
             <SwipeNavigator>
               <Outlet />
             </SwipeNavigator>

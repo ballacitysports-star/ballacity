@@ -29,6 +29,7 @@ import { Route as SafetyRouteImport } from './routes/safety'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as StaffRouteImport } from './routes/staff'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrustCenterRouteImport } from './routes/trust-center'
@@ -213,6 +214,11 @@ const ShopRoute = ShopRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperadminRoute = SuperadminRouteImport.update({
@@ -674,6 +680,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
@@ -781,6 +788,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
@@ -889,6 +897,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
@@ -998,6 +1007,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
@@ -1105,6 +1115,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
@@ -1212,6 +1223,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
@@ -1321,6 +1333,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  StaffRoute: typeof StaffRoute
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
   TrustCenterRoute: typeof TrustCenterRoute
@@ -1536,6 +1549,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/superadmin': {
@@ -2208,6 +2228,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  StaffRoute: StaffRoute,
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
   TrustCenterRoute: TrustCenterRoute,

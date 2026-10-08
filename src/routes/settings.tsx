@@ -33,6 +33,7 @@ import {
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useMyProfiles } from "@/lib/account-profiles";
+import { StaffSettingsSection } from "@/components/staff/StaffSettingsSection";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { MyAvatar } from "@/components/UserAvatar";
@@ -304,6 +305,8 @@ function SettingsHubPage() {
             </p>
           </SettingsStaticRow>
         </SettingsGroup>
+
+        <StaffSettingsSection />
 
         <ParentCenterSection />
 
