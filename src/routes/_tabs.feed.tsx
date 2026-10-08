@@ -304,6 +304,13 @@ function Feed() {
         .sort((a, b) => {
           // Archive lists the most recently finished games first.
           if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
+          // Runs that need players now lead the one unified list (their cards
+          // carry the urgency badge) instead of a separate duplicate section.
+          if (prefs.sections.showUrgent) {
+            const ua = a.urgent && a.joined < a.maxPlayers ? 0 : 1;
+            const ub = b.urgent && b.joined < b.maxPlayers ? 0 : 1;
+            if (ua !== ub) return ua - ub;
+          }
           if (prefs.sortBy === "nearest") {
             // Nearest first; prefer local city, then distanceMi, then date.
             const la = isLocal(a) ? 0 : 1;
