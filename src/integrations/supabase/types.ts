@@ -529,9 +529,9 @@ export type Database = {
           notification_curfew_lifted: boolean
           notifications: boolean
           public_profile: boolean
-          public_xp: boolean
           public_profile_authorized_at: string | null
           public_profile_authorized_by: string | null
+          public_xp: boolean
           social_discovery: boolean
           updated_at: string
           updated_by: string | null
@@ -550,9 +550,9 @@ export type Database = {
           notification_curfew_lifted?: boolean
           notifications?: boolean
           public_profile?: boolean
-          public_xp?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
+          public_xp?: boolean
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -571,9 +571,9 @@ export type Database = {
           notification_curfew_lifted?: boolean
           notifications?: boolean
           public_profile?: boolean
-          public_xp?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
+          public_xp?: boolean
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -4820,6 +4820,7 @@ export type Database = {
           id: string
         }[]
       }
+      public_xp_enabled: { Args: { _user: string }; Returns: boolean }
       publish_legal_document: { Args: { _id: string }; Returns: string }
       publish_team_waiver: { Args: { _id: string }; Returns: string }
       record_late_cancellation: {
