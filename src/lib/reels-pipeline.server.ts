@@ -49,10 +49,12 @@ export type Reel = {
   frame_times?: number[] | null;
   audio_path?: string | null;
   style_prefs?: Record<string, any> | null;
+  /** Set on a family post: a parent's clip of their under-13 child. */
+  subject_child_id?: string | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs,subject_child_id";
 
 async function callLovableAI(prompt: string, system: string, ctx: StepCtx) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, ctx);
@@ -439,7 +441,9 @@ const STEP_RUNNERS: Record<
       if (images.length === 0) return { advanced_analytics: null };
 
       // No session (batch worker) means the age is unknown: development feedback only.
-      const cohort = ctx.session?.cohort ?? null;
+      // A family post is footage of an under-13 child, whoever uploaded it, so it
+      // gets the same limited version: no scout report, no pro comparisons.
+      const cohort = reel.subject_child_id ? "child_under_13" : (ctx.session?.cohort ?? null);
       const full = analyticsAudience(cohort) === "full";
       const stamps = images
         .map((im, i) => `frame ${i + 1}${im.t != null ? ` @ ${im.t}s` : ""}`)

@@ -1030,6 +1030,7 @@ export type Database = {
           status: string
           step_progress: Json
           style_prefs: Json | null
+          subject_child_id: string | null
           suggested_clip: Json | null
           thumbnail_path: string | null
           title: string
@@ -1072,6 +1073,7 @@ export type Database = {
           status?: string
           step_progress?: Json
           style_prefs?: Json | null
+          subject_child_id?: string | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string
@@ -1114,6 +1116,7 @@ export type Database = {
           status?: string
           step_progress?: Json
           style_prefs?: Json | null
+          subject_child_id?: string | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string

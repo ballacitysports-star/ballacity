@@ -83,12 +83,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
+import { familyPostErrorMessage } from "@/lib/family-posts";
+import { useMyChildren } from "@/lib/child-safety";
 
 export const Route = createFileRoute("/_tabs/reels")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  // `child` is optional so the existing links to this page need no change.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { game: string; title: string; upload: string; child?: string } => ({
     game: typeof search.game === "string" ? search.game : "",
     title: typeof search.title === "string" ? search.title : "",
     upload: search.upload === "1" || search.upload === true ? "1" : "",
+    child: typeof search.child === "string" && search.child ? search.child : undefined,
   }),
   head: () =>
     pageHead({
@@ -144,6 +150,8 @@ type Reel = {
   hidden_at?: string | null;
   /** New uploads start as drafts, private to their owner until posted. */
   is_draft?: boolean | null;
+  /** Set on a family post: a parent's private clip of their under-13 child. */
+  subject_child_id?: string | null;
 };
 
 function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
@@ -239,7 +247,9 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{displayTitle}</p>
           <p className="text-xs text-muted-foreground">
-            {isDraft
+            {reel.subject_child_id
+              ? "Family post · only you can see this"
+              : isDraft
               ? "Draft · only you can see this"
               : phase === "posted"
                 ? "Posted"
@@ -329,7 +339,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             </button>
           )}
         </div>
-        {isDone && reel.game_id && (
+        {isDone && reel.game_id && !reel.subject_child_id && (
           <button
             onClick={async () => {
               const r = await shareRecap(reel as unknown as RecapSummary, {
@@ -409,7 +419,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {!isDraft && (
+              {!isDraft && !reel.subject_child_id && (
                 <DropdownMenuItem onSelect={() => void toggleHidden()}>
                   {reel.hidden_at ? (
                     <Eye className="h-4 w-4" />
@@ -624,7 +634,20 @@ function ReelsPage() {
   const navigate = useNavigate();
   const { can: canChildFeature } = useMyChildStatus();
   const uploadDecision = canChildFeature("video_upload");
-  const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
+  const {
+    game: gameId,
+    title: gameTitle,
+    upload: autoUpload,
+    child: childParam,
+  } = Route.useSearch();
+  // Family post: a parent's private clip of their under-13 child. Only a child this
+  // member is a verified guardian of counts; the database re-checks everything.
+  const { children: guardianChildren, isFetched: guardianChildrenLoaded } = useMyChildren();
+  const subjectChild = childParam
+    ? (guardianChildren.find(
+        (c) => c.childUserId === childParam && c.cohort === "child_under_13",
+      ) ?? null)
+    : null;
   const {
     isActive,
     isPastDue,
@@ -856,6 +879,14 @@ function ReelsPage() {
   }
 
   async function handleUpload(file: File) {
+    // Never fall back to an ordinary (potentially public) reel when the link asked
+    // for a family post but the guardian relationship can't be confirmed.
+    if (childParam && !subjectChild) {
+      toast.error(
+        "We couldn't confirm you're a parent or guardian of this child, so nothing was uploaded.",
+      );
+      return;
+    }
     if (!user) return;
     if (!uploadDecision.allowed) {
       toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
@@ -1023,12 +1054,14 @@ function ReelsPage() {
         frame_times: frameTimes.length > 0 ? frameTimes : null,
         audio_path: audioPath,
         style_prefs: styleRef.current,
+        ...(subjectChild ? { subject_child_id: subjectChild.childUserId } : {}),
       };
       // Starts private to its owner; they review it and tap Post. If the database
       // predates drafts, fall back to the old behaviour rather than failing the upload.
       let insertRes = await supabase
         .from("highlight_reels")
-        .insert({ ...reelRow, is_draft: true } as any)
+        // A family post is never public, so it skips the review-and-post step.
+        .insert((subjectChild ? reelRow : { ...reelRow, is_draft: true }) as any)
         .select("id")
         .maybeSingle();
       if (insertRes.error && /is_draft/i.test(insertRes.error.message ?? "")) {
@@ -1048,7 +1081,7 @@ function ReelsPage() {
       toast.error(
         e instanceof ConverterUnavailableError
           ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
-          : (e?.message ?? "Upload failed"),
+          : (familyPostErrorMessage(e) ?? e?.message ?? "Upload failed"),
       );
     } finally {
       setBusy(false);
@@ -1196,6 +1229,25 @@ function ReelsPage() {
               </span>
             </span>
           </label>
+        )}
+
+        {subjectChild && (
+          <div className="mb-3 rounded-xl border border-lime/40 bg-lime/5 p-3">
+            <p className="micro-label text-lime">Family post</p>
+            <p className="mt-1 text-xs font-semibold">
+              A clip of {subjectChild.displayName}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Only you can see it. It is never shown on the highlights feed, on a profile, or to
+              other members. Every clip is analysed by AI, which you control in the Parent Center.
+            </p>
+          </div>
+        )}
+        {childParam && guardianChildrenLoaded && !subjectChild && (
+          <p className="mb-3 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+            We couldn&apos;t confirm you&apos;re a parent or guardian of this child, so uploads are
+            paused. Open this from the Parent Center.
+          </p>
         )}
 
         <AiDisclosureNotice />

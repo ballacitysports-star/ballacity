@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import type { GuardianChild } from "@/lib/child-safety.functions";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
@@ -68,6 +72,41 @@ const MEMBERS_OPTION: (typeof MEDIA_OPTIONS)[number] = {
   label: "Signed-in members",
   hint: "Reels they choose to post can be seen by signed-in ballaCity members. Never public on the web.",
 };
+
+/**
+ * Family post: add a private clip of an under-13 child to the parent's own reels.
+ * Only shown while the family_posts switch is on. The clip is never public or
+ * visible to other members; the database enforces that and the guardian link.
+ */
+function FamilyPostLink({ child }: { child: GuardianChild }) {
+  const fetchEnabled = useServerFn(getFamilyPostsEnabled);
+  const { data } = useQuery({
+    queryKey: ["family-posts-enabled"],
+    queryFn: () => fetchEnabled(),
+    staleTime: 60_000,
+  });
+  if (!data?.enabled || child.cohort !== "child_under_13") return null;
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <div className="text-sm font-semibold">Add a clip of {child.displayName}</div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Upload to your own reels and tag it to {child.displayName}. Only you can see it: it never
+        appears on the highlights feed, on a profile, or to other members.
+      </p>
+      {child.controls.aiAnalysis ? (
+        <Button asChild size="sm" variant="outline" className="mt-2">
+          <Link to="/reels" search={{ game: "", title: "", upload: "", child: child.childUserId }}>
+            Add a clip
+          </Link>
+        </Button>
+      ) : (
+        <p className="mt-2 text-xs font-semibold text-amber-300">
+          Turn on &ldquo;AI video analysis&rdquo; below first. Every clip is analysed by AI.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function OptionRow<T extends string>({
   label,
@@ -225,6 +264,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       ) : null}
 
       <div className="mt-4 grid gap-4">
+        <FamilyPostLink child={child} />
         <OptionRow
           label="Messaging"
           value={c.messaging}

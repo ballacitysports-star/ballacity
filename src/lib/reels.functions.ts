@@ -907,3 +907,25 @@ export const suggestGameForReel = createServerFn({ method: "GET" })
       date: (best.date as string) ?? null,
     };
   });
+
+/**
+ * Whether family posts (a parent's private clip of their under-13 child) are
+ * switched on. Off unless `app_settings.family_posts` says {"enabled": true}; a
+ * missing row or any read failure means off. The database enforces the same
+ * switch, so this only decides whether the UI offers the button.
+ */
+export const getFamilyPostsEnabled = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "family_posts")
+        .maybeSingle();
+      return { enabled: (data?.value as { enabled?: unknown } | null)?.enabled === true };
+    } catch {
+      return { enabled: false };
+    }
+  });
