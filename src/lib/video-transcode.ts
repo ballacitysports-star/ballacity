@@ -274,3 +274,56 @@ export async function convertToPlayableMp4(
   }
   return null;
 }
+
+/**
+ * Output options that drop everything identifying from a clip: container and
+ * stream tags (GPS position, device make and model, creation time, app and
+ * encoder names), chapters, and any extra data track such as a phone's location
+ * track. Only the first video and audio streams are kept. Rotation is not a tag,
+ * so the picture still plays the right way up.
+ */
+export const PRIVACY_ARGS = [
+  "-map",
+  "0:v:0",
+  "-map",
+  "0:a:0?",
+  "-map_metadata",
+  "-1",
+  "-map_chapters",
+  "-1",
+  "-fflags",
+  "+bitexact",
+  "-flags:v",
+  "+bitexact",
+  "-flags:a",
+  "+bitexact",
+];
+
+const PRIVACY_PASSES: { label: string; args: string[] }[] = [
+  // Fast and lossless: the picture and sound are copied, only the tags go.
+  { label: "remux", args: [...PRIVACY_ARGS, "-c", "copy", "-movflags", "+faststart"] },
+  // The container does not allow a straight copy (.avi, .mkv, odd codecs): re-encode.
+  ...FALLBACK_PASSES.filter((p) => p.label !== "remux").map((p) => ({
+    label: p.label,
+    args: [...PRIVACY_ARGS, ...p.args],
+  })),
+];
+
+/**
+ * A copy of `file` with location and device information removed, as an .mp4.
+ * Returns null when no pass could produce one, so callers can refuse the upload
+ * rather than store the original with its metadata.
+ */
+export async function stripVideoMetadata(
+  file: File,
+  onProgress?: (ratio: number) => void,
+): Promise<File | null> {
+  for (const pass of PRIVACY_PASSES) {
+    const blob = await transcodeToH264Mp4(file, onProgress, pass.args);
+    if (blob && blob.size > 0) {
+      const stem = file.name.replace(/\.[^.]+$/, "") || "clip";
+      return new File([blob], `${stem}.mp4`, { type: "video/mp4" });
+    }
+  }
+  return null;
+}

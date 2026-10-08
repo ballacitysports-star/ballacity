@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { familyClipVia, familyClipViaLabel, teamShareErrorMessage } from "@/lib/family-clips";
 
 describe("family clip tiers", () => {
-  it("accepts only the two ways a non-parent can see a clip", () => {
+  it("accepts only the three ways a clip can be seen", () => {
     expect(familyClipVia("child")).toBe("child");
     expect(familyClipVia("team")).toBe("team");
+    expect(familyClipVia("owner")).toBe("owner");
     for (const bad of ["none", "public", "", null, undefined, 3]) {
       expect(familyClipVia(bad)).toBeNull();
     }
@@ -13,6 +14,7 @@ describe("family clip tiers", () => {
   it("explains why a viewer can see a clip without naming anyone", () => {
     expect(familyClipViaLabel("child")).toBe("A clip your parent added of you");
     expect(familyClipViaLabel("team")).toBe("Shared with your team");
+    expect(familyClipViaLabel("owner")).toBe("A clip you added");
   });
 
   it("words every team-sharing error code", () => {

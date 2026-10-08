@@ -11,14 +11,15 @@
  * module only words its error codes for people.
  */
 
-export type FamilyClipVia = "child" | "team";
+export type FamilyClipVia = "owner" | "child" | "team";
 
 export function familyClipVia(v: unknown): FamilyClipVia | null {
-  return v === "child" || v === "team" ? v : null;
+  return v === "owner" || v === "child" || v === "team" ? v : null;
 }
 
 /** What a viewer is told about why they can see a clip. No names, ever. */
 export function familyClipViaLabel(via: FamilyClipVia): string {
+  if (via === "owner") return "A clip you added";
   return via === "child" ? "A clip your parent added of you" : "Shared with your team";
 }
 

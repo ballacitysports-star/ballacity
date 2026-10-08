@@ -78,6 +78,11 @@ export function describeFamilyActivity(entry: {
         title: "Child's view of family clips changed",
         detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
       };
+    case "child.public_xp_changed":
+      return {
+        title: "Public level and XP changed",
+        detail: ctx["enabled"] === true ? "Level, XP and milestone badges are shown on the Player Card" : "Level and XP are no longer shown publicly",
+      };
     case "family_post.sharing_changed": {
       const what = ctx["kind"] === "team" ? "Team sharing" : "Private links";
       return {

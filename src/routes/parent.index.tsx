@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { getChildPublicXp, setChildPublicXp } from "@/lib/public-xp.functions";
+import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
 import {
   getChildFamilySharing,
   getChildFamilyView,
@@ -130,11 +132,7 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
         appears on the highlights feed, on a profile, or to other members.
       </p>
       {child.controls.aiAnalysis ? (
-        <Button asChild size="sm" variant="outline" className="mt-2">
-          <Link to="/reels" search={{ game: "", title: "", upload: "", child: child.childUserId }}>
-            Add a clip
-          </Link>
-        </Button>
+        <GuardianVideoUploadDialog childUserId={child.childUserId} className="mt-2" />
       ) : (
         <p className="mt-2 text-xs font-semibold text-amber-300">
           Turn on &ldquo;AI video analysis&rdquo; below first. Every clip is analysed by AI.
@@ -187,6 +185,45 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Safe public XP: show this child's level, XP bar and milestone badges on their public
+ * Player Card. Off until the guardian turns it on. Never shows game dates, venues,
+ * streaks, reliability or attendance.
+ */
+function PublicXpToggle({ child }: { child: GuardianChild }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getChildPublicXp);
+  const setFn = useServerFn(setChildPublicXp);
+  const { data } = useQuery({
+    queryKey: ["child-public-xp", child.childUserId],
+    queryFn: () => getFn({ data: { childUserId: child.childUserId } }),
+  });
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">Show {child.displayName}&apos;s level and XP publicly</div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Their level, XP bar and milestone badges appear on their Player Card. Never game dates,
+          locations, streaks or attendance. Off until you turn it on.
+        </p>
+      </div>
+      <Switch
+        checked={data?.enabled === true}
+        onCheckedChange={async (v) => {
+          try {
+            await setFn({ data: { childUserId: child.childUserId, enabled: v } });
+            await qc.invalidateQueries({ queryKey: ["child-public-xp", child.childUserId] });
+            toast.success(v ? "Level and XP are now public" : "Level and XP are no longer public");
+          } catch (e: any) {
+            toast.error(e?.message ?? "Could not save this setting");
+          }
+        }}
+        aria-label={`Show ${child.displayName}'s level and XP publicly`}
+      />
     </div>
   );
 }
@@ -348,6 +385,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
 
       <div className="mt-4 grid gap-4">
         <FamilyPostLink child={child} />
+        <PublicXpToggle child={child} />
         <OptionRow
           label="Messaging"
           value={c.messaging}

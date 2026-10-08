@@ -84,3 +84,32 @@ export function computeAthleteProgress(i: AthleteProgressInput): AthleteProgress
     badges,
   };
 }
+
+/**
+ * What a minor's guardian can choose to show on the public Player Card. An
+ * allow-list: level, the XP bar and milestone badges only. Streaks, reliability,
+ * attendance counts and anything dated or located are never in it. The badges kept
+ * are the milestone ones; "Iron Streak" and "Always Shows" describe routine and
+ * attendance, so they stay off.
+ */
+export const PUBLIC_XP_BADGE_IDS = ["first-run", "runs-10", "runs-25", "runs-50", "host", "tryout"];
+
+export type PublicXp = {
+  xp: number;
+  level: number;
+  levelXp: number;
+  nextLevelXp: number;
+  badges: AthleteBadge[];
+};
+
+export function toPublicXp(p: AthleteProgress): PublicXp {
+  return {
+    xp: p.xp,
+    level: p.level,
+    levelXp: p.levelXp,
+    nextLevelXp: p.nextLevelXp,
+    badges: p.badges
+      .filter((b) => PUBLIC_XP_BADGE_IDS.includes(b.id))
+      .map((b) => ({ id: b.id, label: b.label, emoji: b.emoji, hint: b.hint })),
+  };
+}

@@ -37,6 +37,33 @@ async function childAllows(supabase: any, userId: string, reelId: string | undef
   return data === true;
 }
 
+/**
+ * What a viewer may do with a family post: the database check for the linked child
+ * and the chosen team, plus the parent who added it while they are still a verified
+ * guardian and the clip is live. Anything else, or any doubt, is 'none'.
+ */
+async function clipAccess(admin: any, reelId: string, viewerId: string): Promise<FamilyClipVia | null> {
+  const { data: access } = await admin.rpc("family_post_viewer_access" as never, {
+    _reel_id: reelId,
+    _viewer: viewerId,
+  } as never);
+  const via = familyClipVia(access);
+  if (via) return via;
+  const { data: r } = await admin
+    .from("highlight_reels")
+    .select("user_id,subject_child_id,status,hidden_at")
+    .eq("id", reelId)
+    .maybeSingle();
+  const row = r as { user_id: string; subject_child_id: string | null; status: string; hidden_at: string | null } | null;
+  if (!row || row.user_id !== viewerId || !row.subject_child_id) return null;
+  if (row.status !== "completed" || row.hidden_at) return null;
+  const { data: ok } = await admin.rpc("is_guardian_of", {
+    _parent: viewerId,
+    _child: row.subject_child_id,
+  } as never);
+  return ok === true ? "owner" : null;
+}
+
 /** Whether choosing a team is switched on. Off on any doubt. */
 export const getTeamShareEnabled = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -305,11 +332,7 @@ export const getFamilyClip = createServerFn({ method: "GET" })
       );
       const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
-      const { data: access } = await supabaseAdmin.rpc("family_post_viewer_access" as never, {
-        _reel_id: data.reelId,
-        _viewer: context.userId,
-      } as never);
-      const via = familyClipVia(access);
+      const via = await clipAccess(supabaseAdmin, data.reelId, context.userId);
       if (!via) return { found: false };
 
       const { data: r } = await supabaseAdmin
@@ -359,5 +382,44 @@ export const getFamilyClip = createServerFn({ method: "GET" })
       };
     } catch {
       return { found: false };
+    }
+  });
+
+/**
+ * The family clips of one child that the signed-in member may watch: the parent's own,
+ * the child's own view, and clips shared with a team they are on. Empty for anyone else.
+ */
+export const listFamilyClipsAboutChild = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { childUserId: string }) => {
+    if (!input?.childUserId) throw new Error("childUserId is required");
+    return { childUserId: input.childUserId };
+  })
+  .handler(async ({ data, context }): Promise<FamilyClipSummary[]> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: reels } = await supabaseAdmin
+        .from("highlight_reels")
+        .select("id,title,ai_title,ai_caption,created_at")
+        .eq("subject_child_id", data.childUserId)
+        .eq("status", "completed")
+        .is("hidden_at", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const out: FamilyClipSummary[] = [];
+      for (const r of (reels ?? []) as any[]) {
+        const via = await clipAccess(supabaseAdmin, String(r.id), context.userId);
+        if (!via) continue;
+        out.push({
+          id: String(r.id),
+          title: String(r.ai_title || r.title || "Clip").slice(0, 120),
+          caption: r.ai_caption ? String(r.ai_caption).slice(0, 500) : null,
+          createdAt: String(r.created_at),
+          via,
+        });
+      }
+      return out;
+    } catch {
+      return [];
     }
   });

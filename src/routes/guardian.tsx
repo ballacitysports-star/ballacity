@@ -12,6 +12,7 @@ import {
   listChildrenActivity,
   type ChildGame,
 } from "@/lib/guardian-activity.functions";
+import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
 import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
 
@@ -171,6 +172,7 @@ function GuardianDashboard() {
       <Link to="/parent" className="mt-2 inline-block text-xs font-semibold text-primary underline">
         Settings, approvals and safety → Parent Center
       </Link>
+      <GuardianVideoUploadDialog className="mt-3" />
 
       {q.isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>

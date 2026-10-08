@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Clapperboard, MapPin, BarChart3, ExternalLink } from "lucide-react";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
+import { PublicXpCard } from "@/components/players/PublicXpCard";
+import { FamilyClipsSection } from "@/components/reels/FamilyClipsSection";
 import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
@@ -244,6 +246,11 @@ function PlayerCardPage() {
           </button>
         ))}
       </nav>
+
+      {card?.publicXp && <PublicXpCard xp={card.publicXp} />}
+
+      {/* Private: renders nothing unless the server says this viewer may watch one. */}
+      {p.isMinor && <FamilyClipsSection childUserId={userId} />}
 
       {/* Highlights */}
       <section

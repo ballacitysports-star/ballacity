@@ -529,6 +529,7 @@ export type Database = {
           notification_curfew_lifted: boolean
           notifications: boolean
           public_profile: boolean
+          public_xp: boolean
           public_profile_authorized_at: string | null
           public_profile_authorized_by: string | null
           social_discovery: boolean
@@ -549,6 +550,7 @@ export type Database = {
           notification_curfew_lifted?: boolean
           notifications?: boolean
           public_profile?: boolean
+          public_xp?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
           social_discovery?: boolean
@@ -569,6 +571,7 @@ export type Database = {
           notification_curfew_lifted?: boolean
           notifications?: boolean
           public_profile?: boolean
+          public_xp?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
           social_discovery?: boolean
