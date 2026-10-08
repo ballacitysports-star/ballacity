@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
+import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -26,7 +27,6 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SafetyRouteImport } from './routes/safety'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
@@ -63,6 +63,7 @@ import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blo
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
+import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$token'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as GuideIndexRouteImport } from './routes/guide.index'
 import { Route as GuideSportRouteImport } from './routes/guide.$sport'
@@ -76,7 +77,6 @@ import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as ParentIndexRouteImport } from './routes/parent.index'
 import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$userId'
-import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$token'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
@@ -145,6 +145,11 @@ const CookiesRoute = CookiesRouteImport.update({
   path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyClipsRoute = FamilyClipsRouteImport.update({
+  id: '/family-clips',
+  path: '/family-clips',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuardianRoute = GuardianRouteImport.update({
   id: '/guardian',
   path: '/guardian',
@@ -198,11 +203,6 @@ const SafetyRoute = SafetyRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FamilyClipsRoute = FamilyClipsRouteImport.update({
-  id: '/family-clips',
-  path: '/family-clips',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -388,6 +388,11 @@ const DevRouteDoctorRoute = DevRouteDoctorRouteImport.update({
   path: '/dev/route-doctor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyShareTokenRoute = FamilyShareTokenRouteImport.update({
+  id: '/family-share/$token',
+  path: '/family-share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
@@ -451,11 +456,6 @@ const ParentIndexRoute = ParentIndexRouteImport.update({
 const PlayerCardUserIdRoute = PlayerCardUserIdRouteImport.update({
   id: '/player-card/$userId',
   path: '/player-card/$userId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FamilyShareTokenRoute = FamilyShareTokenRouteImport.update({
-  id: '/family-share/$token',
-  path: '/family-share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
@@ -660,6 +660,7 @@ export interface FileRoutesByFullPath {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -671,7 +672,6 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
-  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -707,6 +707,7 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -716,7 +717,6 @@ export interface FileRoutesByFullPath {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
-  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -767,6 +767,7 @@ export interface FileRoutesByTo {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -778,7 +779,6 @@ export interface FileRoutesByTo {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
-  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -814,6 +814,7 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
@@ -822,7 +823,6 @@ export interface FileRoutesByTo {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
-  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -875,6 +875,7 @@ export interface FileRoutesById {
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -886,7 +887,6 @@ export interface FileRoutesById {
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
-  '/family-clips': typeof FamilyClipsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
@@ -922,6 +922,7 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -931,7 +932,6 @@ export interface FileRoutesById {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
-  '/family-share/$token': typeof FamilyShareTokenRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -984,6 +984,7 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -995,7 +996,6 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
-    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1031,6 +1031,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1040,7 +1041,6 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
-    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1091,6 +1091,7 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1102,7 +1103,6 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
-    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1138,6 +1138,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
@@ -1146,7 +1147,6 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
-    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1198,6 +1198,7 @@ export interface FileRouteTypes {
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1209,7 +1210,6 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/safety'
     | '/settings'
-    | '/family-clips'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
@@ -1245,6 +1245,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1254,7 +1255,6 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
-    | '/family-share/$token'
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
@@ -1307,6 +1307,7 @@ export interface RootRouteChildren {
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
+  FamilyClipsRoute: typeof FamilyClipsRoute
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
@@ -1318,7 +1319,6 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SafetyRoute: typeof SafetyRoute
   SettingsRoute: typeof SettingsRoute
-  FamilyClipsRoute: typeof FamilyClipsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuperadminRoute: typeof SuperadminRoute
@@ -1344,6 +1344,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
+  FamilyShareTokenRoute: typeof FamilyShareTokenRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   GuideSportRoute: typeof GuideSportRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
@@ -1353,7 +1354,6 @@ export interface RootRouteChildren {
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
-  FamilyShareTokenRoute: typeof FamilyShareTokenRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -1440,6 +1440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CookiesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family-clips': {
+      id: '/family-clips'
+      path: '/family-clips'
+      fullPath: '/family-clips'
+      preLoaderRoute: typeof FamilyClipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guardian': {
       id: '/guardian'
       path: '/guardian'
@@ -1515,13 +1522,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/family-clips': {
-      id: '/family-clips'
-      path: '/family-clips'
-      fullPath: '/family-clips'
-      preLoaderRoute: typeof FamilyClipsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -1776,6 +1776,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevRouteDoctorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family-share/$token': {
+      id: '/family-share/$token'
+      path: '/family-share/$token'
+      fullPath: '/family-share/$token'
+      preLoaderRoute: typeof FamilyShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId': {
       id: '/games/$gameId'
       path: '/games/$gameId'
@@ -1865,13 +1872,6 @@ declare module '@tanstack/react-router' {
       path: '/player-card/$userId'
       fullPath: '/player-card/$userId'
       preLoaderRoute: typeof PlayerCardUserIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/family-share/$token': {
-      id: '/family-share/$token'
-      path: '/family-share/$token'
-      fullPath: '/family-share/$token'
-      preLoaderRoute: typeof FamilyShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/players/$userId': {
@@ -2194,6 +2194,7 @@ const rootRouteChildren: RootRouteChildren = {
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
+  FamilyClipsRoute: FamilyClipsRoute,
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,
@@ -2205,7 +2206,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SafetyRoute: SafetyRoute,
   SettingsRoute: SettingsRoute,
-  FamilyClipsRoute: FamilyClipsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuperadminRoute: SuperadminRoute,
@@ -2232,6 +2232,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
+  FamilyShareTokenRoute: FamilyShareTokenRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   GuideSportRoute: GuideSportRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
@@ -2241,7 +2242,6 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayerCardUserIdRoute: PlayerCardUserIdRoute,
-  FamilyShareTokenRoute: FamilyShareTokenRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,

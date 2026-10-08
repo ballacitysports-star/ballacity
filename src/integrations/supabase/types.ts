@@ -708,6 +708,50 @@ export type Database = {
         }
         Relationships: []
       }
+      family_post_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          last_viewed_at: string | null
+          reel_id: string
+          revoked_at: string | null
+          token_hash: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          last_viewed_at?: string | null
+          reel_id: string
+          revoked_at?: string | null
+          token_hash: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          reel_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_post_links_reel_id_fkey"
+            columns: ["reel_id"]
+            isOneToOne: false
+            referencedRelation: "highlight_reels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feed_preferences: {
         Row: {
           created_at: string
@@ -1040,8 +1084,8 @@ export type Database = {
           step_progress: Json
           style_prefs: Json | null
           subject_child_id: string | null
-          team_share_team_id: string | null
           suggested_clip: Json | null
+          team_share_team_id: string | null
           thumbnail_path: string | null
           title: string
           used_free: boolean
@@ -1084,8 +1128,8 @@ export type Database = {
           step_progress?: Json
           style_prefs?: Json | null
           subject_child_id?: string | null
-          team_share_team_id?: string | null
           suggested_clip?: Json | null
+          team_share_team_id?: string | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
@@ -1128,15 +1172,23 @@ export type Database = {
           step_progress?: Json
           style_prefs?: Json | null
           subject_child_id?: string | null
-          team_share_team_id?: string | null
           suggested_clip?: Json | null
+          team_share_team_id?: string | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
           user_id?: string
           video_path?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "highlight_reels_team_share_team_id_fkey"
+            columns: ["team_share_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       host_payment_methods: {
         Row: {
@@ -4349,6 +4401,27 @@ export type Database = {
         Returns: undefined
       }
       expire_stale_data_exports: { Args: never; Returns: number }
+      family_child_allows: {
+        Args: { _child: string; _kind: string }
+        Returns: boolean
+      }
+      family_post_viewer_access: {
+        Args: { _reel_id: string; _viewer: string }
+        Returns: string
+      }
+      family_posts_enabled: { Args: never; Returns: boolean }
+      family_posts_visible_to: {
+        Args: { _viewer: string }
+        Returns: {
+          caption: string
+          created_at: string
+          reel_id: string
+          title: string
+          via: string
+        }[]
+      }
+      family_share_enabled: { Args: never; Returns: boolean }
+      family_team_share_enabled: { Args: never; Returns: boolean }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
@@ -4415,6 +4488,10 @@ export type Database = {
       guardian_approve_team_invite: {
         Args: { _approve?: boolean; _invite: string }
         Returns: undefined
+      }
+      guardian_cancel_child_game: {
+        Args: { _child: string; _game: string }
+        Returns: string
       }
       guardian_children_overview: {
         Args: never
@@ -4497,6 +4574,7 @@ export type Database = {
       is_minor: { Args: { _user: string }; Returns: boolean }
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
+      is_self_or_guardian: { Args: { _player: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: {
         Args: { _team: string; _user: string }
@@ -4650,6 +4728,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      notify_guardians_of: {
+        Args: {
+          _body: string
+          _link: string
+          _player: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
       owns_player_profile: { Args: { _player: string }; Returns: boolean }
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
@@ -4755,7 +4843,6 @@ export type Database = {
           parent_id: string
         }[]
       }
-      guardian_cancel_child_game: { Args: { _child: string; _game: string }; Returns: string }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
       refund_pct_for: {
         Args: {
@@ -4785,6 +4872,18 @@ export type Database = {
           _versions: Json
         }
         Returns: string
+      }
+      resolve_family_post_link: {
+        Args: { _token_hash: string }
+        Returns: {
+          caption: string
+          owner_id: string
+          playback_path: string
+          reel_id: string
+          thumbnail_path: string
+          title: string
+          video_path: string
+        }[]
       }
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
