@@ -59,6 +59,16 @@ const MEDIA_OPTIONS: Array<{
   { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
 ];
 
+/**
+ * Offered for ages 13-15 only (the database enforces this too). Reels still stay
+ * private until the teen posts them, and are never shown to anonymous visitors.
+ */
+const MEMBERS_OPTION: (typeof MEDIA_OPTIONS)[number] = {
+  value: "members",
+  label: "Signed-in members",
+  hint: "Reels they choose to post can be seen by signed-in ballaCity members. Never public on the web.",
+};
+
 function OptionRow<T extends string>({
   label,
   value,
@@ -224,7 +234,12 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         <OptionRow
           label="Video visibility"
           value={c.mediaVisibility}
-          options={MEDIA_OPTIONS}
+          options={
+            // Keep the option listed if it is already selected (e.g. the teen turned 16).
+            child.cohort === "teen_13_15" || c.mediaVisibility === "members"
+              ? [...MEDIA_OPTIONS, MEMBERS_OPTION]
+              : MEDIA_OPTIONS
+          }
           onChange={(v) => set({ media_visibility: v })}
         />
         {[

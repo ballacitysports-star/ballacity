@@ -726,7 +726,11 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
 
 export type ChildControls = {
   messaging: "off" | "guardian_only" | "teammates" | "peers";
-  mediaVisibility: "private" | "guardian" | "teammates";
+  /**
+   * 'members' (ages 13-15 only) lets signed-in members see reels the teen posts.
+   * Enforced in the database; see 20261008140000_teen_reel_sharing.sql.
+   */
+  mediaVisibility: "private" | "guardian" | "teammates" | "members";
   socialDiscovery: boolean;
   aiAnalysis: boolean;
   locationPrecision: "city" | "region";
@@ -762,7 +766,7 @@ export function parseChildControls(row: unknown): ChildControls {
     messaging: pick(r["messaging"], ["off", "guardian_only", "teammates", "peers"], d.messaging),
     mediaVisibility: pick(
       r["media_visibility"],
-      ["private", "guardian", "teammates"],
+      ["private", "guardian", "teammates", "members"],
       d.mediaVisibility,
     ),
     socialDiscovery: bool(r["social_discovery"], d.socialDiscovery),
