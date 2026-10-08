@@ -33,6 +33,9 @@ export type TryoutListing = {
   spotsTaken: number;
   /** Minutes before start after which cancelling counts as late. 0 = off. */
   cancelCutoffMin: number;
+  /** Refund rule for the fee (see lib/refund-policy). */
+  refundRule: string;
+  lateRefundPct: number;
   teamId: string;
   teamName: string;
   teamAvatar: string | null;
@@ -45,7 +48,7 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
     try {
     const { data, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,refund_rule,late_refund_pct,team_id,teams!inner(name,avatar,sports)")
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
       .gte("event_date", new Date().toISOString())
@@ -66,6 +69,8 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
       spotsMax: r.spots_max,
       spotsTaken: r.spots_taken ?? 0,
       cancelCutoffMin: normalizeCutoff(r.cancel_cutoff_min),
+      refundRule: r.refund_rule ?? "until_cutoff",
+      lateRefundPct: Number(r.late_refund_pct ?? 0) || 0,
       teamId: r.team_id,
       teamName: r.teams?.name ?? "Team",
       teamAvatar: r.teams?.avatar ?? null,
@@ -384,7 +389,7 @@ export const getTryout = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<TryoutListing | null> => {
     const { data: r, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,refund_rule,late_refund_pct,team_id,teams!inner(name,avatar,sports)")
       .eq("id", data.postId)
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
@@ -395,6 +400,8 @@ export const getTryout = createServerFn({ method: "GET" })
       id: x.id, kind: x.kind, title: x.title, body: x.body ?? "", eventDate: x.event_date,
       location: x.location, price: x.price, spotsMax: x.spots_max, spotsTaken: x.spots_taken ?? 0,
       cancelCutoffMin: normalizeCutoff(x.cancel_cutoff_min),
+      refundRule: x.refund_rule ?? "until_cutoff",
+      lateRefundPct: Number(x.late_refund_pct ?? 0) || 0,
       teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
     };
   });

@@ -795,6 +795,8 @@ export type Database = {
           payment_instructions: string | null
           payment_mode: string
           refund_policy: string | null
+          late_refund_pct: number
+          refund_rule: string
           requires_approval: boolean
           updated_at: string
         }
@@ -810,6 +812,8 @@ export type Database = {
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
+          late_refund_pct?: number
+          refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
         }
@@ -825,6 +829,8 @@ export type Database = {
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
+          late_refund_pct?: number
+          refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
         }
@@ -2263,6 +2269,12 @@ export type Database = {
           payment_method_id: string | null
           payment_type: string | null
           player_id: string
+          refund_amount: number | null
+          refund_pct: number | null
+          refund_reason: string | null
+          refund_settled_at: string | null
+          refund_status: string | null
+          refunded_at: string | null
           reviewed_at: string | null
           reviewer_notes: string | null
           screenshot_path: string | null
@@ -2285,6 +2297,12 @@ export type Database = {
           payment_method_id?: string | null
           payment_type?: string | null
           player_id: string
+          refund_amount?: number | null
+          refund_pct?: number | null
+          refund_reason?: string | null
+          refund_settled_at?: string | null
+          refund_status?: string | null
+          refunded_at?: string | null
           reviewed_at?: string | null
           reviewer_notes?: string | null
           screenshot_path?: string | null
@@ -2307,6 +2325,12 @@ export type Database = {
           payment_method_id?: string | null
           payment_type?: string | null
           player_id?: string
+          refund_amount?: number | null
+          refund_pct?: number | null
+          refund_reason?: string | null
+          refund_settled_at?: string | null
+          refund_status?: string | null
+          refunded_at?: string | null
           reviewed_at?: string | null
           reviewer_notes?: string | null
           screenshot_path?: string | null
@@ -3199,6 +3223,8 @@ export type Database = {
           price: number | null
           share_notes: boolean
           share_scores: boolean
+          late_refund_pct: number
+          refund_rule: string
           spots_max: number | null
           spots_taken: number
           team_id: string
@@ -3223,6 +3249,8 @@ export type Database = {
           price?: number | null
           share_notes?: boolean
           share_scores?: boolean
+          late_refund_pct?: number
+          refund_rule?: string
           spots_max?: number | null
           spots_taken?: number
           team_id: string
@@ -3247,6 +3275,8 @@ export type Database = {
           price?: number | null
           share_notes?: boolean
           share_scores?: boolean
+          late_refund_pct?: number
+          refund_rule?: string
           spots_max?: number | null
           spots_taken?: number
           team_id?: string
@@ -3439,6 +3469,8 @@ export type Database = {
           sports: string[]
           staff: Json
           tagline: string
+          late_refund_pct: number
+          refund_rule: string
           timezone: string
           updated_at: string
           venue_addresses: Json
@@ -3492,6 +3524,8 @@ export type Database = {
           sports?: string[]
           staff?: Json
           tagline?: string
+          late_refund_pct?: number
+          refund_rule?: string
           timezone?: string
           updated_at?: string
           venue_addresses?: Json
@@ -3545,6 +3579,8 @@ export type Database = {
           sports?: string[]
           staff?: Json
           tagline?: string
+          late_refund_pct?: number
+          refund_rule?: string
           timezone?: string
           updated_at?: string
           venue_addresses?: Json
@@ -4644,6 +4680,7 @@ export type Database = {
           parent_id: string
         }[]
       }
+      mark_refund_sent: { Args: { _submission: string }; Returns: undefined }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
       release_expired_payment_holds: {
         Args: { _game_id?: string }

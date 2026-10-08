@@ -424,6 +424,9 @@ export type Org = {
   timezone?: string;
   /** Minutes before a session after which a player's cancellation counts as late. 0 = off. */
   cancelCutoffMin?: number;
+  /** Refund rule for session fees (see lib/refund-policy). */
+  refundRule?: string;
+  lateRefundPct?: number;
   availabilitySlots?: {
     day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
     start: string;

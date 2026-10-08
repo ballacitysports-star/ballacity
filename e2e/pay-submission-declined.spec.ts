@@ -214,6 +214,8 @@ test("declined submission shows actionable error and stays on the pay screen", a
   await page.locator("#paid-at").fill(new Date().toISOString().slice(0, 10));
 
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
 
   // First submit: mocked decline.
   const [declinedResp] = await Promise.all([

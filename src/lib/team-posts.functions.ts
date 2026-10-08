@@ -101,6 +101,8 @@ const CreateInput = z.object({
   spotsMax: z.number().int().min(1).max(500).nullable().optional(),
   /** Minutes before start after which cancelling counts as late; 0 = off. */
   cancelCutoffMin: z.number().int().min(0).max(10080).optional(),
+  refundRule: z.enum(["until_cutoff", "before_start", "none"]).optional(),
+  lateRefundPct: z.number().int().min(0).max(100).optional(),
   pinned: z.boolean().optional(),
 });
 
@@ -126,6 +128,8 @@ export const createTeamPost = createServerFn({ method: "POST" })
         spots_max: data.spotsMax ?? null,
         // Left to the database default (2 hours) unless the poster picked one.
         ...(data.cancelCutoffMin !== undefined ? { cancel_cutoff_min: data.cancelCutoffMin } : {}),
+        ...(data.refundRule !== undefined ? { refund_rule: data.refundRule } : {}),
+        ...(data.lateRefundPct !== undefined ? { late_refund_pct: data.lateRefundPct } : {}),
         pinned: data.pinned ?? false,
       } as any)
       .select("*")

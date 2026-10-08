@@ -1,3 +1,4 @@
+import { normalizeRefundPolicy, refundPctFor, refundPhase } from "@/lib/refund-policy";
 /**
  * In-app alerts for tryout/camp sign-ups. Best-effort: never blocks the RSVP.
  * Runs after the RSVP RPC succeeded (which already enforced permissions).
@@ -20,15 +21,40 @@ export async function notifyTryoutSignup(opts: {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: post } = await supabaseAdmin
       .from("team_posts")
-      .select("title, kind, team_id, event_date")
+      .select("*")
       .eq("id", opts.postId)
       .maybeSingle();
     if (!post) return;
-    const p = post as { title: string; kind: string; team_id: string; event_date: string | null };
+    const p = post as {
+      title: string;
+      kind: string;
+      team_id: string;
+      event_date: string | null;
+      price?: number | null;
+      cancel_cutoff_min?: number | null;
+      refund_rule?: string | null;
+      late_refund_pct?: number | null;
+    };
+    // What the team's refund policy means for this cancellation, in money.
+    const fee = Number(p.price ?? 0);
+    const refund =
+      opts.action === "cancelled" && fee > 0
+        ? (() => {
+            const pct = refundPctFor(
+              normalizeRefundPolicy(p.refund_rule, p.late_refund_pct),
+              "player_cancelled",
+              refundPhase(p.event_date, p.cancel_cutoff_min),
+            );
+            return { pct, amount: Math.round(fee * pct) / 100 };
+          })()
+        : null;
     const label = p.kind === "clinic" ? "camp" : "tryout";
     const link = `/tryouts/${opts.postId}`;
     const ids = Array.from(new Set([opts.actorId, opts.attendeeId]));
-    const { data: profs } = await supabaseAdmin.from("profiles").select("id, display_name").in("id", ids);
+    const { data: profs } = await supabaseAdmin
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", ids);
     const name = (id: string) =>
       ((profs ?? []) as any[]).find((x) => x.id === id)?.display_name || "A player";
     const attendee = name(opts.attendeeId);
@@ -46,7 +72,13 @@ export async function notifyTryoutSignup(opts: {
       body:
         opts.action === "registered"
           ? `${onBehalf ? `${attendee} is` : "You're"} registered for this ${label}. The team has your application; watch for updates here.`
-          : `${onBehalf ? `${attendee}'s` : "Your"} spot was released.`,
+          : `${onBehalf ? `${attendee}'s` : "Your"} spot was released.${
+              refund
+                ? refund.amount > 0
+                  ? ` Under the team's refund policy you're owed $${refund.amount.toFixed(2)} back — the team sends it directly; ballaCity doesn't hold money.`
+                  : " Under the team's refund policy, the fee isn't refunded."
+                : ""
+            }`,
       link,
     });
 
@@ -68,11 +100,16 @@ export async function notifyTryoutSignup(opts: {
               ? `Late ${label} cancellation — ${p.title}`
               : `${label[0].toUpperCase()}${label.slice(1)} cancellation — ${p.title}`,
         body:
-          opts.action === "registered"
+          (opts.action === "registered"
             ? `${attendee} signed up${onBehalf ? " (registered by a parent/guardian)" : ""}.`
             : opts.late
               ? `${attendee} cancelled ${minutesPhrase(opts.late.minutesBefore)} before start (your cutoff is ${minutesPhrase(opts.late.cutoffMin)}).`
-              : `${attendee} cancelled their spot.`,
+              : `${attendee} cancelled their spot.`) +
+          (refund
+            ? refund.amount > 0
+              ? ` Your refund policy: refund $${refund.amount.toFixed(2)} (${refund.pct}%).`
+              : " Your refund policy: you keep the fee."
+            : ""),
         link: `/teams/${p.team_id}/tryouts`,
       });
     }
