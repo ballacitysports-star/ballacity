@@ -112,3 +112,14 @@ describe("family clip sharing toggles in the activity trail", () => {
     ).toBe("Private links turned off");
   });
 });
+
+describe("public XP toggle in the activity trail", () => {
+  it("words both states", () => {
+    expect(
+      describeFamilyActivity({ action: "child.public_xp_changed", context: { enabled: true } }).detail,
+    ).toContain("shown on the Player Card");
+    expect(
+      describeFamilyActivity({ action: "child.public_xp_changed", context: { enabled: false } }).detail,
+    ).toContain("no longer");
+  });
+});
