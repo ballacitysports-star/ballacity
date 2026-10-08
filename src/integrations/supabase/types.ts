@@ -790,12 +790,12 @@ export type Database = {
           game_id: string
           host_id: string
           id: string
+          late_refund_pct: number
           payment_deadline: string | null
           payment_hold_minutes: number | null
           payment_instructions: string | null
           payment_mode: string
           refund_policy: string | null
-          late_refund_pct: number
           refund_rule: string
           requires_approval: boolean
           updated_at: string
@@ -807,12 +807,12 @@ export type Database = {
           game_id: string
           host_id: string
           id?: string
+          late_refund_pct?: number
           payment_deadline?: string | null
           payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
-          late_refund_pct?: number
           refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
@@ -824,12 +824,12 @@ export type Database = {
           game_id?: string
           host_id?: string
           id?: string
+          late_refund_pct?: number
           payment_deadline?: string | null
           payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
-          late_refund_pct?: number
           refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
@@ -1020,8 +1020,8 @@ export type Database = {
           game_id: string | null
           game_title: string | null
           hidden_at: string | null
-          is_draft: boolean
           id: string
+          is_draft: boolean
           last_step_at: string | null
           media_meta: Json | null
           playback_path: string | null
@@ -1062,8 +1062,8 @@ export type Database = {
           game_id?: string | null
           game_title?: string | null
           hidden_at?: string | null
-          is_draft?: boolean
           id?: string
+          is_draft?: boolean
           last_step_at?: string | null
           media_meta?: Json | null
           playback_path?: string | null
@@ -1104,8 +1104,8 @@ export type Database = {
           game_id?: string | null
           game_title?: string | null
           hidden_at?: string | null
-          is_draft?: boolean
           id?: string
+          is_draft?: boolean
           last_step_at?: string | null
           media_meta?: Json | null
           playback_path?: string | null
@@ -1191,9 +1191,9 @@ export type Database = {
           all_day: boolean
           allow_waitlist: boolean
           arrive_early_min: number
+          cancel_cutoff_min: number
           cancellation_notes: string | null
           cancellation_policy: string
-          cancel_cutoff_min: number
           cancellation_reason: string | null
           cancelled_at: string | null
           completed_at: string | null
@@ -1246,9 +1246,9 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
-          cancel_cutoff_min?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -1301,9 +1301,9 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
-          cancel_cutoff_min?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -1484,6 +1484,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      late_cancellations: {
+        Row: {
+          cancelled_by: string | null
+          created_at: string
+          cutoff_min: number
+          event_at: string
+          id: string
+          kind: string
+          minutes_before: number
+          owner_id: string | null
+          ref_id: string
+          team_id: string | null
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_by?: string | null
+          created_at?: string
+          cutoff_min: number
+          event_at: string
+          id?: string
+          kind: string
+          minutes_before: number
+          owner_id?: string | null
+          ref_id: string
+          team_id?: string | null
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_by?: string | null
+          created_at?: string
+          cutoff_min?: number
+          event_at?: string
+          id?: string
+          kind?: string
+          minutes_before?: number
+          owner_id?: string | null
+          ref_id?: string
+          team_id?: string | null
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       legal_consents: {
         Row: {
@@ -3216,15 +3261,15 @@ export type Database = {
           id: string
           kind: string
           lat: number | null
+          late_refund_pct: number
           lng: number | null
           location: string | null
           pinned: boolean
           place_id: string | null
           price: number | null
+          refund_rule: string
           share_notes: boolean
           share_scores: boolean
-          late_refund_pct: number
-          refund_rule: string
           spots_max: number | null
           spots_taken: number
           team_id: string
@@ -3242,15 +3287,15 @@ export type Database = {
           id?: string
           kind: string
           lat?: number | null
+          late_refund_pct?: number
           lng?: number | null
           location?: string | null
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          refund_rule?: string
           share_notes?: boolean
           share_scores?: boolean
-          late_refund_pct?: number
-          refund_rule?: string
           spots_max?: number | null
           spots_taken?: number
           team_id: string
@@ -3268,15 +3313,15 @@ export type Database = {
           id?: string
           kind?: string
           lat?: number | null
+          late_refund_pct?: number
           lng?: number | null
           location?: string | null
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          refund_rule?: string
           share_notes?: boolean
           share_scores?: boolean
-          late_refund_pct?: number
-          refund_rule?: string
           spots_max?: number | null
           spots_taken?: number
           team_id?: string
@@ -3435,10 +3480,10 @@ export type Database = {
           bio: string
           cadence: string | null
           cadences: Json
+          cancel_cutoff_min: number
           city: string
           claimed_at: string | null
           cover: string
-          cancel_cutoff_min: number
           created_at: string
           credentials: string[]
           distances: string[]
@@ -3451,6 +3496,7 @@ export type Database = {
           home_court: string | null
           id: string
           kind: string
+          late_refund_pct: number
           league: string | null
           listed_at: string | null
           listed_by: string | null
@@ -3463,14 +3509,13 @@ export type Database = {
           rating_max: string | null
           rating_min: string | null
           rating_system: string | null
+          refund_rule: string
           session_types: string[]
           skill_max: number
           skill_min: number
           sports: string[]
           staff: Json
           tagline: string
-          late_refund_pct: number
-          refund_rule: string
           timezone: string
           updated_at: string
           venue_addresses: Json
@@ -3490,10 +3535,10 @@ export type Database = {
           bio?: string
           cadence?: string | null
           cadences?: Json
+          cancel_cutoff_min?: number
           city?: string
           claimed_at?: string | null
           cover?: string
-          cancel_cutoff_min?: number
           created_at?: string
           credentials?: string[]
           distances?: string[]
@@ -3506,6 +3551,7 @@ export type Database = {
           home_court?: string | null
           id: string
           kind: string
+          late_refund_pct?: number
           league?: string | null
           listed_at?: string | null
           listed_by?: string | null
@@ -3518,14 +3564,13 @@ export type Database = {
           rating_max?: string | null
           rating_min?: string | null
           rating_system?: string | null
+          refund_rule?: string
           session_types?: string[]
           skill_max?: number
           skill_min?: number
           sports?: string[]
           staff?: Json
           tagline?: string
-          late_refund_pct?: number
-          refund_rule?: string
           timezone?: string
           updated_at?: string
           venue_addresses?: Json
@@ -3545,10 +3590,10 @@ export type Database = {
           bio?: string
           cadence?: string | null
           cadences?: Json
+          cancel_cutoff_min?: number
           city?: string
           claimed_at?: string | null
           cover?: string
-          cancel_cutoff_min?: number
           created_at?: string
           credentials?: string[]
           distances?: string[]
@@ -3561,6 +3606,7 @@ export type Database = {
           home_court?: string | null
           id?: string
           kind?: string
+          late_refund_pct?: number
           league?: string | null
           listed_at?: string | null
           listed_by?: string | null
@@ -3573,14 +3619,13 @@ export type Database = {
           rating_max?: string | null
           rating_min?: string | null
           rating_system?: string | null
+          refund_rule?: string
           session_types?: string[]
           skill_max?: number
           skill_min?: number
           sports?: string[]
           staff?: Json
           tagline?: string
-          late_refund_pct?: number
-          refund_rule?: string
           timezone?: string
           updated_at?: string
           venue_addresses?: Json
@@ -4090,7 +4135,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_worker_secret: { Args: { _provided: string }; Returns: boolean }
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
       admin_audit_log_facets: {
@@ -4189,6 +4233,7 @@ export type Database = {
         Args: { _on_behalf_of?: string; _post_id: string }
         Returns: undefined
       }
+      check_worker_secret: { Args: { _provided: string }; Returns: boolean }
       child_features_locked: { Args: { _user: string }; Returns: boolean }
       child_game_participation_allowed: {
         Args: { _user: string }
@@ -4519,6 +4564,7 @@ export type Database = {
           state: string
         }[]
       }
+      mark_refund_sent: { Args: { _submission: string }; Returns: undefined }
       minor_handle_unsafe: {
         Args: { _cohort: string; _handle: string }
         Returns: boolean
@@ -4540,6 +4586,7 @@ export type Database = {
           members: number
         }[]
       }
+      minutes_phrase: { Args: { _m: number }; Returns: string }
       moderate_gym_review: {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
@@ -4669,6 +4716,19 @@ export type Database = {
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
       publish_team_waiver: { Args: { _id: string }; Returns: string }
+      record_late_cancellation: {
+        Args: {
+          _cutoff: number
+          _event_at: string
+          _kind: string
+          _owner: string
+          _ref: string
+          _team: string
+          _title: string
+          _user: string
+        }
+        Returns: boolean
+      }
       record_session_heartbeat: {
         Args: { _timezone?: string }
         Returns: string
@@ -4680,8 +4740,16 @@ export type Database = {
           parent_id: string
         }[]
       }
-      mark_refund_sent: { Args: { _submission: string }; Returns: undefined }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
+      refund_pct_for: {
+        Args: {
+          _late_pct: number
+          _phase: string
+          _reason: string
+          _rule: string
+        }
+        Returns: number
+      }
       release_expired_payment_holds: {
         Args: { _game_id?: string }
         Returns: number
@@ -4744,6 +4812,10 @@ export type Database = {
           review_required: boolean
           status: string
         }[]
+      }
+      settle_paid_spot: {
+        Args: { _game: string; _player: string; _reason: string }
+        Returns: string
       }
       shares_game_or_chat: {
         Args: { _a: string; _b: string }
