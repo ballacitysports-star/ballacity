@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarSearch, RefreshCw, Search, X } from "lucide-react";
+import { ArrowLeft, CalendarSearch, List, Map as MapIcon, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Bell, MessageCircle, MapPin } from "lucide-react";
-import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -12,8 +11,7 @@ import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { parseSportList, serializeSportList } from "@/lib/sport-filter";
 import { GameCard } from "@/components/GameCard";
-import { GameListRow } from "@/components/GameListRow";
-import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
+import { GameCardSkeleton } from "@/components/GameCardSkeleton";
 import { FilterBar } from "@/components/FilterBar";
 import { FeedPreferencesBody, FeedViewsRow } from "@/components/feed/FeedPreferencesSheet";
 import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
@@ -355,7 +353,10 @@ function Feed() {
 
   const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
-  const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
+  const positionSport =
+    chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0
+      ? (chipSelected[0] as Sport)
+      : null;
   const finishedCount = useMemo(() => onlyFinishedGames([...hosted, ...GAMES]).length, [hosted]);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
@@ -517,12 +518,12 @@ function Feed() {
       </div>
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
-      {/* One slim row instead of a headline, a timeframe toggle and two toggle
-          groups: where you are on the left, the layout switch on the right. */}
+      {/* Tier 2: where you are + run count on the left (tap to update
+          location), one Map/List switch on the right. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-4 flex items-center justify-between gap-3"
+        className="mb-3 flex items-center justify-between gap-3"
       >
         {tab === "archive" ? (
           <button
@@ -533,30 +534,42 @@ function Feed() {
             <ArrowLeft className="h-4 w-4" /> Back to upcoming
           </button>
         ) : (
-          <p className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <button
+            type="button"
+            onClick={handleLocationTap}
+            title={locationExplanation}
+            className="inline-flex min-h-9 min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
             <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
-            {userCityToken ? (
-              <span className="truncate">
-                Nearest to <span className="font-semibold text-foreground">{profile?.city}</span>
+            <span className="truncate">
+              <span className="font-semibold text-foreground">
+                {geoStatus === "prompting"
+                  ? "Locating…"
+                  : profile?.city || (coords ? "Near you" : "Set location")}
               </span>
-            ) : (
-              <span className="truncate">
-                <Link to="/profile/edit" className="font-semibold text-lime">
-                  Set your city
-                </Link>{" "}
-                for nearby
-              </span>
-            )}
-          </p>
+              {" · "}
+              {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+            </span>
+          </button>
         )}
-        <ViewDensityToggle
-          variant="icons"
-          view={viewMode}
-          onViewChange={(v) => switchView(v)}
-          density={density}
-          onDensityChange={(d) => switchDensity(d)}
-        />
+        <button
+          type="button"
+          onClick={() => switchView(viewMode === "map" ? "list" : "map")}
+          aria-label={viewMode === "map" ? "Show list" : "Show map"}
+          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-bold"
+        >
+          {viewMode === "map" ? (
+            <>
+              <List className="h-3.5 w-3.5" /> List
+            </>
+          ) : (
+            <>
+              <MapIcon className="h-3.5 w-3.5" /> Map
+            </>
+          )}
+        </button>
       </motion.div>
+      <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
 
       {viewMode === "map" ? (
         <PlayMapView
@@ -565,200 +578,127 @@ function Feed() {
         />
       ) : (
         <>
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <FilterBar
               q={q}
               onQChange={setQ}
               searchPlaceholder="Search pickup runs"
-              activeFilterCount={activeFilterCount}
+              activeFilterCount={activeFilterCount + (positionFilter ? 1 : 0)}
               create={{ to: "/create", label: "Create game" }}
               sheetTitle="Feed filters"
-              sheet={<FeedPreferencesBody />}
-              onReset={() => setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })}
+              sheet={
+                <div className="space-y-5">
+                  {positionSport && (
+                    <section>
+                      <h3 className="section-eyebrow mb-2 text-muted-foreground">
+                        {positionSport} position
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {[null, ...POSITIONS_BY_SPORT[positionSport]].map((p) => {
+                          const active = positionFilter === p;
+                          return (
+                            <button
+                              key={p ?? "any"}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setPositionFilter(p)}
+                              className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                                active
+                                  ? "border-lime bg-lime text-primary-foreground"
+                                  : "border-border bg-surface text-foreground hover:border-lime/40"
+                              }`}
+                            >
+                              {p ?? "Any position"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+                  {prefs.savedViews.length > 0 && <FeedViewsRow compact />}
+                  <FeedPreferencesBody />
+                  {tab === "upcoming" && finishedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setTab("archive")}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold"
+                    >
+                      View finished games ({finishedCount})
+                    </button>
+                  )}
+                </div>
+              }
+              onReset={() => {
+                setPositionFilter(null);
+                setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
+              }}
+              chips={<SportChips multi selected={chipSelected} onSelect={setChipSport} />}
             />
             {q && suggestions.length > 0 && (
-              <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+              <div className="absolute left-0 right-14 top-[2.9rem] z-20 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
                 {suggestions.map((s, idx) => (
                   <button
                     key={`${s.label}-${idx}`}
                     onClick={() => setQ(s.label)}
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
+                    className="w-full border-b border-border px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-background"
                   >
-                    <div className="font-semibold truncate">{s.label}</div>
-                    <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
+                    <div className="truncate font-semibold">{s.label}</div>
+                    <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {prefs.savedViews.length > 0 && (
-            <div className="mb-3">
-              <FeedViewsRow compact />
-            </div>
+          {q && (
+            <h2 className="section-eyebrow mb-2 text-muted-foreground">
+              {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
+            </h2>
           )}
-
-          <div className="mb-5">
-            <SportChips multi selected={chipSelected} onSelect={setChipSport} />
-            {chipSelected.length === 1 &&
-              POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-                  <button
-                    onClick={() => setPositionFilter(null)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                      !positionFilter
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    Any position
-                  </button>
-                  {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
-                    const active = positionFilter === p;
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => setPositionFilter(active ? null : p)}
-                        className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                          active
-                            ? "border-lime bg-lime text-primary-foreground"
-                            : "border-border bg-surface text-foreground hover:border-lime/40"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-          </div>
-
-          {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
-            geoStatus !== "unsupported" &&
-            (!coords || locationRemembered) &&
-            !locPromptHidden && (
-              <div className="mb-4 flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleLocationTap}
-                  title={locationExplanation}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-                >
-                  <MapPin className="h-3.5 w-3.5 text-coral" />
-                  {geoStatus === "prompting"
-                    ? "Locating…"
-                    : locationRemembered
-                      ? "Using your last known location — refresh"
-                      : geoStatus === "denied"
-                        ? "Location blocked — tap to retry"
-                        : "Use my location to sort and filter by distance"}
-                </button>
-                <button
-                  type="button"
-                  onClick={dismissLocPrompt}
-                  aria-label="Dismiss location prompt"
-                  className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
+          <div className={listContainerClass}>
+            {refreshing && filtered.length === 0
+              ? renderSkeletons(3)
+              : visible.map((g, i) => renderGame(g, i))}
+            {hasMore && !refreshing && renderSkeletons(3)}
+            {!refreshing && filtered.length === 0 && (
+              <EmptyState
+                className={emptyColSpan}
+                icon={
+                  q ? (
+                    <Search className="h-6 w-6" aria-hidden />
+                  ) : (
+                    <CalendarSearch className="h-6 w-6" aria-hidden />
+                  )
+                }
+                title={
+                  q
+                    ? `No games match "${q}"`
+                    : tab === "archive"
+                      ? "No finished games match your filters"
+                      : "No games match your filters"
+                }
+                description={
+                  q
+                    ? "Try a shorter search, or a different sport or city name."
+                    : "Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                }
+                action={
+                  q ? undefined : (
+                    <button
+                      onClick={() => {
+                        setPositionFilter(null);
+                        setFeedPrefs(DEFAULT_PREFS);
+                      }}
+                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                    >
+                      Clear filters
+                    </button>
+                  )
+                }
+              />
             )}
-          <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
-
-          {q ? (
-            <>
-              <h2 className="section-eyebrow text-muted-foreground mb-2">
-                {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-              </h2>
-              <div className={listContainerClass}>
-                {refreshing && filtered.length === 0
-                  ? renderSkeletons(density === "list" ? 6 : 3)
-                  : visible.map((g, i) => renderGame(g, i))}
-                {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                {!refreshing && filtered.length === 0 && (
-                  <EmptyState
-                    className={emptyColSpan}
-                    icon={<Search className="h-6 w-6" aria-hidden />}
-                    title={`No games match "${q}"`}
-                    description="Try a shorter search, or a different sport or city name."
-                  />
-                )}
-              </div>
-              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-            </>
-          ) : (
-            <>
-              {prefs.sections.showUrgent && urgent.length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
-                    <span className="text-xs text-muted-foreground">{urgent.length} games</span>
-                  </div>
-                  <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
-                </div>
-              )}
-
-              {(tab === "archive" || prefs.sections.showForYou) && (
-                <>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h2 className="section-eyebrow text-muted-foreground">
-                      {tab === "archive" ? "Recently finished" : "For you"}
-                    </h2>
-                    <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {filtered.length} {filtered.length === 1 ? "game" : "games"}
-                      {tab === "upcoming" && finishedCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setTab("archive")}
-                          className="font-semibold text-lime"
-                        >
-                          Finished ({finishedCount})
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                  <div className={listContainerClass}>
-                    {refreshing && filtered.length === 0
-                      ? renderSkeletons(density === "list" ? 6 : 3)
-                      : visible.map((g, i) => renderGame(g, i))}
-                    {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-                    {!refreshing && filtered.length === 0 && (
-                      <EmptyState
-                        className={emptyColSpan}
-                        icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
-                        title={
-                          tab === "archive"
-                            ? "No finished games match your filters"
-                            : "No games match your filters"
-                        }
-                        description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
-                        action={
-                          <button
-                            onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                            className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                          >
-                            Clear filters
-                          </button>
-                        }
-                      />
-                    )}
-                  </div>
-                  <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-                </>
-              )}
-              {/* The list heading carries this link; keep archive reachable when
-                  that list is switched off in feed settings. */}
-              {tab === "upcoming" && !prefs.sections.showForYou && finishedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setTab("archive")}
-                  className="text-xs font-semibold text-lime"
-                >
-                  Finished ({finishedCount})
-                </button>
-              )}
-            </>
-          )}
+          </div>
+          <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
         </>
       )}
     </div>
