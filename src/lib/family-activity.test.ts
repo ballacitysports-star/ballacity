@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { describeFamilyActivity } from "@/lib/family-activity";
 
 describe("describeFamilyActivity", () => {
+  it("words the members sharing choice in plain language", () => {
+    const d = describeFamilyActivity({
+      action: "controls.changed",
+      context: { media_visibility: "members" },
+    });
+    expect(d.detail).toContain("Video visibility");
+    expect(d.detail).toContain("signed-in members");
+  });
+
   it("labels control creation", () => {
     expect(describeFamilyActivity({ action: "controls.created" })).toEqual({
       title: "Safety settings created",

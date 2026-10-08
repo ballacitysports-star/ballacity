@@ -345,6 +345,12 @@ describe("guardian controls parsing", () => {
     });
   });
 
+  it("reads the 13-15 members sharing choice, and stays private by default", () => {
+    expect(parseChildControls({ media_visibility: "members" }).mediaVisibility).toBe("members");
+    expect(parseChildControls({ media_visibility: "public" }).mediaVisibility).toBe("private");
+    expect(parseChildControls({}).mediaVisibility).toBe("private");
+  });
+
   it("ignores invalid values", () => {
     expect(
       parseChildControls({ messaging: "everyone", location_precision: "exact" }),

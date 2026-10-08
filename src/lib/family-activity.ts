@@ -24,6 +24,7 @@ const VALUE_LABELS: Record<string, string> = {
   peers: "peers",
   private: "private",
   guardian: "guardian review",
+  members: "signed-in members",
   city: "city only",
   region: "region only",
 };

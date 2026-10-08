@@ -519,7 +519,7 @@ export const updateChildControls = createServerFn({ method: "POST" })
         childUserId: z.string().uuid(),
         controls: z.object({
           messaging: z.enum(["off", "guardian_only", "teammates", "peers"]).optional(),
-          media_visibility: z.enum(["private", "guardian", "teammates"]).optional(),
+          media_visibility: z.enum(["private", "guardian", "teammates", "members"]).optional(),
           social_discovery: z.boolean().optional(),
           ai_analysis: z.boolean().optional(),
           location_precision: z.enum(["city", "region"]).optional(),
