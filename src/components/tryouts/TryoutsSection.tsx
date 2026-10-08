@@ -20,6 +20,13 @@ import {
   type TryoutListing,
 } from "@/lib/tryouts.functions";
 import { createTeamPost } from "@/lib/team-posts.functions";
+import {
+  CANCEL_CUTOFF_PRESETS,
+  DEFAULT_CANCEL_CUTOFF_MIN,
+  cancelPolicyNote,
+  isLateCancel,
+  lateCancelWarning,
+} from "@/lib/cancel-window";
 
 const KIND_LABEL = { tryout: "Tryout", clinic: "Camp / Clinic" } as const;
 
@@ -190,6 +197,11 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                       at {tryout.title}? {tryout.teamName} will be told and the spot opens up for someone else.
                       {tryout.price ? " If you already paid the team, ask them about a refund." : ""}
                     </p>
+                    {isLateCancel(tryout.eventDate, tryout.cancelCutoffMin) && (
+                      <p role="alert" className="text-xs font-semibold text-amber-500">
+                        {lateCancelWarning(tryout.cancelCutoffMin)}
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(false)}>Keep my spot</Button>
                       <Button variant="destructive" disabled={busy} onClick={doCancel}>
@@ -219,6 +231,9 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                 <Button className="w-full" disabled={busy || (needsWaiver && !agree)} onClick={submit}>
                   {needsWaiver ? "Sign waiver & RSVP" : "RSVP"}
                 </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  {cancelPolicyNote(tryout.cancelCutoffMin)}
+                </p>
               </>
             )}
           </div>
@@ -233,7 +248,7 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
   const teamsFn = useServerFn(listMyManagedTeams);
   const create = useServerFn(createTeamPost);
   const { data: teams } = useQuery({ queryKey: ["tryouts", "my-teams"], queryFn: () => teamsFn() });
-  const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "" });
+  const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "", cancelCutoff: String(DEFAULT_CANCEL_CUTOFF_MIN) });
   const [busy, setBusy] = useState(false);
   const teamId = f.teamId || teams?.[0]?.id || "";
 
@@ -248,6 +263,7 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
           location: f.location || null,
           spotsMax: f.spots ? Number(f.spots) : null,
           price: f.price ? Number(f.price) : null,
+          cancelCutoffMin: Number(f.cancelCutoff) || 0,
         },
       });
       toast.success("Posted! Players can now RSVP.");
@@ -291,6 +307,19 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
               <Input type="number" min={1} placeholder="Spots (optional)" value={f.spots} onChange={(e) => setF({ ...f, spots: e.target.value })} />
               <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
             </div>
+            <label className="block text-xs font-semibold text-muted-foreground">
+              Cancellation cutoff
+              <select
+                className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm font-normal text-foreground"
+                value={f.cancelCutoff}
+                onChange={(e) => setF({ ...f, cancelCutoff: e.target.value })}
+              >
+                {CANCEL_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              <span className="mt-1 block font-normal">Cancelling after this counts as late and lowers the player's reliability.</span>
+            </label>
             <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
             <Button className="w-full" disabled={busy} onClick={submit}>Post</Button>
           </div>

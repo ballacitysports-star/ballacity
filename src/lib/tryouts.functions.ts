@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { normalizeCutoff } from "@/lib/cancel-window";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -30,6 +31,8 @@ export type TryoutListing = {
   price: number | null;
   spotsMax: number | null;
   spotsTaken: number;
+  /** Minutes before start after which cancelling counts as late. 0 = off. */
+  cancelCutoffMin: number;
   teamId: string;
   teamName: string;
   teamAvatar: string | null;
@@ -42,7 +45,7 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
     try {
     const { data, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,team_id,teams!inner(name,avatar,sports)")
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
       .gte("event_date", new Date().toISOString())
@@ -62,6 +65,7 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
       price: r.price,
       spotsMax: r.spots_max,
       spotsTaken: r.spots_taken ?? 0,
+      cancelCutoffMin: normalizeCutoff(r.cancel_cutoff_min),
       teamId: r.team_id,
       teamName: r.teams?.name ?? "Team",
       teamAvatar: r.teams?.avatar ?? null,
@@ -133,6 +137,7 @@ export type MyTryoutSignup = {
   location: string | null;
   price: number | null;
   teamName: string;
+  cancelCutoffMin: number;
   /** Who is registered: the caller, or a child they're linked to. */
   attendeeId: string;
   attendeeName: string;
@@ -162,7 +167,7 @@ export const listMyTryoutSignups = createServerFn({ method: "GET" })
     if (rows.length === 0) return [];
     const { data: posts } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,event_date,location,price,teams!inner(name)")
+      .select("id,kind,title,event_date,location,price,cancel_cutoff_min,teams!inner(name)")
       .in("id", [...new Set(rows.map((r) => r.post_id as string))])
       .is("hidden_at", null)
       .gte("event_date", new Date().toISOString());
@@ -179,6 +184,7 @@ export const listMyTryoutSignups = createServerFn({ method: "GET" })
           location: p.location,
           price: p.price,
           teamName: p.teams?.name ?? "Team",
+          cancelCutoffMin: normalizeCutoff(p.cancel_cutoff_min),
           attendeeId: r.user_id as string,
           attendeeName: nameOf.get(r.user_id as string) ?? "Player",
           isChild: r.user_id !== context.userId,
@@ -229,9 +235,28 @@ export const cancelTryoutRsvp = createServerFn({ method: "POST" })
       _on_behalf_of: data.onBehalfOf as any,
     });
     if (error) return { ok: false as const, error: friendly(error.message) };
+    const attendeeId = data.onBehalfOf ?? context.userId;
+    // The database records a late cancellation on its own; read it back so the
+    // team's notice can say so.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: late } = await supabaseAdmin
+      .from("late_cancellations" as never)
+      .select("minutes_before,cutoff_min")
+      .eq("user_id", attendeeId)
+      .eq("kind", "tryout")
+      .eq("ref_id", data.postId)
+      .gte("created_at", new Date(Date.now() - 5 * 60_000).toISOString())
+      .maybeSingle();
+    const l = late as { minutes_before: number; cutoff_min: number } | null;
     const { notifyTryoutSignup } = await import("./tryout-alerts.server");
-    await notifyTryoutSignup({ postId: data.postId, actorId: context.userId, attendeeId: data.onBehalfOf ?? context.userId, action: "cancelled" });
-    return { ok: true as const };
+    await notifyTryoutSignup({
+      postId: data.postId,
+      actorId: context.userId,
+      attendeeId,
+      action: "cancelled",
+      late: l ? { minutesBefore: l.minutes_before, cutoffMin: l.cutoff_min } : null,
+    });
+    return { ok: true as const, late: !!l };
   });
 
 /** Teams the caller can post tryouts for. */
@@ -359,7 +384,7 @@ export const getTryout = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<TryoutListing | null> => {
     const { data: r, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,team_id,teams!inner(name,avatar,sports)")
       .eq("id", data.postId)
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
@@ -369,6 +394,7 @@ export const getTryout = createServerFn({ method: "GET" })
     return {
       id: x.id, kind: x.kind, title: x.title, body: x.body ?? "", eventDate: x.event_date,
       location: x.location, price: x.price, spotsMax: x.spots_max, spotsTaken: x.spots_taken ?? 0,
+      cancelCutoffMin: normalizeCutoff(x.cancel_cutoff_min),
       teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
     };
   });

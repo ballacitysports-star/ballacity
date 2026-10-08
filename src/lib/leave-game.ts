@@ -3,6 +3,7 @@ import { createNotification } from "@/lib/notifications";
 import { isUuid } from "@/lib/game-flow-status";
 import { withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
+import { isLateCancel } from "@/lib/cancel-window";
 
 /** Drop the viewer's unreviewed payment proof for a game. Best effort. */
 export async function clearPendingSubmissions(gameId: string) {
@@ -31,11 +32,18 @@ export async function notifyHostOfLeave(gameId: string, fallbackTitle: string) {
     const uid = u.user?.id;
     if (!uid || !isUuid(gameId)) return;
     const [{ data: game }, { data: me }] = await Promise.all([
-      supabase.from("hosted_games").select("host_id,title").eq("id", gameId).maybeSingle(),
+      supabase.from("hosted_games").select("*").eq("id", gameId).maybeSingle(),
       supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle(),
     ]);
-    const hostId = (game as { host_id?: string } | null)?.host_id;
+    const g = game as {
+      host_id?: string;
+      date?: string;
+      cancel_cutoff_min?: number | null;
+    } | null;
+    const hostId = g?.host_id;
     if (!hostId || hostId === uid) return;
+    // Inside the cutoff the database sends its own "cancelled late" notice.
+    if (isLateCancel(g?.date, g?.cancel_cutoff_min)) return;
     const title = (game as { title?: string } | null)?.title ?? fallbackTitle;
     const who = (me as { display_name?: string } | null)?.display_name || "A player";
     await createNotification({

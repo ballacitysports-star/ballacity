@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
+import { normalizeCutoff } from "@/lib/cancel-window";
 import { imageFor, ME } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
@@ -94,6 +95,7 @@ type DbRow = {
   completed_at?: string | null;
   joins_closed: boolean;
   signup_cutoff_min?: number | null;
+  cancel_cutoff_min?: number | null;
   min_age?: number | null;
   max_age?: number | null;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
@@ -161,6 +163,7 @@ function rowToGame(r: DbRow): Game {
     completedAt: r.completed_at ?? null,
     joinsClosed: !!r.joins_closed,
     signupCutoffMin: Number(r.signup_cutoff_min ?? 0) || 0,
+    cancelCutoffMin: normalizeCutoff(r.cancel_cutoff_min),
     minAge: r.min_age ?? null,
     maxAge: r.max_age ?? null,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
@@ -528,6 +531,11 @@ export async function updateHostedGame(
   if ((patch as { signupCutoffMin?: number }).signupCutoffMin !== undefined) {
     dbPatch.signup_cutoff_min =
       Number((patch as { signupCutoffMin?: number }).signupCutoffMin) || 0;
+  }
+  if ((patch as { cancelCutoffMin?: number }).cancelCutoffMin !== undefined) {
+    (dbPatch as Record<string, unknown>).cancel_cutoff_min = normalizeCutoff(
+      (patch as { cancelCutoffMin?: number }).cancelCutoffMin,
+    );
   }
   if ((patch as { minAge?: number | null }).minAge !== undefined) {
     dbPatch.min_age = (patch as { minAge?: number | null }).minAge ?? null;

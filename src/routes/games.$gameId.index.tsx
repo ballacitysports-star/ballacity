@@ -136,6 +136,13 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import {
+  CANCEL_CUTOFF_PRESETS,
+  cancelPolicyNote,
+  isLateCancel,
+  lateCancelWarning,
+  normalizeCutoff,
+} from "@/lib/cancel-window";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
@@ -988,8 +995,14 @@ function GameDetail() {
             );
         }
         toast("You left the game.");
-        // Notify host in real time that a player left.
-        if (gameHostId && user && gameHostId !== user.id) {
+        // Notify host in real time that a player left. A late leave gets its
+        // own "cancelled late" notice from the database instead.
+        if (
+          gameHostId &&
+          user &&
+          gameHostId !== user.id &&
+          !isLateCancel(game.date, game.cancelCutoffMin)
+        ) {
           const who = myProfile?.name || emailLocalPart(user.email) || "A player";
           void createNotification({
             user_id: gameHostId,
@@ -2527,6 +2540,39 @@ function GameDetail() {
                 pay.
               </p>
             </div>
+            <div className="mt-3">
+              <label
+                htmlFor="cancel-cutoff"
+                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Cancellation cutoff
+              </label>
+              <select
+                id="cancel-cutoff"
+                value={String(normalizeCutoff(game.cancelCutoffMin))}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 0;
+                  void updateHostedGame(game.id, { cancelCutoffMin: v } as never).catch(() => {});
+                  toast.success(
+                    v > 0
+                      ? `Cancellations within ${cutoffAmountLabel(v)} of start will count as late.`
+                      : "Players can cancel any time without a late mark.",
+                  );
+                }}
+                disabled={gate.joinState === "completed"}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {CANCEL_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Players can still cancel after this, but it's recorded as a late cancellation and
+                counts against their reliability like a no-show.
+              </p>
+            </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -3111,9 +3157,17 @@ function GameDetail() {
             <AlertDialogDescription>
               {confirmAction === "leave"
                 ? "Your spot will open up for someone else. You can rejoin if there's still space."
-                : "You'll be added to the roster. You can leave later if plans change."}
+                : `You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirmAction === "leave" && isLateCancel(game.date, game.cancelCutoffMin) && (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
+            >
+              {lateCancelWarning(game.cancelCutoffMin)}
+            </p>
+          )}
           {confirmAction === "join" && (
             <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
           )}
@@ -3133,7 +3187,11 @@ function GameDetail() {
                   : undefined
               }
             >
-              {confirmAction === "leave" ? "Leave game" : "Join game"}
+              {confirmAction === "leave"
+                ? isLateCancel(game.date, game.cancelCutoffMin)
+                  ? "Leave anyway"
+                  : "Leave game"
+                : "Join game"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

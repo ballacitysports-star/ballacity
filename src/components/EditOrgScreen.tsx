@@ -52,6 +52,7 @@ import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -133,6 +134,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
   const [rules, setRules] = useState<AvailabilityRule[]>(org.availabilityRules ?? []);
   const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
+  const [cancelCutoff, setCancelCutoff] = useState<number>(normalizeCutoff(org.cancelCutoffMin));
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
@@ -463,6 +465,11 @@ export function EditOrgScreen({ org }: { org: Org }) {
       availabilityOverrides: kind === "coach" ? overrides : undefined,
       availabilityRules: kind === "coach" ? rules : undefined,
       timezone: kind === "coach" ? timezone : undefined,
+      // Only written when changed, so saving never depends on the column otherwise.
+      cancelCutoffMin:
+        kind === "coach" && cancelCutoff !== normalizeCutoff(org.cancelCutoffMin)
+          ? cancelCutoff
+          : undefined,
       venueAddresses:
         kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
@@ -1109,6 +1116,24 @@ export function EditOrgScreen({ org }: { org: Org }) {
             <div className="space-y-5">
               <Section title="Timezone">
                 <TimezoneSelect value={timezone} onChange={setTimezone} />
+              </Section>
+
+              <Section
+                title="Cancellation cutoff"
+                hint="Players can still cancel after this, but it's recorded as late and lowers their reliability."
+              >
+                <select
+                  value={cancelCutoff}
+                  onChange={(e) => setCancelCutoff(Number(e.target.value) || 0)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  aria-label="Cancellation cutoff"
+                >
+                  {CANCEL_CUTOFF_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
               </Section>
 
               <Section

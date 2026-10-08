@@ -2,11 +2,19 @@
  * In-app alerts for tryout/camp sign-ups. Best-effort: never blocks the RSVP.
  * Runs after the RSVP RPC succeeded (which already enforced permissions).
  */
+function minutesPhrase(m: number): string {
+  if (m < 60) return `${m} min`;
+  if (m % 60 === 0) return `${m / 60} hour${m === 60 ? "" : "s"}`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 export async function notifyTryoutSignup(opts: {
   postId: string;
   actorId: string;
   attendeeId: string;
   action: "registered" | "cancelled";
+  /** Set when the cancellation fell inside the team's cutoff. */
+  late?: { minutesBefore: number; cutoffMin: number } | null;
 }) {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -56,11 +64,15 @@ export async function notifyTryoutSignup(opts: {
         title:
           opts.action === "registered"
             ? `New ${label} applicant — ${p.title}`
-            : `${label[0].toUpperCase()}${label.slice(1)} cancellation — ${p.title}`,
+            : opts.late
+              ? `Late ${label} cancellation — ${p.title}`
+              : `${label[0].toUpperCase()}${label.slice(1)} cancellation — ${p.title}`,
         body:
           opts.action === "registered"
             ? `${attendee} signed up${onBehalf ? " (registered by a parent/guardian)" : ""}.`
-            : `${attendee} cancelled their spot.`,
+            : opts.late
+              ? `${attendee} cancelled ${minutesPhrase(opts.late.minutesBefore)} before start (your cutoff is ${minutesPhrase(opts.late.cutoffMin)}).`
+              : `${attendee} cancelled their spot.`,
         link: `/teams/${p.team_id}/tryouts`,
       });
     }

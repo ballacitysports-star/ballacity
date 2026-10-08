@@ -99,6 +99,8 @@ const CreateInput = z.object({
   lng: z.number().min(-180).max(180).nullable().optional(),
   price: z.number().int().min(0).max(100000).nullable().optional(),
   spotsMax: z.number().int().min(1).max(500).nullable().optional(),
+  /** Minutes before start after which cancelling counts as late; 0 = off. */
+  cancelCutoffMin: z.number().int().min(0).max(10080).optional(),
   pinned: z.boolean().optional(),
 });
 
@@ -122,6 +124,8 @@ export const createTeamPost = createServerFn({ method: "POST" })
         lng: data.lng ?? null,
         price: data.price ?? null,
         spots_max: data.spotsMax ?? null,
+        // Left to the database default (2 hours) unless the poster picked one.
+        ...(data.cancelCutoffMin !== undefined ? { cancel_cutoff_min: data.cancelCutoffMin } : {}),
         pinned: data.pinned ?? false,
       } as any)
       .select("*")
