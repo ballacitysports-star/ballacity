@@ -520,6 +520,8 @@ export type Database = {
           child_user_id: string
           created_at: string
           family_posts_child_view: boolean
+          family_posts_link_sharing: boolean
+          family_posts_team_sharing: boolean
           game_participation: boolean
           location_precision: string
           media_visibility: string
@@ -538,6 +540,8 @@ export type Database = {
           child_user_id: string
           created_at?: string
           family_posts_child_view?: boolean
+          family_posts_link_sharing?: boolean
+          family_posts_team_sharing?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string
@@ -556,6 +560,8 @@ export type Database = {
           child_user_id?: string
           created_at?: string
           family_posts_child_view?: boolean
+          family_posts_link_sharing?: boolean
+          family_posts_team_sharing?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string

@@ -3,7 +3,12 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
-import { getChildFamilyView, setChildFamilyView } from "@/lib/family-clips.functions";
+import {
+  getChildFamilySharing,
+  getChildFamilyView,
+  setChildFamilySharing,
+  setChildFamilyView,
+} from "@/lib/family-clips.functions";
 import type { GuardianChild } from "@/lib/child-safety.functions";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Users } from "lucide-react";
@@ -89,7 +94,28 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
   const qc = useQueryClient();
   const getViewFn = useServerFn(getChildFamilyView);
   const setViewFn = useServerFn(setChildFamilyView);
+  const getShareFn = useServerFn(getChildFamilySharing);
+  const setShareFn = useServerFn(setChildFamilySharing);
   const enabled = data?.enabled === true && child.cohort === "child_under_13";
+  const { data: sharing } = useQuery({
+    queryKey: ["child-family-sharing", child.childUserId],
+    queryFn: () => getShareFn({ data: { childUserId: child.childUserId } }),
+    enabled,
+  });
+  const shareRows = [
+    {
+      kind: "link" as const,
+      checked: sharing?.links === true,
+      label: "Allow private links",
+      hint: "You can send one clip at a time to someone, such as a coach or relative. Links expire and you can turn them off.",
+    },
+    {
+      kind: "team" as const,
+      checked: sharing?.team === true,
+      label: "Allow sharing with a team",
+      hint: "You can let one team that includes them watch a clip. Never anyone under 13.",
+    },
+  ];
   const { data: view } = useQuery({
     queryKey: ["child-family-view", child.childUserId],
     queryFn: () => getViewFn({ data: { childUserId: child.childUserId } }),
@@ -135,6 +161,32 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
           aria-label={`${child.displayName} can watch family clips`}
         />
       </div>
+      {shareRows.map((row) => (
+        <div
+          key={row.kind}
+          className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3"
+        >
+          <div className="min-w-0">
+            <div className="text-xs font-semibold">{row.label}</div>
+            <p className="text-[11px] text-muted-foreground">{row.hint} Off until you turn it on.</p>
+          </div>
+          <Switch
+            checked={row.checked}
+            onCheckedChange={async (v) => {
+              try {
+                await setShareFn({ data: { childUserId: child.childUserId, kind: row.kind, enabled: v } });
+                await qc.invalidateQueries({ queryKey: ["child-family-sharing", child.childUserId] });
+                await qc.invalidateQueries({ queryKey: ["family-share-enabled"] });
+                await qc.invalidateQueries({ queryKey: ["family-team-share-enabled"] });
+                toast.success(v ? "Turned on" : "Turned off, and anything already shared this way has been stopped");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Could not save this setting");
+              }
+            }}
+            aria-label={`${row.label} for ${child.displayName}`}
+          />
+        </div>
+      ))}
     </div>
   );
 }

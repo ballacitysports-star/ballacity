@@ -24,6 +24,7 @@ export function familyClipViaLabel(via: FamilyClipVia): string {
 
 const TEAM_ERRORS: Record<string, string> = {
   FAMILY_TEAM_SHARE_OFF: "Sharing with a team isn't available yet.",
+  FAMILY_TEAM_NOT_ALLOWED: "Turn on team sharing for this child in the Parent area first.",
   FAMILY_TEAM_NOT_FAMILY_POST: "Only a family clip can be shared with a team.",
   FAMILY_POST_NOT_GUARDIAN:
     "Only a verified parent or guardian of this child can choose who sees their clip.",

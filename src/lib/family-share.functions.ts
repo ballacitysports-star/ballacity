@@ -23,14 +23,35 @@ export type FamilyShareLink = {
   createdAt: string;
 };
 
+/** The guardian's per-child opt-in for a reel's child. Off on any doubt. */
+async function childAllows(supabase: any, userId: string, reelId: string | undefined, kind: "link" | "team") {
+  if (!reelId) return true;
+  const { data: reel } = await supabase
+    .from("highlight_reels")
+    .select("subject_child_id")
+    .eq("id", reelId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const childId = (reel as { subject_child_id?: string | null } | null)?.subject_child_id;
+  if (!childId) return false;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.rpc("family_child_allows" as never, {
+    _child: childId,
+    _kind: kind,
+  } as never);
+  return data === true;
+}
+
 /** Whether the share-link switch (and family posts) are on. Off on any doubt. */
 export const getFamilyShareEnabled = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .inputValidator((input: { reelId?: string } | undefined) => ({ reelId: input?.reelId }))
+  .handler(async ({ data: input, context }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data } = await supabaseAdmin.rpc("family_share_enabled" as never);
-      return { enabled: data === true };
+      const allowed = data === true && (await childAllows(context.supabase, context.userId, input.reelId, "link"));
+      return { enabled: allowed };
     } catch {
       return { enabled: false };
     }

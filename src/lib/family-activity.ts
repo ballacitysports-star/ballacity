@@ -78,6 +78,13 @@ export function describeFamilyActivity(entry: {
         title: "Child's view of family clips changed",
         detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
       };
+    case "family_post.sharing_changed": {
+      const what = ctx["kind"] === "team" ? "Team sharing" : "Private links";
+      return {
+        title: "Family clip sharing changed",
+        detail: `${what} turned ${ctx["enabled"] === true ? "on" : "off"}`,
+      };
+    }
     case "family_post.link_created":
       return {
         title: "Private share link created",

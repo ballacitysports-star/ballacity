@@ -27,8 +27,8 @@ export function FamilyShareLinks({ reelId }: { reelId: string }) {
   const revokeFn = useServerFn(revokeFamilyPostLink);
 
   const { data: enabled } = useQuery({
-    queryKey: ["family-share-enabled"],
-    queryFn: () => enabledFn(),
+    queryKey: ["family-share-enabled", reelId],
+    queryFn: () => enabledFn({ data: { reelId } }),
     staleTime: 60_000,
   });
   const { data: links = [] } = useQuery({
