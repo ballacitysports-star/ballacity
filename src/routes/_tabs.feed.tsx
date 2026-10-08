@@ -94,34 +94,15 @@ function Feed() {
       /* ignore */
     }
   };
-  const [density, setDensity] = useState<"grid" | "list">(() => {
-    if (search.density === "grid" || search.density === "list") return search.density;
-    if (typeof window === "undefined") return "grid";
-    return (localStorage.getItem("openrun:feed-density") as "grid" | "list") ?? "grid";
-  });
-  const switchDensity = (d: "grid" | "list") => {
-    setDensity(d);
-    try {
-      localStorage.setItem("openrun:feed-density", d);
-    } catch {
-      /* ignore */
-    }
-  };
-  const listContainerClass =
-    density === "list"
-      ? "flex flex-col gap-2"
-      : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
-  const emptyColSpan = density === "list" ? "" : "sm:col-span-2 lg:col-span-3";
-  const renderGame = (g: (typeof GAMES)[number], i: number) =>
-    density === "list" ? (
-      <GameListRow key={g.id} game={g} index={i} />
-    ) : (
-      <GameCard key={g.id} game={g} index={i} />
-    );
-  const renderSkeletons = (count: number) => {
-    const Skel = density === "list" ? GameListRowSkeleton : GameCardSkeleton;
-    return Array.from({ length: count }, (_, i) => <Skel key={`sk-${i}`} />);
-  };
+  // Card density is automatic: one column on phones, 2–3 on wider screens.
+  const density = "grid" as const;
+  const listContainerClass = "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
+  const emptyColSpan = "sm:col-span-2 lg:col-span-3";
+  const renderGame = (g: (typeof GAMES)[number], i: number) => (
+    <GameCard key={g.id} game={g} index={i} />
+  );
+  const renderSkeletons = (count: number) =>
+    Array.from({ length: count }, (_, i) => <GameCardSkeleton key={`sk-${i}`} />);
   const [positionFilter, setPositionFilter] = useState<string | null>(search.pos || null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
