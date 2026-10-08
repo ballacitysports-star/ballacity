@@ -78,6 +78,13 @@ export function describeFamilyActivity(entry: {
         title: "Child's view of family clips changed",
         detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
       };
+    case "family_post.link_created":
+      return {
+        title: "Private share link created",
+        detail: typeof ctx["days"] === "number" ? `Valid for ${ctx["days"]} days` : null,
+      };
+    case "family_post.link_revoked":
+      return { title: "Private share link turned off", detail: null };
     default:
       break;
   }

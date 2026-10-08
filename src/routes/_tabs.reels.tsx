@@ -76,6 +76,7 @@ import {
 } from "@/lib/recaps";
 import { EyeOff, Film, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { ReelPostCard } from "@/components/reels/ReelPostCard";
+import { FamilyShareLinks } from "@/components/reels/FamilyShareLinks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -369,6 +370,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
       )}
 
       {isDone && reel.subject_child_id && <FamilyPostAudience reelId={reel.id} />}
+      {isDone && reel.subject_child_id && <FamilyShareLinks reelId={reel.id} />}
 
       {/* Secondary actions live in one menu; realtime patches the row after each change. */}
       <div className="mt-2 flex items-center gap-2">

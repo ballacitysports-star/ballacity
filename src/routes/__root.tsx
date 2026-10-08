@@ -449,6 +449,9 @@ const PUBLIC_ROUTES = [
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
+  // A parent's private link to one family clip: opens without signing in, but is
+  // unindexed, expires, and can be revoked.
+  "/family-share",
   // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
   "/tryouts",
 ];
