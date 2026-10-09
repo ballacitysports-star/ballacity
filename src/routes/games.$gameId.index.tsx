@@ -9,6 +9,7 @@ import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { trackEvent } from "@/lib/analytics";
+import { getPublicGameSeo } from "@/lib/city-pages.functions";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -243,38 +244,43 @@ export const Route = createFileRoute("/games/$gameId/")({
     return out;
   },
 
-  loader: ({ params }) => {
-    return { gameId: params.gameId };
+  loader: async ({ params }) => {
+    // Public facts for the page head. A failed read must not break the page:
+    // the head falls back to a generic, noindex description.
+    const seo = await getPublicGameSeo({ data: { id: params.gameId } }).catch(() => null);
+    return { gameId: params.gameId, seo };
   },
   head: ({ loaderData, params }) => {
-    const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
-    const name = game?.title ?? "Pickup game";
+    const seo = loaderData?.seo ?? null;
+    const name = seo?.title ?? "Pickup game";
     return pageHead({
       path: `/games/${params.gameId}`,
       title: `${name} — ballaCity`,
       description: (
-        game?.description ??
+        seo?.description ||
         "See the details for this pickup game and request to join on ballaCity."
       ).slice(0, 155),
       ogType: "article",
+      // Private, cancelled, past and youth games are never indexed.
+      noindex: !seo?.indexable,
       image: ogImageUrl({
         kind: "game",
         title: name,
-        subtitle: game
-          ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ")
+        subtitle: seo
+          ? [seo.sport, seo.neighborhood || seo.location].filter(Boolean).join(" • ")
           : "Pickup game on ballaCity",
-        meta: game
-          ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"]
+        meta: seo
+          ? [formatGameWhen({ date: seo.date }), seo.location, seo.price ? `$${seo.price}` : "Free"]
           : [],
       }),
-      jsonLd: game
+      jsonLd: seo?.indexable
         ? {
             "@context": "https://schema.org",
             "@type": "SportsEvent",
-            name: game.title,
-            startDate: game.date,
-            location: { "@type": "Place", name: game.location, address: game.neighborhood },
-            sport: game.sport,
+            name: seo.title,
+            startDate: seo.date,
+            location: { "@type": "Place", name: seo.location, address: seo.neighborhood },
+            sport: seo.sport,
             url: `https://ballacity.com/games/${params.gameId}`,
           }
         : undefined,
