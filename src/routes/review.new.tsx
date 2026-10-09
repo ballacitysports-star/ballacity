@@ -29,7 +29,7 @@ const isKind = (v: unknown): v is ReviewerKind =>
 export const Route = createFileRoute("/review/new")({
   head: () =>
     pageHead({
-      title: "Write a review — ballaCity",
+      title: "Write a review — BallaCity",
       description: "Rate and review a player, team, trainer, or gym you played with.",
       noindex: true,
     }),

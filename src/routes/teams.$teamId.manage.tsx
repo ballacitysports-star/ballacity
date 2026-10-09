@@ -16,7 +16,7 @@ import { RsvpsTab } from "@/components/team/manage/RsvpsTab";
 export const Route = createFileRoute("/teams/$teamId/manage")({
   head: () =>
     pageHead({
-      title: "Manage team — ballaCity",
+      title: "Manage team — BallaCity",
       description: "Manage your team's roster, invitations and ownership.",
       noindex: true,
     }),

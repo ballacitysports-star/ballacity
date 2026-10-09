@@ -45,7 +45,7 @@ export const Route = createFileRoute("/payments")({
   head: () =>
     pageHead({
       path: "/payments",
-      title: "Payments — ballaCity",
+      title: "Payments — BallaCity",
       description: "Manage payment methods, verify player payments, and review requests.",
       noindex: true,
     }),
@@ -93,7 +93,7 @@ function PaymentsHub() {
         <div>
           <h1 className="page-title">Payments</h1>
           <p className="text-xs text-muted-foreground">
-            Direct, peer-to-peer. No fees through ballaCity.
+            Direct, peer-to-peer. No fees through BallaCity.
           </p>
         </div>
       </div>

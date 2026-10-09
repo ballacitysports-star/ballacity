@@ -326,7 +326,7 @@ export async function upsertGamePaymentSettings(input: {
   if (!u.user) throw new Error("Sign in to configure payments.");
   const payment_mode = input.payment_mode ?? "direct_host";
   if (payment_mode !== "direct_host") {
-    throw new Error("ballaCity does not process game payments yet — hosts collect directly.");
+    throw new Error("BallaCity does not process game payments yet — hosts collect directly.");
   }
   const { error } = await supabase
     .from("game_payment_settings")
@@ -453,7 +453,7 @@ export async function cancelMyPaymentSubmission(
   if (error) throw error;
 }
 
-/** Either party can flag a payment as disputed; ballaCity never moves money. */
+/** Either party can flag a payment as disputed; BallaCity never moves money. */
 export async function disputeMyPaymentSubmission(id: string, reason: string) {
   const trimmed = reason.trim().slice(0, 500);
   if (!trimmed) throw new Error("Tell us what went wrong with this payment.");

@@ -19,7 +19,7 @@ export function Logo({
     variant === "mark" ? (
       <img
         src={mark.url}
-        alt="ballaCity"
+        alt="BallaCity"
         width={size}
         height={size}
         style={{ height: size, width: "auto" }}
@@ -28,7 +28,7 @@ export function Logo({
     ) : (
       <img
         src={lockup.url}
-        alt="ballaCity"
+        alt="BallaCity"
         style={{ height: size, width: "auto" }}
         className="enter-pop object-contain"
       />

@@ -3,9 +3,9 @@
  *
  * Two payment modes exist and they must never be confused:
  *
- * - `direct_host` — the player pays the host inside Venmo/Zelle/cash. ballaCity
+ * - `direct_host` — the player pays the host inside Venmo/Zelle/cash. BallaCity
  *   never touches the money and takes **nothing**. No fee may ever be added.
- * - `ballacity_processed` — reserved for the future. Only when ballaCity really
+ * - `ballacity_processed` — reserved for the future. Only when BallaCity really
  *   processes the payment may a processing fee and platform fee apply, and the
  *   full breakdown must be shown before the member pays.
  *
@@ -83,11 +83,11 @@ export function feeBreakdownLines(quote: FeeQuote): { label: string; value: stri
   const lines = [{ label: "Game fee", value: formatCents(quote.subtotalCents) }];
   if (quote.mode === "ballacity_processed") {
     lines.push({ label: "Processing fee", value: formatCents(quote.processingFeeCents) });
-    lines.push({ label: "ballaCity fee", value: formatCents(quote.platformFeeCents) });
+    lines.push({ label: "BallaCity fee", value: formatCents(quote.platformFeeCents) });
   }
   lines.push({ label: "Total", value: formatCents(quote.totalCents) });
   return lines;
 }
 
 export const DIRECT_HOST_MODE_NOTE =
-  "You pay the host directly in their payment app. ballaCity adds no fees and never holds the money.";
+  "You pay the host directly in their payment app. BallaCity adds no fees and never holds the money.";

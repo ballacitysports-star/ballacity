@@ -37,7 +37,7 @@ type WithOAuth = { oauth: OAuthNs };
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   head: () =>
     pageHead({
-      title: "Authorize access — ballaCity",
+      title: "Authorize access — BallaCity",
       description: "Review and approve access for a connected application.",
       noindex: true,
     }),
@@ -110,9 +110,9 @@ function Consent() {
 
   return (
     <main className="page-shell-narrow py-6">
-      <h1 className="page-title">Connect {clientName} to your ballaCity account</h1>
+      <h1 className="page-title">Connect {clientName} to your BallaCity account</h1>
       <p className="mt-3 page-subtitle">
-        This lets {clientName} use ballaCity as you. It does not bypass ballaCity's permissions or
+        This lets {clientName} use BallaCity as you. It does not bypass BallaCity's permissions or
         backend policies.
       </p>
       {redirectUri && (

@@ -102,7 +102,7 @@ export const Route = createFileRoute("/_tabs/reels")({
   head: () =>
     pageHead({
       path: "/reels",
-      title: "Highlight reels — ballaCity",
+      title: "Highlight reels — BallaCity",
       description: "Turn your game footage into AI-edited highlight reels you can share.",
       noindex: true,
     }),
@@ -1197,7 +1197,7 @@ function ReelsPage() {
         </section>
       )}
 
-      {/* Nothing is being charged while ballaCity is free, so a past-due
+      {/* Nothing is being charged while BallaCity is free, so a past-due
           warning would be alarming and meaningless. */}
       {isPastDue && access.showUpgradePrompts && (
         <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
@@ -1400,7 +1400,7 @@ function ReelsPage() {
         ) : isActive ? (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-lime">ballaCity+ · Unlimited reels</p>
+              <p className="text-sm font-semibold text-lime">BallaCity+ · Unlimited reels</p>
               <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
             </div>
             <button

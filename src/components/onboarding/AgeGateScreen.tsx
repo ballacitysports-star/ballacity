@@ -119,7 +119,7 @@ export function AgeGateScreen({ onResolved }: { onResolved?: (cohort: string) =>
       step={1}
       steps={2}
       title="Your date of birth"
-      description="Your age helps us provide the right safety, privacy and account experience. Everyone is welcome on ballaCity — we just set things up differently depending on your age."
+      description="Your age helps us provide the right safety, privacy and account experience. Everyone is welcome on BallaCity — we just set things up differently depending on your age."
     >
       <>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>

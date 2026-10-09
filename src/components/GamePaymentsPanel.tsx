@@ -569,7 +569,7 @@ export function HostPaymentsPanel({
           </div>
         </div>
         <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
-          {PAYMENT_DISCLAIMER} Confirming here only marks the player paid in ballaCity — it does not
+          {PAYMENT_DISCLAIMER} Confirming here only marks the player paid in BallaCity — it does not
           move money.
         </p>
         {settings?.entry_fee != null && (

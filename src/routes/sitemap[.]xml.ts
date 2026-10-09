@@ -49,7 +49,7 @@ export const Route = createFileRoute("/sitemap.xml")({
     handlers: {
       GET: async () => {
         // Don't advertise pages that sell nothing. The shop is switched off
-        // while ballaCity is free, and /plans has no prices on it, so both are
+        // while BallaCity is free, and /plans has no prices on it, so both are
         // dropped from the sitemap until monetization returns.
         //
         // Imported inside the handler: this route is part of the client graph

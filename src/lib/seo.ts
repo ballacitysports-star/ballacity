@@ -7,7 +7,7 @@
  * writing meta arrays.
  */
 export const SITE_URL = "https://ballacity.com";
-export const SITE_NAME = "ballaCity";
+export const SITE_NAME = "BallaCity";
 /** The site’s own title and description. Pages either use these verbatim or
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */
 export const SITE_TITLE = "BallaCity | Find Games, Join Teams — Your City's Sports Network";

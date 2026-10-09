@@ -96,7 +96,7 @@ describe("FacilityTrainerCard (live trainer)", () => {
 
   it("doesn't invent a rating for a trainer with no reviews", () => {
     render(<FacilityTrainerCard trainer={{ ...live, rating: null, reviewCount: 0 }} />);
-    expect(screen.getByText("New on ballaCity")).toBeTruthy();
+    expect(screen.getByText("New on BallaCity")).toBeTruthy();
     expect(screen.queryByText(/reviews?\)/)).toBeNull();
   });
 

@@ -22,7 +22,7 @@ import {
 export const Route = createFileRoute("/orgs/$orgId/members")({
   head: () =>
     pageHead({
-      title: "Manage gym members — ballaCity",
+      title: "Manage gym members — BallaCity",
       description: "Review requests and manage members of your gym.",
       noindex: true,
     }),

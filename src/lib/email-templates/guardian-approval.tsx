@@ -14,13 +14,13 @@ const GuardianApprovalEmail = ({ childName, parentName, approvalUrl, expiresHour
   return (
     <Html lang="en" dir="ltr">
       <Head />
-      <Preview>{who} asked you to approve their ballaCity account</Preview>
+      <Preview>{who} asked you to approve their BallaCity account</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Approve a ballaCity account</Heading>
+          <Heading style={h1}>Approve a BallaCity account</Heading>
           <Text style={text}>{parentName ? `Hi ${parentName},` : "Hi,"}</Text>
           <Text style={text}>
-            {who} is signing up for ballaCity and named you as their parent or guardian. Their
+            {who} is signing up for BallaCity and named you as their parent or guardian. Their
             account stays limited — no messages, videos or public profile — until you approve it.
           </Text>
           {approvalUrl ? (
@@ -29,7 +29,7 @@ const GuardianApprovalEmail = ({ childName, parentName, approvalUrl, expiresHour
             </Button>
           ) : null}
           <Text style={footer}>
-            You'll sign in with your own adult ballaCity account to approve. This one-time link
+            You'll sign in with your own adult BallaCity account to approve. This one-time link
             expires in {expiresHours ?? 72} hours. If you don't know who sent this, you can safely
             ignore it.
           </Text>
@@ -43,8 +43,8 @@ export const template = {
   component: GuardianApprovalEmail,
   subject: (d: Record<string, any>) =>
     d.childName
-      ? `${d.childName} asked you to approve their ballaCity account`
-      : "Approve a ballaCity account",
+      ? `${d.childName} asked you to approve their BallaCity account`
+      : "Approve a BallaCity account",
   displayName: "Guardian approval request",
   previewData: {
     childName: "Jordan",

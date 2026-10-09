@@ -63,13 +63,13 @@ export const Route = createFileRoute("/players/$userId")({
       path: `/players/${params.userId}`,
       title: "Player Profile | BallaCity Sports Profile",
       description:
-        "See this player's sports, skill levels, availability, badges, and reviews on ballaCity.",
+        "See this player's sports, skill levels, availability, badges, and reviews on BallaCity.",
       ogType: "profile",
       image: ogImageUrl({
         kind: "player",
         title: "Player profile",
         subtitle: "Sports, availability, badges, and reviews",
-        meta: ["ballaCity player"],
+        meta: ["BallaCity player"],
       }),
       jsonLd: {
         "@context": "https://schema.org",

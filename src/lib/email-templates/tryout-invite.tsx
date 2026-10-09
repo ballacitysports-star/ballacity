@@ -50,7 +50,7 @@ export const template = {
   displayName: "Tryout invite",
   previewData: {
     playerName: "Jordan",
-    teamName: "Balacity",
+    teamName: "BallaCity",
     title: "BallaCity 14U Baseball Tryouts",
     when: "Sat, Oct 17, 2026, 10:00 AM",
     location: "Bogan Park",

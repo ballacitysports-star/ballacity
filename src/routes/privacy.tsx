@@ -13,7 +13,7 @@ export const Route = createFileRoute("/privacy")({
       path: "/privacy",
       title: "Privacy Policy | BallaCity",
       description:
-        "ballaCity's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
+        "BallaCity's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
     }),
   // The published rows only supply the version history and any newer text; the
   // policy itself is bundled, and `effectiveVersion` already falls back to that

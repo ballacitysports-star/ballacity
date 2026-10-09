@@ -31,14 +31,14 @@ import { FeaturedFacilityTrainer } from "@/components/landing/FeaturedFacilityTr
 const FAQS = [
   {
     q: "How do I find pickup games near me?",
-    a: "Open ballaCity, allow location or pick your city, and browse open games by sport, skill level and distance. Tap a game to see the time, place and open spots.",
+    a: "Open BallaCity, allow location or pick your city, and browse open games by sport, skill level and distance. Tap a game to see the time, place and open spots.",
   },
   {
     q: "Do I need a team to join?",
     a: "No. Pickup games are built for individual players. Request a spot and the host balances teams when everyone arrives.",
   },
   {
-    q: "Is ballaCity free?",
+    q: "Is BallaCity free?",
     a: "Yes, finding and joining games is free. Some hosts charge a small fee for court or field costs, which is shown on the game before you join.",
   },
   {
@@ -71,14 +71,14 @@ export const Route = createFileRoute("/")({
         {
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "ballaCity",
+          name: "BallaCity",
           url: `${SITE_URL}/`,
           description: SITE_DESCRIPTION,
         },
         {
           "@context": "https://schema.org",
           "@type": "Organization",
-          name: "ballaCity",
+          name: "BallaCity",
           url: `${SITE_URL}/`,
           description: SITE_DESCRIPTION,
         },
@@ -208,7 +208,7 @@ function Landing() {
               </Link>
             </div>
             <nav
-              aria-label="Explore ballaCity"
+              aria-label="Explore BallaCity"
               style={{ "--enter-delay": "240ms" } as CSSProperties}
               className="enter-up mt-8 flex flex-wrap gap-2"
             >
@@ -556,7 +556,7 @@ function Landing() {
               to="/feed"
               className="inline-flex items-center gap-2 mt-7 rounded-full bg-lime-gradient px-7 py-4 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
             >
-              Open ballaCity <ArrowRight className="h-4 w-4" />
+              Open BallaCity <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -594,7 +594,7 @@ function Landing() {
               Contact
             </Link>
           </nav>
-          <span>© {new Date().getFullYear()} ballaCity. Built for the players.</span>
+          <span>© {new Date().getFullYear()} BallaCity. Built for the players.</span>
         </div>
       </footer>
     </div>

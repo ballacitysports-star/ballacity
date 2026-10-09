@@ -25,7 +25,7 @@ import { SaveStatus } from "@/components/SaveStatus";
 export const Route = createFileRoute("/orgs/$orgId/edit")({
   head: () =>
     pageHead({
-      title: "Edit gym — ballaCity",
+      title: "Edit gym — BallaCity",
       description: "Update your gym's details, hours, amenities, and photos.",
       noindex: true,
     }),

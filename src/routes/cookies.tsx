@@ -11,9 +11,9 @@ export const Route = createFileRoute("/cookies")({
   head: () =>
     pageHead({
       path: "/cookies",
-      title: "Cookies & Local Storage — ballaCity",
+      title: "Cookies & Local Storage — BallaCity",
       description:
-        "What ballaCity stores in your browser to keep you signed in and remember preferences, and how to clear it.",
+        "What BallaCity stores in your browser to keep you signed in and remember preferences, and how to clear it.",
     }),
   // The published rows only supply the version history and any newer text; the
   // document itself is bundled, and `effectiveVersion` already falls back to

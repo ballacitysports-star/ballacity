@@ -63,7 +63,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         typeof context.claims?.email === "string" ? (context.claims.email as string) : undefined;
 
       // Monetization is switched server-side, so a crafted client cannot open
-      // checkout while ballaCity is free. Checked before Stripe is touched, so
+      // checkout while BallaCity is free. Checked before Stripe is touched, so
       // no session is ever created. `createPortalSession` is deliberately NOT
       // gated: existing subscribers must always be able to cancel.
       const monetization = await loadMonetizationConfig(context.supabase);
@@ -72,7 +72,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         return {
           error:
             monetization.access.freeModeNotice ||
-            "ballaCity is free right now — there is nothing to buy.",
+            "BallaCity is free right now — there is nothing to buy.",
         };
       }
 

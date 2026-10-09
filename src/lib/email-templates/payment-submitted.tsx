@@ -39,7 +39,7 @@ export const template = {
   displayName: "Payment proof submitted (host)",
   previewData: {
     playerName: "Jordan",
-    gameTitle: "Balacity 5v5 Open Run",
+    gameTitle: "BallaCity 5v5 Open Run",
     amount: "$10",
     method: "Venmo",
     reviewUrl: "https://ballacity.com/games/example",

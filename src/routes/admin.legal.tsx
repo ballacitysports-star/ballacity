@@ -39,8 +39,8 @@ export const Route = createFileRoute("/admin/legal")({
   head: () =>
     pageHead({
       path: "/admin/legal",
-      title: "Legal & Compliance — ballaCity Admin",
-      description: "Manage versions of ballaCity's legal and policy documents.",
+      title: "Legal & Compliance — BallaCity Admin",
+      description: "Manage versions of BallaCity's legal and policy documents.",
       noindex: true,
     }),
   ssr: false,
@@ -220,7 +220,7 @@ function LegalManager() {
         <div className="min-w-0 flex-1">
           <h1 className="page-title">Legal &amp; Compliance</h1>
           <p className="page-subtitle">
-            Draft, review, and publish versions of ballaCity's policy documents. Published versions
+            Draft, review, and publish versions of BallaCity's policy documents. Published versions
             are what users see and are never edited afterwards.
           </p>
         </div>

@@ -2,7 +2,7 @@ import { cutoffAmountLabel } from "@/lib/live-status";
 import { normalizeCutoff } from "@/lib/cancel-window";
 
 /**
- * Refund policies. ballaCity never moves money — players pay hosts directly —
+ * Refund policies. BallaCity never moves money — players pay hosts directly —
  * so a policy is the host's rule for what a player gets back. The database
  * applies the same rule (`refund_pct_for`) when a player cancels, no-shows,
  * or the host cancels; this module is the client's copy, used for settings
@@ -97,5 +97,5 @@ export function refundDisclaimer(
   policy: RefundPolicy,
   cutoffMin: number | null | undefined,
 ): string {
-  return `I understand the refund terms: ${refundPolicySummary(policy, cutoffMin)} Refunds come from the host directly — ballaCity doesn't hold or return money.`;
+  return `I understand the refund terms: ${refundPolicySummary(policy, cutoffMin)} Refunds come from the host directly — BallaCity doesn't hold or return money.`;
 }

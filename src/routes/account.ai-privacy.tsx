@@ -17,9 +17,9 @@ export const Route = createFileRoute("/account/ai-privacy")({
   head: () =>
     pageHead({
       path: "/account/ai-privacy",
-      title: "AI & Video Privacy — ballaCity",
+      title: "AI & Video Privacy — BallaCity",
       description:
-        "See how ballaCity's AI analyzes your clips, what is kept, and delete AI results or uploaded videos at any time.",
+        "See how BallaCity's AI analyzes your clips, what is kept, and delete AI results or uploaded videos at any time.",
       noindex: true,
     }),
   component: AiVideoPrivacyPage,
@@ -281,7 +281,7 @@ function AiVideoPrivacyPage() {
               <Link to="/trust-center" className="font-semibold text-lime underline">
                 Trust Center
               </Link>{" "}
-              for how AI is used across ballaCity.
+              for how AI is used across BallaCity.
             </p>
           </SettingsStaticRow>
         </SettingsGroup>

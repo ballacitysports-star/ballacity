@@ -27,8 +27,8 @@ export type SubscriptionRow = {
 };
 
 /**
- * Reel access, derived from the ballaCity+ entitlement rather than "has any
- * subscription", so an older reels subscriber and a new ballaCity+ member are
+ * Reel access, derived from the BallaCity+ entitlement rather than "has any
+ * subscription", so an older reels subscriber and a new BallaCity+ member are
  * treated identically.
  */
 export function useSubscription() {

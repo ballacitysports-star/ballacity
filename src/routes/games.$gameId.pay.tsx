@@ -135,7 +135,7 @@ function feeLabel(fee: number | null | undefined) {
 export const Route = createFileRoute("/games/$gameId/pay")({
   head: () =>
     pageHead({
-      title: "Pay for your spot — ballaCity",
+      title: "Pay for your spot — BallaCity",
       description: "Submit payment for your approved spot in this game.",
       noindex: true,
     }),
@@ -1933,9 +1933,9 @@ function PayApprovalIndicator({
     >
   > = {
     requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
-    payment_pending: { label: "Approved · Pay host to lock your spot", tone: "warn", icon: "clock" },
-    payment_submitted: { label: "Verifying with host", tone: "info", icon: "clock" },
-    payment_rejected: { label: "Payment declined — resubmit", tone: "bad", icon: "x" },
+    payment_pending: { label: "Approved · Pay host directly to lock your spot", tone: "warn", icon: "clock" },
+    payment_submitted: { label: "Proof sent · Awaiting host confirmation", tone: "info", icon: "clock" },
+    payment_rejected: { label: "Payment declined by host · Resubmit proof or message host", tone: "bad", icon: "x" },
     payment_verified: {
       label: "You're in! Payment confirmed",
       tone: "ok",

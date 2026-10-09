@@ -11,9 +11,9 @@ export const Route = createFileRoute("/account/blocked")({
   head: () =>
     pageHead({
       path: "/account/blocked",
-      title: "Blocked users — ballaCity",
+      title: "Blocked users — BallaCity",
       description:
-        "Review the accounts you've blocked on ballaCity and unblock anyone you want to hear from again.",
+        "Review the accounts you've blocked on BallaCity and unblock anyone you want to hear from again.",
       noindex: true,
     }),
   ssr: false,

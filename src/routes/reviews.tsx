@@ -18,9 +18,9 @@ import { useMemo } from "react";
 export const Route = createFileRoute("/reviews")({
   head: () =>
     pageHead({
-      title: "Reviews & reputation — ballaCity",
+      title: "Reviews & reputation — BallaCity",
       description:
-        "Read and manage reviews for players, teams, trainers, and gyms across ballaCity.",
+        "Read and manage reviews for players, teams, trainers, and gyms across BallaCity.",
       noindex: true,
     }),
   // URL-persisted filter + sort so refresh/share preserves the view.
@@ -132,7 +132,7 @@ function ReviewsDashboard() {
         <h1 className="page-title">Reviews Hub</h1>
       </div>
       <p className="mb-5 page-subtitle">
-        Trust scores, top strengths, and AI insights for everyone on ballaCity.
+        Trust scores, top strengths, and AI insights for everyone on BallaCity.
       </p>
 
       {/* Kind filter */}

@@ -39,7 +39,7 @@ export const Route = createFileRoute("/admin/listings")({
   head: () =>
     pageHead({
       path: "/admin/listings",
-      title: "Listings — ballaCity Admin",
+      title: "Listings — BallaCity Admin",
       description: "List teams and gyms that have no owner yet, and review ownership claims.",
       noindex: true,
     }),

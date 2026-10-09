@@ -157,10 +157,10 @@ export type DobParts = { month: string; day: string; year: string };
 
 export const EMPTY_DOB: DobParts = { month: "", day: "", year: "" };
 
-/** Minimum age to hold a ballaCity account, per the published Terms. */
+/** Minimum age to hold a BallaCity account, per the published Terms. */
 export const MINIMUM_SIGNUP_AGE = 13;
 
-export const MIN_AGE_MESSAGE = `You need to be at least ${MINIMUM_SIGNUP_AGE} to use ballaCity.`;
+export const MIN_AGE_MESSAGE = `You need to be at least ${MINIMUM_SIGNUP_AGE} to use BallaCity.`;
 
 export type DobCheck =
   { ok: true; iso: string; age: number; cohort: AgeCohort } | { ok: false; message: string };
@@ -193,7 +193,7 @@ export function checkDobParts(parts: DobParts, now: Date = new Date()): DobCheck
     return { ok: false, message: `Enter a year within the last ${MAX_PLAUSIBLE_AGE_YEARS} years.` };
   }
   const cohort = cohortFromAge(age);
-  // ballaCity's published Terms set 13 as the minimum age. The under-13
+  // BallaCity's published Terms set 13 as the minimum age. The under-13
   // architecture (guardian links, child_controls, parental consent) stays in
   // place and enforced for anyone already in that cohort, but new signups stop
   // here: the emailed-token consent flow does not meet the standard COPPA

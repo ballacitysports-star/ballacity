@@ -4,7 +4,7 @@ import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
 
-const TITLE = "Sports Guide — how pickup games work | ballaCity";
+const TITLE = "Sports Guide — how pickup games work | BallaCity";
 const DESCRIPTION =
   "How pickup games work in basketball, soccer, baseball, softball, football, volleyball, tennis, pickleball and running: group sizes, gear, positions, etiquette and how to join a game.";
 
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/guide/")({
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        name: "ballaCity Sports Guide",
+        name: "BallaCity Sports Guide",
         itemListElement: SPORT_GUIDES.map((g, i) => ({
           "@type": "ListItem",
           position: i + 1,
@@ -39,7 +39,7 @@ function GuideIndex() {
         <p className="mt-2 page-subtitle">
           New to a sport, or new to playing it with strangers? Each guide covers how a pickup
           session usually runs, what to bring, the positions people play, and the unwritten rules
-          that keep it fun — plus how to find a game on ballaCity.
+          that keep it fun — plus how to find a game on BallaCity.
         </p>
 
         <ul className="mt-6 grid gap-3">
@@ -78,7 +78,7 @@ function GuideIndex() {
         <section className="mt-4 rounded-2xl border border-border bg-surface px-4 py-4">
           <h2 className="text-sm font-bold">Playing safely</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Games are organized by hosts, not by ballaCity. Read the Safety Center before your first
+            Games are organized by hosts, not by BallaCity. Read the Safety Center before your first
             session, and tell someone where you're playing.
           </p>
           <PolicyLinks className="mt-3" />

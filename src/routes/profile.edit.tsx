@@ -48,7 +48,7 @@ export const Route = createFileRoute("/profile/edit")({
   head: () =>
     pageHead({
       path: "/profile/edit",
-      title: "Edit your profile — ballaCity",
+      title: "Edit your profile — BallaCity",
       description: "Update your sports, skill levels, photos, location, and links.",
       noindex: true,
     }),
@@ -538,7 +538,7 @@ function EditProfile() {
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-sm">Reviews Hub</div>
             <div className="text-xs text-muted-foreground">
-              Trust scores and AI insights across ballaCity
+              Trust scores and AI insights across BallaCity
             </div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>

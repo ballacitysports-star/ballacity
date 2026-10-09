@@ -47,7 +47,7 @@ export const template = {
   subject: (d: Record<string, any>) => `${d.teamName || "A team"} invited ${d.childName || "your player"} to ${d.title || (d.kind === "clinic" ? "a camp" : "a tryout")}`,
   displayName: "Tryout invite (new parent)",
   previewData: {
-    parentName: "Sam", childName: "Jordan", teamName: "Balacity", title: "BallaCity 14U Tryouts",
+    parentName: "Sam", childName: "Jordan", teamName: "BallaCity", title: "BallaCity 14U Tryouts",
     when: "Sat, Oct 17, 2026, 10:00 AM EDT", location: "Bogan Park", tryoutUrl: "https://ballacity.com/tryouts/example", inviterName: "Coach D",
   },
 } satisfies TemplateEntry;

@@ -299,7 +299,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               }}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime transition-colors hover:bg-lime/20"
             >
-              <Users className="h-3.5 w-3.5" /> Join waitlist
+              <Users className="h-3.5 w-3.5" /> Join Waitlist
             </button>
           )}
           <div className="mt-auto h-1 overflow-hidden rounded-full bg-secondary">

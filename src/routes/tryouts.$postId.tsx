@@ -93,7 +93,9 @@ function TryoutPage() {
       {t.body && <p className="mt-6 whitespace-pre-wrap">{t.body}</p>}
 
       <div className="mt-8 rounded-2xl border border-border bg-card p-5">
-        <h2 className="font-display text-lg font-semibold">Apply for a spot</h2>
+        <h2 className="font-display text-lg font-semibold">
+          {t.kind === "tryout" ? "Apply for Tryout" : "Register for Camp"}
+        </h2>
         <p className="mt-1 flex items-start gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           Parents can sign up a linked child and sign the team waiver on their behalf. The team sees your application on their dashboard.
@@ -104,7 +106,11 @@ function TryoutPage() {
           </Button>
         ) : (
           <Button className="mt-4 w-full rounded-full" disabled={left === 0 || passed} onClick={apply}>
-            {passed ? "This event has passed" : left === 0 ? "Full" : user ? "Apply now" : "Sign in to apply"}
+            {passed ? "This event has passed" : left === 0 ? "Full" : user
+                ? t.kind === "tryout"
+                  ? "Apply now"
+                  : "Register now"
+                : "Sign in to apply"}
           </Button>
         )}
       </div>

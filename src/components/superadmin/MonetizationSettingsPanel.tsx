@@ -25,7 +25,7 @@ export const MONETIZATION_SETTING_KEY = "monetization";
 /**
  * Monetization & Feature Access.
  *
- * Free Mode is the master switch: while it is on, ballaCity is free for
+ * Free Mode is the master switch: while it is on, BallaCity is free for
  * everyone and every feature priced as Premium is served as Free. Nothing is
  * deleted — products, prices, Stripe wiring and the billing webhook all stay
  * live — so the paid product can be brought back without a rebuild.
@@ -153,7 +153,7 @@ export function MonetizationSettingsPanel() {
             <div className="text-sm font-semibold">Monetization status</div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {freeMode
-                ? "ballaCity is free for everyone. Every feature priced as Premium is being served as Free."
+                ? "BallaCity is free for everyone. Every feature priced as Premium is being served as Free."
                 : "Free mode is off. Each surface below decides what is actually enforced."}
             </p>
           </div>
@@ -417,7 +417,7 @@ export function MonetizationSettingsPanel() {
       <div className="rounded-xl border bg-card p-4">
         <div className="text-sm font-semibold">Fees &amp; allowances</div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Fees apply only to payments ballaCity processes itself. Host-to-player game fees always
+          Fees apply only to payments BallaCity processes itself. Host-to-player game fees always
           carry a zero platform fee and are unaffected by anything here.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -450,7 +450,7 @@ export function MonetizationSettingsPanel() {
             </label>
           ))}
           <label className="block">
-            <span className="text-xs font-medium">Free AI reels (before ballaCity+)</span>
+            <span className="text-xs font-medium">Free AI reels (before BallaCity+)</span>
             <input
               type="number"
               min={0}
@@ -477,7 +477,7 @@ export function MonetizationSettingsPanel() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
-              ballaCity-processed game payments
+              BallaCity-processed game payments
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Only switch this on once a processor is genuinely wired up — never present a payment
@@ -488,7 +488,7 @@ export function MonetizationSettingsPanel() {
           <Switch
             checked={effective.ballacityProcessedPaymentsEnabled}
             disabled={busy}
-            aria-label="ballaCity-processed game payments"
+            aria-label="BallaCity-processed game payments"
             onCheckedChange={(v) =>
               void persist({ ...local, ballacityProcessedPaymentsEnabled: v }, "Processed payments")
             }

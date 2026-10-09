@@ -21,8 +21,8 @@ export const Route = createFileRoute("/orgs/create")({
   head: () =>
     pageHead({
       path: "/orgs/create",
-      title: "Create a gym profile — ballaCity",
-      description: "List your gym on ballaCity with hours, amenities, photos, and location.",
+      title: "Create a gym profile — BallaCity",
+      description: "List your gym on BallaCity with hours, amenities, photos, and location.",
       noindex: true,
     }),
   ssr: false,

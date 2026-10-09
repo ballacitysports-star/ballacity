@@ -66,12 +66,12 @@ export const Route = createFileRoute("/teams/$teamId/")({
       description: (
         o?.bio ||
         o?.tagline ||
-        `Follow ${name} on ballaCity: roster, games, tryouts, and reviews.`
+        `Follow ${name} on BallaCity: roster, games, tryouts, and reviews.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "team",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Team on ballaCity",
+        subtitle: o?.tagline ?? o?.city ?? "Team on BallaCity",
         meta: [o?.sports?.[0], o?.city, "Roster & games"],
       }),
       jsonLd: o
@@ -591,7 +591,7 @@ function TeamPage() {
               }
             >
               <p className="text-sm text-muted-foreground">
-                Active on ballaCity since {org.founded}.
+                Active on BallaCity since {org.founded}.
               </p>
             </Section>
           </div>

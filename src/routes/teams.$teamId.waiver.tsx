@@ -9,7 +9,7 @@ import { WaiverTab } from "@/components/team/manage/WaiverTab";
 export const Route = createFileRoute("/teams/$teamId/waiver")({
   head: () =>
     pageHead({
-      title: "Team waiver — ballaCity",
+      title: "Team waiver — BallaCity",
       description: "Draft, publish and sign your team's waiver before anyone joins.",
       noindex: true,
     }),

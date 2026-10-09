@@ -24,7 +24,7 @@ export const Route = createFileRoute("/cities/$city/")({
     const city = cityBySlug(params.city);
     if (!city || !loaderData) {
       return pageHead({
-        title: "City not found — ballaCity",
+        title: "City not found — BallaCity",
         description: "We don't have a page for that city yet.",
         noindex: true,
       });

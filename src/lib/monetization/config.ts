@@ -1,5 +1,5 @@
 /**
- * The single source of truth for everything ballaCity charges for.
+ * The single source of truth for everything BallaCity charges for.
  *
  * No price, fee, trial length or feature list may be written into a screen or a
  * server function: they all live here, and a superadmin can override the
@@ -39,7 +39,7 @@ export type MonetizationProduct = {
 };
 
 export type FeeConfig = {
-  /** ballaCity's cut, in basis points, on payments ballaCity processes. */
+  /** BallaCity's cut, in basis points, on payments BallaCity processes. */
   platformFeeBps: number;
   /** Card processing, in basis points plus a fixed amount. */
   processingFeeBps: number;
@@ -57,7 +57,7 @@ export type FeeConfig = {
 export type MonetizationAiTier = "free" | "premium" | "team" | "gym";
 
 /**
- * Everything ballaCity charges for, and whether it is charging at all.
+ * Everything BallaCity charges for, and whether it is charging at all.
  *
  * While `platformFreeMode` is true the platform is free for everyone: nothing
  * is purchasable, no paywall, checkout, upgrade prompt or premium lock blocks
@@ -83,7 +83,7 @@ export const FEATURE_ACCESS_MODES: FeatureAccessMode[] = ["free", "premium", "di
 
 export type MonetizationAccess = {
   /**
-   * The master switch. True means ballaCity is free for everyone and every
+   * The master switch. True means BallaCity is free for everyone and every
    * feature configured as `premium` is served as `free`.
    */
   platformFreeMode: boolean;
@@ -126,10 +126,10 @@ export type MonetizationAccess = {
 export type MonetizationConfig = {
   products: MonetizationProduct[];
   fees: FeeConfig;
-  /** AI reels every member gets before ballaCity+ is required. */
+  /** AI reels every member gets before BallaCity+ is required. */
   freeReelAllowance: number;
   /**
-   * Whether ballaCity can process game fees itself. False until a processor is
+   * Whether BallaCity can process game fees itself. False until a processor is
    * genuinely wired up — we never present a payment path that does not exist.
    */
   ballacityProcessedPaymentsEnabled: boolean;
@@ -149,7 +149,7 @@ export const MONETIZATION_AI_TIERS: MonetizationAiTier[] = ["free", "premium", "
 export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
   freeReelAllowance: 3,
   ballacityProcessedPaymentsEnabled: false,
-  // ballaCity ships free, and every paid surface ships off. Turning free mode
+  // BallaCity ships free, and every paid surface ships off. Turning free mode
   // off is therefore not enough to start charging: each surface has to be
   // switched on deliberately, so monetization can be staged rather than
   // arriving all at once.
@@ -163,7 +163,7 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
     upgradePromptsEnabled: false,
     freeModeEntitlements: ["player_plus", "host_pro", "team_pro", "org_pro", "facility_pro"],
     freeModeAiTier: "gym",
-    freeModeNotice: "Everything on ballaCity is free right now — no subscription needed.",
+    freeModeNotice: "Everything on BallaCity is free right now — no subscription needed.",
     freeModeEndsAt: null,
     featureAccess: {},
   },
@@ -179,7 +179,7 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
       priceId: "ai_highlight_reel_monthly",
       legacyPriceIds: ["ballacity_plus_monthly"],
       entitlement: "player_plus",
-      name: "ballaCity+",
+      name: "BallaCity+",
       tagline: "For players who want the full toolkit",
       priceCents: 999,
       interval: "month",
@@ -191,7 +191,7 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
       // mode renders the union of every product's features, so an unbuilt claim
       // would now be promised to every member.
       features: ["Unlimited AI highlight reels", "AI reel coach, styles and captions"],
-      cta: "Get ballaCity+",
+      cta: "Get BallaCity+",
       status: "live",
     },
     {
@@ -270,7 +270,7 @@ const FREE_TIER_BASE_FEATURES: string[] = [
 /**
  * The free-tier list, with the reel line derived rather than hardcoded.
  *
- * The count follows the resolved allowance, and while ballaCity is free it
+ * The count follows the resolved allowance, and while BallaCity is free it
  * reads "Unlimited" — otherwise the page would promise unlimited reels at the
  * top and "3 free" three lines below.
  */

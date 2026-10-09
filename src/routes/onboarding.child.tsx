@@ -14,9 +14,9 @@ export const Route = createFileRoute("/onboarding/child")({
   head: () =>
     pageHead({
       path: "/onboarding/child",
-      title: "Parent or guardian approval — ballaCity",
+      title: "Parent or guardian approval — BallaCity",
       description:
-        "Under-13 ballaCity accounts need a parent or guardian to approve them before games, messages and videos turn on.",
+        "Under-13 BallaCity accounts need a parent or guardian to approve them before games, messages and videos turn on.",
       noindex: true,
     }),
   ssr: false,
@@ -69,7 +69,7 @@ function ChildOnboardingPage() {
   return (
     <OnboardingShell
       title="A parent or guardian approves this account"
-      description={`ballaCity requires a parent or guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
+      description={`BallaCity requires a parent or guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
     >
       <>
         {!isLoading && !approved && (
@@ -96,7 +96,7 @@ function ChildOnboardingPage() {
               to="/feed"
               className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
             >
-              Go to ballaCity
+              Go to BallaCity
             </Link>
           </div>
         ) : (
@@ -127,7 +127,7 @@ function ChildOnboardingPage() {
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   We're waiting for {status.consent.parentEmail} to approve. They need to open the
-                  approval link and sign in with their own adult ballaCity account.
+                  approval link and sign in with their own adult BallaCity account.
                 </p>
               </div>
             ) : null}
@@ -214,9 +214,9 @@ function ChildOnboardingPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const subject = encodeURIComponent("Please approve my ballaCity account");
+                      const subject = encodeURIComponent("Please approve my BallaCity account");
                       const body = encodeURIComponent(
-                        `Hi,\n\nPlease approve my ballaCity account by opening this one-time link and signing in with your own adult account:\n\n${link}\n\nIt expires in 72 hours.\n\nThank you!`,
+                        `Hi,\n\nPlease approve my BallaCity account by opening this one-time link and signing in with your own adult account:\n\n${link}\n\nIt expires in 72 hours.\n\nThank you!`,
                       );
                       window.location.href = `mailto:${encodeURIComponent(parentEmail)}?subject=${subject}&body=${body}`;
                     }}
@@ -229,7 +229,7 @@ function ChildOnboardingPage() {
                       variant="outline"
                       onClick={() => {
                         void navigator
-                          .share({ title: "Approve my ballaCity account", url: link })
+                          .share({ title: "Approve my BallaCity account", url: link })
                           .catch(() => undefined);
                       }}
                     >
