@@ -92,7 +92,23 @@ export const Route = createFileRoute("/sitemap.xml")({
           // A read failure must not break the sitemap; omitting gyms is safe.
         }
 
-        const entries = [...ENTRIES, ...facilityEntries].filter(
+        // Launch-city pages and public games, teams and trainers. Each rule
+        // for what is safe to list lives in city-seo; city pages below the
+        // listing threshold are left out so thin pages never get submitted.
+        let cityEntries: SitemapEntry[] = [];
+        try {
+          const { loadCitySitemapEntries } = await import("@/lib/city-sitemap.server");
+          cityEntries = await loadCitySitemapEntries();
+        } catch {
+          // A read failure must not break the sitemap; omitting them is safe.
+        }
+
+        const entries = [
+          { path: "/cities", changefreq: "weekly" as const, priority: "0.7" },
+          ...ENTRIES,
+          ...facilityEntries,
+          ...cityEntries,
+        ].filter(
           (e) =>
             (e.path !== "/shop" || merchEnabled) && (e.path !== "/plans" || subscriptionsEnabled),
         );

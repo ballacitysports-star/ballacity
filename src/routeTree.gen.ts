@@ -61,6 +61,7 @@ import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.locat
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blog.how-to-find-pickup-soccer-games'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as CitiesIndexRouteImport } from './routes/cities.index'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
 import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$token'
@@ -88,6 +89,8 @@ import { Route as TryoutsPostIdRouteImport } from './routes/tryouts.$postId'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
+import { Route as CitiesCityIndexRouteImport } from './routes/cities.$city.index'
+import { Route as CitiesCitySportRouteImport } from './routes/cities.$city.$sport'
 import { Route as FamilyJoinTokenRouteImport } from './routes/family.join.$token'
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
@@ -378,6 +381,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CitiesIndexRoute = CitiesIndexRouteImport.update({
+  id: '/cities/',
+  path: '/cities/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevOgPreviewRoute = DevOgPreviewRouteImport.update({
   id: '/dev/og-preview',
   path: '/dev/og-preview',
@@ -512,6 +520,16 @@ const Char91DotmcpChar93InvokeToolToolRoute =
 const ApiPublicOgRoute = ApiPublicOgRouteImport.update({
   id: '/api/public/og',
   path: '/api/public/og',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CitiesCityIndexRoute = CitiesCityIndexRouteImport.update({
+  id: '/cities/$city/',
+  path: '/cities/$city/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CitiesCitySportRoute = CitiesCitySportRouteImport.update({
+  id: '/cities/$city/$sport',
+  path: '/cities/$city/$sport',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FamilyJoinTokenRoute = FamilyJoinTokenRouteImport.update({
@@ -726,6 +744,7 @@ export interface FileRoutesByFullPath {
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/cities/': typeof CitiesIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
@@ -733,6 +752,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -749,6 +769,7 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city/': typeof CitiesCityIndexRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
@@ -832,6 +853,7 @@ export interface FileRoutesByTo {
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin': typeof AdminIndexRoute
+  '/cities': typeof CitiesIndexRoute
   '/guide': typeof GuideIndexRoute
   '/messages': typeof MessagesIndexRoute
   '/orgs': typeof OrgsIndexRoute
@@ -839,6 +861,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -855,6 +878,7 @@ export interface FileRoutesByTo {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city': typeof CitiesCityIndexRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
@@ -941,6 +965,7 @@ export interface FileRoutesById {
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/cities/': typeof CitiesIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
@@ -948,6 +973,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -964,6 +990,7 @@ export interface FileRoutesById {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city/': typeof CitiesCityIndexRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
@@ -1050,6 +1077,7 @@ export interface FileRouteTypes {
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin/'
+    | '/cities/'
     | '/guide/'
     | '/messages/'
     | '/orgs/'
@@ -1057,6 +1085,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1073,6 +1102,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city/'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
@@ -1156,6 +1186,7 @@ export interface FileRouteTypes {
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin'
+    | '/cities'
     | '/guide'
     | '/messages'
     | '/orgs'
@@ -1163,6 +1194,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1179,6 +1211,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city'
     | '/games/$gameId'
     | '/orgs/$orgId'
     | '/teams/$teamId'
@@ -1264,6 +1297,7 @@ export interface FileRouteTypes {
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin/'
+    | '/cities/'
     | '/guide/'
     | '/messages/'
     | '/orgs/'
@@ -1271,6 +1305,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1287,6 +1322,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city/'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
@@ -1363,6 +1399,7 @@ export interface RootRouteChildren {
   TrainersCreateRoute: typeof TrainersCreateRoute
   TryoutsPostIdRoute: typeof TryoutsPostIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  CitiesIndexRoute: typeof CitiesIndexRoute
   GuideIndexRoute: typeof GuideIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   OrgsIndexRoute: typeof OrgsIndexRoute
@@ -1370,6 +1407,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicOgRoute: typeof ApiPublicOgRoute
+  CitiesCitySportRoute: typeof CitiesCitySportRoute
   FamilyJoinTokenRoute: typeof FamilyJoinTokenRoute
   OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
@@ -1384,6 +1422,7 @@ export interface RootRouteChildren {
   TeamsTeamIdTryoutsRoute: typeof TeamsTeamIdTryoutsRoute
   TeamsTeamIdWaiverRoute: typeof TeamsTeamIdWaiverRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
+  CitiesCityIndexRoute: typeof CitiesCityIndexRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
@@ -1762,6 +1801,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cities/': {
+      id: '/cities/'
+      path: '/cities'
+      fullPath: '/cities/'
+      preLoaderRoute: typeof CitiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/og-preview': {
       id: '/dev/og-preview'
       path: '/dev/og-preview'
@@ -1949,6 +1995,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/og'
       fullPath: '/api/public/og'
       preLoaderRoute: typeof ApiPublicOgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cities/$city/': {
+      id: '/cities/$city/'
+      path: '/cities/$city'
+      fullPath: '/cities/$city/'
+      preLoaderRoute: typeof CitiesCityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cities/$city/$sport': {
+      id: '/cities/$city/$sport'
+      path: '/cities/$city/$sport'
+      fullPath: '/cities/$city/$sport'
+      preLoaderRoute: typeof CitiesCitySportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/family/join/$token': {
@@ -2251,6 +2311,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainersCreateRoute: TrainersCreateRoute,
   TryoutsPostIdRoute: TryoutsPostIdRoute,
   AdminIndexRoute: AdminIndexRoute,
+  CitiesIndexRoute: CitiesIndexRoute,
   GuideIndexRoute: GuideIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   OrgsIndexRoute: OrgsIndexRoute,
@@ -2258,6 +2319,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicOgRoute: ApiPublicOgRoute,
+  CitiesCitySportRoute: CitiesCitySportRoute,
   FamilyJoinTokenRoute: FamilyJoinTokenRoute,
   OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
@@ -2272,6 +2334,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdTryoutsRoute: TeamsTeamIdTryoutsRoute,
   TeamsTeamIdWaiverRoute: TeamsTeamIdWaiverRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
+  CitiesCityIndexRoute: CitiesCityIndexRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
