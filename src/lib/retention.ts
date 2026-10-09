@@ -1,7 +1,7 @@
 /**
  * Documented retention configuration.
  *
- * This file describes what ballaCity keeps, for how long, and why. It is
+ * This file describes what BallaCity keeps, for how long, and why. It is
  * intentionally descriptive rather than an automated purge job: several
  * categories have dependencies (safety cases, payment disputes, audit trails)
  * where deleting rows would break other people's records. Nothing is deleted
@@ -26,7 +26,7 @@ export type RetentionRule = {
   onAccountDeletion: string;
   /** Why anything survives deletion, when it does. */
   reason: string;
-  /** Whether ballaCity keeps anything after account deletion. */
+  /** Whether BallaCity keeps anything after account deletion. */
   survivesDeletion: boolean;
   /** Tables/buckets this rule covers, for engineering traceability. */
   sources: string[];
@@ -138,7 +138,7 @@ export const RETENTION_RULES: RetentionRule[] = [
     retention:
       "Kept for financial record-keeping; typically 7 years for receipts (needs legal review).",
     contains:
-      "Entry-fee submissions and their verification history, subscription status and purchase receipts. ballaCity never stores card or bank credentials.",
+      "Entry-fee submissions and their verification history, subscription status and purchase receipts. BallaCity never stores card or bank credentials.",
     onAccountDeletion:
       "The member's saved payout handles are deleted. Submissions, receipts and verification events are retained.",
     reason: "Hosts, disputes and accounting need the record of what was paid for which game.",

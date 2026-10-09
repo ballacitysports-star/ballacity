@@ -24,8 +24,8 @@ export const Route = createFileRoute("/superadmin")({
   head: () =>
     pageHead({
       path: "/superadmin",
-      title: "Superadmin — ballaCity",
-      description: "Internal ballaCity control center.",
+      title: "Superadmin — BallaCity",
+      description: "Internal BallaCity control center.",
       noindex: true,
     }),
   ssr: false,

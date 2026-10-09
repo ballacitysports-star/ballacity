@@ -75,7 +75,7 @@ export async function notifyTryoutSignup(opts: {
           : `${onBehalf ? `${attendee}'s` : "Your"} spot was released.${
               refund
                 ? refund.amount > 0
-                  ? ` Under the team's refund policy you're owed $${refund.amount.toFixed(2)} back — the team sends it directly; ballaCity doesn't hold money.`
+                  ? ` Under the team's refund policy you're owed $${refund.amount.toFixed(2)} back — the team sends it directly; BallaCity doesn't hold money.`
                   : " Under the team's refund policy, the fee isn't refunded."
                 : ""
             }`,

@@ -51,8 +51,8 @@ export const Route = createFileRoute("/admin/")({
   head: () =>
     pageHead({
       path: "/admin",
-      title: "Admin — ballaCity",
-      description: "Internal ballaCity administration tools.",
+      title: "Admin — BallaCity",
+      description: "Internal BallaCity administration tools.",
       noindex: true,
     }),
   ssr: false,

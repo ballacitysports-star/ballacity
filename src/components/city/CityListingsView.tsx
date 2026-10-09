@@ -151,7 +151,7 @@ export function CityListingsView({
               {sport ? sport.name.toLowerCase() : "basketball"} pickup works
             </Link>
             , then follow the Safety Center tips before your first session. Games are organized by
-            hosts, not by ballaCity.
+            hosts, not by BallaCity.
           </p>
           <PolicyLinks className="mt-3" />
         </section>

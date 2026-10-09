@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { matchesOrgQuery } from "./org-search";
 
 const org = {
-  name: "Balacity 14U",
+  name: "BallaCity 14U",
   handle: "@balacity14",
   tagline: "Travel ball",
   city: "Atlanta, GA",

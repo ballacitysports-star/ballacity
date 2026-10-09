@@ -24,9 +24,9 @@ import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
 export const Route = createFileRoute("/parent/consent/$token")({
   head: () =>
     pageHead({
-      title: "Approve a child's ballaCity account",
+      title: "Approve a child's BallaCity account",
       description:
-        "Review what ballaCity collects and what your child can do, then approve or decline the account.",
+        "Review what BallaCity collects and what your child can do, then approve or decline the account.",
       noindex: true,
     }),
   ssr: false,
@@ -133,7 +133,7 @@ function ConsentApprovalPage() {
         </span>
       </div>
       <h1 className="mt-2 page-title">
-        Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
+        Approve {info?.childDisplayName ?? "a child"}&rsquo;s BallaCity account
       </h1>
 
       {query.isLoading ? (
@@ -192,7 +192,7 @@ function ConsentApprovalPage() {
               <Link to="/safety/children" className="font-semibold text-primary underline">
                 Children&rsquo;s privacy information
               </Link>
-              , and I consent to ballaCity collecting and using my child&rsquo;s information as
+              , and I consent to BallaCity collecting and using my child&rsquo;s information as
               described.
             </span>
           </label>
@@ -200,7 +200,7 @@ function ConsentApprovalPage() {
           {loading ? null : !user ? (
             <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-xs">
               <p className="text-muted-foreground">
-                Sign in with your own adult ballaCity account to approve. This confirms your email
+                Sign in with your own adult BallaCity account to approve. This confirms your email
                 and gives you the Parent Center.
               </p>
               <Link

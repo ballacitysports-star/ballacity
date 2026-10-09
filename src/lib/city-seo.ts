@@ -221,8 +221,8 @@ export function entitySitemapEntries(
 
 export function cityTitle(city: LaunchCity, sport?: string): string {
   return sport
-    ? `Pickup ${sport} in ${cityLabel(city)} — games, teams & trainers | ballaCity`
-    : `Pickup Games in ${cityLabel(city)} — ${cityLabel(city)} Sports Network | ballaCity`;
+    ? `Pickup ${sport} in ${cityLabel(city)} — games, teams & trainers | BallaCity`
+    : `Pickup Games in ${cityLabel(city)} — ${cityLabel(city)} Sports Network | BallaCity`;
 }
 
 export function cityDescription(city: LaunchCity, listings: CityListings, sport?: string): string {
@@ -233,7 +233,7 @@ export function cityDescription(city: LaunchCity, listings: CityListings, sport?
     listings.gyms.length ? `${listings.gyms.length} gyms` : null,
   ].filter(Boolean);
   const what = sport ? `pickup ${sport.toLowerCase()}` : "pickup games";
-  const found = parts.length ? ` ${parts.join(", ")} on ballaCity.` : "";
+  const found = parts.length ? ` ${parts.join(", ")} on BallaCity.` : "";
   return `Find ${what} in ${cityLabel(city)}.${found} See times, skill levels and spots, then request to join.`.slice(
     0,
     160,

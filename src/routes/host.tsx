@@ -15,7 +15,7 @@ export const Route = createFileRoute("/host")({
   head: () =>
     pageHead({
       path: "/host",
-      title: "Host Dashboard — ballaCity",
+      title: "Host Dashboard — BallaCity",
       description: "Manage your hosted games, unpaid players and payment reminders.",
       noindex: true,
     }),
@@ -48,7 +48,7 @@ function HostDashboard() {
 
   const shareGame = async (g: HostedGame) => {
     const url = `${window.location.origin}/games/${g.id}`;
-    const text = `Join my game "${g.title}" on ballaCity — ${formatGameWhen({ date: g.date })}`;
+    const text = `Join my game "${g.title}" on BallaCity — ${formatGameWhen({ date: g.date })}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: g.title, text, url });

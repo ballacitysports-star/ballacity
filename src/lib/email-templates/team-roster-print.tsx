@@ -67,7 +67,7 @@ export const template = {
   subject: (d: Record<string, any>) => `${d.teamName || "Team"} roster — bring to ${d.tryoutTitle || "tryouts"}`,
   displayName: "Printable team roster",
   previewData: {
-    teamName: "Balacity",
+    teamName: "BallaCity",
     tryoutTitle: "BallaCity 14U Tryouts",
     when: "Sat, Oct 17, 2026, 10:00 AM",
     location: "Bogan Park",

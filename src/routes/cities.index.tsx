@@ -7,13 +7,13 @@ export const Route = createFileRoute("/cities/")({
   head: () =>
     pageHead({
       path: "/cities",
-      title: "Pickup Games by City — ballaCity",
+      title: "Pickup Games by City — BallaCity",
       description:
         "Find pickup basketball, soccer, baseball, pickleball and more in your city. Browse upcoming games, teams, trainers and gyms across major US cities.",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        name: "ballaCity cities",
+        name: "BallaCity cities",
         itemListElement: LAUNCH_CITIES.map((c, i) => ({
           "@type": "ListItem",
           position: i + 1,

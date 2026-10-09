@@ -416,7 +416,7 @@ describe("AI tier follows the monetization switch", () => {
     };
   }
 
-  it("gives everyone the configured tier while ballaCity is free", async () => {
+  it("gives everyone the configured tier while BallaCity is free", async () => {
     monetizationConfig = {
       ...DEFAULT_MONETIZATION_CONFIG,
       access: { ...DEFAULT_MONETIZATION_CONFIG.access, platformFreeMode: true },

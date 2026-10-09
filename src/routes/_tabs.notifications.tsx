@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_tabs/notifications")({
   head: () =>
     pageHead({
       path: "/notifications",
-      title: "Notifications — ballaCity",
+      title: "Notifications — BallaCity",
       description: "Join requests, approvals, messages, and game updates in one place.",
       noindex: true,
     }),

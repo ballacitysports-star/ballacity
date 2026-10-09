@@ -18,7 +18,7 @@ export const Route = createFileRoute("/safety")({
       path: "/safety",
       title: "BallaCity Safety & Community Guidelines",
       description:
-        "How to stay safe on ballaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
+        "How to stay safe on BallaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
     }),
   component: SafetyCenter,
 });
@@ -31,7 +31,7 @@ function SafetyCenter() {
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Safety Center</h1>
         <p className="mt-2 page-subtitle">
-          ballaCity helps players find games — hosts organize them. ballaCity does not supervise
+          BallaCity helps players find games — hosts organize them. BallaCity does not supervise
           games, inspect venues, referee play, or guarantee anyone's safety. These are the habits
           that keep pickup sports safe.
         </p>
@@ -143,7 +143,7 @@ function SafetyCenter() {
           </div>
           <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
             Use the flag icon on any profile, game, message, or highlight. Safety reports go to
-            ballaCity moderators.
+            BallaCity moderators.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link

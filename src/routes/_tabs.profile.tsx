@@ -76,9 +76,9 @@ export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
     pageHead({
       path: "/profile",
-      title: "Your profile — ballaCity",
+      title: "Your profile — BallaCity",
       description:
-        "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
+        "Your BallaCity profile: sports, skill levels, availability, games, and reviews.",
       noindex: true,
     }),
   // URL-persisted requests filter (all/host/player).

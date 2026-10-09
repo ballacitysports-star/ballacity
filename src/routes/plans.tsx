@@ -23,8 +23,8 @@ export const Route = createFileRoute("/plans")({
       // Neutral on purpose: this is SSR metadata, so no hook can suppress it
       // when free mode is on. Copy that is true in both modes beats copy that
       // advertises subscriptions on a platform that is currently free.
-      title: "Your plan — ballaCity",
-      description: "What your ballaCity account includes.",
+      title: "Your plan — BallaCity",
+      description: "What your BallaCity account includes.",
     }),
   component: PlansPage,
 });
@@ -138,6 +138,18 @@ function PlansPage() {
             </>
           )}
         </p>
+        {access.freeMode && (
+          <div
+            role="status"
+            className="mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-3 text-sm"
+          >
+            <span className="font-semibold text-lime">Free during community launch.</span>{" "}
+            <span className="text-muted-foreground">
+              All host and player tools are free while BallaCity is in its community launch. Nothing
+              here is charged.
+            </span>
+          </div>
+        )}
 
         {anyActiveCustomerId() && (
           <button
@@ -154,7 +166,7 @@ function PlansPage() {
           </button>
         )}
 
-        {/* One grid in both modes. While ballaCity is free the real plans are
+        {/* One grid in both modes. While BallaCity is free the real plans are
             still shown — with their normal price struck through and nothing to
             buy — so a member can see what they are getting and that it is
             temporary. Hiding them made the offer invisible. */}
@@ -208,9 +220,9 @@ function PlansPage() {
                   {active
                     ? "Current plan"
                     : isFree
-                      ? "Included"
+                      ? "Included with BallaCity (Free)"
                       : freeForNow
-                        ? "Included right now"
+                        ? "Included with BallaCity (Free)"
                         : plan.cta}
                 </button>
               </div>

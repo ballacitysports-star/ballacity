@@ -5,7 +5,7 @@ const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN;
 export function PaymentTestModeBanner() {
   const { freeMode } = useFeatureAccess();
 
-  // Nothing is chargeable while ballaCity is free, so a banner about payment
+  // Nothing is chargeable while BallaCity is free, so a banner about payment
   // modes is noise at best and implies a cost at worst.
   if (freeMode) return null;
 

@@ -13,8 +13,8 @@ export const Route = createFileRoute("/shop")({
   head: () =>
     pageHead({
       path: "/shop",
-      title: "Shop — ballaCity",
-      description: "ballaCity gear and merch for players, teams, and trainers.",
+      title: "Shop — BallaCity",
+      description: "BallaCity gear and merch for players, teams, and trainers.",
     }),
   component: ShopPage,
 });
@@ -25,7 +25,7 @@ function ShopPage() {
   const { merchEnabled, loading: accessLoading } = useFeatureAccess();
   const navigate = useNavigate();
 
-  // The shop is switched off while ballaCity is free. Same imperative-guard
+  // The shop is switched off while BallaCity is free. Same imperative-guard
   // idiom the other gated screens use; the route stays registered so a
   // superadmin can bring it back without a deploy.
   useEffect(() => {
@@ -72,7 +72,7 @@ function ShopPage() {
         </Link>
         <h1 className="mt-4 page-title">Shop</h1>
         <p className="mt-1 page-subtitle">
-          ballaCity gear, shipped to your door.{" "}
+          BallaCity gear, shipped to your door.{" "}
           <span className="font-semibold text-foreground">All sales final — no refunds.</span>
         </p>
 

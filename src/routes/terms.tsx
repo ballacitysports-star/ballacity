@@ -13,7 +13,7 @@ export const Route = createFileRoute("/terms")({
       path: "/terms",
       title: "Terms of Service | BallaCity",
       description:
-        "ballaCity's Terms of Service: account rules, game participation, peer-to-peer payments, content, and conduct.",
+        "BallaCity's Terms of Service: account rules, game participation, peer-to-peer payments, content, and conduct.",
     }),
   // The published rows only supply the version history and any newer text; the
   // document itself is bundled, and `effectiveVersion` already falls back to

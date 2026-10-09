@@ -42,8 +42,8 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () =>
     pageHead({
-      title: "Chat — ballaCity",
-      description: "A private ballaCity conversation.",
+      title: "Chat — BallaCity",
+      description: "A private BallaCity conversation.",
       noindex: true,
     }),
   // `draft` pre-fills the composer (e.g. a host nudging a player from the game

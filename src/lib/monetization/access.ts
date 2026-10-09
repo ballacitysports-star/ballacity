@@ -2,7 +2,7 @@
  * The one place that decides whether a feature is locked.
  *
  * Every screen, hook and server function asks this module — none of them keeps
- * its own idea of "is this account paid". That matters because ballaCity is
+ * its own idea of "is this account paid". That matters because BallaCity is
  * currently free for everyone: `access.platformFreeMode` is true in the shipped
  * config, so `has()` grants every entitlement and no paywall, checkout or
  * upgrade prompt may render.
@@ -22,7 +22,7 @@ import {
 import { EMPTY_ENTITLEMENTS, hasEntitlement, type EntitlementState } from "./entitlements";
 
 export type FeatureAccess = {
-  /** True while ballaCity is free for everyone. */
+  /** True while BallaCity is free for everyone. */
   freeMode: boolean;
   /** Does this account hold the entitlement? Always true in free mode. */
   has: (key: EntitlementKey) => boolean;

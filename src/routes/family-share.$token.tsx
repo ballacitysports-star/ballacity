@@ -16,7 +16,7 @@ import { getSharedFamilyPost } from "@/lib/family-share.functions";
 export const Route = createFileRoute("/family-share/$token")({
   head: () => {
     const head = pageHead({
-      title: "A private clip — ballaCity",
+      title: "A private clip — BallaCity",
       description: "A clip shared privately by a parent.",
       noindex: true,
     });

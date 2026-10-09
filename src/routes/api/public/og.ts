@@ -28,7 +28,7 @@ const KINDS: Record<string, { label: string; accent: string }> = {
   team: { label: "Team", accent: "#FFB454" },
   trainer: { label: "Trainer", accent: "#FF8FA3" },
   venue: { label: "Venue", accent: "#A6F5C0" },
-  page: { label: "ballaCity", accent: "#C2F542" },
+  page: { label: "BallaCity", accent: "#C2F542" },
 };
 
 const esc = (s: string) =>
@@ -51,7 +51,7 @@ function fallbackSvg(opts: {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
     <rect width="${width}" height="${height}" fill="#0C0F0B"/>
     <rect x="${s(72)}" y="${s(72)}" width="${s(56)}" height="${s(56)}" rx="${s(16)}" fill="${kind.accent}"/>
-    <text x="${s(148)}" y="${s(116)}" fill="#F4F7F2" font-family="Arial, sans-serif" font-size="${s(40)}" font-weight="700">ballaCity</text>
+    <text x="${s(148)}" y="${s(116)}" fill="#F4F7F2" font-family="Arial, sans-serif" font-size="${s(40)}" font-weight="700">BallaCity</text>
     <rect x="${width - s(300)}" y="${s(72)}" width="${s(228)}" height="${s(58)}" rx="${s(29)}" fill="${kind.accent}"/>
     <text x="${width - s(186)}" y="${s(111)}" text-anchor="middle" fill="#0C0F0B" font-family="Arial, sans-serif" font-size="${s(26)}" font-weight="700">${esc(kind.label)}</text>
     <text x="${s(72)}" y="${Math.round(height * 0.55)}" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">${esc(title)}</text>
@@ -92,7 +92,7 @@ export const Route = createFileRoute("/api/public/og")({
         const url = new URL(request.url);
         const kindKey = (url.searchParams.get("kind") ?? "page").toLowerCase();
         const kind = KINDS[kindKey] ?? KINDS["page"]!;
-        const title = clamp(url.searchParams.get("title")?.trim() || "ballaCity", 90);
+        const title = clamp(url.searchParams.get("title")?.trim() || "BallaCity", 90);
         const subtitle = clamp(url.searchParams.get("subtitle")?.trim() || "", 120);
         const meta = (url.searchParams.get("meta") ?? "")
           .split("|")

@@ -4,7 +4,7 @@ export function LegalNotice({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        ballaCity does not process payments, hold funds, or act as an escrow. All payments go
+        BallaCity does not process payments, hold funds, or act as an escrow. All payments go
         directly between you and the host. Verify recipient details before sending.
       </p>
     );
@@ -16,9 +16,9 @@ export function LegalNotice({ compact = false }: { compact?: boolean }) {
         Peer-to-peer payment notice
       </div>
       <ul className="space-y-1 list-disc pl-4">
-        <li>ballaCity does not process payments.</li>
+        <li>BallaCity does not process payments.</li>
         <li>All payments are sent directly between players and hosts.</li>
-        <li>ballaCity does not hold funds, provide escrow, or act as a payment processor.</li>
+        <li>BallaCity does not hold funds, provide escrow, or act as a payment processor.</li>
         <li>You are responsible for verifying payment information before sending funds.</li>
       </ul>
     </div>

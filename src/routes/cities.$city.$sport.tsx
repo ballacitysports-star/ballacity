@@ -27,7 +27,7 @@ export const Route = createFileRoute("/cities/$city/$sport")({
     const sport = sportForGuideSlug(params.sport);
     if (!city || !sport || !loaderData) {
       return pageHead({
-        title: "Page not found — ballaCity",
+        title: "Page not found — BallaCity",
         description: "We don't have a page for that city and sport.",
         noindex: true,
       });

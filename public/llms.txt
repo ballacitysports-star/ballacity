@@ -1,24 +1,24 @@
-# ballaCity
+# BallaCity
 
 > Find and join pickup baseball, basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms, and grab your spot fast.
 
-ballaCity is a pickup sports community app. Players discover nearby games on a map or list, request to join, and follow teams, trainers and gyms. Hosts create games under a team, trainer or gym profile and manage rosters, approvals and entry fees.
+BallaCity is a pickup sports community app. Players discover nearby games on a map or list, request to join, and follow teams, trainers and gyms. Hosts create games under a team, trainer or gym profile and manage rosters, approvals and entry fees.
 
 ## Pages
 
-- [Home](/): What ballaCity is, featured pickup games, and how to get started.
+- [Home](/): What BallaCity is, featured pickup games, and how to get started.
 - [Teams, trainers & gyms](/orgs): Browse local organizations hosting games and training.
 - [Cities](/cities): Upcoming pickup games, teams, trainers and gyms in major US cities.
 - [Plans](/plans): Membership plans and pricing.
-- [Shop](/shop): ballaCity gear and merchandise.
+- [Shop](/shop): BallaCity gear and merchandise.
 
 - [Safety](/safety): Safety practices, reporting, and youth protections.
 - [Community guidelines](/community-guidelines): Expected conduct for players and hosts.
 - [Trust center](/trust-center): Privacy, security and compliance overview.
-- [Contact](/contact): How to reach the ballaCity team.
+- [Contact](/contact): How to reach the BallaCity team.
 
 ## Optional
 
 - [Terms of Service](/terms): Account rules, game participation and payments.
-- [Privacy Policy](/privacy): What data ballaCity collects and how it is used.
+- [Privacy Policy](/privacy): What data BallaCity collects and how it is used.
 - [Cookies](/cookies): Cookie and tracking details.
