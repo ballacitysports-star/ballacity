@@ -39,9 +39,7 @@ export function ChildConsentGate() {
         <ShieldAlert className="h-4 w-4 shrink-0 text-primary" aria-hidden />
         <p className="min-w-0 flex-1 text-muted-foreground">
           <span className="font-semibold text-foreground">
-            {revoked
-              ? "A parent or guardian turned this account off."
-              : "Parent approval needed ·"}
+            {revoked ? "A parent or guardian turned this account off." : "Parent approval needed ·"}
           </span>{" "}
           {revoked
             ? "Games, messages, videos and comments stay off until they approve again."

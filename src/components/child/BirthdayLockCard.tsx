@@ -68,7 +68,8 @@ export function BirthdayLockCard() {
 
           {pending ? (
             <div className="mt-3 rounded-xl border border-lime/40 bg-lime/10 p-2 text-[11px] leading-snug">
-              Birthday correction submitted · Under BallaCity staff review (requested {birthdayToDisplay(pending.requestedBirthday)}).
+              Birthday correction submitted · Under BallaCity staff review (requested{" "}
+              {birthdayToDisplay(pending.requestedBirthday)}).
             </div>
           ) : latest && latest.status !== "pending" ? (
             <div className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] leading-snug">

@@ -257,8 +257,7 @@ export const Route = createFileRoute("/games/$gameId/")({
       path: `/games/${params.gameId}`,
       title: `${name} — BallaCity`,
       description: (
-        seo?.description ||
-        "See the details for this pickup game and request to join on BallaCity."
+        seo?.description || "See the details for this pickup game and request to join on BallaCity."
       ).slice(0, 155),
       ogType: "article",
       // Private, cancelled, past and youth games are never indexed.
@@ -866,9 +865,7 @@ function GameDetail() {
     holdMinutes,
     gameStartsAt: game.date,
   });
-  const myHoldLabel = myHoldExpiresAt
-    ? formatHoldRemaining(myHoldExpiresAt.getTime() - now)
-    : null;
+  const myHoldLabel = myHoldExpiresAt ? formatHoldRemaining(myHoldExpiresAt.getTime() - now) : null;
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
   const hostRequiresApproval = settings ? !!settings.requires_approval : true;
@@ -1542,8 +1539,8 @@ function GameDetail() {
                 <div className="font-display text-sm font-bold">You're invited to this game</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   The host invited you personally{inviteFrom ? "" : ""}. Tap{" "}
-                  {requiresApproval ? "“Request Spot”" : isPaid ? "“Pay Host”" : "“Join Run”"}{" "}
-                  below to confirm your spot.
+                  {requiresApproval ? "“Request Spot”" : isPaid ? "“Pay Host”" : "“Join Run”"} below
+                  to confirm your spot.
                 </p>
               </div>
             </div>
@@ -1553,7 +1550,10 @@ function GameDetail() {
         {!isHost &&
           (() => {
             const r = mySubs.find(
-              (x) => x.refund_status === "owed" || x.refund_status === "refunded" || x.refund_status === "kept",
+              (x) =>
+                x.refund_status === "owed" ||
+                x.refund_status === "refunded" ||
+                x.refund_status === "kept",
             );
             if (!r) return null;
             const amt = `$${Number(r.refund_amount ?? 0).toFixed(2)}`;
@@ -1576,7 +1576,11 @@ function GameDetail() {
                       cls: "border-border bg-surface",
                     };
             return (
-              <div className={`rounded-2xl border p-4 ${copy.cls}`} role="status" aria-live="polite">
+              <div
+                className={`rounded-2xl border p-4 ${copy.cls}`}
+                role="status"
+                aria-live="polite"
+              >
                 <div className="font-display text-sm font-bold">{copy.title}</div>
                 <p className="mt-0.5 text-xs text-muted-foreground">{copy.body}</p>
               </div>
@@ -1778,7 +1782,10 @@ function GameDetail() {
                 text: "Proof sent · Awaiting host confirmation",
                 tone: "info",
               },
-              payment_rejected: { text: "Payment declined by host · Resubmit proof or message host", tone: "bad" },
+              payment_rejected: {
+                text: "Payment declined by host · Resubmit proof or message host",
+                tone: "bad",
+              },
               payment_verified: { text: "You're in! Payment confirmed", tone: "ok" },
               confirmed: { text: "You're in! Payment confirmed", tone: "ok" },
             };
@@ -2079,16 +2086,16 @@ function GameDetail() {
                 </div>
               )}
               {isPaid && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
-                <p className="text-sm leading-relaxed">
-                  {refundPolicySummary(
-                    normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
-                    game.cancelCutoffMin,
-                  )}
-                  {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
-                </p>
-              </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
+                  <p className="text-sm leading-relaxed">
+                    {refundPolicySummary(
+                      normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
+                      game.cancelCutoffMin,
+                    )}
+                    {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
+                  </p>
+                </div>
               )}
               {settings?.payment_instructions && (
                 <div>
@@ -3011,7 +3018,8 @@ function GameDetail() {
             >
               <MessageCircle className="h-5 w-5" />
             </button>
-            {!isParentMode && !isHost &&
+            {!isParentMode &&
+              !isHost &&
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
@@ -3666,9 +3674,7 @@ function EditGameModal({
                         {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
                       <span className="truncate max-w-[10rem]">{a.name || "Loading…"}</span>
-                      <span className="micro-label opacity-70">
-                        {affLabel(a)}
-                      </span>
+                      <span className="micro-label opacity-70">{affLabel(a)}</span>
                     </button>
                   );
                 })}
@@ -4069,8 +4075,8 @@ function EditGameModal({
                 ))}
               </select>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Approved players who haven't sent payment by then lose the spot, and the next
-                player on the waitlist is notified. Holds never release after tip-off.
+                Approved players who haven't sent payment by then lose the spot, and the next player
+                on the waitlist is notified. Holds never release after tip-off.
               </p>
             </Field>
           )}
@@ -4232,9 +4238,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="micro-label text-muted-foreground mb-2">
-        Blocked players
-      </div>
+      <div className="micro-label text-muted-foreground mb-2">Blocked players</div>
       {blocked.length === 0 ? (
         <div className="text-xs text-muted-foreground">
           You haven't blocked anyone. Use the Block button on a request or roster row to prevent a
@@ -4833,9 +4837,7 @@ function RosterPlayerRow({
       )}
       {feeRequired && historyOpen && (
         <div className="mt-2 rounded-xl border border-border bg-background/60 p-2.5">
-          <div className="mb-1.5 micro-label text-muted-foreground">
-            Verification history
-          </div>
+          <div className="mb-1.5 micro-label text-muted-foreground">Verification history</div>
           {historyLoading ? (
             <div className="text-[11px] text-muted-foreground">Loading…</div>
           ) : history.length === 0 ? (
@@ -5174,7 +5176,11 @@ async function notifyJoinReview(
 ) {
   let fee = 0;
   if (status === "approved") {
-    const { data } = await supabase.from("hosted_games").select("price").eq("id", gameId).maybeSingle();
+    const { data } = await supabase
+      .from("hosted_games")
+      .select("price")
+      .eq("id", gameId)
+      .maybeSingle();
     fee = Number(data?.price ?? 0);
   }
   const paid = status === "approved" && fee > 0;

@@ -51,7 +51,9 @@ export function PaymentRequiredBanner({
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-display text-sm font-bold">
-          {isRejected ? "Payment declined by host · Resubmit proof or message host" : "Payment required"}
+          {isRejected
+            ? "Payment declined by host · Resubmit proof or message host"
+            : "Payment required"}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {isRejected
