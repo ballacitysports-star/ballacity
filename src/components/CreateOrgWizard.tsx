@@ -1,4 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { geocodeAddress } from "@/lib/geocode.functions";
+import { geocodeTeamHome } from "@/lib/team-geo";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus } from "lucide-react";
@@ -261,6 +264,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     enabled: isCoach && orgChoice.mode === "join",
   });
 
+  const geocodeFn = useServerFn(geocodeAddress);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -293,6 +297,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       id,
       handle: `@${handleClean || "org"}`,
     };
+    if (!isCoach) {
+      const geo = await geocodeTeamHome(geocodeFn, homeCourt, city);
+      if (geo) org.venueGeo = geo;
+    }
     try {
       const saved = await addOrg(org);
       await setActiveProfileByRef(isCoach ? "trainer" : "team", saved.id).catch(() => {});

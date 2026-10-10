@@ -1,6 +1,8 @@
 // Shared org/team/trainer edit screen. Kept in components/ (not the route
 // file) so it can be reused by other routes without pulling this large
 // editor into the shared initial bundle.
+import { geocodeAddress } from "@/lib/geocode.functions";
+import { geocodeTeamHome } from "@/lib/team-geo";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -186,6 +188,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   });
 
   // Google Places gym search, biased to the user's current location.
+  const geocodeFn = useServerFn(geocodeAddress);
   const placesAutocomplete = useServerFn(autocompletePlaces);
   const placesDetails = useServerFn(getPlaceDetails);
   const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
@@ -432,6 +435,15 @@ export function EditOrgScreen({ org }: { org: Org }) {
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
       .toLowerCase();
+    // Teams: refresh the saved court coordinates when the court/city changed or
+    // were never resolved. Coaches keep their per-venue geo below.
+    let teamGeo: Org["venueGeo"] | undefined;
+    if (
+      kind === "team" &&
+      (homeCourt !== (org.homeCourt ?? "") || city !== org.city || !(org.venueGeo?.length ?? 0))
+    ) {
+      teamGeo = await geocodeTeamHome(geocodeFn, homeCourt, city);
+    }
     await updateOrg(org.id, {
       name,
       handle: `@${handleClean || org.handle.slice(1)}`,
@@ -484,7 +496,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
           : undefined,
       verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
       venueGeo:
-        kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
+        kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : teamGeo,
       primaryVenue:
         kind === "coach"
           ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
