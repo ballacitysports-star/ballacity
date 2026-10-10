@@ -27,6 +27,7 @@ import { hideFinishedGames } from "@/lib/game-time";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
 import { TryoutsSection } from "@/components/tryouts/TryoutsSection";
 import { FeaturedFacilityTrainer } from "@/components/landing/FeaturedFacilityTrainer";
+import { useLandingListingsConfig } from "@/hooks/useLandingListingsConfig";
 
 const FAQS = [
   {
@@ -92,6 +93,7 @@ function Landing() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const hosted = useHostedGames();
+  const { visible } = useLandingListingsConfig();
   const hasStoredSession = typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
   // Clearing the hint below updates the user, which runs the effect again; that
   // run sees no hint and would send them on to the feed over their setup.
@@ -147,14 +149,23 @@ function Landing() {
           <Logo />
           <div className="flex items-center gap-5">
             <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-              <a href="#trending" className="hover:text-foreground">
-                Games
-              </a>
-              <a href="#tryouts" className="hover:text-foreground">
-                Tryouts
-              </a>
-              <a href="#availability" className="hover:text-foreground">
-                Get found
+              {visible.pickupGames && (
+                <a href="#trending" className="hover:text-foreground">
+                  Games
+                </a>
+              )}
+              {visible.tryouts && (
+                <a href="#tryouts" className="hover:text-foreground">
+                  Tryouts
+                </a>
+              )}
+              {visible.availability && (
+                <a href="#availability" className="hover:text-foreground">
+                  Get found
+                </a>
+              )}
+              <a href="#for-teams" className="hover:text-foreground">
+                Teams &amp; trainers
               </a>
               <a href="#for-facilities" className="hover:text-foreground">
                 Facilities
@@ -213,57 +224,61 @@ function Landing() {
               className="enter-up mt-8 flex flex-wrap gap-2"
             >
               {[
-                ["#trending", "🏀 Pickup games"],
-                ["#tryouts", "📋 Tryouts & camps"],
-                ["#availability", "🙋 Get found"],
+                visible.pickupGames && ["#trending", "🏀 Pickup games"],
+                visible.tryouts && ["#tryouts", "📋 Tryouts & camps"],
+                visible.availability && ["#availability", "🙋 Get found"],
                 ["#for-teams", "🧢 Teams & trainers"],
                 ["#for-facilities", "🏢 Gyms & facilities"],
-              ].map(([href, label]) => (
-                <a
-                  key={href}
-                  href={href}
-                  className="rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
-                >
-                  {label}
-                </a>
-              ))}
+              ]
+                .filter((x): x is string[] => !!x)
+                .map(([href, label]) => (
+                  <a
+                    key={href}
+                    href={href}
+                    className="rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
+                  >
+                    {label}
+                  </a>
+                ))}
             </nav>
           </div>
         </div>
       </section>
 
       {/* Trending */}
-      <section id="trending" className="page-shell py-16">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link
-            to="/feed"
-            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
-          >
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        {trending.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
-            <p className="font-semibold">No games posted near you yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Be the first to put one on the board — hosting takes about a minute.
-            </p>
+      {visible.pickupGames && (
+        <section id="trending" className="page-shell py-16">
+          <div className="flex items-end justify-between mb-6">
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
             <Link
-              to="/create"
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+              to="/feed"
+              className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
             >
-              Host a game <ArrowRight className="h-4 w-4" />
+              See all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trending.map((g, i) => (
-              <GameCard key={g.id} game={g} index={i} />
-            ))}
-          </div>
-        )}
-      </section>
+          {trending.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+              <p className="font-semibold">No games posted near you yet.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Be the first to put one on the board — hosting takes about a minute.
+              </p>
+              <Link
+                to="/create"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+              >
+                Host a game <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {trending.map((g, i) => (
+                <GameCard key={g.id} game={g} index={i} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* How it works */}
       <section id="how" className="page-shell py-16" aria-labelledby="how-heading">
@@ -272,9 +287,18 @@ function Landing() {
         </h2>
         <ol className="grid md:grid-cols-3 gap-4">
           {[
-            ["Find a game nearby", "Browse open games by sport, skill level and distance on a live map."],
-            ["Grab your spot", "Request to join in a tap. The host confirms and you get the details."],
-            ["Show up and play", "Meet your crew at the court or field. Rate the run and play again."],
+            [
+              "Find a game nearby",
+              "Browse open games by sport, skill level and distance on a live map.",
+            ],
+            [
+              "Grab your spot",
+              "Request to join in a tap. The host confirms and you get the details.",
+            ],
+            [
+              "Show up and play",
+              "Meet your crew at the court or field. Rate the run and play again.",
+            ],
           ].map(([t, b], i) => (
             <li key={t} className="rounded-3xl border border-border bg-surface p-6">
               <span className="font-display text-2xl font-bold text-lime">{i + 1}</span>
@@ -286,59 +310,61 @@ function Landing() {
       </section>
 
       {/* Availability */}
-      <section
-        id="availability"
-        className="page-shell py-16"
-        aria-labelledby="availability-heading"
-      >
-        <div className="mb-8">
-          <h2 id="availability-heading" className="font-display text-3xl md:text-4xl font-bold">
-            List your availability — let teams find you.
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Post when you're free to play, and teams and coaches can find you and invite you
-            directly.
-          </p>
-        </div>
-        <ol className="grid md:grid-cols-3 gap-4">
-          {[
-            {
-              icon: CalendarClock,
-              title: "Post your availability",
-              body: "List your sport, skill level and when you're free to play.",
-            },
-            {
-              icon: Search,
-              title: "Teams and coaches find you",
-              body: "They browse available players by sport, skill and distance.",
-            },
-            {
-              icon: UserPlus,
-              title: "Invites come to you",
-              body: "Accept an invite and you're on the roster.",
-            },
-          ].map((s) => {
-            const Icon = s.icon;
-            return (
-              <li key={s.title} className="rounded-3xl border border-border bg-surface p-6">
-                <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="font-display text-xl font-semibold">{s.title}</h3>
-                <p className="text-muted-foreground mt-1.5 text-sm">{s.body}</p>
-              </li>
-            );
-          })}
-        </ol>
-        <Link
-          to="/players"
-          className="mt-8 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+      {visible.availability && (
+        <section
+          id="availability"
+          className="page-shell py-16"
+          aria-labelledby="availability-heading"
         >
-          Post your availability <ArrowRight className="h-4 w-4" />
-        </Link>
-      </section>
+          <div className="mb-8">
+            <h2 id="availability-heading" className="font-display text-3xl md:text-4xl font-bold">
+              List your availability — let teams find you.
+            </h2>
+            <p className="text-muted-foreground mt-1">
+              Post when you're free to play, and teams and coaches can find you and invite you
+              directly.
+            </p>
+          </div>
+          <ol className="grid md:grid-cols-3 gap-4">
+            {[
+              {
+                icon: CalendarClock,
+                title: "Post your availability",
+                body: "List your sport, skill level and when you're free to play.",
+              },
+              {
+                icon: Search,
+                title: "Teams and coaches find you",
+                body: "They browse available players by sport, skill and distance.",
+              },
+              {
+                icon: UserPlus,
+                title: "Invites come to you",
+                body: "Accept an invite and you're on the roster.",
+              },
+            ].map((s) => {
+              const Icon = s.icon;
+              return (
+                <li key={s.title} className="rounded-3xl border border-border bg-surface p-6">
+                  <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-display text-xl font-semibold">{s.title}</h3>
+                  <p className="text-muted-foreground mt-1.5 text-sm">{s.body}</p>
+                </li>
+              );
+            })}
+          </ol>
+          <Link
+            to="/players"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+          >
+            Post your availability <ArrowRight className="h-4 w-4" />
+          </Link>
+        </section>
+      )}
 
-      <TryoutsSection />
+      {visible.tryouts && <TryoutsSection />}
 
       {/* Teams, coaches & trainers */}
       <section id="for-teams" className="page-shell py-16" aria-labelledby="for-teams-heading">
@@ -431,8 +457,8 @@ function Landing() {
             For gyms &amp; facilities
           </h2>
           <p className="text-muted-foreground mt-1 max-w-2xl">
-            Put your courts, fields and training space in front of local players, parents,
-            teams and trainers.
+            Put your courts, fields and training space in front of local players, parents, teams and
+            trainers.
           </p>
           <ul className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -467,7 +493,7 @@ function Landing() {
               );
             })}
           </ul>
-          <FeaturedFacilityTrainer />
+          {visible.trainerSpotlight && <FeaturedFacilityTrainer />}
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               to="/orgs/create"
