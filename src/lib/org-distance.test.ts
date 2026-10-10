@@ -34,3 +34,17 @@ describe("orgDistance", () => {
     expect(orgDistanceMi({ venueGeo: [zero], city: "" }, louisville)).toBeNull();
   });
 });
+
+describe("orgDistance with geocoded cities", () => {
+  it("uses geocoded city coordinates for cities outside the launch list", () => {
+    const cityCoords = new Map([["brooklyn, ny", { lat: 40.6782, lng: -73.9442 }]]);
+    const d = orgDistance({ venueGeo: [], city: "Brooklyn, NY" }, louisville, cityCoords);
+    expect(d?.approx).toBe(true);
+    expect(d!.mi).toBeGreaterThan(550);
+    expect(d!.mi).toBeLessThan(700);
+  });
+
+  it("is still null when the city was never geocoded", () => {
+    expect(orgDistance({ venueGeo: [], city: "Brooklyn, NY" }, louisville, new Map())).toBeNull();
+  });
+});

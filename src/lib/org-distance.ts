@@ -21,14 +21,20 @@ function validPoint(p: { lat?: number | null; lng?: number | null }): p is LatLn
   return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
+/** Lookup key for a free-text city, shared with the geocoding hook. */
+export function cityKey(city: string | null | undefined): string {
+  return (city ?? "").trim().toLowerCase();
+}
+
 /**
  * Distance from the viewer to the org's nearest verified venue. Orgs without
  * venue coordinates (most teams) fall back to the centre of their city when it
- * is a known one, flagged `approx`.
+ * is a known one, or to a geocoded city from `cityCoords`, flagged `approx`.
  */
 export function orgDistance(
   org: Pick<Org, "venueGeo" | "city">,
   viewer: LatLng | null,
+  cityCoords?: ReadonlyMap<string, LatLng>,
 ): OrgDistance | null {
   if (!viewer) return null;
   let minKm: number | null = null;
@@ -41,6 +47,11 @@ export function orgDistance(
 
   const city = cityForText(org.city);
   if (city) return { mi: haversineKm(viewer, city) * MI_PER_KM, approx: true };
+
+  const geocoded = cityCoords?.get(cityKey(org.city));
+  if (geocoded && validPoint(geocoded)) {
+    return { mi: haversineKm(viewer, geocoded) * MI_PER_KM, approx: true };
+  }
   return null;
 }
 
@@ -48,6 +59,7 @@ export function orgDistance(
 export function orgDistanceMi(
   org: Pick<Org, "venueGeo" | "city">,
   viewer: LatLng | null,
+  cityCoords?: ReadonlyMap<string, LatLng>,
 ): number | null {
-  return orgDistance(org, viewer)?.mi ?? null;
+  return orgDistance(org, viewer, cityCoords)?.mi ?? null;
 }

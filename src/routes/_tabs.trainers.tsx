@@ -31,6 +31,8 @@ import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { orgDistance } from "@/lib/org-distance";
+import { useOrgCityCoords } from "@/hooks/use-org-city-coords";
+import { EnableDistanceButton } from "@/components/EnableDistanceButton";
 import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { useQuery } from "@tanstack/react-query";
@@ -236,6 +238,10 @@ function TrainersPage() {
   }, []);
 
   const orgs = useAllOrgs();
+  const cityCoords = useOrgCityCoords(
+    orgs.filter((o) => o.kind === "coach"),
+    !!user && !!coords,
+  );
 
   // Real ratings and the facility each trainer works at, fetched once for the
   // whole page (not per card).
@@ -298,7 +304,7 @@ function TrainersPage() {
       .map((rawOrg) => {
         // Real review stats replace a missing (or stale) rating.
         const o = withReviewStats(rawOrg, ratings.get(rawOrg.id));
-        const measured = orgDistance(o, coords);
+        const measured = orgDistance(o, coords, cityCoords);
         return {
           o,
           dist: measured,
@@ -335,6 +341,7 @@ function TrainersPage() {
     avail,
     radiusKm,
     coords,
+    cityCoords,
     maxRate,
     ageGroup,
     ratings,
@@ -484,6 +491,7 @@ function TrainersPage() {
   function TrainersView() {
     return (
       <>
+        <EnableDistanceButton className="mb-3" />
         <ViewDensityToggle
           view={viewMode}
           onViewChange={switchView}

@@ -27,6 +27,8 @@ import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 import { useUserLocation } from "@/lib/geo";
 import { orgDistance } from "@/lib/org-distance";
+import { useOrgCityCoords } from "@/hooks/use-org-city-coords";
+import { EnableDistanceButton } from "@/components/EnableDistanceButton";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 
 type SortBy = "nearest" | "followers" | "name";
@@ -158,6 +160,10 @@ function TeamsPage() {
 
   const orgs = useAllOrgs();
   const { coords } = useUserLocation();
+  const cityCoords = useOrgCityCoords(
+    orgs.filter((o) => o.kind === "team"),
+    !!user && !!coords,
+  );
 
   const list = useMemo(() => {
     const isRecruiting = (o: (typeof orgs)[number]) => {
@@ -182,7 +188,7 @@ function TeamsPage() {
         return cadenceMatches(o, avail);
       })
       .filter((o) => matchesOrgQuery(o, q));
-    const withDist = filtered.map((o) => ({ o, dist: orgDistance(o, coords) }));
+    const withDist = filtered.map((o) => ({ o, dist: orgDistance(o, coords, cityCoords) }));
     withDist.sort((a, b) => {
       if (sortBy === "nearest") {
         // Teams we can't measure sort last, then alphabetically.
@@ -195,7 +201,7 @@ function TeamsPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sports, q, sortBy, avail, coords]);
+  }, [orgs, sports, q, sortBy, avail, coords, cityCoords]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "team") ?? orgs.find((o) => o.kind === "team");
@@ -221,6 +227,8 @@ function TeamsPage() {
           )}
         </p>
       </motion.div>
+
+      <EnableDistanceButton className="mb-4" />
 
       {/* Looking for coaches? Cross-link to /trainers */}
       <div className="mb-4 text-xs text-muted-foreground">
