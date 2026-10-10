@@ -164,6 +164,9 @@ function Landing() {
                   Get found
                 </a>
               )}
+              <a href="#for-teams" className="hover:text-foreground">
+                Teams &amp; trainers
+              </a>
               <a href="#for-facilities" className="hover:text-foreground">
                 Facilities
               </a>
