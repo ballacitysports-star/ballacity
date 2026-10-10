@@ -3,7 +3,7 @@ import { StaffSwitcher } from "@/components/staff/StaffSwitcher";
 import { useStaffAccess } from "@/hooks/use-staff-access";
 import { showsStaffChrome } from "@/lib/staff";
 
-/** Slim top bar shown above every page to active admins and superadmins. */
+/** Slim top bar shown above every page to staff. */
 export function StaffBar() {
   const router = useRouter();
   const pathname = router.state.location.pathname;

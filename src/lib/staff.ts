@@ -73,7 +73,7 @@ export function staffHomeFor(access: StaffAccess): string | null {
   return staffDashboards(access)[0]?.to ?? null;
 }
 
-/** The badge and quick switcher are shown to active admins and superadmins. */
+/** The badge, quick switcher and sign-out are shown to every staff tier. */
 export function showsStaffChrome(access: StaffAccess): boolean {
-  return access.isSuperadmin || access.isAdmin;
+  return staffTierOf(access) !== null;
 }

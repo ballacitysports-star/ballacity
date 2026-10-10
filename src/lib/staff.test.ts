@@ -33,10 +33,10 @@ describe("staff dispatcher", () => {
     expect(staffDashboards(NO_STAFF_ACCESS)).toEqual([]);
   });
 
-  it("shows the badge and switcher for admins and superadmins only", () => {
+  it("shows the badge, switcher and sign-out to every staff tier", () => {
     expect(showsStaffChrome(sa)).toBe(true);
     expect(showsStaffChrome(admin)).toBe(true);
-    expect(showsStaffChrome(mod)).toBe(false);
+    expect(showsStaffChrome(mod)).toBe(true);
     expect(showsStaffChrome(NO_STAFF_ACCESS)).toBe(false);
   });
 });
