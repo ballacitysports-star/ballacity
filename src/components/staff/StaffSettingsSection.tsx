@@ -3,7 +3,7 @@ import { SettingsGroup, SettingsLinkRow } from "@/components/settings/SettingsRo
 import { useStaffAccess } from "@/hooks/use-staff-access";
 import { STAFF_TIER_LABEL, showsStaffChrome, staffDashboards, staffTierOf } from "@/lib/staff";
 
-/** Settings shortcuts to the staff dashboards. Admins and superadmins only. */
+/** Settings shortcuts to the staff dashboards. */
 export function StaffSettingsSection() {
   const { access } = useStaffAccess();
   const tier = staffTierOf(access);

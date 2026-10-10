@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogOut, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import { signOut } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -12,7 +14,17 @@ import {
 import { useStaffAccess } from "@/hooks/use-staff-access";
 import { STAFF_TIER_LABEL, showsStaffChrome, staffDashboards, staffTierOf } from "@/lib/staff";
 
-/** Staff badge with a dropdown to jump between dashboards. Admins and superadmins only. */
+/** Staff badge with a dropdown to jump between dashboards and sign out. */
+async function handleSignOut() {
+  try {
+    await signOut();
+    toast.success("Signed out");
+    window.location.href = "/auth";
+  } catch {
+    toast.error("Couldn't sign out");
+  }
+}
+
 export function StaffSwitcher() {
   const { access } = useStaffAccess();
   const tier = staffTierOf(access);
@@ -44,6 +56,11 @@ export function StaffSwitcher() {
             </Link>
           </DropdownMenuItem>
         ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void handleSignOut()} className="text-destructive">
+          <LogOut className="mr-2 h-4 w-4" aria-hidden />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
