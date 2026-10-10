@@ -3,7 +3,7 @@ import { feeBreakdownLines, isPaymentMode, quoteFees } from "./fees";
 import { DEFAULT_MONETIZATION_CONFIG, resolveMonetizationConfig } from "./config";
 
 describe("direct host payments", () => {
-  it("never adds a fee to money ballaCity does not touch", () => {
+  it("never adds a fee to money BallaCity does not touch", () => {
     const q = quoteFees({ amountCents: 1500, mode: "direct_host" });
     expect(q.processingFeeCents).toBe(0);
     expect(q.platformFeeCents).toBe(0);
@@ -23,7 +23,7 @@ describe("direct host payments", () => {
   });
 });
 
-describe("ballaCity-processed payments", () => {
+describe("BallaCity-processed payments", () => {
   it("is transparent: subtotal + processing + platform = total", () => {
     const q = quoteFees({ amountCents: 2000, mode: "ballacity_processed" });
     expect(q.processingFeeCents).toBe(Math.round(2000 * 0.029) + 30);

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/checkout/return")({
   head: () =>
     pageHead({
       path: "/checkout/return",
-      title: "All set — ballaCity",
+      title: "All set — BallaCity",
       description: "Confirmation and next steps.",
       noindex: true,
     }),
@@ -25,14 +25,14 @@ function CheckoutReturn() {
       <div className="max-w-md w-full rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
         <CheckCircle2 className="mx-auto h-12 w-12 text-lime" />
         <h1 className="mt-4 page-title">{session_id ? "Payment complete" : "Checkout complete"}</h1>
-        {/* Nothing is being sold while ballaCity is free, so subscription and
+        {/* Nothing is being sold while BallaCity is free, so subscription and
             refund copy would only confuse someone who landed here. */}
         {freeMode ? (
           <p className="mt-2 page-subtitle">{notice}</p>
         ) : (
           <>
             <p className="mt-2 page-subtitle">
-              Thanks for supporting ballaCity! Subscriptions activate immediately. For merch orders,
+              Thanks for supporting BallaCity! Subscriptions activate immediately. For merch orders,
               you'll receive a confirmation email with shipping details.
             </p>
             <p className="mt-3 text-xs text-muted-foreground">

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/account/security")({
   head: () =>
     pageHead({
       path: "/account/security",
-      title: "Security — ballaCity",
+      title: "Security — BallaCity",
       description: "Manage sign-in methods, password, and connected accounts.",
       noindex: true,
     }),

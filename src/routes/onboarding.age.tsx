@@ -6,9 +6,9 @@ export const Route = createFileRoute("/onboarding/age")({
   head: () =>
     pageHead({
       path: "/onboarding/age",
-      title: "Add your date of birth — ballaCity",
+      title: "Add your date of birth — BallaCity",
       description:
-        "ballaCity asks for your date of birth so we can set the right safety, privacy and account experience.",
+        "BallaCity asks for your date of birth so we can set the right safety, privacy and account experience.",
       noindex: true,
     }),
   ssr: false,

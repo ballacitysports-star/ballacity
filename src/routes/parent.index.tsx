@@ -44,9 +44,9 @@ export const Route = createFileRoute("/parent/")({
   head: () =>
     pageHead({
       path: "/parent",
-      title: "Parent Center — ballaCity",
+      title: "Parent Center — BallaCity",
       description:
-        "Manage your child's ballaCity account: messaging, video visibility, discoverability, data requests and consent.",
+        "Manage your child's BallaCity account: messaging, video visibility, discoverability, data requests and consent.",
       noindex: true,
     }),
   ssr: false,
@@ -78,7 +78,7 @@ const MEDIA_OPTIONS: Array<{
 const MEMBERS_OPTION: (typeof MEDIA_OPTIONS)[number] = {
   value: "members",
   label: "Signed-in members",
-  hint: "Reels they choose to post can be seen by signed-in ballaCity members. Never public on the web.",
+  hint: "Reels they choose to post can be seen by signed-in BallaCity members. Never public on the web.",
 };
 
 /**
@@ -589,7 +589,7 @@ function ParentCenterPage() {
       <main className="page-shell-content py-10">
         <h1 className="page-title">Parent Center</h1>
         <p className="mt-2 page-subtitle">
-          Sign in with your adult account to manage a child&rsquo;s ballaCity account.
+          Sign in with your adult account to manage a child&rsquo;s BallaCity account.
         </p>
         <Link
           to="/auth"

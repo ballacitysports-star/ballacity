@@ -16,7 +16,7 @@ export const Route = createFileRoute("/family-clips")({
   head: () =>
     pageHead({
       path: "/family-clips",
-      title: "Family clips — ballaCity",
+      title: "Family clips — BallaCity",
       description: "Clips shared with you by a parent.",
       noindex: true,
     }),

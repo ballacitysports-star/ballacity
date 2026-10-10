@@ -13,7 +13,7 @@ import { resolveFeatureAccess } from "@/lib/monetization/access";
 import type { EntitlementKey } from "@/lib/monetization/config";
 
 /**
- * The one place a screen asks "does this account have Host Pro / ballaCity+".
+ * The one place a screen asks "does this account have Host Pro / BallaCity+".
  *
  * It reads the member's own subscription rows (RLS restricts the query to their
  * own) and derives entitlements from them. Anything that actually matters is
@@ -77,7 +77,7 @@ export function useEntitlements() {
     loading: busy,
     /** The raw derivation from subscription rows — what billing actually sees. */
     state,
-    /** The centralized gate. True for everything while ballaCity is free. */
+    /** The centralized gate. True for everything while BallaCity is free. */
     has: (key: EntitlementKey) => access.has(key),
     /** True when the account really holds it, ignoring free mode. */
     hasPaid: (key: EntitlementKey) => hasEntitlementIn(state, key),

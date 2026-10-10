@@ -67,15 +67,15 @@ export const Route = createFileRoute("/orgs/$orgId/")({
     const name = org?.name ?? "Gym";
     return pageHead({
       path: `/orgs/${params.orgId}`,
-      title: `${name} — ${org?.category || "Gym"} on ballaCity`,
+      title: `${name} — ${org?.category || "Gym"} on BallaCity`,
       description: (
         org?.bio ||
-        `${name}${org?.city ? ` in ${org.city}` : ""} on ballaCity: hours, amenities, upcoming runs, and how to book a court.`
+        `${name}${org?.city ? ` in ${org.city}` : ""} on BallaCity: hours, amenities, upcoming runs, and how to book a court.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "venue",
         title: name,
-        subtitle: org?.city ?? org?.address ?? "Gym on ballaCity",
+        subtitle: org?.city ?? org?.address ?? "Gym on BallaCity",
         meta: [org?.city, "Hours & amenities", "Member reviews"],
       }),
       noindex: !org,

@@ -40,7 +40,7 @@ import { loadAiConfig } from "./settings.server";
 import { addJobCost, recordUsage } from "./usage.server";
 
 /**
- * Platform safety work. It runs on ballaCity's behalf for every account, so it
+ * Platform safety work. It runs on BallaCity's behalf for every account, so it
  * is not subject to member consent, cohort allowances or plan quotas — only to
  * the feature flag.
  */
@@ -71,7 +71,7 @@ export async function resolveAiTier(admin: any, userId: string): Promise<AiTier>
     const monetization = await loadMonetizationConfig(admin);
     const access = resolveFeatureAccess(monetization);
 
-    // While ballaCity is free, nobody's tier depends on what they bought. The
+    // While BallaCity is free, nobody's tier depends on what they bought. The
     // quota itself still applies — it is a cost ceiling, not a paywall — so an
     // admin can dial the tier down without charging anyone.
     if (access.aiTierOverride && AI_TIERS.includes(access.aiTierOverride as AiTier)) {

@@ -29,8 +29,8 @@ export const Route = createFileRoute("/messages/")({
   head: () =>
     pageHead({
       path: "/messages",
-      title: "Inbox — ballaCity",
-      description: "Your ballaCity conversations with players, teams, trainers, and gyms.",
+      title: "Inbox — BallaCity",
+      description: "Your BallaCity conversations with players, teams, trainers, and gyms.",
       noindex: true,
     }),
   validateSearch: zodValidator(searchSchema),

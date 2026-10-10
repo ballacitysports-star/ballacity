@@ -29,7 +29,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
-import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { orgDistance } from "@/lib/org-distance";
 import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { useQuery } from "@tanstack/react-query";
@@ -89,12 +90,6 @@ function availabilityLabel(score: number): string {
   return "Ask";
 }
 
-function pseudoDistance(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return Math.round(((h % 400) / 10 + 0.3) * 10) / 10;
-}
-
 const trainersSearchSchema = z.object({
   mode: fallback(z.string(), "trainers").default("trainers"),
   q: fallback(z.string(), "").default(""),
@@ -115,7 +110,7 @@ export const Route = createFileRoute("/_tabs/trainers")({
   head: () =>
     pageHead({
       path: "/trainers",
-      title: "Trainers & coaches — ballaCity",
+      title: "Trainers & coaches — BallaCity",
       description:
         "Find and book trainers and coaches near you by sport, availability, and distance.",
       noindex: true,
@@ -303,18 +298,12 @@ function TrainersPage() {
       .map((rawOrg) => {
         // Real review stats replace a missing (or stale) rating.
         const o = withReviewStats(rawOrg, ratings.get(rawOrg.id));
-        let minKm: number | null = null;
-        if (coords && (o.venueGeo?.length ?? 0) > 0) {
-          for (const g of o.venueGeo ?? []) {
-            const d = haversineKm(coords, { lat: g.lat, lng: g.lng });
-            if (minKm == null || d < minKm) minKm = d;
-          }
-        }
+        const measured = orgDistance(o, coords);
         return {
           o,
-          dist: pseudoDistance(o.id),
+          dist: measured,
           score: availabilityScore(o),
-          minKm,
+          minKm: measured ? measured.mi * KM_PER_MI : null,
         };
       })
       .filter((x) => {
@@ -322,18 +311,15 @@ function TrainersPage() {
         return x.minKm != null && x.minKm <= radiusKm;
       });
     withDist.sort((a, b) => {
+      // Trainers we can't measure sort last within any distance tie-break.
+      const byDistance = () => (a.minKm ?? Infinity) - (b.minKm ?? Infinity) || 0;
       if (sortBy === "nearest") {
-        if (radiusKm > 0 && coords) {
-          const ax = a.minKm ?? Infinity;
-          const bx = b.minKm ?? Infinity;
-          if (ax !== bx) return ax - bx;
-        }
-        return a.dist - b.dist;
+        return byDistance() || a.o.name.localeCompare(b.o.name);
       }
-      if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
+      if (sortBy === "soonest") return a.score - b.score || byDistance();
       if (sortBy === "followers") return b.o.followers - a.o.followers;
-      if (sortBy === "rating") return compareByRatingDesc(a.o, b.o) || a.dist - b.dist;
-      if (sortBy === "rate") return compareByRateAsc(a.o, b.o) || a.dist - b.dist;
+      if (sortBy === "rating") return compareByRatingDesc(a.o, b.o) || byDistance();
+      if (sortBy === "rate") return compareByRateAsc(a.o, b.o) || byDistance();
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
@@ -744,11 +730,13 @@ function TrainersPage() {
           >
             {list.map(({ o, dist, score, minKm }, i) => {
               const distLabel =
-                radiusKm > 0 && coords && minKm != null
-                  ? distanceUnit === "km"
-                    ? `${minKm.toFixed(1)} km`
-                    : `${(minKm * MI_PER_KM).toFixed(1)} mi`
-                  : `${dist} mi`;
+                minKm == null
+                  ? null
+                  : `${dist?.approx ? "~" : ""}${
+                      distanceUnit === "km"
+                        ? `${minKm.toFixed(1)} km`
+                        : `${(minKm * MI_PER_KM).toFixed(1)} mi`
+                    }`;
               const venueOffered =
                 !!venue &&
                 (o.venueAddresses ?? []).some(
@@ -764,9 +752,11 @@ function TrainersPage() {
                     facility={facilities[o.id] ?? null}
                   />
                   <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
-                    <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                      {distLabel}
-                    </span>
+                    {distLabel && (
+                      <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                        {distLabel}
+                      </span>
+                    )}
                     <span
                       className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
                         score === 0

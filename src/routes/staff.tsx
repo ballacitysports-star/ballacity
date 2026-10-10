@@ -11,8 +11,8 @@ export const Route = createFileRoute("/staff")({
   head: () =>
     pageHead({
       path: "/staff",
-      title: "Staff sign-in — ballaCity",
-      description: "Staff sign-in for ballaCity.",
+      title: "Staff sign-in — BallaCity",
+      description: "Staff sign-in for BallaCity.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) =>

@@ -12,8 +12,8 @@ export const Route = createFileRoute("/admin/legal")({
   head: () =>
     pageHead({
       path: "/admin/legal",
-      title: "Legal & Compliance — ballaCity Admin",
-      description: "Manage versions of ballaCity's legal and policy documents.",
+      title: "Legal & Compliance — BallaCity Admin",
+      description: "Manage versions of BallaCity's legal and policy documents.",
       noindex: true,
     }),
   ssr: false,

@@ -80,7 +80,7 @@ export const Route = createFileRoute("/settings")({
   head: () =>
     pageHead({
       path: "/settings",
-      title: "Settings — ballaCity",
+      title: "Settings — BallaCity",
       description: "Manage your account, profiles, notifications, privacy, and security settings.",
       noindex: true,
     }),
@@ -133,7 +133,7 @@ const SECTIONS: Section[] = [
     items: [
       {
         to: "/account/security",
-        label: "Password & sign-in",
+        label: "Password & security",
         description: "Set or change your password",
         icon: Lock,
       },
@@ -220,7 +220,7 @@ const SECTIONS: Section[] = [
       },
       {
         to: "/account/legal",
-        label: "Legal & Privacy",
+        label: "Terms & Legal Policies",
         description: "Terms, Privacy Policy, and your consent status",
         icon: FileText,
       },

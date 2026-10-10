@@ -25,9 +25,9 @@ export const Route = createFileRoute("/account/data")({
   head: () =>
     pageHead({
       path: "/account/data",
-      title: "Your data & retention — ballaCity",
+      title: "Your data & retention — BallaCity",
       description:
-        "Download a copy of your ballaCity data, see how long each kind of information is kept, and what happens when you delete your account.",
+        "Download a copy of your BallaCity data, see how long each kind of information is kept, and what happens when you delete your account.",
       noindex: true,
     }),
   component: DataExportPage,

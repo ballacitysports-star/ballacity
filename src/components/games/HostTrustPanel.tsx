@@ -51,7 +51,7 @@ export function HostTrustPanel({
 
       {!verifiedLabel && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-          ballaCity hasn't verified this host. Read the game policies and message the host with any
+          BallaCity hasn't verified this host. Read the game policies and message the host with any
           questions before you commit.
         </p>
       )}

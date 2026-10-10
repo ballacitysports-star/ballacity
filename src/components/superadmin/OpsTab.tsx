@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmAction } from "./ConfirmAction";
+import { LandingListingsPanel } from "./LandingListingsPanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
 
 /**
@@ -32,10 +33,13 @@ import { sendTestPushToSelf } from "@/lib/push.functions";
  * other key keeps the raw editor, which is the escape hatch when a structured
  * UI cannot express something.
  */
-const STRUCTURED_KEYS = new Set(["monetization"]);
+const STRUCTURED_KEYS = new Set(["monetization", "landing_listings"]);
+
+// Keys whose editor is a card on this tab, so no pointer is needed.
+const EDITED_ON_THIS_TAB = new Set(["landing_listings"]);
 
 const STRUCTURED_KEYS_PRESENT = (rows: { key: string }[]) =>
-  rows.map((r) => r.key).filter((k) => STRUCTURED_KEYS.has(k));
+  rows.map((r) => r.key).filter((k) => STRUCTURED_KEYS.has(k) && !EDITED_ON_THIS_TAB.has(k));
 
 export function OpsTab() {
   const qc = useQueryClient();
@@ -95,6 +99,8 @@ export function OpsTab() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
+      <LandingListingsPanel />
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Feature flags & settings</CardTitle>

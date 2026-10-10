@@ -252,7 +252,7 @@ export function analyticsGrounding(a: AdvancedAnalytics | null | undefined): str
 /** Plain-text scout card the athlete can paste to a coach or profile. */
 export function scoutCardText(a: AdvancedAnalytics, title: string): string {
   return [
-    `${title} — ballaCity Pro Analytics`,
+    `${title} — BallaCity Pro Analytics`,
     `Overall ${a.ratings.overall}/100 · Mechanics ${a.ratings.mechanics} · Explosiveness ${a.ratings.explosiveness} · IQ ${a.ratings.iq} · Execution ${a.ratings.execution}`,
     a.archetype ? `Archetype: ${a.archetype}` : "",
     a.comps.length ? `Plays like: ${a.comps.map((c) => c.name).join(", ")}` : "",

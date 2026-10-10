@@ -34,7 +34,7 @@ export const Route = createFileRoute("/admin/location-analytics")({
   head: () =>
     pageHead({
       path: "/admin/location-analytics",
-      title: "Location analytics — ballaCity admin",
+      title: "Location analytics — BallaCity admin",
       description: "Internal analytics for location permission denials.",
       noindex: true,
     }),

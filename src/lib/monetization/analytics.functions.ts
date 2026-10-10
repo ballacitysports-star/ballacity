@@ -189,6 +189,6 @@ export const monetizationAnalytics = createServerFn({ method: "GET" })
       // Direct host payments never generate platform revenue; surfaced so an
       // admin can see the volume without mistaking it for income.
       directHostPaymentsNote:
-        "Direct host payments (Venmo, Cash App, Zelle, cash) are settled between host and player. ballaCity takes no fee and records no revenue from them.",
+        "Direct host payments (Venmo, Cash App, Zelle, cash) are settled between host and player. BallaCity takes no fee and records no revenue from them.",
     };
   });

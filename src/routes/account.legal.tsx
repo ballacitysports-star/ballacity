@@ -14,9 +14,9 @@ export const Route = createFileRoute("/account/legal")({
   head: () =>
     pageHead({
       path: "/account/legal",
-      title: "Legal & Privacy — ballaCity",
+      title: "Legal & Privacy — BallaCity",
       description:
-        "Review the ballaCity Terms of Service and Privacy Policy and see your consent history.",
+        "Review the BallaCity Terms of Service and Privacy Policy and see your consent history.",
       noindex: true,
     }),
   component: LegalSettingsPage,

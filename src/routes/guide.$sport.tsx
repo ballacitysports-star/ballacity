@@ -28,7 +28,7 @@ export const Route = createFileRoute("/guide/$sport")({
   head: ({ params, loaderData }) => {
     if (!loaderData) {
       return pageHead({
-        title: "Sport guide not found — ballaCity",
+        title: "Sport guide not found — BallaCity",
         description: "This sports guide isn't available.",
         noindex: true,
       });
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/guide/$sport")({
         headline: `${guide.sport} pickup guide`,
         description: guide.tagline,
         mainEntityOfPage: `${SITE_URL}/guide/${params.sport}`,
-        publisher: { "@type": "Organization", name: "ballaCity" },
+        publisher: { "@type": "Organization", name: "BallaCity" },
       },
     });
   },
@@ -142,7 +142,7 @@ function SportGuidePage() {
         </section>
 
         <section className="mt-8 rounded-2xl border border-border bg-surface px-4 py-4">
-          <h2 className="text-sm font-bold">Get started on ballaCity</h2>
+          <h2 className="text-sm font-bold">Get started on BallaCity</h2>
           <div className="mt-3 grid gap-2">
             <Link
               to="/feed"
@@ -173,7 +173,7 @@ function SportGuidePage() {
         <section className="mt-6">
           <h2 className="section-eyebrow">Before you play</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Hosts organize games — ballaCity doesn't supervise them, referee, or inspect venues.
+            Hosts organize games — BallaCity doesn't supervise them, referee, or inspect venues.
             Warm up, play within your ability, and stop if you're hurt.
           </p>
           <PolicyLinks className="mt-3" />

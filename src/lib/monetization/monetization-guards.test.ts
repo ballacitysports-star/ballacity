@@ -68,7 +68,7 @@ describe("processed payments are not live", () => {
 });
 
 describe("plan catalog", () => {
-  it("offers ballaCity+ and Host Pro as live products", () => {
+  it("offers BallaCity+ and Host Pro as live products", () => {
     const entitlements = liveProducts(DEFAULT_MONETIZATION_CONFIG).map((p) => p.entitlement);
     expect(entitlements).toContain("player_plus");
     expect(entitlements).toContain("host_pro");

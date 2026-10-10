@@ -6,7 +6,7 @@
  * before launch.
  *
  * IMPORTANT (legal):
- * - ballaCity does NOT organize, supervise, or guarantee the safety of any game.
+ * - BallaCity does NOT organize, supervise, or guarantee the safety of any game.
  * - Host acknowledgments are a plain-language notice of responsibility. They are
  *   NOT a waiver or release of liability and are not universally enforceable.
  */
@@ -76,7 +76,7 @@ export const HOST_ACK_ITEMS: HostAckItem[] = [
   {
     id: "payment",
     label: "Payment info",
-    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not ballaCity.",
+    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not BallaCity.",
   },
 ];
 
@@ -86,7 +86,7 @@ export const HOST_ACK_CHECKBOX_LABEL =
 
 /** Configurable legal copy — pending review. */
 export const HOST_ACK_DISCLAIMER =
-  "ballaCity does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
+  "BallaCity does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
 
 // ---------------------------------------------------------------------------
 // Cancellation policy
@@ -263,7 +263,7 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
     critical: true,
     value:
       policy.entryFee > 0
-        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. ballaCity doesn't process payments.`
+        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. BallaCity doesn't process payments.`
         : "Free to join — the host isn't collecting an entry fee here.",
   });
 
@@ -297,7 +297,7 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
           policy.cancelCutoffMin,
         ),
         policy.refundPolicy,
-        "Refunds come from the host directly — ballaCity can't hold or return money.",
+        "Refunds come from the host directly — BallaCity can't hold or return money.",
       ]
         .filter(Boolean)
         .join(" "),

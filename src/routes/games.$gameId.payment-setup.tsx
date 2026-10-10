@@ -22,7 +22,7 @@ import { LegalNotice } from "@/components/LegalNotice";
 export const Route = createFileRoute("/games/$gameId/payment-setup")({
   head: () =>
     pageHead({
-      title: "Payment setup — ballaCity",
+      title: "Payment setup — BallaCity",
       description: "Set the entry fee, accepted payment methods, and refund policy for your game.",
       noindex: true,
     }),

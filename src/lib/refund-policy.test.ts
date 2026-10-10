@@ -57,7 +57,7 @@ describe("copy", () => {
     );
     expect(refundPolicySummary(none, 120)).toMatch(/non-refundable once paid/);
     expect(refundDisclaimer(until, 120)).toMatch(
-      /^I understand the refund terms: .*ballaCity doesn't hold or return money\.$/,
+      /^I understand the refund terms: .*BallaCity doesn't hold or return money\.$/,
     );
   });
 

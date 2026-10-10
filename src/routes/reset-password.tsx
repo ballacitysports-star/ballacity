@@ -9,8 +9,8 @@ export const Route = createFileRoute("/reset-password")({
   head: () =>
     pageHead({
       path: "/reset-password",
-      title: "Reset your password — ballaCity",
-      description: "Set a new password for your ballaCity account.",
+      title: "Reset your password — BallaCity",
+      description: "Set a new password for your BallaCity account.",
       noindex: true,
     }),
   component: ResetPasswordPage,

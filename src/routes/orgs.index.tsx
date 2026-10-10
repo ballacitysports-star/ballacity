@@ -12,9 +12,9 @@ export const Route = createFileRoute("/orgs/")({
   head: () =>
     pageHead({
       path: "/orgs",
-      title: "Gyms & courts — ballaCity",
+      title: "Gyms & courts — BallaCity",
       description:
-        "Browse gyms, courts, and sports complexes on ballaCity. See photos, live hours, amenities, and book a court.",
+        "Browse gyms, courts, and sports complexes on BallaCity. See photos, live hours, amenities, and book a court.",
     }),
   component: OrgsIndex,
 });

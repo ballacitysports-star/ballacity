@@ -29,16 +29,16 @@ export const Route = createFileRoute("/trust-center")({
   head: () =>
     pageHead({
       path: "/trust-center",
-      title: "Trust Center — ballaCity",
+      title: "Trust Center — BallaCity",
       description:
-        "How ballaCity handles privacy, account security, reporting and blocking, direct player-to-player payments, AI highlight analysis, account deletion, and moderation.",
+        "How BallaCity handles privacy, account security, reporting and blocking, direct player-to-player payments, AI highlight analysis, account deletion, and moderation.",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "WebPage",
-        name: "ballaCity Trust Center",
+        name: "BallaCity Trust Center",
         url: `${SITE_URL}/trust-center`,
         description:
-          "Plain-language explanations of privacy, security, safety, payments, AI, account deletion, and moderation on ballaCity.",
+          "Plain-language explanations of privacy, security, safety, payments, AI, account deletion, and moderation on BallaCity.",
       },
     }),
   component: TrustCenter,
@@ -57,7 +57,7 @@ function TrustCenter() {
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Trust Center</h1>
         <p className="mt-2 page-subtitle">
-          Straight answers about how ballaCity works: what we do with your information, how accounts
+          Straight answers about how BallaCity works: what we do with your information, how accounts
           are protected, what happens when you report someone, and where money actually goes. This
           page describes how the product behaves today — it isn't a certification or an audit
           result.

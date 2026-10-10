@@ -34,7 +34,7 @@ describe("catalog integrity", () => {
     );
   });
 
-  it("launches Host Pro at $19.99 and ballaCity+ at $9.99", () => {
+  it("launches Host Pro at $19.99 and BallaCity+ at $9.99", () => {
     expect(priceLabelFor(productForEntitlement("host_pro")!)).toBe("$19.99/mo");
     expect(priceLabelFor(productForEntitlement("player_plus")!)).toBe("$9.99/mo");
   });

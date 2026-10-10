@@ -614,7 +614,7 @@ export function OrgForm({
             <span className="block text-[11px] text-muted-foreground">
               Where players reserve a court (CourtReserve, Mindbody, your own page). &ldquo;Book
               court&rdquo; opens it in a new tab. Leave it empty to receive court inquiries in
-              ballaCity instead — no fees either way.
+              BallaCity instead — no fees either way.
             </span>
           </label>
         </Section>

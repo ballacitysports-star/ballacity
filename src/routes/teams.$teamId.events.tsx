@@ -18,7 +18,7 @@ import { TeamEventsCalendar, EventWaiverStatus } from "@/components/team/TeamEve
 export const Route = createFileRoute("/teams/$teamId/events")({
   head: () =>
     pageHead({
-      title: "Tryouts & camps — ballaCity",
+      title: "Tryouts & camps — BallaCity",
       description: "Manage team tryouts and camps with a calendar of events, RSVPs and signed waivers.",
       noindex: true,
     }),

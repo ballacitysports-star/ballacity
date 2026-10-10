@@ -5,7 +5,7 @@ import { pageHead, SITE_URL } from "@/lib/seo";
 import { guideBySlug } from "@/lib/sports-guide";
 
 const PATH = "/blog/how-to-find-pickup-soccer-games";
-const TITLE = "How to Find Pickup Soccer Games Near You | ballaCity";
+const TITLE = "How to Find Pickup Soccer Games Near You | BallaCity";
 const DESCRIPTION =
   "Want to play soccer this week? Here's how to find local pickup soccer games — apps, parks, leagues and community groups — plus what to bring and how to join your first match.";
 
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/blog/how-to-find-pickup-soccer-games")({
           headline: "How to find pickup soccer games near you",
           description: DESCRIPTION,
           mainEntityOfPage: `${SITE_URL}${PATH}`,
-          publisher: { "@type": "Organization", name: "ballaCity" },
+          publisher: { "@type": "Organization", name: "BallaCity" },
         },
         {
           "@context": "https://schema.org",
@@ -149,7 +149,7 @@ function Article() {
           </ul>
         </Section>
 
-        <Section title="Finding a soccer game on ballaCity">
+        <Section title="Finding a soccer game on BallaCity">
           <ol className="grid gap-2">
             <li>
               1. Open the games near you and filter to soccer. You'll see the date, time, venue and
@@ -228,7 +228,7 @@ function Article() {
         <section className="mt-6">
           <h2 className="section-eyebrow">Before you play</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Hosts organize games — ballaCity doesn't supervise them, referee, or inspect venues.
+            Hosts organize games — BallaCity doesn't supervise them, referee, or inspect venues.
             Warm up, play within your ability, and stop if you're hurt.
           </p>
           <PolicyLinks className="mt-3" />
