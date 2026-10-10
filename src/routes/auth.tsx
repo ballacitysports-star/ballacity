@@ -897,6 +897,10 @@ function AuthPage() {
               ·{" "}
               <Link to="/cookies" className="underline">
                 Cookies
+              </Link>{" "}
+              ·{" "}
+              <Link to="/staff" className="underline">
+                Staff sign-in
               </Link>
             </p>
           </>
