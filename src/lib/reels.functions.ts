@@ -213,7 +213,7 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
         processing_step: regen.processing_step,
         step_progress: regen.step_progress,
         style_prefs: data.style,
-      },
+      } as Parameters<typeof processReel>[0],
       supabaseAdmin,
       apiKey,
     );
