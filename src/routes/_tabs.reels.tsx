@@ -1034,7 +1034,11 @@ function ReelsPage() {
       const clipForFrames = converted
         ? new File([playable], `${file.name}.h264.mp4`, { type: "video/mp4" })
         : file;
-      const { frames, audio } = await captureClip(clipForFrames);
+      // Paying members get a denser look (more frames) for Pro Analytics. In free mode
+      // everyone is "active", so that alone does not count.
+      const { frames, audio } = await captureClip(clipForFrames, {
+        dense: isActive && !access.freeMode,
+      });
       for (let i = 0; i < frames.length; i++) {
         const framePath = `${base}.frame${i + 1}.jpg`;
         const { error } = await supabase.storage

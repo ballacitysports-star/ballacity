@@ -21,14 +21,24 @@ export type CapturedClip = {
 };
 
 /** Denser sampling for longer clips, capped so uploads stay quick. */
-export function frameCountFor(duration: number): number {
-  if (!duration || !Number.isFinite(duration)) return 6;
+export function frameCountFor(duration: number, dense = false): number {
+  if (!duration || !Number.isFinite(duration)) return dense ? 8 : 6;
+  if (dense) {
+    // Pro: about twice the frames, so a shot or a cut is caught between two of them.
+    // Capped at DENSE_MAX_FRAMES, which is also what the analytics step reads.
+    if (duration <= 8) return 16;
+    if (duration <= 20) return 24;
+    return DENSE_MAX_FRAMES;
+  }
   if (duration <= 8) return 8;
   if (duration <= 20) return 12;
   if (duration <= 45) return 16;
   if (duration <= 90) return 20;
   return 24;
 }
+
+/** The most frames any reel keeps for analysis; the Pro Analytics step reads up to this many. */
+export const DENSE_MAX_FRAMES = 32;
 
 function sampleTimes(duration: number, count: number): number[] {
   if (!duration) return [0];
@@ -149,7 +159,7 @@ export async function extractAudio(file: File): Promise<Blob | null> {
  * Samples frames (with their real timestamps) plus the audio track.
  * Never throws — degrades to fewer frames / no audio.
  */
-export async function captureClip(file: File): Promise<CapturedClip> {
+export async function captureClip(file: File, opts: { dense?: boolean } = {}): Promise<CapturedClip> {
   const empty: CapturedClip = { frames: [], duration: 0, audio: null };
   if (typeof document === "undefined") return empty;
   const url = URL.createObjectURL(file);
@@ -175,7 +185,7 @@ export async function captureClip(file: File): Promise<CapturedClip> {
     canvas.height = Math.round(video.videoHeight * scale);
 
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-    const times = sampleTimes(duration, frameCountFor(duration));
+    const times = sampleTimes(duration, frameCountFor(duration, opts.dense === true));
 
     const frames: CapturedFrame[] = [];
     for (const t of times) {
