@@ -11,6 +11,7 @@ export type ClosedTxn = {
   counterpartyId: string; // revieweeId you may now review
   counterpartyName: string;
   gameId: string | null;
+  sport: string | null;
   context: string;
   date: string; // ISO, when the shared activity happened
   closesAt: string | null; // ISO, last moment a review is accepted (games only)
@@ -27,6 +28,7 @@ export function useTransactionsWith(revieweeId: string): ClosedTxn[] {
           counterpartyId: r.revieweeId,
           counterpartyName: r.revieweeName,
           gameId: r.gameId,
+          sport: r.sport,
           context: r.context ?? "",
           date: r.happenedAt ?? "",
           closesAt: r.closesAt,

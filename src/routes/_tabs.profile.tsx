@@ -18,6 +18,7 @@ import { GameCardSkeleton } from "@/components/GameCardSkeleton";
 import { InfiniteList } from "@/components/InfiniteList";
 import { EmptyRequestsState } from "@/components/EmptyRequestsState";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
@@ -906,6 +907,7 @@ function PlayerProfile() {
 
         {/* Reviews tab — inline */}
         <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
+          <SkillRatingCard userId={user?.id} isOwner />
           <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
         </div>
 

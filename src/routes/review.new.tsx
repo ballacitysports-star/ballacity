@@ -15,6 +15,7 @@ import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { suggestReviewText } from "@/lib/reviews.functions";
+import { submitSkillVote } from "@/lib/skill.functions";
 
 type Search = {
   revieweeId?: string;
@@ -59,6 +60,7 @@ function ReviewNew() {
   const [body, setBody] = useState("");
   const [picks, setPicks] = useState<string[]>([]);
   const [drafting, setDrafting] = useState(false);
+  const [skillVote, setSkillVote] = useState<-1 | 0 | 1 | null>(null);
   const [pickedGame, setPickedGame] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
@@ -114,6 +116,15 @@ function ReviewNew() {
       },
       {
         onSuccess: () => {
+          if (skillVote !== null && selected?.gameId && revieweeKind === "player") {
+            void submitSkillVote({
+              data: {
+                gameId: selected.gameId,
+                subjectId: search.revieweeId ?? "",
+                vote: skillVote,
+              },
+            }).catch(() => undefined);
+          }
           toast.success(isPrivate ? "Private feedback sent" : "Review posted");
           goBack();
         },
@@ -369,6 +380,40 @@ function ReviewNew() {
             <span>{body.length} / 600</span>
           </div>
         </section>
+
+        {/* Skill check (optional, game reviews of players) */}
+        {revieweeKind === "player" && selected?.gameId && selected.sport && (
+          <section>
+            <h2 className="font-display section-eyebrow text-muted-foreground mb-1">
+              Skill check <span className="normal-case text-[10px]">(optional · anonymous)</span>
+            </h2>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              Compared with the level of this {selected.sport} game, how did they play?
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  [-1, "Below"],
+                  [0, "About right"],
+                  [1, "Above"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setSkillVote((cur) => (cur === v ? null : v))}
+                  className={`rounded-2xl border px-3 py-2.5 text-xs font-semibold ${
+                    skillVote === v
+                      ? "border-lime bg-lime/10 text-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Public / private */}
         <section>

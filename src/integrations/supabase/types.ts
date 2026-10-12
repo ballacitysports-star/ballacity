@@ -3092,6 +3092,87 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_ratings: {
+        Row: {
+          high: number
+          hidden: boolean
+          label: string
+          low: number
+          mu: number
+          report: Json | null
+          report_at: string | null
+          self_tier: string | null
+          signals: Json
+          sigma: number
+          sport: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          high: number
+          hidden?: boolean
+          label: string
+          low: number
+          mu: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          signals?: Json
+          sigma: number
+          sport: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          high?: number
+          hidden?: boolean
+          label?: string
+          low?: number
+          mu?: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          signals?: Json
+          sigma?: number
+          sport?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skill_votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          sport?: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          sport?: string
+          subject_id?: string
+          vote?: number
+          voter_id?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           body: string
@@ -4843,6 +4924,7 @@ export type Database = {
           respectful: number
         }[]
       }
+      set_skill_rating_hidden: { Args: { _hidden: boolean; _sport: string }; Returns: undefined }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {

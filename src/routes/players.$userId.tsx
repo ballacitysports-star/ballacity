@@ -34,6 +34,7 @@ import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
 import { kmToMi, formatDistance } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -626,6 +627,7 @@ function PlayerProfilePage() {
 
         {/* Badges — earned from attendance reliability + sportsmanship */}
         {badges.length > 0 && <BadgeList className="mt-6" badgeIds={badges} />}
+        <SkillRatingCard userId={userId} isOwner={user?.id === userId} />
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
