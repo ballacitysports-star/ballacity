@@ -88,6 +88,7 @@ import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
 import { ReelProgress } from "@/components/reels/ReelProgress";
+import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
 import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
 import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
@@ -1386,6 +1387,7 @@ function ReelsPage() {
           {gameId ? "Recaps for this game" : "Your reels"}
         </h2>
         {!gameId && <ReelProgress reels={reels} />}
+        {!gameId && <AnalyticsCoachShare className="mb-4" />}
         {visibleReels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {gameId

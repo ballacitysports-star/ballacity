@@ -78,6 +78,11 @@ export function describeFamilyActivity(entry: {
         title: "Child's view of family clips changed",
         detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
       };
+    case "child.analytics_share_changed":
+      return {
+        title: "Analytics sharing with coaches changed",
+        detail: ctx["enabled"] === true ? "Shared with a team's coaches" : "No longer shared with a team's coaches",
+      };
     case "child.public_xp_changed":
       return {
         title: "Public level and XP changed",

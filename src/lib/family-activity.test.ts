@@ -123,3 +123,14 @@ describe("public XP toggle in the activity trail", () => {
     ).toContain("no longer");
   });
 });
+
+describe("coach analytics sharing in the activity trail", () => {
+  it("words both states", () => {
+    expect(
+      describeFamilyActivity({ action: "child.analytics_share_changed", context: { enabled: true } }).detail,
+    ).toContain("Shared with");
+    expect(
+      describeFamilyActivity({ action: "child.analytics_share_changed", context: { enabled: false } }).detail,
+    ).toContain("No longer");
+  });
+});

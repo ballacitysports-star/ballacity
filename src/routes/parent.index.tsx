@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { getChildPublicXp, setChildPublicXp } from "@/lib/public-xp.functions";
 import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
 import {
@@ -386,6 +387,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       <div className="mt-4 grid gap-4">
         <FamilyPostLink child={child} />
         <PublicXpToggle child={child} />
+        <AnalyticsCoachShare childUserId={child.childUserId} childName={child.displayName} />
         <OptionRow
           label="Messaging"
           value={c.messaging}
