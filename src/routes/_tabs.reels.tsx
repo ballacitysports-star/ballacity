@@ -92,6 +92,8 @@ import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
 import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
 import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
+import { useMyCohort } from "@/lib/youth-features";
+import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
 
 export const Route = createFileRoute("/_tabs/reels")({
   // `child` is optional so the existing links to this page need no change.
@@ -664,6 +666,7 @@ function ReelsPage() {
   const { isParentMode } = useParentMode();
   const navigate = useNavigate();
   const { can: canChildFeature } = useMyChildStatus();
+  const { cohort: myCohort } = useMyCohort();
   const uploadDecision = canChildFeature("video_upload");
   const {
     game: gameId,
@@ -1039,6 +1042,20 @@ function ReelsPage() {
         await finalizeVideoUpload({ data: { path: p, kind: "video" } });
         playbackPath = p;
       }
+      // Optional body tracking: adults and 16-17 only, never family clips. Only the
+      // summary is kept; a null result simply leaves pose out of the record.
+      let pose: PoseMetrics | null = null;
+      if (!subjectChild && poseAllowedForCohort(myCohort)) {
+        const poseToast = toast.loading("Measuring movement…");
+        try {
+          const { capturePoseMetrics } = await import("@/lib/pose-capture");
+          pose = await capturePoseMetrics(playable as File);
+        } catch {
+          pose = null;
+        } finally {
+          toast.dismiss(poseToast);
+        }
+      }
       const mediaMeta = buildMediaMeta({
         file: { name: file.name, type: file.type, size: file.size },
         original: originalProbe,
@@ -1047,6 +1064,7 @@ function ReelsPage() {
         // rather than stored, so a saved reel is always "ready" or "original"
         // and never "failed".
         conversionAttempted,
+        pose,
       });
 
       // Sample frames + audio in the browser: they become the real thumbnail and
