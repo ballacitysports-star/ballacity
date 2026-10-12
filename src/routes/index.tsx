@@ -515,10 +515,10 @@ function Landing() {
       <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
         <div className="mb-6">
           <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Pickup games for every sport
+            Sports on BallaCity
           </h2>
           <p className="text-muted-foreground mt-1">
-            Pick a sport to learn how pickup games work — group sizes, gear and etiquette.
+            Find games, tryouts, teams and trainers across every sport in your area.
           </p>
         </div>
         <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -533,7 +533,7 @@ function Landing() {
                 <span aria-hidden className="block text-3xl mb-2">
                   {g.emoji}
                 </span>
-                <span className="font-semibold">Pickup {g.sport.toLowerCase()}</span>
+                <span className="font-semibold">{g.sport}</span>
               </Link>
             </li>
           ))}
