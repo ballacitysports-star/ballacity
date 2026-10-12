@@ -13,13 +13,13 @@
     "server": {
       "name": "openrun-mcp",
       "version": "0.1.0",
-      "title": "ballaCity"
+      "title": "BallaCity"
     },
     "tools": [
       {
         "name": "whoami",
         "title": "Who am I",
-        "description": "Return the signed-in ballaCity user's id and email for the current MCP session.",
+        "description": "Return the signed-in BallaCity user's id and email for the current MCP session.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -35,7 +35,7 @@
       {
         "name": "list_upcoming_games",
         "title": "List upcoming games",
-        "description": "List upcoming pickup games visible to the signed-in ballaCity user, ordered by date.",
+        "description": "List upcoming pickup games visible to the signed-in BallaCity user, ordered by date.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
