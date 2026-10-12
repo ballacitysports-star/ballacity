@@ -87,6 +87,7 @@ import {
 import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
+import { ReelProgress } from "@/components/reels/ReelProgress";
 import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
 
 export const Route = createFileRoute("/_tabs/reels")({
@@ -1353,6 +1354,7 @@ function ReelsPage() {
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {gameId ? "Recaps for this game" : "Your reels"}
         </h2>
+        {!gameId && <ReelProgress reels={reels} />}
         {visibleReels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {gameId
