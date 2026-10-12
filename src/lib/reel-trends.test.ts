@@ -56,3 +56,37 @@ describe("buildReelTrends", () => {
     expect(t.recurringStrengths).toEqual([]);
   });
 });
+
+import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
+
+describe("follow-up against the previous clip", () => {
+  const cues = (list: [string, "fix" | "strength"][]) => ({
+    biomechanics: list.map(([area, kind], i) => ({ t: i + 1, area, cue: `${area} ${kind}`, kind })),
+  });
+
+  it("picks the closest earlier reel in the same sport", () => {
+    const a = reel(1, 60);
+    const b = reel(2, 64);
+    const c = reel(3, 70);
+    const soccer = { ...reel(2, 50), id: "s", analytics: { ...reel(2, 50).analytics!, sport: "Soccer" } };
+    expect(findPriorReel(c, [a, b, c, soccer])?.id).toBe("r2");
+    expect(findPriorReel(a, [a, b, c])).toBeNull();
+    expect(findPriorReel({ ...c, analytics: null }, [a, b])).toBeNull();
+  });
+
+  it("reports improved, still, new and holding, and never claims an absent fix improved", () => {
+    const prior = reel(1, 60, cues([["Release", "fix"], ["Base", "fix"], ["Footwork", "fix"], ["Balance", "strength"]]));
+    const now = reel(2, 68, cues([["Release", "strength"], ["Base", "fix"], ["Hips", "fix"], ["Balance", "strength"]]));
+    const f = compareToPrior(now.analytics!, prior)!;
+    const status = Object.fromEntries(f.items.map((i) => [i.area, i.status]));
+    expect(status).toEqual({
+      Release: "improved",
+      Base: "still",
+      Footwork: "not_seen",
+      Hips: "new",
+      Balance: "holding",
+    });
+    expect(f.ratingChanges.find((r) => r.key === "overall")!.change).toBe(8);
+    expect(f.items[0].status).toBe("still");
+  });
+});

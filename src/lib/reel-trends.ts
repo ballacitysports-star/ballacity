@@ -112,3 +112,96 @@ export function buildReelTrends(reels: TrendReel[]): ReelTrends | null {
     recurringStrengths: recurring(ordered, "strength"),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Since your last clip                                                */
+/* ------------------------------------------------------------------ */
+
+export type FocusStatus = "improved" | "still" | "new" | "holding" | "not_seen";
+
+export type FocusItem = {
+  area: string;
+  status: FocusStatus;
+  /** The cue from this clip when there is one, else from the earlier clip. */
+  cue: string;
+};
+
+export type FollowUp = {
+  priorTitle: string;
+  priorAt: string;
+  ratingChanges: { key: AnalyticsRatingKey; change: number }[];
+  items: FocusItem[];
+};
+
+/**
+ * The reel to compare `current` against: the most recent earlier one in the same
+ * sport that has analytics. Never crosses sports, never looks at later reels.
+ */
+export function findPriorReel(current: TrendReel, all: TrendReel[]): TrendReel | null {
+  if (!current.analytics) return null;
+  const sport = (current.analytics.sport ?? "").trim().toLowerCase();
+  const at = Date.parse(current.created_at);
+  let best: TrendReel | null = null;
+  for (const r of all) {
+    if (r.id === current.id || !r.analytics) continue;
+    if ((r.analytics.sport ?? "").trim().toLowerCase() !== sport) continue;
+    const t = Date.parse(r.created_at);
+    if (!Number.isFinite(t) || !Number.isFinite(at) || t >= at) continue;
+    if (!best || t > Date.parse(best.created_at)) best = r;
+  }
+  return best;
+}
+
+type AreaKinds = Map<string, { label: string; fix?: string; strength?: string }>;
+
+function kindsByArea(a: AdvancedAnalytics): AreaKinds {
+  const m: AreaKinds = new Map();
+  for (const c of a.biomechanics) {
+    const k = c.area.trim().toLowerCase();
+    if (!k) continue;
+    const cur = m.get(k) ?? { label: c.area.trim() };
+    if (c.kind === "fix") cur.fix ??= c.cue;
+    else cur.strength ??= c.cue;
+    m.set(k, cur);
+  }
+  return m;
+}
+
+/**
+ * Did the things flagged last time get better? A fix that is no longer mentioned is
+ * "not_seen", never "improved": absence from a different clip is not evidence.
+ */
+export function compareToPrior(current: AdvancedAnalytics, prior: TrendReel): FollowUp | null {
+  if (!prior.analytics) return null;
+  const now = kindsByArea(current);
+  const before = kindsByArea(prior.analytics);
+  const items: FocusItem[] = [];
+
+  for (const [k, p] of before) {
+    if (!p.fix) continue;
+    const c = now.get(k);
+    if (c?.strength && !c.fix) items.push({ area: c.label, status: "improved", cue: c.strength });
+    else if (c?.fix) items.push({ area: c.label, status: "still", cue: c.fix });
+    else items.push({ area: p.label, status: "not_seen", cue: p.fix });
+  }
+  for (const [k, c] of now) {
+    const p = before.get(k);
+    if (c.fix && !p?.fix) items.push({ area: c.label, status: "new", cue: c.fix });
+    else if (c.strength && !c.fix && p?.strength && !p.fix) {
+      items.push({ area: c.label, status: "holding", cue: c.strength });
+    }
+  }
+
+  const order: Record<FocusStatus, number> = { still: 0, new: 1, improved: 2, holding: 3, not_seen: 4 };
+  items.sort((a, b) => order[a.status] - order[b.status] || a.area.localeCompare(b.area));
+
+  return {
+    priorTitle: prior.title,
+    priorAt: prior.created_at,
+    ratingChanges: ANALYTICS_RATING_KEYS.map((key) => ({
+      key,
+      change: current.ratings[key] - prior.analytics!.ratings[key],
+    })),
+    items: items.slice(0, 6),
+  };
+}

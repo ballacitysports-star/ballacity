@@ -88,6 +88,8 @@ import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
 import { ReelProgress } from "@/components/reels/ReelProgress";
+import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
+import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
 import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
 
 export const Route = createFileRoute("/_tabs/reels")({
@@ -158,7 +160,16 @@ type Reel = {
   subject_child_id?: string | null;
 };
 
-function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
+function ReelCard({
+  reel,
+  onRetry,
+  prior,
+}: {
+  reel: Reel;
+  onRetry: (id: string) => Promise<void>;
+  /** The most recent earlier analysed reel in the same sport, for "since your last clip". */
+  prior?: { title: string; created_at: string; analytics: AdvancedAnalytics } | null;
+}) {
   const [thumb, setThumb] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -530,6 +541,18 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         />
       )}
 
+      {isDone && reel.ai_advanced_analytics && prior && (() => {
+        const followUp = compareToPrior(reel.ai_advanced_analytics!, {
+          id: "prior",
+          title: prior.title,
+          created_at: prior.created_at,
+          analytics: prior.analytics,
+        });
+        return followUp ? (
+          <ReelFollowUp followUp={followUp} drills={reel.ai_coaching?.drills ?? []} />
+        ) : null;
+      })()}
+
       {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
         <div className="mt-2">
           <button
@@ -749,6 +772,10 @@ function ReelsPage() {
   const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
+  // Earlier reels a clip can be compared with: the athlete's own finished, posted ones.
+  const trendPool = reels
+    .filter((r) => r.status === "completed" && !r.is_draft && !r.subject_child_id)
+    .map((r) => ({ id: r.id, title: r.title, created_at: r.created_at, analytics: r.ai_advanced_analytics }));
 
   const canGenerate = isActive || unlimitedReels || freeRemaining > 0;
   const lockedReason = !user
@@ -1367,9 +1394,27 @@ function ReelsPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {visibleReels.map((r) => (
-              <ReelCard key={r.id} reel={r} onRetry={kickOffProcessing} />
-            ))}
+            {visibleReels.map((r) => {
+              const found =
+                r.ai_advanced_analytics && !r.subject_child_id
+                  ? findPriorReel(
+                      { id: r.id, title: r.title, created_at: r.created_at, analytics: r.ai_advanced_analytics },
+                      trendPool,
+                    )
+                  : null;
+              return (
+                <ReelCard
+                  key={r.id}
+                  reel={r}
+                  onRetry={kickOffProcessing}
+                  prior={
+                    found && found.analytics
+                      ? { title: found.title, created_at: found.created_at, analytics: found.analytics }
+                      : null
+                  }
+                />
+              );
+            })}
           </ul>
         )}
         {gameId && reels.length > gameReels.length && (
