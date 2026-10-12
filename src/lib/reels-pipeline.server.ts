@@ -14,6 +14,7 @@ import { DEFAULT_AI_PROVIDER, type AiProviderConfig } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import type { AiMessagePart } from "@/lib/ai/provider";
+import { DENSE_MAX_FRAMES } from "@/lib/reel-frames";
 import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
 
 export const MAX_ATTEMPTS = 3;
@@ -422,7 +423,7 @@ const STEP_RUNNERS: Record<
   },
 
   /**
-   * Pro Analytics: a second, denser look at the footage (up to 16 frames) that
+   * Pro Analytics: a second, denser look at the footage (up to 32 frames when the athlete uploaded a dense capture) that
    * grades the athlete 0–100, ties biomechanics cues to timestamps, and writes
    * a playstyle archetype, style comps and a scout report. Runs on the
    * configurable `analyticsModel`. It does not depend on the reel's style, so a
@@ -434,7 +435,7 @@ const STEP_RUNNERS: Record<
     if (!progress.analysis?.summary) return { advanced_analytics: null };
     try {
       const images: { url: string; t: number | null }[] = [];
-      for (const p of sampleFrames(reel, 16)) {
+      for (const p of sampleFrames(reel, DENSE_MAX_FRAMES)) {
         const url = await frameDataUrl(ctx.supabaseAdmin, reel.user_id, p.path);
         if (url) images.push({ url, t: p.t });
       }
