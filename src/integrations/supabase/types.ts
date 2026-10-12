@@ -287,6 +287,35 @@ export type Database = {
           },
         ]
       }
+      analytics_team_shares: {
+        Row: {
+          created_at: string
+          set_by: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          set_by: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          set_by?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_team_shares_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -4271,6 +4300,10 @@ export type Database = {
         }
         Returns: Json
       }
+      analytics_share_active: {
+        Args: { _team: string; _user: string }
+        Returns: boolean
+      }
       approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
@@ -4313,6 +4346,13 @@ export type Database = {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
       }
+      coach_analytics_athletes: {
+        Args: { _team: string; _viewer: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
+      coach_analytics_enabled: { Args: never; Returns: boolean }
       confirm_device_pairing: { Args: never; Returns: boolean }
       create_device_pairing: {
         Args: {
