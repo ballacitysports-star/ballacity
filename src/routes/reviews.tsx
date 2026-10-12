@@ -118,7 +118,7 @@ function ReviewsDashboard() {
       rep: computeReputation(r.reviews, r.revieweeKind),
     }));
     if (sort === "trust") withRep.sort((a, b) => b.rep.trustScore - a.rep.trustScore);
-    if (sort === "rating") withRep.sort((a, b) => b.rep.avg - a.rep.avg);
+    if (sort === "rating") withRep.sort((a, b) => b.rep.adjustedAvg - a.rep.adjustedAvg);
     if (sort === "count") withRep.sort((a, b) => b.rep.count - a.rep.count);
     return withRep;
   }, [filtered, sort]);

@@ -1,8 +1,11 @@
+import { weightedCriterion, weightedStats } from "@/lib/reputation-engine";
+
 export type ReviewerKind = "player" | "trainer" | "team" | "host";
 export type RevieweeKind = "player" | "trainer" | "team" | "host";
 
 export type Review = {
   id: string;
+  reviewerId?: string; // auth user id of the author (database reviews)
   kind: ReviewerKind; // who is leaving the review
   revieweeKind: RevieweeKind; // who the review is about
   revieweeId: string;
@@ -369,8 +372,18 @@ export type Reputation = {
   topStrengths: { key: string; label: string; avg: number }[];
   aiSummary: string;
   verifiedShare: number; // 0..1
+  /** Platform-prior-shrunk, recency/verification-weighted average. Use for ranking. */
+  adjustedAvg: number;
+  /** Reviews counted at full strength after weighting. */
+  effectiveCount: number;
+  /** 0..1 — how settled the rating is. */
+  confidence: number;
+  /** Too little evidence to treat the score as established. */
+  provisional: boolean;
   recentTrend: "up" | "down" | "flat";
 };
+
+const reviewerKey = (r: Review) => r.reviewerId ?? (r.reviewerHandle || r.reviewerName);
 
 export function computeReputation(list: Review[], kind: RevieweeKind): Reputation {
   const visible = list.filter((r) => !r.flagged && !r.isPrivate);
@@ -386,13 +399,13 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
   );
 
   const criteria = CRITERIA[kind];
-  const criteriaAverages = criteria.map((c) => {
-    const values = visible
-      .map((r) => r.scores?.[c.key])
-      .filter((v): v is number => typeof v === "number");
-    const a = values.length ? values.reduce((x, y) => x + y, 0) / values.length : 0;
-    return { key: c.key, label: c.label, avg: a };
-  });
+  const weightable = visible.map((r) => ({ ...r, reviewerKey: reviewerKey(r) }));
+  const stats = weightedStats(weightable);
+  const criteriaAverages = criteria.map((c) => ({
+    key: c.key,
+    label: c.label,
+    avg: weightedCriterion(weightable, c.key),
+  }));
   const topStrengths = [...criteriaAverages]
     .filter((c) => c.avg > 0)
     .sort((a, b) => b.avg - a.avg)
@@ -400,9 +413,10 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
 
   const verifiedShare = count ? visible.filter((r) => r.verified).length / count : 0;
 
-  // Trust score: avg quality (60%) + volume curve (20%) + verified share (15%) + diversity (5%)
-  const quality = (avg / 5) * 60;
-  const volume = Math.min(1, count / 12) * 20;
+  // Trust score: shrunk weighted quality (60%) + effective volume (20%) +
+  // verified share (15%) + reviewer diversity (5%). See reputation-engine.ts.
+  const quality = count ? (stats.adjustedAvg / 5) * 60 : 0;
+  const volume = Math.min(1, stats.effectiveCount / 12) * 20;
   const verified = verifiedShare * 15;
   const diversity = (Math.min(4, Object.keys(byKind).length) / 4) * 5;
   const trustScore = Math.round(quality + volume + verified + diversity);
@@ -430,6 +444,10 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
     topStrengths,
     aiSummary,
     verifiedShare,
+    adjustedAvg: stats.adjustedAvg,
+    effectiveCount: stats.effectiveCount,
+    confidence: stats.confidence,
+    provisional: stats.provisional,
     recentTrend,
   };
 }

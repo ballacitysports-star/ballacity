@@ -40,6 +40,7 @@ export function rowToReview(row: ReviewRow, p?: ProfileLite): Review {
   const name = p?.display_name ?? "Player";
   return {
     id: row.id,
+    reviewerId: row.reviewer_id,
     kind: row.kind as ReviewerKind,
     revieweeKind: row.reviewee_kind as RevieweeKind,
     revieweeId: row.reviewee_id,

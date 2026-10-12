@@ -34,12 +34,18 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="micro-label text-muted-foreground">
-            Reputation
-          </div>
+          <div className="micro-label text-muted-foreground">Reputation</div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="font-display text-4xl font-bold leading-none">{rep.trustScore}</span>
             <span className="text-xs text-muted-foreground">/ 100 trust</span>
+            {rep.count > 0 && rep.provisional && (
+              <span
+                className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground"
+                title="Not enough recent, verified reviews yet — this score will settle as more come in."
+              >
+                Provisional
+              </span>
+            )}
           </div>
           <div
             className={`mt-1.5 inline-flex items-center gap-1 text-sm font-bold ${rep.level.color}`}
@@ -105,9 +111,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Top strengths */}
       {rep.topStrengths.length > 0 && (
         <div className="mt-4">
-          <div className="micro-label text-muted-foreground mb-2">
-            Top strengths
-          </div>
+          <div className="micro-label text-muted-foreground mb-2">Top strengths</div>
           <div className="flex flex-wrap gap-1.5">
             {rep.topStrengths.map((s) => (
               <span
@@ -124,9 +128,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Criteria breakdown bars */}
       {rep.criteriaAverages.some((c) => c.avg > 0) && (
         <div className="mt-4">
-          <div className="micro-label text-muted-foreground mb-2">
-            Breakdown
-          </div>
+          <div className="micro-label text-muted-foreground mb-2">Breakdown</div>
           <div className="grid grid-cols-1 gap-1.5">
             {rep.criteriaAverages.map((c) => (
               <div key={c.key} className="grid grid-cols-[1fr_auto] items-center gap-2">
