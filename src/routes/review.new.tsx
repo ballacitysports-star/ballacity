@@ -13,6 +13,8 @@ import {
 import { useTransactionsWith } from "@/lib/transactions";
 import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
+import { suggestReviewText } from "@/lib/reviews.functions";
 
 type Search = {
   revieweeId?: string;
@@ -55,6 +57,8 @@ function ReviewNew() {
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [picks, setPicks] = useState<string[]>([]);
+  const [drafting, setDrafting] = useState(false);
   const [pickedGame, setPickedGame] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
@@ -76,6 +80,20 @@ function ReviewNew() {
       nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
     } else {
       nav({ to: "/profile" });
+    }
+  };
+
+  const draftWithAi = async () => {
+    setDrafting(true);
+    try {
+      const res = await suggestReviewText({
+        data: { revieweeKind, rating, highlights: picks, context: selected?.context ?? null },
+      });
+      setBody(res.draft);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
+    } finally {
+      setDrafting(false);
     }
   };
 
@@ -309,8 +327,45 @@ function ReviewNew() {
             maxLength={600}
             className="mt-2 w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
+          <div className="mt-3 rounded-2xl border border-lime/20 bg-lime/5 p-3">
+            <div className="flex items-center gap-1.5 micro-label text-lime">
+              <Sparkles className="h-3 w-3" /> Need a hand? Tap what you noticed
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {criteria.slice(0, 6).map((c) => {
+                const on = picks.includes(c.label);
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() =>
+                      setPicks((p) => (on ? p.filter((x) => x !== c.label) : [...p, c.label]))
+                    }
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      on
+                        ? "border-lime bg-lime/20 text-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={draftWithAi}
+              disabled={drafting || picks.length === 0}
+              className="mt-2 inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
+            >
+              <Sparkles className="h-3 w-3" /> {drafting ? "Drafting…" : "Draft with AI"}
+            </button>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              AI only uses the points you tap. Edit it so it sounds like you.
+            </p>
+          </div>
           <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>Auto-moderation filters toxic language.</span>
+            <span>AI moderation checks every review before it posts.</span>
             <span>{body.length} / 600</span>
           </div>
         </section>

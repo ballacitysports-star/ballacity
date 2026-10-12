@@ -9,7 +9,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { makeBadgeStats, type BadgeStats } from "@/lib/badges";
+import { makeBadgeStats, type BadgeStats, type SportsmanshipTraitCounts } from "@/lib/badges";
 
 export type PlayerActivityStats = {
   gamesJoined: number;
@@ -24,6 +24,8 @@ export type PlayerActivityStats = {
   verifiedReviewCount: number;
   reviewAvg: number;
   firstActivityAt: string | null;
+  /** AI-extracted trait mentions from reviews (zeros until reviews are analysed). */
+  traits?: SportsmanshipTraitCounts;
 };
 
 export const EMPTY_PLAYER_STATS: PlayerActivityStats = {
@@ -65,6 +67,7 @@ export function toBadgeStats(s: PlayerActivityStats, verified = false): BadgeSta
     onTimeRate: showUpRate,
     sportsmanshipRating: s.reviewAvg,
     reviewCount: s.reviewCount,
+    ...(s.traits ? { traits: s.traits } : {}),
     verified,
   });
 }
@@ -75,7 +78,16 @@ export async function fetchPlayerActivityStats(userId: string): Promise<PlayerAc
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
   if (!row) return EMPTY_PLAYER_STATS;
   const num = (k: string) => Number(row[k] ?? 0) || 0;
+  const { data: t } = await supabase.rpc("player_trait_counts", { _user: userId });
+  const tr = (Array.isArray(t) ? t[0] : t) as Record<string, number> | null | undefined;
   return {
+    traits: {
+      respectful: Number(tr?.respectful ?? 0),
+      communicative: Number(tr?.communicative ?? 0),
+      fairPlay: Number(tr?.fair_play ?? 0),
+      positive: Number(tr?.positive ?? 0),
+      onTime: Number(tr?.on_time ?? 0),
+    },
     gamesJoined: num("games_joined"),
     gamesAttended: num("games_attended"),
     gamesCompleted: num("games_completed"),

@@ -23,6 +23,11 @@ describe("reputation engine", () => {
     expect(u / v).toBeCloseTo(ENGINE.unverifiedWeight);
   });
 
+  it("halves the weight of a review whose stars contradict its text", () => {
+    const [ok, bad] = reviewWeights([r(5, "a"), { ...r(5, "b"), mismatch: true }], NOW);
+    expect(bad / ok).toBeCloseTo(ENGINE.mismatchWeight);
+  });
+
   it("applies diminishing weight to repeat reviews from one reviewer", () => {
     const w = reviewWeights([r(5, "a", 1), r(5, "a", 2), r(5, "a", 3)], NOW);
     // newest counts fully, then 1/√2, then 1/√3 (modulo recency)

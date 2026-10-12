@@ -15,6 +15,8 @@ export type WeightableReview = {
   /** ISO timestamp. */
   date: string;
   verified?: boolean;
+  /** AI found the stars contradict the written text. */
+  mismatch?: boolean;
   /** Stable id of the reviewer (or any string unique to them). */
   reviewerKey: string;
 };
@@ -28,6 +30,8 @@ export const ENGINE = {
   halfLifeDays: 180,
   /** Recency never discounts a review below this fraction. */
   recencyFloor: 0.15,
+  /** Weight multiplier when the rating contradicts the review text. */
+  mismatchWeight: 0.5,
   /** Weight of an unverified review relative to a verified one. */
   unverifiedWeight: 0.3,
   /** Effective-review count at which confidence reaches 50%. */
@@ -64,7 +68,7 @@ export function reviewWeights(reviews: WeightableReview[], now = Date.now()): nu
   }
   return reviews.map((r, i) => {
     const base = r.verified ? 1 : ENGINE.unverifiedWeight;
-    return base * recencyWeight(r.date, now) * repeat[i];
+    return base * (r.mismatch ? ENGINE.mismatchWeight : 1) * recencyWeight(r.date, now) * repeat[i];
   });
 }
 

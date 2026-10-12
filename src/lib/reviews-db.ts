@@ -18,6 +18,7 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import type { Database } from "@/integrations/supabase/types";
+import { analyzeSubmittedReview, submitReview } from "@/lib/reviews.functions";
 
 type ReviewRow = Database["public"]["Tables"]["reviews"]["Row"];
 
@@ -83,7 +84,20 @@ async function fetchReviewsFor(revieweeId: string): Promise<Review[]> {
   if (error) throw error;
   const rows = data ?? [];
   const profiles = await profilesById(Array.from(new Set(rows.map((r) => r.reviewer_id))));
-  return rows.map((r) => rowToReview(r, profiles.get(r.reviewer_id)));
+  const { data: ai } = rows.length
+    ? await supabase
+        .from("review_ai_analysis")
+        .select("review_id, mismatch")
+        .in(
+          "review_id",
+          rows.map((r) => r.id),
+        )
+    : { data: [] };
+  const mismatched = new Set((ai ?? []).filter((a) => a.mismatch).map((a) => a.review_id));
+  return rows.map((r) => ({
+    ...rowToReview(r, profiles.get(r.reviewer_id)),
+    aiMismatch: mismatched.has(r.id),
+  }));
 }
 
 /**
@@ -213,30 +227,69 @@ export function useSubmitReview() {
   return useMutation({
     mutationFn: async (input: SubmitReviewInput) => {
       if (!user) throw new Error("Sign in to write a review.");
-      const { data, error } = await supabase
-        .from("reviews")
-        .insert({
-          reviewer_id: user.id,
+      const res = await submitReview({
+        data: {
           kind: input.kind,
-          reviewee_kind: input.revieweeKind,
-          reviewee_id: input.revieweeId,
-          reviewee_name: input.revieweeName,
-          game_id: input.gameId ?? null,
+          revieweeKind: input.revieweeKind,
+          revieweeId: input.revieweeId,
+          revieweeName: input.revieweeName,
+          gameId: input.gameId ?? null,
           rating: input.rating,
           scores: input.scores,
-          title: input.title?.trim() || null,
-          body: input.body.trim(),
-          is_private: input.isPrivate,
-        })
-        .select("*")
-        .single();
-      if (error) throw error;
-      return data;
+          title: input.title,
+          body: input.body,
+          isPrivate: input.isPrivate,
+        },
+      });
+      // Trait analysis + summary refresh are best-effort and never block posting.
+      if (!res.held && !input.isPrivate) {
+        void analyzeSubmittedReview({ data: { reviewId: res.id } })
+          .then(() => qc.invalidateQueries({ queryKey: ["reputation-insight"] }))
+          .catch(() => undefined);
+      }
+      return res;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["reviews"] });
       void qc.invalidateQueries({ queryKey: ["my-reviewable"] });
       void qc.invalidateQueries({ queryKey: ["player-activity-stats"] });
+    },
+  });
+}
+
+export type ReputationInsight = {
+  summary: string;
+  strengths: string[];
+  growth: string[];
+  reviewCount: number;
+  generatedAt: string;
+};
+
+/** AI-written summary of a profile's reviews, if one has been generated. */
+export function useReputationInsight(revieweeId: string, kind: RevieweeKind) {
+  const { user } = useAuth();
+  const id = revieweeId === "me" ? (user?.id ?? "me") : revieweeId;
+  return useQuery({
+    queryKey: ["reputation-insight", id, kind],
+    enabled: id !== "me" && id.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<ReputationInsight | null> => {
+      const { data, error } = await supabase
+        .from("reputation_insights")
+        .select("summary, strengths, growth, review_count, generated_at")
+        .eq("reviewee_id", id)
+        .eq("reviewee_kind", kind)
+        .maybeSingle();
+      if (error) throw error;
+      return data
+        ? {
+            summary: data.summary,
+            strengths: data.strengths,
+            growth: data.growth,
+            reviewCount: data.review_count,
+            generatedAt: data.generated_at,
+          }
+        : null;
     },
   });
 }

@@ -3024,6 +3024,74 @@ export type Database = {
           },
         ]
       }
+      review_ai_analysis: {
+        Row: {
+          created_at: string
+          mismatch: boolean
+          model: string | null
+          review_id: string
+          sentiment: number | null
+          traits: string[]
+        }
+        Insert: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Update: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id?: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_ai_analysis_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reputation_insights: {
+        Row: {
+          generated_at: string
+          growth: string[]
+          model: string | null
+          review_count: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths: string[]
+          summary: string
+        }
+        Insert: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths?: string[]
+          summary: string
+        }
+        Update: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id?: string
+          reviewee_kind?: string
+          strengths?: string[]
+          summary?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           body: string
@@ -4765,6 +4833,16 @@ export type Database = {
         }[]
       }
       report_review: { Args: { _review_id: string }; Returns: undefined }
+      player_trait_counts: {
+        Args: { _user: string }
+        Returns: {
+          communicative: number
+          fair_play: number
+          on_time: number
+          positive: number
+          respectful: number
+        }[]
+      }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {

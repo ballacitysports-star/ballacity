@@ -24,6 +24,7 @@ export type Review = {
   isPrivate?: boolean; // private feedback (only visible to reviewee)
   helpfulCount?: number;
   flagged?: boolean; // hidden after moderation
+  aiMismatch?: boolean; // rating contradicts the text (AI check); counts for less
   gameId?: string; // game this review is about, when game-based
   sport?: string;
 };
@@ -399,7 +400,11 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
   );
 
   const criteria = CRITERIA[kind];
-  const weightable = visible.map((r) => ({ ...r, reviewerKey: reviewerKey(r) }));
+  const weightable = visible.map((r) => ({
+    ...r,
+    reviewerKey: reviewerKey(r),
+    mismatch: r.aiMismatch,
+  }));
   const stats = weightedStats(weightable);
   const criteriaAverages = criteria.map((c) => ({
     key: c.key,
