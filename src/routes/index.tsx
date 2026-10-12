@@ -224,7 +224,7 @@ function Landing() {
               className="enter-up mt-8 flex flex-wrap gap-2"
             >
               {[
-                visible.pickupGames && ["#trending", "🏀 Pickup games"],
+                visible.pickupGames && ["#trending", "🏀 Games & runs"],
                 visible.tryouts && ["#tryouts", "📋 Tryouts & camps"],
                 visible.availability && ["#availability", "🙋 Get found"],
                 ["#for-teams", "🧢 Teams & trainers"],
@@ -283,7 +283,7 @@ function Landing() {
       {/* How it works */}
       <section id="how" className="page-shell py-16" aria-labelledby="how-heading">
         <h2 id="how-heading" className="font-display text-3xl md:text-4xl font-bold mb-8">
-          How to join a pickup game
+          How to join a game
         </h2>
         <ol className="grid md:grid-cols-3 gap-4">
           {[
@@ -400,7 +400,7 @@ function Landing() {
                 "Parents of young players can message you directly",
               ],
               cta: { to: "/players" as const, label: "Find players" },
-              cta2: { to: "/teams" as const, label: "Post a tryout" },
+              cta2: { to: "/teams/create" as const, label: "Post a tryout" },
             },
             {
               icon: Dumbbell,
@@ -452,30 +452,6 @@ function Landing() {
             );
           })}
         </ul>
-        <nav aria-label="Explore BallaCity" className="mt-6">
-          <p className="text-sm font-semibold text-muted-foreground mb-3">Jump in:</p>
-          <ul className="flex flex-wrap gap-2">
-            {[
-              { to: "/feed" as const, icon: CalendarClock, label: "Find games near you" },
-              { to: "/teams" as const, icon: ClipboardList, label: "Tryouts & camps" },
-              { to: "/players" as const, icon: Search, label: "Player availability" },
-              { to: "/trainers" as const, icon: Dumbbell, label: "Find a trainer" },
-              { to: "/orgs" as const, icon: MapPin, label: "Gyms & courts" },
-            ].map((a) => {
-              const Icon = a.icon;
-              return (
-                <li key={a.label}>
-                  <Link
-                    to={a.to}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold hover:border-lime/40 transition-colors"
-                  >
-                    <Icon className="h-4 w-4 text-lime" /> {a.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
       </section>
 
       {/* Gyms & facilities */}
@@ -541,12 +517,6 @@ function Landing() {
               className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
             >
               Explore facilities
-            </Link>
-            <Link
-              to="/feed"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
-            >
-              Find games at gyms
             </Link>
           </div>
         </div>
