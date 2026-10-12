@@ -388,6 +388,7 @@ function Landing() {
                 "Collect signed waivers — parents sign for minors",
               ],
               cta: { to: "/teams/create" as const, label: "Create a team" },
+              cta2: { to: "/teams" as const, label: "Browse teams" },
             },
             {
               icon: ClipboardList,
@@ -399,6 +400,7 @@ function Landing() {
                 "Parents of young players can message you directly",
               ],
               cta: { to: "/players" as const, label: "Find players" },
+              cta2: { to: "/teams" as const, label: "Post a tryout" },
             },
             {
               icon: Dumbbell,
@@ -409,6 +411,7 @@ function Landing() {
                 "Collect fees directly — no platform cut",
               ],
               cta: { to: "/trainers/create" as const, label: "Become a trainer" },
+              cta2: { to: "/trainers" as const, label: "Find a trainer" },
             },
           ].map((c) => {
             const Icon = c.icon;
@@ -431,16 +434,48 @@ function Landing() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to={c.cta.to}
-                  className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-lime hover:underline"
-                >
-                  {c.cta.label} <ArrowRight className="h-4 w-4" />
-                </Link>
+                <div className="mt-auto pt-5 flex flex-wrap gap-x-4 gap-y-2">
+                  <Link
+                    to={c.cta.to}
+                    className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-lime hover:underline"
+                  >
+                    {c.cta.label} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    to={c.cta2.to}
+                    className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    {c.cta2.label}
+                  </Link>
+                </div>
               </li>
             );
           })}
         </ul>
+        <nav aria-label="Explore BallaCity" className="mt-6">
+          <p className="text-sm font-semibold text-muted-foreground mb-3">Jump in:</p>
+          <ul className="flex flex-wrap gap-2">
+            {[
+              { to: "/feed" as const, icon: CalendarClock, label: "Find games near you" },
+              { to: "/teams" as const, icon: ClipboardList, label: "Tryouts & camps" },
+              { to: "/players" as const, icon: Search, label: "Player availability" },
+              { to: "/trainers" as const, icon: Dumbbell, label: "Find a trainer" },
+              { to: "/orgs" as const, icon: MapPin, label: "Gyms & courts" },
+            ].map((a) => {
+              const Icon = a.icon;
+              return (
+                <li key={a.label}>
+                  <Link
+                    to={a.to}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold hover:border-lime/40 transition-colors"
+                  >
+                    <Icon className="h-4 w-4 text-lime" /> {a.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </section>
 
       {/* Gyms & facilities */}
@@ -506,6 +541,12 @@ function Landing() {
               className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
             >
               Explore facilities
+            </Link>
+            <Link
+              to="/feed"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
+            >
+              Find games at gyms
             </Link>
           </div>
         </div>
