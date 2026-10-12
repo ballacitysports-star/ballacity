@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 export type ReviewerKind = "player" | "trainer" | "team" | "host";
 export type RevieweeKind = "player" | "trainer" | "team" | "host";
 
@@ -23,6 +21,8 @@ export type Review = {
   isPrivate?: boolean; // private feedback (only visible to reviewee)
   helpfulCount?: number;
   flagged?: boolean; // hidden after moderation
+  gameId?: string; // game this review is about, when game-based
+  sport?: string;
 };
 
 export const REVIEWER_META: Record<
@@ -327,65 +327,16 @@ const initial: Review[] = [
   },
 ];
 
-// -------------------------- store --------------------------
+// -------------------------- demo data --------------------------
+// The seed above only backs demo entities (sample-data ids that are not real
+// accounts) and the signed-out "me" preview. Real reviews live in the database
+// and are read through `@/lib/reviews-db`.
 
-let reviews: Review[] = [...initial];
-const listeners = new Set<() => void>();
-let version = 0;
-
-function emit() {
-  version++;
-  listeners.forEach((l) => l());
+export function demoReviewsFor(revieweeId: string): Review[] {
+  return initial.filter((r) => r.revieweeId === revieweeId);
 }
 
-export function addReview(
-  r: Omit<Review, "id" | "date" | "helpfulCount"> & { id?: string; date?: string },
-) {
-  const full: Review = {
-    id: r.id ?? `rv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    date: r.date ?? new Date().toISOString(),
-    helpfulCount: 0,
-    ...r,
-  };
-  // Naive spam/toxicity gate: very short body or banned terms = auto-flag.
-  const banned = /\b(idiot|stupid|trash|loser|hate)\b/i;
-  if (full.body.trim().length < 8 || banned.test(full.body)) full.flagged = true;
-  reviews = [full, ...reviews];
-  emit();
-  return full;
-}
-
-export function markHelpful(id: string) {
-  reviews = reviews.map((r) =>
-    r.id === id ? { ...r, helpfulCount: (r.helpfulCount ?? 0) + 1 } : r,
-  );
-  emit();
-}
-
-export function reportReview(id: string) {
-  reviews = reviews.map((r) => (r.id === id ? { ...r, flagged: true } : r));
-  emit();
-}
-
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-export function getReviewsFor(revieweeId: string): Review[] {
-  return reviews.filter((r) => r.revieweeId === revieweeId);
-}
-
-export function useReviewsFor(revieweeId: string): Review[] {
-  useSyncExternalStore(
-    subscribe,
-    () => version,
-    () => version,
-  );
-  return getReviewsFor(revieweeId);
-}
-
-export function getAllReviewees(): {
+export function demoReviewees(): {
   revieweeId: string;
   revieweeKind: RevieweeKind;
   revieweeName: string;
@@ -394,7 +345,7 @@ export function getAllReviewees(): {
     string,
     { revieweeId: string; revieweeKind: RevieweeKind; revieweeName: string }
   >();
-  for (const r of reviews) {
+  for (const r of initial) {
     if (!map.has(r.revieweeId)) {
       map.set(r.revieweeId, {
         revieweeId: r.revieweeId,
@@ -404,19 +355,6 @@ export function getAllReviewees(): {
     }
   }
   return Array.from(map.values());
-}
-
-export function useAllReviewees(): {
-  revieweeId: string;
-  revieweeKind: RevieweeKind;
-  revieweeName: string;
-}[] {
-  useSyncExternalStore(
-    subscribe,
-    () => version,
-    () => version,
-  );
-  return getAllReviewees();
 }
 
 // -------------------------- reputation --------------------------

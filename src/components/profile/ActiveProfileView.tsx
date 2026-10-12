@@ -8,7 +8,8 @@ import { GAMES, HERO_IMAGE, type Game, type Org } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
 import {
   ChannelPill,

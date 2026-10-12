@@ -39,7 +39,8 @@ import { PostDetailsDialog } from "@/components/PostDetailsDialog";
 
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
 import { CreatePostSheet } from "@/components/CreatePostSheet";

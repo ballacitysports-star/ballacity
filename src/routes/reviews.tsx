@@ -6,12 +6,10 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
   computeReputation,
-  getReviewsFor,
-  useAllReviewees,
-  useReviewsFor,
   REVIEWEE_META,
   type RevieweeKind,
 } from "@/lib/reviews";
+import { useReviewBoard, useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useMemo } from "react";
 
@@ -98,7 +96,7 @@ function RevieweeCard({
 }
 
 function ReviewsDashboard() {
-  const reviewees = useAllReviewees();
+  const reviewees = useReviewBoard();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/reviews" });
   const filter: RevieweeKind | "all" = (search.filter || "all") as RevieweeKind | "all";
@@ -117,7 +115,7 @@ function ReviewsDashboard() {
   const sorted = useMemo(() => {
     const withRep = filtered.map((r) => ({
       ...r,
-      rep: computeReputation(getReviewsFor(r.revieweeId), r.revieweeKind),
+      rep: computeReputation(r.reviews, r.revieweeKind),
     }));
     if (sort === "trust") withRep.sort((a, b) => b.rep.trustScore - a.rep.trustScore);
     if (sort === "rating") withRep.sort((a, b) => b.rep.avg - a.rep.avg);

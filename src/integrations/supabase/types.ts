@@ -3030,6 +3030,7 @@ export type Database = {
           context: string | null
           created_at: string
           flagged: boolean
+          game_id: string | null
           helpful_count: number
           id: string
           is_private: boolean
@@ -3040,6 +3041,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores: Json
+          sport: string | null
           title: string | null
           verified: boolean
         }
@@ -3048,6 +3050,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -3058,6 +3061,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -3066,6 +3070,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -3076,6 +3081,7 @@ export type Database = {
           reviewee_name?: string
           reviewer_id?: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -4745,6 +4751,20 @@ export type Database = {
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }
+      my_reviewable: {
+        Args: { _kind?: string; _reviewee_id?: string }
+        Returns: {
+          closes_at: string | null
+          context: string | null
+          game_id: string | null
+          happened_at: string | null
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          sport: string | null
+        }[]
+      }
+      report_review: { Args: { _review_id: string }; Returns: undefined }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {

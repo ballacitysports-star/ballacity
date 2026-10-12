@@ -13,13 +13,11 @@ import {
 import {
   REVIEWER_META,
   computeReputation,
-  markHelpful,
-  reportReview,
-  useReviewsFor,
   type ReviewerKind,
   type Review,
   type RevieweeKind,
 } from "@/lib/reviews";
+import { useMarkHelpful, useReportReview, useReviewsFor } from "@/lib/reviews-db";
 import { ReputationCard } from "@/components/ReputationCard";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
@@ -76,6 +74,8 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
   const meta = REVIEWER_META[r.kind];
   const [reported, setReported] = useState(false);
   const [helped, setHelped] = useState(false);
+  const markHelpful = useMarkHelpful();
+  const reportReview = useReportReview();
 
   return (
     <motion.article
@@ -159,7 +159,12 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
         <button
           onClick={() => {
             if (helped) return;
-            markHelpful(r.id);
+            markHelpful.mutate(r.id, {
+              onError: () => {
+                setHelped(false);
+                toast.error("Sign in to mark reviews helpful.");
+              },
+            });
             setHelped(true);
           }}
           className={`inline-flex items-center gap-1 text-[11px] font-semibold ${helped ? "text-lime" : "text-muted-foreground"}`}
@@ -170,9 +175,14 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
           <button
             onClick={() => {
               if (reported) return;
-              reportReview(r.id);
+              reportReview.mutate(r.id, {
+                onSuccess: () => toast.success("Reported anonymously. Our mods will review."),
+                onError: () => {
+                  setReported(false);
+                  toast.error("Sign in to report a review.");
+                },
+              });
               setReported(true);
-              toast.success("Reported anonymously. Our mods will review.");
             }}
             className={`inline-flex items-center gap-1 text-[11px] font-semibold ${reported ? "text-coral" : "text-muted-foreground"}`}
           >

@@ -4,15 +4,14 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
 import {
-  addReview,
   REVIEWER_META,
   REVIEWEE_META,
   CRITERIA,
   type ReviewerKind,
   type RevieweeKind,
 } from "@/lib/reviews";
-import { ME } from "@/lib/sample-data";
-import { useCanReview, useTransactionsWith } from "@/lib/transactions";
+import { useTransactionsWith } from "@/lib/transactions";
+import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
 
 type Search = {
@@ -56,7 +55,7 @@ function ReviewNew() {
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [context, setContext] = useState(search.context ?? "");
+  const [pickedGame, setPickedGame] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
 
@@ -64,45 +63,48 @@ function ReviewNew() {
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
   const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
-  const eligible = useCanReview(search.revieweeId ?? "");
   const sharedTxns = useTransactionsWith(search.revieweeId ?? "");
-  const verified = context.trim().length > 0;
-  const canSubmit = eligible && body.trim().length >= 8 && rating > 0;
+  const eligible = sharedTxns.length > 0;
+  const verified = eligible;
+  // Game reviews are one per game; default to the most recent one.
+  const selected = sharedTxns.find((t) => t.gameId === pickedGame) ?? sharedTxns[0] ?? null;
+  const submitReview = useSubmitReview();
+  const canSubmit = eligible && body.trim().length >= 8 && rating > 0 && !submitReview.isPending;
+
+  const goBack = () => {
+    if (revieweeKind === "team" || revieweeKind === "trainer") {
+      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
+    } else {
+      nav({ to: "/profile" });
+    }
+  };
 
   const submit = () => {
-    if (!canSubmit) return;
-    addReview({
-      kind,
-      revieweeKind,
-      revieweeId: search.revieweeId ?? "me",
-      revieweeName: (search.revieweeName as string) ?? ME.name,
-      reviewerName: ME.name,
-      reviewerHandle: ME.username,
-      reviewerAvatar: ME.avatar,
-      reviewerSubtitle: `${reviewerMeta.label} · ${ME.city}`,
-      rating,
-      scores,
-      title: title.trim() || undefined,
-      body: body.trim(),
-      context: context.trim() || undefined,
-      verified,
-      isPrivate,
-    });
-    toast.success(isPrivate ? "Private feedback sent" : "Review posted");
-    if (revieweeKind === "team" || revieweeKind === "trainer") {
-      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
-    } else {
-      nav({ to: "/profile" });
-    }
+    if (!canSubmit || !selected) return;
+    submitReview.mutate(
+      {
+        kind,
+        revieweeKind,
+        revieweeId: search.revieweeId ?? "",
+        revieweeName: selected.counterpartyName || (search.revieweeName ?? ""),
+        gameId: selected.gameId,
+        rating,
+        scores,
+        title,
+        body,
+        isPrivate,
+      },
+      {
+        onSuccess: () => {
+          toast.success(isPrivate ? "Private feedback sent" : "Review posted");
+          goBack();
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't post review"),
+      },
+    );
   };
 
-  const back = () => {
-    if (revieweeKind === "team" || revieweeKind === "trainer") {
-      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
-    } else {
-      nav({ to: "/profile" });
-    }
-  };
+  const back = goBack;
 
   return (
     <div className="page-shell-narrow pb-32">
@@ -150,9 +152,9 @@ function ReviewNew() {
               <Lock className="h-4 w-4" /> Reviews are verified-only
             </div>
             <p className="mt-2 text-foreground/80">
-              You can only review {search.revieweeName ?? "this user"} after a completed transaction
-              together — a game played, a training session, a team tryout, or a hosted event you
-              paid for.
+              You can review {search.revieweeName ?? "this user"} within 14 days of a game you both
+              played, after a training session, or as a team member. Nothing shared yet, or the
+              window has closed.
             </p>
             <Link
               to="/profile"
@@ -169,8 +171,31 @@ function ReviewNew() {
             <p className="mt-1 text-foreground/80">
               {sharedTxns.length === 1
                 ? `Based on: ${sharedTxns[0].context}`
-                : `Based on ${sharedTxns.length} shared activities — most recent: ${sharedTxns[0]?.context ?? ""}`}
+                : "Pick which shared activity this review is about:"}
             </p>
+            {sharedTxns.length > 1 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {sharedTxns.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setPickedGame(t.gameId)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      selected?.id === t.id
+                        ? "border-lime bg-lime/20 text-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {t.context}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selected?.closesAt && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Open until {new Date(selected.closesAt).toLocaleDateString()}.
+              </p>
+            )}
           </div>
         )}
 
@@ -288,20 +313,6 @@ function ReviewNew() {
             <span>Auto-moderation filters toxic language.</span>
             <span>{body.length} / 600</span>
           </div>
-        </section>
-
-        {/* Context */}
-        <section>
-          <label className="font-display section-eyebrow text-muted-foreground">
-            Event / context (unlocks verified badge)
-          </label>
-          <input
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="Friday Night Run · 5v5"
-            maxLength={80}
-            className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-          />
         </section>
 
         {/* Public / private */}

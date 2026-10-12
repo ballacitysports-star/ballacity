@@ -67,7 +67,8 @@ import { DEFAULT_GAME_REMINDER_OFFSETS, saveMyGameReminderOffsets } from "@/lib/
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
