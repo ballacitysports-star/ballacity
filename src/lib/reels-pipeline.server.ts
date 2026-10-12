@@ -14,6 +14,7 @@ import { DEFAULT_AI_PROVIDER, type AiProviderConfig } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import type { AiMessagePart } from "@/lib/ai/provider";
+import { normalizePoseMetrics, poseAllowedForCohort, poseGrounding } from "@/lib/pose-metrics";
 import { DENSE_MAX_FRAMES } from "@/lib/reel-frames";
 import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
 
@@ -52,10 +53,12 @@ export type Reel = {
   style_prefs?: Record<string, any> | null;
   /** Set on a family post: a parent's clip of their under-13 child. */
   subject_child_id?: string | null;
+  /** Browser-side probe results; may carry body-tracking measurements under `pose`. */
+  media_meta?: Record<string, any> | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs,subject_child_id";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs,subject_child_id,media_meta";
 
 async function callLovableAI(prompt: string, system: string, ctx: StepCtx) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, ctx);
@@ -457,6 +460,9 @@ const STEP_RUNNERS: Record<
         (progress.timeline ?? []).length
           ? `Play-by-play: ${(progress.timeline ?? []).map((e: { t: number; label: string }) => `${e.t}s ${e.label}`).join("; ")}`
           : "",
+        // Measured body-tracking numbers, only for adults and 16-17, never for a family
+        // post. Absent for everyone until a client records them, which changes nothing.
+        poseAllowedForCohort(cohort) ? poseGrounding(normalizePoseMetrics(reel.media_meta?.pose)) : "",
         `Frames in order: ${stamps}.`,
         "Grade this athlete's performance on the clip.",
       ]
