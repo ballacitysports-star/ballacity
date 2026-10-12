@@ -218,6 +218,9 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
+/** Real hosts are reviewed by auth user id; sample games keep the demo id. */
+const hostReviewId = (game?: { hostUserId?: string; host: { username: string } } | null) =>
+  game?.hostUserId ?? hostIdFor(game?.host.username ?? "");
 
 export const Route = createFileRoute("/games/$gameId/")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -475,9 +478,9 @@ function GameDetail() {
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
 
-  const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
+  const hostReviews = useReviewsFor(hostReviewId(game));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
-  const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
+  const canReviewHost = useCanReview(hostReviewId(game));
 
   // Policy players must be able to read before joining.
   const viewerPolicy = useMemo<GamePolicy>(
@@ -1966,7 +1969,7 @@ function GameDetail() {
               to="/review/new"
               search={
                 {
-                  revieweeId: hostIdFor(game.host.username),
+                  revieweeId: hostReviewId(game),
                   revieweeKind: "host",
                   revieweeName: game.host.name,
                   kind: "player",
@@ -2006,7 +2009,7 @@ function GameDetail() {
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection
-                revieweeId={hostIdFor(game.host.username)}
+                revieweeId={hostReviewId(game)}
                 revieweeKind="host"
                 revieweeName={game.host.name}
                 isOwner={ownsViaGame}
