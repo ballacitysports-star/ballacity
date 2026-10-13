@@ -4,13 +4,10 @@ import { motion } from "framer-motion";
 import { Trophy, ArrowUpDown } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import {
-  computeReputation,
-  REVIEWEE_META,
-  type RevieweeKind,
-} from "@/lib/reviews";
+import { computeReputation, REVIEWEE_META, type RevieweeKind } from "@/lib/reviews";
 import { useReviewBoard, useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { RatingExplainer } from "@/components/RatingExplainer";
 import { useMemo } from "react";
 
 export const Route = createFileRoute("/reviews")({
@@ -83,9 +80,7 @@ function RevieweeCard({
             </div>
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm truncate">{revieweeName}</div>
-              <div className="micro-label text-muted-foreground">
-                {meta.label}
-              </div>
+              <div className="micro-label text-muted-foreground">{meta.label}</div>
             </div>
           </div>
           <ReputationBadge rep={rep} compact />
@@ -132,6 +127,7 @@ function ReviewsDashboard() {
       <p className="mb-5 page-subtitle">
         Trust scores, top strengths, and AI insights for everyone on BallaCity.
       </p>
+      <RatingExplainer className="mb-4" />
 
       {/* Kind filter */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-2">

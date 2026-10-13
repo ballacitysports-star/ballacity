@@ -27,6 +27,7 @@ import { refreshMyReputationSummary } from "@/lib/reviews.functions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ReputationCard } from "@/components/ReputationCard";
+import { RatingExplainer } from "@/components/RatingExplainer";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
 import {
@@ -277,6 +278,7 @@ export function ReviewsSection({
         onRefreshInsight={isOwner ? refreshInsight : undefined}
         refreshing={refreshing}
       />
+      <RatingExplainer className="mt-3" />
 
       {/* Prominent write-a-review CTA */}
       <div className="mt-3">

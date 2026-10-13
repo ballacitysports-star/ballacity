@@ -4925,6 +4925,25 @@ export type Database = {
         }[]
       }
       set_skill_rating_hidden: { Args: { _hidden: boolean; _sport: string }; Returns: undefined }
+      review_ring_suspects: {
+        Args: { _days?: number }
+        Returns: {
+          a_to_b: number
+          avg_rating: number
+          b_to_a: number
+          user_a: string
+          user_b: string
+        }[]
+      }
+      review_uniform_raters: {
+        Args: { _min?: number }
+        Returns: {
+          avg_rating: number
+          reviewer_id: string
+          reviews: number
+          stddev_rating: number
+        }[]
+      }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {

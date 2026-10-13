@@ -939,3 +939,18 @@ export const superadminAuditLog = createServerFn({ method: "POST" })
     const { data: rows, count } = await q;
     return { rows: rows ?? [], total: count ?? 0 };
   });
+
+/** Read-only abuse signals for reviews: mutual high-rating pairs and uniform raters. */
+export const superadminReviewSignals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context);
+    // Called as the signed-in superadmin: the SQL functions check is_moderator(auth.uid()).
+    const [rings, uniform] = await Promise.all([
+      context.supabase.rpc("review_ring_suspects", { _days: 60 }),
+      context.supabase.rpc("review_uniform_raters", { _min: 6 }),
+    ]);
+    if (rings.error) throw new Error(rings.error.message);
+    if (uniform.error) throw new Error(uniform.error.message);
+    return { rings: rings.data ?? [], uniform: uniform.data ?? [] };
+  });
