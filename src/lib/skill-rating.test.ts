@@ -3,6 +3,7 @@ import {
   describeSkill,
   estimateSkill,
   gameReferenceLevel,
+  levelFit,
   scoreToTier,
   tierToScore,
   voterWeight,
@@ -94,5 +95,21 @@ describe("scale mapping", () => {
   it("trusts settled voters more", () => {
     expect(voterWeight(6)).toBeGreaterThan(voterWeight(25));
     expect(voterWeight(null)).toBe(0.8);
+  });
+});
+
+describe("levelFit", () => {
+  const tennis = (low: number, high: number) => ({ low, high });
+  it("treats All Levels as open", () => {
+    expect(levelFit("Tennis", "All Levels", tennis(40, 60))).toBe("open");
+    expect(levelFit("Tennis", null, tennis(40, 60))).toBe("open");
+  });
+  it("fits when the ranges overlap", () => {
+    const mid = tierToScore("Tennis", "3.5")!;
+    expect(levelFit("Tennis", "3.5", tennis(mid - 5, mid + 5))).toBe("fit");
+  });
+  it("flags games above or below the player's range", () => {
+    expect(levelFit("Tennis", "5.0", tennis(10, 25))).toBe("stretch");
+    expect(levelFit("Tennis", "1.5", tennis(75, 90))).toBe("easy");
   });
 });

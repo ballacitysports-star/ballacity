@@ -21,6 +21,8 @@ import { GameDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useMySkillRange } from "@/lib/skill-db";
+import { levelFit } from "@/lib/skill-rating";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -47,6 +49,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const myRange = useMySkillRange(game.sport);
+  const fit = myRange ? levelFit(game.sport, game.skill, myRange) : "open";
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
@@ -251,6 +255,20 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <span className="truncate">{game.host.name}</span>
               )}
               <span className="shrink-0 text-foreground">· {game.skill}</span>
+              {fit !== "open" && (
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                    fit === "fit" ? "bg-lime/15 text-lime" : "bg-secondary text-muted-foreground"
+                  }`}
+                  title="Based on your skill rating"
+                >
+                  {fit === "fit"
+                    ? "✓ Your level"
+                    : fit === "stretch"
+                      ? "Stretch"
+                      : "Below your level"}
+                </span>
+              )}
               {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
                 <span className="shrink-0 text-muted-foreground">
                   · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}

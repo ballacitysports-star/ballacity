@@ -11,7 +11,7 @@
  * nothing here reads reviews, and nothing in reputation reads this.
  */
 
-import { GENERIC_SCALE, scaleForSport, type SportScale } from "@/lib/sport-levels";
+import { GENERIC_SCALE, parseSkillTiers, scaleForSport, type SportScale } from "@/lib/sport-levels";
 import type { Sport } from "@/lib/sample-data";
 
 export const SKILL = {
@@ -193,4 +193,32 @@ export function gameReferenceLevel(selfScores: Array<number | null | undefined>)
 export function voterWeight(voterSigma: number | null | undefined): number {
   if (voterSigma == null) return 0.8;
   return clamp(1.2 - (voterSigma - SKILL.establishedSigma) / 40, 0.5, 1.2);
+}
+
+export type LevelFit = "open" | "fit" | "stretch" | "easy";
+
+/**
+ * How a game's advertised level compares with a player's rating range.
+ *  - open:    the game is "All Levels" (or has no readable tier)
+ *  - fit:     the ranges overlap
+ *  - stretch: the game is above the player's range
+ *  - easy:    the game is below the player's range
+ * Each tier gets half a rung of tolerance either side, since tiers are coarse.
+ */
+export function levelFit(
+  sport: string,
+  gameSkill: string | null | undefined,
+  player: Pick<SkillEstimate, "low" | "high">,
+): LevelFit {
+  const scores = parseSkillTiers(sport, gameSkill)
+    .map((t) => tierToScore(sport, t))
+    .filter((v): v is number => v != null);
+  if (scores.length === 0) return "open";
+  const rungs = ladder(scaleFor(sport)).length;
+  const half = rungs > 1 ? 40 / (rungs - 1) : 40;
+  const gLow = Math.min(...scores) - half;
+  const gHigh = Math.max(...scores) + half;
+  if (player.high < gLow) return "stretch";
+  if (player.low > gHigh) return "easy";
+  return "fit";
 }

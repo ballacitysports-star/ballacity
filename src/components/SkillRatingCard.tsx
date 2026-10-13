@@ -1,50 +1,19 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Activity, Eye, EyeOff, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateMySkillReport, refreshMySkill } from "@/lib/skill.functions";
-import type { SkillReport } from "@/lib/skill-rating.server";
+import { useSkillRatings, type SkillRatingRow } from "@/lib/skill-db";
 
-type Row = {
-  sport: string;
-  mu: number;
-  low: number;
-  high: number;
-  status: "provisional" | "developing" | "established";
-  label: string;
-  hidden: boolean;
-  signals: {
-    contributions?: { self: number; peer: number; video: number };
-    counts?: { peer: number; video: number };
-  };
-  report: SkillReport | null;
-  report_at: string | null;
-};
+type Row = SkillRatingRow;
 
 const STATUS_COPY: Record<Row["status"], { label: string; tip: string }> = {
   provisional: { label: "Provisional", tip: "Limited evidence so far — play more rated games." },
   developing: { label: "Developing", tip: "Getting clearer with every game." },
   established: { label: "Established", tip: "Backed by plenty of recent evidence." },
 };
-
-function useSkillRatings(userId: string | undefined) {
-  return useQuery({
-    queryKey: ["skill-ratings", userId],
-    enabled: !!userId,
-    staleTime: 60_000,
-    queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase
-        .from("skill_ratings")
-        .select("sport, mu, low, high, status, label, hidden, signals, report, report_at")
-        .eq("user_id", userId!)
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Row[];
-    },
-  });
-}
 
 function RangeBar({ row }: { row: Row }) {
   return (
