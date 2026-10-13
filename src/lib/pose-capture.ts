@@ -13,9 +13,6 @@ import { summarizePose, type PoseFrame, type PoseMetrics } from "@/lib/pose-metr
 export const MEDIAPIPE_VERSION = "0.10.14";
 const BUCKET = "app-assets";
 const PREFIX = `mediapipe/${MEDIAPIPE_VERSION}`;
-const CDN_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
-const CDN_MODEL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const TIMEOUT_MS = 25_000;
 
 /** Evenly spaced sample times inside the clip, avoiding the very first/last frame. */
@@ -49,15 +46,40 @@ async function reachable(url: string): Promise<boolean> {
   }
 }
 
-/** Our own storage first; the pinned CDN copies only if those files were not uploaded. */
-async function resolveSources(): Promise<{ wasm: string; model: string }> {
+/**
+ * Our own storage only. An athlete's browser never calls a third-party host for this, so
+ * nothing about them leaks to one. If the files are not there, pose is simply skipped.
+ */
+async function resolveSources(): Promise<{ wasm: string; model: string } | null> {
   const wasm = bucketUrl("wasm");
   const model = bucketUrl("pose_landmarker_lite.task");
   const [w, m] = await Promise.all([
     reachable(`${wasm}/vision_wasm_internal.wasm`),
     reachable(model),
   ]);
-  return { wasm: w ? wasm : CDN_WASM, model: m ? model : CDN_MODEL };
+  return w && m ? { wasm, model } : null;
+}
+
+/**
+ * Storage may label these files application/octet-stream, which a browser can refuse to
+ * run as a script or stream as wasm. Re-wrap them as blobs with the right type, the same
+ * way the ffmpeg core is loaded in video-transcode.ts, so the label does not matter.
+ * Returns the fileset and a cleanup that frees the blob URLs.
+ */
+async function typedFileset(
+  fs: { wasmLoaderPath: string; wasmBinaryPath: string; [k: string]: unknown },
+): Promise<{ fileset: typeof fs; free: () => void }> {
+  const [js, bin] = await Promise.all([fetch(fs.wasmLoaderPath), fetch(fs.wasmBinaryPath)]);
+  if (!js.ok || !bin.ok) throw new Error("pose files unavailable");
+  const jsUrl = URL.createObjectURL(new Blob([await js.arrayBuffer()], { type: "text/javascript" }));
+  const binUrl = URL.createObjectURL(new Blob([await bin.arrayBuffer()], { type: "application/wasm" }));
+  return {
+    fileset: { ...fs, wasmLoaderPath: jsUrl, wasmBinaryPath: binUrl },
+    free: () => {
+      URL.revokeObjectURL(jsUrl);
+      URL.revokeObjectURL(binUrl);
+    },
+  };
 }
 
 function seek(video: HTMLVideoElement, t: number): Promise<boolean> {
@@ -97,6 +119,7 @@ export async function capturePoseMetrics(
   let url: string | null = null;
   let video: HTMLVideoElement | null = null;
   let timedOut = false;
+  let freeFiles: (() => void) | null = null;
   const timer = setTimeout(() => (timedOut = true), TIMEOUT_MS);
 
   const run = async (): Promise<PoseMetrics | null> => {
@@ -116,7 +139,11 @@ export async function capturePoseMetrics(
       resolveSources(),
     ]);
     if (timedOut) return null;
-    const fileset = await FilesetResolver.forVisionTasks(src.wasm);
+    if (!src) return null;
+    const resolved = await FilesetResolver.forVisionTasks(src.wasm);
+    const typed = await typedFileset(resolved as any);
+    freeFiles = typed.free;
+    const fileset = typed.fileset as typeof resolved;
     landmarker = (await PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: src.model, delegate: "CPU" },
       runningMode: "VIDEO",
@@ -153,6 +180,11 @@ export async function capturePoseMetrics(
     return null;
   } finally {
     clearTimeout(timer);
+    try {
+      freeFiles?.();
+    } catch {
+      /* ignore */
+    }
     try {
       (landmarker as { close: () => void } | null)?.close();
     } catch {
