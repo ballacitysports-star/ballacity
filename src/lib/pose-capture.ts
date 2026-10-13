@@ -181,7 +181,7 @@ export async function capturePoseMetrics(
   } finally {
     clearTimeout(timer);
     try {
-      freeFiles?.();
+      (freeFiles as (() => void) | null)?.();
     } catch {
       /* ignore */
     }
