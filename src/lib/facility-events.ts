@@ -1,5 +1,6 @@
 import type { Game } from "@/lib/sample-data";
 import { computeLiveStatus } from "@/lib/live-status";
+import { collapseSeriesGames } from "@/lib/game-series";
 
 /**
  * Events tied to a facility are plain `hosted_games` rows with `org_id` set.
@@ -69,10 +70,12 @@ export function isFacilityEventKind(v: unknown): v is FacilityEventKind {
 
 /** Events that are still ahead of (or running at) `now`, soonest first. */
 export function upcomingFacilityEvents(games: readonly Game[], now: number = Date.now()): Game[] {
-  return games
+  const live = games
     .filter((g) => !g.cancelledAt && g.status !== "cancelled" && !g.isPrivate)
     .filter((g) => computeLiveStatus(g, now) !== "completed")
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // A multi-day event is one listing, shown at its next session.
+  return collapseSeriesGames(live, "upcoming", now);
 }
 
 /** Link target for the facility page's "Post event / open run" action. */
