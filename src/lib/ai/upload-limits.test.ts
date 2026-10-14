@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AI_LIMITS } from "./config";
 import {
+  PIPELINE_RUN_CAP_SECONDS,
   STORAGE_MAX_UPLOAD_MB,
   claimedReelSeconds,
   clipLengthProblem,
   clipLimitsFor,
+  exceedsResolution,
   mp4DurationSeconds,
+  mp4VideoSize,
+  resolutionProblem,
   uploadSizeProblem,
   type ClipLimits,
 } from "./upload-limits";
@@ -98,13 +102,19 @@ describe("mp4DurationSeconds", () => {
 
 /* --------------------------------- limits --------------------------------- */
 
-const limits: ClipLimits = { tier: "free", maxUploadMb: 100, maxVideoSeconds: 60 };
+const limits: ClipLimits = {
+  tier: "free",
+  maxUploadMb: 100,
+  maxVideoSeconds: 60,
+  maxResolution: 1920,
+  maxProcessingSeconds: 300,
+};
 const MB = 1024 * 1024;
 
 describe("clip limits", () => {
   it("never lets a tier exceed what Storage accepts", () => {
     const big = { ...DEFAULT_AI_LIMITS.gym, maxUploadMb: 500, maxVideoSeconds: 300 };
-    expect(clipLimitsFor("gym", big)).toEqual({
+    expect(clipLimitsFor("gym", big)).toMatchObject({
       tier: "gym",
       maxUploadMb: STORAGE_MAX_UPLOAD_MB,
       maxVideoSeconds: 300,
@@ -138,5 +148,66 @@ describe("clip limits", () => {
     expect(
       claimedReelSeconds({ media_meta: { original: { durationSeconds: "junk" } } }),
     ).toBeNull();
+  });
+});
+
+function tkhd(version: 0 | 1, width: number, height: number): Uint8Array {
+  const body = new Uint8Array(version === 1 ? 96 : 84);
+  const view = new DataView(body.buffer);
+  body[0] = version;
+  const at = version === 1 ? 88 : 76;
+  view.setUint32(at, width * 65536);
+  view.setUint32(at + 4, height * 65536);
+  return box("tkhd", body);
+}
+
+const trak = (header: Uint8Array) => box("trak", concat(header, box("mdia", new Uint8Array(8))));
+
+describe("mp4VideoSize", () => {
+  it("reads the picture track and ignores an audio track's empty size", async () => {
+    const moov = box(
+      "moov",
+      concat(mvhd(0, 1000, 1000), trak(tkhd(0, 0, 0)), trak(tkhd(0, 3840, 2160))),
+    );
+    const file = concat(ftyp, moov);
+    expect(await mp4VideoSize(reader(file).read, file.length)).toEqual({
+      width: 3840,
+      height: 2160,
+    });
+  });
+
+  it("reads a version 1 track header", async () => {
+    const file = concat(ftyp, box("moov", trak(tkhd(1, 1080, 1920))));
+    expect(await mp4VideoSize(reader(file).read, file.length)).toEqual({
+      width: 1080,
+      height: 1920,
+    });
+  });
+
+  it("returns null with no picture track", async () => {
+    const file = concat(ftyp, box("moov", mvhd(0, 1000, 1000)));
+    expect(await mp4VideoSize(reader(file).read, file.length)).toBeNull();
+  });
+});
+
+describe("resolution and processing limits", () => {
+  it("compares the longer edge, so portrait and landscape are treated alike", () => {
+    expect(exceedsResolution({ width: 1920, height: 1080 }, limits)).toBe(false);
+    expect(exceedsResolution({ width: 1080, height: 1920 }, limits)).toBe(false);
+    expect(exceedsResolution({ width: 2160, height: 3840 }, limits)).toBe(true);
+    expect(exceedsResolution({ width: null, height: null }, limits)).toBe(false);
+    expect(resolutionProblem({ width: 3840, height: 2160 }, limits)).toBe(
+      "This clip is 3840×2160. Your plan allows up to 1920 pixels on the longer side.",
+    );
+  });
+
+  it("caps a run under the worker's stuck-run cutoff", async () => {
+    const { STUCK_AFTER_MS } = await import("@/lib/reels-pipeline.server");
+    expect(PIPELINE_RUN_CAP_SECONDS * 1000).toBeLessThan(STUCK_AFTER_MS);
+    const slow = { ...DEFAULT_AI_LIMITS.free, maxProcessingSeconds: 3600 };
+    expect(clipLimitsFor("free", slow).maxProcessingSeconds).toBe(PIPELINE_RUN_CAP_SECONDS);
+    expect(clipLimitsFor("free", { ...slow, maxProcessingSeconds: 120 }).maxProcessingSeconds).toBe(
+      120,
+    );
   });
 });

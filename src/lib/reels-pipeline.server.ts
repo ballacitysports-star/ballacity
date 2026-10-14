@@ -17,7 +17,12 @@ import type { AiMessagePart } from "@/lib/ai/provider";
 import { normalizePoseMetrics, poseAllowedForCohort, poseGrounding } from "@/lib/pose-metrics";
 import { DENSE_MAX_FRAMES } from "@/lib/reel-frames";
 import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
-import { claimedReelSeconds, clipLengthProblem } from "@/lib/ai/upload-limits";
+import {
+  PIPELINE_RUN_CAP_SECONDS,
+  claimedReelSeconds,
+  clipLengthProblem,
+} from "@/lib/ai/upload-limits";
+import { AiError } from "@/lib/ai/errors";
 import { loadClipLimits } from "@/lib/ai/upload-limits.server";
 
 export const MAX_ATTEMPTS = 3;
@@ -88,11 +93,18 @@ async function callLovableAIPartsWithModel(
   pickModel?: (p: AiProviderConfig) => string,
 ): Promise<{ data: unknown; model: string }> {
   const providerConfig = ctx.session?.config.provider ?? DEFAULT_AI_PROVIDER;
+  let signal: AbortSignal | undefined;
+  if (ctx.deadline != null) {
+    const remaining = ctx.deadline - Date.now();
+    if (remaining <= 0) throw processingTimeout();
+    signal = AbortSignal.timeout(remaining);
+  }
   const request = {
     system,
     prompt: "",
     parts: parts as AiMessagePart[],
     model: pickModel ? pickModel(providerConfig) : undefined,
+    signal,
   };
   if (ctx.session) {
     const out = await runAiCall(ctx.session, (provider) => provider.generateStructured(request));
@@ -157,7 +169,27 @@ async function audioBase64(
   }
 }
 
-type StepCtx = { supabaseAdmin: any; apiKey: string; session?: AiSession | null };
+type StepCtx = {
+  supabaseAdmin: any;
+  apiKey: string;
+  session?: AiSession | null;
+  /** Epoch ms when this run's processing-time budget ends. */
+  deadline?: number;
+};
+
+function processingTimeout() {
+  return new AiError("TIMEOUT", { detail: "reel run passed its processing-time limit" });
+}
+
+/** This run's budget: the tier's maxProcessingSeconds, never above the run cap. */
+async function runBudgetSeconds(supabaseAdmin: any, reel: Reel, session?: AiSession | null) {
+  if (session) return Math.min(session.limits.maxProcessingSeconds, PIPELINE_RUN_CAP_SECONDS);
+  try {
+    return (await loadClipLimits(supabaseAdmin, reel.user_id)).maxProcessingSeconds;
+  } catch {
+    return PIPELINE_RUN_CAP_SECONDS;
+  }
+}
 
 const STEP_RUNNERS: Record<
   Step,
@@ -848,9 +880,14 @@ export async function processReel(
   }
 
 
+  // The plan's processing-time limit, per run. A run that passes it fails like
+  // any other error, so the next attempt resumes from the step it reached.
+  const deadline = Date.now() + (await runBudgetSeconds(supabaseAdmin, reel, session)) * 1000;
+
   try {
     for (let i = startIdx; i < STEPS.length; i++) {
       const step = STEPS[i];
+      if (Date.now() >= deadline) throw processingTimeout();
       // Announce the step *before* running it so the card shows what's happening now.
       progress._pipeline = snapshot(done, step, attempt);
       await supabaseAdmin
@@ -858,7 +895,12 @@ export async function processReel(
         .update({ step_progress: progress, last_step_at: new Date().toISOString() })
         .eq("id", reel.id);
 
-      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey, session });
+      const patch = await STEP_RUNNERS[step](reel, progress, {
+        supabaseAdmin,
+        apiKey,
+        session,
+        deadline,
+      });
       Object.assign(progress, patch);
       done.push(step);
       progress._pipeline = snapshot(done, STEPS[i + 1] ?? null, attempt);
@@ -875,6 +917,7 @@ export async function processReel(
     progress._pipeline = { ...snapshot(done, null, attempt), percent: 100 };
 
     // Safety screening runs before the reel can become visible to anyone else.
+    // It gets no deadline: the processing-time limit never cuts a safety check short.
     const screening = await screenReelOutput(reel, progress, { supabaseAdmin, apiKey, session });
     if (screening.quarantined) {
       await supabaseAdmin.from("notifications").insert({

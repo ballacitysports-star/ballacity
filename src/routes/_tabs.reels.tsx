@@ -56,7 +56,13 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { validateVideoSize } from "@/lib/video-validation";
 import { finalizeVideoUpload, getMyClipLimits } from "@/lib/media-uploads.functions";
-import { clipLengthProblem, uploadSizeProblem, type ClipLimits } from "@/lib/ai/upload-limits";
+import {
+  clipLengthProblem,
+  exceedsResolution,
+  resolutionProblem,
+  uploadSizeProblem,
+  type ClipLimits,
+} from "@/lib/ai/upload-limits";
 import { useAuth } from "@/hooks/use-auth";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
@@ -992,23 +998,34 @@ function ReelsPage() {
       let playable: Blob = file;
       let converted = false;
       let processedInfo: (ProbedVideo & { bytes: number; pass: string }) | null = null;
-      const conversionAttempted = await needsPlaybackConversion(file);
+      // A clip over the plan's resolution is shrunk on the way through; the
+      // server refuses a served copy that is still too large.
+      const mustShrink = clipLimits ? exceedsResolution(originalProbe, clipLimits) : false;
+      const conversionAttempted = mustShrink || (await needsPlaybackConversion(file));
       if (conversionAttempted) {
         // Check the converter exists before promising anything. Without this a
         // missing wasm core reads as "your clip failed", sending the athlete off
         // to re-encode on a desktop over a problem only we can fix.
         await assertConverterReachable();
         const toastId = toast.loading("Making this clip play everywhere… 0%");
-        const result = await convertToPlayableMp4(file, (r, pass) =>
-          toast.loading(
-            pass === "standard"
-              ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
-              : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
-            { id: toastId },
-          ),
+        const result = await convertToPlayableMp4(
+          file,
+          (r, pass) =>
+            toast.loading(
+              pass === "standard"
+                ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
+                : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
+              { id: toastId },
+            ),
+          { maxLongEdge: clipLimits?.maxResolution },
         );
         if (!result) {
           toast.dismiss(toastId);
+          if (mustShrink && clipLimits) {
+            throw new Error(
+              `${resolutionProblem(originalProbe, clipLimits)} It couldn't be resized on this device. Record at a lower resolution, or try again on a desktop browser.`,
+            );
+          }
           // Every pass failed, so no copy of this clip would play. Refusing is
           // kinder than storing a reel that shows a dead player to everyone who
           // opens it; the two things that actually work are named so the athlete

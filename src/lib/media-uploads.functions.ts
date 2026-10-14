@@ -5,6 +5,8 @@ import { MAX_VIDEO_BYTES, sniffVideoContainer } from "@/lib/video-validation";
 import {
   clipLengthProblem,
   mp4DurationSeconds,
+  mp4VideoSize,
+  resolutionProblem,
   uploadSizeProblem,
   type ClipLimits,
 } from "@/lib/ai/upload-limits";
@@ -35,8 +37,11 @@ const VIDEO_BUCKET = "highlight-videos";
  *     sibling exists, so nothing reaches a player through this path.
  *
  * A new upload (`purpose: "upload"`) must also fit the member's AI tier: its
- * size against `maxUploadMb`, and for an MP4/QuickTime `video` its length,
- * read from the file's own movie header, against `maxVideoSeconds`. A playback
+ * size against `maxUploadMb`, and for an MP4/QuickTime `video` its length and
+ * picture size, read from the file's own movie header, against
+ * `maxVideoSeconds` and `maxResolution` (the uploader shrinks a larger clip
+ * before it gets here). A `source` original is never served for playback, so
+ * its resolution is not limited. A playback
  * repair re-encodes a reel that already exists, so it is held only to the
  * Storage cap — and only when that reel really is the caller's.
  */
@@ -115,27 +120,35 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       const container = sniffVideoContainer(header);
       if (!container) await reject("That file could not be prepared for playback");
       let seconds: number | null = null;
+      let size: { width: number; height: number } | null = null;
       if (container === "mp4" || container === "quicktime") {
-        seconds = await mp4DurationSeconds(
-          async (start, end) => new Uint8Array(await blob!.slice(start, end).arrayBuffer()),
-          blob!.size,
-        );
+        const read = async (start: number, end: number) =>
+          new Uint8Array(await blob!.slice(start, end).arrayBuffer());
+        seconds = await mp4DurationSeconds(read, blob!.size);
+        size = await mp4VideoSize(read, blob!.size);
       }
       if (clipLimits) {
-        const tooLong = clipLengthProblem(seconds, clipLimits);
-        if (tooLong) {
+        const problem =
+          clipLengthProblem(seconds, clipLimits) ?? resolutionProblem(size, clipLimits);
+        if (problem) {
           // A converted copy's original was stored a moment ago; neither is kept.
           const suffix = ".h264.mp4";
           if (path.endsWith(suffix)) {
             await supabaseAdmin.storage.from(VIDEO_BUCKET).remove([path.slice(0, -suffix.length)]);
           }
-          await reject(tooLong);
+          await reject(problem);
         }
       }
-      return { ok: true, bytes, container, seconds };
+      return { ok: true, bytes, container, seconds, size };
     }
 
-    return { ok: true, bytes, container: null as string | null, seconds: null as number | null };
+    return {
+      ok: true,
+      bytes,
+      container: null as string | null,
+      seconds: null as number | null,
+      size: null as { width: number; height: number } | null,
+    };
   });
 
 /** The signed-in member's clip limits, so the uploader can refuse early and say why. */
