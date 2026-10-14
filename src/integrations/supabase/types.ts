@@ -3053,12 +3053,162 @@ export type Database = {
           },
         ]
       }
+      review_ai_analysis: {
+        Row: {
+          created_at: string
+          mismatch: boolean
+          model: string | null
+          review_id: string
+          sentiment: number | null
+          traits: string[]
+        }
+        Insert: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Update: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id?: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_ai_analysis_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reputation_insights: {
+        Row: {
+          generated_at: string
+          growth: string[]
+          model: string | null
+          review_count: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths: string[]
+          summary: string
+        }
+        Insert: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths?: string[]
+          summary: string
+        }
+        Update: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id?: string
+          reviewee_kind?: string
+          strengths?: string[]
+          summary?: string
+        }
+        Relationships: []
+      }
+      skill_ratings: {
+        Row: {
+          high: number
+          hidden: boolean
+          label: string
+          low: number
+          mu: number
+          report: Json | null
+          report_at: string | null
+          self_tier: string | null
+          signals: Json
+          sigma: number
+          sport: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          high: number
+          hidden?: boolean
+          label: string
+          low: number
+          mu: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          signals?: Json
+          sigma: number
+          sport: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          high?: number
+          hidden?: boolean
+          label?: string
+          low?: number
+          mu?: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          signals?: Json
+          sigma?: number
+          sport?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skill_votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          sport?: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          sport?: string
+          subject_id?: string
+          vote?: number
+          voter_id?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           body: string
           context: string | null
           created_at: string
           flagged: boolean
+          game_id: string | null
           helpful_count: number
           id: string
           is_private: boolean
@@ -3069,6 +3219,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores: Json
+          sport: string | null
           title: string | null
           verified: boolean
         }
@@ -3077,6 +3228,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -3087,6 +3239,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -3095,6 +3248,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -3105,6 +3259,7 @@ export type Database = {
           reviewee_name?: string
           reviewer_id?: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -4785,6 +4940,50 @@ export type Database = {
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }
+      my_reviewable: {
+        Args: { _kind?: string; _reviewee_id?: string }
+        Returns: {
+          closes_at: string | null
+          context: string | null
+          game_id: string | null
+          happened_at: string | null
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          sport: string | null
+        }[]
+      }
+      report_review: { Args: { _review_id: string }; Returns: undefined }
+      player_trait_counts: {
+        Args: { _user: string }
+        Returns: {
+          communicative: number
+          fair_play: number
+          on_time: number
+          positive: number
+          respectful: number
+        }[]
+      }
+      set_skill_rating_hidden: { Args: { _hidden: boolean; _sport: string }; Returns: undefined }
+      review_ring_suspects: {
+        Args: { _days?: number }
+        Returns: {
+          a_to_b: number
+          avg_rating: number
+          b_to_a: number
+          user_a: string
+          user_b: string
+        }[]
+      }
+      review_uniform_raters: {
+        Args: { _min?: number }
+        Returns: {
+          avg_rating: number
+          reviewer_id: string
+          reviews: number
+          stddev_rating: number
+        }[]
+      }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {

@@ -13,14 +13,21 @@ import {
 import {
   REVIEWER_META,
   computeReputation,
-  markHelpful,
-  reportReview,
-  useReviewsFor,
   type ReviewerKind,
   type Review,
   type RevieweeKind,
 } from "@/lib/reviews";
+import {
+  useMarkHelpful,
+  useReportReview,
+  useReputationInsight,
+  useReviewsFor,
+} from "@/lib/reviews-db";
+import { refreshMyReputationSummary } from "@/lib/reviews.functions";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { ReputationCard } from "@/components/ReputationCard";
+import { RatingExplainer } from "@/components/RatingExplainer";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
 import {
@@ -76,6 +83,8 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
   const meta = REVIEWER_META[r.kind];
   const [reported, setReported] = useState(false);
   const [helped, setHelped] = useState(false);
+  const markHelpful = useMarkHelpful();
+  const reportReview = useReportReview();
 
   return (
     <motion.article
@@ -124,11 +133,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
       )}
       <p className="mt-1 text-sm text-foreground/90">{r.body}</p>
 
-      {r.context && (
-        <div className="mt-2 micro-label text-muted-foreground">
-          via {r.context}
-        </div>
-      )}
+      {r.context && <div className="mt-2 micro-label text-muted-foreground">via {r.context}</div>}
 
       {r.scores && Object.keys(r.scores).length > 0 && (
         <details className="mt-3 group">
@@ -141,9 +146,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
                 key={k}
                 className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1"
               >
-                <span className="micro-label text-muted-foreground truncate">
-                  {k}
-                </span>
+                <span className="micro-label text-muted-foreground truncate">{k}</span>
                 <span className="font-display text-xs font-bold text-lime">
                   {v}
                   <span className="text-muted-foreground text-[9px]">/5</span>
@@ -159,7 +162,12 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
         <button
           onClick={() => {
             if (helped) return;
-            markHelpful(r.id);
+            markHelpful.mutate(r.id, {
+              onError: () => {
+                setHelped(false);
+                toast.error("Sign in to mark reviews helpful.");
+              },
+            });
             setHelped(true);
           }}
           className={`inline-flex items-center gap-1 text-[11px] font-semibold ${helped ? "text-lime" : "text-muted-foreground"}`}
@@ -170,9 +178,14 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
           <button
             onClick={() => {
               if (reported) return;
-              reportReview(r.id);
+              reportReview.mutate(r.id, {
+                onSuccess: () => toast.success("Reported anonymously. Our mods will review."),
+                onError: () => {
+                  setReported(false);
+                  toast.error("Sign in to report a review.");
+                },
+              });
               setReported(true);
-              toast.success("Reported anonymously. Our mods will review.");
             }}
             className={`inline-flex items-center gap-1 text-[11px] font-semibold ${reported ? "text-coral" : "text-muted-foreground"}`}
           >
@@ -208,6 +221,23 @@ export function ReviewsSection({
 
   const rep = useMemo(() => computeReputation(all, revieweeKind), [all, revieweeKind]);
   const eligible = useCanReview(revieweeId);
+  const insight = useReputationInsight(revieweeId, revieweeKind).data ?? null;
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshInsight = async () => {
+    setRefreshing(true);
+    try {
+      await refreshMyReputationSummary({
+        data: { revieweeId: revieweeId === "me" ? (user?.id ?? "") : revieweeId, revieweeKind },
+      });
+      await qc.invalidateQueries({ queryKey: ["reputation-insight"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't refresh the summary");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const list = useMemo(() => {
     let xs = publicReviews;
@@ -242,7 +272,13 @@ export function ReviewsSection({
         </div>
       </div>
 
-      <ReputationCard rep={rep} />
+      <ReputationCard
+        rep={rep}
+        insight={insight}
+        onRefreshInsight={isOwner ? refreshInsight : undefined}
+        refreshing={refreshing}
+      />
+      <RatingExplainer className="mt-3" />
 
       {/* Prominent write-a-review CTA */}
       <div className="mt-3">

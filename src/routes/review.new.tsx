@@ -4,16 +4,18 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
 import {
-  addReview,
   REVIEWER_META,
   REVIEWEE_META,
   CRITERIA,
   type ReviewerKind,
   type RevieweeKind,
 } from "@/lib/reviews";
-import { ME } from "@/lib/sample-data";
-import { useCanReview, useTransactionsWith } from "@/lib/transactions";
+import { useTransactionsWith } from "@/lib/transactions";
+import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
+import { suggestReviewText } from "@/lib/reviews.functions";
+import { submitSkillVote } from "@/lib/skill.functions";
 
 type Search = {
   revieweeId?: string;
@@ -56,7 +58,10 @@ function ReviewNew() {
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [context, setContext] = useState(search.context ?? "");
+  const [picks, setPicks] = useState<string[]>([]);
+  const [drafting, setDrafting] = useState(false);
+  const [skillVote, setSkillVote] = useState<-1 | 0 | 1 | null>(null);
+  const [pickedGame, setPickedGame] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
 
@@ -64,45 +69,71 @@ function ReviewNew() {
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
   const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
-  const eligible = useCanReview(search.revieweeId ?? "");
   const sharedTxns = useTransactionsWith(search.revieweeId ?? "");
-  const verified = context.trim().length > 0;
-  const canSubmit = eligible && body.trim().length >= 8 && rating > 0;
+  const eligible = sharedTxns.length > 0;
+  const verified = eligible;
+  // Game reviews are one per game; default to the most recent one.
+  const selected = sharedTxns.find((t) => t.gameId === pickedGame) ?? sharedTxns[0] ?? null;
+  const submitReview = useSubmitReview();
+  const canSubmit = eligible && body.trim().length >= 8 && rating > 0 && !submitReview.isPending;
+
+  const goBack = () => {
+    if (revieweeKind === "team" || revieweeKind === "trainer") {
+      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
+    } else {
+      nav({ to: "/profile" });
+    }
+  };
+
+  const draftWithAi = async () => {
+    setDrafting(true);
+    try {
+      const res = await suggestReviewText({
+        data: { revieweeKind, rating, highlights: picks, context: selected?.context ?? null },
+      });
+      setBody(res.draft);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
+    } finally {
+      setDrafting(false);
+    }
+  };
 
   const submit = () => {
-    if (!canSubmit) return;
-    addReview({
-      kind,
-      revieweeKind,
-      revieweeId: search.revieweeId ?? "me",
-      revieweeName: (search.revieweeName as string) ?? ME.name,
-      reviewerName: ME.name,
-      reviewerHandle: ME.username,
-      reviewerAvatar: ME.avatar,
-      reviewerSubtitle: `${reviewerMeta.label} · ${ME.city}`,
-      rating,
-      scores,
-      title: title.trim() || undefined,
-      body: body.trim(),
-      context: context.trim() || undefined,
-      verified,
-      isPrivate,
-    });
-    toast.success(isPrivate ? "Private feedback sent" : "Review posted");
-    if (revieweeKind === "team" || revieweeKind === "trainer") {
-      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
-    } else {
-      nav({ to: "/profile" });
-    }
+    if (!canSubmit || !selected) return;
+    submitReview.mutate(
+      {
+        kind,
+        revieweeKind,
+        revieweeId: search.revieweeId ?? "",
+        revieweeName: selected.counterpartyName || (search.revieweeName ?? ""),
+        gameId: selected.gameId,
+        rating,
+        scores,
+        title,
+        body,
+        isPrivate,
+      },
+      {
+        onSuccess: () => {
+          if (skillVote !== null && selected?.gameId && revieweeKind === "player") {
+            void submitSkillVote({
+              data: {
+                gameId: selected.gameId,
+                subjectId: search.revieweeId ?? "",
+                vote: skillVote,
+              },
+            }).catch(() => undefined);
+          }
+          toast.success(isPrivate ? "Private feedback sent" : "Review posted");
+          goBack();
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't post review"),
+      },
+    );
   };
 
-  const back = () => {
-    if (revieweeKind === "team" || revieweeKind === "trainer") {
-      nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
-    } else {
-      nav({ to: "/profile" });
-    }
-  };
+  const back = goBack;
 
   return (
     <div className="page-shell-narrow pb-32">
@@ -150,9 +181,9 @@ function ReviewNew() {
               <Lock className="h-4 w-4" /> Reviews are verified-only
             </div>
             <p className="mt-2 text-foreground/80">
-              You can only review {search.revieweeName ?? "this user"} after a completed transaction
-              together — a game played, a training session, a team tryout, or a hosted event you
-              paid for.
+              You can review {search.revieweeName ?? "this user"} within 14 days of a game you both
+              played, after a training session, or as a team member. Nothing shared yet, or the
+              window has closed.
             </p>
             <Link
               to="/profile"
@@ -169,8 +200,31 @@ function ReviewNew() {
             <p className="mt-1 text-foreground/80">
               {sharedTxns.length === 1
                 ? `Based on: ${sharedTxns[0].context}`
-                : `Based on ${sharedTxns.length} shared activities — most recent: ${sharedTxns[0]?.context ?? ""}`}
+                : "Pick which shared activity this review is about:"}
             </p>
+            {sharedTxns.length > 1 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {sharedTxns.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setPickedGame(t.gameId)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      selected?.id === t.id
+                        ? "border-lime bg-lime/20 text-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {t.context}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selected?.closesAt && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Open until {new Date(selected.closesAt).toLocaleDateString()}.
+              </p>
+            )}
           </div>
         )}
 
@@ -284,25 +338,82 @@ function ReviewNew() {
             maxLength={600}
             className="mt-2 w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
+          <div className="mt-3 rounded-2xl border border-lime/20 bg-lime/5 p-3">
+            <div className="flex items-center gap-1.5 micro-label text-lime">
+              <Sparkles className="h-3 w-3" /> Need a hand? Tap what you noticed
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {criteria.slice(0, 6).map((c) => {
+                const on = picks.includes(c.label);
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() =>
+                      setPicks((p) => (on ? p.filter((x) => x !== c.label) : [...p, c.label]))
+                    }
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      on
+                        ? "border-lime bg-lime/20 text-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={draftWithAi}
+              disabled={drafting || picks.length === 0}
+              className="mt-2 inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
+            >
+              <Sparkles className="h-3 w-3" /> {drafting ? "Drafting…" : "Draft with AI"}
+            </button>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              AI only uses the points you tap. Edit it so it sounds like you.
+            </p>
+          </div>
           <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>Auto-moderation filters toxic language.</span>
+            <span>AI moderation checks every review before it posts.</span>
             <span>{body.length} / 600</span>
           </div>
         </section>
 
-        {/* Context */}
-        <section>
-          <label className="font-display section-eyebrow text-muted-foreground">
-            Event / context (unlocks verified badge)
-          </label>
-          <input
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="Friday Night Run · 5v5"
-            maxLength={80}
-            className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-          />
-        </section>
+        {/* Skill check (optional, game reviews of players) */}
+        {revieweeKind === "player" && selected?.gameId && selected.sport && (
+          <section>
+            <h2 className="font-display section-eyebrow text-muted-foreground mb-1">
+              Skill check <span className="normal-case text-[10px]">(optional · anonymous)</span>
+            </h2>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              Compared with the level of this {selected.sport} game, how did they play?
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  [-1, "Below"],
+                  [0, "About right"],
+                  [1, "Above"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setSkillVote((cur) => (cur === v ? null : v))}
+                  className={`rounded-2xl border px-3 py-2.5 text-xs font-semibold ${
+                    skillVote === v
+                      ? "border-lime bg-lime/10 text-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Public / private */}
         <section>

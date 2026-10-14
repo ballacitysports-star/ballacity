@@ -4,15 +4,10 @@ import { motion } from "framer-motion";
 import { Trophy, ArrowUpDown } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import {
-  computeReputation,
-  getReviewsFor,
-  useAllReviewees,
-  useReviewsFor,
-  REVIEWEE_META,
-  type RevieweeKind,
-} from "@/lib/reviews";
+import { computeReputation, REVIEWEE_META, type RevieweeKind } from "@/lib/reviews";
+import { useReviewBoard, useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { RatingExplainer } from "@/components/RatingExplainer";
 import { useMemo } from "react";
 
 export const Route = createFileRoute("/reviews")({
@@ -85,9 +80,7 @@ function RevieweeCard({
             </div>
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm truncate">{revieweeName}</div>
-              <div className="micro-label text-muted-foreground">
-                {meta.label}
-              </div>
+              <div className="micro-label text-muted-foreground">{meta.label}</div>
             </div>
           </div>
           <ReputationBadge rep={rep} compact />
@@ -98,7 +91,7 @@ function RevieweeCard({
 }
 
 function ReviewsDashboard() {
-  const reviewees = useAllReviewees();
+  const reviewees = useReviewBoard();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/reviews" });
   const filter: RevieweeKind | "all" = (search.filter || "all") as RevieweeKind | "all";
@@ -117,10 +110,10 @@ function ReviewsDashboard() {
   const sorted = useMemo(() => {
     const withRep = filtered.map((r) => ({
       ...r,
-      rep: computeReputation(getReviewsFor(r.revieweeId), r.revieweeKind),
+      rep: computeReputation(r.reviews, r.revieweeKind),
     }));
     if (sort === "trust") withRep.sort((a, b) => b.rep.trustScore - a.rep.trustScore);
-    if (sort === "rating") withRep.sort((a, b) => b.rep.avg - a.rep.avg);
+    if (sort === "rating") withRep.sort((a, b) => b.rep.adjustedAvg - a.rep.adjustedAvg);
     if (sort === "count") withRep.sort((a, b) => b.rep.count - a.rep.count);
     return withRep;
   }, [filtered, sort]);
@@ -134,6 +127,7 @@ function ReviewsDashboard() {
       <p className="mb-5 page-subtitle">
         Trust scores, top strengths, and AI insights for everyone on BallaCity.
       </p>
+      <RatingExplainer className="mb-4" />
 
       {/* Kind filter */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-2">
