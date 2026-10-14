@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ReelShareButton } from "@/components/reels/ReelShareButton";
 import { RecapShareButton } from "@/components/RecapShareButton";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
@@ -364,6 +365,14 @@ function ReelCard({
             </button>
           )}
         </div>
+        {phase === "posted" && !reel.subject_child_id && (
+          <ReelShareButton
+            reelId={reel.id}
+            title={displayTitle}
+            caption={reel.ai_caption}
+            hashtags={reel.ai_hashtags}
+          />
+        )}
         {isDone && reel.game_id && !reel.subject_child_id && (
           <RecapShareButton
             recap={reel as unknown as RecapSummary}
