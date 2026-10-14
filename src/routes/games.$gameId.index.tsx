@@ -3028,7 +3028,7 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(describeMessagingError(e));
+                  toast.error(describeMessagingError(e, undefined, "host"));
                 } finally {
                   setMessaging(false);
                 }

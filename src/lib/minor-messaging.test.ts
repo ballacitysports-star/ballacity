@@ -43,6 +43,27 @@ describe("minorMessagingMessage", () => {
     expect(msg).toMatch(/joined one of your games/i);
   });
 
+  it("tells a player messaging a host to wait for approval, not for themselves", () => {
+    for (const code of ["teen_needs_shared_game", "child_needs_shared_game"]) {
+      const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}`, "host")!;
+      expect(msg, code).toMatch(/message the host once your spot .* is approved/i);
+      expect(msg, code).not.toMatch(/your games/i);
+    }
+    expect(
+      describeMessagingError(
+        new Error("MINOR_MESSAGING_BLOCKED:teen_needs_shared_game"),
+        undefined,
+        "host",
+      ),
+    ).toMatch(/host/i);
+  });
+
+  it("keeps the host-independent reasons the same for either audience", () => {
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off", "host")).toBe(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off"),
+    );
+  });
+
   it("names the guardian control when that is what refused", () => {
     expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off")).toMatch(
       /parent or guardian/i,

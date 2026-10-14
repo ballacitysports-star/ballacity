@@ -35,6 +35,19 @@ const MESSAGES: Record<MinorMessagingReason, string> = {
   teen_needs_shared_game: "You can message this player once they've joined one of your games.",
 };
 
+/**
+ * The same refusals seen from the other side: a player messaging the host of
+ * a game they have asked to join. "Once they've joined one of your games"
+ * assumes the reader is the host, so a player requesting a spot would be told
+ * to wait for themselves. Codes not listed here read the same either way.
+ */
+const TO_HOST_MESSAGES: Partial<Record<MinorMessagingReason, string>> = {
+  child_needs_shared_game: "You can message the host once your spot in this game is approved.",
+  teen_needs_shared_game: "You can message the host once your spot in this game is approved.",
+};
+
+export type MessagingAudience = "player" | "host";
+
 /** Fallback when the database sends a code this build does not know. */
 const UNKNOWN =
   "Messaging this player isn't available right now because of their account's safety settings.";
@@ -75,19 +88,28 @@ export function isMinorMessagingBlock(error: unknown): boolean {
  * code so a newer database never surfaces a raw `MINOR_MESSAGING_BLOCKED:` to
  * a user.
  */
-export function minorMessagingMessage(error: unknown): string | null {
+export function minorMessagingMessage(
+  error: unknown,
+  audience: MessagingAudience = "player",
+): string | null {
   if (!isMinorMessagingBlock(error)) return null;
   const reason = parseMinorMessagingReason(error);
-  return reason ? MESSAGES[reason] : UNKNOWN;
+  if (!reason) return UNKNOWN;
+  return (audience === "host" && TO_HOST_MESSAGES[reason]) || MESSAGES[reason];
 }
 
 /**
  * The message for any failure to open a conversation: the explained version
  * when it is a minor-messaging refusal, otherwise whatever the caller raised.
+ * Pass `audience: "host"` when the viewer is messaging a game's host.
  */
-export function describeMessagingError(error: unknown, fallback = "Couldn't open chat"): string {
+export function describeMessagingError(
+  error: unknown,
+  fallback = "Couldn't open chat",
+  audience: MessagingAudience = "player",
+): string {
   return (
-    minorMessagingMessage(error) ??
+    minorMessagingMessage(error, audience) ??
     (error instanceof Error && error.message ? error.message : fallback)
   );
 }
