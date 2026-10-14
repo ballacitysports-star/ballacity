@@ -437,6 +437,9 @@ const PUBLIC_ROUTES = [
   "/terms",
   "/privacy",
   "/cookies",
+  "/payment-policy",
+  "/ai-disclosure",
+  "/youth-policy",
   // Safety Center, Trust Center, and policy pages must be readable without
   // signing in.
   "/safety",

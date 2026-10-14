@@ -31,6 +31,15 @@ export function PolicyLinks({ className = "" }: { className?: string }) {
       <Link to="/cookies" className={cls}>
         Cookies
       </Link>
+      <Link to="/payment-policy" className={cls}>
+        Payments
+      </Link>
+      <Link to="/ai-disclosure" className={cls}>
+        AI disclosure
+      </Link>
+      <Link to="/youth-policy" className={cls}>
+        Youth policy
+      </Link>
       <Link to="/contact" className={cls}>
         Contact
       </Link>

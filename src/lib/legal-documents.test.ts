@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  LEGAL_DOCUMENTS,
+  LEGAL_DOCUMENT_TYPES,
+  LEGAL_PAGE_LIST,
   buildConsentStatus,
   effectiveVersion,
   parseLegalContent,
@@ -7,7 +10,12 @@ import {
   sectionsToContent,
   type PublishedLegalDocument,
 } from "@/lib/legal-documents";
-import { MANAGED_LEGAL_TYPES, isManagedLegalType, legalTypeLabel } from "@/lib/legal-catalog";
+import {
+  MANAGED_LEGAL_META,
+  MANAGED_LEGAL_TYPES,
+  isManagedLegalType,
+  legalTypeLabel,
+} from "@/lib/legal-catalog";
 
 const row = (over: Partial<PublishedLegalDocument> = {}): PublishedLegalDocument => ({
   id: "1",
@@ -137,5 +145,35 @@ describe("managed legal catalog", () => {
     expect(isManagedLegalType("ai_disclosure")).toBe(true);
     expect(isManagedLegalType("nope")).toBe(false);
     expect(legalTypeLabel("youth_policy")).toBe("Youth / Minor Policy");
+  });
+});
+
+describe("informational legal pages", () => {
+  const informational = ["payment_policy", "ai_disclosure", "youth_policy"] as const;
+
+  it("have a public page whose path matches the admin catalog", () => {
+    for (const type of informational) {
+      expect(LEGAL_PAGE_LIST).toContain(LEGAL_DOCUMENTS[type]);
+      expect(MANAGED_LEGAL_META[type].path).toBe(LEGAL_DOCUMENTS[type].path);
+    }
+  });
+
+  it("never gate signup or re-acceptance", () => {
+    for (const type of informational) {
+      expect(LEGAL_DOCUMENT_TYPES).not.toContain(type);
+      expect(effectiveVersion(type).material).toBe(false);
+    }
+    expect(pendingRequiredTypes([], [row({ document_type: "youth_policy" })])).toEqual([
+      "terms",
+      "privacy",
+    ]);
+  });
+
+  it("prefers a published row over the bundled fallback", () => {
+    const v = effectiveVersion("ai_disclosure", [
+      row({ document_type: "ai_disclosure", version: "2026-11-01", requires_reacceptance: false }),
+    ]);
+    expect(v.version).toBe("2026-11-01");
+    expect(v.sections.map((s) => s.heading)).toEqual(["A", "B"]);
   });
 });

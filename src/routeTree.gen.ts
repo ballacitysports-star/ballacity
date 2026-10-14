@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
+import { Route as AiDisclosureRouteImport } from './routes/ai-disclosure'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -19,6 +20,7 @@ import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PaymentPolicyRouteImport } from './routes/payment-policy'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PlansRouteImport } from './routes/plans'
@@ -33,6 +35,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrustCenterRouteImport } from './routes/trust-center'
+import { Route as YouthPolicyRouteImport } from './routes/youth-policy'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
@@ -129,6 +132,11 @@ const TabsRoute = TabsRouteImport.update({
   id: '/_tabs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiDisclosureRoute = AiDisclosureRouteImport.update({
+  id: '/ai-disclosure',
+  path: '/ai-disclosure',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -167,6 +175,11 @@ const HostRoute = HostRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentPolicyRoute = PaymentPolicyRouteImport.update({
+  id: '/payment-policy',
+  path: '/payment-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentsRoute = PaymentsRouteImport.update({
@@ -237,6 +250,11 @@ const TermsRoute = TermsRouteImport.update({
 const TrustCenterRoute = TrustCenterRouteImport.update({
   id: '/trust-center',
   path: '/trust-center',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YouthPolicyRoute = YouthPolicyRouteImport.update({
+  id: '/youth-policy',
+  path: '/youth-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -680,6 +698,7 @@ const LovableEmailTransactionalPreviewRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
@@ -688,6 +707,7 @@ export interface FileRoutesByFullPath {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -702,6 +722,7 @@ export interface FileRoutesByFullPath {
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -791,6 +812,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
@@ -799,6 +821,7 @@ export interface FileRoutesByTo {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -813,6 +836,7 @@ export interface FileRoutesByTo {
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -903,6 +927,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
@@ -911,6 +936,7 @@ export interface FileRoutesById {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -925,6 +951,7 @@ export interface FileRoutesById {
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -1016,6 +1043,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
@@ -1024,6 +1052,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -1038,6 +1067,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -1127,6 +1157,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
@@ -1135,6 +1166,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -1149,6 +1181,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -1238,6 +1271,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_tabs'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
@@ -1246,6 +1280,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -1260,6 +1295,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
@@ -1351,6 +1387,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
+  AiDisclosureRoute: typeof AiDisclosureRoute
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
@@ -1359,6 +1396,7 @@ export interface RootRouteChildren {
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
+  PaymentPolicyRoute: typeof PaymentPolicyRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -1373,6 +1411,7 @@ export interface RootRouteChildren {
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
   TrustCenterRoute: typeof TrustCenterRoute
+  YouthPolicyRoute: typeof YouthPolicyRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountAiPrivacyRoute: typeof AccountAiPrivacyRoute
@@ -1464,6 +1503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-disclosure': {
+      id: '/ai-disclosure'
+      path: '/ai-disclosure'
+      fullPath: '/ai-disclosure'
+      preLoaderRoute: typeof AiDisclosureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -1518,6 +1564,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-policy': {
+      id: '/payment-policy'
+      path: '/payment-policy'
+      fullPath: '/payment-policy'
+      preLoaderRoute: typeof PaymentPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payments': {
@@ -1616,6 +1669,13 @@ declare module '@tanstack/react-router' {
       path: '/trust-center'
       fullPath: '/trust-center'
       preLoaderRoute: typeof TrustCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/youth-policy': {
+      id: '/youth-policy'
+      path: '/youth-policy'
+      fullPath: '/youth-policy'
+      preLoaderRoute: typeof YouthPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -2270,6 +2330,7 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
+  AiDisclosureRoute: AiDisclosureRoute,
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
@@ -2278,6 +2339,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,
+  PaymentPolicyRoute: PaymentPolicyRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
@@ -2292,6 +2354,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
   TrustCenterRoute: TrustCenterRoute,
+  YouthPolicyRoute: YouthPolicyRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
