@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Clapperboard, MapPin, BarChart3, ExternalLink } from "lucide-react";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -444,7 +445,7 @@ function ContactGuardianButton({ childId, childName }: { childId: string; childN
       }
       navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not contact guardian.");
+      toast.error(describeMessagingError(e, "Could not contact guardian.", "guardian"));
     } finally {
       setBusy(false);
     }

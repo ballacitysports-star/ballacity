@@ -199,7 +199,7 @@ describe("enforce_minor_messaging", () => {
     ].map((m) => m[0]);
     expect(defs.length, "the trigger function should be defined").toBeGreaterThan(0);
     const last = defs.at(-1)!;
-    expect(last).toMatch(/minor_messaging_block_reason/);
+    expect(last).toMatch(/minor_messaging_block\b/);
     expect(last).toMatch(/MINOR_MESSAGING_BLOCKED:%/);
   });
 });

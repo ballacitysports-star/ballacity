@@ -3,7 +3,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation, sendMessage } from "@/lib/messages";
-import { describeMessagingError, isMinorMessagingBlock } from "@/lib/minor-messaging";
+import {
+  describeMessagingError,
+  isMinorMessagingBlock,
+  parseMinorMessagingBlock,
+} from "@/lib/minor-messaging";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +37,10 @@ export function useMessageOrGuardian() {
       const id = await getOrCreateDirectConversation(userId);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (e) {
-      if (!isMinorMessagingBlock(e)) {
+      // Offering the other player's guardian only helps when the refusal is
+      // about *their* account. When it is the viewer's own restriction, say
+      // so and stop.
+      if (!isMinorMessagingBlock(e) || parseMinorMessagingBlock(e)?.side === "self") {
         toast.error(describeMessagingError(e));
         return;
       }
@@ -60,7 +67,7 @@ export function useMessageOrGuardian() {
       setBlocked(null);
       navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
     } catch (e) {
-      toast.error(describeMessagingError(e, "Couldn't contact the guardian."));
+      toast.error(describeMessagingError(e, "Couldn't contact the guardian.", "guardian"));
     } finally {
       setBusy(false);
     }

@@ -3028,7 +3028,7 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(describeMessagingError(e));
+                  toast.error(describeMessagingError(e, undefined, "host"));
                 } finally {
                   setMessaging(false);
                 }
@@ -4672,7 +4672,7 @@ function RosterPlayerRow({
         search: { draft },
       });
     } catch (e) {
-      toast.error(describeMessagingError(e));
+      toast.error(describeMessagingError(e, undefined, "game_player"));
       setOpeningChat(false);
     }
   };

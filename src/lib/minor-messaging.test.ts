@@ -3,8 +3,19 @@ import {
   describeMessagingError,
   isMinorMessagingBlock,
   minorMessagingMessage,
+  parseMinorMessagingBlock,
   parseMinorMessagingReason,
 } from "./minor-messaging";
+
+const ALL_CODES = [
+  "messaging_off",
+  "guardian_only",
+  "teammates_only",
+  "child_needs_guardian",
+  "child_needs_shared_game",
+  "teen_needs_shared_game",
+] as const;
+const RECIPIENTS = ["player", "game_player", "host", "team_leader", "guardian", "chat"] as const;
 
 describe("parseMinorMessagingReason", () => {
   it("reads the code out of a raised error", () => {
@@ -31,16 +42,117 @@ describe("parseMinorMessagingReason", () => {
     expect(parseMinorMessagingReason(null)).toBeNull();
   });
 
+  it("ignores the side when reading just the code", () => {
+    expect(parseMinorMessagingReason("MINOR_MESSAGING_BLOCKED:messaging_off:self")).toBe(
+      "messaging_off",
+    );
+  });
+
   it("returns null for a code this build does not know", () => {
     expect(parseMinorMessagingReason("MINOR_MESSAGING_BLOCKED:some_future_rule")).toBeNull();
   });
 });
 
+describe("parseMinorMessagingBlock", () => {
+  it("reads whose restriction it is", () => {
+    expect(
+      parseMinorMessagingBlock(
+        "invalid request: MINOR_MESSAGING_BLOCKED:teen_needs_shared_game:self (SQLSTATE P0001)",
+      ),
+    ).toEqual({ reason: "teen_needs_shared_game", side: "self" });
+    expect(parseMinorMessagingBlock("MINOR_MESSAGING_BLOCKED:guardian_only:other")).toEqual({
+      reason: "guardian_only",
+      side: "other",
+    });
+  });
+
+  it("leaves the side unknown for an older database", () => {
+    expect(parseMinorMessagingBlock("MINOR_MESSAGING_BLOCKED:messaging_off")).toEqual({
+      reason: "messaging_off",
+      side: null,
+    });
+  });
+
+  it("reads a Supabase error object that is not an Error instance", () => {
+    expect(
+      parseMinorMessagingBlock({ message: "MINOR_MESSAGING_BLOCKED:messaging_off:other" }),
+    ).toEqual({ reason: "messaging_off", side: "other" });
+  });
+});
+
 describe("minorMessagingMessage", () => {
-  it("explains that a shared game is what is missing, rather than refusing outright", () => {
+  it("tells a host messaging a requester that the player must be in their game", () => {
     // The case that prompted this: a host who simply needs the player to join.
-    const msg = minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teen_needs_shared_game")!;
-    expect(msg).toMatch(/joined one of your games/i);
+    const msg = minorMessagingMessage(
+      "MINOR_MESSAGING_BLOCKED:teen_needs_shared_game:other",
+      "game_player",
+    )!;
+    expect(msg).toMatch(/their spot in your game is confirmed/i);
+  });
+
+  it("tells a player messaging a host to wait for their spot, not for themselves", () => {
+    for (const block of [
+      "teen_needs_shared_game:self",
+      "child_needs_shared_game:self",
+      // Older databases do not say whose rule it is; the host wording still fits.
+      "teen_needs_shared_game",
+    ]) {
+      const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${block}`, "host")!;
+      expect(msg, block).toBe("You can message the host once your spot in this game is confirmed.");
+    }
+  });
+
+  it("speaks about the viewer's own account when the restriction is theirs", () => {
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off:self", "host")).toMatch(
+      /^Your parent or guardian has turned off/,
+    );
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only:self")).toMatch(
+      /^Your parent or guardian .* only message teammates/,
+    );
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:child_needs_guardian:self")).toMatch(
+      /can only message their own parent or guardian/,
+    );
+    for (const code of ALL_CODES) {
+      for (const to of RECIPIENTS) {
+        const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}:self`, to)!;
+        expect(msg, `${code} -> ${to}`).not.toMatch(
+          /once they've joined|their parent or guardian|Add them/i,
+        );
+      }
+    }
+  });
+
+  it("names the person being messaged when the restriction is theirs", () => {
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off:other", "host")).toBe(
+      "This host's parent or guardian has turned off direct messages.",
+    );
+    expect(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:guardian_only:other", "team_leader"),
+    ).toBe("This team leader can only be messaged by their parent or guardian.");
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off:other", "chat")).toBe(
+      "This person's parent or guardian has turned off direct messages.",
+    );
+  });
+
+  it("only suggests adding to a team when the viewer is messaging a player", () => {
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only:other")).toMatch(
+      /Add them to your team/,
+    );
+    expect(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only:other", "host"),
+    ).not.toMatch(/Add them/);
+  });
+
+  it("never tells anyone but a host to wait for a player to join their games", () => {
+    for (const code of ["child_needs_shared_game", "teen_needs_shared_game"]) {
+      for (const to of RECIPIENTS) {
+        for (const side of [":self", ":other", ""]) {
+          const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}${side}`, to)!;
+          if (to !== "game_player")
+            expect(msg, `${code}${side} -> ${to}`).not.toMatch(/your game/i);
+        }
+      }
+    }
   });
 
   it("names the guardian control when that is what refused", () => {
@@ -52,16 +164,14 @@ describe("minorMessagingMessage", () => {
 
   it("never claims messaging with minors is simply unavailable", () => {
     // The old copy said exactly that, and it was not true.
-    for (const code of [
-      "messaging_off",
-      "guardian_only",
-      "teammates_only",
-      "child_needs_guardian",
-      "child_needs_shared_game",
-      "teen_needs_shared_game",
-    ]) {
-      const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}`)!;
-      expect(msg, code).not.toMatch(/between adults and minors/i);
+    for (const code of ALL_CODES) {
+      for (const side of [":self", ":other", ""]) {
+        for (const to of RECIPIENTS) {
+          const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}${side}`, to)!;
+          expect(msg, `${code}${side} -> ${to}`).not.toMatch(/between adults and minors/i);
+          expect(msg, `${code}${side} -> ${to}`).not.toMatch(/MINOR_MESSAGING_BLOCKED|undefined/);
+        }
+      }
     }
   });
 

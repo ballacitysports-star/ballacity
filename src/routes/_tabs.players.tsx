@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
-import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -66,7 +65,6 @@ import {
   type TimeSlot,
 } from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
-import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import {

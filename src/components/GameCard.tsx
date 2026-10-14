@@ -79,7 +79,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (err: any) {
-      toast.error(describeMessagingError(err));
+      toast.error(describeMessagingError(err, undefined, "host"));
     } finally {
       setOpening(false);
     }

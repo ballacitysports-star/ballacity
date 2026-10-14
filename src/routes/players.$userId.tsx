@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
-import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
@@ -26,7 +25,6 @@ import { toast } from "sonner";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { getOrCreateDirectConversation } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
 import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
