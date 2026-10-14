@@ -81,7 +81,7 @@ export function RepairPlaybackButton({
       // says nothing about what actually landed at that key. Runs before the
       // row is pointed at it, so a copy that fails the sniff is deleted and
       // never becomes a reel's playback path.
-      await finalizeVideoUpload({ data: { path, kind: "video" } });
+      await finalizeVideoUpload({ data: { path, kind: "video", purpose: "repair" } });
       const mediaMeta = buildMediaMeta({
         file: { name: file.name, type: file.type, size: file.size },
         original: await probeVideo(file),

@@ -17,6 +17,8 @@ import type { AiMessagePart } from "@/lib/ai/provider";
 import { normalizePoseMetrics, poseAllowedForCohort, poseGrounding } from "@/lib/pose-metrics";
 import { DENSE_MAX_FRAMES } from "@/lib/reel-frames";
 import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
+import { claimedReelSeconds, clipLengthProblem } from "@/lib/ai/upload-limits";
+import { loadClipLimits } from "@/lib/ai/upload-limits.server";
 
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
@@ -796,6 +798,32 @@ export async function claimReel(supabaseAdmin: any, reel: Reel) {
   return (data?.length ?? 0) > 0;
 }
 
+/**
+ * Backstop for the plan's clip-length limit. The real check runs on upload, in
+ * finalizeVideoUpload; this catches a reel row written without it. Only a
+ * fresh reel is checked, so lowering a limit never fails one already under way
+ * and a restyle of a finished reel is never refused.
+ *
+ * Returns true when the reel was refused (and marked failed, not retried).
+ */
+export async function rejectIfOverClipLimits(supabaseAdmin: any, reel: Reel): Promise<boolean> {
+  if (reel.attempts !== 0 || firstStep(reel.processing_step) !== STEPS[0]) return false;
+  const limits = await loadClipLimits(supabaseAdmin, reel.user_id);
+  const problem = clipLengthProblem(claimedReelSeconds(reel), limits);
+  if (!problem) return false;
+  await supabaseAdmin
+    .from("highlight_reels")
+    .update({
+      status: "failed",
+      attempts: MAX_ATTEMPTS,
+      error_message: problem,
+      failed_at: new Date().toISOString(),
+      processing_started_at: null,
+    })
+    .eq("id", reel.id);
+  return true;
+}
+
 export async function processReel(
   reel: Reel,
   supabaseAdmin: any,
@@ -812,8 +840,11 @@ export async function processReel(
 
   progress._pipeline = snapshot(done, startStep, attempt);
 
-  if (!alreadyClaimed && !(await claimReel(supabaseAdmin, reel))) {
-    return { id: reel.id, status: "skipped" };
+  if (!alreadyClaimed) {
+    if (await rejectIfOverClipLimits(supabaseAdmin, reel)) {
+      return { id: reel.id, status: "rejected" };
+    }
+    if (!(await claimReel(supabaseAdmin, reel))) return { id: reel.id, status: "skipped" };
   }
 
 
