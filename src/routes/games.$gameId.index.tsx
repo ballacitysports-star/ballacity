@@ -3551,6 +3551,7 @@ function EditGameModal({
         allowWaitlist: editPolicy.allowWaitlist,
         cancellationPolicy: editPolicy.cancellationPolicy,
         cancellationNotes: editPolicy.cancellationNotes || null,
+        cancelCutoffMin: editPolicy.cancelCutoffMin,
         gameRules: editPolicy.gameRules || null,
         price: pr,
         indoor,

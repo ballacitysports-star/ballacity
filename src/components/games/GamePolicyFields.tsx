@@ -1,5 +1,6 @@
 import { Users, CalendarX, ListPlus, ScrollText, DollarSign } from "lucide-react";
 import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
 import {
   CANCELLATION_POLICIES,
   MAX_GAME_PLAYERS,
@@ -138,7 +139,15 @@ export function GamePolicyFields({
                 key={p.id}
                 type="button"
                 aria-pressed={active}
-                onClick={() => set("cancellationPolicy", p.id)}
+                onClick={() =>
+                  // A preset also sets the cutoff it promises, so the label and
+                  // the refund/late-cancel timing can't disagree.
+                  onChange({
+                    ...value,
+                    cancellationPolicy: p.id,
+                    ...(p.cutoffMin == null ? {} : { cancelCutoffMin: p.cutoffMin }),
+                  })
+                }
                 className={`rounded-xl border px-3 py-2 text-left transition ${
                   active
                     ? "border-lime bg-lime/10 text-lime"
@@ -151,6 +160,35 @@ export function GamePolicyFields({
             );
           })}
         </div>
+        <label
+          htmlFor={`${idPrefix}-cutoff`}
+          className="mt-3 block text-xs font-semibold text-muted-foreground"
+        >
+          Cancellation cutoff
+          <select
+            id={`${idPrefix}-cutoff`}
+            value={String(normalizeCutoff(value.cancelCutoffMin))}
+            onChange={(e) => set("cancelCutoffMin", Number(e.target.value) || 0)}
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+          >
+            {CANCEL_CUTOFF_PRESETS.some(
+              (o) => o.value === normalizeCutoff(value.cancelCutoffMin),
+            ) ? null : (
+              <option value={normalizeCutoff(value.cancelCutoffMin)}>
+                {normalizeCutoff(value.cancelCutoffMin)} minutes before
+              </option>
+            )}
+            {CANCEL_CUTOFF_PRESETS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] font-normal">
+            Cancelling inside this window counts as late
+            {showPayment && value.entryFee > 0 ? " and is when your refund rule changes" : ""}.
+          </span>
+        </label>
         <textarea
           rows={2}
           value={value.cancellationNotes}
@@ -181,7 +219,9 @@ export function GamePolicyFields({
                 className="mt-3"
                 idPrefix={`${idPrefix}-refund-rule`}
                 value={{ rule: value.refundRule, latePct: value.lateRefundPct }}
-                onChange={(r) => onChange({ ...value, refundRule: r.rule, lateRefundPct: r.latePct })}
+                onChange={(r) =>
+                  onChange({ ...value, refundRule: r.rule, lateRefundPct: r.latePct })
+                }
                 cutoffMin={value.cancelCutoffMin}
               />
               <label

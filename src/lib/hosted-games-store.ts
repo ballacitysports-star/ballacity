@@ -223,6 +223,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     allow_waitlist: g.allowWaitlist ?? true,
     cancellation_policy: g.cancellationPolicy || "flexible",
     cancellation_notes: g.cancellationNotes ?? null,
+    cancel_cutoff_min: normalizeCutoff(g.cancelCutoffMin),
     game_rules: g.gameRules ?? null,
   } as TablesInsert<"hosted_games">;
 }
@@ -347,6 +348,8 @@ export type HostedGameInput = {
   allowWaitlist?: boolean;
   cancellationPolicy?: string | null;
   cancellationNotes?: string | null;
+  /** Minutes before start that cancelling counts as late / the refund rule changes. */
+  cancelCutoffMin?: number;
   gameRules?: string | null;
 };
 
@@ -397,6 +400,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     allowWaitlist: input.allowWaitlist ?? true,
     cancellationPolicy: input.cancellationPolicy || "flexible",
     cancellationNotes: input.cancellationNotes ?? null,
+    cancelCutoffMin: normalizeCutoff(input.cancelCutoffMin),
     gameRules: input.gameRules ?? null,
   };
 

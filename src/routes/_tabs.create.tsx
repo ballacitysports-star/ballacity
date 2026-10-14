@@ -642,6 +642,7 @@ function Create() {
                 allowWaitlist: effectivePolicy.allowWaitlist,
                 cancellationPolicy: effectivePolicy.cancellationPolicy,
                 cancellationNotes: effectivePolicy.cancellationNotes || null,
+                cancelCutoffMin: effectivePolicy.cancelCutoffMin,
                 gameRules: effectivePolicy.gameRules || null,
               });
 

@@ -97,24 +97,29 @@ export const CANCELLATION_POLICIES = [
     id: "flexible",
     label: "Flexible",
     short: "Cancel anytime",
+    /** Cancellation cutoff (minutes before start) this preset sets. */
+    cutoffMin: 120 as number | null,
     text: "Players can drop out any time before start. Refunds, if a fee was paid, are at the host's discretion.",
   },
   {
     id: "standard",
     label: "Standard",
     short: "Cancel 24h ahead",
+    cutoffMin: 1440 as number | null,
     text: "Players should drop out at least 24 hours before start so the host can fill the spot.",
   },
   {
     id: "strict",
     label: "Strict",
     short: "No late cancels",
+    cutoffMin: 2880 as number | null,
     text: "Spots are committed once approved. Late drop-outs may not be refunded and can affect reliability.",
   },
   {
     id: "custom",
     label: "Custom",
     short: "Host's own policy",
+    cutoffMin: null as number | null,
     text: "The host set their own cancellation terms — read them below.",
   },
 ] as const;
