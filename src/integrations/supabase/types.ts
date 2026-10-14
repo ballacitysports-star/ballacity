@@ -3027,31 +3027,38 @@ export type Database = {
         }
         Relationships: []
       }
-      review_helpfuls: {
+      reputation_insights: {
         Row: {
-          created_at: string
-          review_id: string
-          user_id: string
+          generated_at: string
+          growth: string[]
+          model: string | null
+          review_count: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths: string[]
+          summary: string
         }
         Insert: {
-          created_at?: string
-          review_id: string
-          user_id: string
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths?: string[]
+          summary: string
         }
         Update: {
-          created_at?: string
-          review_id?: string
-          user_id?: string
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id?: string
+          reviewee_kind?: string
+          strengths?: string[]
+          summary?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "review_helpfuls_review_id_fkey"
-            columns: ["review_id"]
-            isOneToOne: false
-            referencedRelation: "reviews"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       review_ai_analysis: {
         Row: {
@@ -3088,119 +3095,57 @@ export type Database = {
           },
         ]
       }
-      reputation_insights: {
-        Row: {
-          generated_at: string
-          growth: string[]
-          model: string | null
-          review_count: number
-          reviewee_id: string
-          reviewee_kind: string
-          strengths: string[]
-          summary: string
-        }
-        Insert: {
-          generated_at?: string
-          growth?: string[]
-          model?: string | null
-          review_count?: number
-          reviewee_id: string
-          reviewee_kind: string
-          strengths?: string[]
-          summary: string
-        }
-        Update: {
-          generated_at?: string
-          growth?: string[]
-          model?: string | null
-          review_count?: number
-          reviewee_id?: string
-          reviewee_kind?: string
-          strengths?: string[]
-          summary?: string
-        }
-        Relationships: []
-      }
-      skill_ratings: {
-        Row: {
-          high: number
-          hidden: boolean
-          label: string
-          low: number
-          mu: number
-          report: Json | null
-          report_at: string | null
-          self_tier: string | null
-          signals: Json
-          sigma: number
-          sport: string
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          high: number
-          hidden?: boolean
-          label: string
-          low: number
-          mu: number
-          report?: Json | null
-          report_at?: string | null
-          self_tier?: string | null
-          signals?: Json
-          sigma: number
-          sport: string
-          status: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          high?: number
-          hidden?: boolean
-          label?: string
-          low?: number
-          mu?: number
-          report?: Json | null
-          report_at?: string | null
-          self_tier?: string | null
-          signals?: Json
-          sigma?: number
-          sport?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      skill_votes: {
+      review_helpfuls: {
         Row: {
           created_at: string
-          game_id: string
-          id: string
-          sport: string
-          subject_id: string
-          vote: number
-          voter_id: string
+          review_id: string
+          user_id: string
         }
         Insert: {
           created_at?: string
-          game_id: string
-          id?: string
-          sport?: string
-          subject_id: string
-          vote: number
-          voter_id: string
+          review_id: string
+          user_id: string
         }
         Update: {
           created_at?: string
-          game_id?: string
-          id?: string
-          sport?: string
-          subject_id?: string
-          vote?: number
-          voter_id?: string
+          review_id?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "review_helpfuls_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_reports: {
+        Row: {
+          created_at: string
+          reporter_id: string
+          review_id: string
+        }
+        Insert: {
+          created_at?: string
+          reporter_id: string
+          review_id: string
+        }
+        Update: {
+          created_at?: string
+          reporter_id?: string
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_reports_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reviews: {
         Row: {
@@ -3343,6 +3288,87 @@ export type Database = {
           timezone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      skill_ratings: {
+        Row: {
+          hidden: boolean
+          high: number
+          label: string
+          low: number
+          mu: number
+          report: Json | null
+          report_at: string | null
+          self_tier: string | null
+          sigma: number
+          signals: Json
+          sport: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          hidden?: boolean
+          high: number
+          label: string
+          low: number
+          mu: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          sigma: number
+          signals?: Json
+          sport: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          hidden?: boolean
+          high?: number
+          label?: string
+          low?: number
+          mu?: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          sigma?: number
+          signals?: Json
+          sport?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skill_votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          sport?: string
+          subject_id?: string
+          vote?: number
+          voter_id?: string
         }
         Relationships: []
       }
@@ -4916,6 +4942,19 @@ export type Database = {
           status: string
         }[]
       }
+      my_reviewable: {
+        Args: { _kind?: string; _reviewee_id?: string }
+        Returns: {
+          closes_at: string
+          context: string
+          game_id: string
+          happened_at: string
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          sport: string
+        }[]
+      }
       notify_guardians: {
         Args: {
           _body: string
@@ -4940,50 +4979,6 @@ export type Database = {
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }
-      my_reviewable: {
-        Args: { _kind?: string; _reviewee_id?: string }
-        Returns: {
-          closes_at: string | null
-          context: string | null
-          game_id: string | null
-          happened_at: string | null
-          reviewee_id: string
-          reviewee_kind: string
-          reviewee_name: string
-          sport: string | null
-        }[]
-      }
-      report_review: { Args: { _review_id: string }; Returns: undefined }
-      player_trait_counts: {
-        Args: { _user: string }
-        Returns: {
-          communicative: number
-          fair_play: number
-          on_time: number
-          positive: number
-          respectful: number
-        }[]
-      }
-      set_skill_rating_hidden: { Args: { _hidden: boolean; _sport: string }; Returns: undefined }
-      review_ring_suspects: {
-        Args: { _days?: number }
-        Returns: {
-          a_to_b: number
-          avg_rating: number
-          b_to_a: number
-          user_a: string
-          user_b: string
-        }[]
-      }
-      review_uniform_raters: {
-        Args: { _min?: number }
-        Returns: {
-          avg_rating: number
-          reviewer_id: string
-          reviews: number
-          stddev_rating: number
-        }[]
-      }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {
@@ -4999,6 +4994,16 @@ export type Database = {
           review_count: number
           teams_count: number
           verified_review_count: number
+        }[]
+      }
+      player_trait_counts: {
+        Args: { _user: string }
+        Returns: {
+          communicative: number
+          fair_play: number
+          on_time: number
+          positive: number
+          respectful: number
         }[]
       }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
@@ -5100,6 +5105,7 @@ export type Database = {
         Args: { _game_id?: string }
         Returns: number
       }
+      report_review: { Args: { _review_id: string }; Returns: undefined }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
@@ -5131,6 +5137,34 @@ export type Database = {
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
         Returns: undefined
+      }
+      review_eligibility: {
+        Args: { _kind: string; _reviewee_id: string; _reviewer: string }
+        Returns: {
+          context: string
+          game_id: string
+          happened_at: string
+          sport: string
+        }[]
+      }
+      review_ring_suspects: {
+        Args: { _days?: number }
+        Returns: {
+          a_to_b: number
+          avg_rating: number
+          b_to_a: number
+          user_a: string
+          user_b: string
+        }[]
+      }
+      review_uniform_raters: {
+        Args: { _min?: number }
+        Returns: {
+          avg_rating: number
+          reviewer_id: string
+          reviews: number
+          stddev_rating: number
+        }[]
       }
       revoke_device_pairing: {
         Args: { _child_user_id: string }
@@ -5170,6 +5204,10 @@ export type Database = {
           review_required: boolean
           status: string
         }[]
+      }
+      set_skill_rating_hidden: {
+        Args: { _hidden: boolean; _sport: string }
+        Returns: undefined
       }
       settle_paid_spot: {
         Args: { _game: string; _player: string; _reason: string }
