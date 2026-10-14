@@ -21,6 +21,7 @@ import { AuditTab } from "@/components/superadmin/AuditTab";
 import { YouthTab } from "@/components/superadmin/YouthTab";
 import { AttentionStrip } from "@/components/superadmin/AttentionStrip";
 import { AiControlsPanel } from "@/components/superadmin/AiControlsPanel";
+import { LiveListingsTab } from "@/components/superadmin/LiveListingsTab";
 import { ReelsWorkerTab } from "@/components/superadmin/ReelsWorkerTab";
 import { ListingsClaimsPanel } from "@/components/admin/ListingsClaimsPanel";
 import { LegalPublishingPanel } from "@/components/admin/LegalPublishingPanel";
@@ -117,6 +118,7 @@ function SuperadminPage() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users &amp; profiles</TabsTrigger>
+          <TabsTrigger value="listings-live">Live listings</TabsTrigger>
           <TabsTrigger value="moderation">Content</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -134,6 +136,9 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="users" className="pt-3">
           <UsersTab currentUserId={data.userId} />
+        </TabsContent>
+        <TabsContent value="listings-live" className="pt-3">
+          <LiveListingsTab />
         </TabsContent>
         <TabsContent value="moderation" className="pt-3">
           <ModerationTab />
