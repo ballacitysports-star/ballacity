@@ -5,6 +5,7 @@ import {
   refundPctFor,
   refundPhase,
   refundPolicySummary,
+  refundTermsDisplay,
 } from "./refund-policy";
 
 const until = normalizeRefundPolicy("until_cutoff", 0);
@@ -67,5 +68,42 @@ describe("copy", () => {
       rule: "until_cutoff",
       latePct: 0,
     });
+  });
+});
+
+describe("refundTermsDisplay", () => {
+  it("returns null when the host has posted no terms, instead of a default rule", () => {
+    expect(refundTermsDisplay(null, 60)).toBeNull();
+    expect(refundTermsDisplay(undefined, 60)).toBeNull();
+  });
+
+  it("states non-refundable without any cutoff clause and keeps the host note separate", () => {
+    const d = refundTermsDisplay(
+      { refund_rule: "none", late_refund_pct: 0, refund_policy: "  All sales final.  " },
+      120,
+    )!;
+    expect(d.summary).toMatch(/non-refundable/i);
+    expect(d.summary).not.toMatch(/more than/i);
+    expect(d.hostNote).toBe("All sales final.");
+  });
+
+  it("describes the cutoff rule when the host chose it", () => {
+    const d = refundTermsDisplay(
+      { refund_rule: "until_cutoff", late_refund_pct: 50, refund_policy: null },
+      120,
+    )!;
+    expect(d.summary).toMatch(/more than 2 hours before start/);
+    expect(d.summary).toMatch(/50% back/);
+    expect(d.hostNote).toBe("");
+  });
+});
+
+describe("refundDisclaimer host note", () => {
+  it("includes the host's note in what the player agrees to", () => {
+    const policy = { rule: "none" as const, latePct: 0 };
+    expect(refundDisclaimer(policy, 60, "Rain-outs refunded.")).toContain(
+      "Host's note: Rain-outs refunded.",
+    );
+    expect(refundDisclaimer(policy, 60)).not.toContain("Host's note");
   });
 });

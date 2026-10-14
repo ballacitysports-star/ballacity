@@ -55,7 +55,7 @@ import { LegalNotice } from "@/components/LegalNotice";
 
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
-import { normalizeRefundPolicy, refundDisclaimer, refundPolicySummary } from "@/lib/refund-policy";
+import { normalizeRefundPolicy, refundDisclaimer, refundTermsDisplay } from "@/lib/refund-policy";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
@@ -770,6 +770,7 @@ function PayPage() {
           refundTerms={refundDisclaimer(
             normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
             game.cancelCutoffMin,
+            settings?.refund_policy,
           )}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
@@ -786,13 +787,21 @@ function PayPage() {
       {/* Footer: refund policy is collapsed by default; legal always shows */}
       <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
         <summary className="cursor-pointer font-semibold">Refund policy</summary>
-        <p className="mt-2 text-muted-foreground">
-          {refundPolicySummary(
-            normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
-            game.cancelCutoffMin,
-          )}
-          {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
-        </p>
+        {(() => {
+          const display = refundTermsDisplay(settings, game.cancelCutoffMin);
+          if (!display) return null;
+          return (
+            <div className="mt-2 space-y-1 text-muted-foreground">
+              <p>{display.summary}</p>
+              {display.hostNote && (
+                <p>
+                  <span className="font-semibold text-foreground">Host's note: </span>
+                  {display.hostNote}
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </details>
 
       <LegalNotice />

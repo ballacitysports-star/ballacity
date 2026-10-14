@@ -138,7 +138,8 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
-import { normalizeRefundPolicy, refundPolicySummary } from "@/lib/refund-policy";
+import { refundTermsDisplay } from "@/lib/refund-policy";
+import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import {
   CANCEL_CUTOFF_PRESETS,
   cancelPolicyNote,
@@ -369,6 +370,7 @@ function GameDetail() {
   const participationDecision = canChildFeature("game_participation");
   const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const refundTerms = useGameRefundTerms(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -2092,13 +2094,26 @@ function GameDetail() {
               {isPaid && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
-                  <p className="text-sm leading-relaxed">
-                    {refundPolicySummary(
-                      normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
-                      game.cancelCutoffMin,
-                    )}
-                    {settings?.refund_policy ? ` ${settings.refund_policy}` : ""}
-                  </p>
+                  {(() => {
+                    const display = refundTermsDisplay(refundTerms, game.cancelCutoffMin);
+                    if (!display)
+                      return (
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          The host hasn't posted refund terms yet.
+                        </p>
+                      );
+                    return (
+                      <>
+                        <p className="text-sm leading-relaxed">{display.summary}</p>
+                        {display.hostNote && (
+                          <p className="mt-1 text-sm leading-relaxed">
+                            <span className="font-semibold">Host's note: </span>
+                            {display.hostNote}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               {settings?.payment_instructions && (
@@ -3210,6 +3225,10 @@ function GameDetail() {
 
       {isHost && editOpen && (
         <EditGameModal
+          // The editor seeds its fields from `settings` on mount; remount once
+          // they finish loading so a slow fetch can't leave the host's saved
+          // refund terms blank (and then overwrite them on save).
+          key={settings ? "settings-loaded" : "settings-pending"}
           game={game}
           hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
           settings={settings}
