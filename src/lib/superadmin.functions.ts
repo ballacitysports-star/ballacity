@@ -843,12 +843,33 @@ export const superadminBroadcast = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
     const admin = await getAdmin();
-    let q = admin.from("profiles").select("id").is("suspended_at", null);
+    // Broadcasts are marketing-category announcements: only adults who opted in
+    // to marketing are eligible. Enforced here because the client-side pref only
+    // hides toasts/push — it never stops the notification row being stored.
+    let q = admin.from("profiles").select("id").is("suspended_at", null).eq("age_cohort", "adult");
     if (data.audience !== "all") q = q.eq("account_type", data.audience);
-    const { data: targets, error: qErr } = await q;
+    const { data: candidates, error: qErr } = await q;
     if (qErr) throw new Error(qErr.message);
 
-    const rows = (targets ?? []).map((t: any) => ({
+    const optedIn = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data: prefRows, error: pErr } = await admin
+        .from("notification_preferences" as never)
+        .select("user_id, prefs")
+        .or("prefs->marketing->>inApp.eq.true,prefs->marketing->>push.eq.true")
+        .range(from, from + 999);
+      if (pErr) throw new Error(pErr.message);
+      const page = (prefRows ?? []) as unknown as { user_id: string; prefs: unknown }[];
+      for (const r of page) {
+        const m = (r.prefs as { marketing?: { inApp?: unknown; push?: unknown } } | null)
+          ?.marketing;
+        if (m?.inApp === true || m?.push === true) optedIn.add(r.user_id);
+      }
+      if (page.length < 1000) break;
+    }
+    const targets = (candidates ?? []).filter((t: any) => optedIn.has(t.id));
+
+    const rows = targets.map((t: any) => ({
       user_id: t.id,
       type: "announcement",
       title: data.title,
