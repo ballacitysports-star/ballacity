@@ -5,6 +5,7 @@ import {
   LEGAL_PAGE_LIST,
   buildConsentStatus,
   effectiveVersion,
+  livePublishedVersion,
   parseLegalContent,
   pendingRequiredTypes,
   sectionsToContent,
@@ -175,5 +176,24 @@ describe("informational legal pages", () => {
     ]);
     expect(v.version).toBe("2026-11-01");
     expect(v.sections.map((s) => s.heading)).toEqual(["A", "B"]);
+  });
+});
+
+describe("livePublishedVersion", () => {
+  it("returns null until a version is live, so pages keep their own fallback", () => {
+    expect(livePublishedVersion("community_guidelines", null)).toBeNull();
+    expect(
+      livePublishedVersion("community_guidelines", [
+        row({ document_type: "community_guidelines", published: false }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("parses the live row", () => {
+    const v = livePublishedVersion("safety_guidelines", [
+      row({ document_type: "safety_guidelines", version: "s-2" }),
+    ]);
+    expect(v?.version).toBe("s-2");
+    expect(v?.sections.map((s) => s.heading)).toEqual(["A", "B"]);
   });
 });

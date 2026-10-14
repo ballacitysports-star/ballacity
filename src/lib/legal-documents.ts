@@ -411,6 +411,27 @@ export type PublishedLegalDocument = {
   archived_at: string | null;
 };
 
+/**
+ * The live published version of any managed document, or null when nothing is
+ * published. For pages whose bundled copy is not part of this registry (such
+ * as the Community Guidelines and Safety Center), so they can keep their own
+ * fallback instead of `effectiveVersion`'s.
+ */
+export function livePublishedVersion(
+  type: string,
+  published?: PublishedLegalDocument[] | null,
+): LegalDocumentVersion | null {
+  const row = published?.find((p) => p.document_type === type && p.published);
+  if (!row) return null;
+  return {
+    version: row.version,
+    effectiveDate: row.effective_date,
+    material: row.requires_reacceptance,
+    summary: row.summary,
+    sections: parseLegalContent(row.content),
+  };
+}
+
 /** The version users are currently shown for a consent document. */
 export function effectiveVersion(
   type: LegalDocumentType,
