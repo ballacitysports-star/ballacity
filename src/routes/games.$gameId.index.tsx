@@ -4671,7 +4671,7 @@ function RosterPlayerRow({
         search: { draft },
       });
     } catch (e) {
-      toast.error(describeMessagingError(e));
+      toast.error(describeMessagingError(e, undefined, "game_player"));
       setOpeningChat(false);
     }
   };

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -341,8 +342,11 @@ function Thread() {
       if (e?.name === "AbortError") {
         toast.message("Upload cancelled");
       } else {
-        setUploadError(e?.message ?? "Send failed");
-        toast.error(e.message);
+        // A minor-messaging refusal at send time carries a reason code;
+        // never show the raw sentinel.
+        const msg = describeMessagingError(e, "Send failed", "chat");
+        setUploadError(msg);
+        toast.error(msg);
       }
     } finally {
       setSending(false);

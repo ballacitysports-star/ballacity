@@ -4906,6 +4906,10 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
+      minor_messaging_block: {
+        Args: { _a: string; _b: string }
+        Returns: string
+      }
       minor_messaging_block_reason: {
         Args: { _a: string; _b: string }
         Returns: string
