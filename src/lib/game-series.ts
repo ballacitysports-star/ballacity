@@ -1,5 +1,5 @@
 import type { Game } from "@/lib/sample-data";
-import { isGameFinished } from "@/lib/game-time";
+import { gameEndsAt, hideFinishedGames, isGameFinished, onlyFinishedGames } from "@/lib/game-time";
 
 /**
  * Collapse multi-day event series into a single card.
@@ -55,4 +55,38 @@ export function collapseSeriesGames<T extends Game>(
     if (rep) result.push(rep);
   }
   return result;
+}
+
+/**
+ * Split the games a user hosts or has joined into Upcoming (hosting / playing)
+ * and Archive buckets, collapsing multi-day series to one card per tab so the
+ * profile matches the Feed. The next unfinished session represents a series in
+ * Upcoming; once every session is done the series moves to Archive.
+ */
+export function groupProfileGames<T extends Game & { hostUserId?: string }>(
+  pool: T[],
+  joinedIds: Set<string>,
+  userId: string | undefined,
+  now: number = Date.now(),
+) {
+  const isHosting = (g: T) => Boolean(userId && g.hostUserId === userId);
+  const seen = new Set<string>();
+  const relevant = pool
+    .filter((g) => joinedIds.has(g.id) || isHosting(g))
+    .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  const live = hideFinishedGames(collapseSeriesGames(relevant, "upcoming", now), now).sort(
+    (a, b) => +new Date(a.date) - +new Date(b.date),
+  );
+  const finished = onlyFinishedGames(collapseSeriesGames(relevant, "archive", now), now).sort(
+    (a, b) => gameEndsAt(b) - gameEndsAt(a),
+  );
+  return {
+    hosting: live.filter(isHosting),
+    playing: live.filter((g) => !isHosting(g)),
+    total: live.length,
+    archiveHosting: finished.filter(isHosting),
+    archivePlaying: finished.filter((g) => !isHosting(g)),
+    archiveTotal: finished.length,
+  };
 }
