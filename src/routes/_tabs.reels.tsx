@@ -55,7 +55,8 @@ import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { validateVideoSize } from "@/lib/video-validation";
-import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
+import { finalizeVideoUpload, getMyClipLimits } from "@/lib/media-uploads.functions";
+import { clipLengthProblem, uploadSizeProblem, type ClipLimits } from "@/lib/ai/upload-limits";
 import { useAuth } from "@/hooks/use-auth";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
@@ -947,6 +948,13 @@ function ReelsPage() {
       const invalid = validateVideoSize({ bytes: file.size });
       if (invalid) throw new Error(invalid);
 
+      // The plan's clip limits, checked here so an over-limit clip is refused
+      // before minutes of conversion and upload. The server re-checks both on
+      // finalize; if this lookup fails, that check still stands.
+      const clipLimits: ClipLimits | null = await getMyClipLimits().catch(() => null);
+      const tooBig = clipLimits ? uploadSizeProblem(file.size, clipLimits) : null;
+      if (tooBig) throw new Error(tooBig);
+
       // What the clip actually is (length, size, which way up). Measured here
       // because the server runtime has no ffprobe; kept so a viewer's player and
       // a later support question both have the facts.
@@ -971,6 +979,10 @@ function ReelsPage() {
       }
 
       const originalProbe = await probeVideo(file);
+      const tooLong = clipLimits
+        ? clipLengthProblem(originalProbe.durationSeconds, clipLimits)
+        : null;
+      if (tooLong) throw new Error(tooLong);
 
       // Convert BEFORE storing anything. This ordering is the whole fix: the
       // conversion used to run after the upload and after a container gate that

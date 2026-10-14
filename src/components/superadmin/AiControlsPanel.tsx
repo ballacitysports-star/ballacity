@@ -35,6 +35,7 @@ import {
   applyRecommendedPreset,
   limitsProblems,
 } from "@/lib/ai/admin-controls";
+import { STORAGE_MAX_UPLOAD_MB } from "@/lib/ai/upload-limits";
 import { COHORT_META } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -336,6 +337,11 @@ function LimitsCard({ limits }: { limits: AiLimitsConfig }) {
         <p className="text-xs text-muted-foreground">
           The tier comes from the member's plan (or the Free Mode tier on Monetization). Daily and
           monthly caps are a cost ceiling per member. Safety moderation is never metered.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Clip length and upload size are checked when a reel is uploaded. Storage refuses files
+          over {STORAGE_MAX_UPLOAD_MB} MB, so a higher upload size acts as {STORAGE_MAX_UPLOAD_MB}{" "}
+          MB.
         </p>
 
         <Tabs value={tier} onValueChange={(v) => setTier(v as AiTier)}>

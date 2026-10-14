@@ -59,8 +59,8 @@ export const TIER_LIMIT_FIELDS: {
   enforced: boolean;
 }[] = [
   { key: "maxConcurrentJobs", label: "Concurrent jobs", unit: "jobs", min: 1, enforced: true },
-  { key: "maxVideoSeconds", label: "Max clip length", unit: "sec", min: 1, enforced: false },
-  { key: "maxUploadMb", label: "Max upload size", unit: "MB", min: 1, enforced: false },
+  { key: "maxVideoSeconds", label: "Max clip length", unit: "sec", min: 1, enforced: true },
+  { key: "maxUploadMb", label: "Max upload size", unit: "MB", min: 1, enforced: true },
   { key: "maxResolution", label: "Max resolution", unit: "px", min: 240, enforced: false },
   {
     key: "maxProcessingSeconds",
