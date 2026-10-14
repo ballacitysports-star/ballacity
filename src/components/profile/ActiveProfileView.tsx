@@ -20,6 +20,7 @@ import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
 import { hideFinishedGames } from "@/lib/game-time";
+import { collapseSeriesGames } from "@/lib/game-series";
 
 type ViewModel = {
   name: string;
@@ -61,10 +62,12 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
   const games: Game[] = useMemo(() => {
     const pool = hideFinishedGames([...hosted, ...GAMES]);
     const seen = new Set<string>();
-    return pool
+    const mine = pool
       .filter((g) => (isGym ? g.orgId === refId : g.teamId === refId))
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    // One card per multi-day series (its next session), like the Feed.
+    return collapseSeriesGames(mine, "upcoming");
   }, [hosted, isGym, refId]);
 
   const reviews = useReviewsFor(refId);
