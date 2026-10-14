@@ -4672,6 +4672,14 @@ export type Database = {
           merchant_id: string
         }[]
       }
+      get_game_refund_terms: {
+        Args: { _game_id: string }
+        Returns: {
+          late_refund_pct: number
+          refund_policy: string
+          refund_rule: string
+        }[]
+      }
       get_host_payment_methods: {
         Args: { _host_id: string }
         Returns: {
