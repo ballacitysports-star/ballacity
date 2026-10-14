@@ -18,6 +18,8 @@ import {
   disconnectMyPayPalAccount,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import { DEFAULT_REFUND_RULE, normalizeRefundPolicy, type RefundPolicy } from "@/lib/refund-policy";
 
 export const Route = createFileRoute("/games/$gameId/payment-setup")({
   head: () =>
@@ -64,6 +66,10 @@ function SetupPage() {
   const [fee, setFee] = useState<string>(String(game.price || 0));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState("");
+  const [refundRule, setRefundRule] = useState<RefundPolicy>({
+    rule: DEFAULT_REFUND_RULE,
+    latePct: 0,
+  });
   const [refundPolicy, setRefundPolicy] = useState("");
   const [instructions, setInstructions] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
@@ -95,6 +101,7 @@ function SetupPage() {
         setFee(String(s.entry_fee));
         setSelected(new Set(s.accepted_method_ids));
         setDeadline(s.payment_deadline ? s.payment_deadline.slice(0, 16) : "");
+        setRefundRule(normalizeRefundPolicy(s.refund_rule, s.late_refund_pct));
         setRefundPolicy(s.refund_policy ?? "");
         setInstructions(s.payment_instructions ?? "");
         setRequiresApproval(!!s.requires_approval);
@@ -114,6 +121,8 @@ function SetupPage() {
         entry_fee: Number(fee) || 0,
         accepted_method_ids: Array.from(selected),
         payment_deadline: deadline ? new Date(deadline).toISOString() : null,
+        refund_rule: refundRule.rule,
+        late_refund_pct: refundRule.rule === "none" ? 0 : refundRule.latePct,
         refund_policy: refundPolicy || null,
         payment_instructions: instructions || null,
         requires_approval: requiresApproval,
@@ -331,12 +340,20 @@ function SetupPage() {
       </section>
 
       <section>
-        <Label>Refund policy (optional)</Label>
+        <Label>Refund policy</Label>
+        <RefundPolicyFields
+          value={refundRule}
+          onChange={setRefundRule}
+          cutoffMin={game.cancelCutoffMin}
+          idPrefix="setup-refund"
+          className="mb-3"
+        />
+        <Label>Refund notes (optional)</Label>
         <textarea
           rows={3}
           value={refundPolicy}
           onChange={(e) => setRefundPolicy(e.target.value)}
-          placeholder="e.g. Full refund up to 24h before tip-off."
+          placeholder="e.g. Rain-outs are refunded in full."
           className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
         />
       </section>

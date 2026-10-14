@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   COURT_TYPES,
   INQUIRY_SPORTS,
@@ -47,6 +47,15 @@ describe("court inquiry options", () => {
 });
 
 describe("court inquiry validation", () => {
+  // validateCourtInquiry reads the real clock; pin it so the fixed dates stay valid.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("accepts a slot request without an exact time", () => {
     expect(validateCourtInquiry(base)).toBeNull();
     expect(validateCourtInquiry({ ...base, notes: "Team practice for 12 players" })).toBeNull();

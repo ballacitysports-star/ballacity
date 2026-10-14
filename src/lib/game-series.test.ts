@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collapseSeriesGames } from "./game-series";
+import { collapseSeriesGames, groupProfileGames } from "./game-series";
 import type { Game } from "./sample-data";
 
 const base: Game = {
@@ -71,5 +71,60 @@ describe("collapseSeriesGames", () => {
     expect(arch).toHaveLength(1);
     expect(arch[0].id).toBe("s2");
     expect(arch[0].seriesCount).toBe(2);
+  });
+});
+
+describe("groupProfileGames", () => {
+  const hostGame = (id: string, iso: string, seriesId?: string) => ({
+    ...day(id, iso, seriesId),
+    hostUserId: "me",
+  });
+
+  it("collapses a hosted weekend series to the next session in Hosting", () => {
+    const pool = [
+      hostGame("sat", "2026-10-24T18:00:00Z", "wk"),
+      hostGame("sun", "2026-10-25T18:00:00Z", "wk"),
+    ];
+    const now = +new Date("2026-10-20T12:00:00Z");
+    const g = groupProfileGames(pool, new Set(), "me", now);
+    expect(g.hosting.map((x) => x.id)).toEqual(["sat"]);
+    expect(g.hosting[0].seriesCount).toBe(2);
+    expect(g.total).toBe(1);
+    expect(g.archiveTotal).toBe(0);
+  });
+
+  it("advances to Sunday after Saturday finishes, keeping Saturday in Archive", () => {
+    const pool = [
+      hostGame("sat", "2026-10-24T18:00:00Z", "wk"),
+      hostGame("sun", "2026-10-25T18:00:00Z", "wk"),
+    ];
+    const now = +new Date("2026-10-25T08:00:00Z");
+    const g = groupProfileGames(pool, new Set(), "me", now);
+    expect(g.hosting.map((x) => x.id)).toEqual(["sun"]);
+    expect(g.archiveHosting.map((x) => x.id)).toEqual(["sat"]);
+  });
+
+  it("moves the whole series to Archive once every session is finished", () => {
+    const pool = [
+      hostGame("sat", "2026-10-24T18:00:00Z", "wk"),
+      hostGame("sun", "2026-10-25T18:00:00Z", "wk"),
+    ];
+    const now = +new Date("2026-10-30T12:00:00Z");
+    const g = groupProfileGames(pool, new Set(), "me", now);
+    expect(g.total).toBe(0);
+    expect(g.archiveHosting.map((x) => x.id)).toEqual(["sun"]);
+    expect(g.archiveHosting[0].seriesCount).toBe(2);
+  });
+
+  it("collapses joined series into Playing and ignores games the user is not in", () => {
+    const pool = [
+      day("a", "2026-10-24T18:00:00Z", "s1"),
+      day("b", "2026-10-25T18:00:00Z", "s1"),
+      day("other", "2026-10-26T18:00:00Z"),
+    ];
+    const now = +new Date("2026-10-20T12:00:00Z");
+    const g = groupProfileGames(pool, new Set(["a", "b"]), "me", now);
+    expect(g.playing.map((x) => x.id)).toEqual(["a"]);
+    expect(g.hosting).toHaveLength(0);
   });
 });

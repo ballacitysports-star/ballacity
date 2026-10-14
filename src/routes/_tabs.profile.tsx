@@ -41,7 +41,7 @@ import {
 import { withdrawFromGame } from "@/lib/leave-game";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { MySignups } from "@/components/profile/MySignups";
-import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
+import { groupProfileGames } from "@/lib/game-series";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -136,27 +136,10 @@ function PlayerProfile() {
   const follow = useFollow(profileUser?.id ?? "");
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
-  const upcomingGroups = useMemo(() => {
-    const ids = new Set(joinedGameIds);
-    const pool = [...hosted, ...GAMES];
-    const seen = new Set<string>();
-    const isHosting = (g: Game) =>
-      Boolean(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id);
-    const relevant = pool
-      .filter((game) => ids.has(game.id) || isHosting(game))
-      .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
-      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-    const live = hideFinishedGames(relevant);
-    const finished = onlyFinishedGames(relevant).sort((a, b) => gameEndsAt(b) - gameEndsAt(a));
-    return {
-      hosting: live.filter(isHosting),
-      playing: live.filter((g) => !isHosting(g)),
-      total: live.length,
-      archiveHosting: finished.filter(isHosting),
-      archivePlaying: finished.filter((g) => !isHosting(g)),
-      archiveTotal: finished.length,
-    };
-  }, [joinedGameIds, hosted, profileUser]);
+  const upcomingGroups = useMemo(
+    () => groupProfileGames([...hosted, ...GAMES], new Set(joinedGameIds), profileUser?.id),
+    [joinedGameIds, hosted, profileUser?.id],
+  );
 
   // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);

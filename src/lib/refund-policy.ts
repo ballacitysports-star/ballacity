@@ -96,6 +96,35 @@ export function refundPolicySummary(
 export function refundDisclaimer(
   policy: RefundPolicy,
   cutoffMin: number | null | undefined,
+  hostNote?: string | null,
 ): string {
-  return `I understand the refund terms: ${refundPolicySummary(policy, cutoffMin)} Refunds come from the host directly — BallaCity doesn't hold or return money.`;
+  const note = hostNote?.trim();
+  return `I understand the refund terms: ${refundPolicySummary(policy, cutoffMin)}${note ? ` Host's note: ${note}` : ""} Refunds come from the host directly — BallaCity doesn't hold or return money.`;
+}
+
+/** The refund fields players are allowed to see before joining. */
+export type RefundTerms = {
+  refund_rule?: string | null;
+  late_refund_pct?: number | null;
+  refund_policy?: string | null;
+};
+
+/**
+ * What to show players: the host's structured rule as a summary, and their own
+ * words kept separate (and labeled) so they're never read as part of the
+ * generated sentence. `null` terms means the host hasn't posted any — never
+ * invent a default rule for the player to rely on.
+ */
+export function refundTermsDisplay(
+  terms: RefundTerms | null | undefined,
+  cutoffMin: number | null | undefined,
+): { summary: string; hostNote: string } | null {
+  if (!terms) return null;
+  return {
+    summary: refundPolicySummary(
+      normalizeRefundPolicy(terms.refund_rule, terms.late_refund_pct),
+      cutoffMin,
+    ),
+    hostNote: terms.refund_policy?.trim() ?? "",
+  };
 }
