@@ -259,16 +259,49 @@ const FALLBACK_PASSES: { label: string; args: string[] }[] = [
   },
 ];
 
+/** Each pass's own size ceiling (its longer edge), used when a plan limit is lower. */
+const PASS_LONG_EDGE: Record<string, number> = { standard: Infinity, "720p": 1280, silent: 960 };
+
+/**
+ * A scale filter that shrinks the longer edge to `maxLongEdge` (never enlarging),
+ * keeping the aspect ratio and the even dimensions yuv420p needs.
+ */
+export function longEdgeScaleFilter(maxLongEdge: number): string {
+  const n = Math.max(2, Math.floor(maxLongEdge / 2) * 2);
+  return `scale=w='min(${n},iw)':h='min(${n},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2`;
+}
+
+/**
+ * The passes to try. With `maxLongEdge`, every re-encode is held to it and the
+ * stream-copy remux is dropped, because a copy cannot change the picture size.
+ */
+export function conversionPasses(maxLongEdge?: number): { label: string; args: string[] }[] {
+  if (!maxLongEdge) return FALLBACK_PASSES;
+  return FALLBACK_PASSES.filter((p) => p.label !== "remux").map((p) => {
+    const args = [...p.args];
+    const vf = args.indexOf("-vf");
+    if (vf >= 0) {
+      args[vf + 1] = longEdgeScaleFilter(
+        Math.min(maxLongEdge, PASS_LONG_EDGE[p.label] ?? Infinity),
+      );
+    }
+    return { ...p, args };
+  });
+}
+
 /**
  * Converts `file` to a widely playable .mp4, retrying with progressively
  * lighter settings. Returns null only when every pass fails, so callers can
  * show a clear fallback instead of a silent dead player.
+ *
+ * `maxLongEdge` caps the picture's longer side (the plan's max resolution).
  */
 export async function convertToPlayableMp4(
   file: File,
   onProgress?: (ratio: number, label: string) => void,
+  opts: { maxLongEdge?: number } = {},
 ): Promise<{ blob: Blob; pass: string } | null> {
-  for (const pass of FALLBACK_PASSES) {
+  for (const pass of conversionPasses(opts.maxLongEdge)) {
     const blob = await transcodeToH264Mp4(file, (r) => onProgress?.(r, pass.label), pass.args);
     if (blob && blob.size > 0) return { blob, pass: pass.label };
   }
