@@ -312,7 +312,7 @@ export function MonetizationSettingsPanel() {
             </select>
             <span className="text-[11px] text-muted-foreground">
               AI still has daily and monthly caps — a cost ceiling, not a paywall. Tune the numbers
-              under the <code>ai_limits</code> setting.
+              on the AI controls tab.
             </span>
           </label>
           <label className="block">
