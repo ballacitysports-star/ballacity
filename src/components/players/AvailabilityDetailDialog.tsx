@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
-import { describeMessagingError } from "@/lib/minor-messaging";
 import {
   Calendar,
   MapPin,
@@ -27,7 +26,6 @@ import { SPORTS } from "@/lib/sample-data";
 import { formatSportLevel, resolvePlayerLevel } from "@/lib/sport-levels";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import type { AvailabilityWithAuthor } from "@/lib/availability";
-import { getOrCreateDirectConversation } from "@/lib/messages";
 import { shareAvailability } from "./share-availability";
 
 /**
