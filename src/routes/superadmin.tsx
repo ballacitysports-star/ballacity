@@ -20,6 +20,7 @@ import { OpsTab } from "@/components/superadmin/OpsTab";
 import { AuditTab } from "@/components/superadmin/AuditTab";
 import { YouthTab } from "@/components/superadmin/YouthTab";
 import { AttentionStrip } from "@/components/superadmin/AttentionStrip";
+import { AiControlsPanel } from "@/components/superadmin/AiControlsPanel";
 import { ReelsWorkerTab } from "@/components/superadmin/ReelsWorkerTab";
 import { ListingsClaimsPanel } from "@/components/admin/ListingsClaimsPanel";
 import { LegalPublishingPanel } from "@/components/admin/LegalPublishingPanel";
@@ -120,6 +121,7 @@ function SuperadminPage() {
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="monetization">Monetization</TabsTrigger>
+          <TabsTrigger value="ai">AI controls</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
           <TabsTrigger value="youth">Youth &amp; age</TabsTrigger>
           <TabsTrigger value="listings">Listings &amp; claims</TabsTrigger>
@@ -145,6 +147,9 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="monetization" className="pt-3">
           <MonetizationTab />
+        </TabsContent>
+        <TabsContent value="ai" className="pt-3">
+          <AiControlsPanel />
         </TabsContent>
         <TabsContent value="ops" className="pt-3">
           <OpsTab />
