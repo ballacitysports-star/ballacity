@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { RecapShareButton } from "@/components/RecapShareButton";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -79,7 +80,6 @@ import {
   recapProgress,
   recapStepLabel,
   recapStepStates,
-  shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
 import { EyeOff, Film, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
@@ -275,10 +275,10 @@ function ReelCard({
             {reel.subject_child_id
               ? "Family post · only you can see this"
               : isDraft
-              ? "Draft · only you can see this"
-              : phase === "posted"
-                ? "Posted"
-                : reel.status}{" "}
+                ? "Draft · only you can see this"
+                : phase === "posted"
+                  ? "Posted"
+                  : reel.status}{" "}
             · {new Date(reel.created_at).toLocaleDateString()}
             {reel.used_free && " · free"}
             {reel.hidden_at && " · hidden on profile"}
@@ -365,20 +365,14 @@ function ReelCard({
           )}
         </div>
         {isDone && reel.game_id && !reel.subject_child_id && (
-          <button
-            onClick={async () => {
-              const r = await shareRecap(reel as unknown as RecapSummary, {
-                id: reel.game_id!,
-                title: reel.game_title || displayTitle,
-              });
-              if (r === "copied") toast.success("Highlight link copied");
-              if (r === "failed") toast.error("Could not share this highlight");
-            }}
+          <RecapShareButton
+            recap={reel as unknown as RecapSummary}
+            game={{ id: reel.game_id, title: reel.game_title || displayTitle }}
             className="shrink-0 rounded-full border border-border p-2 text-muted-foreground"
-            aria-label="Share highlight"
+            label="Share highlight"
           >
             <Share2 className="h-3.5 w-3.5" />
-          </button>
+          </RecapShareButton>
         )}
       </div>
       {isDraft && (
@@ -449,11 +443,7 @@ function ReelCard({
             <DropdownMenuContent align="start">
               {!isDraft && !reel.subject_child_id && (
                 <DropdownMenuItem onSelect={() => void toggleHidden()}>
-                  {reel.hidden_at ? (
-                    <Eye className="h-4 w-4" />
-                  ) : (
-                    <EyeOff className="h-4 w-4" />
-                  )}
+                  {reel.hidden_at ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                   {reel.hidden_at ? "Show on profile" : "Hide from profile"}
                 </DropdownMenuItem>
               )}
@@ -551,17 +541,20 @@ function ReelCard({
         />
       )}
 
-      {isDone && reel.ai_advanced_analytics && prior && (() => {
-        const followUp = compareToPrior(reel.ai_advanced_analytics!, {
-          id: "prior",
-          title: prior.title,
-          created_at: prior.created_at,
-          analytics: prior.analytics,
-        });
-        return followUp ? (
-          <ReelFollowUp followUp={followUp} drills={reel.ai_coaching?.drills ?? []} />
-        ) : null;
-      })()}
+      {isDone &&
+        reel.ai_advanced_analytics &&
+        prior &&
+        (() => {
+          const followUp = compareToPrior(reel.ai_advanced_analytics!, {
+            id: "prior",
+            title: prior.title,
+            created_at: prior.created_at,
+            analytics: prior.analytics,
+          });
+          return followUp ? (
+            <ReelFollowUp followUp={followUp} drills={reel.ai_coaching?.drills ?? []} />
+          ) : null;
+        })()}
 
       {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
         <div className="mt-2">
@@ -575,11 +568,7 @@ function ReelCard({
           {showInsights && (
             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
               <p className="mb-2 text-[10px] italic text-muted-foreground">{AI_RESULTS_CAVEAT}</p>
-              {reel.ai_sport && (
-                <p className="micro-label text-lime">
-                  {reel.ai_sport}
-                </p>
-              )}
+              {reel.ai_sport && <p className="micro-label text-lime">{reel.ai_sport}</p>}
               {reel.ai_analysis?.summary && (
                 <p className="mt-1 text-xs text-muted-foreground">{reel.ai_analysis.summary}</p>
               )}
@@ -786,7 +775,12 @@ function ReelsPage() {
   // Earlier reels a clip can be compared with: the athlete's own finished, posted ones.
   const trendPool = reels
     .filter((r) => r.status === "completed" && !r.is_draft && !r.subject_child_id)
-    .map((r) => ({ id: r.id, title: r.title, created_at: r.created_at, analytics: r.ai_advanced_analytics }));
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      created_at: r.created_at,
+      analytics: r.ai_advanced_analytics,
+    }));
 
   const canGenerate = isActive || unlimitedReels || freeRemaining > 0;
   const lockedReason = !user
@@ -1265,9 +1259,7 @@ function ReelsPage() {
 
       {gameId && (
         <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
-          <p className="micro-label text-lime">
-            Recap for finished game
-          </p>
+          <p className="micro-label text-lime">Recap for finished game</p>
           <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {gameReels.length > 0
@@ -1341,9 +1333,7 @@ function ReelsPage() {
         {subjectChild && (
           <div className="mb-3 rounded-xl border border-lime/40 bg-lime/5 p-3">
             <p className="micro-label text-lime">Family post</p>
-            <p className="mt-1 text-xs font-semibold">
-              A clip of {subjectChild.displayName}
-            </p>
+            <p className="mt-1 text-xs font-semibold">A clip of {subjectChild.displayName}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Only you can see it. It is never shown on the highlights feed, on a profile, or to
               other members. Every clip is analysed by AI, which you control in the Parent Center.
@@ -1418,15 +1408,15 @@ function ReelsPage() {
           </span>
           <span className="text-[10px] font-semibold text-lime group-open:hidden">Change</span>
         </summary>
-      <ReelStylePanel
-        value={style}
-        sport={activeSport}
-        onChange={(next) => {
-          setStyle(next);
-          saveReelStyleForSport(activeSport, next);
-        }}
-        disabled={busy}
-      />
+        <ReelStylePanel
+          value={style}
+          sport={activeSport}
+          onChange={(next) => {
+            setStyle(next);
+            saveReelStyleForSport(activeSport, next);
+          }}
+          disabled={busy}
+        />
       </details>
 
       <section className="mx-5 mb-5">
@@ -1447,7 +1437,12 @@ function ReelsPage() {
               const found =
                 r.ai_advanced_analytics && !r.subject_child_id
                   ? findPriorReel(
-                      { id: r.id, title: r.title, created_at: r.created_at, analytics: r.ai_advanced_analytics },
+                      {
+                        id: r.id,
+                        title: r.title,
+                        created_at: r.created_at,
+                        analytics: r.ai_advanced_analytics,
+                      },
                       trendPool,
                     )
                   : null;
@@ -1458,7 +1453,11 @@ function ReelsPage() {
                   onRetry={kickOffProcessing}
                   prior={
                     found && found.analytics
-                      ? { title: found.title, created_at: found.created_at, analytics: found.analytics }
+                      ? {
+                          title: found.title,
+                          created_at: found.created_at,
+                          analytics: found.analytics,
+                        }
                       : null
                   }
                 />
@@ -1482,80 +1481,79 @@ function ReelsPage() {
         <summary className="mb-3 cursor-pointer list-none text-xs font-semibold text-muted-foreground">
           Your plan &amp; what&apos;s included
         </summary>
-      <section className="mb-5 rounded-2xl border border-border bg-surface p-5">
-        {subLoading ? (
-          <p className="text-sm text-muted-foreground">Loading plan…</p>
-        ) : access.freeMode ? (
-          <div>
-            <p className="text-sm font-semibold text-lime">
-              Unlimited reels · Free{access.freeUntil ? " — limited time" : ""}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {access.notice}
-              {/* Same date as /plans, from the same resolved value, so the two
-                  screens can never tell a member different things. */}
-              {access.freeUntil ? ` Free through ${formatFullDay(access.freeUntil)}.` : ""}
-            </p>
-          </div>
-        ) : isActive ? (
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-lime">BallaCity+ · Unlimited reels</p>
-              <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
-            </div>
-            <button
-              onClick={handleManageBilling}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs"
-            >
-              Manage <ExternalLink className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">Free trial</p>
-                <p className="text-xs text-muted-foreground">
-                  {freeRemaining} of {freeAllowance} free reels left
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {freeUsed}/{freeAllowance} used
-              </span>
-            </div>
-            {/* No upgrade button on a build that cannot take a payment — it
-                would only lead to a checkout that immediately fails. */}
-            {paymentsConfigured && access.showUpgradePrompts && (
-              <button
-                onClick={handleSubscribe}
-                className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
-              >
-                {freeRemaining > 0
-                  ? `Upgrade to unlimited · ${plusPriceLabel}`
-                  : `Subscribe · ${plusPriceLabel}`}
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* In free mode `isActive` is true for everyone, which would hide this
-          list entirely — so key it on whether anything is actually sold. */}
-      {(access.freeMode || !isActive) && (
         <section className="mb-5 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="mb-3 text-sm font-semibold">
-            {access.freeMode ? "Your account includes" : "Free account includes"}
-          </h2>
-          <ul className="space-y-2">
-            {freeTierFor(monetization).features.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
-              </li>
-            ))}
-          </ul>
+          {subLoading ? (
+            <p className="text-sm text-muted-foreground">Loading plan…</p>
+          ) : access.freeMode ? (
+            <div>
+              <p className="text-sm font-semibold text-lime">
+                Unlimited reels · Free{access.freeUntil ? " — limited time" : ""}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {access.notice}
+                {/* Same date as /plans, from the same resolved value, so the two
+                  screens can never tell a member different things. */}
+                {access.freeUntil ? ` Free through ${formatFullDay(access.freeUntil)}.` : ""}
+              </p>
+            </div>
+          ) : isActive ? (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-lime">BallaCity+ · Unlimited reels</p>
+                <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
+              </div>
+              <button
+                onClick={handleManageBilling}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs"
+              >
+                Manage <ExternalLink className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Free trial</p>
+                  <p className="text-xs text-muted-foreground">
+                    {freeRemaining} of {freeAllowance} free reels left
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {freeUsed}/{freeAllowance} used
+                </span>
+              </div>
+              {/* No upgrade button on a build that cannot take a payment — it
+                would only lead to a checkout that immediately fails. */}
+              {paymentsConfigured && access.showUpgradePrompts && (
+                <button
+                  onClick={handleSubscribe}
+                  className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
+                >
+                  {freeRemaining > 0
+                    ? `Upgrade to unlimited · ${plusPriceLabel}`
+                    : `Subscribe · ${plusPriceLabel}`}
+                </button>
+              )}
+            </div>
+          )}
         </section>
-      )}
 
+        {/* In free mode `isActive` is true for everyone, which would hide this
+          list entirely — so key it on whether anything is actually sold. */}
+        {(access.freeMode || !isActive) && (
+          <section className="mb-5 rounded-2xl border border-border bg-surface p-5">
+            <h2 className="mb-3 text-sm font-semibold">
+              {access.freeMode ? "Your account includes" : "Free account includes"}
+            </h2>
+            <ul className="space-y-2">
+              {freeTierFor(monetization).features.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </details>
     </div>
   );

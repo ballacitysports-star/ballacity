@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
+import { RecapShareButton } from "@/components/RecapShareButton";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Clapperboard, Download, Eye, EyeOff, Loader2, Share2, Trash2 } from "lucide-react";
-import {
-  pickLatestRecap,
-  recapAttempt,
-  recapStepLabel,
-  shareRecap,
-  type RecapSummary,
-} from "@/lib/recaps";
+import { pickLatestRecap, recapAttempt, recapStepLabel, type RecapSummary } from "@/lib/recaps";
 import { deleteReel, setReelHidden } from "@/lib/reels.functions";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -221,16 +216,13 @@ export function GameRecapPanel({
                 >
                   <Download className="h-3 w-3" /> Export
                 </Link>
-                <button
-                  onClick={async () => {
-                    const r = await shareRecap(latest, { id: gameId, title: gameTitle });
-                    if (r === "copied") toast.success("Highlight link copied");
-                    if (r === "failed") toast.error("Could not share this highlight");
-                  }}
+                <RecapShareButton
+                  recap={latest}
+                  game={{ id: gameId, title: gameTitle }}
                   className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground"
                 >
                   <Share2 className="h-3 w-3" /> Share
-                </button>
+                </RecapShareButton>
               </div>
               <ReelManageRow reel={latest} onChanged={onChanged} />
             </div>
