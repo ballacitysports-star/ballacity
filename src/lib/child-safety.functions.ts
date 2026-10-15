@@ -129,6 +129,8 @@ export const getMyChildStatus = createServerFn({ method: "GET" })
 /* Child → guardian consent request                                   */
 /* ------------------------------------------------------------------ */
 
+const MAX_CONSENT_REQUESTS_PER_DAY = 3;
+
 export const requestParentalConsent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -156,6 +158,26 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ context, data }) => {
+    // Resend limit: each request emails a recipient the caller chose, so cap
+    // how many a single account can trigger per day to stop the link being
+    // used to spam arbitrary inboxes. Each new request replaces the previous
+    // pending link (one pending request per child).
+    {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { count, error: cErr } = await supabaseAdmin
+        .from("parental_consent_events")
+        .select("id", { count: "exact", head: true })
+        .eq("child_user_id", context.userId)
+        .eq("action", "consent_requested")
+        .gte("created_at", since);
+      if (cErr) throw new Error("Could not send the request right now. Please try again.");
+      if ((count ?? 0) >= MAX_CONSENT_REQUESTS_PER_DAY) {
+        throw new Error(
+          "You've sent the most guardian requests allowed today. Please try again tomorrow.",
+        );
+      }
+    }
     const token = newToken();
     const expiresAt = new Date(Date.now() + CONSENT_TOKEN_TTL_HOURS * 3600_000).toISOString();
     const { error } = await context.supabase.rpc("request_parental_consent", {
