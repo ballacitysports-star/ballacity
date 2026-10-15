@@ -1202,7 +1202,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
                 />
                 <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  Auto-generated from your name — edit if you like.
+                  {/^(https?:|data:|blob:)/.test(avatar)
+                    ? "Remove your logo to use initials instead."
+                    : "Auto-generated from your name — edit if you like."}
                 </p>
               </Section>
 
