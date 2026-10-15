@@ -1192,26 +1192,20 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
 
               <Section title="Avatar initials">
                 <input
-                  value={/^(https?:|data:|blob:)/.test(avatar) ? "" : avatar}
+                  value={avatar}
                   onChange={(e) => setAvatar(e.target.value.toUpperCase().slice(0, 3))}
-                  disabled={/^(https?:|data:|blob:)/.test(avatar)}
-                  placeholder={
-                    /^(https?:|data:|blob:)/.test(avatar) ? "Using your logo" : initials(name || "OR")
-                  }
+                  placeholder={initials(name || "OR")}
                   maxLength={3}
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
                 />
                 <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  {/^(https?:|data:|blob:)/.test(avatar)
-                    ? "Remove your logo to use initials instead."
-                    : "Auto-generated from your name — edit if you like."}
+                  Auto-generated from your name — edit if you like.
                 </p>
               </Section>
 
               <Section title={isCoach ? "Trainer photo" : "Team logo"}>
                 <ImageUploader
                   kind="avatar"
-                  logo={!isCoach}
                   bucket={isCoach ? "trainer-avatars" : "team-avatars"}
                   pathPrefix={user?.id}
                   value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
