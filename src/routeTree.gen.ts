@@ -17,7 +17,6 @@ import { Route as CommunityGuidelinesRouteImport } from './routes/community-guid
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as FamilyClipsRouteImport } from './routes/family-clips'
-import { Route as ReelPrivacyRouteImport } from './routes/reel-privacy'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -26,6 +25,7 @@ import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ReelPrivacyRouteImport } from './routes/reel-privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SafetyRouteImport } from './routes/safety'
@@ -164,11 +164,6 @@ const FamilyClipsRoute = FamilyClipsRouteImport.update({
   path: '/family-clips',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReelPrivacyRoute = ReelPrivacyRouteImport.update({
-  id: '/reel-privacy',
-  path: '/reel-privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GuardianRoute = GuardianRouteImport.update({
   id: '/guardian',
   path: '/guardian',
@@ -207,6 +202,11 @@ const PlansRoute = PlansRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReelPrivacyRoute = ReelPrivacyRouteImport.update({
+  id: '/reel-privacy',
+  path: '/reel-privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -716,7 +716,6 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
-  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -725,6 +724,7 @@ export interface FileRoutesByFullPath {
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
@@ -832,7 +832,6 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
-  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -841,6 +840,7 @@ export interface FileRoutesByTo {
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
@@ -949,7 +949,6 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
-  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -958,6 +957,7 @@ export interface FileRoutesById {
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
@@ -1067,7 +1067,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
-    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1076,6 +1075,7 @@ export interface FileRouteTypes {
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
@@ -1183,7 +1183,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
-    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1192,6 +1191,7 @@ export interface FileRouteTypes {
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
@@ -1299,7 +1299,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
-    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1308,6 +1307,7 @@ export interface FileRouteTypes {
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
@@ -1417,7 +1417,6 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   FamilyClipsRoute: typeof FamilyClipsRoute
-  ReelPrivacyRoute: typeof ReelPrivacyRoute
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
@@ -1426,6 +1425,7 @@ export interface RootRouteChildren {
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
   PrivacyRoute: typeof PrivacyRoute
+  ReelPrivacyRoute: typeof ReelPrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
   SafetyRoute: typeof SafetyRoute
@@ -1571,13 +1571,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FamilyClipsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reel-privacy': {
-      id: '/reel-privacy'
-      path: '/reel-privacy'
-      fullPath: '/reel-privacy'
-      preLoaderRoute: typeof ReelPrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/guardian': {
       id: '/guardian'
       path: '/guardian'
@@ -1632,6 +1625,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reel-privacy': {
+      id: '/reel-privacy'
+      path: '/reel-privacy'
+      fullPath: '/reel-privacy'
+      preLoaderRoute: typeof ReelPrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -2376,7 +2376,6 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   FamilyClipsRoute: FamilyClipsRoute,
-  ReelPrivacyRoute: ReelPrivacyRoute,
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,
@@ -2385,6 +2384,7 @@ const rootRouteChildren: RootRouteChildren = {
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
   PrivacyRoute: PrivacyRoute,
+  ReelPrivacyRoute: ReelPrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
   SafetyRoute: SafetyRoute,
