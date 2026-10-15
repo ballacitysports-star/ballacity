@@ -476,7 +476,6 @@ export function OrgForm({
             <div className="text-xs font-semibold text-muted-foreground mb-2">Logo</div>
             <ImageUploader
               kind="avatar"
-              logo
               bucket="org-avatars"
               pathPrefix={userId}
               value={value.avatarUrl}

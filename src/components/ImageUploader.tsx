@@ -25,8 +25,6 @@ type Props = {
   allowBgRemoval?: boolean;
   disabled?: boolean;
   label?: string;
-  /** Team / org logo: square frame, opens with the whole image visible. */
-  logo?: boolean;
 };
 
 const DEFAULT_PRESETS: Sport[] = [
@@ -55,14 +53,13 @@ export function ImageUploader({
   allowBgRemoval,
   disabled,
   label,
-  logo = false,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const shape = logo ? "square" : kind === "avatar" ? "circle" : "rect";
+  const shape = kind === "avatar" ? "circle" : "rect";
   const aspect = kind === "avatar" ? 1 : 16 / 9;
   const outputMaxSize = kind === "avatar" ? 512 : 1600;
   const bgRemoval = allowBgRemoval ?? kind === "avatar";
@@ -107,9 +104,7 @@ export function ImageUploader({
           className={
             isCover
               ? "relative aspect-video overflow-hidden rounded-xl bg-background"
-              : `relative mx-auto h-28 w-28 overflow-hidden bg-background border border-border/60 ${
-                  logo ? "rounded-2xl" : "rounded-full"
-                }`
+              : "relative mx-auto h-28 w-28 overflow-hidden rounded-full bg-background border border-border/60"
           }
         >
           {preview ? (
@@ -120,7 +115,7 @@ export function ImageUploader({
               widths={isCover ? [320, 480, 640, 960] : [112, 224, 448]}
               sizes={isCover ? "(min-width: 640px) 420px, 90vw" : "112px"}
               baseWidth={isCover ? 640 : 224}
-              className={`h-full w-full ${logo ? "object-contain" : "object-cover"}`}
+              className="h-full w-full object-cover"
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-muted-foreground">
@@ -223,8 +218,7 @@ export function ImageUploader({
             aspect={aspect}
             outputMaxSize={outputMaxSize}
             shape={shape}
-            title={isCover ? "Edit cover" : logo ? "Edit logo" : "Edit photo"}
-            initialFit={logo}
+            title={isCover ? "Edit cover" : "Edit photo"}
             allowBgRemoval={bgRemoval}
             onCancel={() => {
               setOpen(false);
