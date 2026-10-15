@@ -93,7 +93,12 @@ export const askReelCoach = createServerFn({ method: "POST" })
       return {
         reelId: input.reelId,
         question: question.slice(0, 1000),
-        history: (input.history ?? []).slice(-8),
+        history: (Array.isArray(input.history) ? input.history : [])
+          .slice(-8)
+          .map((h) => ({
+            role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+            content: String(h?.content ?? "").slice(0, 2000),
+          })),
       };
     },
   )
@@ -128,7 +133,15 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     if (!input?.reelId) throw new Error("reelId is required");
     return {
       reelId: input.reelId,
-      tone: input.tone ? String(input.tone).slice(0, 120) : undefined,
+      // Tone is a short style label interpolated into the system prompt:
+      // keep only plain words so it can't carry extra instructions.
+      tone: input.tone
+        ? String(input.tone)
+            .replace(/[^a-zA-Z ,-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 40) || undefined
+        : undefined,
     };
   })
   .handler(async ({ data, context }) => {

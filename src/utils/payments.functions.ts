@@ -41,6 +41,23 @@ async function resolveOrCreateCustomer(
   return created.id;
 }
 
+const ALLOWED_RETURN_HOSTS = new Set(["ballacity.com", "www.ballacity.com", "ballacity.lovable.app", "localhost"]);
+
+/** Only BallaCity's own origins (plus Lovable previews) may receive checkout redirects. */
+function safeReturnUrl(raw: string): string {
+  let u: URL;
+  try {
+    u = new URL(String(raw));
+  } catch {
+    throw new Error("Invalid return URL");
+  }
+  const host = u.hostname.toLowerCase();
+  const ok =
+    (u.protocol === "https:" || host === "localhost") &&
+    (ALLOWED_RETURN_HOSTS.has(host) || host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com"));
+  if (!ok) throw new Error("Invalid return URL");
+  return u.toString();
+}
 export const createCheckoutSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -52,7 +69,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       collectShipping?: boolean;
     }) => {
       if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
-      return data;
+      return { ...data, returnUrl: safeReturnUrl(data.returnUrl) };
     },
   )
   .handler(async ({ data, context }): Promise<CheckoutSessionResult> => {
@@ -123,7 +140,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 
 export const createPortalSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { returnUrl?: string; environment: StripeEnv }) => data)
+  .inputValidator((data: { returnUrl?: string; environment: StripeEnv }) => ({
+    ...data,
+    returnUrl: data.returnUrl ? safeReturnUrl(data.returnUrl) : undefined,
+  }))
   .handler(async ({ data, context }): Promise<PortalSessionResult> => {
     const { supabase, userId } = context;
     const { data: sub, error: subError } = await supabase
