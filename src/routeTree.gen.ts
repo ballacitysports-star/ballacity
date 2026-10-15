@@ -85,6 +85,7 @@ import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$user
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
+import { Route as ReelsReelIdRouteImport } from './routes/reels.$reelId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
@@ -505,6 +506,11 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
   path: '/profile/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReelsReelIdRoute = ReelsReelIdRouteImport.update({
+  id: '/reels/$reelId',
+  path: '/reels/$reelId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewNewRoute = ReviewNewRouteImport.update({
   id: '/review/new',
   path: '/review/new',
@@ -766,6 +772,7 @@ export interface FileRoutesByFullPath {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
@@ -879,6 +886,7 @@ export interface FileRoutesByTo {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
@@ -995,6 +1003,7 @@ export interface FileRoutesById {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety_/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
@@ -1111,6 +1120,7 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety/children'
     | '/teams/create'
@@ -1224,6 +1234,7 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety/children'
     | '/teams/create'
@@ -1339,6 +1350,7 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety_/children'
     | '/teams/create'
@@ -1445,6 +1457,7 @@ export interface RootRouteChildren {
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
+  ReelsReelIdRoute: typeof ReelsReelIdRoute
   ReviewNewRoute: typeof ReviewNewRoute
   SafetyChildrenRoute: typeof SafetyChildrenRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
@@ -2021,6 +2034,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reels/$reelId': {
+      id: '/reels/$reelId'
+      path: '/reels/$reelId'
+      fullPath: '/reels/$reelId'
+      preLoaderRoute: typeof ReelsReelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/review/new': {
       id: '/review/new'
       path: '/review/new'
@@ -2389,6 +2409,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlayersUserIdRoute: PlayersUserIdRoute,
   PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,
+  ReelsReelIdRoute: ReelsReelIdRoute,
   ReviewNewRoute: ReviewNewRoute,
   SafetyChildrenRoute: SafetyChildrenRoute,
   TeamsCreateRoute: TeamsCreateRoute,

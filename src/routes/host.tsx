@@ -198,8 +198,6 @@ function HostDashboard() {
                   )}
                 </>
               )}
-                </button>
-              )}
             </div>
           ))}
           <Link
