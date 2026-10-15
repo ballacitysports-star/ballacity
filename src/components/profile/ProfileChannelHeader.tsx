@@ -13,6 +13,7 @@ export function ProfileChannelHeader({
   bannerOverlay,
   avatarUrl,
   avatarFallback,
+  avatarShape = "circle",
   name,
   nameBadge,
   meta,
@@ -25,6 +26,8 @@ export function ProfileChannelHeader({
   bannerOverlay?: React.ReactNode;
   avatarUrl?: string | null;
   avatarFallback: React.ReactNode;
+  /** "logo": rounded square, so a team/gym logo isn't clipped by a circle. */
+  avatarShape?: "circle" | "logo";
   name: string;
   nameBadge?: React.ReactNode;
   /** Pieces joined with a middot on one muted line, YouTube-style. */
@@ -64,7 +67,11 @@ export function ProfileChannelHeader({
       {/* Identity */}
       <div className="px-4 pt-4">
         <div className="flex items-start gap-4">
-          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-2xl font-bold">
+          <div
+            className={`grid h-20 w-20 shrink-0 place-items-center overflow-hidden bg-surface-2 text-2xl font-bold ${
+              avatarShape === "logo" ? "rounded-[28%]" : "rounded-full"
+            }`}
+          >
             {avatarUrl && !avatarFailed ? (
               <ResponsiveAvatar
                 src={avatarUrl}
