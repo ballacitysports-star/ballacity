@@ -199,28 +199,3 @@ export function buildRecapShare(
     .join("\n");
   return { url, text, title: recap ? recapDisplayTitle(recap) : game.title };
 }
-
-/** Shares via the native sheet when available, otherwise copies to the clipboard. */
-export async function shareRecap(
-  recap: RecapSummary | null,
-  game: { id: string; title: string },
-): Promise<"shared" | "copied" | "failed"> {
-  if (typeof window === "undefined") return "failed";
-  const { url, text, title } = buildRecapShare(recap, game, window.location.origin);
-  try {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({ title, text, url });
-      return "shared";
-    }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    return "copied";
-  } catch (e: any) {
-    if (e?.name === "AbortError") return "shared";
-    try {
-      await navigator.clipboard.writeText(`${text}\n${url}`);
-      return "copied";
-    } catch {
-      return "failed";
-    }
-  }
-}
