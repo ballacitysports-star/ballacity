@@ -195,6 +195,9 @@ function AuthPage() {
       lastVisited: readLastVisited() ?? undefined,
       referrer,
     });
+    // Onboarding comes first for a new member; keep the link they asked for.
+    const requested = sanitizeNextPath(next);
+    if (requested && dest !== requested) stashPendingNext(requested);
     // Once the hint is what sends them on it has done its job. Wait for that, or
     // the full-page navigation below can cancel the update and send them again.
     if (startDestination && dest === startDestination) {
@@ -202,9 +205,6 @@ function AuthPage() {
       usedStartHint.current = true;
       await withTimeout(clearStartHint(), 2000, undefined);
     }
-    // Onboarding comes first for a new member; keep the link they asked for.
-    const requested = sanitizeNextPath(next);
-    if (requested && dest !== requested) stashPendingNext(requested);
     leave(dest);
   };
 

@@ -2,7 +2,10 @@ import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-route
 import { PublicTeamPreview } from "@/components/team/PublicTeamPreview";
 import { useAuth } from "@/hooks/use-auth";
 import { LoadingState } from "@/components/ui/loading-state";
-import { getPublicTeamPreview } from "@/lib/city-pages.functions";
+import {
+  getPublicTeamPreview,
+  type PublicTeamPreview as PublicTeamPreviewData,
+} from "@/lib/city-pages.functions";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -61,9 +64,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type TeamLoaderData = { org: Org | null; preview: PublicTeamPreviewData | null };
+
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
-    const o = (loaderData?.org ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
+    const o = ((loaderData as TeamLoaderData | undefined)?.org ??
+      ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
     const name = o?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
@@ -123,7 +129,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
       </Link>
     </div>
   ),
-  loader: async ({ params }) => {
+  loader: async ({ params }): Promise<TeamLoaderData> => {
     // The public preview is fetched too so a signed-out visitor can still see it
     // when the full team record isn't readable without a session.
     const [org, preview] = await Promise.all([
@@ -148,7 +154,8 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 
 /** Signed-out visitors get a minimal preview; members get the full page. */
 function TeamRoute() {
-  const { org, preview } = Route.useLoaderData();
+  // Cast like the trainer route: zodValidator + loader leaves the inferred type empty.
+  const { org, preview } = Route.useLoaderData() as TeamLoaderData;
   const { user, loading } = useAuth();
   if (loading) {
     return (
