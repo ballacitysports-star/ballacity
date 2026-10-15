@@ -320,6 +320,47 @@ export async function quarantineForChildSafety(
     }
   }
 
+  await alertChildSafety(admin, {
+    body: "Automated screening quarantined a reel for suspected child sexual abuse material.",
+    link: `/superadmin?reel=${input.reelId}`,
+    targetType: "highlight_reel",
+    targetId: input.reelId,
+    categories: input.categories,
+    source: input.source,
+  });
+}
+
+/**
+ * Escalation for an uploaded photo flagged as suspected CSAM. The caller has
+ * already recorded the `image_moderation` row as quarantined (which stops it
+ * being served); this adds the superadmin alert and audit entry the reel path
+ * gets. Nothing is deleted — evidence must be preserved.
+ */
+export async function escalateImageForChildSafety(
+  admin: any,
+  input: { bucket: string; path: string; categories: string[]; source: string },
+): Promise<void> {
+  await alertChildSafety(admin, {
+    body: "Automated screening quarantined an uploaded image for suspected child sexual abuse material.",
+    link: "/superadmin",
+    targetType: "image_upload",
+    targetId: `${input.bucket}/${input.path}`,
+    categories: input.categories,
+    source: input.source,
+  });
+}
+
+async function alertChildSafety(
+  admin: any,
+  input: {
+    body: string;
+    link: string;
+    targetType: string;
+    targetId: string;
+    categories: string[];
+    source: string;
+  },
+): Promise<void> {
   try {
     const { data: admins } = await admin
       .from("user_roles")
@@ -329,8 +370,8 @@ export async function quarantineForChildSafety(
       user_id: row.user_id,
       type: "safety_alert",
       title: "Urgent safety review required",
-      body: "Automated screening quarantined a reel for suspected child sexual abuse material.",
-      link: `/superadmin?reel=${input.reelId}`,
+      body: input.body,
+      link: input.link,
     }));
     if (rows.length > 0) await admin.from("notifications").insert(rows);
   } catch {
@@ -339,8 +380,8 @@ export async function quarantineForChildSafety(
 
   await logAdminAction(admin, null, {
     action: "ai.content_quarantine",
-    targetType: "highlight_reel",
-    targetId: input.reelId,
+    targetType: input.targetType,
+    targetId: input.targetId,
     reason: "Suspected child sexual abuse material detected by automated screening",
     metadata: {
       categories: input.categories,
