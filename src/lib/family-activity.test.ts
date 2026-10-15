@@ -134,3 +134,11 @@ describe("coach analytics sharing in the activity trail", () => {
     ).toContain("No longer");
   });
 });
+
+describe("teen reel approvals in the activity trail", () => {
+  it("words approve, revoke and delete", () => {
+    expect(describeFamilyActivity({ action: "teen_reel.team_approved" }).title).toBe("Reel approved for a team");
+    expect(describeFamilyActivity({ action: "teen_reel.team_revoked" }).title).toContain("guardian only");
+    expect(describeFamilyActivity({ action: "teen_reel.deleted_by_guardian" }).title).toContain("deleted");
+  });
+});

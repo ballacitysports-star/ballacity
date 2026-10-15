@@ -17,6 +17,7 @@ import { Route as CommunityGuidelinesRouteImport } from './routes/community-guid
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as FamilyClipsRouteImport } from './routes/family-clips'
+import { Route as ReelPrivacyRouteImport } from './routes/reel-privacy'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -161,6 +162,11 @@ const CookiesRoute = CookiesRouteImport.update({
 const FamilyClipsRoute = FamilyClipsRouteImport.update({
   id: '/family-clips',
   path: '/family-clips',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReelPrivacyRoute = ReelPrivacyRouteImport.update({
+  id: '/reel-privacy',
+  path: '/reel-privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GuardianRoute = GuardianRouteImport.update({
@@ -710,6 +716,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -825,6 +832,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -941,6 +949,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/family-clips': typeof FamilyClipsRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
@@ -1058,6 +1067,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
+    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1173,6 +1183,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
+    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1288,6 +1299,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/family-clips'
+    | '/reel-privacy'
     | '/guardian'
     | '/host'
     | '/mcp'
@@ -1405,6 +1417,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   FamilyClipsRoute: typeof FamilyClipsRoute
+  ReelPrivacyRoute: typeof ReelPrivacyRoute
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
@@ -1556,6 +1569,13 @@ declare module '@tanstack/react-router' {
       path: '/family-clips'
       fullPath: '/family-clips'
       preLoaderRoute: typeof FamilyClipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reel-privacy': {
+      id: '/reel-privacy'
+      path: '/reel-privacy'
+      fullPath: '/reel-privacy'
+      preLoaderRoute: typeof ReelPrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guardian': {
@@ -2356,6 +2376,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   FamilyClipsRoute: FamilyClipsRoute,
+  ReelPrivacyRoute: ReelPrivacyRoute,
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,

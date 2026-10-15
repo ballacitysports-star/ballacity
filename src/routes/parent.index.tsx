@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { TeenReelReview } from "@/components/child/TeenReelReview";
 import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { getChildPublicXp, setChildPublicXp } from "@/lib/public-xp.functions";
 import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
@@ -71,16 +72,6 @@ const MEDIA_OPTIONS: Array<{
   { value: "guardian", label: "Guardian review", hint: "You see everything they upload." },
   { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
 ];
-
-/**
- * Offered for ages 13-15 only (the database enforces this too). Reels still stay
- * private until the teen posts them, and are never shown to anonymous visitors.
- */
-const MEMBERS_OPTION: (typeof MEDIA_OPTIONS)[number] = {
-  value: "members",
-  label: "Signed-in members",
-  hint: "Reels they choose to post can be seen by signed-in BallaCity members. Never public on the web.",
-};
 
 /**
  * Family post: add a private clip of an under-13 child to the parent's own reels.
@@ -386,6 +377,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
 
       <div className="mt-4 grid gap-4">
         <FamilyPostLink child={child} />
+        {child.cohort === "teen_13_15" && (
+          <TeenReelReview childUserId={child.childUserId} childName={child.displayName} />
+        )}
         <PublicXpToggle child={child} />
         <AnalyticsCoachShare childUserId={child.childUserId} childName={child.displayName} />
         <OptionRow
@@ -398,9 +392,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           label="Video visibility"
           value={c.mediaVisibility}
           options={
-            // Keep the option listed if it is already selected (e.g. the teen turned 16).
-            child.cohort === "teen_13_15" || c.mediaVisibility === "members"
-              ? [...MEDIA_OPTIONS, MEMBERS_OPTION]
+            // 13-15: team access is approved per reel in the list above, never by a blanket setting.
+            child.cohort === "teen_13_15"
+              ? MEDIA_OPTIONS.filter((o) => o.value !== "teammates")
               : MEDIA_OPTIONS
           }
           onChange={(v) => set({ media_visibility: v })}

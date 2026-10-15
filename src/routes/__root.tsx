@@ -458,6 +458,8 @@ const PUBLIC_ROUTES = [
   // A parent's private link to one family clip: opens without signing in, but is
   // unindexed, expires, and can be revoked.
   "/family-share",
+  // The reel privacy policy: plain-language, readable without signing in.
+  "/reel-privacy",
   // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
   "/tryouts",
 ];

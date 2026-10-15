@@ -78,6 +78,12 @@ export function describeFamilyActivity(entry: {
         title: "Child's view of family clips changed",
         detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
       };
+    case "teen_reel.team_approved":
+      return { title: "Reel approved for a team", detail: "The team's members and coaches can watch it" };
+    case "teen_reel.team_revoked":
+      return { title: "Reel taken back to guardian only", detail: null };
+    case "teen_reel.deleted_by_guardian":
+      return { title: "Reel deleted by a guardian", detail: null };
     case "child.analytics_share_changed":
       return {
         title: "Analytics sharing with coaches changed",
