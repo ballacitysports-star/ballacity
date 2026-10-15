@@ -160,6 +160,7 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ context, data }) => {
+    let newRecipientHash: string | null = null;
     // Resend limit: each request emails a recipient the caller chose, so cap
     // how many a single account can trigger per day to stop the link being
     // used to spam arbitrary inboxes. Each new request replaces the previous
@@ -200,12 +201,7 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
             "Guardian requests can only go to the guardian emails you've already used. Ask BallaCity support to change it.",
           );
         }
-        await supabaseAdmin.from("parental_consent_events").insert({
-          child_user_id: context.userId,
-          actor_id: context.userId,
-          action: "consent_recipient",
-          detail: { recipient_hash: recipientHash },
-        } as never);
+        newRecipientHash = recipientHash;
       }
     }
     const token = newToken();
@@ -220,6 +216,24 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
       _versions: data.versions ?? {},
     });
     if (error) throw new Error(error.message);
+    if (newRecipientHash) {
+      // Remember this guardian address (hashed) so the recipient limit holds.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: consent } = await supabaseAdmin
+        .from("parental_consents")
+        .select("id")
+        .eq("child_user_id", context.userId)
+        .maybeSingle();
+      if (consent?.id) {
+        await supabaseAdmin.from("parental_consent_events").insert({
+          consent_id: consent.id,
+          child_user_id: context.userId,
+          actor_id: context.userId,
+          action: "consent_recipient",
+          detail: { recipient_hash: newRecipientHash },
+        } as never);
+      }
+    }
     const path = `/parent/consent/${token}`;
     // Email the one-time link to the guardian. Failure must not block the
     // request — the minor can still copy/share the link manually.
