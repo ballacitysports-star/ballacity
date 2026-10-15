@@ -6,6 +6,7 @@ import {
   entitySitemapEntries,
   filterBySport,
   isAdultsOnlyGame,
+  isAdultsOnlyOrg,
   isPublicUpcomingGame,
   type CityGameRow,
   type CityOrgRow,
@@ -130,5 +131,15 @@ describe("isAdultsOnlyGame", () => {
     expect(isAdultsOnlyGame({ min_age: 21 })).toBe(true);
     expect(isAdultsOnlyGame({ min_age: 16 })).toBe(false);
     expect(isAdultsOnlyGame({ min_age: null })).toBe(false);
+  });
+});
+
+describe("isAdultsOnlyOrg", () => {
+  it("needs listed age groups with no youth or teen", () => {
+    expect(isAdultsOnlyOrg({ age_groups: ["adult"] })).toBe(true);
+    expect(isAdultsOnlyOrg({ age_groups: ["adult", "youth"] })).toBe(false);
+    expect(isAdultsOnlyOrg({ age_groups: ["teen"] })).toBe(false);
+    expect(isAdultsOnlyOrg({ age_groups: [] })).toBe(false);
+    expect(isAdultsOnlyOrg({ age_groups: null })).toBe(false);
   });
 });

@@ -79,6 +79,11 @@ export function orgTouchesMinors(o: Pick<CityOrgRow, "age_groups">): boolean {
   return (o.age_groups ?? []).some((a) => a === "youth" || a === "teen");
 }
 
+/** True only when the team lists age groups and none of them is youth or teen. */
+export function isAdultsOnlyOrg(o: Pick<CityOrgRow, "age_groups">): boolean {
+  return (o.age_groups ?? []).length > 0 && !orgTouchesMinors(o);
+}
+
 export function isPublicOrg(o: CityOrgRow): boolean {
   return !o.hidden_at && !orgTouchesMinors(o);
 }

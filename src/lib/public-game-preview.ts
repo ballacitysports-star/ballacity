@@ -7,3 +7,8 @@
 export function isPublicGamePreviewPath(pathname: string): boolean {
   return /^\/games\/[^/]+\/?$/.test(pathname);
 }
+
+/** `/teams/:id` likewise; `/teams/create` is a real page, not a team. */
+export function isPublicTeamPreviewPath(pathname: string): boolean {
+  return /^\/teams\/[^/]+\/?$/.test(pathname) && !/^\/teams\/create\/?$/.test(pathname);
+}

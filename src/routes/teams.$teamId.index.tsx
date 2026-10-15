@@ -1,4 +1,8 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { PublicTeamPreview } from "@/components/team/PublicTeamPreview";
+import { useAuth } from "@/hooks/use-auth";
+import { LoadingState } from "@/components/ui/loading-state";
+import { getPublicTeamPreview } from "@/lib/city-pages.functions";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -59,7 +63,7 @@ import {
 
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
-    const o = (loaderData ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
+    const o = (loaderData?.org ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
     const name = o?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
@@ -96,7 +100,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
       modal: fallback(z.string(), "").default(""),
     }),
   ),
-  component: TeamPage,
+  component: TeamRoute,
   errorComponent: () => (
     <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this team.</p>
@@ -120,12 +124,17 @@ export const Route = createFileRoute("/teams/$teamId/")({
     </div>
   ),
   loader: async ({ params }) => {
-    const org = await ensureOrgById(params.teamId);
-    if (!org) throw notFound();
-    if (org.kind === "coach") {
+    // The public preview is fetched too so a signed-out visitor can still see it
+    // when the full team record isn't readable without a session.
+    const [org, preview] = await Promise.all([
+      ensureOrgById(params.teamId).catch(() => undefined),
+      getPublicTeamPreview({ data: { id: params.teamId } }).catch(() => null),
+    ]);
+    if (!org && !preview) throw notFound();
+    if (org?.kind === "coach") {
       throw redirect({ to: "/trainers/$trainerId", params: { trainerId: org.id }, replace: true });
     }
-    return org;
+    return { org: org ?? null, preview };
   },
 });
 
@@ -137,8 +146,35 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "announcement", label: "📣 News" },
 ];
 
-function TeamPage() {
-  const org = Route.useLoaderData() as Org;
+/** Signed-out visitors get a minimal preview; members get the full page. */
+function TeamRoute() {
+  const { org, preview } = Route.useLoaderData();
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <LoadingState label="Loading team…" />
+      </div>
+    );
+  }
+  if (!user) return <PublicTeamPreview preview={preview} />;
+  if (!org) {
+    return (
+      <div className="page-shell-content pt-24 text-center">
+        <p className="text-muted-foreground">Team not found.</p>
+        <Link
+          to="/teams"
+          className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+        >
+          Back to Teams
+        </Link>
+      </div>
+    );
+  }
+  return <TeamPage org={org} />;
+}
+
+function TeamPage({ org }: { org: Org }) {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab: "posts" | "roster" | "about" | "games" =
