@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 import { pageHead } from "@/lib/seo";
-import { BAND_COPY, TEEN_RESTRICTION, type PrivacyBand } from "@/lib/reel-privacy";
+import { BAND_COPY, TEEN_RESTRICTION, type PrivacyBand } from "@/lib/teen-reel-privacy";
 
 /**
  * Who can watch a reel, by age, in plain language. The same words as the panel on the

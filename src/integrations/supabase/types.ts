@@ -1104,6 +1104,8 @@ export type Database = {
           frame_times: number[] | null
           game_id: string | null
           game_title: string | null
+          guardian_team_approved_at: string | null
+          guardian_team_approved_by: string | null
           hidden_at: string | null
           id: string
           is_draft: boolean
@@ -1148,6 +1150,8 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          guardian_team_approved_at?: string | null
+          guardian_team_approved_by?: string | null
           hidden_at?: string | null
           id?: string
           is_draft?: boolean
@@ -1192,6 +1196,8 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          guardian_team_approved_at?: string | null
+          guardian_team_approved_by?: string | null
           hidden_at?: string | null
           id?: string
           is_draft?: boolean
@@ -5278,6 +5284,20 @@ export type Database = {
           _user: string
         }
         Returns: undefined
+      }
+      teen_reel_viewer_access: {
+        Args: { _reel_id: string; _viewer: string }
+        Returns: string
+      }
+      teen_reels_visible_to: {
+        Args: { _viewer: string }
+        Returns: {
+          caption: string
+          created_at: string
+          reel_id: string
+          title: string
+          via: string
+        }[]
       }
       tier_for_price_id: { Args: { _price_id: string }; Returns: string }
       transfer_team_ownership: {

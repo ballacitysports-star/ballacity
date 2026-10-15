@@ -14,7 +14,7 @@ import { Link } from "@tanstack/react-router";
 import { Loader2, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { REEL_PRIVACY_PATH, TEEN_RESTRICTION } from "@/lib/reel-privacy";
+import { REEL_PRIVACY_PATH, TEEN_RESTRICTION } from "@/lib/teen-reel-privacy";
 import {
   deleteTeenReel,
   getTeenReelPlayback,

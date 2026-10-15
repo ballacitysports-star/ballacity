@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { teenReelErrorMessage, teenReelState, type TeenReelState } from "@/lib/reel-privacy";
+import { teenReelErrorMessage, teenReelState, type TeenReelState } from "@/lib/teen-reel-privacy";
 
 /**
  * A guardian's view and controls for a 13-15 player's reels.

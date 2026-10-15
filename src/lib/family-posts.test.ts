@@ -7,6 +7,7 @@ describe("familyPostErrorMessage", () => {
       "FAMILY_POSTS_OFF",
       "FAMILY_POST_NOT_GUARDIAN",
       "FAMILY_POST_UNDER_13_ONLY",
+      "FAMILY_POST_UNDER_16_ONLY",
       "FAMILY_POST_AI_OFF",
     ]) {
       const msg = familyPostErrorMessage({ message: `${code}` });

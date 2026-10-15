@@ -1,82 +1,71 @@
-/**
- * "Reel privacy": a compact, expandable panel on the Reels page that says who can watch
- * this account's reels, by the account's age. Collapsed it is one line. It only explains
- * the rules: the database enforces them, and a player can never widen them from here.
- */
+import { useState } from "react";
+import { ChevronDown, Lock, ShieldCheck } from "lucide-react";
+import { reelPrivacyFor, type ReelPrivacyCohort } from "@/lib/reel-privacy";
 
-import { Link } from "@tanstack/react-router";
-import { Lock, ShieldCheck } from "lucide-react";
-import { useMyCohort } from "@/lib/youth-features";
-import { REEL_PRIVACY_PATH, TEEN_REEL_OPTIONS, TEEN_RESTRICTION, bandCopyFor } from "@/lib/reel-privacy";
-
-export function ReelPrivacyPanel({ className = "" }: { className?: string }) {
-  const { cohort } = useMyCohort();
-  const copy = bandCopyFor(cohort);
-  if (!copy) return null;
-  const teen = copy.band === "teen_13_15";
-
+export function ReelPrivacyPanel({
+  cohort,
+  familyPost,
+}: {
+  cohort: ReelPrivacyCohort;
+  familyPost?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const info = reelPrivacyFor(cohort, { familyPost });
   return (
-    <details className={`group ${className}`}>
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-2.5 text-xs">
-        <span className="flex min-w-0 items-start gap-2">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden />
-          <span className="min-w-0">
-            <span className="font-semibold">Reel privacy</span>
-            <span className="block text-muted-foreground">{copy.summary}</span>
+    <div className="mb-3 rounded-xl border border-border bg-surface p-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span>
+          <span className="inline-flex items-center gap-1.5 micro-label text-lime">
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Reel privacy
           </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{info.summary}</span>
         </span>
-        <span className="shrink-0 text-[10px] font-semibold text-lime group-open:hidden">Details</span>
-      </summary>
-
-      <div className="mt-2 rounded-xl border border-border bg-surface p-4 text-xs">
-        <p className="font-semibold">Who can watch</p>
-        <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-          {copy.audiences.map((a) => (
-            <li key={a}>{a}</li>
-          ))}
-        </ul>
-
-        {teen && (
-          <fieldset className="mt-3" aria-label="Reel visibility">
-            <legend className="font-semibold">Each reel</legend>
-            <div className="mt-1 grid gap-1.5">
-              {TEEN_REEL_OPTIONS.map((o) => {
-                const locked = o.value === "team";
-                return (
-                  <div
-                    key={o.value}
-                    className={`rounded-lg border px-3 py-2 ${
-                      o.value === "guardian" ? "border-primary bg-primary/10" : "border-border bg-background/60"
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2 border-t border-border pt-3 text-xs">
+          {info.options.length > 0 && (
+            <fieldset>
+              <legend className="font-semibold">Who can view this reel?</legend>
+              <ul className="mt-1.5 space-y-1.5">
+                {info.options.map((o) => (
+                  <li
+                    key={o.label}
+                    className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 ${
+                      o.isDefault ? "border-lime/50 bg-lime/5" : "border-border"
                     }`}
-                    aria-disabled={locked}
                   >
-                    <span className="flex items-center gap-1.5 text-sm font-medium">
-                      {locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />}
+                    <span>
                       {o.label}
-                      {o.value === "guardian" && (
-                        <span className="rounded-full bg-primary/20 px-1.5 text-[10px] font-bold text-primary">Default</span>
-                      )}
+                      <span className="ml-1.5 text-[11px] text-muted-foreground">— {o.note}</span>
                     </span>
-                    <span className="block text-muted-foreground">{o.hint}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-2 font-semibold">{TEEN_RESTRICTION}</p>
-          </fieldset>
-        )}
-
-        {copy.never.length > 0 && (
-          <p className="mt-3 text-muted-foreground">
-            <span className="font-semibold text-foreground">Never: </span>
-            {copy.never.join(", ")}.
-          </p>
-        )}
-
-        <Link to={REEL_PRIVACY_PATH} className="mt-3 inline-block font-semibold text-primary underline">
-          Read the full Reel privacy policy
-        </Link>
-      </div>
-    </details>
+                    {o.locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-label="Guardian approval required" />}
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          )}
+          <p className="text-muted-foreground">{info.detail}</p>
+          {info.guardianControlled && (
+            <p className="text-muted-foreground">
+              {familyPost
+                ? "After upload, choose a team under “Who can watch.” You can change sharing or remove this reel anytime."
+                : "Your guardian can change sharing or remove this reel anytime from the Parent Center."}
+            </p>
+          )}
+          <a href="/reel-privacy" className="inline-block font-semibold text-lime underline-offset-2 hover:underline">
+            Read the Reel privacy policy
+          </a>
+        </div>
+      )}
+    </div>
   );
 }
