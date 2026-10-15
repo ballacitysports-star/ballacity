@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { isLegalReviewed } from "@/lib/legal-review";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -301,9 +302,11 @@ function PrivacySettingsPage() {
                 <span className="font-semibold text-foreground">Retained:</span> safety records
                 (reports and blocks filed about your account) and required security logs.
               </p>
-              <p className="micro-label">
-                Legal review required — retention periods are placeholders.
-              </p>
+              {isLegalReviewed("retention") ? null : (
+                <p className="micro-label">
+                  Legal review required — retention periods are placeholders.
+                </p>
+              )}
             </div>
           </SettingsStaticRow>
           <DeleteAccountButton />

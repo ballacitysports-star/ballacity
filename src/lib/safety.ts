@@ -10,7 +10,14 @@
  * carries risk. Legal counsel must review and replace this copy.
  */
 
+import { isLegalReviewed } from "@/lib/legal-review";
+
 export const LEGAL_REVIEW_LABEL = "LEGAL REVIEW REQUIRED";
+
+/** Appended to the acknowledgment disclaimers until counsel has reviewed them. */
+const PENDING_REVIEW = isLegalReviewed("safetyAcknowledgments")
+  ? ""
+  : " and is pending legal review";
 
 /** Bump when the acknowledgment wording changes; stored with every consent. */
 export const SAFETY_ACK_VERSION = "2026-01-draft-1";
@@ -34,8 +41,7 @@ export const RISK_ACKNOWLEDGMENT = {
     "Follow the venue's rules and any staff instructions while you're there.",
     "You are responsible for your own health, insurance, and equipment.",
   ],
-  disclaimer:
-    "This acknowledgment is not a waiver or release of liability and is pending legal review.",
+  disclaimer: `This acknowledgment is not a waiver or release of liability${PENDING_REVIEW}.`,
 } as const;
 
 export const HOST_RESPONSIBILITY = {
@@ -57,8 +63,7 @@ export const HOST_RESPONSIBILITY = {
     "Set the conduct you expect, and report players who behave unsafely.",
     "Never claim BallaCity guarantees safety, supervision, or insurance for your game.",
   ],
-  disclaimer:
-    "This acknowledgment is not a waiver or release of liability and is pending legal review.",
+  disclaimer: `This acknowledgment is not a waiver or release of liability${PENDING_REVIEW}.`,
 } as const;
 
 export function ackCopy(kind: SafetyAckKind) {

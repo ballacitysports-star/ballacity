@@ -618,6 +618,15 @@ function Landing() {
             <Link to="/cookies" className="hover:text-foreground">
               Cookies
             </Link>
+            <Link to="/payment-policy" className="hover:text-foreground">
+              Payments
+            </Link>
+            <Link to="/ai-disclosure" className="hover:text-foreground">
+              AI
+            </Link>
+            <Link to="/youth-policy" className="hover:text-foreground">
+              Youth
+            </Link>
             <Link to="/safety" className="hover:text-foreground">
               Safety
             </Link>

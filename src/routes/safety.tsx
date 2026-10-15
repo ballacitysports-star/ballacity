@@ -2,11 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
+import { LegalSections } from "@/components/legal/LegalDocumentBody";
+import { livePublishedVersion } from "@/lib/legal-documents";
+import { loadPublishedLegalDocuments } from "@/lib/legal-documents.functions";
+import { isLegalReviewed } from "@/lib/legal-review";
+import { LegalReviewTag } from "@/components/legal/LegalReviewTag";
 import { pageHead } from "@/lib/seo";
 import {
   EMERGENCY_NOTICE,
   HOST_RESPONSIBILITY,
-  LEGAL_REVIEW_LABEL,
   RISK_ACKNOWLEDGMENT,
   SAFETY_TOPICS,
   STAY_SAFE_POINTS,
@@ -20,10 +24,14 @@ export const Route = createFileRoute("/safety")({
       description:
         "How to stay safe on BallaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
     }),
+  loader: loadPublishedLegalDocuments,
   component: SafetyCenter,
 });
 
 function SafetyCenter() {
+  const { published } = Route.useLoaderData();
+  // The hub stays as is; a published Safety Guidelines document is added to it.
+  const guidelines = livePublishedVersion("safety_guidelines", published);
   return (
     <div className="min-h-dvh bg-background">
       <BackHeader title="Safety Center" />
@@ -73,13 +81,13 @@ function SafetyCenter() {
             text={HOST_RESPONSIBILITY.text}
             points={HOST_RESPONSIBILITY.points}
           />
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
-              {LEGAL_REVIEW_LABEL}
-            </span>
-            These acknowledgments are placeholder drafts and are not a waiver or release of
-            liability.
-          </p>
+          {isLegalReviewed("safetyAcknowledgments") ? null : (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              <LegalReviewTag area="safetyAcknowledgments" />
+              These acknowledgments are placeholder drafts and are not a waiver or release of
+              liability.
+            </p>
+          )}
         </section>
 
         {/* Stay safe */}
@@ -134,6 +142,21 @@ function SafetyCenter() {
             </section>
           ))}
         </div>
+
+        {guidelines ? (
+          <section
+            id="safety-guidelines"
+            className="mt-6 scroll-mt-16 space-y-4 rounded-2xl border border-border bg-surface px-4 py-4"
+          >
+            <header>
+              <h2 className="text-sm font-bold">Safety Guidelines</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Version {guidelines.version} · Effective {guidelines.effectiveDate}
+              </p>
+            </header>
+            <LegalSections sections={guidelines.sections} />
+          </section>
+        ) : null}
 
         {/* Actions */}
         <section className="mt-6 rounded-2xl border border-border bg-surface px-4 py-4">
