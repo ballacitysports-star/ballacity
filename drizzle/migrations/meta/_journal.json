@@ -134,6 +134,13 @@
       "when": 1791064043766,
       "tag": "0018_paypal_checkout",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792028204239,
+      "tag": "0019_paypal_orders_server_only",
+      "breakpoints": true
     }
   ]
 }
