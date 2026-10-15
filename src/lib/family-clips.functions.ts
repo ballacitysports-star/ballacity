@@ -49,6 +49,12 @@ async function clipAccess(admin: any, reelId: string, viewerId: string): Promise
   } as never);
   const via = familyClipVia(access);
   if (via) return via;
+  // A 13-15 player's reel a guardian approved for the viewer's team.
+  const { data: teen } = await admin.rpc("teen_reel_viewer_access" as never, {
+    _reel_id: reelId,
+    _viewer: viewerId,
+  } as never);
+  if (teen === "team") return "team";
   const { data: r } = await admin
     .from("highlight_reels")
     .select("user_id,subject_child_id,status,hidden_at")
@@ -283,12 +289,13 @@ export const listFamilyClips = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<FamilyClipSummary[]> => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin.rpc("family_posts_visible_to" as never, {
-        _viewer: context.userId,
-      } as never);
+      const [{ data, error }, { data: teenRows }] = await Promise.all([
+        supabaseAdmin.rpc("family_posts_visible_to" as never, { _viewer: context.userId } as never),
+        supabaseAdmin.rpc("teen_reels_visible_to" as never, { _viewer: context.userId } as never),
+      ]);
       if (error) return [];
       const out: FamilyClipSummary[] = [];
-      for (const r of (data ?? []) as any[]) {
+      for (const r of [...((data ?? []) as any[]), ...((teenRows ?? []) as any[])]) {
         const via = familyClipVia(r.via);
         if (!via) continue;
         out.push({
@@ -299,7 +306,8 @@ export const listFamilyClips = createServerFn({ method: "GET" })
           via,
         });
       }
-      return out;
+      out.sort((x, y) => Date.parse(y.createdAt) - Date.parse(x.createdAt));
+      return out.slice(0, 50);
     } catch {
       return [];
     }

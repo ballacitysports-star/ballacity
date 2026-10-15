@@ -28,7 +28,7 @@ export function reelPrivacyFor(
     return {
       summary: under13
         ? "Private to your family and approved team spaces. Never public."
-        : "Private by default for ages 13–15.",
+        : "Private by default. A verified guardian may share with approved teams and coaches. Not shown publicly.",
       detail:
         "This reel will not appear on public profiles, search, or Highlights.",
       options: [

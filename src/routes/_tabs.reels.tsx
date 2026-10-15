@@ -96,6 +96,7 @@ import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
 import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
 import { ReelProgress } from "@/components/reels/ReelProgress";
+import { teenReelState } from "@/lib/teen-reel-privacy";
 import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
 import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
@@ -170,6 +171,9 @@ type Reel = {
   is_draft?: boolean | null;
   /** Set on a family post: a parent's private clip of their under-13 child. */
   subject_child_id?: string | null;
+  /** 13-15 only: the one team a verified guardian approved, and who approved it. */
+  team_share_team_id?: string | null;
+  guardian_team_approved_by?: string | null;
 };
 
 function ReelCard({
@@ -182,6 +186,7 @@ function ReelCard({
   /** The most recent earlier analysed reel in the same sport, for "since your last clip". */
   prior?: { title: string; created_at: string; analytics: AdvancedAnalytics } | null;
 }) {
+  const { cohort: myCohort } = useMyCohort();
   const [thumb, setThumb] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -285,6 +290,13 @@ function ReelCard({
             {reel.used_free && " · free"}
             {reel.hidden_at && " · hidden on profile"}
           </p>
+          {myCohort === "teen_13_15" && !reel.subject_child_id && (
+            <p className="text-[11px] font-semibold text-lime">
+              {teenReelState(reel) === "team"
+                ? "Shared with your team's coaches and members · approved by your guardian"
+                : "Guardian only · not public"}
+            </p>
+          )}
           {reel.ai_caption && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
           )}
