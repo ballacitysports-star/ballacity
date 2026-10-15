@@ -521,7 +521,7 @@ function Create() {
           }
           if (!user) {
             toast.error("Sign in to host a game");
-            nav({ to: "/auth", search: { redirect: "/create" } as any });
+            nav({ to: "/auth", search: { next: "/create" } as any });
             return;
           }
           if (!selectedAffiliation) {

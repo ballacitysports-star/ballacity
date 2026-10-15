@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { stashPendingNext } from "@/lib/pending-next";
 import { pageHead } from "@/lib/seo";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
@@ -194,6 +195,9 @@ function AuthPage() {
       lastVisited: readLastVisited() ?? undefined,
       referrer,
     });
+    // Onboarding comes first for a new member; keep the link they asked for.
+    const requested = sanitizeNextPath(next);
+    if (requested && dest !== requested) stashPendingNext(requested);
     // Once the hint is what sends them on it has done its job. Wait for that, or
     // the full-page navigation below can cancel the update and send them again.
     if (startDestination && dest === startDestination) {

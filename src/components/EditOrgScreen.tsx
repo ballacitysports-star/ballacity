@@ -344,7 +344,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
     credentials: kind === "coach" ? credentials : undefined,
     ratePerHour: kind === "coach" ? rate : undefined,
     sessionTypes: kind === "coach" ? sessionTypes : undefined,
-    ageGroups: kind === "coach" ? ageGroups : undefined,
+    ageGroups,
     skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : org.skillRange,
     availabilitySlots: kind === "coach" ? slots : undefined,
     availabilityOverrides: kind === "coach" ? overrides : undefined,
@@ -449,10 +449,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
       sessionTypes: kind === "coach" ? sessionTypes : undefined,
       // Only written when changed, so saving a profile never depends on this column
       // unless the coach actually edits their age groups.
-      ageGroups:
-        kind === "coach" && ageGroups.join() !== (org.ageGroups ?? []).join()
-          ? ageGroups
-          : undefined,
+      ageGroups: ageGroups.join() !== (org.ageGroups ?? []).join() ? ageGroups : undefined,
       skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
       availabilitySlots:
         kind === "coach"
@@ -1404,6 +1401,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   showCurrentButton={false}
                   placeholder="Tompkins Square Courts"
                 />
+              </Section>
+
+              <Section title="Age groups you play with">
+                <AgeGroupPicker selected={ageGroups} onChange={setAgeGroups} />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Choose Adults (18+) only to let signed-out visitors preview this team from a
+                  shared link. Teams that include youth or teens are never shown publicly.
+                </p>
               </Section>
 
               <Section title="Record (optional)">

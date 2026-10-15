@@ -1,4 +1,7 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { PublicGamePreview } from "@/components/games/PublicGamePreview";
+import { LoadingState } from "@/components/ui/loading-state";
+import { authSearchHere } from "@/lib/pending-next";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
@@ -316,7 +319,7 @@ export const Route = createFileRoute("/games/$gameId/")({
       }
     />
   ),
-  component: GameDetail,
+  component: GamePage,
 });
 
 function formatCooldownLabel(ms: number): string {
@@ -325,6 +328,21 @@ function formatCooldownLabel(ms: number): string {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+/** Signed-out visitors get a minimal preview; members get the full page. */
+function GamePage() {
+  const { user, loading } = useAuth();
+  const { seo } = Route.useLoaderData();
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <LoadingState label="Loading game…" />
+      </div>
+    );
+  }
+  if (!user) return <PublicGamePreview seo={seo} />;
+  return <GameDetail />;
 }
 
 function GameDetail() {
@@ -2996,7 +3014,7 @@ function GameDetail() {
               disabled={messaging || !messagingDecision.allowed}
               onClick={async () => {
                 if (!user) {
-                  nav({ to: "/auth" });
+                  nav({ to: "/auth", search: authSearchHere() as never });
                   return;
                 }
                 if (!messagingDecision.allowed) {

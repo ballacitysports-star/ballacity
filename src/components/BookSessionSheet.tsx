@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { authSearchHere } from "@/lib/pending-next";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -257,7 +258,7 @@ export function BookSessionSheet({
   const submit = async () => {
     if (!user) {
       toast("Sign in to request a session");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearchHere() as never });
       return;
     }
     if (startTime && !date) {

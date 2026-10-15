@@ -6,9 +6,13 @@ import {
   bucketByCity,
   emptyListings,
   filterBySport,
+  isAdultsOnlyGame,
+  isAdultsOnlyOrg,
+  isPublicOrg,
   isPublicUpcomingGame,
   sportForGuideSlug,
   type CityGameRow,
+  type CityOrgRow,
   type CityListings,
 } from "./city-seo";
 import { cityBounds, cityBySlug } from "./launch-cities";
@@ -108,6 +112,8 @@ export type PublicGameSeo = {
   description: string;
   /** False for private, hidden, cancelled, past, or youth games: noindex. */
   indexable: boolean;
+  /** True when the host limited the game to 18+. Only these get the signed-out preview. */
+  adultsOnly: boolean;
 };
 
 export const getPublicGameSeo = createServerFn({ method: "GET" })
@@ -132,5 +138,46 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
       price: g.price,
       description: indexable ? g.description : "",
       indexable,
+      adultsOnly: indexable && isAdultsOnlyGame(g),
+    };
+  });
+
+/**
+ * What a signed-out visitor may see of a team: name, sports, city, tagline and
+ * bio. Never the roster, owner, contact details or posts. Only teams that are
+ * not hidden and list adult-only age groups are `eligible`; for anything else
+ * (youth, unlisted age groups, hidden) nothing but `eligible: false` is returned.
+ */
+export type PublicTeamPreview =
+  | { eligible: false }
+  | {
+      eligible: true;
+      id: string;
+      name: string;
+      city: string;
+      sports: string[];
+      tagline: string;
+      bio: string;
+    };
+
+export const getPublicTeamPreview = createServerFn({ method: "GET" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1).max(64) }).parse(d))
+  .handler(async ({ data }): Promise<PublicTeamPreview | null> => {
+    const { data: row, error } = await publicClient()
+      .from("teams")
+      .select(`${CITY_ORG_COLUMNS},bio`)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) return null;
+    const t = row as unknown as CityOrgRow & { bio: string | null };
+    if (t.kind === "coach" || !isPublicOrg(t) || !isAdultsOnlyOrg(t)) return { eligible: false };
+    return {
+      eligible: true,
+      id: t.id,
+      name: t.name,
+      city: t.city ?? "",
+      sports: t.sports ?? [],
+      tagline: t.tagline ?? "",
+      bio: (t.bio ?? "").slice(0, 400),
     };
   });

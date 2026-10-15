@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { authSearchHere } from "@/lib/pending-next";
 import { toast } from "sonner";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -429,7 +430,7 @@ function ContactGuardianButton({ childId, childName }: { childId: string; childN
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) {
-        navigate({ to: "/auth" });
+        navigate({ to: "/auth", search: authSearchHere() as never });
         return;
       }
       const { data: guardianId, error } = await supabase.rpc("public_minor_guardian", {
