@@ -19,6 +19,7 @@ import {
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
+import { isImageUrl } from "@/components/OrgAvatarMark";
 import { hideFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 
@@ -35,9 +36,6 @@ type ViewModel = {
   editTo: { to: string; params: Record<string, string | undefined> };
   publicTo: { to: string; params: Record<string, string | undefined> };
 };
-
-const isImageUrl = (v: string | null | undefined): v is string =>
-  /^(https?:|data:|blob:)/.test(v ?? "");
 
 /**
  * The Profile tab rendered for a non-player active profile (team, trainer, or

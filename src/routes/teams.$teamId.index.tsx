@@ -49,6 +49,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
 import { Trash2 } from "lucide-react";
 import { hideFinishedGames } from "@/lib/game-time";
+import { OrgAvatarMark } from "@/components/OrgAvatarMark";
 import {
   Dialog,
   DialogContent,
@@ -232,13 +233,13 @@ function TeamPage() {
             initial={{ scale: 0, rotate: -8 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 16 }}
-            className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
+            className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
             style={{
               background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)`,
               boxShadow: `0 12px 40px -10px ${org.accent}88`,
             }}
           >
-            {org.avatar}
+            <OrgAvatarMark avatar={org.avatar} fallback={org.name.slice(0, 2).toUpperCase()} />
           </motion.div>
           <div className="mb-2 flex items-center gap-2">
             {canEdit && (
