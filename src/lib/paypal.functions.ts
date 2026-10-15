@@ -111,7 +111,28 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       .eq("host_id", order.host_id)
       .maybeSingle();
 
-    const { captureOrder } = await import("@/lib/paypal.server");
+    const { captureOrder, getOrder } = await import("@/lib/paypal.server");
+
+    // Check the approved order before capturing: once captured the money has
+    // moved, so a payee or amount mismatch must stop it here.
+    const pending = await getOrder(data.orderId);
+    const pendingCents = pending.amountValue ? Math.round(Number(pending.amountValue) * 100) : 0;
+    const capturable =
+      pending.status === "APPROVED" &&
+      pendingCents === order.amount_cents &&
+      pending.currency === order.currency &&
+      !!pending.payeeMerchantId &&
+      pending.payeeMerchantId === hostPayPal?.merchant_id;
+    if (!capturable) {
+      await supabaseAdmin
+        .from("paypal_orders")
+        .update({ status: "failed" })
+        .eq("order_id", data.orderId);
+      throw new Error(
+        "This PayPal payment doesn't match the host's current checkout. You weren't charged — please start again.",
+      );
+    }
+
     const result = await captureOrder(data.orderId);
 
     const paidCents = result.amountValue ? Math.round(Number(result.amountValue) * 100) : 0;

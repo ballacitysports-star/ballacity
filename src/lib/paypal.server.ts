@@ -56,6 +56,37 @@ export async function createOrder(input: {
   return { orderId: json.id };
 }
 
+export type OrderDetails = {
+  status: string;
+  amountValue: string | null;
+  currency: string | null;
+  payeeMerchantId: string | null;
+};
+
+/** Reads an order without changing it, so it can be checked before capture. */
+export async function getOrder(orderId: string): Promise<OrderDetails> {
+  const token = await getAccessToken();
+  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    status?: string;
+    message?: string;
+    purchase_units?: {
+      amount?: { value?: string; currency_code?: string };
+      payee?: { merchant_id?: string };
+    }[];
+  };
+  if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
+  const unit = json?.purchase_units?.[0];
+  return {
+    status: String(json?.status ?? ""),
+    amountValue: unit?.amount?.value ?? null,
+    currency: unit?.amount?.currency_code ?? null,
+    payeeMerchantId: unit?.payee?.merchant_id ?? null,
+  };
+}
+
 export type CaptureResult = {
   status: string;
   captureId: string | null;
