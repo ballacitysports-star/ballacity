@@ -5,6 +5,7 @@ import { Award, Clock, Flame, MapPin, Shield, Sparkles, Trophy } from "lucide-re
 import type { AthleteProgress } from "@/lib/athlete-xp";
 import { VenueBadge } from "@/components/venue/VenueBadge";
 import { formatGameWhen } from "@/lib/format";
+import { OrgAvatarMark, isImageUrl } from "@/components/OrgAvatarMark";
 import { getPlayerPassport, type PlayerPassport } from "@/lib/player-passport.functions";
 
 /**
@@ -45,7 +46,12 @@ export function PlayerPassportView({ passport }: { passport: PlayerPassport }) {
                 params={t.kind === "coach" ? { trainerId: t.id } : { teamId: t.id }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-lime/60 hover:text-lime"
               >
-                <span aria-hidden>{t.avatar || "🏅"}</span>
+                <span
+                  aria-hidden
+                  className={isImageUrl(t.avatar) ? "h-4 w-4 overflow-hidden rounded" : undefined}
+                >
+                  <OrgAvatarMark avatar={t.avatar} fallback="🏅" />
+                </span>
                 <span className="max-w-[160px] truncate">{t.name}</span>
                 <span className="micro-label text-muted-foreground">{t.role}</span>
               </Link>
@@ -153,7 +159,9 @@ export function AthleteLevelCard({ progress: p }: { progress: AthleteProgress })
             <div className="h-full rounded-full bg-lime" style={{ width: `${pct}%` }} />
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className={`rounded-full border px-2 py-0.5 font-bold ${TIER_TONE[p.reliabilityTier]}`}>
+            <span
+              className={`rounded-full border px-2 py-0.5 font-bold ${TIER_TONE[p.reliabilityTier]}`}
+            >
               {p.reliabilityTier}
               {p.reliability != null ? ` · ${p.reliability}% reliable` : " · reliability pending"}
             </span>
