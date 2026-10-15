@@ -499,7 +499,6 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
-  const refundTerms = useGameRefundTerms(game.id, settings);
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
   const approvalGateActive = requiresApproval && !isApproved;
