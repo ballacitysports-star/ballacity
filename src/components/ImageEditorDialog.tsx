@@ -92,7 +92,9 @@ export function ImageEditorDialog({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
   const [scale, setScale] = useState(1);
+  // minScale: whole image visible (letterboxed). fillScale: image covers the frame.
   const [minScale, setMinScale] = useState(1);
+  const [fillScale, setFillScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   // Transform / adjust / filter state
@@ -204,13 +206,14 @@ export function ImageEditorDialog({
       : 0;
   const cropH = cropW / aspect;
 
-  const maxScale = minScale * 8;
+  const maxScale = fillScale * 8;
 
   useEffect(() => {
     if (!img || cropW === 0) return;
-    const min = Math.max(cropW / rotatedDims.w, cropH / rotatedDims.h);
-    setMinScale(min);
-    setScale(min);
+    const fill = Math.max(cropW / rotatedDims.w, cropH / rotatedDims.h);
+    setMinScale(Math.min(cropW / rotatedDims.w, cropH / rotatedDims.h));
+    setFillScale(fill);
+    setScale(fill);
     setOffset({ x: 0, y: 0 });
   }, [img, cropW, cropH, rotatedDims.w, rotatedDims.h]);
 
@@ -335,7 +338,33 @@ export function ImageEditorDialog({
 
     const scaleX = outW / sW;
     const scaleY = outH / sH;
-    ctx.drawImage(inter, sxRot, syRot, sW, sH, -outW / 2, -outH / 2, sW * scaleX, sH * scaleY);
+    // Background for any letterboxed area (image zoomed out to fit): a blurred,
+    // cover-scaled copy of the photo. Skipped for transparent cut-outs.
+    if (!hasAlpha) {
+      const cover = Math.max(outW / inter.width, outH / inter.height) * 1.2;
+      try {
+        (ctx as any).filter = `blur(${Math.round(outMax / 40)}px)${filterString ? ` ${filterString}` : ""}`;
+      } catch {}
+      ctx.drawImage(
+        inter,
+        (-inter.width * cover) / 2,
+        (-inter.height * cover) / 2,
+        inter.width * cover,
+        inter.height * cover,
+      );
+      try {
+        (ctx as any).filter = filterString || "none";
+      } catch {}
+    }
+    // Draw the whole image at its on-screen position so areas outside the
+    // image (when fitted) are left to the background instead of clamping.
+    ctx.drawImage(
+      inter,
+      -outW / 2 - sxRot * scaleX,
+      -outH / 2 - syRot * scaleY,
+      inter.width * scaleX,
+      inter.height * scaleY,
+    );
     ctx.restore();
 
     const outMime = hasAlpha ? "image/png" : "image/jpeg";
@@ -343,10 +372,15 @@ export function ImageEditorDialog({
     onConfirm(dataUrl);
   }
 
+  // "Fit" shows the whole photo; "Reset" fills the frame.
   const fitToFrame = useCallback(() => {
     setScale(minScale);
     setOffset({ x: 0, y: 0 });
   }, [minScale]);
+  const fillFrame = useCallback(() => {
+    setScale(fillScale);
+    setOffset({ x: 0, y: 0 });
+  }, [fillScale]);
 
   if (!open) return null;
 
@@ -460,6 +494,12 @@ export function ImageEditorDialog({
               disabled={!img}
               icon={<Maximize2 className="h-4 w-4" />}
               label="Fit"
+            />
+            <CropAction
+              onClick={fillFrame}
+              disabled={!img}
+              icon={<CropIcon className="h-4 w-4" />}
+              label="Fill"
             />
 
             {isMobile && (
