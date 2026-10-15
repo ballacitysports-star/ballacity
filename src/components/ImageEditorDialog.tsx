@@ -63,6 +63,8 @@ type Props = {
   shape?: "square" | "rect" | "circle";
   title?: string;
   allowBgRemoval?: boolean;
+  /** Open with the whole image visible (logos) instead of filling the frame. */
+  initialFit?: boolean;
   sizePresets?: CropSizePreset[];
   qualityPresets?: CropQualityPreset[];
   onCancel: () => void;
@@ -79,6 +81,7 @@ export function ImageEditorDialog({
   shape = "rect",
   title = "Edit image",
   allowBgRemoval = false,
+  initialFit = false,
   sizePresets = DEFAULT_SIZE_PRESETS,
   qualityPresets = DEFAULT_QUALITY_PRESETS,
   onCancel,
@@ -213,9 +216,9 @@ export function ImageEditorDialog({
     const fill = Math.max(cropW / rotatedDims.w, cropH / rotatedDims.h);
     setMinScale(Math.min(cropW / rotatedDims.w, cropH / rotatedDims.h));
     setFillScale(fill);
-    setScale(fill);
+    setScale(initialFit ? Math.min(cropW / rotatedDims.w, cropH / rotatedDims.h) : fill);
     setOffset({ x: 0, y: 0 });
-  }, [img, cropW, cropH, rotatedDims.w, rotatedDims.h]);
+  }, [img, cropW, cropH, rotatedDims.w, rotatedDims.h, initialFit]);
 
   const clampOffset = useCallback(
     (ox: number, oy: number, s: number) => {

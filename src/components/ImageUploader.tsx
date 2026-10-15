@@ -25,6 +25,8 @@ type Props = {
   allowBgRemoval?: boolean;
   disabled?: boolean;
   label?: string;
+  /** Team / org logo: square frame, opens with the whole image visible. */
+  logo?: boolean;
 };
 
 const DEFAULT_PRESETS: Sport[] = [
@@ -53,13 +55,14 @@ export function ImageUploader({
   allowBgRemoval,
   disabled,
   label,
+  logo = false,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const shape = kind === "avatar" ? "circle" : "rect";
+  const shape = logo ? "square" : kind === "avatar" ? "circle" : "rect";
   const aspect = kind === "avatar" ? 1 : 16 / 9;
   const outputMaxSize = kind === "avatar" ? 512 : 1600;
   const bgRemoval = allowBgRemoval ?? kind === "avatar";
@@ -218,7 +221,8 @@ export function ImageUploader({
             aspect={aspect}
             outputMaxSize={outputMaxSize}
             shape={shape}
-            title={isCover ? "Edit cover" : "Edit photo"}
+            title={isCover ? "Edit cover" : logo ? "Edit logo" : "Edit photo"}
+            initialFit={logo}
             allowBgRemoval={bgRemoval}
             onCancel={() => {
               setOpen(false);
