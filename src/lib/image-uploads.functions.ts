@@ -79,8 +79,15 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
     }
 
     const verdict = scanTarget
-      ? await scanImageForSafety(scanTarget)
-      : { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
+      ? await scanImageForSafety(scanTarget, { userId: context.userId })
+      : {
+          safe: true,
+          label: "unscanned",
+          reason: null,
+          categories: [],
+          scanned: false,
+          csam: false,
+        };
 
     const quarantined = !verdict.safe;
     const reason = quarantined
@@ -104,6 +111,16 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
       { onConflict: "bucket,path" },
     );
     if (upErr) throw new Error(upErr.message);
+
+    if (verdict.csam) {
+      const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
+      await escalateImageForChildSafety(supabaseAdmin, {
+        bucket,
+        path,
+        categories: verdict.categories,
+        source: "image_upload",
+      });
+    }
 
     return {
       ok: true,

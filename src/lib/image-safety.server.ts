@@ -1,7 +1,13 @@
 /**
  * Server-only automated safety scan for uploaded imagery.
  * Loaded inside server-fn handlers.
+ *
+ * Uses the shared AI provider's `moderateImage` (one classifier prompt for
+ * photos and reel frames alike) and records usage under `image_moderation`.
  */
+
+import type { AiProvider } from "@/lib/ai/provider";
+import type { AiConfig } from "@/lib/ai/config";
 
 export type SafetyVerdict = {
   safe: boolean;
@@ -9,38 +15,83 @@ export type SafetyVerdict = {
   reason: string | null;
   categories: string[];
   scanned: boolean;
+  /** Suspected child sexual abuse material: the caller must escalate. */
+  csam: boolean;
 };
 
-const SYSTEM = `You are an image safety classifier for a community sports app.
-Respond with ONLY compact JSON: {"safe":boolean,"label":"safe|nudity|sexual|violence|gore|hate|drugs|weapons|self_harm|spam|illegible","categories":string[],"reason":string}
-Mark unsafe when the image contains nudity or sexual content, graphic violence or gore, hate symbols, drug use, weapons aimed at people, self-harm, or scam/spam advertising.
-Ordinary sports, gym, team, venue, portrait and logo imagery is safe.`;
+const UNSCANNED: SafetyVerdict = {
+  safe: true,
+  label: "unscanned",
+  reason: null,
+  categories: [],
+  scanned: false,
+  csam: false,
+};
+
+export type ImageSafetyDeps = {
+  admin: any;
+  config: AiConfig;
+  provider: AiProvider;
+};
+
+async function defaultDeps(): Promise<ImageSafetyDeps> {
+  const { loadAiConfig } = await import("@/lib/ai/settings.server");
+  const { createLovableGatewayProvider } = await import("@/lib/ai/gateway.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const config = await loadAiConfig(supabaseAdmin);
+  return { admin: supabaseAdmin, config, provider: createLovableGatewayProvider(config.provider) };
+}
 
 /**
- * Classify an image with the Lovable AI gateway. Never throws: on any gateway
- * failure the verdict is "scanned: false" so the caller can decide (we let the
- * upload through and leave it in the pending review queue).
+ * Classify an image. Never throws: on any failure the verdict is
+ * "scanned: false" so the caller can decide (we let the upload through and
+ * leave it in the pending review queue).
  */
-export async function scanImageForSafety(imageUrl: string): Promise<SafetyVerdict> {
+export async function scanImageForSafety(
+  imageUrl: string,
+  ref: { userId: string },
+  deps?: ImageSafetyDeps,
+): Promise<SafetyVerdict> {
+  let resolved: ImageSafetyDeps;
   try {
-    const { loadAiConfig } = await import("@/lib/ai/settings.server");
-    const { createLovableGatewayProvider } = await import("@/lib/ai/gateway.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const config = await loadAiConfig(supabaseAdmin);
-    // Not gated on the kill switch — safety scanning stays on when AI is off.
-    if (!config.features.features.image_moderation.enabled) {
-      return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
-    }
-    const verdict = await createLovableGatewayProvider(config.provider).moderateImage({ imageUrl });
+    resolved = deps ?? (await defaultDeps());
+  } catch {
+    return UNSCANNED;
+  }
+  const { admin, config, provider } = resolved;
+  // Not gated on the kill switch — safety scanning stays on when AI is off.
+  if (!config.features.features.image_moderation.enabled) return UNSCANNED;
+
+  const { recordUsage } = await import("@/lib/ai/usage.server");
+  const { isCsamCategory } = await import("@/lib/ai/moderation.server");
+  const usageRef = { jobId: null, userId: ref.userId, feature: "image_moderation" as const };
+
+  try {
+    const verdict = await provider.moderateImage({ imageUrl });
+    const csam = isCsamCategory([verdict.label, ...verdict.categories]);
+    const safe = verdict.safe && !csam;
+    await recordUsage(admin, usageRef, {
+      provider: provider.name,
+      model: verdict.model,
+      usage: verdict.usage,
+      outcome: safe ? "ok" : "blocked",
+      config,
+    });
     return {
-      safe: verdict.safe,
+      safe,
       label: verdict.label,
       reason: verdict.reason,
       categories: verdict.categories,
       scanned: true,
+      csam,
     };
   } catch {
-    // Unchanged contract: a scan failure leaves the image in the pending queue.
-    return { safe: true, label: "unscanned", reason: null, categories: [], scanned: false };
+    await recordUsage(admin, usageRef, {
+      provider: config.provider.provider,
+      model: config.provider.moderationImageModel,
+      outcome: "error",
+      config,
+    });
+    return UNSCANNED;
   }
 }
