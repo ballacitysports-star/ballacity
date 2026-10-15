@@ -181,8 +181,12 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       refId: team.id,
       name: team.name,
       handle: team.handle,
-      avatarUrl: null,
-      avatarFallback: team.avatar || initials(team.name),
+      // A team/trainer's uploaded logo is stored in `avatar` as a URL;
+      // initials live there otherwise.
+      avatarUrl: /^(https?:|data:|blob:)/.test(team.avatar ?? "") ? team.avatar : null,
+      avatarFallback: /^(https?:|data:|blob:)/.test(team.avatar ?? "")
+        ? initials(team.name)
+        : team.avatar || initials(team.name),
       href: { to: "/teams/$teamId", params: { teamId: team.id } },
     });
   }
