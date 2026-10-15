@@ -1206,6 +1206,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               <Section title={isCoach ? "Trainer photo" : "Team logo"}>
                 <ImageUploader
                   kind="avatar"
+                  logo={!isCoach}
                   bucket={isCoach ? "trainer-avatars" : "team-avatars"}
                   pathPrefix={user?.id}
                   value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
