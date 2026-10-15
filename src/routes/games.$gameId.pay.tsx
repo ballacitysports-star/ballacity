@@ -57,6 +57,7 @@ import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
 import { normalizeRefundPolicy, refundDisclaimer, refundTermsDisplay } from "@/lib/refund-policy";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
@@ -498,6 +499,7 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
+  const refundTerms = useGameRefundTerms(game.id, settings);
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
   const approvalGateActive = requiresApproval && !isApproved;
@@ -768,9 +770,9 @@ function PayPage() {
           method={picked}
           extraInstructions={settings?.payment_instructions ?? null}
           refundTerms={refundDisclaimer(
-            normalizeRefundPolicy(settings?.refund_rule, settings?.late_refund_pct),
+            normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
             game.cancelCutoffMin,
-            settings?.refund_policy,
+            refundTerms?.refund_policy,
           )}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
@@ -788,8 +790,11 @@ function PayPage() {
       <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
         <summary className="cursor-pointer font-semibold">Refund policy</summary>
         {(() => {
-          const display = refundTermsDisplay(settings, game.cancelCutoffMin);
-          if (!display) return null;
+          const display = refundTermsDisplay(refundTerms, game.cancelCutoffMin);
+          if (!display)
+            return (
+              <p className="mt-2 text-muted-foreground">The host hasn't posted refund terms yet.</p>
+            );
           return (
             <div className="mt-2 space-y-1 text-muted-foreground">
               <p>{display.summary}</p>
