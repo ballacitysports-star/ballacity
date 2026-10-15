@@ -100,6 +100,7 @@ import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
 import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
 import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
+import { ReelPrivacyPanel } from "@/components/reels/ReelPrivacyPanel";
 import { useMyCohort } from "@/lib/youth-features";
 import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
 
@@ -684,7 +685,8 @@ function ReelsPage() {
   const { children: guardianChildren, isFetched: guardianChildrenLoaded } = useMyChildren();
   const subjectChild = childParam
     ? (guardianChildren.find(
-        (c) => c.childUserId === childParam && c.cohort === "child_under_13",
+        (c) => c.childUserId === childParam &&
+          (c.cohort === "child_under_13" || c.cohort === "teen_13_15"),
       ) ?? null)
     : null;
   const {
@@ -1344,7 +1346,7 @@ function ReelsPage() {
             <p className="micro-label text-lime">Family post</p>
             <p className="mt-1 text-xs font-semibold">A clip of {subjectChild.displayName}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Only you can see it. It is never shown on the highlights feed, on a profile, or to
+              Guardian only by default. You can share it with your child's verified team and coaches after upload. It is never shown on the highlights feed, on a profile, or to
               other members. Every clip is analysed by AI, which you control in the Parent Center.
             </p>
           </div>
@@ -1355,6 +1357,8 @@ function ReelsPage() {
             paused. Open this from the Parent Center.
           </p>
         )}
+
+        <ReelPrivacyPanel cohort={subjectChild ? subjectChild.cohort : myCohort} familyPost={!!subjectChild} />
 
         <AiDisclosureNotice />
 

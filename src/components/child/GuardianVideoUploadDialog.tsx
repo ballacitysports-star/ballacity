@@ -33,7 +33,7 @@ export function GuardianVideoUploadDialog({
     staleTime: 60_000,
   });
   const { children } = useMyChildren();
-  const eligible = children.filter((c) => c.cohort === "child_under_13");
+  const eligible = children.filter((c) => c.cohort === "child_under_13" || c.cohort === "teen_13_15");
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string | null>(childUserId ?? null);
 
