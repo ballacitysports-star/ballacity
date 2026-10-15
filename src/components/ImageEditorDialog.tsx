@@ -341,39 +341,24 @@ export function ImageEditorDialog({
 
     const scaleX = outW / sW;
     const scaleY = outH / sH;
-    // Background for any letterboxed area (image zoomed out to fit): a blurred,
-    // cover-scaled copy of the photo. Skipped for transparent cut-outs.
-    if (!hasAlpha && initialFit) {
-      // Logos: pad with the logo's own background colour (sampled from its
-      // corner) so the padding blends in instead of looking blurry.
+    // Background for any letterboxed area (image zoomed out to fit) and for
+    // transparent pixels, since the output is a JPEG: a solid colour sampled
+    // from the image's corner, or black when that corner is transparent.
+    // (A blurred copy here showed through transparent logos and looked smeared.)
+    if (!hasAlpha) {
       let fill = "#000";
       try {
         const px = ictx.getImageData(0, 0, 1, 1).data;
-        fill = `rgb(${px[0]},${px[1]},${px[2]})`;
+        if (px[3] === 255) fill = `rgb(${px[0]},${px[1]},${px[2]})`;
       } catch {}
       const prevFilter = (ctx as any).filter;
       try {
         (ctx as any).filter = "none";
       } catch {}
       ctx.fillStyle = fill;
-      ctx.fillRect(-outW / 2, -outH / 2, outW, outH);
+      ctx.fillRect(-outW, -outH, outW * 2, outH * 2);
       try {
         (ctx as any).filter = prevFilter;
-      } catch {}
-    } else if (!hasAlpha) {
-      const cover = Math.max(outW / inter.width, outH / inter.height) * 1.2;
-      try {
-        (ctx as any).filter = `blur(${Math.round(outMax / 40)}px)${filterString ? ` ${filterString}` : ""}`;
-      } catch {}
-      ctx.drawImage(
-        inter,
-        (-inter.width * cover) / 2,
-        (-inter.height * cover) / 2,
-        inter.width * cover,
-        inter.height * cover,
-      );
-      try {
-        (ctx as any).filter = filterString || "none";
       } catch {}
     }
     // Draw the whole image at its on-screen position so areas outside the
