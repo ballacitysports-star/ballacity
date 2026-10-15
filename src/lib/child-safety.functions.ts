@@ -130,6 +130,8 @@ export const getMyChildStatus = createServerFn({ method: "GET" })
 /* ------------------------------------------------------------------ */
 
 const MAX_CONSENT_REQUESTS_PER_DAY = 3;
+/** Distinct guardian addresses a child account may ever email. */
+const MAX_CONSENT_RECIPIENTS = 2;
 
 export const requestParentalConsent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -158,6 +160,7 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ context, data }) => {
+    let newRecipientHash: string | null = null;
     // Resend limit: each request emails a recipient the caller chose, so cap
     // how many a single account can trigger per day to stop the link being
     // used to spam arbitrary inboxes. Each new request replaces the previous
@@ -177,6 +180,29 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
           "You've sent the most guardian requests allowed today. Please try again tomorrow.",
         );
       }
+      // Recipient limit: a child account may only ever email at most
+      // MAX_CONSENT_RECIPIENTS distinct guardian addresses (stored hashed).
+      const recipientHash = hashToken(data.parentEmail.toLowerCase());
+      const { data: prior, error: rErr } = await supabaseAdmin
+        .from("parental_consent_events")
+        .select("detail")
+        .eq("child_user_id", context.userId)
+        .eq("action", "consent_recipient")
+        .limit(50);
+      if (rErr) throw new Error("Could not send the request right now. Please try again.");
+      const seen = new Set(
+        ((prior ?? []) as { detail: { recipient_hash?: string } | null }[])
+          .map((r) => r.detail?.recipient_hash)
+          .filter(Boolean) as string[],
+      );
+      if (!seen.has(recipientHash)) {
+        if (seen.size >= MAX_CONSENT_RECIPIENTS) {
+          throw new Error(
+            "Guardian requests can only go to the guardian emails you've already used. Ask BallaCity support to change it.",
+          );
+        }
+        newRecipientHash = recipientHash;
+      }
     }
     const token = newToken();
     const expiresAt = new Date(Date.now() + CONSENT_TOKEN_TTL_HOURS * 3600_000).toISOString();
@@ -190,6 +216,24 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
       _versions: data.versions ?? {},
     });
     if (error) throw new Error(error.message);
+    if (newRecipientHash) {
+      // Remember this guardian address (hashed) so the recipient limit holds.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: consent } = await supabaseAdmin
+        .from("parental_consents")
+        .select("id")
+        .eq("child_user_id", context.userId)
+        .maybeSingle();
+      if (consent?.id) {
+        await supabaseAdmin.from("parental_consent_events").insert({
+          consent_id: consent.id,
+          child_user_id: context.userId,
+          actor_id: context.userId,
+          action: "consent_recipient",
+          detail: { recipient_hash: newRecipientHash },
+        } as never);
+      }
+    }
     const path = `/parent/consent/${token}`;
     // Email the one-time link to the guardian. Failure must not block the
     // request — the minor can still copy/share the link manually.
