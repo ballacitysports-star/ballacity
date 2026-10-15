@@ -61,7 +61,7 @@ export function ReelPrivacyPanel({
                 : "Your guardian can change sharing or remove this reel anytime from the Parent Center."}
             </p>
           )}
-          <a href="/safety" className="inline-block font-semibold text-lime underline-offset-2 hover:underline">
+          <a href="/youth-policy" className="inline-block font-semibold text-lime underline-offset-2 hover:underline">
             View Reel privacy policy
           </a>
         </div>

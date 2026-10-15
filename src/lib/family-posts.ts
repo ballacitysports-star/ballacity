@@ -10,7 +10,8 @@ const MESSAGES: Record<string, string> = {
   FAMILY_POSTS_OFF: "Family posts aren't available yet.",
   FAMILY_POST_NOT_GUARDIAN:
     "Only a verified parent or guardian of this child can add a clip of them.",
-  FAMILY_POST_UNDER_13_ONLY: "Family posts are only for children under 13.",
+  FAMILY_POST_UNDER_13_ONLY: "Family posts are only for children under 16.",
+  FAMILY_POST_UNDER_16_ONLY: "Family posts are only for children under 16.",
   FAMILY_POST_AI_OFF:
     "Turn on AI video analysis for this child in the Parent Center first. Every clip is analysed by AI.",
 };
