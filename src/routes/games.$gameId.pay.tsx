@@ -195,6 +195,7 @@ function PayPage() {
   const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
