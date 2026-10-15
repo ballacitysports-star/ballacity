@@ -1576,6 +1576,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Team logo">
                 <ImageUploader
                   kind="avatar"
+                  logo
                   bucket="team-avatars"
                   pathPrefix={user?.id ?? org.id}
                   value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
