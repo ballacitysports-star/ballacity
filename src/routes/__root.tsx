@@ -277,6 +277,9 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
 function markAppBooted() {
   try {
     (window as unknown as { __openrun_booted?: boolean }).__openrun_booted = true;
+    // A slow boot may already have tripped the watchdog: its failure overlay
+    // sits on top of the page, so take it down now that the app is running.
+    document.getElementById("boot-fallback")?.remove();
     sessionStorage.removeItem(BOOT_RETRY_KEY);
   } catch {
     /* storage unavailable */
