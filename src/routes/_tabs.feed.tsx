@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
+import { takePendingNext } from "@/lib/pending-next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CalendarSearch, List, Map as MapIcon, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -74,6 +75,12 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
+  // A shared link opened before sign-up: finish onboarding, then go where they were headed.
+  useEffect(() => {
+    const dest = takePendingNext();
+    if (dest) void navigate({ to: dest as never, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [q, setQ] = useState(search.q ?? "");
   const [tab, setTab] = useState<"upcoming" | "archive">(
     search.tab === "archive" ? "archive" : "upcoming",

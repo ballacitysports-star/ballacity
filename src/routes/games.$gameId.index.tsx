@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { authSearchHere } from "@/lib/pending-next";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { emailLocalPart } from "@/lib/managed-children";
@@ -2996,7 +2997,7 @@ function GameDetail() {
               disabled={messaging || !messagingDecision.allowed}
               onClick={async () => {
                 if (!user) {
-                  nav({ to: "/auth" });
+                  nav({ to: "/auth", search: authSearchHere() as never });
                   return;
                 }
                 if (!messagingDecision.allowed) {

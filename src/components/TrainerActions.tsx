@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { authSearchHere } from "@/lib/pending-next";
 import { useNavigate } from "@tanstack/react-router";
 import {
   UserPlus,
@@ -67,7 +68,7 @@ export function TrainerActions({
   const requireAuth = () => {
     if (!user) {
       toast("Sign in to continue");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearchHere() as never });
       return false;
     }
     return true;
