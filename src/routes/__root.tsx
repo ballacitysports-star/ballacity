@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { isPublicGamePreviewPath } from "@/lib/public-game-preview";
 import {
   Outlet,
   Link,
@@ -551,9 +552,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
+  // A shared game link shows a signed-out visitor a minimal preview. Members
+  // never take this path, so they still pass every sign-in/age/type gate.
   const isPublic =
     pathname === "/" ||
-    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
+    (!user && isPublicGamePreviewPath(pathname));
   const isTab = TAB_PATHS.includes(pathname);
   // Second-chance verification: on mobile Safari/Chrome the Supabase session
   // can hydrate one tick after `loading` flips to false. Redirecting to
