@@ -8,13 +8,14 @@ import { authSearchHere } from "@/lib/pending-next";
 /**
  * What a signed-out visitor sees at a shared game link. It shows only what
  * `getPublicGameSeo` already releases for adult, public, upcoming games, and
- * never the exact venue, host or roster. Anything that server call does not
- * mark `indexable` (private, youth, cancelled, past, unknown) gets a generic
+ * never the exact venue, host or roster. Only games the host limited to 18+ qualify.
+ * Anything that server call does not mark `indexable` and `adultsOnly` (private,
+ * youth, open-age, cancelled, past, unknown) gets a generic
  * sign-in prompt that reveals nothing about the game.
  */
 export function PublicGamePreview({ seo }: { seo: PublicGameSeo | null }) {
   const search = authSearchHere() as never;
-  const shown = seo?.indexable ? seo : null;
+  const shown = seo?.indexable && seo.adultsOnly ? seo : null;
 
   return (
     <div className="min-h-dvh bg-background">

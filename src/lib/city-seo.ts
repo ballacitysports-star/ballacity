@@ -61,6 +61,11 @@ export function gameTouchesMinors(g: Pick<CityGameRow, "min_age" | "max_age">): 
   return g.max_age !== null && g.max_age < 18;
 }
 
+/** True only when the host set a minimum age of 18+, so no minor can join. */
+export function isAdultsOnlyGame(g: Pick<CityGameRow, "min_age">): boolean {
+  return g.min_age !== null && g.min_age >= 18;
+}
+
 /** Whether a game may be shown to anonymous visitors and crawlers. */
 export function isPublicUpcomingGame(g: CityGameRow, now: Date = new Date()): boolean {
   if (g.is_private || g.hidden_at || g.org_hidden_at || g.cancelled_at) return false;

@@ -6,6 +6,7 @@ import {
   bucketByCity,
   emptyListings,
   filterBySport,
+  isAdultsOnlyGame,
   isPublicUpcomingGame,
   sportForGuideSlug,
   type CityGameRow,
@@ -108,6 +109,8 @@ export type PublicGameSeo = {
   description: string;
   /** False for private, hidden, cancelled, past, or youth games: noindex. */
   indexable: boolean;
+  /** True when the host limited the game to 18+. Only these get the signed-out preview. */
+  adultsOnly: boolean;
 };
 
 export const getPublicGameSeo = createServerFn({ method: "GET" })
@@ -132,5 +135,6 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
       price: g.price,
       description: indexable ? g.description : "",
       indexable,
+      adultsOnly: indexable && isAdultsOnlyGame(g),
     };
   });
