@@ -36,6 +36,9 @@ type ViewModel = {
   publicTo: { to: string; params: Record<string, string | undefined> };
 };
 
+const isImageUrl = (v: string | null | undefined): v is string =>
+  /^(https?:|data:|blob:)/.test(v ?? "");
+
 /**
  * The Profile tab rendered for a non-player active profile (team, trainer, or
  * gym). Shows that profile's identity, the games it hosts, and its reviews so
@@ -114,8 +117,12 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       name: org.name,
       handle: org.handle ?? null,
       bannerUrl: org.cover ?? null,
-      avatarUrl: null,
-      avatarFallback: org.avatar || profile.avatarFallback,
+      // Teams/trainers store an uploaded logo as a URL in `avatar`; never
+      // print that URL as text.
+      avatarUrl: isImageUrl(org.avatar) ? org.avatar : null,
+      avatarFallback: isImageUrl(org.avatar)
+        ? profile.avatarFallback
+        : org.avatar || profile.avatarFallback,
       city: org.city ?? null,
       bio: org.bio ?? org.tagline ?? null,
       sports: org.sports ?? [],
@@ -145,6 +152,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         bannerUrl={vm.bannerUrl ?? HERO_IMAGE}
         avatarUrl={vm.avatarUrl}
         avatarFallback={vm.avatarFallback}
+        avatarShape={profile.kind === "trainer" ? "circle" : "logo"}
         name={vm.name}
         nameBadge={
           <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
