@@ -1,3 +1,4 @@
+import { isLegalReviewed } from "@/lib/legal-review";
 import { describe, expect, it } from "vitest";
 import {
   ADDRESS_PRIVACY_NOTE,
@@ -39,10 +40,13 @@ describe("safety copy", () => {
     expect(EMERGENCY_NOTICE).toMatch(/not an emergency service/i);
   });
 
-  it("labels both acknowledgments as pending legal review", () => {
+  it("says the acknowledgments are pending legal review until counsel signs off", () => {
     expect(LEGAL_REVIEW_LABEL).toBe("LEGAL REVIEW REQUIRED");
     expect(RISK_ACKNOWLEDGMENT.disclaimer).toMatch(/not a waiver/i);
-    expect(HOST_RESPONSIBILITY.disclaimer).toMatch(/legal review/i);
+    const pending = !isLegalReviewed("safetyAcknowledgments");
+    for (const ack of [RISK_ACKNOWLEDGMENT, HOST_RESPONSIBILITY]) {
+      expect(/pending legal review/i.test(ack.disclaimer)).toBe(pending);
+    }
   });
 
   it("versions both acknowledgments together", () => {

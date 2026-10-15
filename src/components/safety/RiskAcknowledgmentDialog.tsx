@@ -10,7 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { LEGAL_REVIEW_LABEL, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
+import { RISK_ACKNOWLEDGMENT } from "@/lib/safety";
+import { LegalReviewTag } from "@/components/legal/LegalReviewTag";
 
 /**
  * Shown before a player joins a physical game. The checkbox is never
@@ -80,9 +81,7 @@ export function RiskAcknowledgmentDialog({
           </div>
 
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
-              {LEGAL_REVIEW_LABEL}
-            </span>
+            <LegalReviewTag area="safetyAcknowledgments" />
             {RISK_ACKNOWLEDGMENT.disclaimer} Read the{" "}
             <Link to="/safety" target="_blank" rel="noreferrer" className="text-lime underline">
               Safety Center

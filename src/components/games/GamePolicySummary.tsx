@@ -5,9 +5,9 @@ import {
   gamePolicyLines,
   gamePolicyTeaser,
   HOST_ACK_DISCLAIMER,
-  LEGAL_REVIEW_LABEL,
   type GamePolicy,
 } from "@/lib/game-policy";
+import { LegalReviewTag } from "@/components/legal/LegalReviewTag";
 
 /**
  * Participant-facing game policy block. Critical lines (payment, approval,
@@ -84,9 +84,7 @@ export function GamePolicySummary({
       <p className="mt-3 flex gap-2 text-[11px] leading-relaxed text-muted-foreground">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
-          <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
-            {LEGAL_REVIEW_LABEL}
-          </span>
+          <LegalReviewTag area="safetyAcknowledgments" />
           {HOST_ACK_DISCLAIMER}{" "}
           <Link to="/safety" className="text-lime underline">
             Safety Center

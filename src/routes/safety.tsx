@@ -5,11 +5,12 @@ import { PolicyLinks } from "@/components/PolicyLinks";
 import { LegalSections } from "@/components/legal/LegalDocumentBody";
 import { livePublishedVersion } from "@/lib/legal-documents";
 import { loadPublishedLegalDocuments } from "@/lib/legal-documents.functions";
+import { isLegalReviewed } from "@/lib/legal-review";
+import { LegalReviewTag } from "@/components/legal/LegalReviewTag";
 import { pageHead } from "@/lib/seo";
 import {
   EMERGENCY_NOTICE,
   HOST_RESPONSIBILITY,
-  LEGAL_REVIEW_LABEL,
   RISK_ACKNOWLEDGMENT,
   SAFETY_TOPICS,
   STAY_SAFE_POINTS,
@@ -80,13 +81,13 @@ function SafetyCenter() {
             text={HOST_RESPONSIBILITY.text}
             points={HOST_RESPONSIBILITY.points}
           />
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
-              {LEGAL_REVIEW_LABEL}
-            </span>
-            These acknowledgments are placeholder drafts and are not a waiver or release of
-            liability.
-          </p>
+          {isLegalReviewed("safetyAcknowledgments") ? null : (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              <LegalReviewTag area="safetyAcknowledgments" />
+              These acknowledgments are placeholder drafts and are not a waiver or release of
+              liability.
+            </p>
+          )}
         </section>
 
         {/* Stay safe */}
