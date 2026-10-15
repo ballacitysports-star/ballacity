@@ -16,10 +16,18 @@ export const submitSkillVote = createServerFn({ method: "POST" })
     return { gameId: String(input.gameId), subjectId: String(input.subjectId), vote };
   })
   .handler(async ({ data, context }) => {
+    const { data: game, error: gameError } = await context.supabase
+      .from("hosted_games")
+      .select("sport")
+      .eq("id", data.gameId)
+      .maybeSingle();
+    if (gameError) throw new Error(gameError.message);
+    if (!game?.sport) throw new Error("Game not found");
     const { error } = await context.supabase.from("skill_votes").insert({
       game_id: data.gameId,
       voter_id: context.userId,
       subject_id: data.subjectId,
+      sport: game.sport,
       vote: data.vote,
     });
     if (error) {
