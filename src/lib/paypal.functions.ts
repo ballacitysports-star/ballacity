@@ -104,6 +104,13 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
     if (!order || order.player_id !== context.userId) throw new Error("Order not found.");
     if (order.status === "captured") return { ok: true as const, already: true as const };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: hostPayPal } = await supabaseAdmin
+      .from("host_paypal_accounts")
+      .select("merchant_id")
+      .eq("host_id", order.host_id)
+      .maybeSingle();
+
     const { captureOrder } = await import("@/lib/paypal.server");
     const result = await captureOrder(data.orderId);
 
@@ -112,9 +119,9 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       result.status === "COMPLETED" &&
       paidCents === order.amount_cents &&
       result.currency === order.currency &&
-      !!result.payeeMerchantId;
+      !!result.payeeMerchantId &&
+      result.payeeMerchantId === hostPayPal?.merchant_id;
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (!valid) {
       await supabaseAdmin
         .from("paypal_orders")
