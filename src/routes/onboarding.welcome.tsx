@@ -36,7 +36,16 @@ import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
+  /** Same-origin path to return to once setup is done (e.g. /create). */
+  next: z.string().optional(),
 });
+
+/** Only accept an in-app path, never another origin or an onboarding loop. */
+function safeNext(next: string | undefined): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return null;
+  if (next.startsWith("/onboarding") || next.startsWith("/auth")) return null;
+  return next;
+}
 
 export const Route = createFileRoute("/onboarding/welcome")({
   head: () =>
@@ -136,6 +145,8 @@ type GeoState =
 
 function OnboardingWizard({ type }: { type: AccountType }) {
   const nav = useNavigate();
+  const { next } = Route.useSearch();
+  const returnTo = safeNext(next) ?? "/feed";
   const { user } = useAuth();
   const { profile, loaded: profileLoaded } = useMyProfileState(user);
   const queryClient = useQueryClient();
@@ -477,7 +488,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         return;
       }
       if (nextCfg) nav({ to: nextCfg.goto, search: { finish: 1 } as never });
-      else nav({ to: "/feed" });
+      else nav({ href: returnTo } as never);
       return;
     }
     setStep((s) => s + 1);
@@ -494,7 +505,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       footer={
         <button
           type="button"
-          onClick={() => nav({ to: "/feed" })}
+          onClick={() => nav({ href: returnTo } as never)}
           className="underline-offset-2 hover:underline"
         >
           I&apos;ll do this later

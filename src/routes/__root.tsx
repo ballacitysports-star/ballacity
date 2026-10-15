@@ -915,7 +915,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const finishType = (_type?: AccountType, setup?: SetupId) => {
       if (user) onboardedUsers.add(user.id);
       setTypeStatus("ok");
-      if (setup) router.navigate({ ...routeForSetup(setup), replace: true } as never);
+      if (!setup) return;
+      // Player setup returns to the page they were trying to reach (e.g.
+      // /create) so the gate never strands them on the feed.
+      const target = routeForSetup(setup);
+      const here = router.state.location.href;
+      if (setup === "player" && pathname !== "/" && pathname !== "/feed") {
+        router.navigate({ to: target.to, search: { next: here }, replace: true } as never);
+      } else {
+        router.navigate({ ...target, replace: true } as never);
+      }
     };
     return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }
