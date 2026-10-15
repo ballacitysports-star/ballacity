@@ -111,19 +111,17 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       .eq("host_id", order.host_id)
       .maybeSingle();
 
-    const { captureOrder, getOrder } = await import("@/lib/paypal.server");
+    const { captureOrder, getOrder, paypalPaymentMatches } = await import("@/lib/paypal.server");
+    const expected = {
+      amountCents: order.amount_cents,
+      currency: order.currency,
+      merchantId: hostPayPal?.merchant_id,
+    };
 
     // Check the approved order before capturing: once captured the money has
     // moved, so a payee or amount mismatch must stop it here.
     const pending = await getOrder(data.orderId);
-    const pendingCents = pending.amountValue ? Math.round(Number(pending.amountValue) * 100) : 0;
-    const capturable =
-      pending.status === "APPROVED" &&
-      pendingCents === order.amount_cents &&
-      pending.currency === order.currency &&
-      !!pending.payeeMerchantId &&
-      pending.payeeMerchantId === hostPayPal?.merchant_id;
-    if (!capturable) {
+    if (!paypalPaymentMatches(pending, { ...expected, status: "APPROVED" })) {
       await supabaseAdmin
         .from("paypal_orders")
         .update({ status: "failed" })
@@ -135,15 +133,7 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
 
     const result = await captureOrder(data.orderId);
 
-    const paidCents = result.amountValue ? Math.round(Number(result.amountValue) * 100) : 0;
-    const valid =
-      result.status === "COMPLETED" &&
-      paidCents === order.amount_cents &&
-      result.currency === order.currency &&
-      !!result.payeeMerchantId &&
-      result.payeeMerchantId === hostPayPal?.merchant_id;
-
-    if (!valid) {
+    if (!paypalPaymentMatches(result, { ...expected, status: "COMPLETED" })) {
       await supabaseAdmin
         .from("paypal_orders")
         .update({ status: "failed" })

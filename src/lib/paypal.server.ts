@@ -56,6 +56,35 @@ export async function createOrder(input: {
   return { orderId: json.id };
 }
 
+/**
+ * True when a PayPal order (or capture) is in the expected status and pays
+ * exactly the recorded amount, in the recorded currency, to the host's
+ * connected merchant account.
+ */
+export function paypalPaymentMatches(
+  actual: {
+    status: string;
+    amountValue: string | null;
+    currency: string | null;
+    payeeMerchantId: string | null;
+  },
+  expected: {
+    status: string;
+    amountCents: number;
+    currency: string;
+    merchantId: string | null | undefined;
+  },
+): boolean {
+  const cents = actual.amountValue ? Math.round(Number(actual.amountValue) * 100) : 0;
+  return (
+    actual.status === expected.status &&
+    cents === expected.amountCents &&
+    actual.currency === expected.currency &&
+    !!actual.payeeMerchantId &&
+    actual.payeeMerchantId === expected.merchantId
+  );
+}
+
 export type OrderDetails = {
   status: string;
   amountValue: string | null;
