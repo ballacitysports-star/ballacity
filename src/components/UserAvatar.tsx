@@ -2,6 +2,7 @@ import * as React from "react";
 import { RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useActiveProfile } from "@/lib/account-profiles";
 import { useUserAvatar } from "@/lib/user-avatars";
 import { cn } from "@/lib/utils";
 
@@ -187,15 +188,18 @@ export function UserAvatarById({ userId, ...props }: Props & { userId?: string |
 /**
  * Convenience: renders the signed-in user's avatar. Safe to use during
  * hydration — falls through to the neutral placeholder until the profile
- * has loaded.
+ * has loaded. When acting as a team, trainer or gym profile, shows that
+ * profile's logo instead of the personal photo.
  */
 export function MyAvatar(props: Omit<Props, "avatarUrl" | "initials" | "name">) {
   const me = useMyProfile();
+  const { active } = useActiveProfile();
+  const useLogo = !!active && active.kind !== "player";
   return (
     <UserAvatar
-      avatarUrl={me?.avatarUrl}
-      initials={me?.avatar}
-      name={me?.name}
+      avatarUrl={useLogo ? active.avatarUrl : me?.avatarUrl}
+      initials={useLogo ? active.avatarFallback : me?.avatar}
+      name={useLogo ? active.name : me?.name}
       loading={!me}
       {...props}
     />
