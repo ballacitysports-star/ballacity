@@ -2,6 +2,7 @@ import * as React from "react";
 import { RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useActiveProfile } from "@/lib/account-profiles";
 import { useUserAvatar } from "@/lib/user-avatars";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,8 @@ type Props = {
   className?: string;
   ringWhenActive?: boolean;
   active?: boolean;
-  rounded?: "full" | "square";
+  /** "logo": rounded square that keeps a team/org logo fully visible. */
+  rounded?: "full" | "square" | "logo";
   /** Show a shimmering placeholder while the avatar record is still resolving. */
   loading?: boolean;
   /** Lookup failed — renders a tappable retry affordance. */
@@ -105,7 +107,8 @@ export function UserAvatar({
   onRetry,
 }: Props) {
   const label = toInitials(name, initials);
-  const shape = rounded === "square" ? "rounded-2xl" : "rounded-full";
+  const shape =
+    rounded === "square" ? "rounded-2xl" : rounded === "logo" ? "rounded-[28%]" : "rounded-full";
   const frame = cn(
     SIZE_MAP[size],
     shape,
@@ -187,16 +190,21 @@ export function UserAvatarById({ userId, ...props }: Props & { userId?: string |
 /**
  * Convenience: renders the signed-in user's avatar. Safe to use during
  * hydration — falls through to the neutral placeholder until the profile
- * has loaded.
+ * has loaded. When acting as a team, trainer or gym profile, shows that
+ * profile's logo (as a rounded square, so the whole logo is visible)
+ * instead of the personal photo.
  */
 export function MyAvatar(props: Omit<Props, "avatarUrl" | "initials" | "name">) {
   const me = useMyProfile();
+  const { active } = useActiveProfile();
+  const logo = active && active.kind !== "player" ? active : null;
   return (
     <UserAvatar
-      avatarUrl={me?.avatarUrl}
-      initials={me?.avatar}
-      name={me?.name}
+      avatarUrl={logo ? logo.avatarUrl : me?.avatarUrl}
+      initials={logo ? logo.avatarFallback : me?.avatar}
+      name={logo ? logo.name : me?.name}
       loading={!me}
+      rounded={logo?.avatarUrl ? "logo" : undefined}
       {...props}
     />
   );
