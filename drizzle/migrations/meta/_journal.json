@@ -141,6 +141,13 @@
       "when": 1792028204239,
       "tag": "0019_paypal_orders_server_only",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792114120561,
+      "tag": "0020_add_post_text_moderation_status",
+      "breakpoints": true
     }
   ]
 }

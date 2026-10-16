@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
 import { normalizeCutoff } from "@/lib/cancel-window";
-import { imageFor, ME } from "@/lib/sample-data";
+import { imageFor, ME, resolveSportAsset } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
@@ -154,7 +154,7 @@ function rowToGame(r: DbRow): Game {
     isPrivate: !!r.is_private,
     urgent: r.urgent ?? undefined,
     trending: r.trending ?? undefined,
-    image: r.image || imageFor(r.sport as Sport),
+    image: resolveSportAsset(r.image) || imageFor(r.sport as Sport),
     description: r.description,
     equipment: r.equipment ?? [],
     status: (r.status as Game["status"]) ?? undefined,
@@ -203,7 +203,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     is_private: !!g.isPrivate,
     urgent: !!g.urgent,
     trending: !!g.trending,
-    image: g.image && g.image !== imageFor(g.sport) ? g.image : "",
+    image: g.image && resolveSportAsset(g.image) !== imageFor(g.sport) ? g.image : "",
     description: g.description ?? "",
     equipment: g.equipment ?? [],
     status: g.status ?? null,
@@ -525,7 +525,8 @@ export async function updateHostedGame(
   if (patch.indoor !== undefined) dbPatch.indoor = patch.indoor;
   if (patch.isPrivate !== undefined) dbPatch.is_private = patch.isPrivate;
   if (patch.image !== undefined) {
-    dbPatch.image = patch.image && patch.image !== imageFor(updated.sport) ? patch.image : "";
+    dbPatch.image =
+      patch.image && resolveSportAsset(patch.image) !== imageFor(updated.sport) ? patch.image : "";
   }
   if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   if (patch.status !== undefined) dbPatch.status = patch.status;
