@@ -46,25 +46,14 @@ export function ProfileChannelHeader({
       {/* Banner — full-bleed, 176px tall, heavy fade into the page background */}
       <div className="relative h-44 w-full overflow-hidden bg-surface">
         {bannerUrl && (
-          <>
-            {/* Whole cover shown (contain) over a blurred fill of itself, so a
-                16:9 upload isn't cropped to the short banner. */}
-            <ResponsiveImage
-              src={bannerUrl}
-              alt=""
-              aspect={16 / 5}
-              sizes="100vw"
-              baseWidth={1280}
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl"
-            />
-            <ResponsiveImage
-              src={bannerUrl}
-              alt=""
-              sizes="100vw"
-              baseWidth={1280}
-              className="relative h-full w-full object-contain"
-            />
-          </>
+          <ResponsiveImage
+            src={bannerUrl}
+            alt=""
+            aspect={16 / 5}
+            sizes="100vw"
+            baseWidth={1280}
+            className="h-full w-full object-cover"
+          />
         )}
         <div
           aria-hidden
