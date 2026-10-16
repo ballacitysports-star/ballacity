@@ -84,7 +84,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       kind: (t.kind === "coach" ? "trainer" : "team") as "team" | "trainer",
       ref: t.id,
     })),
-    ...((myOrgs ?? []) as { id: string }[]).map((o) => ({ kind: "gym" as const, ref: String(o.id) })),
+    ...((myOrgs ?? []) as { id: string }[]).map((o) => ({
+      kind: "gym" as const,
+      ref: String(o.id),
+    })),
   ];
   for (const o of owned) {
     if (list.some((r) => r.ref_id === o.ref && r.kind === o.kind)) continue;
@@ -167,8 +170,11 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
         refId: org.id,
         name: org.name,
         handle: org.handle,
-        avatarUrl: org.avatar_url ?? null,
-        avatarFallback: org.avatar || initials(org.name),
+        avatarUrl:
+          org.avatar_url ?? (/^(https?:|data:|blob:)/.test(org.avatar ?? "") ? org.avatar : null),
+        avatarFallback: /^(https?:|data:|blob:)/.test(org.avatar ?? "")
+          ? initials(org.name)
+          : org.avatar || initials(org.name),
         href: { to: "/orgs/$orgId", params: { orgId: org.id } },
       });
       continue;
