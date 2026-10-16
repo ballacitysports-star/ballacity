@@ -490,7 +490,6 @@ export function OrgForm({
               kind="cover"
               bucket="org-covers"
               pathPrefix={userId}
-              presets={[]}
               value={value.coverUrl}
               onChange={(url) => patch({ coverUrl: url })}
               onClear={() => patch({ coverUrl: "" })}
