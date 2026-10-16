@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
+import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -287,12 +288,13 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
     });
     if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [members, posts, rsvps, waiver, evals] = await Promise.all([
+    const [members, posts, rsvps, waiver, evals, availability] = await Promise.all([
       supabaseAdmin.from("team_members").select("user_id,role,jersey_number,position").eq("team_id", data.teamId),
       supabaseAdmin.from("team_posts").select("id,title,kind,event_date,spots_max,spots_taken").eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).order("event_date", { ascending: false }),
       supabaseAdmin.from("tryout_rsvps").select("id,post_id,user_id,registered_by,status,created_at").eq("team_id", data.teamId),
       supabaseAdmin.from("team_waivers").select("id,version").eq("team_id", data.teamId).eq("published", true).maybeSingle(),
       context.supabase.from("tryout_evaluations").select("rsvp_id,post_id,attended").eq("team_id", data.teamId),
+      supabaseAdmin.from("team_event_availability").select("post_id,user_id,status,note,set_by").eq("team_id", data.teamId),
     ]);
     const attendedByPost = new Map<string, number>();
     for (const e of evals.data ?? []) {
@@ -322,6 +324,14 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
             ...person(r.user_id), status: r.status, byGuardian: r.registered_by !== r.user_id, at: r.created_at,
             isMember: (members.data ?? []).some((m) => m.user_id === r.user_id),
           })),
+          availability: (availability.data ?? [])
+            .filter((a) => a.post_id === p.id)
+            .map((a): AvailabilityAnswer => ({
+              userId: a.user_id,
+              status: a.status as AvailabilityStatus,
+              note: a.note,
+              byGuardian: !!a.set_by && a.set_by !== a.user_id,
+            })),
         };
       }),
     };

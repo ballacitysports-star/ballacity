@@ -15,12 +15,13 @@ import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { createTeamPost, deleteTeamPost, updateTeamPost } from "@/lib/team-posts.functions";
 import { getTeamRosterOverview } from "@/lib/tryouts.functions";
 import { TeamEventsCalendar, EventWaiverStatus } from "@/components/team/TeamEventsCalendar";
+import { EventAvailabilitySummary } from "@/components/team/EventAvailabilitySummary";
 
 export const Route = createFileRoute("/teams/$teamId/events")({
   head: () =>
     pageHead({
       title: "Tryouts & camps — BallaCity",
-      description: "Manage team tryouts and camps with a calendar of events, RSVPs and signed waivers.",
+      description: "Manage team tryouts and camps with a calendar of events, RSVPs, roster availability and signed waivers.",
       noindex: true,
     }),
   ssr: false,
@@ -63,6 +64,7 @@ function TeamEventsPage() {
     enabled: perms.canInvite,
     refetchInterval: 20_000,
   });
+  const availabilityByEvent = new Map((overview.data?.events ?? []).map((event) => [event.id, event.availability]));
   const summaries = new Map((overview.data?.events ?? []).map((event) => {
     const registered = event.rsvps.filter((rsvp) => rsvp.status === "registered");
     return [event.id, { going: registered.length, signed: registered.filter((rsvp) => rsvp.waiver).length }];
@@ -144,6 +146,7 @@ function TeamEventsPage() {
           {e.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{e.location}</p>}
           <p className="flex items-center gap-2"><Users className="h-4 w-4" />{going} going{e.spots_max ? ` · ${left} spots left` : ""} · {e.price ? `$${e.price}` : "Free"}</p>
           <EventWaiverStatus summary={summaries.get(e.id)} required={!!overview.data?.waiverVersion} loading={overview.isPending} error={overview.isError} />
+          {overview.data && <EventAvailabilitySummary members={overview.data.members} answers={availabilityByEvent.get(e.id) ?? []} />}
         </div>
       </li>
     );

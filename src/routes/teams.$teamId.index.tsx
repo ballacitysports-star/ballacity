@@ -30,6 +30,7 @@ import {
 import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { GuardianTeamContactAction } from "@/components/team/GuardianTeamContactAction";
+import { TeamEventAvailabilityCard } from "@/components/team/TeamEventAvailabilityCard";
 import { useTeamPermissions } from "@/lib/team-roster";
 import { SignTeamWaiverCard } from "@/components/team/SignTeamWaiverCard";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
@@ -499,6 +500,7 @@ function TeamPage() {
         {tab === "roster" && (
           <>
             <SignTeamWaiverCard teamId={org.id} teamName={org.name} />
+            <TeamEventAvailabilityCard teamId={org.id} />
             <TeamRosterPanel teamId={org.id} teamName={org.name} />
           </>
         )}

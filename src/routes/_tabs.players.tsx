@@ -47,6 +47,17 @@ import { MineView } from "@/components/players/MineView";
 import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability-gate";
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
+import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
+import {
+  AVAILABILITY_INTENTS,
+  INTENT_BLURB,
+  INTENT_LABEL,
+  buildSkillFields,
+  initialLevelsForPost,
+  parseIntents,
+  postTiersForSport,
+  type AvailabilityIntent,
+} from "@/lib/availability-levels";
 import { shareAvailability } from "@/components/players/share-availability";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { ProfileLinksList } from "@/components/ProfileLinks";
@@ -87,8 +98,8 @@ import { Distance } from "@/components/Distance";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
 import {
   formatSportLevel,
+  levelTiers,
   parseSportLevels,
-  playerLevelsForSports,
   resolvePlayerLevel,
   sanitizeSkillForSport,
   scaleForSport,
@@ -136,6 +147,8 @@ const playersSearchSchema = z.object({
   ageMax: fallback(z.number().optional(), undefined).default(undefined),
   unknownAge: fallback(z.boolean(), true).default(true),
   when: fallback(z.string(), "any").default("any"),
+  // "" | "guest" | "tryout" — what the player is available as.
+  as: fallback(z.string(), "").default(""),
   sort: fallback(z.string(), "recent").default("recent"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
@@ -242,6 +255,7 @@ function PlayersPage() {
     ageMax: undefined,
     unknownAge: true,
     when: "any",
+    as: "",
     sort: "recent",
 
     view: "list",
@@ -262,6 +276,8 @@ function PlayersPage() {
     search.when === "today" || search.when === "week" || search.when === "weekend"
       ? search.when
       : "any";
+  const availableAs: AvailabilityIntent | "" =
+    search.as === "guest" || search.as === "tryout" ? search.as : "";
   const sortBy: PlayersSortBy =
     search.sort === "soonest" || search.sort === "nearest" || search.sort === "name"
       ? search.sort
@@ -302,6 +318,7 @@ function PlayersPage() {
   const setAgeMax = (v: number | "") => updateSearch({ ageMax: v === "" ? undefined : v });
   const setIncludeUnknownAge = (v: boolean) => updateSearch({ unknownAge: v });
   const setWhen = (v: "any" | "today" | "week" | "weekend") => updateSearch({ when: v });
+  const setAvailableAs = (v: AvailabilityIntent | "") => updateSearch({ as: v });
   const setSortBy = (v: PlayersSortBy) => updateSearch({ sort: v });
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
@@ -396,7 +413,8 @@ function PlayersPage() {
     (sports.length ? 1 : 0) +
     countSkillSelections(skills) +
     (maxDistance > 0 ? 1 : 0) +
-    (ageActive ? 1 : 0);
+    (ageActive ? 1 : 0) +
+    (availableAs ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
@@ -431,8 +449,13 @@ function PlayersPage() {
     };
     const hasWeekendDay = (days: string[]) => days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
-      if (!matchesSportSkillFilter(a.author_sport_levels, a.sports, a.skill_level, sports, skills))
+      if (
+        !matchesSportSkillFilter(a.author_sport_levels, a.sports, a.skill_level, sports, skills, (s) =>
+          postTiersForSport(a, s),
+        )
+      )
         return false;
+      if (availableAs && !parseIntents(a.looking_for).includes(availableAs)) return false;
 
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (when !== "any") {
@@ -471,7 +494,7 @@ function PlayersPage() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
+  }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when, availableAs]);
 
   const { coords } = useUserLocation();
   const sorted = useMemo(() => {
@@ -622,6 +645,7 @@ function PlayersPage() {
               setAgeMin("");
               setAgeMax("");
               setIncludeUnknownAge(true);
+              setAvailableAs("");
               setSortBy("recent");
             }}
             sheet={
@@ -676,6 +700,24 @@ function PlayersPage() {
                     }`}
                   >
                     {w.label}
+                  </button>
+                );
+              })}
+              <span aria-hidden className="mx-1 w-px shrink-0 self-stretch bg-border" />
+              {AVAILABILITY_INTENTS.map((intent) => {
+                const active = availableAs === intent;
+                return (
+                  <button
+                    key={intent}
+                    aria-pressed={active}
+                    onClick={() => setAvailableAs(active ? "" : intent)}
+                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {INTENT_LABEL[intent]}
                   </button>
                 );
               })}
@@ -1120,18 +1162,7 @@ function AvailabilityCard({
             >
               {a.author_name}
             </Link>
-            {(() => {
-              // Profile tier wins; only fall back to the post's own level when
-              // the profile has none for any of the listed sports.
-              const profileLevels = playerLevelsForSports(a.author_sport_levels, a.sports);
-              if (profileLevels.length > 0) return null;
-              const fallback = resolvePlayerLevel(null, null, a.skill_level);
-              return fallback ? (
-                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                  {formatSportLevel(fallback)}
-                </span>
-              ) : null;
-            })()}
+            <AvailabilityIntentBadges value={a.looking_for} className="justify-end" />
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {a.sports.length === 0 ? (
@@ -1139,8 +1170,11 @@ function AvailabilityCard({
             ) : (
               a.sports.map((s) => {
                 const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
-                const level = parseSportLevels(a.author_sport_levels)[s] ?? null;
-                const levelText = formatSportLevel(level);
+                // Levels picked on this post win; otherwise show the profile tier.
+                const postTiers = postTiersForSport(a, s);
+                const levelText = postTiers.length
+                  ? postTiers.join(" · ")
+                  : formatSportLevel(parseSportLevels(a.author_sport_levels)[s] ?? null);
                 return (
                   <span
                     key={s}
@@ -1180,9 +1214,11 @@ function AvailabilityCard({
           {
             label: "Level",
             value:
+              (a.sports[0] ? postTiersForSport(a, a.sports[0]).join(" · ") : "") ||
               formatSportLevel(
                 resolvePlayerLevel(a.author_sport_levels, a.sports[0] ?? null, a.skill_level),
-              ) || "—",
+              ) ||
+              "—",
           },
           { label: "Sports", value: a.sports.length ? String(a.sports.length) : "Any" },
           { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
@@ -1353,11 +1389,12 @@ function PostAvailabilityDialog({
     if (initial || sportsTouchedRef.current || !mySports.length) return;
     setSports((cur) => (cur.length ? cur : mySports));
   }, [initial, mySports]);
-  // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
-  const [levels, setLevels] = useState<Record<string, string>>(() =>
-    initial && initial.sports.length && initial.skill_level
-      ? { [initial.sports[0]]: initial.skill_level }
-      : {},
+  // Per-sport tiers — a player can be open to several competitive levels.
+  const [levels, setLevels] = useState<Record<string, string[]>>(() =>
+    initial ? initialLevelsForPost(initial) : {},
+  );
+  const [lookingFor, setLookingFor] = useState<AvailabilityIntent[]>(() =>
+    parseIntents(initial?.looking_for),
   );
 
   const [slots, setSlots] = useState<TimeSlot[]>(() =>
@@ -1389,8 +1426,8 @@ function PostAvailabilityDialog({
     try {
       const payload = {
         sports,
-        // The primary sport's tier is what the text column stores.
-        skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
+        ...buildSkillFields(sports, levels),
+        looking_for: lookingFor,
 
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         time_slots: slots,
@@ -1426,10 +1463,10 @@ function PostAvailabilityDialog({
                     sportsTouchedRef.current = true;
                     setSports((arr) => {
                       const next = toggle(arr, s.name);
-                      // Prefill from the profile tier the first time a sport is added.
+                      // Prefill from the profile tiers the first time a sport is added.
                       if (!arr.includes(s.name)) {
-                        const mine = myProfile?.sports.find((x) => x.name === s.name)?.level?.tier;
-                        if (mine) setLevels((l) => ({ ...l, [s.name]: mine }));
+                        const mine = levelTiers(myProfile?.sports.find((x) => x.name === s.name)?.level);
+                        if (mine.length) setLevels((l) => (l[s.name]?.length ? l : { ...l, [s.name]: mine }));
                       }
                       return next;
                     });
@@ -1449,26 +1486,53 @@ function PostAvailabilityDialog({
               return (
                 <div key={name}>
                   <div className="mb-2 flex items-baseline gap-2">
-                    <Label className="block">{name} level</Label>
+                    <Label className="block">{name} levels</Label>
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {scale.system}
                     </span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">Pick all that fit</span>
                   </div>
                   <TierChips
                     scale={scale}
-                    selected={levels[name] ? [levels[name]] : []}
+                    selected={levels[name] ?? []}
                     ariaPrefix={name}
                     onToggle={(tier) =>
-                      setLevels((l) => ({
-                        ...l,
-                        [name]: l[name] === tier ? "" : tier,
-                      }))
+                      setLevels((l) => {
+                        const cur = l[name] ?? [];
+                        return {
+                          ...l,
+                          [name]: cur.includes(tier) ? cur.filter((t) => t !== tier) : [...cur, tier],
+                        };
+                      })
                     }
                   />
                 </div>
               );
             })
           )}
+          <div>
+            <Label className="mb-2 block">Available as</Label>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Available as">
+              {AVAILABILITY_INTENTS.map((intent) => (
+                <Chip
+                  key={intent}
+                  active={lookingFor.includes(intent)}
+                  onClick={() =>
+                    setLookingFor((cur) =>
+                      cur.includes(intent) ? cur.filter((x) => x !== intent) : [...cur, intent],
+                    )
+                  }
+                >
+                  {INTENT_LABEL[intent]}
+                </Chip>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {lookingFor.length === 0
+                ? "Optional. Pick one or both."
+                : lookingFor.map((i) => INTENT_BLURB[i]).join(" · ")}
+            </p>
+          </div>
           <div>
             <Label className="mb-2 block">When are you free?</Label>
             <AvailabilitySchedulePicker value={slots} onChange={setSlots} busy={busy} />

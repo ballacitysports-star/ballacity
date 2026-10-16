@@ -12,6 +12,7 @@ import {
   type PlayerAvailability,
 } from "@/lib/availability";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
+import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
 import { shareAvailability } from "./share-availability";
 
 function LoadingRows() {
@@ -98,6 +99,7 @@ export function MineView({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatAvailabilityWindow(m) || "No date set"} · {m.city || "Anywhere"}
                 </p>
+                <AvailabilityIntentBadges value={m.looking_for} className="mt-1" />
                 <div className="mt-2 flex items-center gap-3">
                   <button onClick={() => onEdit(m)} className="text-xs font-semibold text-lime">
                     Edit
