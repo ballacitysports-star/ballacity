@@ -1238,7 +1238,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     setCover(HERO_IMAGE);
                     setCustomCover(false);
                   }}
-                  presets={sports.length ? sports : undefined}
+                  presets={sports}
                 />
               </Section>
 
