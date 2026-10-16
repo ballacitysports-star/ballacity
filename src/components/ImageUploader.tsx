@@ -5,12 +5,6 @@ import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
 import { imageFor, type Sport } from "@/lib/sample-data";
-import {
-  GRADIENT_PRESETS,
-  gradientCss,
-  renderGradientCover,
-  renderSportCover,
-} from "@/lib/cover-presets";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 type Kind = "avatar" | "cover";
@@ -100,14 +94,6 @@ export function ImageUploader({
       toast.error(message);
     } finally {
       setUploading(false);
-    }
-  };
-
-  const pickPreset = async (render: () => Promise<string>) => {
-    try {
-      await handleConfirm(await render());
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not apply preset");
     }
   };
 
@@ -208,42 +194,23 @@ export function ImageUploader({
             Or pick a preset
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {(presets.length ? presets : DEFAULT_PRESETS).map((sport) => (
-              <button
-                key={sport}
-                type="button"
-                disabled={uploading || disabled}
-                aria-label={`${sport} cover`}
-                onClick={() => pickPreset(() => renderSportCover(sport))}
-                className={`relative aspect-video overflow-hidden rounded-xl border-2 border-transparent opacity-80 transition-all hover:opacity-100 ${
-                  uploading ? "pointer-events-none opacity-40" : ""
-                }`}
-              >
-                <img
-                  src={imageFor(sport)}
-                  alt=""
-                  className="h-full w-full object-cover saturate-[.55]"
-                />
-                {/* Same dark-blue wash that is baked into the saved cover. */}
-                <span
-                  aria-hidden
-                  className="absolute inset-0 bg-gradient-to-br from-[#3b6bd6] to-[#1b2f73] mix-blend-multiply"
-                />
-              </button>
-            ))}
-            {GRADIENT_PRESETS.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                disabled={uploading || disabled}
-                aria-label={`${g.label} cover`}
-                onClick={() => pickPreset(async () => renderGradientCover(g))}
-                className={`relative aspect-video overflow-hidden rounded-xl border-2 border-transparent opacity-80 transition-all hover:opacity-100 ${
-                  uploading ? "pointer-events-none opacity-40" : ""
-                }`}
-                style={{ background: gradientCss(g) }}
-              />
-            ))}
+            {(presets.length ? presets : DEFAULT_PRESETS).map((s) => {
+              const src = imageFor(s);
+              const active = value === src;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={uploading || disabled}
+                  onClick={() => onChange(src)}
+                  className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
+                    active ? "border-lime" : "border-transparent opacity-70 hover:opacity-100"
+                  } ${uploading ? "pointer-events-none opacity-40" : ""}`}
+                >
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

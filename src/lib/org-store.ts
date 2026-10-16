@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { ORGS, type Org, type OrgKind, type Sport } from "./sample-data";
+import { ORGS, resolveSportAsset, type Org, type OrgKind, type Sport } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
@@ -85,7 +85,7 @@ function rowToOrg(row: TeamRow): Org {
     founded: row.founded ?? new Date().getFullYear(),
     sports: (row.sports as Sport[]) ?? [],
     verified: row.verified,
-    cover: row.cover,
+    cover: resolveSportAsset(row.cover),
     avatar: row.avatar,
     accent: row.accent,
     followers: row.followers,

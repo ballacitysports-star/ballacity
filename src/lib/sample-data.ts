@@ -175,6 +175,22 @@ export function imageFor(sport: Sport) {
   return sportImage[sport];
 }
 
+const SPORT_ASSET_RE = /\/assets\/sport-([a-z]+)[-.][^/]*$/;
+
+/**
+ * Covers saved with a built-in sport image store its bundled URL, which
+ * includes a content hash. When the artwork is updated that hash changes and
+ * the saved URL would 404, so map any bundled sport image back to the
+ * current one. Other URLs pass through unchanged.
+ */
+export function resolveSportAsset<T extends string | null | undefined>(url: T): T {
+  if (!url) return url;
+  const m = SPORT_ASSET_RE.exec(url.split("?")[0]);
+  if (!m) return url;
+  const sport = (Object.keys(sportImage) as Sport[]).find((s) => s.toLowerCase() === m[1]);
+  return (sport ? sportImage[sport] : url) as T;
+}
+
 // Pinned to start-of-UTC-day so SSR and client hydration produce identical
 // ISO strings. Date.now() at module scope causes hydration mismatches because
 // the server and client evaluate the module at different instants.
