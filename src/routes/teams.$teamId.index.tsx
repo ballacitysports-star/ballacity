@@ -207,8 +207,15 @@ function TeamPage() {
   return (
     <div className="page-shell-flush pb-32">
       {/* Cover */}
-      <div className="relative h-56">
-        <img src={org.cover} alt="" className="h-full w-full object-cover" />
+      <div className="relative h-56 overflow-hidden">
+        {/* Whole cover shown (contain) over a blurred fill of itself. */}
+        <img
+          src={org.cover}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl"
+        />
+        <img src={org.cover} alt="" className="relative h-full w-full object-contain" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
         <Link
           to="/teams"
