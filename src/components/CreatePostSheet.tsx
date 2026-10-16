@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { Sparkles, Undo2 } from "lucide-react";
+import { heldNotice } from "@/lib/post-moderation";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +14,7 @@ import {
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
-import { createTeamPost } from "@/lib/team-posts.functions";
+import { createTeamPost, suggestTeamPostDraft } from "@/lib/team-posts.functions";
 import type { PostKind } from "@/lib/sample-data";
 import { POST_KIND_META } from "@/lib/sample-data";
 
@@ -41,14 +43,34 @@ export function CreatePostSheet({
   const [price, setPrice] = useState("");
   const [spotsMax, setSpotsMax] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  /** What the member had before the AI draft, so one tap puts it back. */
+  const [beforeDraft, setBeforeDraft] = useState<{ title: string; body: string } | null>(null);
 
   const qc = useQueryClient();
   const createFn = useServerFn(createTeamPost);
+  const draftFn = useServerFn(suggestTeamPostDraft);
+
+  const draftWithAi = async () => {
+    setDrafting(true);
+    try {
+      const draft = await draftFn({ data: { kind, notes: body, title: title || null } });
+      setBeforeDraft({ title, body });
+      setTitle(draft.title);
+      setBody(draft.body);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
+    } finally {
+      setDrafting(false);
+    }
+  };
   const mutation = useMutation({
     mutationFn: createFn,
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["team-posts", teamId] });
-      toast.success("Post published");
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success("Post published");
       setTitle("");
       setBody("");
       setEventDate("");
@@ -57,6 +79,7 @@ export function CreatePostSheet({
       setPrice("");
       setSpotsMax("");
       setErr(null);
+      setBeforeDraft(null);
       onOpenChange(false);
     },
     onError: (e: any) => {
@@ -141,6 +164,33 @@ export function CreatePostSheet({
               className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm"
               maxLength={4000}
             />
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={draftWithAi}
+                disabled={drafting || body.trim().length < 10}
+                className="inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
+              >
+                <Sparkles className="h-3 w-3" /> {drafting ? "Drafting…" : "Draft with AI"}
+              </button>
+              {beforeDraft && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitle(beforeDraft.title);
+                    setBody(beforeDraft.body);
+                    setBeforeDraft(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                >
+                  <Undo2 className="h-3 w-3" /> Undo
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Jot rough notes above and AI writes the title and details from them. It only uses what
+              you wrote — check dates, prices and places before you publish.
+            </p>
           </div>
 
           {isEvent && (

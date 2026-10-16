@@ -29,6 +29,7 @@ const ENTRY_POINTS: Record<string, { file: string; feature: AiFeature }> = {
   buildReelPackage: { file: "src/lib/reels.functions.ts", feature: "reel_package" },
   previewReelStyle: { file: "src/lib/reels.functions.ts", feature: "reel_style" },
   removeBackground: { file: "src/lib/bg-remove.functions.ts", feature: "background_remove" },
+  draftTeamPost: { file: "src/lib/post-assist.server.ts", feature: "post_assist" },
 };
 
 function baseConfig(): AiConfig {
@@ -166,4 +167,18 @@ describe("image generation stays closed for minors", () => {
       }
     });
   }
+});
+
+describe("post writing help is adults only", () => {
+  it("post_assist is refused for every minor cohort before any AI work", async () => {
+    for (const cohort of AGE_COHORTS.filter((c) => c !== "adult")) {
+      const admin = makeAdmin({ consented: true, cohort });
+      const work = vi.fn();
+      await expect(
+        withAiSession({ admin, userId: "kid", feature: "post_assist" }, work as any),
+      ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
+      expect(work).not.toHaveBeenCalled();
+      expect(admin.calls).not.toContain("ai_reserve_quota");
+    }
+  });
 });

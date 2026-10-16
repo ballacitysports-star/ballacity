@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarClock, MapPin, Megaphone, Users } from "lucide-react";
 import { toast } from "sonner";
+import { blockedMessage, heldNotice } from "@/lib/post-moderation";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -285,7 +286,7 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
     if (!teamId || !f.title.trim() || !f.date) return toast.error("Team, title and date are required.");
     setBusy(true);
     try {
-      await create({
+      const result = await create({
         data: {
           teamId, kind: f.kind, title: f.title.trim(), body: f.body,
           eventDate: new Date(f.date).toISOString(),
@@ -298,11 +299,13 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
             : {}),
         },
       });
-      toast.success("Posted! Players can now RSVP.");
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success("Posted! Players can now RSVP.");
       qc.invalidateQueries({ queryKey: ["tryouts", "upcoming"] });
       onClose();
-    } catch {
-      toast.error("Couldn't post. Please try again.");
+    } catch (e) {
+      toast.error(blockedMessage(e) ?? "Couldn't post. Please try again.");
     } finally {
       setBusy(false);
     }

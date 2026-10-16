@@ -110,6 +110,17 @@ export const createTeamPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateInput.parse(input))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    // Screen before insert so blocked text is never stored.
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "team_posts",
+      context: mod.TEAM_POST_CONTEXT,
+      fields: { title: data.title, body: data.body, location: data.location },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
     const { data: row, error } = await context.supabase
       .from("team_posts" as any)
       .insert({
@@ -135,7 +146,9 @@ export const createTeamPost = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return row;
+    const created = row as unknown as Record<string, unknown> & { id: string };
+    const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", created.id, screen);
+    return { ...created, moderation_status: status, held: status !== "approved" };
   });
 
 export const deleteTeamPost = createServerFn({ method: "POST" })
@@ -167,21 +180,54 @@ export const updateTeamPost = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "team_posts",
+      id: data.id,
+      context: mod.TEAM_POST_CONTEXT,
+      fields: { title: data.title, body: data.body, location: data.location },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    // Counted, not RETURNING: an edit re-queues the post, which can hide it from
+    // a manager editing someone else's post before the screen settles it.
+    const { count, error } = await context.supabase
       .from("team_posts")
-      .update({
-        kind: data.kind,
-        title: data.title,
-        body: data.body ?? "",
-        event_date: data.eventDate,
-        location: data.location,
-        price: data.price,
-        spots_max: data.spotsMax,
-      })
-      .eq("id", data.id)
-      .select("id")
-      .maybeSingle();
+      .update(
+        {
+          kind: data.kind,
+          title: data.title,
+          body: data.body ?? "",
+          event_date: data.eventDate,
+          location: data.location,
+          price: data.price,
+          spots_max: data.spotsMax,
+        },
+        { count: "exact" },
+      )
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
-    if (!row) throw new Error("You can't edit this post.");
-    return { ok: true };
+    if (!count) throw new Error("You can't edit this post.");
+    const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", data.id, screen);
+    return { ok: true, held: status !== "approved" };
+  });
+
+/** "Draft with AI": turns the member's notes into a title and description. Adults only. */
+export const suggestTeamPostDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        kind: PostKind,
+        notes: z.string().trim().min(10, "Add a few notes first.").max(1000),
+        title: z.string().max(200).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { draftTeamPost } = await import("@/lib/post-assist.server");
+    return draftTeamPost(supabaseAdmin, { userId: context.userId, ...data });
   });
