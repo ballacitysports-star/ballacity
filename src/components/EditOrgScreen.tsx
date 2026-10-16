@@ -802,7 +802,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     setCover(HERO_IMAGE);
                     setCustomCover(false);
                   }}
-                  presets={sports.length ? sports : undefined}
+                  presets={sports}
                 />
               </Section>
             </div>
@@ -1610,7 +1610,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     setCover(HERO_IMAGE);
                     setCustomCover(false);
                   }}
-                  presets={sports.length ? sports : undefined}
+                  presets={sports}
                 />
               </Section>
 

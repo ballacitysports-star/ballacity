@@ -565,7 +565,7 @@ export function CreateTrainerWizard() {
                   fallback={HERO_IMAGE}
                   onChange={(url) => setDraft((d) => ({ ...d, coverUrl: url }))}
                   onClear={() => setDraft((d) => ({ ...d, coverUrl: null }))}
-                  presets={draft.primarySport ? [draft.primarySport] : undefined}
+                  presets={draft.primarySport ? [draft.primarySport] : []}
                 />
               </Section>
             </div>
