@@ -98,8 +98,10 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         name: org.name,
         handle: org.handle ?? null,
         bannerUrl: org.cover_url ?? null,
-        avatarUrl: org.avatar_url ?? null,
-        avatarFallback: org.avatar || profile.avatarFallback,
+        avatarUrl: org.avatar_url ?? (isImageUrl(org.avatar) ? org.avatar : null),
+        avatarFallback: isImageUrl(org.avatar)
+          ? profile.avatarFallback
+          : org.avatar || profile.avatarFallback,
         city: org.city ?? null,
         bio: org.bio ?? null,
         sports: org.sports ?? [],
