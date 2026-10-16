@@ -135,6 +135,12 @@ const CATEGORY_QUERIES: Record<
       columns:
         "id, sports, skill_level, starts_on, ends_on, recurring_days, time_slots, timezone, city, formatted_address, travel_radius_km, note, status, created_at",
     },
+    {
+      key: "team_event_availability",
+      table: "team_event_availability",
+      column: "user_id",
+      columns: "post_id, team_id, status, note, created_at, updated_at",
+    },
   ],
   reviews: [
     {

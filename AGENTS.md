@@ -3,3 +3,4 @@
 - Guardian-to-team contact discovery must verify the guardian-child relationship and the child's team membership on the server before returning leader identities, because roster UI visibility is not an authorization boundary.
 - Team event calendars reuse the manager-authorized roster overview for RSVP/current-waiver summaries and shared date-key utilities for grouping, avoiding duplicate permissions or participation logic.
 - Reel pose tracking runs only in the browser (adults/16-17, never family clips) and stores only the summarized PoseMetrics in media_meta.pose, because raw landmarks are biometric data that must never leave the device.
+- Team event availability is written only through the set_team_event_availability RPC, which re-verifies that the caller is the member or their verified guardian and that the member is on the event's team; managers read it via the roster overview, and members and guardians see only their own rows.

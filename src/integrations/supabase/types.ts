@@ -3441,6 +3441,57 @@ export type Database = {
         }
         Relationships: []
       }
+      team_event_availability: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          post_id: string
+          set_by: string | null
+          status: string
+          team_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          post_id: string
+          set_by?: string | null
+          status: string
+          team_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          post_id?: string
+          set_by?: string | null
+          status?: string
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_event_availability_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "team_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_event_availability_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invites: {
         Row: {
           created_at: string
@@ -5231,6 +5282,10 @@ export type Database = {
       }
       set_skill_rating_hidden: {
         Args: { _hidden: boolean; _sport: string }
+        Returns: undefined
+      }
+      set_team_event_availability: {
+        Args: { _note?: string; _post: string; _status: string | null; _user: string }
         Returns: undefined
       }
       settle_paid_spot: {
