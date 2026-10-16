@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { heldNotice } from "@/lib/post-moderation";
 import {
   Dialog,
   DialogContent,
@@ -46,9 +47,11 @@ export function CreatePostSheet({
   const createFn = useServerFn(createTeamPost);
   const mutation = useMutation({
     mutationFn: createFn,
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["team-posts", teamId] });
-      toast.success("Post published");
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success("Post published");
       setTitle("");
       setBody("");
       setEventDate("");

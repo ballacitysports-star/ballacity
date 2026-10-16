@@ -2738,6 +2738,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           hidden_at: string | null
+          moderation_status: string
           id: string
           subject_id: string
           subject_type: string
@@ -2749,6 +2750,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           hidden_at?: string | null
+          moderation_status?: string
           id?: string
           subject_id: string
           subject_type: string
@@ -2760,6 +2762,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           hidden_at?: string | null
+          moderation_status?: string
           id?: string
           subject_id?: string
           subject_type?: string
@@ -3544,6 +3547,7 @@ export type Database = {
           event_date: string | null
           formatted_address: string | null
           hidden_at: string | null
+          moderation_status: string
           id: string
           kind: string
           lat: number | null
@@ -3570,6 +3574,7 @@ export type Database = {
           event_date?: string | null
           formatted_address?: string | null
           hidden_at?: string | null
+          moderation_status?: string
           id?: string
           kind: string
           lat?: number | null
@@ -3596,6 +3601,7 @@ export type Database = {
           event_date?: string | null
           formatted_address?: string | null
           hidden_at?: string | null
+          moderation_status?: string
           id?: string
           kind?: string
           lat?: number | null

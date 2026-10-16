@@ -69,10 +69,12 @@ export const CONTENT_KINDS = {
     table: "team_posts",
     idCol: "id",
     label: "Team post",
-    select: "id, team_id, author_id, kind, title, body, pinned, hidden_at, created_at",
+    select:
+      "id, team_id, author_id, kind, title, body, pinned, hidden_at, moderation_status, created_at",
     searchCols: ["title", "body"],
     orderBy: "created_at",
     hideCol: "hidden_at",
+    textStatusCol: "moderation_status",
   },
   availability: {
     table: "player_availabilities",
@@ -87,10 +89,12 @@ export const CONTENT_KINDS = {
     table: "post_comments",
     idCol: "id",
     label: "Comment",
-    select: "id, subject_type, subject_id, author_id, body, hidden_at, deleted_at, created_at",
+    select:
+      "id, subject_type, subject_id, author_id, body, hidden_at, deleted_at, moderation_status, created_at",
     searchCols: ["body"],
     orderBy: "created_at",
     hideCol: "hidden_at",
+    textStatusCol: "moderation_status",
   },
   reviews: {
     table: "reviews",

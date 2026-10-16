@@ -10,6 +10,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmAction } from "./ConfirmAction";
 import { ReviewSignalsPanel } from "./ReviewSignalsPanel";
 
+/** Kinds whose text is AI-screened and can be held for review. */
+const TEXT_REVIEW_KINDS = new Set(["posts", "comments"]);
+
 const KINDS = [
   { key: "games", label: "Games" },
   { key: "teams", label: "Teams" },
@@ -69,6 +72,12 @@ function actionsFor(kind: string, row: any, hideCol: string | null): Action[] {
         ? { action: "unverify", label: "Unverify" }
         : { action: "verify", label: "Verify" },
     );
+  if (row.moderation_status)
+    out.push(
+      row.moderation_status === "approved"
+        ? { action: "hold_text", label: "Hold for review", destructive: true }
+        : { action: "approve_text", label: "Approve text" },
+    );
   return out;
 }
 
@@ -111,7 +120,7 @@ export function ModerationTab() {
   const [kind, setKind] = useState<string>("games");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "hidden" | "visible">("all");
+  const [filter, setFilter] = useState<"all" | "hidden" | "visible" | "held">("all");
   const [page, setPage] = useState(0);
   const [confirm, setConfirm] = useState<null | {
     title: string;
@@ -131,6 +140,7 @@ export function ModerationTab() {
           offset: page * limit,
           onlyHidden: filter === "hidden" ? true : undefined,
           onlyVisible: filter === "visible" ? true : undefined,
+          onlyHeld: filter === "held" ? true : undefined,
         },
       }),
   });
@@ -154,6 +164,7 @@ export function ModerationTab() {
         onValueChange={(v) => {
           setKind(v);
           setPage(0);
+          if (filter === "held" && !TEXT_REVIEW_KINDS.has(v)) setFilter("all");
         }}
       >
         <TabsList className="flex-wrap h-auto">
@@ -185,7 +196,10 @@ export function ModerationTab() {
             Search
           </Button>
         </form>
-        {(["all", "visible", "hidden"] as const).map((f) => (
+        {(TEXT_REVIEW_KINDS.has(kind)
+          ? (["all", "visible", "hidden", "held"] as const)
+          : (["all", "visible", "hidden"] as const)
+        ).map((f) => (
           <Button
             key={f}
             size="sm"
@@ -222,7 +236,14 @@ export function ModerationTab() {
                       {row.id} · {new Date(row.created_at).toLocaleString()}
                     </div>
                   </div>
-                  {hidden ? <Badge variant="destructive">Hidden</Badge> : null}
+                  <div className="flex shrink-0 gap-1">
+                    {row.moderation_status && row.moderation_status !== "approved" ? (
+                      <Badge variant="secondary">
+                        {row.moderation_status === "held" ? "Held by AI" : "Not screened"}
+                      </Badge>
+                    ) : null}
+                    {hidden ? <Badge variant="destructive">Hidden</Badge> : null}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {actionsFor(kind, row, data!.hideCol).map((a) => (

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, CalendarClock, CalendarDays, List, Loader2, MapPin, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { blockedMessage, heldNotice } from "@/lib/post-moderation";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -237,13 +238,16 @@ function EventDialog({ teamId, initial, onClose, onSaved }: { teamId: string; in
     };
     setBusy(true);
     try {
-      if (initial) await update({ data: { id: initial.id, ...payload } });
-      else await create({ data: { teamId, ...payload } });
-      toast.success(initial ? "Event updated" : "Event posted");
+      const result = initial
+        ? await update({ data: { id: initial.id, ...payload } })
+        : await create({ data: { teamId, ...payload } });
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success(initial ? "Event updated" : "Event posted");
       onSaved();
       onClose();
-    } catch {
-      toast.error("Couldn't save. Please try again.");
+    } catch (e) {
+      toast.error(blockedMessage(e) ?? "Couldn't save. Please try again.");
     } finally {
       setBusy(false);
     }
