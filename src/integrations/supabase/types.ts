@@ -2739,6 +2739,7 @@ export type Database = {
           deleted_at: string | null
           hidden_at: string | null
           id: string
+          moderation_status: string
           subject_id: string
           subject_type: string
           updated_at: string
@@ -2750,6 +2751,7 @@ export type Database = {
           deleted_at?: string | null
           hidden_at?: string | null
           id?: string
+          moderation_status?: string
           subject_id: string
           subject_type: string
           updated_at?: string
@@ -2761,6 +2763,7 @@ export type Database = {
           deleted_at?: string | null
           hidden_at?: string | null
           id?: string
+          moderation_status?: string
           subject_id?: string
           subject_type?: string
           updated_at?: string
@@ -3550,6 +3553,7 @@ export type Database = {
           late_refund_pct: number
           lng: number | null
           location: string | null
+          moderation_status: string
           pinned: boolean
           place_id: string | null
           price: number | null
@@ -3576,6 +3580,7 @@ export type Database = {
           late_refund_pct?: number
           lng?: number | null
           location?: string | null
+          moderation_status?: string
           pinned?: boolean
           place_id?: string | null
           price?: number | null
@@ -3602,6 +3607,7 @@ export type Database = {
           late_refund_pct?: number
           lng?: number | null
           location?: string | null
+          moderation_status?: string
           pinned?: boolean
           place_id?: string | null
           price?: number | null
