@@ -2615,10 +2615,12 @@ export type Database = {
           id: string
           lat: number | null
           lng: number | null
+          looking_for: string[]
           note: string | null
           place_id: string | null
           recurring_days: string[]
           skill_level: string
+          skill_levels: Json
           sports: string[]
           starts_on: string | null
           status: string
@@ -2637,10 +2639,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          looking_for?: string[]
           note?: string | null
           place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
+          skill_levels?: Json
           sports?: string[]
           starts_on?: string | null
           status?: string
@@ -2659,10 +2663,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          looking_for?: string[]
           note?: string | null
           place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
+          skill_levels?: Json
           sports?: string[]
           starts_on?: string | null
           status?: string

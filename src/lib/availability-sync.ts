@@ -5,6 +5,7 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
+import { buildSkillFields, parsePostSkillLevels } from "@/lib/availability-levels";
 
 export type ProfileSyncInput = {
   /** Favorite sports with their per-sport level, straight from the profile form. */
@@ -29,7 +30,7 @@ export function availabilityPatchFromProfile(
     | "lat"
     | "lng"
     | "travel_radius_km"
-  >,
+  > & { skill_levels?: unknown },
   input: ProfileSyncInput,
 ): Partial<PlayerAvailability> | null {
   const patch: Partial<PlayerAvailability> = {};
@@ -45,11 +46,26 @@ export function availabilityPatchFromProfile(
     }
   }
 
-  // Skill: the profile level for the post's primary sport wins.
-  const primary = (patch.sports ?? post.sports ?? [])[0] ?? null;
+  // Skill: levels the player picked on the post itself stay; otherwise the
+  // profile level for the post's primary sport wins.
+  const finalSports = patch.sports ?? post.sports ?? [];
+  const postLevels = parsePostSkillLevels(post.skill_levels, finalSports);
+  const primary = finalSports[0] ?? null;
   const level = input.sports.find((s) => s.name === primary)?.level ?? null;
-  const nextSkill = level ? serializeSkillTiers(primary, levelTiers(level)) : ANY_SKILL;
+  const explicit = primary ? postLevels[primary] : undefined;
+  const nextSkill = explicit
+    ? serializeSkillTiers(primary, explicit)
+    : level
+      ? serializeSkillTiers(primary, levelTiers(level))
+      : ANY_SKILL;
   if (nextSkill !== post.skill_level) patch.skill_level = nextSkill;
+  // Drop picked levels for sports the post no longer lists.
+  if (patch.sports && post.skill_levels && typeof post.skill_levels === "object") {
+    const before = Object.keys(post.skill_levels as Record<string, unknown>).length;
+    if (Object.keys(postLevels).length !== before) {
+      patch.skill_levels = buildSkillFields(finalSports, postLevels).skill_levels;
+    }
+  }
 
   // Location: keep the city text aligned, and only drop the saved Places
   // details when they no longer belong to the new city.

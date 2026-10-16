@@ -45,6 +45,8 @@ import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileC
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { PlayerShareCard } from "@/components/PlayerShareCard";
+import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
+import { parseIntents, postTiersForSport } from "@/lib/availability-levels";
 import { BadgeList } from "@/components/BadgeList";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
@@ -669,9 +671,13 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="section-eyebrow text-muted-foreground">Looking to play</span>
-        <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-          {a.skill_level}
-        </span>
+        {parseIntents(a.looking_for).length > 0 ? (
+          <AvailabilityIntentBadges value={a.looking_for} className="justify-end" />
+        ) : (
+          <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+            {a.skill_level}
+          </span>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {a.sports.length === 0 ? (
@@ -679,12 +685,18 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
         ) : (
           a.sports.map((s) => {
             const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+            const tiers = postTiersForSport(a, s);
             return (
               <span
                 key={s}
-                className="rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold"
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold"
               >
                 {emoji} {s}
+                {tiers.length > 0 && (
+                  <span className="rounded-full bg-lime/15 px-1.5 text-[10px] font-bold text-lime">
+                    {tiers.join(" · ")}
+                  </span>
+                )}
               </span>
             );
           })
