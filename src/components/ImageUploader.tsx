@@ -4,7 +4,7 @@ import { Upload, Loader2, X, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
-import { SPORTS, imageFor, resolveSportAsset, type Sport } from "@/lib/sample-data";
+import { imageFor, type Sport } from "@/lib/sample-data";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 type Kind = "avatar" | "cover";
@@ -19,11 +19,7 @@ type Props = {
   onClear?: () => void;
   /** Placeholder shown when there is no value. */
   fallback?: string;
-  /**
-   * Cover-only: show the built-in sport covers as presets. Every sport is
-   * offered; the ones listed here (e.g. the listing's own sports) come first.
-   * Omit to hide the picker.
-   */
+  /** Cover-only quick-pick chips. */
   presets?: Sport[];
   /** Enable AI background removal (avatar only, default true). */
   allowBgRemoval?: boolean;
@@ -33,7 +29,14 @@ type Props = {
   logo?: boolean;
 };
 
-const ALL_PRESETS: Sport[] = SPORTS.map((s) => s.name);
+const DEFAULT_PRESETS: Sport[] = [
+  "Basketball",
+  "Soccer",
+  "Tennis",
+  "Volleyball",
+  "Pickleball",
+  "Running",
+];
 
 /**
  * Unified avatar / cover uploader that opens {@link ImageEditorDialog} for
@@ -185,15 +188,15 @@ export function ImageUploader({
         </p>
       </div>
 
-      {isCover && presets && (
+      {isCover && presets && presets.length > 0 && (
         <div>
           <div className="mb-2 micro-label text-muted-foreground">
             Or pick a preset
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {[...new Set([...presets, ...ALL_PRESETS])].map((s) => {
+            {(presets.length ? presets : DEFAULT_PRESETS).map((s) => {
               const src = imageFor(s);
-              const active = !!value && resolveSportAsset(value) === src;
+              const active = value === src;
               return (
                 <button
                   key={s}
