@@ -39,7 +39,15 @@ export type PlayerPassport = {
 };
 
 const EMPTY: PlayerPassport = { teams: [], accolades: [], upcomingRuns: [], progress: null };
-const MINOR_COHORTS = ["child_under_13", "teen_13_15", "teen_16_17"];
+
+/**
+ * Fails closed: only a confirmed adult cohort unlocks attendance and run
+ * details. A failed lookup, "unknown" (no birthday) or any new cohort value is
+ * treated as a minor, so the privacy floor can't be lost to a bad read.
+ */
+export function isPassportMinor(cohort: unknown, lookupFailed = false): boolean {
+  return lookupFailed || cohort !== "adult";
+}
 
 /**
  * A player's footprint on the platform for `/players/$userId`: team badges,
@@ -68,7 +76,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
     if (blockRes.data === true) return EMPTY;
     if (!profRes.data || profRes.data.suspended_at) return EMPTY;
 
-    const isMinor = MINOR_COHORTS.includes(cohortRes.data as string);
+    const isMinor = isPassportMinor(cohortRes.data, !!cohortRes.error);
     const flags = ((flagsRes.data ?? []) as { show_games_played?: boolean | null }[])[0] ?? {};
     const showGames = flags.show_games_played !== false;
 
