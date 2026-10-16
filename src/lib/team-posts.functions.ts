@@ -213,3 +213,21 @@ export const updateTeamPost = createServerFn({ method: "POST" })
     const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", data.id, screen);
     return { ok: true, held: status !== "approved" };
   });
+
+/** "Draft with AI": turns the member's notes into a title and description. Adults only. */
+export const suggestTeamPostDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        kind: PostKind,
+        notes: z.string().trim().min(10, "Add a few notes first.").max(1000),
+        title: z.string().max(200).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { draftTeamPost } = await import("@/lib/post-assist.server");
+    return draftTeamPost(supabaseAdmin, { userId: context.userId, ...data });
+  });

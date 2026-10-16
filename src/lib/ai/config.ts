@@ -20,6 +20,7 @@ export const AI_FEATURES = [
   "reel_style",
   "review_insights",
   "review_assist",
+  "post_assist",
   "skill_assessment",
   "text_moderation",
   "image_moderation",
@@ -105,6 +106,8 @@ export const DEFAULT_AI_FEATURES: AiFeaturesConfig = {
     // Review analysis/summaries describe a person from what others wrote about them: adults only.
     review_insights: { enabled: true, cohorts: ADULT_ONLY },
     review_assist: { enabled: true, cohorts: ADULT_ONLY },
+    // Writing help for team posts. Adults only, like review_assist.
+    post_assist: { enabled: true, cohorts: ADULT_ONLY },
     // Skill ratings are adults-only: peers never rate minors.
     skill_assessment: { enabled: true, cohorts: ADULT_ONLY },
     text_moderation: { enabled: true, cohorts: ALL_COHORTS },
@@ -144,6 +147,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 40, monthly: 400 },
       review_insights: { daily: 20, monthly: 200 },
       review_assist: { daily: 10, monthly: 100 },
+      post_assist: { daily: 10, monthly: 100 },
       skill_assessment: { daily: 3, monthly: 15 },
       reel_package: { daily: 20, monthly: 150 },
       reel_style: { daily: 10, monthly: 60 },
@@ -159,6 +163,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 200, monthly: 2000 },
       review_insights: { daily: 60, monthly: 600 },
       review_assist: { daily: 40, monthly: 400 },
+      post_assist: { daily: 40, monthly: 400 },
       skill_assessment: { daily: 10, monthly: 60 },
       reel_package: { daily: 100, monthly: 1000 },
       reel_style: { daily: 40, monthly: 400 },
@@ -174,6 +179,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 300, monthly: 3000 },
       review_insights: { daily: 100, monthly: 1000 },
       review_assist: { daily: 60, monthly: 600 },
+      post_assist: { daily: 80, monthly: 800 },
       skill_assessment: { daily: 20, monthly: 100 },
       reel_package: { daily: 150, monthly: 1500 },
       reel_style: { daily: 80, monthly: 800 },
@@ -189,6 +195,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       reel_coach: { daily: 400, monthly: 4000 },
       review_insights: { daily: 150, monthly: 1500 },
       review_assist: { daily: 80, monthly: 800 },
+      post_assist: { daily: 100, monthly: 1000 },
       skill_assessment: { daily: 30, monthly: 150 },
       reel_package: { daily: 200, monthly: 2000 },
       reel_style: { daily: 120, monthly: 1200 },
