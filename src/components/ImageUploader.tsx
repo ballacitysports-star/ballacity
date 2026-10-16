@@ -224,7 +224,7 @@ export function ImageUploader({
             outputMaxSize={outputMaxSize}
             shape={shape}
             title={isCover ? "Edit cover" : logo ? "Edit logo" : "Edit photo"}
-            initialFit={logo}
+            initialFit={logo || isCover}
             allowBgRemoval={bgRemoval}
             onCancel={() => {
               setOpen(false);
