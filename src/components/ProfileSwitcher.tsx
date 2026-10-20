@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, hasLogoAvatar, type AccountType } from "@/lib/account-type";
 import {
   addProfileRoute,
   useMyProfiles,
@@ -29,7 +29,9 @@ const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number }) {
   return (
     <span
-      className="grid shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-xs font-bold"
+      className={`grid shrink-0 place-items-center overflow-hidden bg-surface-2 text-xs font-bold ${
+        hasLogoAvatar(profile.kind) ? "rounded-[28%]" : "rounded-full"
+      }`}
       style={{ height: `${size * 0.25}rem`, width: `${size * 0.25}rem` }}
     >
       {profile.avatarUrl ? (

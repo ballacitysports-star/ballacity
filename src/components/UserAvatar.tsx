@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useActiveProfile } from "@/lib/account-profiles";
+import { hasLogoAvatar } from "@/lib/account-type";
 import { useUserAvatar } from "@/lib/user-avatars";
 import { cn } from "@/lib/utils";
 
@@ -204,7 +205,7 @@ export function MyAvatar(props: Omit<Props, "avatarUrl" | "initials" | "name">) 
       initials={logo ? logo.avatarFallback : me?.avatar}
       name={logo ? logo.name : me?.name}
       loading={!me}
-      rounded={logo?.avatarUrl ? "logo" : undefined}
+      rounded={logo?.avatarUrl && hasLogoAvatar(logo.kind) ? "logo" : undefined}
       {...props}
     />
   );
