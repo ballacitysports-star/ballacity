@@ -1206,6 +1206,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               <Section title={isCoach ? "Cover image" : "Team cover"}>
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id}
                   value={customCover ? cover : ""}

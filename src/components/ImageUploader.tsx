@@ -27,6 +27,11 @@ type Props = {
   label?: string;
   /** Team / org logo: square frame, opens with the whole image visible. */
   logo?: boolean;
+  /**
+   * Cover only: also show how the cover will look as the short profile banner,
+   * which crops the top and bottom of a 16:9 image.
+   */
+  bannerPreview?: boolean;
 };
 
 const DEFAULT_PRESETS: Sport[] = [
@@ -56,6 +61,7 @@ export function ImageUploader({
   disabled,
   label,
   logo = false,
+  bannerPreview = false,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
@@ -144,6 +150,28 @@ export function ImageUploader({
             </div>
           )}
         </div>
+
+        {isCover && bannerPreview && preview && (
+          <div className="mt-3">
+            <div className="mb-1.5 micro-label text-muted-foreground">On your profile</div>
+            {/* Same image request and crop as ProfileChannelHeader's banner
+                (16:5 variant, object-cover, fade), at a phone banner's shape. */}
+            <div className="relative aspect-[390/176] overflow-hidden rounded-xl bg-surface-2">
+              <ResponsiveImage
+                src={preview}
+                alt="Profile banner preview"
+                aspect={16 / 5}
+                sizes="(min-width: 640px) 420px, 90vw"
+                baseWidth={640}
+                className="h-full w-full object-cover"
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="mt-3 flex gap-2">
           <label
