@@ -46,6 +46,7 @@ import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
+import { isPublicReelPath } from "@/lib/social-share";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -584,7 +585,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const isPublic =
     pathname === "/" ||
-    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
+    // A shared reel page; an exact match, since a /reels prefix would open the studio tab.
+    isPublicReelPath(pathname);
   const isTab = TAB_PATHS.includes(pathname);
   // Second-chance verification: on mobile Safari/Chrome the Supabase session
   // can hydrate one tick after `loading` flips to false. Redirecting to

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { ShareSheet } from "@/components/ShareSheet";
 import { supabase } from "@/integrations/supabase/client";
-import { reelDownloadName } from "@/lib/social-share";
+import { publicReelPath, reelDownloadName } from "@/lib/social-share";
 import { useMyCohort } from "@/lib/youth-features";
 
 /**
@@ -64,7 +64,7 @@ export function ReelShareButton({
           content={{
             title,
             text: caption || title,
-            url: `${window.location.origin}/reels/${reelId}`,
+            url: `${window.location.origin}${publicReelPath(reelId)}`,
             hashtags: (hashtags ?? []).slice(0, 3),
           }}
         />

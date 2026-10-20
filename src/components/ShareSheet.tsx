@@ -55,8 +55,8 @@ export function ShareSheet({
     setDownloading(true);
     try {
       await onDownload();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't download the video");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't download the video");
     } finally {
       setDownloading(false);
     }

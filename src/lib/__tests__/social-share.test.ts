@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCaption,
+  isPublicReelPath,
   normalizeHashtags,
   platformShareUrl,
+  publicReelPath,
   reelDownloadName,
 } from "../social-share";
 
@@ -37,5 +39,17 @@ describe("social-share", () => {
     );
     expect(reelDownloadName("🔥🔥", "u/abc/clip")).toBe("ballacity-reel.mp4");
     expect(reelDownloadName("a".repeat(100), "x.mp4")).toBe(`${"a".repeat(60)}.mp4`);
+  });
+  it("opens a shared reel page to signed-out visitors, but not the reels tab", () => {
+    const id = "6f1c2a9e-1b2c-4d3e-8f90-123456789abc";
+    expect(publicReelPath(id)).toBe(`/reels/${id}`);
+    expect(isPublicReelPath(publicReelPath(id))).toBe(true);
+    expect(isPublicReelPath(`/reels/${id}/`)).toBe(true);
+    // The studio tab and anything deeper stay behind sign-in.
+    expect(isPublicReelPath("/reels")).toBe(false);
+    expect(isPublicReelPath("/reels/")).toBe(false);
+    expect(isPublicReelPath(`/reels/${id}/edit`)).toBe(false);
+    expect(isPublicReelPath(`/reelsx/${id}`)).toBe(false);
+    expect(isPublicReelPath(`/x/reels/${id}`)).toBe(false);
   });
 });

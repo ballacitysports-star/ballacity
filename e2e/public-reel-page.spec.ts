@@ -9,7 +9,9 @@ import { test, expect, type Page } from "@playwright/test";
  * not a family clip, account not locked). These specs cover the refusals that
  * need no seeded data, so they run with or without backend credentials: an
  * unknown id and a malformed id both land on the same "not available" page,
- * with no video, no signed storage URL and a noindex robots tag.
+ * with no video, no signed storage URL and a noindex robots tag. They run
+ * signed out, which also pins that the root AuthGate lets a shared reel link
+ * open without bouncing the visitor to sign-in.
  *
  * Not covered here: draft, hidden, 13-17 and family-clip reels. Those need
  * seeded highlight_reels rows with stored media, birthdays and guardian links
@@ -24,6 +26,8 @@ async function openReel(page: Page, id: string) {
   await expect(page.getByRole("heading", { name: NOT_AVAILABLE })).toBeVisible({
     timeout: 20_000,
   });
+  // A shared link must open for a signed-out visitor, not bounce to sign-in.
+  await expect(page).toHaveURL(new RegExp(`/reels/${id}$`));
 }
 
 async function expectNothingLeaked(page: Page) {
