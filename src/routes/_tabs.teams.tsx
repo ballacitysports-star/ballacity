@@ -28,6 +28,8 @@ import { Distance } from "@/components/Distance";
 import { useUserLocation } from "@/lib/geo";
 import { orgDistance } from "@/lib/org-distance";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
+import { featuredRecruitingTeam, openSpotCount } from "@/lib/team-recruiting";
+import { spotsOpenLabel } from "@/lib/spots-urgency";
 
 type SortBy = "nearest" | "followers" | "name";
 
@@ -160,13 +162,7 @@ function TeamsPage() {
   const { coords } = useUserLocation();
 
   const list = useMemo(() => {
-    const isRecruiting = (o: (typeof orgs)[number]) => {
-      const pn = o.positionsNeeded;
-      if (!pn) return false;
-      return Object.values(pn).some((byPos) =>
-        Object.values(byPos ?? {}).some((n) => Number(n) > 0),
-      );
-    };
+    const isRecruiting = (o: (typeof orgs)[number]) => openSpotCount(o.positionsNeeded) > 0;
     const cadenceMatches = (o: (typeof orgs)[number], target: "weekly" | "casual") => {
       const c = (o.cadence ?? "").toLowerCase();
       if (!c) return false;
@@ -197,8 +193,8 @@ function TeamsPage() {
     return withDist;
   }, [orgs, sports, q, sortBy, avail, coords]);
 
-  const featured =
-    orgs.find((o) => o.verified && o.kind === "team") ?? orgs.find((o) => o.kind === "team");
+  const featured = featuredRecruitingTeam(orgs);
+  const featuredSpots = featured ? openSpotCount(featured.positionsNeeded) : 0;
 
   return (
     <div className="page-shell-content pt-6">
@@ -230,24 +226,24 @@ function TeamsPage() {
         </Link>
       </div>
 
-      {/* Featured banner */}
+      {/* Featured banner: only a team that has posted open spots, linking to its page */}
       {featured && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="relative mb-5 overflow-hidden rounded-3xl border border-lime/30 bg-surface"
+          className="mb-5 overflow-hidden rounded-3xl border border-lime/30 bg-surface"
         >
-          <img src={featured.cover} alt="" className="h-32 w-full object-cover opacity-50" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
-          <div className="absolute inset-0 p-4 flex flex-col justify-end">
-            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime uppercase tracking-wider">
-              <Megaphone className="h-3 w-3" /> Hiring · 3 spots
-            </span>
-            <div className="mt-1 font-display text-xl font-bold">
-              {featured.name} · Open Tryouts
+          <Link to="/teams/$teamId" params={{ teamId: featured.id }} className="relative block">
+            <img src={featured.cover} alt="" className="h-32 w-full object-cover opacity-50" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
+            <div className="absolute inset-0 p-4 flex flex-col justify-end">
+              <span className="inline-flex w-fit items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime uppercase tracking-wider">
+                <Megaphone className="h-3 w-3" /> Recruiting · {spotsOpenLabel(featuredSpots)}
+              </span>
+              <div className="mt-1 font-display text-xl font-bold">{featured.name}</div>
+              <div className="text-xs text-muted-foreground">{featured.tagline}</div>
             </div>
-            <div className="text-xs text-muted-foreground">{featured.tagline}</div>
-          </div>
+          </Link>
         </motion.div>
       )}
 

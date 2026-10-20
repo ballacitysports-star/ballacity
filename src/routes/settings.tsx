@@ -18,13 +18,10 @@ import {
   Lock,
   Scale,
   ShieldCheck,
-  Monitor,
-  Moon,
   Pencil,
   Shield,
   ShieldOff,
   Sparkles,
-  Sun,
   Trash2,
   UserCog,
   BadgeCheck,
@@ -55,7 +52,6 @@ import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
-import { useTheme } from "@/lib/theme";
 import { listMyOrgs, deleteTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { deleteMyAccount } from "@/lib/account.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -229,7 +225,6 @@ const SECTIONS: Section[] = [
 ];
 
 function SettingsHubPage() {
-  const [theme, setTheme, , resolved] = useTheme();
   const { user } = useAuth();
   // A managed child has no email or password, so the password screens don't
   // apply — and setting a password there would hand the child a login their
@@ -251,16 +246,6 @@ function SettingsHubPage() {
     }
   };
 
-  const themeOptions: Array<{
-    value: "light" | "dark" | "system";
-    label: string;
-    Icon: typeof Sun;
-  }> = [
-    { value: "light", label: "Light", Icon: Sun },
-    { value: "dark", label: "Dark", Icon: Moon },
-    { value: "system", label: "System", Icon: Monitor },
-  ];
-
   return (
     <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Settings" fallbackTo="/profile" />
@@ -273,38 +258,6 @@ function SettingsHubPage() {
         <div className="px-4 pt-2">
           <BirthdayLockCard />
         </div>
-
-        <SettingsGroup title="Appearance">
-          <SettingsStaticRow>
-            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Theme">
-              {themeOptions.map(({ value, label, Icon }) => {
-                const active = theme === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setTheme(value)}
-                    className={`flex flex-col items-center gap-1.5 rounded-lg px-2 py-3 text-xs font-medium transition ${
-                      active
-                        ? "bg-surface-2 text-foreground"
-                        : "text-muted-foreground hover:bg-surface hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {theme === "system"
-                ? `Following your device (currently ${resolved})`
-                : `Using ${theme} theme`}
-            </p>
-          </SettingsStaticRow>
-        </SettingsGroup>
 
         <StaffSettingsSection />
 

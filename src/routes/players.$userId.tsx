@@ -10,7 +10,6 @@ import {
   Loader2,
   Calendar,
   MapPin,
-  Shield,
   Trophy,
   UserPlus,
   UserCheck,
@@ -42,7 +41,7 @@ import { useReviewsFor } from "@/lib/reviews-db";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
-import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
+import { ProfileAboutSheet, AboutBlock } from "@/components/profile/ProfileAboutSheet";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { PlayerShareCard } from "@/components/PlayerShareCard";
 import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
@@ -221,7 +220,6 @@ function PlayerProfilePage() {
   const follow = useFollow(userId);
   const privacyFlags = usePublicPrivacyFlags(userId);
   const showSports = privacyFlags.data?.show_sports ?? true;
-  const showGamesPlayed = privacyFlags.data?.show_games_played ?? true;
 
   useEffect(() => {
     let cancelled = false;
@@ -334,7 +332,6 @@ function PlayerProfilePage() {
   const links = overrides.links?.length ? overrides.links : dbLinks;
   const avatarUrl = overrides.avatarUrl ?? profile.avatar_url ?? undefined;
   const coverUrl = overrides.coverUrl ?? profile.cover_url ?? undefined;
-  const stats = { played: 0, reliability: 100, sportsmanship: 5, friends: 0 };
 
   return (
     <div className="page-shell-flush pb-28">
@@ -353,11 +350,6 @@ function PlayerProfilePage() {
         avatarUrl={avatarUrl}
         avatarFallback={initials}
         name={displayName}
-        nameBadge={
-          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-            <Shield className="h-3 w-3" /> Verified
-          </span>
-        }
         meta={[
           username,
           age != null ? `${age}` : null,
@@ -378,7 +370,6 @@ function PlayerProfilePage() {
           >
             {follow.following} following
           </button>,
-          ...(showGamesPlayed ? [`${stats.played} game${stats.played === 1 ? "" : "s"}`] : []),
         ].filter(Boolean)}
         description={bio}
         onOpenAbout={() => setAboutOpen(true)}
@@ -487,15 +478,6 @@ function PlayerProfilePage() {
             {profile.graduating_class && <li>Class of {profile.graduating_class}</li>}
           </ul>
         </AboutBlock>
-        <AboutBlock label="Stats">
-          <AboutStats
-            items={[
-              { k: `${stats.reliability}%`, v: "Reliable" },
-              { k: stats.sportsmanship, v: "Sport" },
-              { k: stats.friends, v: "Crew" },
-            ]}
-          />
-        </AboutBlock>
         {links.length > 0 && (
           <AboutBlock label="Links">
             <ProfileLinksList links={links} />
@@ -537,16 +519,6 @@ function PlayerProfilePage() {
               </ul>
             </section>
             <div className="mt-2 border-t border-border/60 pt-1">
-              <ExpandableAboutSection label="Stats">
-                <AboutStats
-                  items={[
-                    { k: `${stats.reliability}%`, v: "Reliable" },
-                    { k: stats.sportsmanship, v: "Sport" },
-                    { k: stats.friends, v: "Crew" },
-                  ]}
-                />
-              </ExpandableAboutSection>
-
               {links.length > 0 && (
                 <ExpandableAboutSection label="Links" count={links.length}>
                   <ProfileLinksList links={links} />

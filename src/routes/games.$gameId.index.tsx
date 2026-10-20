@@ -16,7 +16,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Share2,
-  Bookmark,
   MapPin,
   Clock,
   Users,
@@ -153,6 +152,8 @@ import { PostEngagement } from "@/components/PostEngagement";
 import { GameDistance } from "@/components/GameDistance";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
+import { ShareSheet } from "@/components/ShareSheet";
+import { buildGameShare } from "@/lib/social-share";
 
 import {
   useHostedGames,
@@ -375,6 +376,7 @@ function GameDetail() {
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, _setEditOpen] = useState(urlModal === "edit");
   const [requesting, setRequesting] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -1311,6 +1313,18 @@ function GameDetail() {
         onConfirm={() => void confirmRiskAck()}
       />
 
+      {shareOpen && !game.isPrivate && (
+        <ShareSheet
+          content={buildGameShare(
+            game,
+            game.allDay ? formatWhenDate(game.date) : formatGameWhen(game),
+            window.location.origin,
+          )}
+          open
+          onOpenChange={setShareOpen}
+        />
+      )}
+
       {reportedHostId && (
         <ReportDialog
           open={reportGameOpen}
@@ -1396,17 +1410,23 @@ function GameDetail() {
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
           <Link
             to="/feed"
+            aria-label="Back to feed"
             className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex gap-2">
-            <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
-              <Bookmark className="h-4 w-4" />
-            </button>
-            <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
-              <Share2 className="h-4 w-4" />
-            </button>
+            {/* A private game is invite-only, so its link would lead nowhere for anyone else. */}
+            {!game.isPrivate && (
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                aria-label="Share this game"
+                className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+            )}
             {!isHost && reportedHostId && (
               <button
                 onClick={() => setReportGameOpen(true)}
@@ -2994,6 +3014,7 @@ function GameDetail() {
           <div className="flex items-center gap-2">
             <button
               disabled={messaging || !messagingDecision.allowed}
+              aria-label="Message the host"
               onClick={async () => {
                 if (!user) {
                   nav({ to: "/auth" });
