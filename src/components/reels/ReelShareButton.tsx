@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { ShareSheet } from "@/components/ShareSheet";
-import { useMyAge } from "@/lib/use-my-age";
+import { useMyCohort } from "@/lib/youth-features";
 
 /**
  * Share a posted reel via its public page. Only shown to adults: the page itself
- * refuses anyone under 18 (server-side), so this is a convenience, not the gate.
+ * serves only reels whose reel_audience() is 'public' (server-side), so this is a
+ * convenience, not the gate.
  * Never rendered for family clips — the caller checks subject_child_id.
  */
 export function ReelShareButton({
@@ -19,9 +20,9 @@ export function ReelShareButton({
   caption: string | null;
   hashtags: string[] | null;
 }) {
-  const { age } = useMyAge();
+  const { cohort } = useMyCohort();
   const [open, setOpen] = useState(false);
-  if (age === null || age < 18) return null;
+  if (cohort !== "adult") return null;
   return (
     <>
       <button
