@@ -5291,7 +5291,7 @@ export type Database = {
         Returns: undefined
       }
       set_team_event_availability: {
-        Args: { _note?: string; _post: string; _status: string | null; _user: string }
+        Args: { _note?: string; _post: string; _status: string; _user: string }
         Returns: undefined
       }
       settle_paid_spot: {
