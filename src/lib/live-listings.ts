@@ -9,6 +9,11 @@
 
 import { z } from "zod";
 import { SPORTS } from "@/lib/sample-data";
+import {
+  AVAILABILITY_INTENTS,
+  buildSkillFields,
+  initialLevelsForPost,
+} from "@/lib/availability-levels";
 
 export const LISTING_SECTIONS = ["games", "tryouts", "availability"] as const;
 export type ListingSection = (typeof LISTING_SECTIONS)[number];
@@ -30,10 +35,20 @@ export const SECTION_MODERATION_KIND: Record<ListingSection, string> = {
 };
 
 export type ListingStatus =
-  "hidden" | "cancelled" | "completed" | "full" | "joins_closed" | "closed" | "active";
+  | "hidden"
+  | "held"
+  | "screening"
+  | "cancelled"
+  | "completed"
+  | "full"
+  | "joins_closed"
+  | "closed"
+  | "active";
 
 export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
   hidden: "Hidden",
+  held: "Held for review",
+  screening: "Awaiting screening",
   cancelled: "Cancelled",
   completed: "Completed",
   full: "Full",
@@ -55,7 +70,8 @@ function isPast(iso: string | null | undefined, now: number): boolean {
 
 /**
  * One status per listing, most decisive first: hidden beats everything, then
- * the listing's own lifecycle, then capacity.
+ * text screening (a held or unscreened team post is not public), then the
+ * listing's own lifecycle, then capacity.
  */
 export function listingStatus(section: ListingSection, row: Row, now = Date.now()): ListingStatus {
   if (row.hidden_at) return "hidden";
@@ -67,6 +83,8 @@ export function listingStatus(section: ListingSection, row: Row, now = Date.now(
     return "active";
   }
   if (section === "tryouts") {
+    if (row.moderation_status === "held") return "held";
+    if (row.moderation_status === "pending") return "screening";
     if (isPast(row.event_date, now)) return "completed";
     if (row.spots_max != null && row.spots_max > 0 && row.spots_taken >= row.spots_max) {
       return "full";
@@ -123,7 +141,9 @@ export const TRYOUT_EDIT_SCHEMA = z
 export const AVAILABILITY_EDIT_SCHEMA = z
   .object({
     sports: z.array(z.string().trim().min(1).max(40)).min(1, "Pick at least one sport").max(12),
-    skill_level: z.string().trim().min(1).max(80),
+    /** Competitive levels per sport; saved as skill_levels plus skill_level. */
+    levels: z.record(z.string().max(40), z.array(z.string().max(80)).max(20)),
+    looking_for: z.array(z.enum(AVAILABILITY_INTENTS)).max(AVAILABILITY_INTENTS.length),
     city: z.string().trim().max(120).nullable(),
     status: z.enum(["open", "closed"]),
     note: z.string().max(1000).nullable(),
@@ -138,6 +158,15 @@ export const EDIT_SCHEMAS = {
 
 const TIME_FIELDS = new Set(["date", "event_date"]);
 
+/** JSON with object keys sorted, so jsonb read back in another key order compares equal. */
+function stableJson(v: unknown): string {
+  return JSON.stringify(v ?? null, (_k, val) =>
+    val && typeof val === "object" && !Array.isArray(val)
+      ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b)))
+      : val,
+  );
+}
+
 /**
  * Only the fields whose value actually changes; nothing to write means no-op.
  * Times compare as instants, so "18:00:00+00:00" and "18:00:00.000Z" are equal.
@@ -149,7 +178,7 @@ export function changedFields(before: Row, patch: Row): Row {
       if (Date.parse(before[k]) !== Date.parse(v as string)) out[k] = v;
       continue;
     }
-    if (JSON.stringify(before[k] ?? null) !== JSON.stringify(v ?? null)) out[k] = v;
+    if (stableJson(before[k]) !== stableJson(v)) out[k] = v;
   }
   return out;
 }
@@ -173,4 +202,24 @@ export function gameSideEffects(before: Row, changes: Row): Row {
     extra.lng = null;
   }
   return extra;
+}
+
+/**
+ * An availability edit as the columns it writes. Levels are not a column: a
+ * change to sports or levels is saved the way the post dialog saves it, as
+ * `skill_levels` for every sport plus `skill_level` for the primary one, so
+ * readers that prefer either agree. Levels for a removed sport are dropped.
+ */
+export function availabilityColumns(before: Row, patch: Row): Row {
+  const { levels, ...rest } = patch;
+  if (levels === undefined && rest.sports === undefined) return rest;
+  const sports: string[] = rest.sports ?? before.sports ?? [];
+  const chosen: Record<string, string[]> =
+    levels ??
+    initialLevelsForPost({
+      sports: before.sports ?? [],
+      skill_level: before.skill_level ?? null,
+      skill_levels: before.skill_levels,
+    });
+  return { ...rest, ...buildSkillFields(sports, chosen) };
 }

@@ -559,6 +559,7 @@ export function CreateTrainerWizard() {
               <Section title="Cover image (optional)">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id}
                   value={draft.coverUrl ?? ""}

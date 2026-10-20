@@ -30,7 +30,17 @@ import {
   type ListingVisibility,
   type TryoutKind,
 } from "@/lib/live-listings";
-import { SPORTS } from "@/lib/sample-data";
+import { SPORTS, type Sport } from "@/lib/sample-data";
+import { scaleForSport } from "@/lib/sport-levels";
+import {
+  AVAILABILITY_INTENTS,
+  INTENT_LABEL,
+  initialLevelsForPost,
+  parseIntents,
+  postTiersForSport,
+  type AvailabilityIntent,
+} from "@/lib/availability-levels";
+import { TierChips } from "@/components/sports/TierChips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,6 +79,8 @@ const STATUS_VARIANT: Record<ListingStatus, "default" | "secondary" | "destructi
   closed: "outline",
   cancelled: "destructive",
   hidden: "destructive",
+  held: "destructive",
+  screening: "secondary",
 };
 
 type Listing = ListingRow;
@@ -115,6 +127,26 @@ export function LiveListingsTab() {
       }),
     onSuccess: (_r, row) => {
       toast.success(row.hidden_at ? "Listing is visible again" : "Listing hidden");
+      qc.invalidateQueries({ queryKey: ["superadmin-listings"] });
+      qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  // A tryout or camp whose text is held or unscreened is not public until a
+  // superadmin approves it — the same action the Content tab uses.
+  const approveText = useMutation({
+    mutationFn: (row: Listing) =>
+      moderate({
+        data: {
+          kind: SECTION_MODERATION_KIND.tryouts,
+          id: row.id,
+          action: "approve_text",
+          reason: "Live listings tab",
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Text approved");
       qc.invalidateQueries({ queryKey: ["superadmin-listings"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
@@ -189,8 +221,16 @@ export function LiveListingsTab() {
             key={row.id}
             section={section}
             row={row}
-            busy={toggleHidden.isPending && toggleHidden.variables?.id === row.id}
+            busy={
+              (toggleHidden.isPending && toggleHidden.variables?.id === row.id) ||
+              (approveText.isPending && approveText.variables?.id === row.id)
+            }
             onToggleHidden={() => toggleHidden.mutate(row)}
+            onApprove={
+              section === "tryouts" && row.moderation_status !== "approved"
+                ? () => approveText.mutate(row)
+                : undefined
+            }
             onEdit={() => setEditing(row)}
           />
         ))}
@@ -243,19 +283,18 @@ function ListingCard({
   row,
   busy,
   onToggleHidden,
+  onApprove,
   onEdit,
 }: {
   section: ListingSection;
   row: Listing;
   busy: boolean;
   onToggleHidden: () => void;
+  onApprove?: () => void;
   onEdit: () => void;
 }) {
   const status = listingStatus(section, row);
-  const title =
-    section === "availability"
-      ? `${(row.sports ?? []).join(", ") || "Any sport"} · ${row.skill_level}`
-      : row.title;
+  const title = section === "availability" ? availabilityTitle(row) : row.title;
   const details: string[] = [];
   if (section === "games") {
     details.push(row.sport, formatWhen(row.date), row.location);
@@ -267,6 +306,8 @@ function ListingCard({
     if (row.location) details.push(row.location);
     if (row.spots_max) details.push(`${row.spots_taken}/${row.spots_max} spots`);
   } else {
+    const intents = parseIntents(row.looking_for);
+    if (intents.length) details.push(intents.map((i) => INTENT_LABEL[i]).join(" & "));
     if (row.city) details.push(row.city);
     if (row.starts_on || row.ends_on) {
       details.push(`${row.starts_on ?? "…"} to ${row.ends_on ?? "open-ended"}`);
@@ -296,6 +337,11 @@ function ListingCard({
               View live
             </a>
           </Button>
+          {onApprove && (
+            <Button size="sm" variant="default" disabled={busy} onClick={onApprove}>
+              Approve
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={onEdit}>
             <Pencil className="mr-1 h-3.5 w-3.5" />
             Edit
@@ -312,6 +358,27 @@ function ListingCard({
       </div>
     </li>
   );
+}
+
+/** The level fields of an availability row, in the shape the level helpers take. */
+function levelSource(row: Listing) {
+  return {
+    sports: (row.sports ?? []) as string[],
+    skill_level: (row.skill_level ?? null) as string | null,
+    skill_levels: row.skill_levels as unknown,
+  };
+}
+
+/** "Basketball (Varsity · JV), Soccer" — each sport with the levels the post lists. */
+function availabilityTitle(row: Listing): string {
+  const sports: string[] = row.sports ?? [];
+  if (!sports.length) return "Any sport";
+  return sports
+    .map((sport) => {
+      const tiers = postTiersForSport(levelSource(row), sport);
+      return tiers.length ? `${sport} (${tiers.join(" · ")})` : sport;
+    })
+    .join(", ");
 }
 
 function formatWhen(iso: string | null | undefined) {
@@ -509,11 +576,58 @@ function EditListingDialog({
                   })}
                 </div>
               </Field>
-              <Field label="Skill level">
-                <Input
-                  value={form.skill_level}
-                  onChange={(e) => set("skill_level", e.target.value)}
-                />
+              {form.sports.map((sport: string) => {
+                const scale = scaleForSport(sport as Sport);
+                const picked: string[] = form.levels[sport] ?? [];
+                return (
+                  <div key={sport} className="space-y-1">
+                    <span className="block text-xs font-medium">
+                      {sport} levels{" "}
+                      <span className="text-[10px] uppercase text-muted-foreground">
+                        {scale.system}
+                      </span>
+                    </span>
+                    <TierChips
+                      scale={scale}
+                      selected={picked}
+                      ariaPrefix={sport}
+                      onToggle={(tier) =>
+                        set("levels", {
+                          ...form.levels,
+                          [sport]: picked.includes(tier)
+                            ? picked.filter((t) => t !== tier)
+                            : [...picked, tier],
+                        })
+                      }
+                    />
+                  </div>
+                );
+              })}
+              <Field label="Available as">
+                <div className="flex gap-2" role="group" aria-label="Available as">
+                  {AVAILABILITY_INTENTS.map((intent) => {
+                    const on = form.looking_for.includes(intent);
+                    return (
+                      <Button
+                        key={intent}
+                        type="button"
+                        size="sm"
+                        variant={on ? "default" : "outline"}
+                        aria-pressed={on}
+                        onClick={() =>
+                          set(
+                            "looking_for",
+                            AVAILABILITY_INTENTS.filter((i) =>
+                              i === intent ? !on : form.looking_for.includes(i),
+                            ),
+                          )
+                        }
+                      >
+                        {INTENT_LABEL[intent]}
+                      </Button>
+                    );
+                  })}
+                </div>
               </Field>
               <Field label="City / neighborhood">
                 <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
@@ -579,7 +693,8 @@ function initialForm(section: ListingSection, row: Listing): FormState {
   }
   return {
     sports: [...(row.sports ?? [])],
-    skill_level: row.skill_level ?? "",
+    levels: initialLevelsForPost(levelSource(row)),
+    looking_for: parseIntents(row.looking_for) as AvailabilityIntent[],
     city: row.city ?? "",
     status: row.status === "closed" ? "closed" : "open",
     note: row.note ?? "",
@@ -609,7 +724,8 @@ function toPatch(section: ListingSection, f: FormState): Record<string, unknown>
   }
   return {
     sports: f.sports,
-    skill_level: f.skill_level,
+    levels: f.levels,
+    looking_for: f.looking_for,
     city: f.city.trim() || null,
     status: f.status,
     note: f.note.trim() || null,

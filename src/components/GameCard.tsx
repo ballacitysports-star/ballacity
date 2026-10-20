@@ -6,6 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
+import { spotsOpenLabel } from "@/lib/spots-urgency";
 import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
@@ -17,7 +18,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
-import { GameDistance } from "@/components/GameDistance";
+import { GamePlaceDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -188,9 +189,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Clock className="h-3.5 w-3.5 text-lime" />
               {formatGameWhen(game)}
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-coral" />
-              <GameDistance game={game} />
+              <GamePlaceDistance game={game} />
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
@@ -287,18 +288,24 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                   <MessageCircle className="h-3.5 w-3.5" />
                 </button>
               )}
-              <div className="flex items-center gap-1 text-[11px] font-semibold">
+              <div
+                className="flex items-center gap-1 text-[11px] font-semibold"
+                title={`${joinedCount} of ${game.maxPlayers} joined`}
+              >
                 <Users className="h-3.5 w-3.5 text-lime" />
-                <span
-                  key={joinedCount}
-                  className="text-foreground inline-block motion-safe:animate-scale-in"
-                >
-                  {joinedCount}/{game.maxPlayers}
-                </span>
+                {/* When few are left the urgency pill says it; otherwise a plain
+                    "N spots open" reads better than a bare joined/max count. */}
                 {spotsLeft < game.maxPlayers &&
-                  spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
-                    <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
-                  )}
+                spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) ? (
+                  <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
+                ) : (
+                  <span
+                    key={joinedCount}
+                    className="text-foreground inline-block motion-safe:animate-scale-in"
+                  >
+                    {spotsOpenLabel(spotsLeft)}
+                  </span>
+                )}
               </div>
             </div>
           </div>

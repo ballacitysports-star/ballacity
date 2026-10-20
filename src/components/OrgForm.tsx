@@ -488,6 +488,7 @@ export function OrgForm({
             <div className="text-xs font-semibold text-muted-foreground mb-2">Cover image</div>
             <ImageUploader
               kind="cover"
+              bannerPreview
               bucket="org-covers"
               pathPrefix={userId}
               value={value.coverUrl}

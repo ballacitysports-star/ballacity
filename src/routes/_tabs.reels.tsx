@@ -1063,7 +1063,7 @@ function ReelsPage() {
       }
 
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      let playbackPath: string | null = null;
+      const playbackPath: string | null = converted ? `${base}.h264.mp4` : null;
 
       // The original always lands at `base`. How it is finalized depends on
       // whether anything will ever play it: without a converted copy it IS the
@@ -1072,23 +1072,41 @@ function ReelsPage() {
       // refusing exotic containers is the bug being fixed. Keeping it is not
       // sentimental — RepairPlaybackButton re-converts from `video_path`, so
       // discarding the original would make "Re-run fix" impossible.
-      const { error: upErr } = await supabase.storage
-        .from("highlight-videos")
-        .upload(base, file, { upsert: false });
-      if (upErr) throw upErr;
-      await finalizeVideoUpload({ data: { path: base, kind: converted ? "source" : "video" } });
+      //
+      // The two copies go up side by side, and the network transfer runs while
+      // the device measures movement and samples frames below, rather than each
+      // step waiting on the last. Finalizing still waits for both, in order: the
+      // playback copy's check removes the original if it fails.
+      const videoUpload = (async () => {
+        try {
+          const [orig, play] = await Promise.all([
+            supabase.storage.from("highlight-videos").upload(base, file, { upsert: false }),
+            playbackPath
+              ? supabase.storage
+                  .from("highlight-videos")
+                  .upload(playbackPath, playable, { upsert: true, contentType: "video/mp4" })
+              : Promise.resolve({ error: null }),
+          ]);
+          if (orig.error) throw orig.error;
+          if (play.error) throw play.error;
+          await finalizeVideoUpload({ data: { path: base, kind: converted ? "source" : "video" } });
+          // This is the copy the feed serves (`playback_path ?? video_path`), so
+          // it is the one that has to pass the sniff as a real MP4.
+          if (playbackPath) {
+            await finalizeVideoUpload({ data: { path: playbackPath, kind: "video" } });
+          }
+        } catch (e) {
+          // Both paths belong to this upload alone; don't leave either behind.
+          void supabase.storage
+            .from("highlight-videos")
+            .remove(playbackPath ? [base, playbackPath] : [base])
+            .catch(() => {});
+          throw e;
+        }
+      })();
+      // Awaited below; this only stops a failure surfacing as unhandled meanwhile.
+      videoUpload.catch(() => {});
 
-      if (converted) {
-        // This is the copy the feed serves (`playback_path ?? video_path`), so
-        // it is the one that has to pass the sniff as a real MP4.
-        const p = `${base}.h264.mp4`;
-        const { error: playErr } = await supabase.storage
-          .from("highlight-videos")
-          .upload(p, playable, { upsert: true, contentType: "video/mp4" });
-        if (playErr) throw playErr;
-        await finalizeVideoUpload({ data: { path: p, kind: "video" } });
-        playbackPath = p;
-      }
       // Optional body tracking: adults and 16-17 only, never family clips. Only the
       // summary is kept; a null result simply leaves pose out of the record.
       let pose: PoseMetrics | null = null;
@@ -1122,8 +1140,6 @@ function ReelsPage() {
       // browser can't play, so on an .avi or .mkv the original would yield no
       // thumbnail and no AI input — converting first fixes those too, not just
       // playback.
-      const framePaths: string[] = [];
-      const frameTimes: number[] = [];
       const clipForFrames = converted
         ? new File([playable], `${file.name}.h264.mp4`, { type: "video/mp4" })
         : file;
@@ -1132,24 +1148,33 @@ function ReelsPage() {
       const { frames, audio } = await captureClip(clipForFrames, {
         dense: isActive && !access.freeMode,
       });
-      for (let i = 0; i < frames.length; i++) {
-        const framePath = `${base}.frame${i + 1}.jpg`;
-        const { error } = await supabase.storage
-          .from("highlight-videos")
-          .upload(framePath, frames[i].blob, { upsert: true, contentType: "image/jpeg" });
-        if (!error) {
-          framePaths.push(framePath);
-          frameTimes.push(frames[i].t);
-        }
-      }
-      let audioPath: string | null = null;
-      if (audio) {
-        const p = `${base}.audio.wav`;
-        const { error } = await supabase.storage
-          .from("highlight-videos")
-          .upload(p, audio, { upsert: true, contentType: "audio/wav" });
-        if (!error) audioPath = p;
-      }
+
+      // Nothing derived is stored for a clip the server refused.
+      await videoUpload;
+
+      // Frames and audio upload together; one that fails is simply left out.
+      const [frameResults, audioPath] = await Promise.all([
+        Promise.all(
+          frames.map(async (frame, i) => {
+            const framePath = `${base}.frame${i + 1}.jpg`;
+            const { error } = await supabase.storage
+              .from("highlight-videos")
+              .upload(framePath, frame.blob, { upsert: true, contentType: "image/jpeg" });
+            return error ? null : { path: framePath, t: frame.t };
+          }),
+        ),
+        (async () => {
+          if (!audio) return null;
+          const p = `${base}.audio.wav`;
+          const { error } = await supabase.storage
+            .from("highlight-videos")
+            .upload(p, audio, { upsert: true, contentType: "audio/wav" });
+          return error ? null : p;
+        })(),
+      ]);
+      const uploadedFrames = frameResults.filter((f) => f !== null);
+      const framePaths = uploadedFrames.map((f) => f.path);
+      const frameTimes = uploadedFrames.map((f) => f.t);
 
       const usedFree = !isActive;
       // Link to the game the athlete came from, or the auto-detected one.

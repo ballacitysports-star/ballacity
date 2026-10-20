@@ -203,3 +203,38 @@ describe("enforce_minor_messaging", () => {
     expect(last).toMatch(/MINOR_MESSAGING_BLOCKED:%/);
   });
 });
+
+/**
+ * Accepting a message request clears is_request on the thread's messages. The
+ * recipient guard once allowed read_at alone, so accept_conversation tripped
+ * it and no request could ever be accepted ("MESSAGE_FIELD_FORBIDDEN"). The
+ * guard must let exactly that change through, and nothing more.
+ */
+describe("guard_message_recipient_update", () => {
+  const defs = [
+    ...migrationsInOrder()
+      .map((m) => m.sql)
+      .join("\n")
+      .matchAll(
+        /CREATE OR REPLACE FUNCTION public\.guard_message_recipient_update\(\)[\s\S]*?\$\$;/gi,
+      ),
+  ].map((m) => m[0]);
+  const last = defs.at(-1) ?? "";
+
+  it("is defined", () => {
+    expect(defs.length).toBeGreaterThan(0);
+  });
+
+  it("lets a recipient clear is_request, so accept_conversation works", () => {
+    expect(last).toMatch(
+      /IF\s+OLD\.is_request\s+AND\s+NOT\s+NEW\.is_request\s+THEN\s+baseline\.is_request\s*:=\s*false\s*;/i,
+    );
+  });
+
+  it("lets nothing else through: read_at as given, is_request only to false", () => {
+    const assigned = [...last.matchAll(/baseline\.(\w+)\s*:=\s*([^;]+);/gi)].map(
+      (m) => `${m[1]}=${m[2].trim()}`,
+    );
+    expect(assigned.sort()).toEqual(["is_request=false", "read_at=NEW.read_at"]);
+  });
+});

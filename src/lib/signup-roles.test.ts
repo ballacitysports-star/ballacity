@@ -171,9 +171,29 @@ describe("the landing routes and the root gate", () => {
 
   it("send whoever picked in the inline gate to their setup, Player included", () => {
     const root = read("../routes/__root.tsx");
-    expect(root).toMatch(
-      /const finishType = \(_type\?: AccountType, setup\?: SetupId\) => \{[\s\S]{0,200}if \(setup\) router\.navigate\(\{ \.\.\.routeForSetup\(setup\), replace: true \} as never\)/,
+    const finish = root.slice(root.indexOf("const finishType = "));
+    expect(finish).toMatch(
+      /^const finishType = \(_type\?: AccountType, setup\?: SetupId\) => \{[\s\S]{0,120}if \(!setup\) return;[\s\S]{0,200}const target = routeForSetup\(setup\);/,
     );
+    const body = finish.slice(0, finish.indexOf("return <AccountTypeScreen"));
+    // A Player stopped mid-flow (e.g. on /create) goes to setup with a way back…
+    expect(body).toMatch(
+      /if \(setup === "player" && pathname !== "\/" && pathname !== "\/feed"\) \{\s*router\.navigate\(\{ to: target\.to, search: \{ next: here \}, replace: true \} as never\);/,
+    );
+    // …and everyone else, Player included, goes straight to their setup.
+    expect(body).toMatch(
+      /\} else \{\s*router\.navigate\(\{ \.\.\.target, replace: true \} as never\);/,
+    );
+  });
+
+  it("only follow a setup return path that stays inside the app", () => {
+    const welcome = read("../routes/onboarding.welcome.tsx");
+    expect(welcome).toMatch(/const returnTo = safeNext\(next\) \?\? "\/feed";/);
+    const safe = welcome.slice(welcome.indexOf("function safeNext"));
+    expect(safe).toMatch(/!next\.startsWith\("\/"\)/);
+    expect(safe).toMatch(/next\.startsWith\("\/\/"\)/);
+    expect(safe).toMatch(/next\.startsWith\("\/\\\\"\)/);
+    expect(safe).toMatch(/next\.startsWith\("\/onboarding"\) \|\| next\.startsWith\("\/auth"\)/);
   });
 
   it("send whoever picked on the standalone screen to their setup with a full-page load", () => {
