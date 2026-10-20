@@ -217,7 +217,12 @@ function TeamPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <button className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label={`Share ${org.name}`}
+          className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+        >
           <Share2 className="h-4 w-4" />
         </button>
       </div>

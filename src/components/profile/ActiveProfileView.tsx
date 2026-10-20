@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Star, Users } from "lucide-react";
+import { MapPin, Share2, Star, UserPlus, Users } from "lucide-react";
 import { ensureOrgById } from "@/lib/org-store";
 import { getTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { GAMES, HERO_IMAGE, type Game, type Org } from "@/lib/sample-data";
@@ -22,6 +22,8 @@ import type { AccountProfile } from "@/lib/account-profiles";
 import { isImageUrl } from "@/components/OrgAvatarMark";
 import { hideFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
+import { InvitePlayerDialog } from "@/components/team/InvitePlayerDialog";
+import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 type ViewModel = {
   name: string;
@@ -35,6 +37,8 @@ type ViewModel = {
   members: number | null;
   editTo: { to: string; params: Record<string, string | undefined> };
   publicTo: { to: string; params: Record<string, string | undefined> };
+  /** Public URL path, for sharing. */
+  publicPath: string;
 };
 
 /**
@@ -77,6 +81,9 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
 
   const [tab, setTab] = useState<"games" | "reviews">("games");
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const isTeam = profile.kind === "team";
 
   const vm: ViewModel | null = useMemo(() => {
     if (isGym) {
@@ -108,6 +115,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         members: gymQuery.data?.members?.length ?? null,
         editTo: { to: "/orgs/$orgId/edit", params: { orgId: org.id } },
         publicTo: { to: "/orgs/$orgId", params: { orgId: org.id } },
+        publicPath: `/orgs/${org.id}`,
       };
     }
     const org = teamQuery.data as Org | undefined;
@@ -133,6 +141,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       publicTo: isTrainer
         ? { to: "/trainers/$trainerId", params: { trainerId: org.id } }
         : { to: "/teams/$teamId", params: { teamId: org.id } },
+      publicPath: isTrainer ? `/trainers/${org.id}` : `/teams/${org.id}`,
     };
   }, [isGym, gymQuery.data, teamQuery.data, profile.kind, profile.avatarFallback]);
 
@@ -176,6 +185,19 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             >
               Edit {meta.label.toLowerCase()}
             </Link>
+            {/* Growing the roster and spreading the link come first for a new
+                team; the rest stay one swipe along the row. */}
+            {isTeam && (
+              <ChannelPill onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" /> Invite players
+              </ChannelPill>
+            )}
+            <ChannelPill onClick={() => setShareOpen(true)}>
+              <Share2 className="h-4 w-4" /> Share
+            </ChannelPill>
+            <Link to="/create" className={channelPillClass()}>
+              Host a game
+            </Link>
             <Link
               to={vm.publicTo.to}
               params={vm.publicTo.params as never}
@@ -183,12 +205,34 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             >
               View public page
             </Link>
-            <Link to="/create" className={channelPillClass()}>
-              Host a game
-            </Link>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
           </>
         }
+      />
+
+      {isTeam && refId && (
+        <InvitePlayerDialog
+          teamId={refId}
+          teamName={vm.name}
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+        />
+      )}
+      <ProfileShareCard
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        data={{
+          kind: profile.kind,
+          path: vm.publicPath,
+          displayName: vm.name,
+          username: vm.handle ?? undefined,
+          initials: vm.avatarFallback,
+          avatarUrl: vm.avatarUrl ?? undefined,
+          bio: vm.bio ?? undefined,
+          city: vm.city ?? undefined,
+          sports: vm.sports.map((name) => ({ name })),
+          reviewCount: rep.count,
+        }}
       />
 
       <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
