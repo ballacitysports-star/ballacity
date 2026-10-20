@@ -28,7 +28,9 @@ describe("band copy", () => {
     expect(BAND_COPY.teen_16_17.summary).toBe(
       "Visible to signed-in BallaCity members when shared. Public discovery is off.",
     );
-    expect(BAND_COPY.adult.summary).toBe("You choose: private, team-only, members, or public Highlights.");
+    expect(BAND_COPY.adult.summary).toBe(
+      "Private until you post. Posted reels appear on your profile and public Highlights.",
+    );
   });
 
   it("never offers public, member-wide or share links to under 16", () => {
@@ -59,5 +61,13 @@ describe("teenReelErrorMessage", () => {
   it("maps database codes and ignores the rest", () => {
     expect(teenReelErrorMessage(new Error("TEEN_TEAM_GUARDIAN_ONLY"))).toContain("guardian");
     expect(teenReelErrorMessage(new Error("boom"))).toBeNull();
+  });
+});
+
+describe("adult copy", () => {
+  it("never promises audience choices adults do not have", () => {
+    const all = [BAND_COPY.adult.summary, ...BAND_COPY.adult.audiences].join(" ").toLowerCase();
+    expect(all).not.toContain("team-only");
+    expect(all).not.toContain("members");
   });
 });

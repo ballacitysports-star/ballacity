@@ -17,3 +17,13 @@ describe("reelPrivacyFor", () => {
     expect(reelPrivacyFor("adult").summary).toContain("public Highlights");
   });
 });
+
+describe("adult reel privacy copy", () => {
+  it("describes drafts and public posts only, with no team-only or members option", () => {
+    const p = reelPrivacyFor("adult");
+    const text = `${p.summary} ${p.detail}`.toLowerCase();
+    expect(text).toContain("public");
+    expect(text).not.toContain("team-only");
+    expect(text).not.toContain("members");
+  });
+});
