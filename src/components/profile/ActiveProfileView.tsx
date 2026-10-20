@@ -23,6 +23,8 @@ import { isImageUrl } from "@/components/OrgAvatarMark";
 import { hideFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 import { InvitePlayerDialog } from "@/components/team/InvitePlayerDialog";
+import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
+import { useTeamRoster } from "@/lib/team-roster";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 type ViewModel = {
@@ -48,6 +50,7 @@ type ViewModel = {
  */
 export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
   const isGym = profile.kind === "gym";
+  const isTeam = profile.kind === "team";
   const refId = profile.refId ?? "";
 
   const teamQuery = useQuery({
@@ -62,6 +65,9 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
     enabled: isGym && !!refId,
     staleTime: 30_000,
   });
+
+  // The real roster (team_members), so the member count matches the Roster tab.
+  const roster = useTeamRoster(isTeam && refId ? refId : undefined);
 
   const hosted = useHostedGames();
   const games: Game[] = useMemo(() => {
@@ -79,11 +85,10 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
   const revieweeKind: "trainer" | "team" = profile.kind === "trainer" ? "trainer" : "team";
   const rep = useMemo(() => computeReputation(reviews, revieweeKind), [reviews, revieweeKind]);
 
-  const [tab, setTab] = useState<"games" | "reviews">("games");
+  const [tab, setTab] = useState<"games" | "roster" | "reviews">("games");
   const [aboutOpen, setAboutOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const isTeam = profile.kind === "team";
 
   const vm: ViewModel | null = useMemo(() => {
     if (isGym) {
@@ -134,7 +139,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       city: org.city ?? null,
       bio: org.bio ?? org.tagline ?? null,
       sports: org.sports ?? [],
-      members: org.roster ?? null,
+      members: roster.data?.length ?? org.roster ?? null,
       editTo: isTrainer
         ? { to: "/trainers/$trainerId/edit", params: { trainerId: org.id } }
         : { to: "/teams/$teamId/edit", params: { teamId: org.id } },
@@ -143,7 +148,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         : { to: "/teams/$teamId", params: { teamId: org.id } },
       publicPath: isTrainer ? `/trainers/${org.id}` : `/teams/${org.id}`,
     };
-  }, [isGym, gymQuery.data, teamQuery.data, profile.kind, profile.avatarFallback]);
+  }, [isGym, gymQuery.data, teamQuery.data, roster.data, profile.kind, profile.avatarFallback]);
 
   const meta = ACCOUNT_TYPE_META[profile.kind];
 
@@ -270,6 +275,9 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
           onChange={setTab}
           tabs={[
             { k: "games" as const, label: "Games", count: games.length },
+            ...(isTeam
+              ? [{ k: "roster" as const, label: "Roster", count: roster.data?.length }]
+              : []),
             { k: "reviews" as const, label: "Reviews", count: rep.count },
           ]}
         />
@@ -294,6 +302,12 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             </div>
           )}
         </section>
+
+        {isTeam && refId && (
+          <section className={tab === "roster" ? "" : "hidden"}>
+            <TeamRosterPanel teamId={refId} teamName={vm.name} />
+          </section>
+        )}
 
         <section className={`mt-6 ${tab === "reviews" ? "" : "hidden"}`}>
           {vm.members != null && (
