@@ -148,6 +148,13 @@
       "when": 1792114120561,
       "tag": "0020_add_post_text_moderation_status",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792495848439,
+      "tag": "0021_hide_team_posts_moderation_hidden_at",
+      "breakpoints": true
     }
   ]
 }

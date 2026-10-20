@@ -113,7 +113,8 @@ export const setTeamEventAvailability = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("set_team_event_availability", {
       _post: data.postId,
       _user: data.userId,
-      _status: data.status,
+      // The RPC clears availability when _status is NULL; generated types mark it required.
+      _status: data.status as string,
       _note: data.note,
     });
     if (error) throw new Error(describeAvailabilityError(error.message));
