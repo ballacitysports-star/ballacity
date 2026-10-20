@@ -8,10 +8,74 @@ import {
   mp4VideoSize,
   resolutionProblem,
   uploadSizeProblem,
+  type ByteReader,
   type ClipLimits,
 } from "@/lib/ai/upload-limits";
 
 const VIDEO_BUCKET = "highlight-videos";
+
+/** Ranged reads are fetched in blocks this size, so walking box headers costs a few requests. */
+const RANGE_BLOCK_BYTES = 256 * 1024;
+
+/**
+ * Reads byte ranges of a stored clip through a short-lived signed URL, caching
+ * whole blocks. `failed()` reports whether any read came back as anything but
+ * the exact range asked for (a server ignoring Range, an error, a short body);
+ * a caller must not trust what it read when it did. Null when no URL could be
+ * signed.
+ */
+async function rangedObjectReader(
+  admin: { storage: { from: (bucket: string) => any } },
+  path: string,
+  total: number,
+): Promise<{ read: ByteReader; failed: () => boolean } | null> {
+  const { data, error } = await admin.storage.from(VIDEO_BUCKET).createSignedUrl(path, 60);
+  const url: string | undefined = data?.signedUrl;
+  if (error || !url || total <= 0) return null;
+  let failed = false;
+  const blocks = new Map<number, Promise<Uint8Array>>();
+  const block = (index: number) => {
+    let pending = blocks.get(index);
+    if (!pending) {
+      const start = index * RANGE_BLOCK_BYTES;
+      const end = Math.min(total, start + RANGE_BLOCK_BYTES);
+      pending = (async () => {
+        const res = await fetch(url, { headers: { range: `bytes=${start}-${end - 1}` } });
+        if (res.status !== 206) {
+          await res.body?.cancel().catch(() => {});
+          throw new Error(`Range read refused (${res.status})`);
+        }
+        const body = new Uint8Array(await res.arrayBuffer());
+        if (body.length !== end - start) throw new Error("Short range read");
+        return body;
+      })().catch((e) => {
+        failed = true;
+        throw e;
+      });
+      blocks.set(index, pending);
+    }
+    return pending;
+  };
+  const read: ByteReader = async (start, end) => {
+    start = Math.max(0, start);
+    end = Math.min(total, end);
+    if (end <= start) return new Uint8Array(0);
+    const first = Math.floor(start / RANGE_BLOCK_BYTES);
+    const last = Math.floor((end - 1) / RANGE_BLOCK_BYTES);
+    const parts = await Promise.all(
+      Array.from({ length: last - first + 1 }, (_, i) => block(first + i)),
+    );
+    const out = new Uint8Array(end - start);
+    parts.forEach((part, i) => {
+      const blockStart = (first + i) * RANGE_BLOCK_BYTES;
+      const from = Math.max(start, blockStart) - blockStart;
+      const to = Math.min(end, blockStart + part.length) - blockStart;
+      out.set(part.subarray(from, to), blockStart + from - start);
+    });
+    return out;
+  };
+  return { read, failed: () => failed };
+}
 
 /**
  * Server-side gate for uploaded reel media. The client already validates, but
@@ -113,20 +177,36 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
     if (kind === "audio" && bytes > 50 * 1024 * 1024) await reject("Audio track is too large");
 
     if (kind === "video") {
-      // Range-read just the header: enough for the container magic bytes.
-      const { data: blob, error } = await supabaseAdmin.storage.from(VIDEO_BUCKET).download(path);
-      if (error || !blob) await reject("Uploaded file could not be read");
-      const header = new Uint8Array(await blob!.slice(0, 64).arrayBuffer());
-      const container = sniffVideoContainer(header);
-      if (!container) await reject("That file could not be prepared for playback");
-      let seconds: number | null = null;
-      let size: { width: number; height: number } | null = null;
-      if (container === "mp4" || container === "quicktime") {
-        const read = async (start: number, end: number) =>
-          new Uint8Array(await blob!.slice(start, end).arrayBuffer());
-        seconds = await mp4DurationSeconds(read, blob!.size);
-        size = await mp4VideoSize(read, blob!.size);
+      // Only the container magic bytes and the movie header are read, by range,
+      // rather than pulling the whole clip (up to 200 MB) into the Worker first.
+      // Any read the ranged path can't vouch for falls back to the full download,
+      // so this gate never passes a clip just because a range request failed.
+      const inspect = async (read: ByteReader, total: number) => {
+        const container = sniffVideoContainer(await read(0, 64));
+        let seconds: number | null = null;
+        let size: { width: number; height: number } | null = null;
+        if (container === "mp4" || container === "quicktime") {
+          seconds = await mp4DurationSeconds(read, total);
+          size = await mp4VideoSize(read, total);
+        }
+        return { container, seconds, size };
+      };
+      let facts: Awaited<ReturnType<typeof inspect>> | null = null;
+      const ranged = await rangedObjectReader(supabaseAdmin, path, bytes);
+      if (ranged) {
+        const result = await inspect(ranged.read, bytes).catch(() => null);
+        if (result && !ranged.failed()) facts = result;
       }
+      if (!facts) {
+        const { data: blob, error } = await supabaseAdmin.storage.from(VIDEO_BUCKET).download(path);
+        if (error || !blob) await reject("Uploaded file could not be read");
+        facts = await inspect(
+          async (start, end) => new Uint8Array(await blob!.slice(start, end).arrayBuffer()),
+          blob!.size,
+        );
+      }
+      const { container, seconds, size } = facts;
+      if (!container) await reject("That file could not be prepared for playback");
       if (clipLimits) {
         const problem =
           clipLengthProblem(seconds, clipLimits) ?? resolutionProblem(size, clipLimits);

@@ -231,3 +231,40 @@ export async function mp4VideoSize(
     return null;
   }
 }
+
+/**
+ * The codec of every picture track (`moov` → `trak` → `mdia` → `hdlr` "vide",
+ * then `minf` → `stbl` → `stsd`'s first sample entry), e.g. `avc1` or `hvc1`.
+ * Null when the file has no readable movie header. Walks box headers only, so a
+ * header written after the media (as phone cameras do) costs a few small reads.
+ */
+export async function mp4VideoCodecs(read: ByteReader, fileSize: number): Promise<string[] | null> {
+  try {
+    const moov = await findBox(read, 0, fileSize, "moov");
+    if (!moov) return null;
+    const inside = (b: Box, type: string) => findBox(read, b.start + b.headerSize, b.end, type);
+    const codecs: string[] = [];
+    for (const trak of await findBoxes(read, moov.start + moov.headerSize, moov.end, "trak")) {
+      const mdia = await inside(trak, "mdia");
+      const hdlr = mdia && (await inside(mdia, "hdlr"));
+      if (!mdia || !hdlr) continue;
+      // Version and flags, pre_defined, then the handler type.
+      const handler = await read(
+        hdlr.start + hdlr.headerSize + 8,
+        hdlr.start + hdlr.headerSize + 12,
+      );
+      if (String.fromCharCode(...handler) !== "vide") continue;
+      const minf = await inside(mdia, "minf");
+      const stbl = minf && (await inside(minf, "stbl"));
+      const stsd = stbl && (await inside(stbl, "stsd"));
+      if (!stsd) continue;
+      // Version and flags, entry count, then the first sample entry's size and type.
+      const entry = await read(stsd.start + stsd.headerSize + 8, stsd.start + stsd.headerSize + 16);
+      if (entry.length < 8) continue;
+      codecs.push(String.fromCharCode(entry[4], entry[5], entry[6], entry[7]));
+    }
+    return codecs;
+  } catch {
+    return null;
+  }
+}
