@@ -790,6 +790,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Cover image">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}
@@ -1561,6 +1562,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Cover image">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}
