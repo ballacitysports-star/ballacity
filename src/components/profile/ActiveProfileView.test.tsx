@@ -62,6 +62,13 @@ vi.mock("@/components/team/InvitePlayerDialog", () => ({
   InvitePlayerDialog: ({ open, teamName }: { open: boolean; teamName: string }) =>
     open ? <div role="dialog">Invite to {teamName}</div> : null,
 }));
+vi.mock("@/components/team/TeamRosterPanel", () => ({
+  TeamRosterPanel: ({ teamName }: { teamName: string }) => <div>Roster panel for {teamName}</div>,
+}));
+const rosterMembers = [{ id: "m1" }, { id: "m2" }, { id: "m3" }, { id: "m4" }, { id: "m5" }];
+vi.mock("@/lib/team-roster", () => ({
+  useTeamRoster: (teamId: string | undefined) => ({ data: teamId ? rosterMembers : undefined }),
+}));
 vi.mock("@/components/ProfileShareCard", () => ({
   ProfileShareCard: ({ open, data }: { open: boolean; data: { path: string } }) =>
     open ? <div role="dialog">Share {data.path}</div> : null,
@@ -112,9 +119,19 @@ describe("ActiveProfileView actions", () => {
     expect(screen.getByRole("dialog").textContent).toContain("Share /teams/t-1");
   });
 
+  it("gives a team a Roster tab and counts members from the roster", async () => {
+    renderView("team");
+    expect((await screen.findAllByText(/5 members/)).length).toBeGreaterThan(0);
+    const rosterTab = screen.getByRole("tab", { name: /roster/i });
+    expect(rosterTab.textContent).toContain("5");
+    fireEvent.click(rosterTab);
+    expect(screen.getByText("Roster panel for Ballacity Scout 14U")).toBeTruthy();
+  });
+
   it("offers Share but not roster invites to a trainer", async () => {
     renderView("trainer");
     expect(await screen.findByRole("button", { name: /^share$/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /invite players/i })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /roster/i })).toBeNull();
   });
 });
