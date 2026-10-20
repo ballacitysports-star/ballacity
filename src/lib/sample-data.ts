@@ -176,19 +176,42 @@ export function imageFor(sport: Sport) {
 }
 
 const SPORT_ASSET_RE = /\/assets\/sport-([a-z]+)[-.][^/]*$/;
+const PRESET_PREFIX = "preset:";
+
+function sportByKey(key: string): Sport | undefined {
+  return (Object.keys(sportImage) as Sport[]).find((s) => s.toLowerCase() === key.toLowerCase());
+}
 
 /**
- * Covers saved with a built-in sport image store its bundled URL, which
- * includes a content hash. When the artwork is updated that hash changes and
- * the saved URL would 404, so map any bundled sport image back to the
- * current one. Other URLs pass through unchanged.
+ * Turns a saved cover/image value into something an <img> can show.
+ *
+ * Built-in sport covers are saved by name (`preset:basketball`, see
+ * {@link toStoredCover}), so replacing the artwork never breaks a saved cover.
+ * Older rows hold the bundled file's URL, which includes a content hash that
+ * changes with the artwork and would 404, so those map back to the current
+ * image too. Every other URL passes through unchanged.
  */
 export function resolveSportAsset<T extends string | null | undefined>(url: T): T {
   if (!url) return url;
+  if (url.startsWith(PRESET_PREFIX)) {
+    const sport = sportByKey(url.slice(PRESET_PREFIX.length));
+    return (sport ? sportImage[sport] : HERO_IMAGE) as T;
+  }
   const m = SPORT_ASSET_RE.exec(url.split("?")[0]);
   if (!m) return url;
-  const sport = (Object.keys(sportImage) as Sport[]).find((s) => s.toLowerCase() === m[1]);
+  const sport = sportByKey(m[1]);
   return (sport ? sportImage[sport] : url) as T;
+}
+
+/**
+ * What to persist for a cover/image value: a built-in sport image becomes
+ * `preset:<sport>`; uploaded images and any other URL are kept as they are.
+ */
+export function toStoredCover<T extends string | null | undefined>(url: T): T | string {
+  if (!url || url.startsWith(PRESET_PREFIX)) return url;
+  const m = SPORT_ASSET_RE.exec(url.split("?")[0]);
+  const sport = m ? sportByKey(m[1]) : undefined;
+  return sport ? `${PRESET_PREFIX}${sport.toLowerCase()}` : url;
 }
 
 // Pinned to start-of-UTC-day so SSR and client hydration produce identical

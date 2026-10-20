@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
 import { normalizeCutoff } from "@/lib/cancel-window";
-import { imageFor, ME, resolveSportAsset } from "@/lib/sample-data";
+import { imageFor, ME, resolveSportAsset, toStoredCover } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
@@ -203,7 +203,8 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     is_private: !!g.isPrivate,
     urgent: !!g.urgent,
     trending: !!g.trending,
-    image: g.image && resolveSportAsset(g.image) !== imageFor(g.sport) ? g.image : "",
+    image:
+      g.image && resolveSportAsset(g.image) !== imageFor(g.sport) ? toStoredCover(g.image) : "",
     description: g.description ?? "",
     equipment: g.equipment ?? [],
     status: g.status ?? null,
@@ -526,7 +527,9 @@ export async function updateHostedGame(
   if (patch.isPrivate !== undefined) dbPatch.is_private = patch.isPrivate;
   if (patch.image !== undefined) {
     dbPatch.image =
-      patch.image && resolveSportAsset(patch.image) !== imageFor(updated.sport) ? patch.image : "";
+      patch.image && resolveSportAsset(patch.image) !== imageFor(updated.sport)
+        ? toStoredCover(patch.image)
+        : "";
   }
   if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   if (patch.status !== undefined) dbPatch.status = patch.status;
