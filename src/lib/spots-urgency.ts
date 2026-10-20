@@ -26,3 +26,14 @@ export function getSpotsUrgency(spotsLeft: number, maxPlayers?: number): SpotsUr
   }
   return "normal";
 }
+
+/**
+ * Plain-language availability for cards: "10 spots open" / "1 spot open" /
+ * "Full". `short` gives "10 open" for tight rows. Reads as a call to action
+ * where a bare "0/10" reads like nothing is happening.
+ */
+export function spotsOpenLabel(spotsLeft: number, opts: { short?: boolean } = {}): string {
+  if (spotsLeft <= 0) return "Full";
+  if (opts.short) return `${spotsLeft} open`;
+  return `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} open`;
+}
