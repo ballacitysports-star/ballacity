@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MapPin, Share2, Star, UserPlus, Users } from "lucide-react";
 import { ensureOrgById } from "@/lib/org-store";
 import { getTrainerOrg } from "@/lib/trainer-orgs.functions";
-import { GAMES, HERO_IMAGE, type Game, type Org } from "@/lib/sample-data";
+import { GAMES, HERO_IMAGE, resolveSportAsset, type Game, type Org } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -24,7 +24,9 @@ import { hideFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 import { InvitePlayerDialog } from "@/components/team/InvitePlayerDialog";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
-import { useTeamRoster } from "@/lib/team-roster";
+import { useTeamPendingInvites, useTeamRoster } from "@/lib/team-roster";
+import { TeamSetupChecklist } from "@/components/team/TeamSetupChecklist";
+import { teamSetupSteps } from "@/lib/team-setup";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 type ViewModel = {
@@ -68,6 +70,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
 
   // The real roster (team_members), so the member count matches the Roster tab.
   const roster = useTeamRoster(isTeam && refId ? refId : undefined);
+  const pendingInvites = useTeamPendingInvites(isTeam && refId ? refId : undefined, isTeam);
 
   const hosted = useHostedGames();
   const games: Game[] = useMemo(() => {
@@ -269,6 +272,25 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       </ProfileAboutSheet>
 
       <div className="px-4">
+        {isTeam && refId && teamQuery.data && (
+          <TeamSetupChecklist
+            teamId={refId}
+            editTo={vm.editTo}
+            onInvite={() => setInviteOpen(true)}
+            steps={teamSetupSteps({
+              hasLogo: !!vm.avatarUrl,
+              // The untouched default cover doesn't count; an upload or a
+              // chosen preset does.
+              hasCover:
+                !!teamQuery.data.cover && resolveSportAsset(teamQuery.data.cover) !== HERO_IMAGE,
+              bio: teamQuery.data.bio,
+              gameCount: games.length,
+              invitedCount:
+                (roster.data?.filter((m) => m.role !== "owner").length ?? 0) +
+                (pendingInvites.data?.length ?? 0),
+            })}
+          />
+        )}
         <ChannelTabs
           className="mt-5"
           value={tab}
