@@ -68,6 +68,7 @@ vi.mock("@/components/team/TeamRosterPanel", () => ({
 const rosterMembers = [{ id: "m1" }, { id: "m2" }, { id: "m3" }, { id: "m4" }, { id: "m5" }];
 vi.mock("@/lib/team-roster", () => ({
   useTeamRoster: (teamId: string | undefined) => ({ data: teamId ? rosterMembers : undefined }),
+  useTeamPendingInvites: () => ({ data: [] }),
 }));
 vi.mock("@/components/ProfileShareCard", () => ({
   ProfileShareCard: ({ open, data }: { open: boolean; data: { path: string } }) =>
@@ -128,10 +129,20 @@ describe("ActiveProfileView actions", () => {
     expect(screen.getByText("Roster panel for Ballacity Scout 14U")).toBeTruthy();
   });
 
+  it("shows a team its setup checklist", async () => {
+    renderView("team");
+    // Bio and roster are already there; logo, cover and a first game are not.
+    expect(await screen.findByText("2 of 5 done")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /add your logo/i }).getAttribute("href")).toBe(
+      "/teams/t-1/edit",
+    );
+  });
+
   it("offers Share but not roster invites to a trainer", async () => {
     renderView("trainer");
     expect(await screen.findByRole("button", { name: /^share$/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /invite players/i })).toBeNull();
     expect(screen.queryByRole("tab", { name: /roster/i })).toBeNull();
+    expect(screen.queryByText(/finish setting up/i)).toBeNull();
   });
 });
