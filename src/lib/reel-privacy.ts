@@ -52,8 +52,10 @@ export function reelPrivacyFor(
     };
   }
   return {
-    summary: "You choose: private, team-only, members, or public Highlights.",
-    detail: "Posted, completed reels can appear on public Highlights.",
+    // Adults have two states today: a draft only they can see, and a posted reel
+    // that is public. Say exactly that; there is no team-only or members choice.
+    summary: "Private until you post. Posted reels appear on your profile and public Highlights.",
+    detail: "Drafts are visible only to you. Once you post a reel, anyone can see it on your profile and public Highlights.",
     options: [],
     guardianControlled: false,
   };

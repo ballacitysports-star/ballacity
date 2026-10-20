@@ -74,10 +74,10 @@ export const BAND_COPY: Record<PrivacyBand, BandCopy> = {
   adult: {
     band: "adult",
     ageLabel: "18 and over",
-    summary: "You choose: private, team-only, members, or public Highlights.",
+    summary: "Private until you post. Posted reels appear on your profile and public Highlights.",
     audiences: [
-      "Private: only you.",
-      "Team-only, or signed-in members, or public Highlights: your choice for each reel you post.",
+      "Drafts: only you.",
+      "Posted reels: anyone, on your profile and the public Highlights feed.",
     ],
     never: [],
   },
