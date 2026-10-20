@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AVAILABILITY_EDIT_SCHEMA,
+  availabilityColumns,
   GAME_EDIT_SCHEMA,
   TRYOUT_EDIT_SCHEMA,
   changedFields,
@@ -28,6 +29,18 @@ describe("listingStatus", () => {
     expect(listingStatus("games", { ...game, date: past, ends_at: future }, NOW)).toBe("active");
     expect(listingStatus("games", { ...game, joined: 10 }, NOW)).toBe("full");
     expect(listingStatus("games", { ...game, joins_closed: true }, NOW)).toBe("joins_closed");
+  });
+
+  it("treats a held or unscreened team post as not live", () => {
+    const post = { event_date: future, moderation_status: "approved" };
+    expect(listingStatus("tryouts", post, NOW)).toBe("active");
+    expect(listingStatus("tryouts", { ...post, moderation_status: "held" }, NOW)).toBe("held");
+    expect(listingStatus("tryouts", { ...post, moderation_status: "pending" }, NOW)).toBe(
+      "screening",
+    );
+    expect(
+      listingStatus("tryouts", { ...post, moderation_status: "held", hidden_at: past }, NOW),
+    ).toBe("hidden");
   });
 
   it("reads tryouts and availability", () => {
@@ -67,6 +80,10 @@ describe("edits", () => {
     expect(TRYOUT_EDIT_SCHEMA.safeParse({ kind: "clinic" }).success).toBe(true);
     expect(AVAILABILITY_EDIT_SCHEMA.safeParse({ status: "active" }).success).toBe(false);
     expect(AVAILABILITY_EDIT_SCHEMA.safeParse({ sports: [] }).success).toBe(false);
+    expect(AVAILABILITY_EDIT_SCHEMA.safeParse({ looking_for: ["coach"] }).success).toBe(false);
+    expect(AVAILABILITY_EDIT_SCHEMA.safeParse({ looking_for: ["guest", "tryout"] }).success).toBe(
+      true,
+    );
   });
 
   it("treats the same instant in another format as unchanged", () => {
@@ -75,6 +92,13 @@ describe("edits", () => {
     expect(changedFields(before, { date: "2026-10-20T19:00:00.000Z" })).toEqual({
       date: "2026-10-20T19:00:00.000Z",
     });
+  });
+
+  it("ignores key order when comparing jsonb read back from the database", () => {
+    const before = { skill_levels: { Soccer: "High School", Basketball: "Rec League" } };
+    expect(
+      changedFields(before, { skill_levels: { Basketball: "Rec League", Soccer: "High School" } }),
+    ).toEqual({});
   });
 
   it("shifts a fixed end with the start and drops the pin when the address changes", () => {
@@ -89,5 +113,47 @@ describe("edits", () => {
     });
     expect(gameSideEffects(before, { location: "New Court" })).toEqual({ lat: null, lng: null });
     expect(gameSideEffects({ ...before, ends_at: null }, { date: future })).toEqual({});
+  });
+});
+
+describe("availabilityColumns", () => {
+  const before = {
+    sports: ["Basketball", "Soccer"],
+    skill_level: "Rec League",
+    skill_levels: { Basketball: "Rec League · High School", Soccer: "Club / Travel" },
+  };
+
+  it("saves edited levels as skill_levels and the primary sport's skill_level", () => {
+    expect(
+      availabilityColumns(before, {
+        levels: { Basketball: ["AAU / Travel"], Soccer: ["High School"] },
+        note: "x",
+      }),
+    ).toEqual({
+      note: "x",
+      skill_level: "AAU / Travel",
+      skill_levels: { Basketball: "AAU / Travel", Soccer: "High School" },
+    });
+  });
+
+  it("keeps existing levels when only sports change, dropping a removed sport's", () => {
+    expect(availabilityColumns(before, { sports: ["Soccer"] })).toEqual({
+      sports: ["Soccer"],
+      skill_level: "Club / Travel",
+      skill_levels: { Soccer: "Club / Travel" },
+    });
+  });
+
+  it("falls back to skill_level on a post saved before skill_levels existed", () => {
+    const legacy = { sports: ["Basketball"], skill_level: "High School", skill_levels: {} };
+    expect(availabilityColumns(legacy, { sports: ["Basketball", "Soccer"] })).toEqual({
+      sports: ["Basketball", "Soccer"],
+      skill_level: "High School",
+      skill_levels: { Basketball: "High School" },
+    });
+  });
+
+  it("leaves level columns alone when neither sports nor levels change", () => {
+    expect(availabilityColumns(before, { city: "Austin" })).toEqual({ city: "Austin" });
   });
 });

@@ -12,6 +12,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertSuperadmin, buildOrFilter, getAdmin, writeAudit } from "@/lib/superadmin.server";
 import {
   EDIT_SCHEMAS,
+  availabilityColumns,
   LISTING_SECTIONS,
   LISTING_VISIBILITY,
   TRYOUT_KINDS,
@@ -36,9 +37,9 @@ const SECTION_SELECT: Record<ListingSection, string> = {
   games:
     "id, title, sport, date, ends_at, location, neighborhood, host_id, status, joined, max_players, joins_closed, is_private, hidden_at, cancelled_at, completed_at, created_at",
   tryouts:
-    "id, team_id, author_id, kind, title, body, event_date, location, spots_max, spots_taken, hidden_at, created_at, team:teams(name, handle)",
+    "id, team_id, author_id, kind, title, body, event_date, location, spots_max, spots_taken, hidden_at, moderation_status, created_at, team:teams(name, handle)",
   availability:
-    "id, user_id, sports, skill_level, city, status, note, starts_on, ends_on, hidden_at, created_at",
+    "id, user_id, sports, skill_level, skill_levels, looking_for, city, status, note, starts_on, ends_on, hidden_at, created_at",
 };
 
 /** Who a listing belongs to: the game host or the availability's player. */
@@ -92,9 +93,17 @@ export const superadminListListings = createServerFn({ method: "POST" })
 
     // Visible means still live: not hidden and not over. Past ignores hiding.
     const whenCol = section === "games" ? "date" : section === "tryouts" ? "event_date" : null;
-    if (data.visibility === "hidden") q = q.not("hidden_at", "is", null);
+    // A team post whose text is held or not yet screened is not public either,
+    // so it counts as hidden here, not visible.
+    if (data.visibility === "hidden") {
+      q =
+        section === "tryouts"
+          ? q.or("hidden_at.not.is.null,moderation_status.neq.approved")
+          : q.not("hidden_at", "is", null);
+    }
     if (data.visibility === "visible") {
       q = q.is("hidden_at", null);
+      if (section === "tryouts") q = q.eq("moderation_status", "approved");
       if (section === "games") {
         // Still on, or not started: a game in progress stays live until it ends.
         q = q
@@ -204,7 +213,11 @@ export const superadminUpdateListing = createServerFn({ method: "POST" })
     if (readErr) throw new Error(readErr.message);
     if (!before) throw new Error("Listing not found");
 
-    const changes = changedFields(before, parsed.data as Record<string, unknown>);
+    const proposed =
+      section === "availability"
+        ? availabilityColumns(before, parsed.data as Record<string, unknown>)
+        : (parsed.data as Record<string, unknown>);
+    const changes = changedFields(before, proposed);
     if (Object.keys(changes).length === 0) return { ok: true, changed: [] as string[] };
 
     if (section === "games" && changes.max_players != null && changes.max_players < before.joined) {

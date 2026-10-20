@@ -36,6 +36,7 @@ import { LiveListingsTab } from "./LiveListingsTab";
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  listListings.mockImplementation(async () => ({ total: 1, rows: [game] }));
 });
 
 function renderTab() {
@@ -95,5 +96,61 @@ describe("LiveListingsTab", () => {
     expect(
       (screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe("LiveListingsTab tryouts and availability", () => {
+  it("badges a held tryout and approves it through the moderation action", async () => {
+    listListings.mockResolvedValue({
+      total: 1,
+      rows: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          kind: "tryout",
+          title: "Fall Tryouts",
+          event_date: "2099-11-01T18:00:00Z",
+          moderation_status: "held",
+          hidden_at: null,
+          owner_name: "Hawks",
+        },
+      ],
+    } as never);
+    renderTab();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Tryouts & camps/ }));
+    expect(await screen.findByText("Held for review")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(moderate).toHaveBeenCalledTimes(1));
+    expect(moderate.mock.calls[0][0]).toEqual({
+      data: {
+        kind: "posts",
+        id: "22222222-2222-4222-8222-222222222222",
+        action: "approve_text",
+        reason: "Live listings tab",
+      },
+    });
+  });
+
+  it("shows availability levels per sport and intent", async () => {
+    listListings.mockResolvedValue({
+      total: 1,
+      rows: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          user_id: "u1",
+          sports: ["Basketball", "Soccer"],
+          skill_level: "Rec League",
+          skill_levels: { Basketball: "Rec League · High School" },
+          looking_for: ["guest", "tryout"],
+          status: "open",
+          city: "Austin",
+          hidden_at: null,
+          owner_name: "Jo",
+        },
+      ],
+    } as never);
+    renderTab();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Player availability/ }));
+    expect(await screen.findByText("Basketball (Rec League · High School), Soccer")).toBeTruthy();
+    expect(screen.getByText(/Guest player & Trying out · Austin/)).toBeTruthy();
   });
 });
