@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles, TrendingUp, TrendingDown, Minus, ShieldCheck, Star } from "lucide-react";
-import type { Reputation } from "@/lib/reviews";
+import { trustLabel, type Reputation } from "@/lib/reviews";
 import type { ReputationInsight } from "@/lib/reviews-db";
 
 function Stars({ value, size = 14 }: { value: number; size?: number }) {
@@ -49,8 +49,8 @@ export function ReputationCard({
         <div>
           <div className="micro-label text-muted-foreground">Reputation</div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-display text-4xl font-bold leading-none">{rep.trustScore}</span>
-            <span className="text-xs text-muted-foreground">/ 100 trust</span>
+            <span className="font-display text-4xl font-bold leading-none">{trustLabel(rep)}</span>
+            {rep.count > 0 && <span className="text-xs text-muted-foreground">/ 100 trust</span>}
             {rep.count > 0 && rep.provisional && (
               <span
                 className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground"

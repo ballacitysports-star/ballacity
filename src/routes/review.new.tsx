@@ -3,13 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
-import {
-  REVIEWER_META,
-  REVIEWEE_META,
-  CRITERIA,
-  type ReviewerKind,
-  type RevieweeKind,
-} from "@/lib/reviews";
+import { REVIEWEE_META, CRITERIA, type ReviewerKind, type RevieweeKind } from "@/lib/reviews";
 import { useTransactionsWith } from "@/lib/transactions";
 import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
@@ -45,17 +39,14 @@ export const Route = createFileRoute("/review/new")({
   component: ReviewNew,
 });
 
-const KINDS: ReviewerKind[] = ["player", "trainer", "team", "host"];
-
 function ReviewNew() {
   const search = Route.useSearch();
   const nav = useNavigate();
   const revieweeKind: RevieweeKind = search.revieweeKind ?? "player";
-  const lockReviewerToPlayer = revieweeKind !== "player";
-  const [kind, setKind] = useState<ReviewerKind>(
-    lockReviewerToPlayer ? "player" : (search.kind ?? "player"),
-  );
-  const [rating, setRating] = useState(5);
+  // The reviewer's role (player, or host of the game being reviewed) is
+  // decided by the server from the shared activity, never picked here.
+  const kind: ReviewerKind = "player";
+  const [rating, setRating] = useState(0); // no default: an unpicked rating anchors people
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [picks, setPicks] = useState<string[]>([]);
@@ -65,7 +56,6 @@ function ReviewNew() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
 
-  const reviewerMeta = REVIEWER_META[kind];
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
   const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
@@ -228,38 +218,6 @@ function ReviewNew() {
           </div>
         )}
 
-        {/* Reviewer role */}
-        {!lockReviewerToPlayer && (
-          <section>
-            <h2 className="font-display section-eyebrow text-muted-foreground mb-2">
-              I'm reviewing as
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {KINDS.map((k) => {
-                const m = REVIEWER_META[k];
-                const active = kind === k;
-                return (
-                  <button
-                    key={k}
-                    onClick={() => {
-                      setKind(k);
-                      setScores({});
-                    }}
-                    className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
-                      active
-                        ? "border-lime bg-lime/10 text-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    <span className="text-base">{m.emoji}</span>
-                    {m.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
         {/* Star rating */}
         <section>
           <h2 className="font-display section-eyebrow text-muted-foreground mb-2">Overall</h2>
@@ -278,32 +236,62 @@ function ReviewNew() {
                 />
               </motion.button>
             ))}
-            <span className="ml-2 font-display text-2xl font-bold">{rating}</span>
+            <span
+              className={`ml-2 font-display font-bold ${rating ? "text-2xl" : "text-sm text-muted-foreground"}`}
+            >
+              {rating || "Tap to rate"}
+            </span>
           </div>
         </section>
 
         {/* 10-criterion breakdown */}
         <section>
-          <h2 className="font-display section-eyebrow text-muted-foreground mb-2">
-            10-point breakdown
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-1">
+            Breakdown <span className="normal-case text-[10px]">(optional)</span>
           </h2>
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Only the ones you set are saved — skip any you didn't notice.
+          </p>
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
             {criteria.map((c) => {
-              const value = scores[c.key] ?? 4;
+              const set = scores[c.key] !== undefined;
               return (
                 <div key={c.key}>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold">{c.label}</span>
-                    <span className="text-lime font-bold">{value} / 5</span>
+                    {set ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScores((s) => {
+                            const next = { ...s };
+                            delete next[c.key];
+                            return next;
+                          })
+                        }
+                        aria-label={`Clear ${c.label}`}
+                        className="text-lime font-bold"
+                      >
+                        {scores[c.key]} / 5 ✕
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">Not rated</span>
+                    )}
                   </div>
                   <input
                     type="range"
                     min={1}
                     max={5}
                     step={1}
-                    value={value}
+                    value={scores[c.key] ?? 3}
+                    aria-label={c.label}
                     onChange={(e) => setScores((s) => ({ ...s, [c.key]: Number(e.target.value) }))}
-                    className="mt-1 w-full accent-lime"
+                    // An unset slider rests on 3, where a tap fires no change event.
+                    onPointerUp={(e) => {
+                      const v = Number(e.currentTarget.value);
+                      setScores((s) => (s[c.key] === undefined ? { ...s, [c.key]: v } : s));
+                    }}
+                    className={`mt-1 w-full accent-lime ${set ? "" : "opacity-40"}`}
                   />
                 </div>
               );

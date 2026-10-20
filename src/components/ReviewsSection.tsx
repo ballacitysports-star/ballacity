@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import {
+  CRITERIA,
   REVIEWER_META,
   computeReputation,
   type ReviewerKind,
@@ -138,7 +139,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
       {r.scores && Object.keys(r.scores).length > 0 && (
         <details className="mt-3 group">
           <summary className="cursor-pointer micro-label text-muted-foreground hover:text-lime">
-            See all 10 criteria
+            See breakdown ({Object.keys(r.scores).length})
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             {Object.entries(r.scores).map(([k, v]) => (
@@ -146,7 +147,9 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
                 key={k}
                 className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1"
               >
-                <span className="micro-label text-muted-foreground truncate">{k}</span>
+                <span className="micro-label text-muted-foreground truncate">
+                  {CRITERIA[r.revieweeKind]?.find((c) => c.key === k)?.label ?? k}
+                </span>
                 <span className="font-display text-xs font-bold text-lime">
                   {v}
                   <span className="text-muted-foreground text-[9px]">/5</span>

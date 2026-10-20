@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Minus, Star, ShieldCheck } from "lucide-react";
-import type { Reputation } from "@/lib/reviews";
+import { trustLabel, type Reputation } from "@/lib/reviews";
 
 function Stars({ value, size = 12 }: { value: number; size?: number }) {
   return (
@@ -14,6 +14,12 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
       ))}
     </div>
   );
+}
+
+function badgeAriaLabel(rep: Reputation): string {
+  return rep.count > 0
+    ? `Open reviews. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`
+    : "Open reviews. No reviews yet.";
 }
 
 export function ReputationBadge({
@@ -42,19 +48,14 @@ export function ReputationBadge({
       <Component
         type={onClick ? "button" : undefined}
         onClick={onClick}
-        aria-label={
-          onClick
-            ? (ariaLabel ??
-              `Open reviews. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`)
-            : undefined
-        }
+        aria-label={onClick ? (ariaLabel ?? badgeAriaLabel(rep)) : undefined}
         aria-haspopup={onClick ? "dialog" : undefined}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         className={`flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}
       >
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 font-display text-sm font-bold text-lime">
-          {rep.trustScore}
+          {trustLabel(rep)}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -87,12 +88,7 @@ export function ReputationBadge({
     <Component
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      aria-label={
-        onClick
-          ? (ariaLabel ??
-            `Open reviews. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`)
-          : undefined
-      }
+      aria-label={onClick ? (ariaLabel ?? badgeAriaLabel(rep)) : undefined}
       aria-haspopup={onClick ? "dialog" : undefined}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -101,7 +97,7 @@ export function ReputationBadge({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-lime/15 font-display text-lg font-bold text-lime">
-            {rep.trustScore}
+            {trustLabel(rep)}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
