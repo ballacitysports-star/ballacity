@@ -90,6 +90,9 @@ export async function assertConverterReachable(): Promise<void> {
   return reachable;
 }
 
+/** The standard pass's longest side: 1080p in either orientation. */
+const STANDARD_LONG_EDGE = 1920;
+
 /** Full-quality baseline H.264 + AAC re-encode: the first thing we try. */
 export const DEFAULT_ENCODE_ARGS = [
   "-c:v",
@@ -104,9 +107,12 @@ export const DEFAULT_ENCODE_ARGS = [
   "veryfast",
   "-crf",
   "26",
-  // Even dimensions are required by yuv420p.
+  // At most 1080p (and even dimensions, which yuv420p requires). Single-threaded
+  // wasm encodes a 4K clip at a crawl, or runs out of memory and falls through
+  // to a lighter pass after minutes of wasted work; 1080p is plenty on a phone,
+  // and the original is kept beside this copy.
   "-vf",
-  "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+  longEdgeScaleFilter(STANDARD_LONG_EDGE),
   "-c:a",
   "aac",
   "-b:a",
@@ -260,7 +266,11 @@ const FALLBACK_PASSES: { label: string; args: string[] }[] = [
 ];
 
 /** Each pass's own size ceiling (its longer edge), used when a plan limit is lower. */
-const PASS_LONG_EDGE: Record<string, number> = { standard: Infinity, "720p": 1280, silent: 960 };
+const PASS_LONG_EDGE: Record<string, number> = {
+  standard: STANDARD_LONG_EDGE,
+  "720p": 1280,
+  silent: 960,
+};
 
 /**
  * A scale filter that shrinks the longer edge to `maxLongEdge` (never enlarging),

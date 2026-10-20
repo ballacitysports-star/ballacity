@@ -8,6 +8,7 @@ import {
   clipLimitsFor,
   exceedsResolution,
   mp4DurationSeconds,
+  mp4VideoCodecs,
   mp4VideoSize,
   resolutionProblem,
   uploadSizeProblem,
@@ -209,5 +210,45 @@ describe("resolution and processing limits", () => {
     expect(clipLimitsFor("free", { ...slow, maxProcessingSeconds: 120 }).maxProcessingSeconds).toBe(
       120,
     );
+  });
+});
+
+/** A track with a handler and a first sample entry, as cameras write them. */
+function codecTrak(handler: string, entry: string): Uint8Array {
+  const hdlr = box(
+    "hdlr",
+    concat(new Uint8Array(8), new TextEncoder().encode(handler), new Uint8Array(12)),
+  );
+  const stsd = box(
+    "stsd",
+    concat(new Uint8Array([0, 0, 0, 0, 0, 0, 0, 1]), box(entry, new Uint8Array(78))),
+  );
+  const minf = box("minf", box("stbl", stsd));
+  return box("trak", concat(tkhd(0, 0, 0), box("mdia", concat(hdlr, minf))));
+}
+
+describe("mp4VideoCodecs", () => {
+  it("reads the picture track's codec from a header written after the media", async () => {
+    const mdat = box("mdat", new Uint8Array(600_000));
+    const moov = box(
+      "moov",
+      concat(mvhd(0, 600, 6000), codecTrak("soun", "mp4a"), codecTrak("vide", "avc1")),
+    );
+    const file = concat(box("ftyp", new TextEncoder().encode("qt  \0\0\0\0qt  ")), mdat, moov);
+    const { read, reads } = reader(file);
+    expect(await mp4VideoCodecs(read, file.length)).toEqual(["avc1"]);
+    expect(reads.every(([s, e]) => e - s <= 16)).toBe(true);
+  });
+
+  it("reports HEVC, and nothing for a header with no picture track", async () => {
+    const hevc = concat(ftyp, box("moov", codecTrak("vide", "hvc1")));
+    expect(await mp4VideoCodecs(reader(hevc).read, hevc.length)).toEqual(["hvc1"]);
+    const audioOnly = concat(ftyp, box("moov", codecTrak("soun", "mp4a")));
+    expect(await mp4VideoCodecs(reader(audioOnly).read, audioOnly.length)).toEqual([]);
+  });
+
+  it("returns null for a file that is not an MP4", async () => {
+    const riff = new TextEncoder().encode("RIFF\xff\xff\xff\xffAVI LIST");
+    expect(await mp4VideoCodecs(reader(riff).read, riff.length)).toBeNull();
   });
 });

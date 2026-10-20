@@ -133,10 +133,10 @@ describe("plan resolution cap", () => {
     expect(filters[2]).toContain("min(960,iw)");
   });
 
-  it("uses the pass's own ceiling when the plan allows more, and changes nothing without a cap", async () => {
+  it("uses the pass's own ceiling when the plan allows more, and keeps the remux without a cap", async () => {
     const { conversionPasses, longEdgeScaleFilter } = await freshModule();
     const passes = conversionPasses(4096);
-    expect(passes[0].args).toContain(longEdgeScaleFilter(4096));
+    expect(passes[0].args).toContain(longEdgeScaleFilter(1920));
     expect(passes[1].args).toContain(longEdgeScaleFilter(1280));
     expect(conversionPasses().map((p) => p.label)).toContain("remux");
     expect(longEdgeScaleFilter(1081)).toContain("min(1080,iw)");
