@@ -384,6 +384,7 @@ function ReelCard({
             title={displayTitle}
             caption={reel.ai_caption}
             hashtags={reel.ai_hashtags}
+            videoPath={reel.playback_path ?? reel.video_path}
           />
         )}
         {isDone && reel.game_id && !reel.subject_child_id && (

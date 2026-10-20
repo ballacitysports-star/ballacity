@@ -47,3 +47,17 @@ export function platformShareUrl(platform: SharePlatform, c: ShareContent): stri
       return `https://wa.me/?text=${q(buildCaption(c, { withUrl: true }))}`;
   }
 }
+
+/** A safe download filename for a reel, keeping the stored file's extension. */
+export function reelDownloadName(title: string, storagePath: string): string {
+  const ext = /\.(mp4|mov|m4v|webm)$/i.exec(storagePath)?.[1]?.toLowerCase() ?? "mp4";
+  const slug = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return `${slug || "ballacity-reel"}.${ext}`;
+}

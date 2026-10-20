@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildCaption, normalizeHashtags, platformShareUrl } from "../social-share";
+import {
+  buildCaption,
+  normalizeHashtags,
+  platformShareUrl,
+  reelDownloadName,
+} from "../social-share";
 
 const c = {
   title: "T",
@@ -25,5 +30,12 @@ describe("social-share", () => {
     const long = { ...c, text: "a".repeat(500) };
     const text = decodeURIComponent(platformShareUrl("x", long).split("text=")[1].split("&url")[0]);
     expect(text.length).toBeLessThanOrEqual(220);
+  });
+  it("builds safe reel download names", () => {
+    expect(reelDownloadName("Big Win! Café 3-pointer", "u/abc/clip.MOV")).toBe(
+      "big-win-cafe-3-pointer.mov",
+    );
+    expect(reelDownloadName("🔥🔥", "u/abc/clip")).toBe("ballacity-reel.mp4");
+    expect(reelDownloadName("a".repeat(100), "x.mp4")).toBe(`${"a".repeat(60)}.mp4`);
   });
 });
