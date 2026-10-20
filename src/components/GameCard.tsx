@@ -17,7 +17,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
-import { GameDistance } from "@/components/GameDistance";
+import { GamePlaceDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -188,9 +188,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Clock className="h-3.5 w-3.5 text-lime" />
               {formatGameWhen(game)}
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-coral" />
-              <GameDistance game={game} />
+              <GamePlaceDistance game={game} />
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
