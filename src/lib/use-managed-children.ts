@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
   createManagedChild,
+  createPairingLink,
   deleteManagedChild,
+  revokeChildDevices,
   startManagedSession,
   type CreatedManagedChild,
 } from "@/lib/managed-children.functions";
@@ -55,6 +57,22 @@ export function useSwitchToManagedChild() {
       const { tokenHash } = await fn({ data: { childUserId: input.childUserId } });
       await switchToManagedChild({ ...input, tokenHash, guardianName });
     },
+  });
+}
+
+/** Make a one-time link for the child's own phone (see `createPairingLink`). */
+export function useCreatePairingLink() {
+  const fn = useServerFn(createPairingLink);
+  return useMutation({
+    mutationFn: (input: { childUserId: string }) => fn({ data: input }),
+  });
+}
+
+/** Sign the child out of every device. */
+export function useRevokeChildDevices() {
+  const fn = useServerFn(revokeChildDevices);
+  return useMutation({
+    mutationFn: (input: { childUserId: string }) => fn({ data: input }),
   });
 }
 

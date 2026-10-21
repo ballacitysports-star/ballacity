@@ -114,6 +114,24 @@ export async function switchToManagedChild(input: {
   window.location.assign("/profile");
 }
 
+/**
+ * Sign this device into a managed child's profile from a guardian's pairing
+ * link. `tokenHash` comes from `redeemPairingLink`, which has already spent the
+ * link. Unlike `switchToManagedChild` there is no guardian session to park:
+ * this is the child's own phone, and a guardian only ever gets back in by
+ * signing in on their own device.
+ */
+export async function pairThisDevice(tokenHash: string): Promise<void> {
+  identitySwitchInProgress = true;
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+  if (error) {
+    identitySwitchInProgress = false;
+    throw new Error("Couldn't open that profile. Ask your parent for a new link.");
+  }
+  await resetPerUserClientState();
+  window.location.assign("/profile");
+}
+
 /** Read and remove the parked guardian session in one step. */
 export function takeParkedGuardianSession(): ParkedGuardianSession | null {
   const parked = readParkedGuardianSession();

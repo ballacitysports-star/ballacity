@@ -20,6 +20,13 @@ import {
   managedChildErrorMessage,
   managedEmailFor,
 } from "@/lib/managed-children";
+import {
+  MAX_PAIR_LINKS_PER_HOUR,
+  generatePairToken,
+  hashPairToken,
+  isPairToken,
+  pairLinkExpiry,
+} from "@/lib/managed-pairing";
 
 /**
  * Server side of managed children — minors a guardian adds without giving
@@ -319,4 +326,208 @@ export const startManagedSession = createServerFn({ method: "POST" })
     } as never);
 
     return { tokenHash };
+  });
+
+/**
+ * The caller must be an adult, not a managed child, and the managing guardian
+ * of `childUserId`, who must still be a credential-less managed child. Returns
+ * the child's placeholder address (what a sign-in link is generated for).
+ */
+async function assertManagingGuardian(ctx: Ctx, childUserId: string): Promise<string> {
+  refuseManagedCaller(ctx);
+  if ((await callerCohort(ctx)) !== "adult") {
+    throw new Error(managedChildErrorMessage("ADULT_REQUIRED"));
+  }
+  const { data: managed } = await ctx.supabase
+    .from("managed_accounts")
+    .select("child_user_id")
+    .eq("child_user_id", childUserId)
+    .eq("managed_by", ctx.userId)
+    .maybeSingle();
+  if (!managed) throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+  return childEmailManagedBy(childUserId, ctx.userId);
+}
+
+/** The child's address, only if they are a managed child managed by `guardianId`. */
+async function childEmailManagedBy(childUserId: string, guardianId: string): Promise<string> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: child } = await supabaseAdmin.auth.admin.getUserById(childUserId);
+  const user = child?.user;
+  if (!user?.email || !isManagedUser(user) || managedByOf(user) !== guardianId) {
+    throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+  }
+  return user.email;
+}
+
+/**
+ * `managed_pair_links` is not in the generated types until they are next
+ * regenerated, and only ever touched here with the service role.
+ */
+async function pairLinksTable() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const admin = supabaseAdmin as unknown as SupabaseClient;
+  return { admin, links: admin.from("managed_pair_links") };
+}
+
+async function auditFamily(
+  actorUserId: string,
+  childUserId: string,
+  action: string,
+  context: Record<string, unknown> = {},
+) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin.from("family_audit_log").insert({
+    actor_user_id: actorUserId,
+    child_user_id: childUserId,
+    action,
+    context,
+  } as never);
+}
+
+/**
+ * Make a one-time link the managing guardian can give to their child's phone.
+ *
+ * Only a hash of the token is stored. A new link cancels any earlier one that
+ * hasn't been used, so there is only ever one live link per child.
+ */
+export const createPairingLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string }) =>
+    z.object({ childUserId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ context, data }): Promise<{ token: string; expiresAt: string }> => {
+    const ctx: Ctx = context;
+    await assertManagingGuardian(ctx, data.childUserId);
+
+    const { links } = await pairLinksTable();
+    const hourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+    const { count } = await links
+      .select("id", { count: "exact", head: true })
+      .eq("child_user_id", data.childUserId)
+      .gte("created_at", hourAgo);
+    if ((count ?? 0) >= MAX_PAIR_LINKS_PER_HOUR) {
+      throw new Error(managedChildErrorMessage("PAIR_RATE_LIMITED"));
+    }
+
+    const now = new Date().toISOString();
+    await links
+      .update({ revoked_at: now })
+      .eq("child_user_id", data.childUserId)
+      .is("used_at", null)
+      .is("revoked_at", null);
+
+    const token = generatePairToken();
+    const expiresAt = pairLinkExpiry().toISOString();
+    const { error } = await links.insert({
+      child_user_id: data.childUserId,
+      created_by: ctx.userId,
+      token_hash: await hashPairToken(token),
+      expires_at: expiresAt,
+    });
+    if (error) {
+      console.error("[managed-children] pair link insert failed", error.message);
+      throw new Error(managedChildErrorMessage(null));
+    }
+
+    await auditFamily(ctx.userId, data.childUserId, "managed.pair_link_created");
+    return { token, expiresAt };
+  });
+
+/**
+ * Redeem a pairing link from the child's phone. There is no signed-in caller:
+ * the unguessable, single-use token is the credential.
+ *
+ * The link is spent before anything else happens, in one conditional update, so
+ * two taps can't both win. Every failure answers the same way, so nobody can
+ * tell an unknown link from an expired, used or revoked one. Like
+ * `startManagedSession`, this returns only a one-time token hash for the
+ * browser to redeem with `verifyOtp`; the child's session tokens never pass
+ * through this server.
+ */
+export const redeemPairingLink = createServerFn({ method: "POST" })
+  .inputValidator((d: { token: string }) =>
+    z.object({ token: z.string().refine(isPairToken) }).parse(d),
+  )
+  .handler(async ({ data }): Promise<{ tokenHash: string }> => {
+    const invalid = () => new Error(managedChildErrorMessage("PAIR_LINK_INVALID"));
+
+    const { admin, links } = await pairLinksTable();
+    const { data: spent } = await links
+      .update({ used_at: new Date().toISOString() })
+      .eq("token_hash", await hashPairToken(data.token))
+      .is("used_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .select("child_user_id, created_by")
+      .maybeSingle();
+    if (!spent) throw invalid();
+    const { child_user_id: childUserId, created_by: guardianId } = spent as {
+      child_user_id: string;
+      created_by: string;
+    };
+
+    // The guardian must still manage this child, as when the link was made.
+    const { data: managed } = await admin
+      .from("managed_accounts")
+      .select("child_user_id")
+      .eq("child_user_id", childUserId)
+      .eq("managed_by", guardianId)
+      .maybeSingle();
+    if (!managed) throw invalid();
+
+    let email: string;
+    try {
+      email = await childEmailManagedBy(childUserId, guardianId);
+    } catch {
+      throw invalid();
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+    const tokenHash = link?.properties?.hashed_token;
+    if (error || !tokenHash) {
+      console.error("[managed-children] pair generateLink failed", error?.message);
+      throw new Error(managedChildErrorMessage(null));
+    }
+
+    await auditFamily(guardianId, childUserId, "managed.device_paired", { via: "pair_link" });
+    return { tokenHash };
+  });
+
+/**
+ * Sign the child out everywhere: every session and refresh token is deleted,
+ * and any link that hasn't been used is cancelled. A phone that was already
+ * signed in is logged out the next time it refreshes — an access token already
+ * issued keeps working until it expires (about an hour).
+ */
+export const revokeChildDevices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string }) =>
+    z.object({ childUserId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ context, data }): Promise<{ ok: true }> => {
+    const ctx: Ctx = context;
+    await assertManagingGuardian(ctx, data.childUserId);
+
+    const { links } = await pairLinksTable();
+    await links
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("child_user_id", data.childUserId)
+      .is("used_at", null)
+      .is("revoked_at", null);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("admin_revoke_user_sessions", {
+      _user_id: data.childUserId,
+    });
+    if (error) {
+      console.error("[managed-children] revoke sessions failed", error.message);
+      throw new Error(managedChildErrorMessage(null));
+    }
+
+    await auditFamily(ctx.userId, data.childUserId, "managed.devices_revoked");
+    return { ok: true };
   });
