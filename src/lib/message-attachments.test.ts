@@ -52,6 +52,30 @@ describe("message attachment storage", () => {
     expect(p).toMatch(/is_conversation_participant\(\s*\(split_part\(name, '\/', 1\)\)::uuid/);
   });
 
+  it("keeps a file nobody has sent yet private to whoever uploaded it", () => {
+    // Attachments upload as soon as they are picked, so a file can sit in the
+    // bucket for a while before any message points at it. The other person in
+    // the conversation must not be able to read or list it through the
+    // storage API in the meantime: hiding it in the UI is not a boundary.
+    const p = lastPolicy("msg_attach_read_participants");
+    // The uploader reads their own file. Without this the upload itself fails,
+    // because a new row is checked against the read policy on its way back out.
+    expect(p).toMatch(/auth\.uid\(\)::text = split_part\(name, '\/', 2\)/);
+    // Anyone else needs a message in that same conversation that points at it.
+    expect(p).toMatch(
+      /EXISTS \( SELECT 1 FROM public\.messages m WHERE m\.attachment_path = objects\.name/,
+    );
+    expect(p).toMatch(/m\.conversation_id = \(split_part\(objects\.name, '\/', 1\)\)::uuid/);
+    // An unsent or removed message no longer exposes its file.
+    expect(p).toMatch(/m\.deleted_at IS NULL/);
+  });
+
+  it("indexes the path that read check looks up", () => {
+    expect(ALL).toMatch(
+      /CREATE INDEX IF NOT EXISTS messages_attachment_path_idx ON public\.messages \(attachment_path\)/,
+    );
+  });
+
   it("only lets a member upload into their own folder, in a thread they are in", () => {
     // Second segment is the uploader; without both checks a member could write
     // into someone else's conversation, or spoof another sender's folder.
