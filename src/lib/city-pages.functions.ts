@@ -8,8 +8,11 @@ import {
   filterBySport,
   isPublicUpcomingGame,
   sportForGuideSlug,
+  toPublicTeam,
   type CityGameRow,
   type CityListings,
+  type PublicTeam,
+  type PublicTeamRow,
 } from "./city-seo";
 import { cityBounds, cityBySlug } from "./launch-cities";
 
@@ -111,6 +114,25 @@ export type PublicGameSeo = {
   /** False for private, hidden, cancelled, past, or youth games: noindex. */
   indexable: boolean;
 };
+
+export const PUBLIC_TEAM_COLUMNS = `${CITY_ORG_COLUMNS},handle,bio,verified,founded,positions_needed`;
+
+/**
+ * One team for a signed-out visitor. Public columns only, and null for a team
+ * that is hidden, a coach profile, or aimed at under-18s, so the page can show
+ * one generic prompt without saying which of those it is.
+ */
+export const getPublicTeam = createServerFn({ method: "GET" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1).max(64) }).parse(d))
+  .handler(async ({ data }): Promise<PublicTeam | null> => {
+    const { data: row, error } = await publicClient()
+      .from("teams")
+      .select(PUBLIC_TEAM_COLUMNS)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) return null;
+    return toPublicTeam(row as unknown as PublicTeamRow);
+  });
 
 export const getPublicGameSeo = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1).max(64) }).parse(d))

@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
-import { isPublicGamePath } from "@/lib/public-paths";
+import { isSignedOutPublicPath } from "@/lib/public-paths";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { StaffBar } from "@/components/staff/StaffBar";
@@ -588,9 +588,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const isPublic =
     pathname === "/" ||
-    // Only a signed-out visitor gets the public game preview. A signed-in member
-    // still goes through the age and account-type steps below on a game link.
-    (!user && isPublicGamePath(pathname)) ||
+    // Only a signed-out visitor gets the public game, team and facility pages. A
+    // signed-in member still goes through the age and account-type steps below.
+    (!user && isSignedOutPublicPath(pathname)) ||
     PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
   const isTab = TAB_PATHS.includes(pathname);
   // Second-chance verification: on mobile Safari/Chrome the Supabase session

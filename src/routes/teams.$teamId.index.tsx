@@ -1,4 +1,7 @@
-import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect, useLocation } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
+import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
+import { PublicTeamPreview } from "@/components/teams/PublicTeamPreview";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -99,7 +102,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
       modal: fallback(z.string(), "").default(""),
     }),
   ),
-  component: TeamPage,
+  component: TeamRoute,
   errorComponent: () => (
     <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this team.</p>
@@ -139,6 +142,19 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "clinic", label: "🧠 Clinics" },
   { key: "announcement", label: "📣 News" },
 ];
+
+/**
+ * Signed-out visitors (a shared link, a search result) get the short public
+ * preview; the roster, posts and actions are the signed-in page below.
+ */
+function TeamRoute() {
+  const { user, loading } = useAuth();
+  const { teamId } = Route.useParams();
+  const { pathname, searchStr } = useLocation();
+  if (loading) return <AuthRedirectSkeleton label="Loading team…" />;
+  if (!user) return <PublicTeamPreview teamId={teamId} next={`${pathname}${searchStr}`} />;
+  return <TeamPage />;
+}
 
 function TeamPage() {
   const org = Route.useLoaderData() as Org;

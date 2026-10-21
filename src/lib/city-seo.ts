@@ -1,6 +1,7 @@
 import { SITE_URL } from "@/lib/seo";
 import { cityForPoint, cityForText, cityLabel, type LaunchCity } from "@/lib/launch-cities";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
+import { openSpotCount } from "@/lib/team-recruiting";
 
 /**
  * SEO rules for the city landing pages and the public-entity sitemap entries.
@@ -76,6 +77,55 @@ export function orgTouchesMinors(o: Pick<CityOrgRow, "age_groups">): boolean {
 
 export function isPublicOrg(o: CityOrgRow): boolean {
   return !o.hidden_at && !orgTouchesMinors(o);
+}
+
+export type PublicTeamRow = CityOrgRow & {
+  handle: string | null;
+  bio: string | null;
+  verified: boolean | null;
+  founded: number | null;
+  positions_needed: unknown;
+};
+
+/** The few facts a signed-out visitor sees of a team. No roster, staff or contact details. */
+export type PublicTeam = {
+  id: string;
+  name: string;
+  handle: string | null;
+  city: string | null;
+  sports: string[];
+  tagline: string | null;
+  bio: string | null;
+  verified: boolean;
+  founded: number | null;
+  /** Open roster spots the team has posted; 0 when it is not recruiting. */
+  openSpots: number;
+};
+
+const PUBLIC_TEAM_BIO_MAX = 400;
+
+/**
+ * What may be shown to an anonymous visitor, or null when the team is hidden, a
+ * coach profile (those pages are not public), or aimed at under-18s.
+ */
+export function toPublicTeam(row: PublicTeamRow): PublicTeam | null {
+  if (row.kind === "coach" || !isPublicOrg(row)) return null;
+  const needed =
+    row.positions_needed && typeof row.positions_needed === "object"
+      ? (row.positions_needed as Parameters<typeof openSpotCount>[0])
+      : undefined;
+  return {
+    id: row.id,
+    name: row.name,
+    handle: row.handle,
+    city: row.city,
+    sports: row.sports ?? [],
+    tagline: row.tagline,
+    bio: row.bio ? row.bio.slice(0, PUBLIC_TEAM_BIO_MAX) : null,
+    verified: row.verified === true,
+    founded: row.founded,
+    openSpots: openSpotCount(needed),
+  };
 }
 
 export function guideSlugForSport(sport: string): string | undefined {
