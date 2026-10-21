@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useMemo, useState } from "react";
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/review/new")({
     kind: isKind(s.kind) ? s.kind : "player",
     context: typeof s.context === "string" ? s.context : undefined,
   }),
-  component: ReviewNew,
+  component: withRequireAuth(ReviewNew),
 });
 
 const KINDS: ReviewerKind[] = ["player", "trainer", "team", "host"];

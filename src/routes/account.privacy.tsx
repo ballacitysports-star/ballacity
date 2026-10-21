@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { isLegalReviewed } from "@/lib/legal-review";
 import { BackHeader } from "@/components/layout/BackHeader";
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/account/privacy")({
         "Control who can see your BallaCity profile, how precisely your location is shared, who can message or invite you, and delete your account.",
       noindex: true,
     }),
-  component: PrivacySettingsPage,
+  component: withRequireAuth(PrivacySettingsPage),
 });
 
 function OptionList<T extends string>({

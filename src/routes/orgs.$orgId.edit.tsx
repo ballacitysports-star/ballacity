@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/orgs/$orgId/edit")({
       noindex: true,
     }),
   ssr: false,
-  component: EditOrg,
+  component: withRequireAuth(EditOrg),
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't open this gym for editing"

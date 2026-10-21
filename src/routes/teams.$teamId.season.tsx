@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/teams/$teamId/season")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: SeasonPage,
+  component: withRequireAuth(SeasonPage),
 });
 
 function SeasonPage() {

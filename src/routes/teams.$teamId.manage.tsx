@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Shield } from "lucide-react";
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/teams/$teamId/manage")({
       noindex: true,
     }),
   ssr: false,
-  component: ManageTeam,
+  component: withRequireAuth(ManageTeam),
 });
 
 function ManageTeam() {

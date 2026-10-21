@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/teams/$teamId/invite-parent")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: InviteParentPage,
+  component: withRequireAuth(InviteParentPage),
 });
 
 function InviteParentPage() {
