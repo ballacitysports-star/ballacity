@@ -138,6 +138,7 @@ function MessagesInbox() {
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/feed"
+          aria-label="Back to feed"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />

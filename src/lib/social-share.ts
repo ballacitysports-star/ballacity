@@ -36,6 +36,23 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max - 1).trimEnd()}…`;
 }
 
+/**
+ * Share-sheet content for a game page: the canonical link and a one-line
+ * invitation. The venue is left out on purpose; the link carries it.
+ */
+export function buildGameShare(
+  game: { id: string; title: string; sport?: string },
+  when: string,
+  origin: string,
+): ShareContent {
+  return {
+    title: game.title,
+    text: `Come play: ${game.title} · ${when}`,
+    url: `${origin}/games/${game.id}`,
+    hashtags: game.sport ? [game.sport] : [],
+  };
+}
+
 export function platformShareUrl(platform: SharePlatform, c: ShareContent): string {
   const q = encodeURIComponent;
   switch (platform) {
