@@ -34,6 +34,7 @@ export function ProfileBasicsFields({
   onChange,
   birthdayError,
   birthdayLocked = false,
+  compact = false,
 }: {
   userId?: string;
   value: ProfileBasicsValue;
@@ -41,6 +42,8 @@ export function ProfileBasicsFields({
   birthdayError?: string | null;
   /** True once a date of birth is on file: it can only change via a support-reviewed correction. */
   birthdayLocked?: boolean;
+  /** First-run setup: only what is needed to start. The rest is optional, on Edit profile. */
+  compact?: boolean;
 }) {
   // Minor-safety checks derived from the entered birthday, so onboarding and
   // Edit profile enforce identical rules (the database re-checks on write).
@@ -50,17 +53,19 @@ export function ProfileBasicsFields({
 
   return (
     <>
-      <Field label="Cover photo">
-        <ImageUploader
-          kind="cover"
-          bannerPreview
-          bucket="covers"
-          pathPrefix={userId}
-          value={value.coverUrl ?? ""}
-          onChange={(url) => onChange({ coverUrl: url })}
-          onClear={() => onChange({ coverUrl: undefined })}
-        />
-      </Field>
+      {compact ? null : (
+        <Field label="Cover photo">
+          <ImageUploader
+            kind="cover"
+            bannerPreview
+            bucket="covers"
+            pathPrefix={userId}
+            value={value.coverUrl ?? ""}
+            onChange={(url) => onChange({ coverUrl: url })}
+            onClear={() => onChange({ coverUrl: undefined })}
+          />
+        </Field>
+      )}
       <Field label="Photo">
         <ImageUploader
           kind="avatar"
@@ -89,9 +94,11 @@ export function ProfileBasicsFields({
           </div>
         ) : null}
       </Field>
-      <Field label="Avatar initials (fallback)">
-        <Input value={value.avatar} onChange={(v) => onChange({ avatar: v })} maxLength={3} />
-      </Field>
+      {compact ? null : (
+        <Field label="Avatar initials (fallback)">
+          <Input value={value.avatar} onChange={(v) => onChange({ avatar: v })} maxLength={3} />
+        </Field>
+      )}
       <Field label="City">
         <LocationAutocomplete
           value={value.city}
@@ -100,18 +107,20 @@ export function ProfileBasicsFields({
           mode="city"
         />
       </Field>
-      <Field label="Bio">
-        <textarea
-          value={value.bio}
-          onChange={(e) => onChange({ bio: e.target.value })}
-          maxLength={280}
-          rows={3}
-          className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
-        />
-        <div className="mt-1 text-right text-[10px] text-muted-foreground">
-          {value.bio.length}/280
-        </div>
-      </Field>
+      {compact ? null : (
+        <Field label="Bio">
+          <textarea
+            value={value.bio}
+            onChange={(e) => onChange({ bio: e.target.value })}
+            maxLength={280}
+            rows={3}
+            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+          />
+          <div className="mt-1 text-right text-[10px] text-muted-foreground">
+            {value.bio.length}/280
+          </div>
+        </Field>
+      )}
       <Field label="Birthday">
         {birthdayLocked ? (
           <div className="rounded-2xl border border-border bg-background px-3 py-2 text-sm">
@@ -134,14 +143,16 @@ export function ProfileBasicsFields({
           </div>
         ) : null}
       </Field>
-      <Field label="Graduating class">
-        <Input
-          value={value.graduatingClass}
-          onChange={(v) => onChange({ graduatingClass: v.replace(/[^0-9]/g, "").slice(0, 4) })}
-          placeholder={`e.g. ${new Date().getFullYear() + 4}`}
-          maxLength={4}
-        />
-      </Field>
+      {compact ? null : (
+        <Field label="Graduating class">
+          <Input
+            value={value.graduatingClass}
+            onChange={(v) => onChange({ graduatingClass: v.replace(/[^0-9]/g, "").slice(0, 4) })}
+            placeholder={`e.g. ${new Date().getFullYear() + 4}`}
+            maxLength={4}
+          />
+        </Field>
+      )}
     </>
   );
 }
