@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/teams/$teamId/roster")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: RosterPage,
+  component: withRequireAuth(RosterPage),
 });
 
 type Tryout = { score: number | null; attended: boolean; tryout: string } | null;

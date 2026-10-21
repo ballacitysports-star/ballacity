@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { useState } from "react";
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/account/ai-privacy")({
         "See how BallaCity's AI analyzes your clips, what is kept, and delete AI results or uploaded videos at any time.",
       noindex: true,
     }),
-  component: AiVideoPrivacyPage,
+  component: withRequireAuth(AiVideoPrivacyPage),
 });
 
 function AnalysisCard({

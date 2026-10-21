@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/teams/$teamId/events")({
       noindex: true,
     }),
   ssr: false,
-  component: TeamEventsPage,
+  component: withRequireAuth(TeamEventsPage),
 });
 
 type EventRow = {

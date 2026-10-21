@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ensureOrgById } from "@/lib/org-store";
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
       noindex: true,
     }),
   ssr: false,
-  component: EditOrg,
+  component: withRequireAuth(EditOrg),
   pendingComponent: () => (
     <div className="page-shell-narrow pt-24 text-center text-muted-foreground">Loading editor…</div>
   ),

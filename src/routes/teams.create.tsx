@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { CreateOrgWizard } from "@/components/CreateOrgWizard";
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/teams/create")({
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
     finish: search.finish ? 1 : undefined,
   }),
-  component: CreateTeamPage,
+  component: withRequireAuth(CreateTeamPage),
 });
 
 function CreateTeamPage() {
