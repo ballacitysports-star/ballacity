@@ -1,28 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { validateVenueList } from "./venue-address";
 import { requireAccountType } from "./account-type-guard";
-import type { Database } from "@/integrations/supabase/types";
-
-function publicClient() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
-  return createClient<Database>(url, key, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) => {
-        const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
-          h.delete("Authorization");
-        }
-        h.set("apikey", key);
-        return fetch(input, { ...init, headers: h });
-      },
-    },
-  });
-}
 
 const TeamShape = z.object({
   id: z.string().min(1).max(200),
@@ -159,15 +139,22 @@ function stripNonDbFields<T extends { verified_venues?: unknown }>(input: T) {
   return rest;
 }
 
-export const listTeams = createServerFn({ method: "GET" }).handler(async () => {
-  const sb = publicClient();
-  const { data, error } = await sb
-    .from("teams")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
+/**
+ * Every team and coach profile the signed-in viewer may read (row level
+ * security decides which). Needs a session: a signed-out visitor gets the
+ * short public description from `getPublicTeam` instead, because this returns
+ * whole rows (owner, staff, availability, refund rules).
+ */
+export const listTeams = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("teams")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
 
 export const listMyTeams = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -185,15 +172,6 @@ export const listMyTeams = createServerFn({ method: "GET" })
       handle: string;
       avatar: string;
     }[];
-  });
-
-export const getTeamById = createServerFn({ method: "GET" })
-  .inputValidator((input) => z.object({ id: z.string() }).parse(input))
-  .handler(async ({ data }) => {
-    const sb = publicClient();
-    const { data: row, error } = await sb.from("teams").select("*").eq("id", data.id).maybeSingle();
-    if (error) throw new Error(error.message);
-    return row;
   });
 
 export const createTeam = createServerFn({ method: "POST" })
