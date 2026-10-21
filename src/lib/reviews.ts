@@ -1,4 +1,11 @@
 import { weightedCriterion, weightedStats } from "@/lib/reputation-engine";
+import {
+  RECOMMEND_COPY,
+  REVIEW_QUESTIONS,
+  tagLabel,
+  type Answer,
+  type Recommend,
+} from "@/lib/review-questions";
 
 export type ReviewerKind = "player" | "trainer" | "team" | "host";
 export type RevieweeKind = "player" | "trainer" | "team" | "host";
@@ -25,6 +32,9 @@ export type Review = {
   helpfulCount?: number;
   flagged?: boolean; // hidden after moderation
   aiMismatch?: boolean; // rating contradicts the text (AI check); counts for less
+  recommend?: Recommend; // "would you do this with them again?"
+  answers?: Record<string, Answer>; // yes/mostly/no per behaviour question
+  tags?: string[]; // praise tags
   gameId?: string; // game this review is about, when game-based
   sport?: string;
 };
@@ -367,6 +377,7 @@ export function demoReviewees(): {
 // -------------------------- reputation --------------------------
 
 export type Reputation = {
+  kind: RevieweeKind;
   avg: number;
   count: number;
   trustScore: number; // 0..100
@@ -384,6 +395,19 @@ export type Reputation = {
   confidence: number;
   /** Too little evidence to treat the score as established. */
   provisional: boolean;
+  /** "Would you do this with them again?" tallies (reviews that answered it). */
+  recommend: { answered: number; yes: number; notSure: number; no: number };
+  /** Most-given praise tags, most common first. */
+  topTags: { key: string; label: string; count: number }[];
+  /** Yes/mostly/no tallies for each behaviour question that has answers. */
+  questionStats: {
+    key: string;
+    label: string;
+    answered: number;
+    yes: number;
+    mostly: number;
+    no: number;
+  }[];
   recentTrend: "up" | "down" | "flat";
 };
 
@@ -404,6 +428,19 @@ export function levelFor(
       .reverse()
       .find((l) => trustScore >= l.min && evidence >= l.minEvidence) ?? REPUTATION_LEVELS[0]
   );
+}
+
+/**
+ * The headline line for "would you do this again?": a percentage once there
+ * are enough answers to mean something, otherwise the plain counts ("3 of 4").
+ */
+export function recommendLine(rep: Pick<Reputation, "kind" | "recommend">): string | null {
+  const { answered, yes } = rep.recommend;
+  if (answered === 0) return null;
+  const stat = RECOMMEND_COPY[rep.kind].stat;
+  return answered >= 5
+    ? `${Math.round((yes / answered) * 100)}% ${stat}`
+    : `${yes} of ${answered} ${stat}`;
 }
 
 /** What to print where a trust score goes: the number, or "New" before any reviews. */
@@ -443,6 +480,36 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
 
   const verifiedShare = count ? visible.filter((r) => r.verified).length / count : 0;
 
+  const recommend = { answered: 0, yes: 0, notSure: 0, no: 0 };
+  for (const r of visible) {
+    if (!r.recommend) continue;
+    recommend.answered += 1;
+    if (r.recommend === "yes") recommend.yes += 1;
+    else if (r.recommend === "no") recommend.no += 1;
+    else recommend.notSure += 1;
+  }
+
+  const tagCounts = new Map<string, number>();
+  for (const r of visible)
+    for (const t of r.tags ?? []) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  const topTags = [...tagCounts]
+    .map(([key, n]) => ({ key, label: tagLabel(kind, key), count: n }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, 4);
+
+  const questionStats = REVIEW_QUESTIONS[kind]
+    .map((q) => {
+      const st = { key: q.key, label: q.label, answered: 0, yes: 0, mostly: 0, no: 0 };
+      for (const r of visible) {
+        const a = r.answers?.[q.key];
+        if (!a) continue;
+        st.answered += 1;
+        st[a] += 1;
+      }
+      return st;
+    })
+    .filter((q) => q.answered > 0);
+
   // Trust score: the cautious estimate of the true average (low end of its
   // likely range) on 0–100. It rises only as recent, consistent reviews pile
   // up, and a poor review always lowers it. With no reviews there is no score
@@ -460,9 +527,16 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
   const recentTrend: Reputation["recentTrend"] = dr > 0.25 ? "up" : dr < -0.25 ? "down" : "flat";
 
   // AI-style summary (templated, deterministic)
-  const aiSummary = buildSummary({ count, avg, topStrengths, kind, trend: recentTrend });
+  const aiSummary = buildSummary({
+    count,
+    avg,
+    topStrengths: topStrengths.length ? topStrengths : topTags,
+    kind,
+    trend: recentTrend,
+  });
 
   return {
+    kind,
     avg,
     count,
     trustScore,
@@ -472,6 +546,9 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
     topStrengths,
     aiSummary,
     verifiedShare,
+    recommend,
+    topTags,
+    questionStats,
     adjustedAvg: stats.adjustedAvg,
     effectiveCount: stats.effectiveCount,
     confidence: stats.confidence,
@@ -506,5 +583,5 @@ function buildSummary(args: {
       : args.trend === "down"
         ? "Recent feedback has cooled slightly — watch for the next runs."
         : "Feedback has been remarkably consistent.";
-  return `${subject} is most known for ${strengths}. ${trend}`;
+  return strengths ? `${subject} is most known for ${strengths}. ${trend}` : trend;
 }

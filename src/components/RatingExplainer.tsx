@@ -18,11 +18,18 @@ export function RatingExplainer({ className = "" }: { className?: string }) {
             clearly contradict its own words counts for half.
           </p>
           <p className="mt-2">
-            The trust score is a cautious estimate: the low end of what the reviews so far suggest.
-            It starts out modest, climbs as consistent good reviews come in, and a poor review
-            always pulls it down. Profiles show "New" until their first review and "Provisional"
-            while there are only a few. Levels need both a score and enough recent reviews: Rising
-            needs 3, Pro 5, Elite 15 and Legend 40.
+            Reviews ask one headline question (would you do this with them again?), three quick yes
+            / mostly / no questions about behaviour, and let you tap up to five praise tags. Showing
+            up, lateness and cancellations aren't asked about: the app tracks those itself and shows
+            them as "Tracked automatically". If you answer "No" to a safety question, it also goes
+            privately to our moderators.
+          </p>
+          <p className="mt-2">
+            The trust score is a cautious estimate: the low end of what the star ratings so far
+            suggest. It starts out modest, climbs as consistent good reviews come in, and a poor
+            review always pulls it down. Profiles show "New" until their first review and
+            "Provisional" while there are only a few. Levels need both a score and enough recent
+            reviews: Rising needs 3, Pro 5, Elite 15 and Legend 40.
           </p>
         </section>
         <section>

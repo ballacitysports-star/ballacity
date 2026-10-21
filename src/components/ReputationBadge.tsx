@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Minus, Star, ShieldCheck } from "lucide-react";
-import { trustLabel, type Reputation } from "@/lib/reviews";
+import { recommendLine, trustLabel, type Reputation } from "@/lib/reviews";
 
 function Stars({ value, size = 12 }: { value: number; size?: number }) {
   return (
@@ -65,6 +65,23 @@ export function ReputationBadge({
             <Stars value={rep.avg} size={10} />
             <span className="text-[10px] text-muted-foreground">{rep.avg.toFixed(1)}</span>
           </div>
+          {recommendLine(rep) && (
+            <div className="mt-0.5 text-[10px] font-semibold text-foreground/80">
+              👍 {recommendLine(rep)}
+            </div>
+          )}
+          {rep.topStrengths.length === 0 && rep.topTags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {rep.topTags.slice(0, 2).map((t) => (
+                <span
+                  key={t.key}
+                  className="rounded-full border border-lime/30 bg-lime/10 px-1.5 py-0.5 text-[9px] font-bold text-lime"
+                >
+                  {t.label} · {t.count}
+                </span>
+              ))}
+            </div>
+          )}
           {rep.topStrengths.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {rep.topStrengths.slice(0, 2).map((s) => (
@@ -127,6 +144,23 @@ export function ReputationBadge({
               : "Steady"}
         </div>
       </div>
+
+      {recommendLine(rep) && (
+        <p className="mt-3 text-xs font-semibold text-foreground/90">👍 {recommendLine(rep)}</p>
+      )}
+
+      {rep.topTags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {rep.topTags.map((t) => (
+            <span
+              key={t.key}
+              className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+            >
+              {t.label} · {t.count}
+            </span>
+          ))}
+        </div>
+      )}
 
       {rep.topStrengths.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeReviewExtras, safetyConcern } from "@/lib/review-questions";
 
 /**
  * Review submission and AI follow-ups.
@@ -33,6 +34,9 @@ export const submitReview = createServerFn({ method: "POST" })
       gameId?: string | null;
       rating: number;
       scores?: Record<string, number>;
+      recommend?: unknown;
+      answers?: unknown;
+      tags?: unknown;
       title?: string;
       body: string;
       isPrivate?: boolean;
@@ -42,6 +46,9 @@ export const submitReview = createServerFn({ method: "POST" })
       if (!(rating >= 1 && rating <= 5)) throw new Error("Pick a star rating");
       const body = String(input.body ?? "").trim();
       if (body.length < 8) throw new Error("Write at least a sentence.");
+      // The headline answer is required here (the database only validates what
+      // is present, so an older form keeps working until this one ships).
+      const extras = normalizeReviewExtras(input.revieweeKind, input);
       return {
         kind: input.kind,
         revieweeKind: input.revieweeKind,
@@ -50,6 +57,9 @@ export const submitReview = createServerFn({ method: "POST" })
         gameId: input.gameId ? String(input.gameId).slice(0, 120) : null,
         rating,
         scores: input.scores ?? {},
+        recommend: extras.recommend,
+        answers: extras.answers,
+        tags: extras.tags,
         title: input.title ? String(input.title).trim().slice(0, 120) : undefined,
         body: body.slice(0, 2000),
         isPrivate: input.isPrivate === true,
@@ -83,6 +93,9 @@ export const submitReview = createServerFn({ method: "POST" })
         game_id: data.gameId,
         rating: data.rating,
         scores: data.scores,
+        recommend: data.recommend,
+        answers: data.answers,
+        tags: data.tags,
         title: data.title ?? null,
         body: data.body,
         is_private: data.isPrivate,
@@ -90,6 +103,28 @@ export const submitReview = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    // A "No" on a safety question is more than a low mark: also put it in the
+    // moderators' report queue (the form tells the reviewer this before they
+    // post). Best effort — the review itself is already saved.
+    const concern = safetyConcern(data.revieweeKind, data.answers);
+    if (concern) {
+      try {
+        const subject = await revieweeUser(supabaseAdmin, data.revieweeKind, data.revieweeId);
+        if (subject && subject !== context.userId) {
+          await supabaseAdmin.from("user_reports").insert({
+            reporter_id: context.userId,
+            reported_id: subject,
+            reason: "unsafe_behavior",
+            subject_type: data.gameId ? "game" : "user",
+            game_id: data.gameId,
+            details: `Raised in a review (id ${row.id}): answered "No" to "${concern.label}".`,
+          });
+        }
+      } catch {
+        /* the review is saved; moderators can still find it via the review itself */
+      }
+    }
 
     // Moderator couldn't clear it (or was unavailable): hold it for human review.
     let held = false;
