@@ -1,5 +1,12 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { ORGS, resolveSportAsset, type Org, type OrgKind, type Sport } from "./sample-data";
+import {
+  ORGS,
+  resolveSportAsset,
+  toStoredCover,
+  type Org,
+  type OrgKind,
+  type Sport,
+} from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
@@ -161,7 +168,7 @@ function orgToInsert(org: Org) {
     achievements: org.achievements,
     accent: org.accent,
     avatar: org.avatar,
-    cover: org.cover,
+    cover: toStoredCover(org.cover),
     league: org.league ?? null,
     home_court: org.homeCourt ?? null,
     wins: org.record?.w ?? 0,
@@ -318,7 +325,7 @@ export async function updateOrg(
   if (patch.achievements !== undefined) mapped.achievements = patch.achievements;
   if (patch.accent !== undefined) mapped.accent = patch.accent;
   if (patch.avatar !== undefined) mapped.avatar = patch.avatar;
-  if (patch.cover !== undefined) mapped.cover = patch.cover;
+  if (patch.cover !== undefined) mapped.cover = toStoredCover(patch.cover);
   if (patch.league !== undefined) mapped.league = patch.league ?? null;
   if (patch.homeCourt !== undefined) mapped.home_court = patch.homeCourt ?? null;
   if (patch.record !== undefined) {
