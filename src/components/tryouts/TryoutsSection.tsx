@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { CalendarClock, MapPin, Megaphone, Users } from "lucide-react";
 import { toast } from "sonner";
 import { blockedMessage, heldNotice } from "@/lib/post-moderation";
+import { DraftWithAi } from "@/components/DraftWithAi";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -364,6 +365,7 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
               />
             )}
             <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
+            <DraftWithAi kind={f.kind} title={f.title} body={f.body} onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))} />
             <Button className="w-full" disabled={busy} onClick={submit}>Post</Button>
           </div>
         )}
