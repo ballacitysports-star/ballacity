@@ -1,6 +1,8 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
+import { PublicGamePreview } from "@/components/games/PublicGamePreview";
 import { emailLocalPart } from "@/lib/managed-children";
 import { Navigation } from "lucide-react";
 import { OpenInMaps } from "@/components/OpenInMaps";
@@ -317,8 +319,22 @@ export const Route = createFileRoute("/games/$gameId/")({
       }
     />
   ),
-  component: GameDetail,
+  component: GameRoute,
 });
+
+/**
+ * Signed-out visitors (a shared link, a search result) get the short public
+ * preview; everything else, including the join and pay actions, is the
+ * signed-in page below.
+ */
+function GameRoute() {
+  const { user, loading } = useAuth();
+  const { seo } = Route.useLoaderData();
+  const { pathname, searchStr } = useLocation();
+  if (loading) return <AuthRedirectSkeleton label="Loading game…" />;
+  if (!user) return <PublicGamePreview seo={seo} next={`${pathname}${searchStr}`} />;
+  return <GameDetail />;
+}
 
 function formatCooldownLabel(ms: number): string {
   const secs = Math.max(1, Math.ceil(ms / 1000));

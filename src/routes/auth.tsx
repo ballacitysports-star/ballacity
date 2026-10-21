@@ -52,20 +52,24 @@ export const Route = createFileRoute("/auth")({
     }),
   validateSearch: (s: Record<string, unknown>) => {
     const next = sanitizeNextPath(s.next);
-    return next ? { next } : {};
+    // `mode=signup` opens on "Create account", for links from a shared game.
+    const mode = s.mode === "signup" ? ("signup" as const) : undefined;
+    return { ...(next ? { next } : {}), ...(mode ? { mode } : {}) };
   },
   component: AuthPage,
 });
 
 function AuthPage() {
-  const { next } = Route.useSearch();
+  const { next, mode: modeFromLink } = Route.useSearch();
   const { user, loading } = useAuth();
   // Consent must be recorded against the version that is actually published,
   // not the bundled fallback — otherwise every signup stores a stale version
   // string and LegalReacceptGate re-gates the user immediately after. The
   // query is already warm here because <LegalConsent> shares its key.
   const { published: publishedLegal } = usePublishedLegalDocuments();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(
+    modeFromLink === "signup" ? "signup" : "signin",
+  );
   // A `next` that points at an account-setup escape (guardian consent, the
   // Parent Center, safety/legal reading) has no player/team/trainer/gym
   // answer to give — AuthGate itself skips the type gate on those routes, so
