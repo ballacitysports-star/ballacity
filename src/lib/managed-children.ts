@@ -154,6 +154,8 @@ const MESSAGES: Record<string, string> = {
   MANAGED_CHILD_DELETE_INSTEAD:
     "This child only exists under your account. Delete their profile instead of ending the link.",
   MANAGED_SESSION_NOT_ALLOWED: "Switch back to your own account to do that.",
+  PAIR_LINK_INVALID: "This link has expired or was already used. Ask your parent for a new one.",
+  PAIR_RATE_LIMITED: "You've made a lot of links in the last hour. Try again later.",
   MANAGES_CHILDREN: "Your account can't be deleted while it manages child profiles.",
   MANAGED_UNAVAILABLE: "Adding a child isn't available yet. Please try again later.",
   MANAGES_CHECK_FAILED:

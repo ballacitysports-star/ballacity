@@ -40,6 +40,7 @@ import { GuardianProfileCard } from "@/components/child/GuardianProfileCard";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
+import { PairDeviceDialog } from "@/components/child/PairDeviceDialog";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 
 export const Route = createFileRoute("/parent/")({
@@ -317,26 +318,28 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         {child.managed ? (
           // Everything done after switching is done as the child, under the
           // child's rules — that is what makes acting on their behalf safe.
-          <Button
-            size="sm"
-            className="shrink-0"
-            disabled={switchTo.isPending}
-            onClick={() =>
-              switchTo.mutate(
-                { childUserId, childName: child.displayName },
-                {
-                  onError: (e) =>
-                    toast.error(
-                      e instanceof Error ? e.message : "Could not switch to that profile",
-                    ),
-                },
-              )
-            }
-          >
-            {switchTo.isPending
-              ? "Switching…"
-              : `Switch to ${child.displayName.split(" ")[0]}'s profile`}
-          </Button>
+          <div className="flex shrink-0 flex-col gap-2">
+            <Button
+              size="sm"
+              disabled={switchTo.isPending}
+              onClick={() =>
+                switchTo.mutate(
+                  { childUserId, childName: child.displayName },
+                  {
+                    onError: (e) =>
+                      toast.error(
+                        e instanceof Error ? e.message : "Could not switch to that profile",
+                      ),
+                  },
+                )
+              }
+            >
+              {switchTo.isPending
+                ? "Switching…"
+                : `Switch to ${child.displayName.split(" ")[0]}'s profile`}
+            </Button>
+            <PairDeviceDialog childUserId={childUserId} childName={child.displayName} />
+          </div>
         ) : null}
       </header>
 

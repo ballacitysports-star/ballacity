@@ -20,6 +20,7 @@ import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PairRouteImport } from './routes/pair'
 import { Route as PaymentPolicyRouteImport } from './routes/payment-policy'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -177,6 +178,11 @@ const HostRoute = HostRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PairRoute = PairRouteImport.update({
+  id: '/pair',
+  path: '/pair',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentPolicyRoute = PaymentPolicyRouteImport.update({
@@ -719,6 +725,7 @@ export interface FileRoutesByFullPath {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/pair': typeof PairRoute
   '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -835,6 +842,7 @@ export interface FileRoutesByTo {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/pair': typeof PairRoute
   '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -952,6 +960,7 @@ export interface FileRoutesById {
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/pair': typeof PairRoute
   '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -1070,6 +1079,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/pair'
     | '/payment-policy'
     | '/payments'
     | '/pickup'
@@ -1186,6 +1196,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/pair'
     | '/payment-policy'
     | '/payments'
     | '/pickup'
@@ -1302,6 +1313,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/pair'
     | '/payment-policy'
     | '/payments'
     | '/pickup'
@@ -1420,6 +1432,7 @@ export interface RootRouteChildren {
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
+  PairRoute: typeof PairRoute
   PaymentPolicyRoute: typeof PaymentPolicyRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1590,6 +1603,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pair': {
+      id: '/pair'
+      path: '/pair'
+      fullPath: '/pair'
+      preLoaderRoute: typeof PairRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment-policy': {
@@ -2379,6 +2399,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,
+  PairRoute: PairRoute,
   PaymentPolicyRoute: PaymentPolicyRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,

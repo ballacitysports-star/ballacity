@@ -459,6 +459,9 @@ const PUBLIC_ROUTES = [
   "/staff",
   "/reset-password",
   "/.lovable/oauth/consent",
+  // A child opens a guardian's one-time pairing link here before they have a
+  // session; the link itself is the credential.
+  "/pair",
   // Legal documents must be readable before/without signing in.
   "/terms",
   "/privacy",
