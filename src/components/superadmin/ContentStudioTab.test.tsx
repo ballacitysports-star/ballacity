@@ -131,7 +131,9 @@ describe("ContentStudioTab", () => {
     renderTab();
     const dialog = await openDraft();
     expect(within(dialog).getByText(/Set a destination Page/)).toBeTruthy();
-    expect((within(dialog).getByRole("button", { name: "Approve v3" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (within(dialog).getByRole("button", { name: "Approve v3" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("needs an explicit acknowledgement to approve unverified facts, and approves the version shown", async () => {
@@ -153,7 +155,9 @@ describe("ContentStudioTab", () => {
     );
     renderTab();
     const dialog = await openDraft();
-    const approveBtn = within(dialog).getByRole("button", { name: "Approve v3" }) as HTMLButtonElement;
+    const approveBtn = within(dialog).getByRole("button", {
+      name: "Approve v3",
+    }) as HTMLButtonElement;
     expect(approveBtn.disabled).toBe(true);
     fireEvent.click(within(dialog).getByRole("checkbox"));
     expect(approveBtn.disabled).toBe(false);
@@ -175,7 +179,11 @@ describe("ContentStudioTab", () => {
     renderTab();
     fireEvent.mouseDown(await screen.findByRole("tab", { name: /Page & settings/ }));
     expect(await screen.findByText(/approved through Meta App Review/)).toBeTruthy();
-    expect((screen.getByRole("switch", { name: "Publishing" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: /Connect Facebook/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("switch", { name: "Publishing" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(
+      (screen.getByRole("button", { name: /Connect Facebook/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 });
