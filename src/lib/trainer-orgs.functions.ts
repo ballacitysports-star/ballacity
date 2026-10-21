@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -39,12 +40,36 @@ function publicClient() {
   });
 }
 
+/**
+ * The caller's own client when they are signed in, otherwise the anonymous one.
+ * A signed-in viewer may read a little more of a facility (its owner id) than a
+ * visitor; the database, not this code, decides what each role can select.
+ */
+function viewerClient() {
+  const bearer = getRequest()?.headers.get("authorization");
+  if (!bearer?.startsWith("Bearer ")) return { sb: publicClient(), signedIn: false };
+  const sb = createClient<Database>(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_PUBLISHABLE_KEY!,
+    {
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: bearer } },
+    },
+  );
+  return { sb, signedIn: true };
+}
+
 const handleRe = /^[a-z0-9_-]{3,40}$/;
 
 // Columns the public directory needs to render a facility card. All are
-// anon-readable (phone/email are not — see ORG_PUBLIC_COLUMNS below).
+// anon-readable except `owner_id`, which only a signed-in viewer is given
+// (phone/email are never anon-readable — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
   "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
+const ORG_DIRECTORY_COLUMNS_ANON = ORG_DIRECTORY_COLUMNS.replace(
+  ",owner_id",
+  "",
+) as typeof ORG_DIRECTORY_COLUMNS;
 
 // Escape characters that are special inside an ilike pattern.
 function likePattern(term: string): string {
@@ -63,10 +88,10 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
       .parse(d ?? {}),
   )
   .handler(async ({ data }) => {
-    const sb = publicClient();
+    const { sb, signedIn } = viewerClient();
     let query = sb
       .from("trainer_orgs")
-      .select(ORG_DIRECTORY_COLUMNS)
+      .select(signedIn ? ORG_DIRECTORY_COLUMNS : ORG_DIRECTORY_COLUMNS_ANON)
       // Hand-picked featured facilities first (most recently featured on top),
       // then newest.
       .order("featured_at", { ascending: false, nullsFirst: false })
@@ -180,6 +205,10 @@ export const listMyOrgs = createServerFn({ method: "GET" })
 // scraped from every gym listing, so selecting "*" here would fail for guests.
 const ORG_PUBLIC_COLUMNS =
   "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone,booking_url";
+const ORG_PUBLIC_COLUMNS_ANON = ORG_PUBLIC_COLUMNS.replace(
+  "id,owner_id,",
+  "id,",
+) as typeof ORG_PUBLIC_COLUMNS;
 
 /**
  * A facility's trainers for its public page. Reads `trainer_org_members` with
@@ -205,10 +234,12 @@ async function listPublicOrgRoster(orgId: string): Promise<PublicRosterMember[]>
 export const getTrainerOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    // Always the anonymous view: this runs in the route loader on the server,
+    // which has no viewer. Who owns the facility comes from `getMyOrgAccess`.
     const sb = publicClient();
     const { data: org, error } = await sb
       .from("trainer_orgs")
-      .select(ORG_PUBLIC_COLUMNS)
+      .select(ORG_PUBLIC_COLUMNS_ANON)
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -242,7 +273,20 @@ export const getMyOrgAccess = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (memberErr) throw new Error(memberErr.message);
-    return { isAdmin: !!isAdmin, isMember: !!member };
+    // The owner id is not in the public listing; a signed-in viewer reads it here.
+    const { data: org, error: orgErr } = await context.supabase
+      .from("trainer_orgs")
+      .select("owner_id")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    return {
+      isAdmin: !!isAdmin,
+      isMember: !!member,
+      isOwner: !!org && org.owner_id === context.userId,
+      /** A moderator-seeded listing nobody has claimed yet. */
+      unclaimed: !!org && org.owner_id === null,
+    };
   });
 
 // Contact details are only readable by signed-in users.
