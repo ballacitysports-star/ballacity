@@ -35,6 +35,14 @@ export type PendingClaim = {
   message: string | null;
   evidenceUrl: string | null;
   createdAt: string;
+  status: "pending" | "needs_info";
+  /** What the claimant said their connection is; null on claims filed before it was asked. */
+  relationship: string | null;
+  attestedAt: string | null;
+  /** The reviewer's open question, while the claim waits on the claimant. */
+  infoRequest: string | null;
+  /** Other open claims on the same listing. */
+  competingClaims: number;
 };
 
 const SUBJECT = z.enum(["team", "gym"]);
@@ -195,8 +203,10 @@ export const listPendingClaims = createServerFn({ method: "GET" })
 
     const { data: claims } = await untyped(admin)
       .from("listing_claims")
-      .select("id, subject_type, subject_id, user_id, message, evidence_url, created_at")
-      .eq("status", "pending")
+      .select(
+        "id, subject_type, subject_id, user_id, message, evidence_url, created_at, status, relationship, attested_at, info_request",
+      )
+      .in("status", ["pending", "needs_info"])
       .order("created_at", { ascending: true })
       .limit(200);
     const rows: any[] = claims ?? [];
@@ -224,6 +234,12 @@ export const listPendingClaims = createServerFn({ method: "GET" })
     for (const p of profiles.data ?? [])
       people.set(p.id, p.display_name || p.username || "Someone");
 
+    const open = new Map<string, number>();
+    for (const r of rows) {
+      const k = `${r.subject_type}:${r.subject_id}`;
+      open.set(k, (open.get(k) ?? 0) + 1);
+    }
+
     return rows.map((r) => ({
       id: r.id,
       subjectType: r.subject_type as ListingSubjectType,
@@ -234,19 +250,25 @@ export const listPendingClaims = createServerFn({ method: "GET" })
       message: r.message ?? null,
       evidenceUrl: r.evidence_url ?? null,
       createdAt: r.created_at,
+      status: r.status,
+      relationship: r.relationship ?? null,
+      attestedAt: r.attested_at ?? null,
+      infoRequest: r.info_request ?? null,
+      competingClaims: (open.get(`${r.subject_type}:${r.subject_id}`) ?? 1) - 1,
     }));
   });
 
 export const reviewClaim = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { claimId: string; action: "approve" | "deny"; reason?: string }) =>
-    z
-      .object({
-        claimId: z.string().uuid(),
-        action: z.enum(["approve", "deny"]),
-        reason: z.string().trim().max(500).optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: { claimId: string; action: "approve" | "deny" | "request_info"; reason?: string }) =>
+      z
+        .object({
+          claimId: z.string().uuid(),
+          action: z.enum(["approve", "deny", "request_info"]),
+          reason: z.string().trim().max(500).optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertModerator(context);
@@ -263,6 +285,23 @@ export const reviewClaim = createServerFn({ method: "POST" })
       n: string,
       a: Record<string, unknown>,
     ) => Promise<any>;
+    if (data.action === "request_info") {
+      // The note goes to the claimant as written; it is their question, not an internal note.
+      const { error } = await rpc("request_listing_claim_info", {
+        _claim: data.claimId,
+        _note: data.reason ?? null,
+      });
+      if (error) throw new Error(error.message);
+      await writeAudit(admin, context.userId, {
+        action: "listing.claim_request_info",
+        targetType: claim?.subject_type === "gym" ? "org" : "team",
+        targetId: claim?.subject_id ?? null,
+        reason: data.reason ?? null,
+        after: { claimId: data.claimId, status: "needs_info" },
+      });
+      return { ok: true };
+    }
+
     const { error } =
       data.action === "approve"
         ? await rpc("approve_listing_claim", { _claim: data.claimId })
