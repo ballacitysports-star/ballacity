@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubNewUserOnboarding } from "./helpers/server-fn";
 
 /**
  * A brand-new user tapping "Continue with Google/Apple" on `/auth` — arriving
@@ -85,6 +86,7 @@ test.describe("OAuth from /auth with referrer '/' → onboarding picker", () => 
       const page = await context.newPage();
       try {
         await stubNullAccountType(page);
+        await stubNewUserOnboarding(page, provider);
         await primeStorageAndLandOnAuth(page);
 
         // Simulate the provider callback resolving on this tab and emitting

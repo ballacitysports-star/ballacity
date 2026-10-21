@@ -130,11 +130,11 @@ test("Pay screen uses host-scoped RPC and renders empty state when no methods", 
 
   // Empty state renders.
   await expect(
-    page.getByText(/host hasn't configured payment yet/i).first(),
+    page.getByText(/host hasn't set up payment yet/i).first(),
   ).toBeVisible({ timeout: 15_000 });
 
-  // "Pay host using" list heading must not render when there are no methods.
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  // The payment-method list heading ("How do you want to pay?") must not render when there are no methods.
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
 
   // Give the client a moment to make any late requests it might make.
   await page.waitForTimeout(500);

@@ -833,6 +833,18 @@ function GameDetail() {
     rosterInitializedRef.ids = currentIds;
   }, [liveRoster, user?.id, game?.maxPlayers, rosterInitializedRef]);
 
+  // Every hook must run before the loading / not-found returns below. A deep
+  // link renders "Loading…" first and the game a moment later; a hook that only
+  // runs once the game exists changes the hook count between those renders,
+  // React throws, and the page falls into its error screen.
+  const { age: myAge } = useMyAge();
+  const gate = useJoinGate(game);
+  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+  // Reminder lead times the player picks while RSVPing.
+  const [reminderOffsets, setReminderOffsets] = useState<number[]>([
+    ...DEFAULT_GAME_REMINDER_OFFSETS,
+  ]);
+
   // Spot holds: sweep expired holds while the page is open and tick the
   // countdown. Hooks, so they stay above the early returns below.
   const holdMinutes = (flowSettings ?? settings)?.payment_hold_minutes ?? null;
@@ -863,7 +875,6 @@ function GameDetail() {
     );
   }
 
-  const { age: myAge } = useMyAge();
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
   const myHoldExpiresAt = holdExpiresAt({
@@ -911,7 +922,6 @@ function GameDetail() {
   const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
-  const gate = useJoinGate(game);
   // Display-only gate for the viewer: adds "roster full" on top of the
   // schedule/host gates so the CTA can always explain why joining is blocked.
   const viewerGate: JoinGate =
@@ -925,12 +935,6 @@ function GameDetail() {
           locked: true,
           waitlistOpen: true,
         };
-
-  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
-  // Reminder lead times the player picks while RSVPing.
-  const [reminderOffsets, setReminderOffsets] = useState<number[]>([
-    ...DEFAULT_GAME_REMINDER_OFFSETS,
-  ]);
 
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.

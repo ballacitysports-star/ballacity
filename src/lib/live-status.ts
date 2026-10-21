@@ -208,11 +208,27 @@ function sameGate(a: JoinGate, b: JoinGate): boolean {
   );
 }
 
-/** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
-export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
+/** What `useJoinGate` reports while the game itself is still loading. */
+const NO_GAME_GATE: JoinGate = {
+  liveStatus: "scheduled",
+  joinState: "open",
+  label: "Open",
+  reason: "",
+  locked: false,
+  waitlistOpen: false,
+};
+
+/**
+ * Live-updating variant of `resolveJoinGate` (shares the 30s ticker).
+ *
+ * Accepts a game that hasn't loaded yet so a page can call it unconditionally,
+ * before any loading / not-found early return. Calling it after such a return
+ * changes the hook count between renders, which React rejects.
+ */
+export function useJoinGate(game: Game | undefined, opts: JoinGateOptions = {}): JoinGate {
   const spotsLeft = opts.spotsLeft;
   const [gate, setGate] = useState<JoinGate>(() =>
-    resolveJoinGate(game, Date.now(), { spotsLeft }),
+    game ? resolveJoinGate(game, Date.now(), { spotsLeft }) : NO_GAME_GATE,
   );
   // Same rule as useLiveStatus: depend on the gate-relevant primitives, and
   // keep the previous gate object when nothing actually changed, so a caller
@@ -220,19 +236,20 @@ export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
   const gameRef = useRef(game);
   gameRef.current = game;
   const key = [
-    game.id,
-    game.date,
-    game.duration,
-    game.status ?? "",
-    (game as { cancelledAt?: string | null }).cancelledAt ?? "",
-    game.joinsClosed ? 1 : 0,
-    (game as { signupCutoffMin?: number }).signupCutoffMin ?? 0,
+    game?.id ?? "",
+    game?.date ?? "",
+    game?.duration ?? "",
+    game?.status ?? "",
+    (game as { cancelledAt?: string | null } | undefined)?.cancelledAt ?? "",
+    game?.joinsClosed ? 1 : 0,
+    (game as { signupCutoffMin?: number } | undefined)?.signupCutoffMin ?? 0,
     spotsLeft ?? "",
   ].join("|");
   useEffect(() => {
     ensureTicker();
     const cb = () => {
-      const next = resolveJoinGate(gameRef.current, Date.now(), { spotsLeft });
+      const current = gameRef.current;
+      const next = current ? resolveJoinGate(current, Date.now(), { spotsLeft }) : NO_GAME_GATE;
       setGate((prev) => (sameGate(prev, next) ? prev : next));
     };
     cb();

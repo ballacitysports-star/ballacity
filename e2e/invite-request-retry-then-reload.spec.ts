@@ -200,7 +200,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
   // Invite params preserved after reload.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 

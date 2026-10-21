@@ -247,7 +247,7 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(
-    page.getByText(/host hasn't configured payment yet/i).first(),
+    page.getByText(/host hasn't set up payment yet/i).first(),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/couldn't reach the payment service/i)).toHaveCount(0);
   expect(writeAttempts, "opening pay should remain read-only").toEqual([]);

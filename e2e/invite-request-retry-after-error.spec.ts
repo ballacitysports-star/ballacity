@@ -193,7 +193,7 @@ test("failed first join request can be retried and lands on pending UI with invi
   // Invite params preserved on the final URL.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 

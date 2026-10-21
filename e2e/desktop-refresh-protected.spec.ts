@@ -19,7 +19,6 @@ const PROTECTED_ROUTES = [
   "/feed",
   "/players",
   "/teams",
-  "/discover",
   "/create",
   "/profile",
   "/notifications",

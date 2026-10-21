@@ -19,6 +19,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { LEGAL_DOCUMENT_TYPES, currentVersion } from "../src/lib/legal-documents";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
@@ -107,6 +108,13 @@ export default async function globalSetup() {
         // "Database error creating new user" — which is what blocked CI seeding.
         // Naming it here is also just more honest about what these fixtures are.
         account_type: "player",
+        // Reset every run. The existing metadata is merged in below, and a
+        // Parent / Guardian pick in the onboarding picker once wrote
+        // is_guardian: true to the real e2e-player account. That flag never
+        // cleared, so the account ran in Parent Mode from then on: /profile
+        // redirected to /parent, /games/$id/pay to /guardian, and the join and
+        // pay CTAs were hidden on every game page.
+        is_guardian: false,
       };
       try {
         const { data: list, error: listErr } = await admin.auth.admin.listUsers({
@@ -145,6 +153,17 @@ export default async function globalSetup() {
               `[e2e global-setup] Could not set birthday for ${acct.email}: ${bErr.message}`,
             );
           }
+          // handle_new_user only writes account_type when the account is
+          // created, so put it back in case an earlier run changed it.
+          const { error: tErr } = await admin
+            .from("profiles")
+            .update({ account_type: "player" })
+            .eq("id", id);
+          if (tErr) {
+            console.warn(
+              `[e2e global-setup] Could not reset account_type for ${acct.email}: ${tErr.message}`,
+            );
+          }
         }
         return id;
       } catch (err) {
@@ -157,7 +176,64 @@ export default async function globalSetup() {
       }
     }
 
-    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+    const fixtureIds: string[] = [];
+    for (const acct of TEST_ACCOUNTS) {
+      const id = await upsertAccount(acct);
+      if (id) fixtureIds.push(id);
+    }
+
+    // (2a) Record the fixture accounts' acceptance of the current Terms and
+    // Privacy Policy. The 2026-09-01 versions are material, so an account that
+    // never accepted them gets LegalReacceptGate: a full-screen "Updated legal
+    // documents" dialog over every tab route that intercepts every click (the
+    // FilterBar specs failed on exactly that in run 288). The fixtures stand in
+    // for returning members who already agreed.
+    //
+    // Same versions effectiveVersion() shows: a published legal_documents row
+    // wins, the bundled registry is the fallback. Both are accepted.
+    if (fixtureIds.length > 0) {
+      try {
+        const versions = new Map<string, Set<string>>(
+          LEGAL_DOCUMENT_TYPES.map(
+            (type) => [type, new Set([currentVersion(type).version])] as const,
+          ),
+        );
+        const { data: published, error: docsErr } = await admin
+          .from("legal_documents")
+          .select("document_type, version")
+          .eq("published", true);
+        if (docsErr) {
+          console.warn(
+            `[e2e global-setup] Could not read published legal documents: ${docsErr.message}. ` +
+              "Accepting the bundled versions only.",
+          );
+        }
+        for (const row of (published ?? []) as { document_type: string; version: string }[]) {
+          versions.get(row.document_type)?.add(row.version);
+        }
+        const rows = fixtureIds.flatMap((user_id) =>
+          [...versions].flatMap(([document_type, set]) =>
+            [...set].map((document_version) => ({
+              user_id,
+              document_type,
+              document_version,
+              user_agent: "e2e global-setup",
+            })),
+          ),
+        );
+        const { error } = await admin.from("legal_consents").upsert(rows, {
+          onConflict: "user_id,document_type,document_version",
+          ignoreDuplicates: true,
+        });
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        console.warn(
+          `[e2e global-setup] Could not record legal consent for the fixture accounts: ${
+            err instanceof Error ? err.message : String(err)
+          }. The "Updated legal documents" dialog will cover tab routes.`,
+        );
+      }
+    }
 
     // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
     // hardcodes as a lightweight fixture game.

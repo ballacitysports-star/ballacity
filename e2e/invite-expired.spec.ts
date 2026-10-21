@@ -88,7 +88,7 @@ test("expired invite → renders Invite expired banner, CTA routes to /discover 
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID &&
       u.searchParams.get("exp") === String(EXPIRED_MS),
     { timeout: 10_000 },

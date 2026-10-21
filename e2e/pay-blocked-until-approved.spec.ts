@@ -164,7 +164,7 @@ test("payment submission is blocked while join request is unapproved", async ({ 
   await expect(gate).toContainText(/waiting on host approval/i);
 
   // 2. Payment picker + submit surfaces are NOT rendered.
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /i have paid/i })).toHaveCount(0);
   await expect(page.getByText(/@testhost/i)).toHaveCount(0);
 

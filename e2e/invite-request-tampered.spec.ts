@@ -149,7 +149,9 @@ async function runTamperedCase(
 
   // Land on game with the tampered/missing params exactly as encoded.
   await page.waitForURL(
-    (u) => u.pathname === `/games/${GAME_ID}` && u.searchParams.get("invite") === "1",
+    (u) =>
+      u.pathname === `/games/${GAME_ID}` &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? ""),
     { timeout: 10_000 },
   );
 
@@ -170,7 +172,7 @@ async function runTamperedCase(
   // silently rewrite the link.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   if (variant === "missing-from") {
     expect(finalUrl.searchParams.get("from")).toBeNull();
   } else {

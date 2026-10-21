@@ -149,7 +149,7 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
   await expect(gate).toContainText(/waiting on host approval/i);
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
 
   const getsBeforeApproval = joinGets;
 
@@ -163,7 +163,7 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
 
   // Gate disappears, picker appears — automatically, no reload.
   await expect(gate).toHaveCount(0, { timeout: 20_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
 
   // A refetch definitely happened after approval.
