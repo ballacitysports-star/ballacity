@@ -409,6 +409,8 @@ export type OrgPost = {
   price?: number;
   rsvps?: number;
   pinned?: boolean;
+  /** Cover image: an uploaded URL or a built-in cover saved by name. */
+  imageUrl?: string;
 };
 
 export type Org = {

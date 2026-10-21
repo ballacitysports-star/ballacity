@@ -13,6 +13,7 @@ const REFERENCES: Array<{ table: string; columns: string[]; jsonColumns?: string
     jsonColumns: ["photos"],
   },
   { table: "hosted_games", columns: ["image"] },
+  { table: "team_posts", columns: ["image_url"] },
 ];
 
 /** Clear every DB reference pointing at `bucket/path`. Returns rows touched. */

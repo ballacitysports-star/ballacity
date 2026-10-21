@@ -3605,6 +3605,7 @@ export type Database = {
           formatted_address: string | null
           hidden_at: string | null
           id: string
+          image_url: string | null
           kind: string
           lat: number | null
           late_refund_pct: number
@@ -3632,6 +3633,7 @@ export type Database = {
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind: string
           lat?: number | null
           late_refund_pct?: number
@@ -3659,6 +3661,7 @@ export type Database = {
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind?: string
           lat?: number | null
           late_refund_pct?: number

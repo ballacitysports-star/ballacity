@@ -14,6 +14,7 @@ import {
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useNavigate } from "@tanstack/react-router";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 /**
  * Instagram-style feed card. Preserves every existing datum on OrgPost
@@ -89,14 +90,40 @@ export function PostCard({
       </header>
 
       {/* Media / hero area — edge-to-edge square. Renders a rich gradient
-          placeholder with the post title when no image is available (which
-          is the case today for team posts). */}
+          placeholder with the post title when the post has no image. */}
       <div {...openProps} className="relative w-full">
-        <div className="relative aspect-square w-full bg-ig-gradient">
-          <div className="absolute inset-0 grid place-items-center px-6 text-center">
+        <div className="relative aspect-square w-full overflow-hidden bg-ig-gradient">
+          {post.imageUrl && (
+            <>
+              <ResponsiveImage
+                src={post.imageUrl}
+                alt=""
+                aspect={1}
+                sizes="(min-width: 640px) 480px, 100vw"
+                baseWidth={640}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {/* Keep the title readable over any picture. */}
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent"
+              />
+            </>
+          )}
+          <div
+            className={
+              post.imageUrl
+                ? "absolute inset-x-0 bottom-0 p-4"
+                : "absolute inset-0 grid place-items-center px-6 text-center"
+            }
+          >
             <div>
-              <div className="text-5xl">{meta.emoji}</div>
-              <h3 className="mt-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-lg">
+              {!post.imageUrl && <div className="text-5xl">{meta.emoji}</div>}
+              <h3
+                className={`font-display text-2xl font-bold leading-tight text-white drop-shadow-lg ${
+                  post.imageUrl ? "" : "mt-3"
+                }`}
+              >
                 {post.title}
               </h3>
               {isEvent && post.date && (
