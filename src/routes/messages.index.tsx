@@ -62,14 +62,26 @@ function MessagesInbox() {
       }
     };
     load();
+    let hasSubscribed = false;
     const channel = supabase
       .channel(`inbox-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, load)
-      .subscribe();
+      .subscribe((status) => {
+        // Joined again after a drop: events in the gap never arrived.
+        if (status === "SUBSCRIBED") {
+          if (hasSubscribed) void load();
+          hasSubscribed = true;
+        }
+      });
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
   }, [user?.id, loading]);

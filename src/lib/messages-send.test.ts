@@ -63,7 +63,17 @@ const h = vi.hoisted(() => {
           insert: (row: Record<string, unknown>) => {
             state.log.push("insert");
             state.inserted.push(row);
-            return Promise.resolve({ error: state.insertError });
+            // insert(...).select().single(): the stored row comes back.
+            return {
+              select: () => ({
+                single: () =>
+                  Promise.resolve(
+                    state.insertError
+                      ? { data: null, error: state.insertError }
+                      : { data: { id: "m-new", ...row }, error: null },
+                  ),
+              }),
+            };
           },
           select: () => read("count", () => ({ count: state.myMessageCount })),
         };
@@ -144,8 +154,18 @@ describe("sendMessage", () => {
   });
 
   it("does nothing for an empty message with no attachment", async () => {
-    await sendMessage("c1", "   ");
+    await expect(sendMessage("c1", "   ")).resolves.toBeNull();
     expect(h.state.inserted).toHaveLength(0);
+  });
+
+  it("hands back the stored message so the sender can show it straight away", async () => {
+    const sent = await sendMessage("c1", "see you at 7");
+    expect(sent).toMatchObject({
+      id: "m-new",
+      conversation_id: "c1",
+      sender_id: ME,
+      body: "see you at 7",
+    });
   });
 
   it("stores the message before it looks anything else up", async () => {
@@ -181,7 +201,7 @@ describe("sendMessage", () => {
   it("does not let a failing notification break a send that already went through", async () => {
     h.state.acceptedBy = [THEM];
     h.createNotification.mockImplementationOnce(() => Promise.reject(new Error("push down")));
-    await expect(sendMessage("c1", "hi")).resolves.toBeUndefined();
+    await expect(sendMessage("c1", "hi")).resolves.toMatchObject({ id: "m-new" });
     await new Promise((r) => setTimeout(r, 0));
   });
 });

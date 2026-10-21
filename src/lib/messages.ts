@@ -285,6 +285,25 @@ async function currentUserId(): Promise<string | null> {
   return data.session?.user?.id ?? null;
 }
 
+/**
+ * Combine messages already on screen with a fresh copy from the server, by id.
+ *
+ * The thread hears about new messages two ways — a realtime event and a fetch
+ * — and either can arrive first, twice, or after a gap. Replacing the list
+ * with each fetch dropped a message that had arrived while it was loading, and
+ * appending each event showed a message twice. Merging by id makes both safe.
+ * Incoming wins on a clash (a fetch is the authoritative copy); the result is
+ * in send order.
+ */
+export function upsertMessages(current: Message[], incoming: Message[]): Message[] {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((m) => [m.id, m]));
+  for (const m of incoming) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) =>
+    a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0,
+  );
+}
+
 export type UploadOptions = {
   onProgress?: (pct: number) => void;
   signal?: AbortSignal;
@@ -362,21 +381,27 @@ export async function sendMessage(
   body: string,
   attachment?: Attachment | null,
   opts?: { replyToId?: string | null },
-) {
+): Promise<Message | null> {
   const me = await currentUserId();
   if (!me) throw new Error("Sign in to send messages.");
   const trimmed = (body ?? "").trim();
-  if (!trimmed && !attachment) return;
-  const { error } = await supabase.from("messages" as any).insert({
-    conversation_id: convId,
-    sender_id: me,
-    body: trimmed ? trimmed.slice(0, 4000) : null,
-    attachment_path: attachment?.path ?? null,
-    attachment_type: attachment?.type ?? null,
-    attachment_name: attachment?.name ?? null,
-    attachment_size: attachment?.size ?? null,
-    reply_to_id: opts?.replyToId ?? null,
-  } as any);
+  if (!trimmed && !attachment) return null;
+  // Ask for the stored row back so the sender sees their message the moment it
+  // is saved, rather than when the realtime echo arrives (or never, if it drops).
+  const { data: inserted, error } = await supabase
+    .from("messages" as any)
+    .insert({
+      conversation_id: convId,
+      sender_id: me,
+      body: trimmed ? trimmed.slice(0, 4000) : null,
+      attachment_path: attachment?.path ?? null,
+      attachment_type: attachment?.type ?? null,
+      attachment_name: attachment?.name ?? null,
+      attachment_size: attachment?.size ?? null,
+      reply_to_id: opts?.replyToId ?? null,
+    } as any)
+    .select()
+    .single();
   if (error) throw error;
 
   // A recipient who has not accepted the thread is looking at a message
@@ -453,6 +478,7 @@ export async function sendMessage(
         )
       : []),
   ]).catch((e) => console.warn("[messages] notifying recipients failed", e));
+  return (inserted as unknown as Message | null) ?? null;
 }
 
 /**

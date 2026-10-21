@@ -22,6 +22,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import {
   getConversationOther,
   listMessages,
+  upsertMessages,
   markConversationRead,
   sendMessage,
   uploadMessageAttachment,
@@ -152,6 +153,8 @@ function Thread() {
   useEffect(() => {
     if (loading || !user) return;
     let cancelled = false;
+    // Messages of the thread we just left must not linger once loads merge by id.
+    setMsgs([]);
     (async () => {
       try {
         const [m, o, conv] = await Promise.all([
@@ -164,7 +167,9 @@ function Thread() {
             .maybeSingle(),
         ]);
         if (cancelled) return;
-        setMsgs(m);
+        // Merge rather than replace: a realtime message can land while this
+        // fetch is in flight, and replacing would drop it.
+        setMsgs((prev) => upsertMessages(prev, m));
         setOther(o);
         const accepted: string[] = ((conv.data as any)?.accepted_by ?? []) as string[];
         setIsRequest(!accepted.includes(user.id));
@@ -174,6 +179,18 @@ function Thread() {
         toast.error(e.message);
       }
     })();
+
+    let hasSubscribed = false;
+    const catchUp = async () => {
+      try {
+        const m = await listMessages(conversationId);
+        if (cancelled) return;
+        setMsgs((prev) => upsertMessages(prev, m));
+        void markConversationRead(conversationId);
+      } catch {
+        /* the next event or return to the tab tries again */
+      }
+    };
 
     const channel = supabase.channel(`thread-${conversationId}`, {
       config: { presence: { key: user.id } },
@@ -190,7 +207,12 @@ function Thread() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          setMsgs((prev) => [...prev, payload.new as Message]);
+          const added = payload.new as Message;
+          // The sender's own message is added when it is saved, and then
+          // arrives here again as the realtime echo.
+          setMsgs((prev) =>
+            prev.some((x) => x.id === added.id) ? prev : upsertMessages(prev, [added]),
+          );
           markConversationRead(conversationId);
         },
       )
@@ -245,11 +267,22 @@ function Thread() {
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ typing: false, at: Date.now() });
+          // Joined again after a drop (a locked phone, a network change):
+          // anything sent in the gap never arrived as an event, so fetch it.
+          if (hasSubscribed) void catchUp();
+          hasSubscribed = true;
         }
       });
 
+    // Coming back to the tab is the other moment events may have been missed.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void catchUp();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       if (typingTimer.current) clearTimeout(typingTimer.current);
       supabase.removeChannel(channel);
       channelRef.current = null;
@@ -346,8 +379,12 @@ function Thread() {
       // Usually already uploaded while the sender was typing; otherwise this
       // waits for the upload in progress, or starts one.
       const attachment = await uploader.ensure();
-      await sendMessage(conversationId, text, attachment, { replyToId: replyTo?.id ?? null });
+      const sent = await sendMessage(conversationId, text, attachment, {
+        replyToId: replyTo?.id ?? null,
+      });
       uploader.release();
+      // Show it now; the realtime echo of the same row is ignored by id.
+      if (sent) setMsgs((prev) => upsertMessages(prev, [sent]));
       setText("");
       setReplyTo(null);
       setTypingState(false);
