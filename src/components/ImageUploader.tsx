@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Upload, Loader2, X, ImagePlus } from "lucide-react";
+import { Upload, Loader2, X, ImagePlus, Crop } from "lucide-react";
 import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
+import { originalImageCache, originalKey } from "@/lib/original-image-cache";
 import { imageFor, type Sport } from "@/lib/sample-data";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 
@@ -67,6 +68,36 @@ export function ImageUploader({
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Whether this device still has the original of the current upload, so its
+  // crop can be adjusted (the original never leaves the device).
+  const [canAdjust, setCanAdjust] = useState(false);
+  const cacheKey = pathPrefix && value ? originalKey(pathPrefix, value) : null;
+  useEffect(() => {
+    let live = true;
+    setCanAdjust(false);
+    if (cacheKey) {
+      void originalImageCache()
+        .has(cacheKey)
+        .then((has) => live && setCanAdjust(has));
+    }
+    return () => {
+      live = false;
+    };
+  }, [cacheKey]);
+
+  const adjustCrop = async () => {
+    if (!cacheKey) return;
+    const original = await originalImageCache().load(cacheKey);
+    if (!original) {
+      setCanAdjust(false);
+      toast.error(
+        "The original isn't on this device any more. Upload the photo again to adjust it.",
+      );
+      return;
+    }
+    setFile(original);
+    setOpen(true);
+  };
 
   const shape = logo ? "square" : kind === "avatar" ? "circle" : "rect";
   const aspect = kind === "avatar" ? 1 : 16 / 9;
@@ -85,6 +116,7 @@ export function ImageUploader({
   };
 
   const handleConfirm = async (dataUrl: string) => {
+    const source = file;
     setOpen(false);
     setFile(null);
     if (!pathPrefix) {
@@ -94,6 +126,9 @@ export function ImageUploader({
     setUploading(true);
     try {
       const url = await uploadDataUrlToBucket(bucket, pathPrefix, dataUrl);
+      // Keep the original on this device (best effort) so the crop can be
+      // adjusted later; it is never uploaded.
+      if (source) void originalImageCache().save(originalKey(pathPrefix, url), source);
       onChange(url);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Upload failed";
@@ -201,6 +236,16 @@ export function ImageUploader({
               }}
             />
           </label>
+          {hasValue && !uploading && canAdjust && (
+            <button
+              type="button"
+              onClick={adjustCrop}
+              disabled={disabled || open}
+              className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground inline-flex items-center gap-1 disabled:opacity-60"
+            >
+              <Crop className="h-3.5 w-3.5" /> Adjust crop
+            </button>
+          )}
           {hasValue && !uploading && onClear && (
             <button
               type="button"
