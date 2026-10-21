@@ -3829,6 +3829,7 @@ export type Database = {
           availability_rules: Json
           availability_slots: Json
           avatar: string
+          avatar_url: string | null
           bio: string
           cadence: string | null
           cadences: Json
@@ -3884,6 +3885,7 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json
@@ -3939,6 +3941,7 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json

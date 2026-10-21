@@ -36,6 +36,7 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
 import { LogoWithInitialsField } from "@/components/org/LogoWithInitialsField";
+import { teamInitials, teamLogoUrl } from "@/lib/team-avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { SESSION_TYPES } from "@/lib/sport-config";
 import { AgeGroupPicker } from "@/components/AgeGroupPicker";
@@ -269,7 +270,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
   // Branding
   const [accent, setAccent] = useState(org.accent);
-  const [avatar, setAvatar] = useState(org.avatar);
+  // The logo and the initials are kept apart (older teams stored a logo URL
+  // in `avatar`, which these helpers understand).
+  const [logoUrl, setLogoUrl] = useState(
+    teamLogoUrl({ avatar: org.avatar, avatar_url: org.avatarUrl }) ?? "",
+  );
+  const [avatar, setAvatar] = useState(
+    org.avatarInitials ?? teamInitials({ avatar: org.avatar, avatar_url: org.avatarUrl }),
+  );
   const [cover, setCover] = useState<string>(org.cover);
   const [customCover, setCustomCover] = useState<boolean>(() => {
     const c = org.cover;
@@ -327,7 +335,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
     );
   }
 
-  const computedAvatar = avatar || initials(name || "OR");
+  const computedInitials = avatar || initials(name || "OR");
+  // What cards render: the logo when there is one, else the initials.
+  const computedAvatar = logoUrl || computedInitials;
 
   const handlePreview: Org = {
     ...org,
@@ -339,6 +349,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
     sports: sports.length ? sports : org.sports,
     cover,
     avatar: computedAvatar,
+    avatarUrl: logoUrl || undefined,
+    avatarInitials: computedInitials,
     accent,
     bio,
     achievements,
@@ -442,6 +454,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
       sports,
       cover,
       avatar: computedAvatar,
+      avatarUrl: logoUrl,
+      avatarInitials: computedInitials,
       accent,
       bio,
       achievements,
@@ -510,6 +524,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
       sports,
       cover,
       computedAvatar,
+      computedInitials,
       accent,
       bio,
       achievements,
@@ -779,8 +794,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
               <Section title="Profile photo">
                 <LogoWithInitialsField
-                  value={avatar}
-                  onChange={setAvatar}
+                  logoUrl={logoUrl}
+                  onLogoChange={setLogoUrl}
+                  initials={avatar}
+                  onInitialsChange={setAvatar}
                   defaultInitials={initials(name || "OR")}
                   bucket="trainer-avatars"
                   pathPrefix={user?.id ?? org.id}
@@ -1550,8 +1567,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
               <Section title="Team logo">
                 <LogoWithInitialsField
-                  value={avatar}
-                  onChange={setAvatar}
+                  logoUrl={logoUrl}
+                  onLogoChange={setLogoUrl}
+                  initials={avatar}
+                  onInitialsChange={setAvatar}
                   defaultInitials={initials(name || "OR")}
                   bucket="team-avatars"
                   pathPrefix={user?.id ?? org.id}

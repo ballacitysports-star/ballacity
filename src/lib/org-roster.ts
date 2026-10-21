@@ -5,6 +5,7 @@
  * leave the server: public trainer fields only, never user ids, and nothing
  * for hidden trainer profiles or hidden facilities.
  */
+import { teamAvatarDisplay } from "@/lib/team-avatar";
 
 export type PublicRosterMember = {
   id: string;
@@ -26,6 +27,7 @@ type RawTeam = {
   name: string;
   handle: string;
   avatar: string | null;
+  avatar_url?: string | null;
   city: string | null;
   sports: string[] | null;
   hidden_at?: string | null;
@@ -55,7 +57,8 @@ export function toPublicRoster(rows: readonly RawRosterRow[]): PublicRosterMembe
         id: t.id,
         name: t.name,
         handle: t.handle,
-        avatar: t.avatar,
+        // Logo URL when there is one, else the initials.
+        avatar: teamAvatarDisplay(t) || null,
         city: t.city,
         sports: t.sports,
       },
