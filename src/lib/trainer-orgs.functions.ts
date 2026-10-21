@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
 import { parseHours } from "./org-hours";
+import { teamAvatarDisplay } from "./team-avatar";
 import { MAX_ORG_AMENITIES } from "./org-listing";
 import {
   pickFeaturedTrainer,
@@ -98,7 +99,7 @@ export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).hand
     const { data: links, error } = await supabaseAdmin
       .from("trainer_org_members")
       .select(
-        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
+        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,avatar_url,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
       )
       .limit(200);
     if (error) throw new Error(error.message);
@@ -111,6 +112,7 @@ export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).hand
         owner_id: string | null;
         name: string;
         avatar: string | null;
+        avatar_url?: string | null;
         city: string | null;
         sports: string[] | null;
         verified: boolean | null;
@@ -132,7 +134,7 @@ export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).hand
         kind: t.kind,
         ownerId: t.owner_id,
         name: t.name,
-        avatar: t.avatar,
+        avatar: teamAvatarDisplay(t) || null,
         city: t.city,
         sports: t.sports ?? [],
         verified: !!t.verified,
@@ -192,7 +194,7 @@ async function listPublicOrgRoster(orgId: string): Promise<PublicRosterMember[]>
   const { data, error } = await supabaseAdmin
     .from("trainer_org_members")
     .select(
-      "id,trainer_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports,hidden_at)",
+      "id,trainer_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,avatar_url,city,sports,hidden_at)",
     )
     .eq("org_id", orgId)
     .order("joined_at", { ascending: true });
