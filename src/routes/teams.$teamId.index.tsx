@@ -23,6 +23,7 @@ import {
   ORGS,
   GAMES,
   POST_KIND_META,
+  resolveSportAsset,
   type PostKind,
   type Org,
   type OrgPost,
@@ -199,6 +200,7 @@ function TeamPage() {
             ? { taken: r.spots_taken ?? 0, max: r.spots_max }
             : undefined,
         pinned: !!r.pinned,
+        imageUrl: r.image_url ? resolveSportAsset(String(r.image_url)) : undefined,
       })),
     [postsQuery.data],
   );
@@ -646,7 +648,12 @@ function TeamPage() {
         </Dialog>
 
         {canEdit && (
-          <CreatePostSheet teamId={org.id} open={composerOpen} onOpenChange={setComposerOpen} />
+          <CreatePostSheet
+            teamId={org.id}
+            sports={org.sports}
+            open={composerOpen}
+            onOpenChange={setComposerOpen}
+          />
         )}
       </div>
       <PostDetailsDialog

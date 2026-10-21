@@ -14,18 +14,23 @@ import {
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
+import { ImageUploader } from "@/components/ImageUploader";
+import { useAuth } from "@/hooks/use-auth";
 import { createTeamPost, suggestTeamPostDraft } from "@/lib/team-posts.functions";
-import type { PostKind } from "@/lib/sample-data";
-import { POST_KIND_META } from "@/lib/sample-data";
+import type { PostKind, Sport } from "@/lib/sample-data";
+import { POST_KIND_META, toStoredCover } from "@/lib/sample-data";
 
 const KINDS: PostKind[] = ["announcement", "tryout", "pickup", "clinic", "recap"];
 
 export function CreatePostSheet({
   teamId,
+  sports = [],
   open,
   onOpenChange,
 }: {
   teamId: string;
+  /** The team's sports: their built-in covers are offered first as presets. */
+  sports?: Sport[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -42,6 +47,8 @@ export function CreatePostSheet({
   } | null>(null);
   const [price, setPrice] = useState("");
   const [spotsMax, setSpotsMax] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const { user } = useAuth();
   const [err, setErr] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
   /** What the member had before the AI draft, so one tap puts it back. */
@@ -78,6 +85,7 @@ export function CreatePostSheet({
       setLocationGeo(null);
       setPrice("");
       setSpotsMax("");
+      setImageUrl("");
       setErr(null);
       setBeforeDraft(null);
       onOpenChange(false);
@@ -110,6 +118,8 @@ export function CreatePostSheet({
         lng: isEvent ? (locationGeo?.lng ?? null) : null,
         price: isEvent && price !== "" ? Number(price) : null,
         spotsMax: isEvent && spotsMax !== "" ? Number(spotsMax) : null,
+        // Built-in covers are sent by name; uploads by their storage URL.
+        imageUrl: imageUrl ? toStoredCover(imageUrl) : null,
       },
     });
   };
@@ -256,6 +266,24 @@ export function CreatePostSheet({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Cover image (optional)
+            </label>
+            <div className="mt-1.5">
+              <ImageUploader
+                kind="cover"
+                bucket="team-covers"
+                pathPrefix={user?.id}
+                value={imageUrl}
+                onChange={setImageUrl}
+                onClear={() => setImageUrl("")}
+                presets={sports}
+                allowBgRemoval={false}
+              />
+            </div>
+          </div>
 
           {err && (
             <div className="rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
