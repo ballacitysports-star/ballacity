@@ -3164,6 +3164,7 @@ export type Database = {
       }
       reviews: {
         Row: {
+          answers: Json
           body: string
           context: string | null
           created_at: string
@@ -3174,16 +3175,19 @@ export type Database = {
           is_private: boolean
           kind: string
           rating: number
+          recommend: string | null
           reviewee_id: string
           reviewee_kind: string
           reviewee_name: string
           reviewer_id: string
           scores: Json
           sport: string | null
+          tags: string[]
           title: string | null
           verified: boolean
         }
         Insert: {
+          answers?: Json
           body: string
           context?: string | null
           created_at?: string
@@ -3194,16 +3198,19 @@ export type Database = {
           is_private?: boolean
           kind: string
           rating: number
+          recommend?: string | null
           reviewee_id: string
           reviewee_kind: string
           reviewee_name: string
           reviewer_id: string
           scores?: Json
           sport?: string | null
+          tags?: string[]
           title?: string | null
           verified?: boolean
         }
         Update: {
+          answers?: Json
           body?: string
           context?: string | null
           created_at?: string
@@ -3214,12 +3221,14 @@ export type Database = {
           is_private?: boolean
           kind?: string
           rating?: number
+          recommend?: string | null
           reviewee_id?: string
           reviewee_kind?: string
           reviewee_name?: string
           reviewer_id?: string
           scores?: Json
           sport?: string | null
+          tags?: string[]
           title?: string | null
           verified?: boolean
         }

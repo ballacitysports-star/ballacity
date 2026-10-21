@@ -29,6 +29,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ReputationCard } from "@/components/ReputationCard";
 import { RatingExplainer } from "@/components/RatingExplainer";
+import { MeasuredStats } from "@/components/MeasuredStats";
+import {
+  ANSWER_LABELS,
+  RECOMMEND_COPY,
+  RECOMMEND_LABELS,
+  REVIEW_QUESTIONS,
+  tagLabel,
+} from "@/lib/review-questions";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
 import {
@@ -136,6 +144,52 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
 
       {r.context && <div className="mt-2 micro-label text-muted-foreground">via {r.context}</div>}
 
+      {r.recommend && (
+        <div className="mt-2 text-xs">
+          <span className="text-muted-foreground">{RECOMMEND_COPY[r.revieweeKind].prompt}</span>{" "}
+          <span className={`font-bold ${r.recommend === "no" ? "text-coral" : "text-lime"}`}>
+            {RECOMMEND_LABELS[r.recommend]}
+          </span>
+        </div>
+      )}
+
+      {r.tags && r.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {r.tags.map((t) => (
+            <span
+              key={t}
+              className="rounded-full border border-lime/30 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime"
+            >
+              {tagLabel(r.revieweeKind, t)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {r.answers && Object.keys(r.answers).length > 0 && (
+        <details className="mt-3 group">
+          <summary className="cursor-pointer micro-label text-muted-foreground hover:text-lime">
+            Quick answers ({Object.keys(r.answers).length})
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {REVIEW_QUESTIONS[r.revieweeKind]
+              .filter((q) => r.answers?.[q.key])
+              .map((q) => (
+                <li key={q.key} className="flex items-center justify-between gap-3 text-[11px]">
+                  <span className="text-foreground/80">{q.label}</span>
+                  <span
+                    className={`shrink-0 font-bold ${
+                      r.answers?.[q.key] === "no" ? "text-coral" : "text-lime"
+                    }`}
+                  >
+                    {ANSWER_LABELS[r.answers![q.key]]}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </details>
+      )}
+
       {r.scores && Object.keys(r.scores).length > 0 && (
         <details className="mt-3 group">
           <summary className="cursor-pointer micro-label text-muted-foreground hover:text-lime">
@@ -226,13 +280,14 @@ export function ReviewsSection({
   const eligible = useCanReview(revieweeId);
   const insight = useReputationInsight(revieweeId, revieweeKind).data ?? null;
   const { user } = useAuth();
+  const realId = revieweeId === "me" ? user?.id : revieweeId;
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const refreshInsight = async () => {
     setRefreshing(true);
     try {
       await refreshMyReputationSummary({
-        data: { revieweeId: revieweeId === "me" ? (user?.id ?? "") : revieweeId, revieweeKind },
+        data: { revieweeId: realId ?? "", revieweeKind },
       });
       await qc.invalidateQueries({ queryKey: ["reputation-insight"] });
     } catch (e) {
@@ -281,6 +336,7 @@ export function ReviewsSection({
         onRefreshInsight={isOwner ? refreshInsight : undefined}
         refreshing={refreshing}
       />
+      <MeasuredStats revieweeId={realId} kind={revieweeKind} />
       <RatingExplainer className="mt-3" />
 
       {/* Prominent write-a-review CTA */}

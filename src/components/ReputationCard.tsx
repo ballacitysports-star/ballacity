@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles, TrendingUp, TrendingDown, Minus, ShieldCheck, Star } from "lucide-react";
-import { trustLabel, type Reputation } from "@/lib/reviews";
+import { recommendLine, trustLabel, type Reputation } from "@/lib/reviews";
 import type { ReputationInsight } from "@/lib/reviews-db";
 
 function Stars({ value, size = 14 }: { value: number; size?: number }) {
@@ -158,6 +158,43 @@ export function ReputationCard({
           </p>
         )}
       </div>
+
+      {/* What people say: the headline answer, praise tags and quick-question results */}
+      {(rep.recommend.answered > 0 || rep.topTags.length > 0 || rep.questionStats.length > 0) && (
+        <div className="mt-4">
+          {recommendLine(rep) && (
+            <p className="text-sm font-semibold" data-testid="recommend-line">
+              👍 {recommendLine(rep)}
+            </p>
+          )}
+          {rep.topTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {rep.topTags.map((t) => (
+                <span
+                  key={t.key}
+                  className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                >
+                  {t.label} · {t.count}
+                </span>
+              ))}
+            </div>
+          )}
+          {rep.questionStats.some((q) => q.answered >= 3) && (
+            <ul className="mt-2 space-y-1">
+              {rep.questionStats
+                .filter((q) => q.answered >= 3)
+                .map((q) => (
+                  <li key={q.key} className="flex items-center justify-between gap-3 text-[11px]">
+                    <span className="text-foreground/80">{q.label}</span>
+                    <span className="shrink-0 font-display font-bold text-lime">
+                      {Math.round((q.yes / q.answered) * 100)}% yes
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Top strengths */}
       {rep.topStrengths.length > 0 && (

@@ -4,6 +4,7 @@ import {
   REPUTATION_LEVELS,
   computeReputation,
   levelFor,
+  recommendLine,
   trustLabel,
   type Review,
 } from "@/lib/reviews";
@@ -172,5 +173,101 @@ describe("trust score and levels", () => {
     expect(levelFor(95, 2).name).toBe("Rookie");
     expect(levelFor(60, 100).name).toBe("Rising");
     expect(levelFor(0, 0)).toBe(REPUTATION_LEVELS[0]);
+  });
+});
+
+describe("structured answers in the reputation", () => {
+  const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+  let n = 0;
+  const rv = (extra: Partial<Review> = {}): Review => {
+    n += 1;
+    return {
+      id: `q${n}`,
+      kind: "player",
+      revieweeKind: "player",
+      revieweeId: "x",
+      revieweeName: "X",
+      reviewerName: `R${n}`,
+      reviewerHandle: "",
+      reviewerAvatar: "RR",
+      reviewerId: `rr${n}`,
+      rating: 5,
+      body: "played a fair game",
+      date: at(2),
+      verified: true,
+      ...extra,
+    };
+  };
+  const rep = (list: Review[], kind: "player" | "host" | "team" | "trainer" = "player") =>
+    computeReputation(list, kind);
+
+  it("tallies the headline answer and ignores reviews that skipped it", () => {
+    const r = rep([
+      rv({ recommend: "yes" }),
+      rv({ recommend: "yes" }),
+      rv({ recommend: "not_sure" }),
+      rv({ recommend: "no" }),
+      rv(), // older review without the new question
+    ]);
+    expect(r.recommend).toEqual({ answered: 4, yes: 2, notSure: 1, no: 1 });
+  });
+
+  it("words the headline as counts first, a percentage once there are enough answers", () => {
+    const few = rep([rv({ recommend: "yes" }), rv({ recommend: "yes" }), rv({ recommend: "no" })]);
+    expect(recommendLine(few)).toBe("2 of 3 would play with them again");
+    const many = rep(Array.from({ length: 8 }, (_, i) => rv({ recommend: i < 7 ? "yes" : "no" })));
+    expect(recommendLine(many)).toBe("88% would play with them again");
+    expect(recommendLine(rep([rv()]))).toBeNull();
+    expect(recommendLine(rep([rv({ recommend: "yes" })], "trainer"))).toBe(
+      "1 of 1 would book them again",
+    );
+  });
+
+  it("ranks praise tags by how often they're given, with readable labels", () => {
+    const r = rep([
+      rv({ tags: ["fairPlay", "onTime"] }),
+      rv({ tags: ["fairPlay"] }),
+      rv({ tags: ["fairPlay", "positive"] }),
+      rv({ tags: ["onTime"] }),
+    ]);
+    expect(r.topTags).toEqual([
+      { key: "fairPlay", label: "Plays fair", count: 3 },
+      { key: "onTime", label: "Always on time", count: 2 },
+      { key: "positive", label: "Positive energy", count: 1 },
+    ]);
+  });
+
+  it("tallies each behaviour question separately and skips unanswered ones", () => {
+    const r = rep([
+      rv({ answers: { fair: "yes", respect: "yes" } }),
+      rv({ answers: { fair: "mostly" } }),
+      rv({ answers: { fair: "no", respect: "yes" } }),
+    ]);
+    expect(r.questionStats.map((q) => q.key)).toEqual(["fair", "respect"]);
+    expect(r.questionStats[0]).toMatchObject({ answered: 3, yes: 1, mostly: 1, no: 1 });
+    expect(r.questionStats[1]).toMatchObject({ answered: 2, yes: 2, mostly: 0, no: 0 });
+  });
+
+  it("leaves private and flagged reviews out of every tally", () => {
+    const r = rep([
+      rv({ recommend: "yes", tags: ["fairPlay"] }),
+      rv({ recommend: "no", tags: ["hustle"], isPrivate: true }),
+      rv({ recommend: "no", tags: ["hustle"], flagged: true }),
+    ]);
+    expect(r.recommend.answered).toBe(1);
+    expect(r.topTags.map((t) => t.key)).toEqual(["fairPlay"]);
+  });
+
+  it("does not change the trust score: that still comes from the stars", () => {
+    const base = [rv(), rv(), rv()];
+    const withExtras = base.map((b) => ({ ...b, recommend: "no" as const, tags: ["hustle"] }));
+    expect(rep(withExtras).trustScore).toBe(rep(base).trustScore);
+  });
+
+  it("writes a sensible summary from tags, and never an empty 'known for' clause", () => {
+    expect(rep([rv({ tags: ["fairPlay"] })]).aiSummary).toMatch(/most known for plays fair/);
+    const none = rep([rv()]).aiSummary;
+    expect(none).not.toMatch(/known for\s*\./);
+    expect(none.length).toBeGreaterThan(10);
   });
 });

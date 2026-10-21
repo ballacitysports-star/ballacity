@@ -1,9 +1,21 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
-import { REVIEWEE_META, CRITERIA, type ReviewerKind, type RevieweeKind } from "@/lib/reviews";
+import { REVIEWEE_META, type ReviewerKind, type RevieweeKind } from "@/lib/reviews";
+import {
+  ANSWER_LABELS,
+  ANSWER_VALUES,
+  MAX_TAGS,
+  PRAISE_TAGS,
+  RECOMMEND_COPY,
+  RECOMMEND_LABELS,
+  RECOMMEND_VALUES,
+  REVIEW_QUESTIONS,
+  type Answer,
+  type Recommend,
+} from "@/lib/review-questions";
 import { useTransactionsWith } from "@/lib/transactions";
 import { useSubmitReview } from "@/lib/reviews-db";
 import { toast } from "sonner";
@@ -49,23 +61,38 @@ function ReviewNew() {
   const [rating, setRating] = useState(0); // no default: an unpicked rating anchors people
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [picks, setPicks] = useState<string[]>([]);
+  const [recommend, setRecommend] = useState<Recommend | null>(null);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [tags, setTags] = useState<string[]>([]);
   const [drafting, setDrafting] = useState(false);
   const [skillVote, setSkillVote] = useState<-1 | 0 | 1 | null>(null);
   const [pickedGame, setPickedGame] = useState<string | null>(null);
-  const [scores, setScores] = useState<Record<string, number>>({});
   const [isPrivate, setIsPrivate] = useState(false);
 
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
-  const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
+  const questions = REVIEW_QUESTIONS[revieweeKind];
+  const tagOptions = PRAISE_TAGS[revieweeKind];
   const sharedTxns = useTransactionsWith(search.revieweeId ?? "");
   const eligible = sharedTxns.length > 0;
   const verified = eligible;
   // Game reviews are one per game; default to the most recent one.
   const selected = sharedTxns.find((t) => t.gameId === pickedGame) ?? sharedTxns[0] ?? null;
   const submitReview = useSubmitReview();
-  const canSubmit = eligible && body.trim().length >= 8 && rating > 0 && !submitReview.isPending;
+  const canSubmit =
+    eligible &&
+    body.trim().length >= 8 &&
+    rating > 0 &&
+    recommend !== null &&
+    !submitReview.isPending;
+  const toggleTag = (key: string) =>
+    setTags((cur) =>
+      cur.includes(key)
+        ? cur.filter((k) => k !== key)
+        : cur.length >= MAX_TAGS
+          ? cur
+          : [...cur, key],
+    );
 
   const goBack = () => {
     if (revieweeKind === "team" || revieweeKind === "trainer") {
@@ -79,7 +106,12 @@ function ReviewNew() {
     setDrafting(true);
     try {
       const res = await suggestReviewText({
-        data: { revieweeKind, rating, highlights: picks, context: selected?.context ?? null },
+        data: {
+          revieweeKind,
+          rating,
+          highlights: tags.map((k) => tagOptions.find((t) => t.key === k)?.label ?? k),
+          context: selected?.context ?? null,
+        },
       });
       setBody(res.draft);
     } catch (e) {
@@ -99,7 +131,10 @@ function ReviewNew() {
         revieweeName: selected.counterpartyName || (search.revieweeName ?? ""),
         gameId: selected.gameId,
         rating,
-        scores,
+        scores: {},
+        recommend: recommend as Recommend,
+        answers,
+        tags,
         title,
         body,
         isPrivate,
@@ -244,56 +279,108 @@ function ReviewNew() {
           </div>
         </section>
 
-        {/* 10-criterion breakdown */}
+        {/* Headline question */}
+        <section>
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-2">
+            {RECOMMEND_COPY[revieweeKind].prompt}
+          </h2>
+          <div
+            className="grid grid-cols-3 gap-2"
+            role="group"
+            aria-label="Would you do this again?"
+          >
+            {RECOMMEND_VALUES.map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={recommend === v}
+                onClick={() => setRecommend(v)}
+                className={`rounded-2xl border px-3 py-3 text-sm font-semibold ${
+                  recommend === v
+                    ? v === "no"
+                      ? "border-coral bg-coral/10 text-coral"
+                      : "border-lime bg-lime/10 text-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                {RECOMMEND_LABELS[v]}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Quick behaviour questions */}
         <section>
           <h2 className="font-display section-eyebrow text-muted-foreground mb-1">
-            Breakdown <span className="normal-case text-[10px]">(optional)</span>
+            Quick questions <span className="normal-case text-[10px]">(optional)</span>
           </h2>
           <p className="mb-2 text-[11px] text-muted-foreground">
-            Only the ones you set are saved — skip any you didn't notice.
+            Skip any you didn't notice. Showing up and being on time are tracked automatically.
           </p>
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            {criteria.map((c) => {
-              const set = scores[c.key] !== undefined;
-              return (
-                <div key={c.key}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">{c.label}</span>
-                    {set ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setScores((s) => {
-                            const next = { ...s };
-                            delete next[c.key];
-                            return next;
-                          })
-                        }
-                        aria-label={`Clear ${c.label}`}
-                        className="text-lime font-bold"
-                      >
-                        {scores[c.key]} / 5 ✕
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">Not rated</span>
-                    )}
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={scores[c.key] ?? 3}
-                    aria-label={c.label}
-                    onChange={(e) => setScores((s) => ({ ...s, [c.key]: Number(e.target.value) }))}
-                    // An unset slider rests on 3, where a tap fires no change event.
-                    onPointerUp={(e) => {
-                      const v = Number(e.currentTarget.value);
-                      setScores((s) => (s[c.key] === undefined ? { ...s, [c.key]: v } : s));
-                    }}
-                    className={`mt-1 w-full accent-lime ${set ? "" : "opacity-40"}`}
-                  />
+            {questions.map((q) => (
+              <div key={q.key}>
+                <div className="text-sm font-semibold">{q.label}</div>
+                <div className="mt-1.5 flex gap-1.5" role="group" aria-label={q.label}>
+                  {ANSWER_VALUES.map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      aria-pressed={answers[q.key] === a}
+                      onClick={() =>
+                        setAnswers((cur) => {
+                          const next = { ...cur };
+                          if (cur[q.key] === a) delete next[q.key];
+                          else next[q.key] = a;
+                          return next;
+                        })
+                      }
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                        answers[q.key] === a
+                          ? a === "no"
+                            ? "border-coral bg-coral/10 text-coral"
+                            : "border-lime bg-lime/15 text-foreground"
+                          : "border-border bg-background text-muted-foreground"
+                      }`}
+                    >
+                      {ANSWER_LABELS[a]}
+                    </button>
+                  ))}
                 </div>
+                {q.safety && answers[q.key] === "no" && (
+                  <p className="mt-1.5 text-[11px] text-coral">
+                    Because this is about safety, a "No" is also sent privately to our moderators.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Praise tags */}
+        <section>
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-1">
+            What stood out?{" "}
+            <span className="normal-case text-[10px]">(optional · up to {MAX_TAGS})</span>
+          </h2>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Praise tags">
+            {tagOptions.map((t) => {
+              const on = tags.includes(t.key);
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={!on && tags.length >= MAX_TAGS}
+                  onClick={() => toggleTag(t.key)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                    on
+                      ? "border-lime bg-lime/20 text-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
               );
             })}
           </div>
@@ -316,7 +403,7 @@ function ReviewNew() {
         {/* Body */}
         <section>
           <label className="font-display section-eyebrow text-muted-foreground">
-            What stood out?
+            Tell people more
           </label>
           <textarea
             value={body}
@@ -326,42 +413,20 @@ function ReviewNew() {
             maxLength={600}
             className="mt-2 w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
-          <div className="mt-3 rounded-2xl border border-lime/20 bg-lime/5 p-3">
-            <div className="flex items-center gap-1.5 micro-label text-lime">
-              <Sparkles className="h-3 w-3" /> Need a hand? Tap what you noticed
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {criteria.slice(0, 6).map((c) => {
-                const on = picks.includes(c.label);
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    onClick={() =>
-                      setPicks((p) => (on ? p.filter((x) => x !== c.label) : [...p, c.label]))
-                    }
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                      on
-                        ? "border-lime bg-lime/20 text-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={draftWithAi}
-              disabled={drafting || picks.length === 0}
-              className="mt-2 inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
+              disabled={drafting || tags.length === 0}
+              className="inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
             >
               <Sparkles className="h-3 w-3" /> {drafting ? "Drafting…" : "Draft with AI"}
             </button>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              AI only uses the points you tap. Edit it so it sounds like you.
-            </p>
+            <span className="text-[10px] text-muted-foreground">
+              {tags.length === 0
+                ? "Pick a few tags above first — AI only uses the points you tapped."
+                : "AI only uses the tags you picked. Edit it so it sounds like you."}
+            </span>
           </div>
           <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
             <span>AI moderation checks every review before it posts.</span>

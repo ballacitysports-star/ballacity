@@ -19,6 +19,12 @@ import {
 } from "@/lib/reviews";
 import type { Database } from "@/integrations/supabase/types";
 import { analyzeSubmittedReview, submitReview } from "@/lib/reviews.functions";
+import {
+  ANSWER_VALUES,
+  RECOMMEND_VALUES,
+  type Answer,
+  type Recommend,
+} from "@/lib/review-questions";
 
 type ReviewRow = Database["public"]["Tables"]["reviews"]["Row"];
 
@@ -36,6 +42,19 @@ type ProfileLite = {
   username: string | null;
   avatar_initials: string | null;
 };
+
+function parseRecommend(v: string | null): Recommend | undefined {
+  return (RECOMMEND_VALUES as readonly string[]).includes(v ?? "") ? (v as Recommend) : undefined;
+}
+
+function parseAnswers(v: unknown): Record<string, Answer> | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out: Record<string, Answer> = {};
+  for (const [k, a] of Object.entries(v as Record<string, unknown>)) {
+    if ((ANSWER_VALUES as readonly string[]).includes(a as string)) out[k] = a as Answer;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 export function rowToReview(row: ReviewRow, p?: ProfileLite): Review {
   const name = p?.display_name ?? "Player";
@@ -61,6 +80,9 @@ export function rowToReview(row: ReviewRow, p?: ProfileLite): Review {
     flagged: row.flagged,
     gameId: row.game_id ?? undefined,
     sport: row.sport ?? undefined,
+    recommend: parseRecommend(row.recommend),
+    answers: parseAnswers(row.answers),
+    tags: row.tags?.length ? row.tags : undefined,
   };
 }
 
@@ -216,6 +238,12 @@ export type SubmitReviewInput = {
   gameId?: string | null;
   rating: number;
   scores: Record<string, number>;
+  /** Headline answer: would you do this with them again? */
+  recommend: Recommend;
+  /** Yes / mostly / no per behaviour question (optional). */
+  answers: Record<string, Answer>;
+  /** Praise tags (optional, up to 5). */
+  tags: string[];
   title?: string;
   body: string;
   isPrivate: boolean;
@@ -236,6 +264,9 @@ export function useSubmitReview() {
           gameId: input.gameId ?? null,
           rating: input.rating,
           scores: input.scores,
+          recommend: input.recommend,
+          answers: input.answers,
+          tags: input.tags,
           title: input.title,
           body: input.body,
           isPrivate: input.isPrivate,
