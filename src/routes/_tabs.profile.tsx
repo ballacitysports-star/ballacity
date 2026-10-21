@@ -71,6 +71,7 @@ import {
 } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
+import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow";
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 
@@ -459,6 +460,8 @@ function PlayerProfile() {
           </>
         }
       />
+
+      <ProfileVisibilityRow />
 
       <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
         {me.bio && (
