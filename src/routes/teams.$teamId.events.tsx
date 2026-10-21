@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, CalendarClock, CalendarDays, List, Loader2, MapPin, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { blockedMessage, heldNotice } from "@/lib/post-moderation";
+import { DraftWithAi } from "@/components/DraftWithAi";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -277,6 +278,7 @@ function EventDialog({ teamId, initial, onClose, onSaved }: { teamId: string; in
             <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
           </div>
           <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
+          <DraftWithAi kind={f.kind} title={f.title} body={f.body} onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))} />
           <Button className="w-full" disabled={busy} onClick={save}>{initial ? "Save changes" : "Post event"}</Button>
         </div>
       </DialogContent>
