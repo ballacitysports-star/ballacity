@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ACCOUNT_TYPE_META, isAccountType, type AccountType } from "@/lib/account-type";
+import { teamInitials, teamLogoUrl } from "@/lib/team-avatar";
 
 /**
  * An account can hold several profiles at once: one personal player profile
@@ -107,7 +108,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
 
   const [teamsRes, orgsRes] = await Promise.all([
     teamRefs.length
-      ? supabase.from("teams").select("id, name, handle, avatar").in("id", teamRefs)
+      ? supabase.from("teams").select("id, name, handle, avatar, avatar_url").in("id", teamRefs)
       : Promise.resolve({ data: [] as unknown[] }),
     orgRefs.length
       ? supabase
@@ -118,9 +119,15 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   ]);
 
   const teams = new Map(
-    ((teamsRes.data ?? []) as { id: string; name: string; handle: string; avatar: string }[]).map(
-      (t) => [t.id, t],
-    ),
+    (
+      (teamsRes.data ?? []) as {
+        id: string;
+        name: string;
+        handle: string;
+        avatar: string;
+        avatar_url: string | null;
+      }[]
+    ).map((t) => [t.id, t]),
   );
   const orgs = new Map(
     (
@@ -187,12 +194,9 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       refId: team.id,
       name: team.name,
       handle: team.handle,
-      // A team/trainer's uploaded logo is stored in `avatar` as a URL;
-      // initials live there otherwise.
-      avatarUrl: /^(https?:|data:|blob:)/.test(team.avatar ?? "") ? team.avatar : null,
-      avatarFallback: /^(https?:|data:|blob:)/.test(team.avatar ?? "")
-        ? initials(team.name)
-        : team.avatar || initials(team.name),
+      // The logo lives in `avatar_url` (older rows kept it in `avatar`).
+      avatarUrl: teamLogoUrl(team),
+      avatarFallback: teamInitials(team) || initials(team.name),
       href: { to: "/teams/$teamId", params: { teamId: team.id } },
     });
   }

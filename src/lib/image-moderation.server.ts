@@ -6,13 +6,14 @@ import { isPublicImageBucket } from "@/lib/image-moderation";
 /** Columns that may reference an uploaded image URL, cleared when it is removed. */
 const REFERENCES: Array<{ table: string; columns: string[]; jsonColumns?: string[] }> = [
   { table: "profiles", columns: ["avatar_url", "cover_url"] },
-  { table: "teams", columns: ["avatar", "cover"] },
+  { table: "teams", columns: ["avatar", "avatar_url", "cover"] },
   {
     table: "trainer_orgs",
     columns: ["avatar", "avatar_url", "cover_url"],
     jsonColumns: ["photos"],
   },
   { table: "hosted_games", columns: ["image"] },
+  { table: "team_posts", columns: ["image_url"] },
 ];
 
 /** Clear every DB reference pointing at `bucket/path`. Returns rows touched. */

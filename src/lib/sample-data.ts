@@ -409,6 +409,8 @@ export type OrgPost = {
   price?: number;
   rsvps?: number;
   pinned?: boolean;
+  /** Cover image: an uploaded URL or a built-in cover saved by name. */
+  imageUrl?: string;
 };
 
 export type Org = {
@@ -422,7 +424,12 @@ export type Org = {
   sports: Sport[];
   verified: boolean;
   cover: string;
-  avatar: string; // initials
+  /** What cards render: the logo URL when there is one, else the initials. */
+  avatar: string;
+  /** The uploaded logo, kept apart from the initials. */
+  avatarUrl?: string;
+  /** The team's own initials (never a URL); empty means use the name's. */
+  avatarInitials?: string;
   accent: string; // hex
   followers: number;
   roster: number;

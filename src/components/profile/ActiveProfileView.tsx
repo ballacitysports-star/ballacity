@@ -133,12 +133,10 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       name: org.name,
       handle: org.handle ?? null,
       bannerUrl: org.cover ?? null,
-      // Teams/trainers store an uploaded logo as a URL in `avatar`; never
-      // print that URL as text.
-      avatarUrl: isImageUrl(org.avatar) ? org.avatar : null,
-      avatarFallback: isImageUrl(org.avatar)
-        ? profile.avatarFallback
-        : org.avatar || profile.avatarFallback,
+      // The logo and the initials are separate (older rows kept a logo URL in
+      // `avatar`, which `avatarUrl` already accounts for); never print a URL.
+      avatarUrl: org.avatarUrl ?? (isImageUrl(org.avatar) ? org.avatar : null),
+      avatarFallback: org.avatarInitials || profile.avatarFallback,
       city: org.city ?? null,
       bio: org.bio ?? org.tagline ?? null,
       sports: org.sports ?? [],

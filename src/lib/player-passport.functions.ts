@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { computeAthleteProgress, type AthleteProgress } from "@/lib/athlete-xp";
+import { teamAvatarDisplay } from "@/lib/team-avatar";
 
 export type PassportTeam = {
   id: string;
@@ -74,7 +75,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
 
     const { data: memberRows } = await supabaseAdmin
       .from("team_members")
-      .select("role, teams(id, name, handle, avatar, kind, hidden_at)")
+      .select("role, teams(id, name, handle, avatar, avatar_url, kind, hidden_at)")
       .eq("user_id", userId)
       .limit(20);
     const teams: PassportTeam[] = [];
@@ -85,6 +86,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         name: string;
         handle: string | null;
         avatar: string | null;
+        avatar_url?: string | null;
         kind: string | null;
         hidden_at: string | null;
       } | null;
@@ -95,7 +97,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         id: t.id,
         name: t.name,
         handle: t.handle,
-        avatar: t.avatar,
+        avatar: teamAvatarDisplay(t) || null,
         kind: t.kind,
         role: row.role,
       });
