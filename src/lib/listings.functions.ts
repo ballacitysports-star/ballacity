@@ -4,6 +4,11 @@ import { z } from "zod";
 import { assertModerator } from "@/lib/moderation.server";
 import { getAdmin, writeAudit } from "@/lib/superadmin.server";
 import { MAX_FEATURED_ORGS, canFeatureAnother } from "@/lib/featured-orgs";
+import {
+  UNCLAIMED_LISTING_INPUT,
+  createUnclaimedListingRecord,
+  type UnclaimedListingInput,
+} from "@/lib/listings-create.server";
 
 export type ListingSubjectType = "team" | "gym";
 
@@ -110,72 +115,11 @@ export const listUnclaimedListings = createServerFn({ method: "GET" })
 
 export const createUnclaimedListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: {
-      subjectType: ListingSubjectType;
-      name: string;
-      handle: string;
-      city?: string;
-      kind?: "team" | "coach";
-      sports?: string[];
-      category?: string;
-      address?: string;
-      website?: string;
-    }) =>
-      z
-        .object({
-          subjectType: SUBJECT,
-          name: z.string().trim().min(2).max(120),
-          handle: z.string().trim().min(2).max(60),
-          city: z.string().trim().max(120).optional(),
-          kind: z.enum(["team", "coach"]).optional(),
-          sports: z.array(z.string().trim().max(40)).max(10).optional(),
-          category: z.string().trim().max(60).optional(),
-          address: z.string().trim().max(240).optional(),
-          website: z.string().trim().max(240).optional(),
-        })
-        .parse(d),
-  )
+  .inputValidator((d: UnclaimedListingInput) => UNCLAIMED_LISTING_INPUT.parse(d))
   .handler(async ({ context, data }) => {
     await assertModerator(context);
 
-    // Called with the moderator's own client, not the admin one: the RPCs read
-    // auth.uid() to authorise and to stamp listed_by.
-    const rpc = untyped(context.supabase).rpc.bind(context.supabase) as (
-      n: string,
-      a: Record<string, unknown>,
-    ) => Promise<any>;
-    let id: string;
-
-    if (data.subjectType === "team") {
-      const slug =
-        data.handle
-          .replace(/^@/, "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "") || crypto.randomUUID();
-      const { data: out, error } = await rpc("create_unclaimed_team", {
-        _id: slug,
-        _kind: data.kind ?? "team",
-        _name: data.name,
-        _handle: data.handle,
-        _city: data.city ?? "",
-        _sports: data.sports ?? [],
-      });
-      if (error) throw new Error(error.message);
-      id = String(out);
-    } else {
-      const { data: out, error } = await rpc("create_unclaimed_gym", {
-        _name: data.name,
-        _handle: data.handle,
-        _city: data.city ?? null,
-        _category: data.category ?? null,
-        _address: data.address ?? null,
-        _website: data.website ?? null,
-      });
-      if (error) throw new Error(error.message);
-      id = String(out);
-    }
+    const { id } = await createUnclaimedListingRecord(context.supabase, data);
 
     await writeAudit(await getAdmin(), context.userId, {
       action: "listing.create_unclaimed",

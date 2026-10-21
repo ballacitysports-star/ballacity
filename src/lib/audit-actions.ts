@@ -64,6 +64,12 @@ export const AUDIT_ACTIONS = {
   "listing.claim_deny": { label: "Listing claim denied", category: "content" },
   "listing.feature": { label: "Facility featured", category: "content" },
   "listing.unfeature": { label: "Facility unfeatured", category: "content" },
+  "listings.games.edit": { label: "Game edited by admin", category: "content" },
+  "listings.tryouts.edit": { label: "Tryout or camp edited by admin", category: "content" },
+  "listings.availability.edit": { label: "Availability post edited by admin", category: "content" },
+  "discovery.run": { label: "Listing discovery run started", category: "content" },
+  "discovery.approve": { label: "Discovered listing approved", category: "content" },
+  "discovery.reject": { label: "Discovered listing rejected", category: "content" },
 
   // Reports
   "report.resolve": { label: "Report resolved", category: "reports" },
