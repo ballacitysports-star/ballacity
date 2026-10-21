@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Upload, Loader2, X, ImagePlus } from "lucide-react";
+import { Upload, Loader2, X, ImagePlus, Crop } from "lucide-react";
 import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
+import { originalImageCache, originalKey } from "@/lib/original-image-cache";
 import { imageFor, type Sport } from "@/lib/sample-data";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 
@@ -25,6 +26,13 @@ type Props = {
   allowBgRemoval?: boolean;
   disabled?: boolean;
   label?: string;
+  /** Team / org logo: square frame, opens with the whole image visible. */
+  logo?: boolean;
+  /**
+   * Cover only: also show how the cover will look as the short profile banner,
+   * which crops the top and bottom of a 16:9 image.
+   */
+  bannerPreview?: boolean;
 };
 
 const DEFAULT_PRESETS: Sport[] = [
@@ -53,13 +61,45 @@ export function ImageUploader({
   allowBgRemoval,
   disabled,
   label,
+  logo = false,
+  bannerPreview = false,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Whether this device still has the original of the current upload, so its
+  // crop can be adjusted (the original never leaves the device).
+  const [canAdjust, setCanAdjust] = useState(false);
+  const cacheKey = pathPrefix && value ? originalKey(pathPrefix, value) : null;
+  useEffect(() => {
+    let live = true;
+    setCanAdjust(false);
+    if (cacheKey) {
+      void originalImageCache()
+        .has(cacheKey)
+        .then((has) => live && setCanAdjust(has));
+    }
+    return () => {
+      live = false;
+    };
+  }, [cacheKey]);
 
-  const shape = kind === "avatar" ? "circle" : "rect";
+  const adjustCrop = async () => {
+    if (!cacheKey) return;
+    const original = await originalImageCache().load(cacheKey);
+    if (!original) {
+      setCanAdjust(false);
+      toast.error(
+        "The original isn't on this device any more. Upload the photo again to adjust it.",
+      );
+      return;
+    }
+    setFile(original);
+    setOpen(true);
+  };
+
+  const shape = logo ? "square" : kind === "avatar" ? "circle" : "rect";
   const aspect = kind === "avatar" ? 1 : 16 / 9;
   const outputMaxSize = kind === "avatar" ? 512 : 1600;
   const bgRemoval = allowBgRemoval ?? kind === "avatar";
@@ -76,6 +116,7 @@ export function ImageUploader({
   };
 
   const handleConfirm = async (dataUrl: string) => {
+    const source = file;
     setOpen(false);
     setFile(null);
     if (!pathPrefix) {
@@ -85,6 +126,9 @@ export function ImageUploader({
     setUploading(true);
     try {
       const url = await uploadDataUrlToBucket(bucket, pathPrefix, dataUrl);
+      // Keep the original on this device (best effort) so the crop can be
+      // adjusted later; it is never uploaded.
+      if (source) void originalImageCache().save(originalKey(pathPrefix, url), source);
       onChange(url);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Upload failed";
@@ -104,7 +148,9 @@ export function ImageUploader({
           className={
             isCover
               ? "relative aspect-video overflow-hidden rounded-xl bg-background"
-              : "relative mx-auto h-28 w-28 overflow-hidden rounded-full bg-background border border-border/60"
+              : `relative mx-auto h-28 w-28 overflow-hidden bg-background border border-border/60 ${
+                  logo ? "rounded-2xl" : "rounded-full"
+                }`
           }
         >
           {preview ? (
@@ -115,7 +161,7 @@ export function ImageUploader({
               widths={isCover ? [320, 480, 640, 960] : [112, 224, 448]}
               sizes={isCover ? "(min-width: 640px) 420px, 90vw" : "112px"}
               baseWidth={isCover ? 640 : 224}
-              className="h-full w-full object-cover"
+              className={`h-full w-full ${logo ? "object-contain" : "object-cover"}`}
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-muted-foreground">
@@ -139,6 +185,28 @@ export function ImageUploader({
             </div>
           )}
         </div>
+
+        {isCover && bannerPreview && preview && (
+          <div className="mt-3">
+            <div className="mb-1.5 micro-label text-muted-foreground">On your profile</div>
+            {/* Same image request and crop as ProfileChannelHeader's banner
+                (16:5 variant, object-cover, fade), at a phone banner's shape. */}
+            <div className="relative aspect-[390/176] overflow-hidden rounded-xl bg-surface-2">
+              <ResponsiveImage
+                src={preview}
+                alt="Profile banner preview"
+                aspect={16 / 5}
+                sizes="(min-width: 640px) 420px, 90vw"
+                baseWidth={640}
+                className="h-full w-full object-cover"
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="mt-3 flex gap-2">
           <label
@@ -168,6 +236,16 @@ export function ImageUploader({
               }}
             />
           </label>
+          {hasValue && !uploading && canAdjust && (
+            <button
+              type="button"
+              onClick={adjustCrop}
+              disabled={disabled || open}
+              className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground inline-flex items-center gap-1 disabled:opacity-60"
+            >
+              <Crop className="h-3.5 w-3.5" /> Adjust crop
+            </button>
+          )}
           {hasValue && !uploading && onClear && (
             <button
               type="button"
@@ -218,7 +296,8 @@ export function ImageUploader({
             aspect={aspect}
             outputMaxSize={outputMaxSize}
             shape={shape}
-            title={isCover ? "Edit cover" : "Edit photo"}
+            title={isCover ? "Edit cover" : logo ? "Edit logo" : "Edit photo"}
+            initialFit={logo || isCover}
             allowBgRemoval={bgRemoval}
             onCancel={() => {
               setOpen(false);

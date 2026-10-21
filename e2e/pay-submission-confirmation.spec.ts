@@ -205,6 +205,8 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
 
   // Submit — proof screenshot is optional in the current UX.
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
   await expect(submitBtn).toBeEnabled();
 
   const [submitReq] = await Promise.all([

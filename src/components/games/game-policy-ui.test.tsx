@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...rest }: any) => <a {...rest}>{children}</a>,
 }));
@@ -20,6 +20,28 @@ describe("game policy UI", () => {
     onChange.mockClear();
     fireEvent.click(screen.getByText("Waitlist when full"));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ allowWaitlist: false }));
+  });
+
+  it("ties the cancellation preset to the cutoff that refunds use", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <GamePolicyFields
+        value={normalizeGamePolicy({ entryFee: 10, cancelCutoffMin: 120 })}
+        onChange={onChange}
+        idPrefix="cutoff-test"
+      />,
+    );
+    // The refund preview reflects the real cutoff (2 hours), and it is editable.
+    expect(within(container).getByText(/more than 2 hours before start/i)).toBeTruthy();
+    fireEvent.click(within(container).getByRole("button", { name: /Standard.*24h/ }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ cancellationPolicy: "standard", cancelCutoffMin: 1440 }),
+    );
+    onChange.mockClear();
+    fireEvent.change(within(container).getByLabelText(/Cancellation cutoff/), {
+      target: { value: "720" },
+    });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ cancelCutoffMin: 720 }));
   });
 
   it("shows critical payment and cancellation info to players without expanding", () => {

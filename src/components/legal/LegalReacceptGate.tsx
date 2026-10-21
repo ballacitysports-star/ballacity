@@ -72,7 +72,7 @@ export function LegalReacceptGate() {
         <h2 className="text-lg font-bold">We've updated our legal documents</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {pendingRequired.map((t) => LEGAL_DOCUMENTS[t].title).join(" and ")} changed. Please
-          review and accept the current version to keep using ballaCity.
+          review and accept the current version to keep using BallaCity.
         </p>
         <div className="mt-4">
           <LegalConsent

@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
+import { StaffBar } from "@/components/staff/StaffBar";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -122,8 +123,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: SITE_TITLE },
       { name: "description", content: SITE_DESCRIPTION },
-      { name: "author", content: "ballaCity" },
-      { property: "og:site_name", content: "ballaCity" },
+      { name: "author", content: "BallaCity" },
+      { property: "og:site_name", content: "BallaCity" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -139,7 +140,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "ballaCity",
+          name: "BallaCity",
           url: "https://ballacity.com",
         }),
       },
@@ -171,6 +172,13 @@ const GA_INIT_SCRIPT = GA_ID
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
+/**
+ * In development (the Lovable preview) Vite owns HMR and compiles modules on
+ * demand, so a slow first load is normal: never auto-reload there. Just clear
+ * any retry stamp left over from an earlier cycle.
+ */
+const WATCHDOG_DISABLED = import.meta.env.DEV;
+const BOOT_RETRY_CLEAR_SCRIPT = `try{sessionStorage.removeItem(${JSON.stringify(BOOT_RETRY_KEY)});}catch(e){}`;
 const BOOT_TIMEOUT_MS = 12_000;
 /**
  * Absolute backstop, applied even while the page still looks busy. It only has
@@ -191,8 +199,9 @@ const BOOT_PROGRESS_GRACE_MS = 4_000;
 const BOOT_WATCHDOG_SCRIPT = `(function(){
   var K=${JSON.stringify(BOOT_RETRY_KEY)};
   var START=Date.now();
-  var previousAttempt=Number((function(){try{return sessionStorage.getItem(K)||'0';}catch(e){return '0';}})());
-  var TIMEOUT=previousAttempt&&START-previousAttempt<120000?8000:${BOOT_TIMEOUT_MS};
+  // Always the full budget: a shortened timeout after a recent retry turned
+  // one transient delay into a repeating reload cycle.
+  var TIMEOUT=${BOOT_TIMEOUT_MS};
   var HARD_TIMEOUT=${BOOT_HARD_TIMEOUT_MS};
   var PROGRESS_GRACE=${BOOT_PROGRESS_GRACE_MS};
   var lastResourceCount=0;
@@ -254,10 +263,11 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
     if(now-START>=TIMEOUT&&now-lastProgressAt>=PROGRESS_GRACE){recover(true);return;}
     setTimeout(checkProgress,1000);
   }
-  function onMessage(m){if(m&&RE.test(String(m)))recover(true);}
-  window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'');});
+  var ABORT=/abort/i;
+  function onMessage(m,name){if(name==='AbortError'||ABORT.test(String(m)))return;if(m&&RE.test(String(m)))recover(true);}
+  window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'',e&&e.error&&e.error.name);});
   window.addEventListener('unhandledrejection',function(e){
-    var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
+    var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''),r&&r.name);
   });
   lastResourceCount=resourceCount();
   setTimeout(checkProgress,1000);
@@ -267,6 +277,9 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
 function markAppBooted() {
   try {
     (window as unknown as { __openrun_booted?: boolean }).__openrun_booted = true;
+    // A slow boot may already have tripped the watchdog: its failure overlay
+    // sits on top of the page, so take it down now that the app is running.
+    document.getElementById("boot-fallback")?.remove();
     sessionStorage.removeItem(BOOT_RETRY_KEY);
   } catch {
     /* storage unavailable */
@@ -285,7 +298,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
         ) : null}
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG_SCRIPT }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: WATCHDOG_DISABLED ? BOOT_RETRY_CLEAR_SCRIPT : BOOT_WATCHDOG_SCRIPT,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -368,7 +385,17 @@ function clearSavedOAuthProvider() {
   }
 }
 
+function isAbortError(reason: unknown): boolean {
+  const r = reason as { name?: string; message?: string } | null | undefined;
+  if (r?.name === "AbortError") return true;
+  const msg = r?.message ?? (typeof reason === "string" ? reason : "");
+  return /abort/i.test(msg);
+}
+
 function isChunkLoadError(reason: unknown): boolean {
+  // An aborted request (e.g. a module preload cancelled by navigation) is not
+  // a stale deploy and must never force a reload.
+  if (isAbortError(reason)) return false;
   const msg =
     (reason as { message?: string } | null | undefined)?.message ??
     (typeof reason === "string" ? reason : "");
@@ -382,7 +409,7 @@ function isChunkLoadError(reason: unknown): boolean {
 }
 
 function maybeReloadForStaleChunk(reason: unknown) {
-  if (!isChunkLoadError(reason)) return;
+  if (WATCHDOG_DISABLED || !isChunkLoadError(reason)) return;
   try {
     const last = Number(sessionStorage.getItem(BOOT_RETRY_KEY) ?? "0");
     if (last && Date.now() - last < 120_000) return;
@@ -428,12 +455,17 @@ function installStaleServerFnRecovery() {
 const PUBLIC_ROUTES = [
   "/",
   "/auth",
+  // Staff entry: signed-out visitors see the single sign-in button.
+  "/staff",
   "/reset-password",
   "/.lovable/oauth/consent",
   // Legal documents must be readable before/without signing in.
   "/terms",
   "/privacy",
   "/cookies",
+  "/payment-policy",
+  "/ai-disclosure",
+  "/youth-policy",
   // Safety Center, Trust Center, and policy pages must be readable without
   // signing in.
   "/safety",
@@ -449,6 +481,11 @@ const PUBLIC_ROUTES = [
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
+  // A parent's private link to one family clip: opens without signing in, but is
+  // unindexed, expires, and can be revoked.
+  "/family-share",
+  // The reel privacy policy: plain-language, readable without signing in.
+  "/reel-privacy",
   // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
   "/tryouts",
 ];
@@ -904,7 +941,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const finishType = (_type?: AccountType, setup?: SetupId) => {
       if (user) onboardedUsers.add(user.id);
       setTypeStatus("ok");
-      if (setup) router.navigate({ ...routeForSetup(setup), replace: true } as never);
+      if (!setup) return;
+      // Player setup returns to the page they were trying to reach (e.g.
+      // /create) so the gate never strands them on the feed.
+      const target = routeForSetup(setup);
+      const here = router.state.location.href;
+      if (setup === "player" && pathname !== "/" && pathname !== "/feed") {
+        router.navigate({ to: target.to, search: { next: here }, replace: true } as never);
+      } else {
+        router.navigate({ ...target, replace: true } as never);
+      }
     };
     return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }
@@ -1071,6 +1117,7 @@ function RootComponent() {
       >
         <GlobalErrorBoundary scope="root">
           <AuthGate>
+            <StaffBar />
             <SwipeNavigator>
               <Outlet />
             </SwipeNavigator>

@@ -54,6 +54,19 @@ describe("upcomingFacilityEvents", () => {
     expect(rows.map((g) => g.id)).toEqual(["soon", "later"]);
   });
 
+  it("lists a multi-day series once, at its next session", () => {
+    const rows = upcomingFacilityEvents(
+      [
+        game({ id: "d2", date: "2026-10-09T18:00:00Z", seriesId: "s" }),
+        game({ id: "d1", date: "2026-10-08T18:00:00Z", seriesId: "s" }),
+        game({ id: "solo", date: "2026-10-10T18:00:00Z" }),
+      ],
+      NOW,
+    );
+    expect(rows.map((g) => g.id)).toEqual(["d1", "solo"]);
+    expect(rows[0].seriesCount).toBe(2);
+  });
+
   it("keeps an event that is in progress", () => {
     const rows = upcomingFacilityEvents([game({ id: "live", date: "2026-10-06T11:30:00Z" })], NOW);
     expect(rows.map((g) => g.id)).toEqual(["live"]);

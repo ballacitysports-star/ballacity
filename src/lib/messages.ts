@@ -270,6 +270,40 @@ export async function listMessages(convId: string): Promise<Message[]> {
   return (data ?? []) as unknown as Message[];
 }
 
+/**
+ * The signed-in user's id, read from the session the client already holds.
+ *
+ * `auth.getUser()` asks the auth server on every call, which put a network
+ * round trip in front of both the upload and the send. The id only builds a
+ * storage path and a sender_id, and the server checks both against the
+ * verified token (the storage insert policy compares the folder with
+ * auth.uid(); the messages policy requires sender_id = auth.uid()), so a stale
+ * local value can make a request fail but never succeed as someone else.
+ */
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
+/**
+ * Combine messages already on screen with a fresh copy from the server, by id.
+ *
+ * The thread hears about new messages two ways — a realtime event and a fetch
+ * — and either can arrive first, twice, or after a gap. Replacing the list
+ * with each fetch dropped a message that had arrived while it was loading, and
+ * appending each event showed a message twice. Merging by id makes both safe.
+ * Incoming wins on a clash (a fetch is the authoritative copy); the result is
+ * in send order.
+ */
+export function upsertMessages(current: Message[], incoming: Message[]): Message[] {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((m) => [m.id, m]));
+  for (const m of incoming) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) =>
+    a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0,
+  );
+}
+
 export type UploadOptions = {
   onProgress?: (pct: number) => void;
   signal?: AbortSignal;
@@ -280,12 +314,12 @@ export async function uploadMessageAttachment(
   file: File,
   opts: UploadOptions = {},
 ): Promise<Attachment> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to send attachments.");
+  const uid = await currentUserId();
+  if (!uid) throw new Error("Sign in to send attachments.");
   const MAX = 20 * 1024 * 1024;
   if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
-  const path = `${convId}/${u.user.id}/${Date.now()}-${safeName}`;
+  const path = `${convId}/${uid}/${Date.now()}-${safeName}`;
   const contentType = file.type || "application/octet-stream";
 
   // Use a signed upload URL so we can PUT via XHR and report progress / support cancel.
@@ -293,6 +327,9 @@ export async function uploadMessageAttachment(
     .from("message-attachments")
     .createSignedUploadUrl(path);
   if (signErr || !signed) throw signErr ?? new Error("Could not start upload.");
+  // Cancelled while the upload URL was being made. Nothing is in flight yet, so
+  // there is no XHR to abort and no abort event to wait for.
+  if (opts.signal?.aborted) throw new DOMException("Upload cancelled", "AbortError");
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -314,13 +351,7 @@ export async function uploadMessageAttachment(
     };
     xhr.onerror = () => reject(new Error("Network error during upload."));
     xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
-    if (opts.signal) {
-      if (opts.signal.aborted) {
-        xhr.abort();
-        return;
-      }
-      opts.signal.addEventListener("abort", () => xhr.abort(), { once: true });
-    }
+    opts.signal?.addEventListener("abort", () => xhr.abort(), { once: true });
     xhr.send(file);
   });
 
@@ -335,27 +366,42 @@ export async function getAttachmentUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+/**
+ * Remove an uploaded file that never became a message — the sender picked
+ * another one, took it off, or left the thread. Best effort: the object is
+ * private and unreferenced, so a failure only costs storage.
+ */
+export async function discardMessageAttachment(path: string): Promise<void> {
+  const { error } = await supabase.storage.from("message-attachments").remove([path]);
+  if (error) console.warn("[messages] could not remove an unsent attachment", { path, error });
+}
+
 export async function sendMessage(
   convId: string,
   body: string,
   attachment?: Attachment | null,
   opts?: { replyToId?: string | null },
-) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to send messages.");
-  const me = u.user.id;
+): Promise<Message | null> {
+  const me = await currentUserId();
+  if (!me) throw new Error("Sign in to send messages.");
   const trimmed = (body ?? "").trim();
-  if (!trimmed && !attachment) return;
-  const { error } = await supabase.from("messages" as any).insert({
-    conversation_id: convId,
-    sender_id: me,
-    body: trimmed ? trimmed.slice(0, 4000) : null,
-    attachment_path: attachment?.path ?? null,
-    attachment_type: attachment?.type ?? null,
-    attachment_name: attachment?.name ?? null,
-    attachment_size: attachment?.size ?? null,
-    reply_to_id: opts?.replyToId ?? null,
-  } as any);
+  if (!trimmed && !attachment) return null;
+  // Ask for the stored row back so the sender sees their message the moment it
+  // is saved, rather than when the realtime echo arrives (or never, if it drops).
+  const { data: inserted, error } = await supabase
+    .from("messages" as any)
+    .insert({
+      conversation_id: convId,
+      sender_id: me,
+      body: trimmed ? trimmed.slice(0, 4000) : null,
+      attachment_path: attachment?.path ?? null,
+      attachment_type: attachment?.type ?? null,
+      attachment_name: attachment?.name ?? null,
+      attachment_size: attachment?.size ?? null,
+      reply_to_id: opts?.replyToId ?? null,
+    } as any)
+    .select()
+    .single();
   if (error) throw error;
 
   // A recipient who has not accepted the thread is looking at a message
@@ -364,23 +410,23 @@ export async function sendMessage(
   // they reply, so the very first message — the one that starts every
   // conversation — reached nobody. The thread sat unread until they happened
   // to open the inbox, which is what "messaging doesn't work" looked like.
-  const { data: convRow } = await supabase
-    .from("conversations" as any)
-    .select("accepted_by")
-    .eq("id", convId)
-    .maybeSingle();
+  //
+  // The three reads below do not depend on each other, so they go out
+  // together instead of one after another.
+  const [{ data: convRow }, { data: parts }, { data: meProf }] = await Promise.all([
+    supabase
+      .from("conversations" as any)
+      .select("accepted_by")
+      .eq("id", convId)
+      .maybeSingle(),
+    supabase
+      .from("conversation_participants" as any)
+      .select("user_id")
+      .eq("conversation_id", convId),
+    supabase.from("profiles").select("display_name").eq("id", me).maybeSingle(),
+  ]);
   const accepted: string[] = ((convRow as any)?.accepted_by ?? []) as string[];
-
-  const { data: parts } = await supabase
-    .from("conversation_participants" as any)
-    .select("user_id")
-    .eq("conversation_id", convId);
   const others = ((parts ?? []) as any[]).map((p) => p.user_id).filter((id) => id !== me);
-  const { data: meProf } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", me)
-    .maybeSingle();
   const name = (meProf as any)?.display_name ?? "Someone";
   const preview = trimmed ? trimmed.slice(0, 140) : `📎 ${attachment?.name ?? "Attachment"}`;
   const known = others.filter((uid) => accepted.includes(uid));
@@ -389,6 +435,9 @@ export async function sendMessage(
   // Only the opening message of a request notifies, so someone who has not
   // been accepted cannot push a stream of alerts at a person who never
   // answered. Counted after the insert, so the first message is exactly 1.
+  // This count stays awaited: it has to be taken before the sender can post
+  // another message, or a quick second message would make the first look like
+  // a repeat and the recipient would never hear about the request.
   let firstContact = false;
   if (strangers.length > 0) {
     const { count } = await supabase
@@ -399,7 +448,11 @@ export async function sendMessage(
     firstContact = (count ?? 0) <= 1;
   }
 
-  await Promise.all([
+  // Not awaited. The message is stored and already on screen; the notification
+  // goes through a server function and two lazily loaded modules, which made it
+  // the slowest step of a send and not something the sender is waiting to see.
+  // createNotification reports its own failures.
+  void Promise.all([
     ...known.map((uid) =>
       createNotification({
         user_id: uid,
@@ -424,7 +477,8 @@ export async function sendMessage(
           }),
         )
       : []),
-  ]);
+  ]).catch((e) => console.warn("[messages] notifying recipients failed", e));
+  return (inserted as unknown as Message | null) ?? null;
 }
 
 /**

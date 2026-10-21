@@ -90,6 +90,9 @@ export async function assertConverterReachable(): Promise<void> {
   return reachable;
 }
 
+/** The standard pass's longest side: 1080p in either orientation. */
+const STANDARD_LONG_EDGE = 1920;
+
 /** Full-quality baseline H.264 + AAC re-encode: the first thing we try. */
 export const DEFAULT_ENCODE_ARGS = [
   "-c:v",
@@ -104,9 +107,12 @@ export const DEFAULT_ENCODE_ARGS = [
   "veryfast",
   "-crf",
   "26",
-  // Even dimensions are required by yuv420p.
+  // At most 1080p (and even dimensions, which yuv420p requires). Single-threaded
+  // wasm encodes a 4K clip at a crawl, or runs out of memory and falls through
+  // to a lighter pass after minutes of wasted work; 1080p is plenty on a phone,
+  // and the original is kept beside this copy.
   "-vf",
-  "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+  longEdgeScaleFilter(STANDARD_LONG_EDGE),
   "-c:a",
   "aac",
   "-b:a",
@@ -259,18 +265,108 @@ const FALLBACK_PASSES: { label: string; args: string[] }[] = [
   },
 ];
 
+/** Each pass's own size ceiling (its longer edge), used when a plan limit is lower. */
+const PASS_LONG_EDGE: Record<string, number> = {
+  standard: STANDARD_LONG_EDGE,
+  "720p": 1280,
+  silent: 960,
+};
+
+/**
+ * A scale filter that shrinks the longer edge to `maxLongEdge` (never enlarging),
+ * keeping the aspect ratio and the even dimensions yuv420p needs.
+ */
+export function longEdgeScaleFilter(maxLongEdge: number): string {
+  const n = Math.max(2, Math.floor(maxLongEdge / 2) * 2);
+  return `scale=w='min(${n},iw)':h='min(${n},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2`;
+}
+
+/**
+ * The passes to try. With `maxLongEdge`, every re-encode is held to it and the
+ * stream-copy remux is dropped, because a copy cannot change the picture size.
+ */
+export function conversionPasses(maxLongEdge?: number): { label: string; args: string[] }[] {
+  if (!maxLongEdge) return FALLBACK_PASSES;
+  return FALLBACK_PASSES.filter((p) => p.label !== "remux").map((p) => {
+    const args = [...p.args];
+    const vf = args.indexOf("-vf");
+    if (vf >= 0) {
+      args[vf + 1] = longEdgeScaleFilter(
+        Math.min(maxLongEdge, PASS_LONG_EDGE[p.label] ?? Infinity),
+      );
+    }
+    return { ...p, args };
+  });
+}
+
 /**
  * Converts `file` to a widely playable .mp4, retrying with progressively
  * lighter settings. Returns null only when every pass fails, so callers can
  * show a clear fallback instead of a silent dead player.
+ *
+ * `maxLongEdge` caps the picture's longer side (the plan's max resolution).
  */
 export async function convertToPlayableMp4(
   file: File,
   onProgress?: (ratio: number, label: string) => void,
+  opts: { maxLongEdge?: number } = {},
 ): Promise<{ blob: Blob; pass: string } | null> {
-  for (const pass of FALLBACK_PASSES) {
+  for (const pass of conversionPasses(opts.maxLongEdge)) {
     const blob = await transcodeToH264Mp4(file, (r) => onProgress?.(r, pass.label), pass.args);
     if (blob && blob.size > 0) return { blob, pass: pass.label };
+  }
+  return null;
+}
+
+/**
+ * Output options that drop everything identifying from a clip: container and
+ * stream tags (GPS position, device make and model, creation time, app and
+ * encoder names), chapters, and any extra data track such as a phone's location
+ * track. Only the first video and audio streams are kept. Rotation is not a tag,
+ * so the picture still plays the right way up.
+ */
+export const PRIVACY_ARGS = [
+  "-map",
+  "0:v:0",
+  "-map",
+  "0:a:0?",
+  "-map_metadata",
+  "-1",
+  "-map_chapters",
+  "-1",
+  "-fflags",
+  "+bitexact",
+  "-flags:v",
+  "+bitexact",
+  "-flags:a",
+  "+bitexact",
+];
+
+const PRIVACY_PASSES: { label: string; args: string[] }[] = [
+  // Fast and lossless: the picture and sound are copied, only the tags go.
+  { label: "remux", args: [...PRIVACY_ARGS, "-c", "copy", "-movflags", "+faststart"] },
+  // The container does not allow a straight copy (.avi, .mkv, odd codecs): re-encode.
+  ...FALLBACK_PASSES.filter((p) => p.label !== "remux").map((p) => ({
+    label: p.label,
+    args: [...PRIVACY_ARGS, ...p.args],
+  })),
+];
+
+/**
+ * A copy of `file` with location and device information removed, as an .mp4.
+ * Returns null when no pass could produce one, so callers can refuse the upload
+ * rather than store the original with its metadata.
+ */
+export async function stripVideoMetadata(
+  file: File,
+  onProgress?: (ratio: number) => void,
+): Promise<File | null> {
+  for (const pass of PRIVACY_PASSES) {
+    const blob = await transcodeToH264Mp4(file, onProgress, pass.args);
+    if (blob && blob.size > 0) {
+      const stem = file.name.replace(/\.[^.]+$/, "") || "clip";
+      return new File([blob], `${stem}.mp4`, { type: "video/mp4" });
+    }
   }
   return null;
 }

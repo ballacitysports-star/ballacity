@@ -11,26 +11,32 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
+import { Route as AiDisclosureRouteImport } from './routes/ai-disclosure'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
+import { Route as FamilyClipsRouteImport } from './routes/family-clips'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as HostRouteImport } from './routes/host'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PaymentPolicyRouteImport } from './routes/payment-policy'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ReelPrivacyRouteImport } from './routes/reel-privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SafetyRouteImport } from './routes/safety'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as StaffRouteImport } from './routes/staff'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrustCenterRouteImport } from './routes/trust-center'
+import { Route as YouthPolicyRouteImport } from './routes/youth-policy'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
@@ -60,8 +66,10 @@ import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.locat
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blog.how-to-find-pickup-soccer-games'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as CitiesIndexRouteImport } from './routes/cities.index'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
+import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$token'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as GuideIndexRouteImport } from './routes/guide.index'
 import { Route as GuideSportRouteImport } from './routes/guide.$sport'
@@ -78,6 +86,7 @@ import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$user
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
+import { Route as ReelsReelIdRouteImport } from './routes/reels.$reelId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
@@ -86,6 +95,8 @@ import { Route as TryoutsPostIdRouteImport } from './routes/tryouts.$postId'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
+import { Route as CitiesCityIndexRouteImport } from './routes/cities.$city.index'
+import { Route as CitiesCitySportRouteImport } from './routes/cities.$city.$sport'
 import { Route as FamilyJoinTokenRouteImport } from './routes/family.join.$token'
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
@@ -107,6 +118,7 @@ import { Route as TeamsTeamIdWaiverRouteImport } from './routes/teams.$teamId.wa
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
+import { Route as ApiPublicPaymentsReleaseHoldsRouteImport } from './routes/api/public/payments/release-holds'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
@@ -120,6 +132,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const TabsRoute = TabsRouteImport.update({
   id: '/_tabs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiDisclosureRoute = AiDisclosureRouteImport.update({
+  id: '/ai-disclosure',
+  path: '/ai-disclosure',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -142,6 +159,11 @@ const CookiesRoute = CookiesRouteImport.update({
   path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyClipsRoute = FamilyClipsRouteImport.update({
+  id: '/family-clips',
+  path: '/family-clips',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuardianRoute = GuardianRouteImport.update({
   id: '/guardian',
   path: '/guardian',
@@ -155,6 +177,11 @@ const HostRoute = HostRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentPolicyRoute = PaymentPolicyRouteImport.update({
+  id: '/payment-policy',
+  path: '/payment-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentsRoute = PaymentsRouteImport.update({
@@ -175,6 +202,11 @@ const PlansRoute = PlansRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReelPrivacyRoute = ReelPrivacyRouteImport.update({
+  id: '/reel-privacy',
+  path: '/reel-privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -207,6 +239,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
@@ -220,6 +257,11 @@ const TermsRoute = TermsRouteImport.update({
 const TrustCenterRoute = TrustCenterRouteImport.update({
   id: '/trust-center',
   path: '/trust-center',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YouthPolicyRoute = YouthPolicyRouteImport.update({
+  id: '/youth-policy',
+  path: '/youth-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -370,6 +412,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CitiesIndexRoute = CitiesIndexRouteImport.update({
+  id: '/cities/',
+  path: '/cities/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevOgPreviewRoute = DevOgPreviewRouteImport.update({
   id: '/dev/og-preview',
   path: '/dev/og-preview',
@@ -378,6 +425,11 @@ const DevOgPreviewRoute = DevOgPreviewRouteImport.update({
 const DevRouteDoctorRoute = DevRouteDoctorRouteImport.update({
   id: '/dev/route-doctor',
   path: '/dev/route-doctor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FamilyShareTokenRoute = FamilyShareTokenRouteImport.update({
+  id: '/family-share/$token',
+  path: '/family-share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
@@ -460,6 +512,11 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
   path: '/profile/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReelsReelIdRoute = ReelsReelIdRouteImport.update({
+  id: '/reels/$reelId',
+  path: '/reels/$reelId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewNewRoute = ReviewNewRouteImport.update({
   id: '/review/new',
   path: '/review/new',
@@ -499,6 +556,16 @@ const Char91DotmcpChar93InvokeToolToolRoute =
 const ApiPublicOgRoute = ApiPublicOgRouteImport.update({
   id: '/api/public/og',
   path: '/api/public/og',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CitiesCityIndexRoute = CitiesCityIndexRouteImport.update({
+  id: '/cities/$city/',
+  path: '/cities/$city/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CitiesCitySportRoute = CitiesCitySportRouteImport.update({
+  id: '/cities/$city/$sport',
+  path: '/cities/$city/$sport',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FamilyJoinTokenRoute = FamilyJoinTokenRouteImport.update({
@@ -607,6 +674,12 @@ const ApiPublicNotificationsFlushRoute =
     path: '/api/public/notifications/flush',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsReleaseHoldsRoute =
+  ApiPublicPaymentsReleaseHoldsRouteImport.update({
+    id: '/api/public/payments/release-holds',
+    path: '/api/public/payments/release-holds',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -637,26 +710,32 @@ const LovableEmailTransactionalPreviewRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -687,6 +766,7 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -699,12 +779,14 @@ export interface FileRoutesByFullPath {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/cities/': typeof CitiesIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
@@ -712,6 +794,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -728,11 +811,13 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city/': typeof CitiesCityIndexRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -741,26 +826,32 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -791,6 +882,7 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
@@ -802,12 +894,14 @@ export interface FileRoutesByTo {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin': typeof AdminIndexRoute
+  '/cities': typeof CitiesIndexRoute
   '/guide': typeof GuideIndexRoute
   '/messages': typeof MessagesIndexRoute
   '/orgs': typeof OrgsIndexRoute
@@ -815,6 +909,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -831,11 +926,13 @@ export interface FileRoutesByTo {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city': typeof CitiesCityIndexRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -846,26 +943,32 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
+  '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
+  '/family-clips': typeof FamilyClipsRoute
   '/guardian': typeof GuardianRoute
   '/host': typeof HostRoute
   '/mcp': typeof McpRoute
+  '/payment-policy': typeof PaymentPolicyRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
+  '/reel-privacy': typeof ReelPrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/staff': typeof StaffRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/trust-center': typeof TrustCenterRoute
+  '/youth-policy': typeof YouthPolicyRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -896,6 +999,7 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
+  '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -908,12 +1012,14 @@ export interface FileRoutesById {
   '/players/$userId': typeof PlayersUserIdRoute
   '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
+  '/reels/$reelId': typeof ReelsReelIdRoute
   '/review/new': typeof ReviewNewRoute
   '/safety_/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/tryouts/$postId': typeof TryoutsPostIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/cities/': typeof CitiesIndexRoute
   '/guide/': typeof GuideIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
@@ -921,6 +1027,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/cities/$city/$sport': typeof CitiesCitySportRoute
   '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
@@ -937,11 +1044,13 @@ export interface FileRoutesById {
   '/teams/$teamId/tryouts': typeof TeamsTeamIdTryoutsRoute
   '/teams/$teamId/waiver': typeof TeamsTeamIdWaiverRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
+  '/cities/$city/': typeof CitiesCityIndexRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
+  '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -952,26 +1061,32 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -1002,6 +1117,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1014,12 +1130,14 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin/'
+    | '/cities/'
     | '/guide/'
     | '/messages/'
     | '/orgs/'
@@ -1027,6 +1145,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1043,11 +1162,13 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city/'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1056,26 +1177,32 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -1106,6 +1233,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/guide/$sport'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
@@ -1117,12 +1245,14 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety/children'
     | '/teams/create'
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin'
+    | '/cities'
     | '/guide'
     | '/messages'
     | '/orgs'
@@ -1130,6 +1260,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1146,11 +1277,13 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city'
     | '/games/$gameId'
     | '/orgs/$orgId'
     | '/teams/$teamId'
     | '/trainers/$trainerId'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1160,26 +1293,32 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_tabs'
+    | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
+    | '/family-clips'
     | '/guardian'
     | '/host'
     | '/mcp'
+    | '/payment-policy'
     | '/payments'
     | '/pickup'
     | '/plans'
     | '/privacy'
+    | '/reel-privacy'
     | '/reset-password'
     | '/reviews'
     | '/safety'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
+    | '/staff'
     | '/superadmin'
     | '/terms'
     | '/trust-center'
+    | '/youth-policy'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
@@ -1210,6 +1349,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
+    | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
     | '/messages/$conversationId'
@@ -1222,12 +1362,14 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/players/add'
     | '/profile/edit'
+    | '/reels/$reelId'
     | '/review/new'
     | '/safety_/children'
     | '/teams/create'
     | '/trainers/create'
     | '/tryouts/$postId'
     | '/admin/'
+    | '/cities/'
     | '/guide/'
     | '/messages/'
     | '/orgs/'
@@ -1235,6 +1377,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/cities/$city/$sport'
     | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
@@ -1251,11 +1394,13 @@ export interface FileRouteTypes {
     | '/teams/$teamId/tryouts'
     | '/teams/$teamId/waiver'
     | '/trainers/$trainerId/edit'
+    | '/cities/$city/'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/notifications/flush'
+    | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
     | '/lovable/email/auth/preview'
@@ -1266,26 +1411,32 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
+  AiDisclosureRoute: typeof AiDisclosureRoute
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
+  FamilyClipsRoute: typeof FamilyClipsRoute
   GuardianRoute: typeof GuardianRoute
   HostRoute: typeof HostRoute
   McpRoute: typeof McpRoute
+  PaymentPolicyRoute: typeof PaymentPolicyRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
   PrivacyRoute: typeof PrivacyRoute
+  ReelPrivacyRoute: typeof ReelPrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
   SafetyRoute: typeof SafetyRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  StaffRoute: typeof StaffRoute
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
   TrustCenterRoute: typeof TrustCenterRoute
+  YouthPolicyRoute: typeof YouthPolicyRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountAiPrivacyRoute: typeof AccountAiPrivacyRoute
@@ -1306,6 +1457,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
+  FamilyShareTokenRoute: typeof FamilyShareTokenRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   GuideSportRoute: typeof GuideSportRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
@@ -1318,12 +1470,14 @@ export interface RootRouteChildren {
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
+  ReelsReelIdRoute: typeof ReelsReelIdRoute
   ReviewNewRoute: typeof ReviewNewRoute
   SafetyChildrenRoute: typeof SafetyChildrenRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
   TryoutsPostIdRoute: typeof TryoutsPostIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  CitiesIndexRoute: typeof CitiesIndexRoute
   GuideIndexRoute: typeof GuideIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   OrgsIndexRoute: typeof OrgsIndexRoute
@@ -1331,6 +1485,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicOgRoute: typeof ApiPublicOgRoute
+  CitiesCitySportRoute: typeof CitiesCitySportRoute
   FamilyJoinTokenRoute: typeof FamilyJoinTokenRoute
   OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
@@ -1345,10 +1500,12 @@ export interface RootRouteChildren {
   TeamsTeamIdTryoutsRoute: typeof TeamsTeamIdTryoutsRoute
   TeamsTeamIdWaiverRoute: typeof TeamsTeamIdWaiverRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
+  CitiesCityIndexRoute: typeof CitiesCityIndexRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
   ApiPublicNotificationsFlushRoute: typeof ApiPublicNotificationsFlushRoute
+  ApiPublicPaymentsReleaseHoldsRoute: typeof ApiPublicPaymentsReleaseHoldsRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
@@ -1370,6 +1527,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof TabsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-disclosure': {
+      id: '/ai-disclosure'
+      path: '/ai-disclosure'
+      fullPath: '/ai-disclosure'
+      preLoaderRoute: typeof AiDisclosureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -1400,6 +1564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CookiesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family-clips': {
+      id: '/family-clips'
+      path: '/family-clips'
+      fullPath: '/family-clips'
+      preLoaderRoute: typeof FamilyClipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guardian': {
       id: '/guardian'
       path: '/guardian'
@@ -1419,6 +1590,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-policy': {
+      id: '/payment-policy'
+      path: '/payment-policy'
+      fullPath: '/payment-policy'
+      preLoaderRoute: typeof PaymentPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payments': {
@@ -1447,6 +1625,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reel-privacy': {
+      id: '/reel-privacy'
+      path: '/reel-privacy'
+      fullPath: '/reel-privacy'
+      preLoaderRoute: typeof ReelPrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -1491,6 +1676,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/superadmin': {
       id: '/superadmin'
       path: '/superadmin'
@@ -1510,6 +1702,13 @@ declare module '@tanstack/react-router' {
       path: '/trust-center'
       fullPath: '/trust-center'
       preLoaderRoute: typeof TrustCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/youth-policy': {
+      id: '/youth-policy'
+      path: '/youth-policy'
+      fullPath: '/youth-policy'
+      preLoaderRoute: typeof YouthPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -1715,6 +1914,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cities/': {
+      id: '/cities/'
+      path: '/cities'
+      fullPath: '/cities/'
+      preLoaderRoute: typeof CitiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/og-preview': {
       id: '/dev/og-preview'
       path: '/dev/og-preview'
@@ -1727,6 +1933,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/route-doctor'
       fullPath: '/dev/route-doctor'
       preLoaderRoute: typeof DevRouteDoctorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/family-share/$token': {
+      id: '/family-share/$token'
+      path: '/family-share/$token'
+      fullPath: '/family-share/$token'
+      preLoaderRoute: typeof FamilyShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/games/$gameId': {
@@ -1841,6 +2054,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reels/$reelId': {
+      id: '/reels/$reelId'
+      path: '/reels/$reelId'
+      fullPath: '/reels/$reelId'
+      preLoaderRoute: typeof ReelsReelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/review/new': {
       id: '/review/new'
       path: '/review/new'
@@ -1895,6 +2115,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/og'
       fullPath: '/api/public/og'
       preLoaderRoute: typeof ApiPublicOgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cities/$city/': {
+      id: '/cities/$city/'
+      path: '/cities/$city'
+      fullPath: '/cities/$city/'
+      preLoaderRoute: typeof CitiesCityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cities/$city/$sport': {
+      id: '/cities/$city/$sport'
+      path: '/cities/$city/$sport'
+      fullPath: '/cities/$city/$sport'
+      preLoaderRoute: typeof CitiesCitySportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/family/join/$token': {
@@ -2044,6 +2278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNotificationsFlushRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/release-holds': {
+      id: '/api/public/payments/release-holds'
+      path: '/api/public/payments/release-holds'
+      fullPath: '/api/public/payments/release-holds'
+      preLoaderRoute: typeof ApiPublicPaymentsReleaseHoldsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -2129,26 +2370,32 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
+  AiDisclosureRoute: AiDisclosureRoute,
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
+  FamilyClipsRoute: FamilyClipsRoute,
   GuardianRoute: GuardianRoute,
   HostRoute: HostRoute,
   McpRoute: McpRoute,
+  PaymentPolicyRoute: PaymentPolicyRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
   PrivacyRoute: PrivacyRoute,
+  ReelPrivacyRoute: ReelPrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
   SafetyRoute: SafetyRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  StaffRoute: StaffRoute,
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
   TrustCenterRoute: TrustCenterRoute,
+  YouthPolicyRoute: YouthPolicyRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
@@ -2170,6 +2417,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
+  FamilyShareTokenRoute: FamilyShareTokenRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   GuideSportRoute: GuideSportRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
@@ -2182,12 +2430,14 @@ const rootRouteChildren: RootRouteChildren = {
   PlayersUserIdRoute: PlayersUserIdRoute,
   PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,
+  ReelsReelIdRoute: ReelsReelIdRoute,
   ReviewNewRoute: ReviewNewRoute,
   SafetyChildrenRoute: SafetyChildrenRoute,
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
   TryoutsPostIdRoute: TryoutsPostIdRoute,
   AdminIndexRoute: AdminIndexRoute,
+  CitiesIndexRoute: CitiesIndexRoute,
   GuideIndexRoute: GuideIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   OrgsIndexRoute: OrgsIndexRoute,
@@ -2195,6 +2445,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicOgRoute: ApiPublicOgRoute,
+  CitiesCitySportRoute: CitiesCitySportRoute,
   FamilyJoinTokenRoute: FamilyJoinTokenRoute,
   OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
@@ -2209,10 +2460,12 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdTryoutsRoute: TeamsTeamIdTryoutsRoute,
   TeamsTeamIdWaiverRoute: TeamsTeamIdWaiverRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
+  CitiesCityIndexRoute: CitiesCityIndexRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
   ApiPublicNotificationsFlushRoute: ApiPublicNotificationsFlushRoute,
+  ApiPublicPaymentsReleaseHoldsRoute: ApiPublicPaymentsReleaseHoldsRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,

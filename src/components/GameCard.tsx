@@ -6,6 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
+import { spotsOpenLabel } from "@/lib/spots-urgency";
 import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
@@ -17,10 +18,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
-import { GameDistance } from "@/components/GameDistance";
+import { GamePlaceDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useMySkillRange } from "@/lib/skill-db";
+import { levelFit } from "@/lib/skill-rating";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -47,6 +50,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const myRange = useMySkillRange(game.sport);
+  const fit = myRange ? levelFit(game.sport, game.skill, myRange) : "open";
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
@@ -75,7 +80,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (err: any) {
-      toast.error(describeMessagingError(err));
+      toast.error(describeMessagingError(err, undefined, "host"));
     } finally {
       setOpening(false);
     }
@@ -184,9 +189,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Clock className="h-3.5 w-3.5 text-lime" />
               {formatGameWhen(game)}
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-coral" />
-              <GameDistance game={game} />
+              <GamePlaceDistance game={game} />
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
@@ -251,6 +256,20 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <span className="truncate">{game.host.name}</span>
               )}
               <span className="shrink-0 text-foreground">· {game.skill}</span>
+              {fit !== "open" && (
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                    fit === "fit" ? "bg-lime/15 text-lime" : "bg-secondary text-muted-foreground"
+                  }`}
+                  title="Based on your skill rating"
+                >
+                  {fit === "fit"
+                    ? "✓ Your level"
+                    : fit === "stretch"
+                      ? "Stretch"
+                      : "Below your level"}
+                </span>
+              )}
               {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
                 <span className="shrink-0 text-muted-foreground">
                   · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
@@ -269,18 +288,24 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                   <MessageCircle className="h-3.5 w-3.5" />
                 </button>
               )}
-              <div className="flex items-center gap-1 text-[11px] font-semibold">
+              <div
+                className="flex items-center gap-1 text-[11px] font-semibold"
+                title={`${joinedCount} of ${game.maxPlayers} joined`}
+              >
                 <Users className="h-3.5 w-3.5 text-lime" />
-                <span
-                  key={joinedCount}
-                  className="text-foreground inline-block motion-safe:animate-scale-in"
-                >
-                  {joinedCount}/{game.maxPlayers}
-                </span>
+                {/* When few are left the urgency pill says it; otherwise a plain
+                    "N spots open" reads better than a bare joined/max count. */}
                 {spotsLeft < game.maxPlayers &&
-                  spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
-                    <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
-                  )}
+                spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) ? (
+                  <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
+                ) : (
+                  <span
+                    key={joinedCount}
+                    className="text-foreground inline-block motion-safe:animate-scale-in"
+                  >
+                    {spotsOpenLabel(spotsLeft)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -299,7 +324,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               }}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime transition-colors hover:bg-lime/20"
             >
-              <Users className="h-3.5 w-3.5" /> Join waitlist
+              <Users className="h-3.5 w-3.5" /> Join Waitlist
             </button>
           )}
           <div className="mt-auto h-1 overflow-hidden rounded-full bg-secondary">

@@ -1,12 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { Check, ShieldAlert } from "lucide-react";
-import {
-  HOST_ACK_CHECKBOX_LABEL,
-  HOST_ACK_DISCLAIMER,
-  HOST_ACK_ITEMS,
-  LEGAL_REVIEW_LABEL,
-} from "@/lib/game-policy";
+import { HOST_ACK_CHECKBOX_LABEL, HOST_ACK_DISCLAIMER, HOST_ACK_ITEMS } from "@/lib/game-policy";
 import { ADDRESS_PRIVACY_NOTE } from "@/lib/safety";
+import { LegalReviewTag } from "@/components/legal/LegalReviewTag";
 
 /**
  * Host responsibility acknowledgments shown in the game creation flow.
@@ -64,9 +60,7 @@ export function HostResponsibilityNotice({
       </div>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
-          {LEGAL_REVIEW_LABEL}
-        </span>
+        <LegalReviewTag area="safetyAcknowledgments" />
         {HOST_ACK_DISCLAIMER} See the{" "}
         <Link to="/safety" target="_blank" rel="noreferrer" className="text-lime underline">
           Safety Center

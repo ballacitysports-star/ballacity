@@ -19,13 +19,20 @@ import { MonetizationTab } from "@/components/superadmin/MonetizationTab";
 import { OpsTab } from "@/components/superadmin/OpsTab";
 import { AuditTab } from "@/components/superadmin/AuditTab";
 import { YouthTab } from "@/components/superadmin/YouthTab";
+import { AttentionStrip } from "@/components/superadmin/AttentionStrip";
+import { AiControlsPanel } from "@/components/superadmin/AiControlsPanel";
+import { LiveListingsTab } from "@/components/superadmin/LiveListingsTab";
+import { DiscoveryTab } from "@/components/superadmin/DiscoveryTab";
+import { ReelsWorkerTab } from "@/components/superadmin/ReelsWorkerTab";
+import { ListingsClaimsPanel } from "@/components/admin/ListingsClaimsPanel";
+import { LegalPublishingPanel } from "@/components/admin/LegalPublishingPanel";
 
 export const Route = createFileRoute("/superadmin")({
   head: () =>
     pageHead({
       path: "/superadmin",
-      title: "Superadmin — ballaCity",
-      description: "Internal ballaCity control center.",
+      title: "Superadmin — BallaCity",
+      description: "Internal BallaCity control center.",
       noindex: true,
     }),
   ssr: false,
@@ -37,6 +44,7 @@ function SuperadminPage() {
   const check = useServerFn(superadminCheck);
   const [authReady, setAuthReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [tab, setTab] = useState("overview");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -50,10 +58,12 @@ function SuperadminPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["superadmin-check"],
     queryFn: () => check({}),
     enabled: authReady && hasSession,
+    retry: 2,
+    retryDelay: (n) => 800 * (n + 1),
   });
 
   useEffect(() => {
@@ -69,6 +79,15 @@ function SuperadminPage() {
 
   if (!authReady || isLoading)
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (isError)
+    return (
+      <div className="page-shell space-y-3 py-6">
+        <p className="text-sm text-muted-foreground">We couldn't verify your access right now.</p>
+        <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying…" : "Try again"}
+        </Button>
+      </div>
+    );
   if (!data?.isSuperadmin) return null;
 
   return (
@@ -94,16 +113,24 @@ function SuperadminPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <AttentionStrip onNavigate={setTab} />
+
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users &amp; profiles</TabsTrigger>
+          <TabsTrigger value="listings-live">Live listings</TabsTrigger>
+          <TabsTrigger value="discovery">Discovery</TabsTrigger>
           <TabsTrigger value="moderation">Content</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="monetization">Monetization</TabsTrigger>
+          <TabsTrigger value="ai">AI controls</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
           <TabsTrigger value="youth">Youth &amp; age</TabsTrigger>
+          <TabsTrigger value="listings">Listings &amp; claims</TabsTrigger>
+          <TabsTrigger value="legal">Legal</TabsTrigger>
+          <TabsTrigger value="reels">Reels worker</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="pt-3">
@@ -111,6 +138,12 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="users" className="pt-3">
           <UsersTab currentUserId={data.userId} />
+        </TabsContent>
+        <TabsContent value="listings-live" className="pt-3">
+          <LiveListingsTab />
+        </TabsContent>
+        <TabsContent value="discovery" className="pt-3">
+          <DiscoveryTab />
         </TabsContent>
         <TabsContent value="moderation" className="pt-3">
           <ModerationTab />
@@ -125,11 +158,23 @@ function SuperadminPage() {
         <TabsContent value="monetization" className="pt-3">
           <MonetizationTab />
         </TabsContent>
+        <TabsContent value="ai" className="pt-3">
+          <AiControlsPanel />
+        </TabsContent>
         <TabsContent value="ops" className="pt-3">
           <OpsTab />
         </TabsContent>
         <TabsContent value="youth" className="pt-3">
           <YouthTab />
+        </TabsContent>
+        <TabsContent value="listings" className="pt-3">
+          <ListingsClaimsPanel />
+        </TabsContent>
+        <TabsContent value="legal" className="pt-3">
+          <LegalPublishingPanel embedded />
+        </TabsContent>
+        <TabsContent value="reels" className="pt-3">
+          <ReelsWorkerTab />
         </TabsContent>
         <TabsContent value="audit" className="pt-3">
           <AuditTab />

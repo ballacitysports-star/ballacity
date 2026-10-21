@@ -42,6 +42,8 @@ export type GenerateTextRequest = {
   model?: string;
   /** Raw parts, when the prompt is multimodal. Overrides `prompt` when present. */
   parts?: AiMessagePart[];
+  /** Cancels the call (and its retries); it then fails as TIMEOUT. */
+  signal?: AbortSignal;
 };
 
 export type GenerateStructuredRequest = GenerateTextRequest;

@@ -10,7 +10,7 @@ import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
-import { GameDistance } from "@/components/GameDistance";
+import { GamePlaceDistance } from "@/components/GameDistance";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -191,9 +191,9 @@ function RequestGameCardInner({
                 <Clock className="h-3.5 w-3.5 text-lime" />
                 {formatGameWhen(game)}
               </span>
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 text-coral" />
-                <GameDistance game={game} />
+                <GamePlaceDistance game={game} />
               </span>
             </div>
             <div className="flex items-center justify-between gap-2">

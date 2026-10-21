@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { authorizeWorker } from "@/lib/worker-auth.server";
 
 /**
  * Flushes push notifications that were held back by the minor notification
@@ -24,13 +25,7 @@ export const Route = createFileRoute("/api/public/notifications/flush")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.REELS_WORKER_SECRET;
-        if (!secret) return json({ error: "worker secret not configured" }, 503);
-        const provided =
-          request.headers.get("x-worker-secret") ??
-          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-          "";
-        if (provided !== secret) return json({ error: "Unauthorized" }, 401);
+        if ((await authorizeWorker(request)) !== "ok") return json({ error: "Unauthorized" }, 401);
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: rows, error } = await supabaseAdmin

@@ -13,6 +13,7 @@ export function ProfileChannelHeader({
   bannerOverlay,
   avatarUrl,
   avatarFallback,
+  avatarShape = "circle",
   name,
   nameBadge,
   meta,
@@ -25,6 +26,8 @@ export function ProfileChannelHeader({
   bannerOverlay?: React.ReactNode;
   avatarUrl?: string | null;
   avatarFallback: React.ReactNode;
+  /** "logo": rounded square, so a team/gym logo isn't clipped by a circle. */
+  avatarShape?: "circle" | "logo";
   name: string;
   nameBadge?: React.ReactNode;
   /** Pieces joined with a middot on one muted line, YouTube-style. */
@@ -64,7 +67,11 @@ export function ProfileChannelHeader({
       {/* Identity */}
       <div className="px-4 pt-4">
         <div className="flex items-start gap-4">
-          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-2xl font-bold">
+          <div
+            className={`grid h-20 w-20 shrink-0 place-items-center overflow-hidden bg-surface-2 text-2xl font-bold ${
+              avatarShape === "logo" ? "rounded-[28%]" : "rounded-full"
+            }`}
+          >
             {avatarUrl && !avatarFailed ? (
               <ResponsiveAvatar
                 src={avatarUrl}
@@ -96,9 +103,10 @@ export function ProfileChannelHeader({
               <button
                 type="button"
                 onClick={onOpenAbout}
-                className="mt-1 flex max-w-full items-baseline gap-1 text-left text-[13px] text-muted-foreground"
+                className="mt-1 flex max-w-full items-end gap-1 text-left text-[13px] text-muted-foreground"
               >
-                <span className="line-clamp-1 min-w-0 break-words">
+                {/* Two lines: enough of the bio to make someone want to read on. */}
+                <span className="line-clamp-2 min-w-0 break-words">
                   {description?.trim() ? description : "Tap for more about this profile"}
                 </span>
                 <span className="shrink-0 text-[13px] font-medium text-foreground">...more</span>

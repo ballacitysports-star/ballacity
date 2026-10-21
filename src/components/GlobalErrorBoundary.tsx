@@ -92,7 +92,15 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
     // A stale deploy chunk is not a real app bug: reload once to pick up
     // the new build instead of showing a failure screen.
-    if (typeof window !== "undefined" && isChunkLoadMessage(error.message ?? "")) {
+    // Never in development (Vite owns reloads there), and never for an
+    // aborted request such as a preload cancelled by navigation.
+    if (
+      typeof window !== "undefined" &&
+      !import.meta.env.DEV &&
+      error.name !== "AbortError" &&
+      !/abort/i.test(error.message ?? "") &&
+      isChunkLoadMessage(error.message ?? "")
+    ) {
       try {
         const last = Number(sessionStorage.getItem(BOOT_RETRY_KEY) ?? "0");
         if (!last || Date.now() - last > 120_000) {

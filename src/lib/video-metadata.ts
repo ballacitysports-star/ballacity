@@ -8,6 +8,8 @@
  * be: `video-validation.ts` still owns the rules.
  */
 
+import type { PoseMetrics } from "@/lib/pose-metrics";
+
 export type ProbedVideo = {
   width: number | null;
   height: number | null;
@@ -37,6 +39,8 @@ export type MediaMeta = {
   playback_status: "ready" | "original" | "failed";
   playback_error: string | null;
   processed_at: string;
+  /** Summary only (never raw landmarks); adults and 16-17, never family clips. */
+  pose?: PoseMetrics;
 };
 
 /**
@@ -102,6 +106,8 @@ export function buildMediaMeta(input: {
   processed?: ({ bytes: number; pass: string } & ProbedVideo) | null;
   playbackError?: string | null;
   conversionAttempted: boolean;
+  /** Summarized body-tracking measurements; omitted from the record when null. */
+  pose?: PoseMetrics | null;
 }): MediaMeta {
   const processed = input.processed ?? null;
   return {
@@ -115,5 +121,6 @@ export function buildMediaMeta(input: {
     playback_status: processed ? "ready" : input.conversionAttempted ? "failed" : "original",
     playback_error: processed ? null : (input.playbackError ?? null),
     processed_at: new Date().toISOString(),
+    ...(input.pose ? { pose: input.pose } : {}),
   };
 }

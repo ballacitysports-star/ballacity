@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * E2E: opening an invite deeplink to an unpaid (free, no-approval) game and
  * tapping the join CTA must (a) land on /games/$gameId with `invite=1` +
- * `from=<hostId>` preserved on entry, (b) render the "Join free" CTA in the
+ * `from=<hostId>` preserved on entry, (b) render the "Join Run" CTA in the
  * sticky action bar, and (c) after tapping the CTA, keep the user on the
  * same game detail page with BOTH invite params still preserved in the URL.
  *
@@ -164,7 +164,7 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
   await expect(banner).not.toContainText(/Request to join/i);
   await expect(banner).not.toContainText(/Pay & join/i);
 
-  // CTA button shows "Join free · N spots left".
+  // CTA button shows "Join Run · N spots left".
   const cta = page.getByRole("button", { name: /join free/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();

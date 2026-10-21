@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { PublicXp } from "@/lib/athlete-xp";
 
 export type PlayerCardGame = {
   id: string;
@@ -31,6 +32,8 @@ export type PlayerCardData = {
     sports: string[];
     upcoming: number;
   };
+  /** A minor's level and milestone badges, only when their guardian turned it on. */
+  publicXp?: PublicXp | null;
 };
 
 /**
@@ -94,6 +97,7 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         .select("id", { count: "exact", head: true })
         .eq("user_id", data.userId)
         .eq("status", "completed")
+        .eq("is_draft", false)
         .is("hidden_at", null),
     ]);
 
@@ -152,7 +156,27 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         )
       : [];
 
+    // Safe public XP: only when the guardian opted in, and only the allow-listed fields.
+    let publicXp: PublicXp | null = null;
+    if (isMinor) {
+      try {
+        const { data: on } = await supabaseAdmin.rpc("public_xp_enabled" as never, {
+          _user: data.userId,
+        } as never);
+        if (on === true) {
+          const [{ loadAthleteProgress }, { toPublicXp }] = await Promise.all([
+            import("@/lib/athlete-progress.server"),
+            import("@/lib/athlete-xp"),
+          ]);
+          publicXp = toPublicXp(await loadAthleteProgress(supabaseAdmin, data.userId));
+        }
+      } catch {
+        publicXp = null;
+      }
+    }
+
     return {
+      publicXp,
       profile: {
         id: prof.id as string,
         displayName: (avatar.display_name as string) ?? (prof.display_name as string) ?? "Player",

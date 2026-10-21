@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
-import { describeMessagingError } from "@/lib/minor-messaging";
 import {
   Calendar,
   MapPin,
@@ -27,8 +26,9 @@ import { SPORTS } from "@/lib/sample-data";
 import { formatSportLevel, resolvePlayerLevel } from "@/lib/sport-levels";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import type { AvailabilityWithAuthor } from "@/lib/availability";
-import { getOrCreateDirectConversation } from "@/lib/messages";
+import { postTiersForSport } from "@/lib/availability-levels";
 import { shareAvailability } from "./share-availability";
+import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
 
 /**
  * Focused view of a single availability post — what a shared
@@ -75,11 +75,7 @@ export function AvailabilityDetailDialog({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold truncate">{a.author_name}</p>
-                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                  {formatSportLevel(
-                    resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
-                  ) ?? a.skill_level}
-                </span>
+                <AvailabilityIntentBadges value={a.looking_for} className="justify-end" />
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 {a.sports.length === 0 ? (
@@ -87,12 +83,21 @@ export function AvailabilityDetailDialog({
                 ) : (
                   a.sports.map((s) => {
                     const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+                    const postTiers = postTiersForSport(a, s);
+                    const levelText = postTiers.length
+                      ? postTiers.join(" · ")
+                      : formatSportLevel(resolvePlayerLevel(a.author_sport_levels, s, null));
                     return (
                       <span
                         key={s}
-                        className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                        className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
                       >
                         {emoji} {s}
+                        {levelText && (
+                          <span className="rounded-full bg-lime/15 px-1.5 text-[10px] font-bold text-lime">
+                            {levelText}
+                          </span>
+                        )}
                       </span>
                     );
                   })

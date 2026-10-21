@@ -4,6 +4,7 @@ import {
   LEGAL_REVIEW_NOTE,
   type LegalDocument,
   type LegalDocumentVersion,
+  type LegalSection,
 } from "@/lib/legal-documents";
 
 export function LegalReviewBanner() {
@@ -44,7 +45,30 @@ export function LegalDocumentBody({
         </p>
         <p className="text-sm text-muted-foreground">{version.summary}</p>
       </header>
-      {version.sections.map((s) => (
+      <LegalSections sections={version.sections} />
+      {versions.length > 1 ? (
+        <section className="space-y-2 border-t border-border pt-4">
+          <h2 className="text-sm font-semibold">Version history</h2>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {versions.map((v) => (
+              <li key={v.version}>
+                <span className="font-semibold text-foreground">{v.version}</span> — effective{" "}
+                {v.effectiveDate}
+                {v.material ? " (material change)" : ""}: {v.summary}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </article>
+  );
+}
+
+/** A document's sections: headings, paragraphs and bullet lists in source order. */
+export function LegalSections({ sections }: { sections: LegalSection[] }) {
+  return (
+    <>
+      {sections.map((s) => (
         <section key={s.heading} className="space-y-2">
           <h2 className="text-base font-semibold">{s.heading}</h2>
           {s.blocks?.length
@@ -71,20 +95,6 @@ export function LegalDocumentBody({
               ))}
         </section>
       ))}
-      {versions.length > 1 ? (
-        <section className="space-y-2 border-t border-border pt-4">
-          <h2 className="text-sm font-semibold">Version history</h2>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {versions.map((v) => (
-              <li key={v.version}>
-                <span className="font-semibold text-foreground">{v.version}</span> — effective{" "}
-                {v.effectiveDate}
-                {v.material ? " (material change)" : ""}: {v.summary}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </article>
+    </>
   );
 }

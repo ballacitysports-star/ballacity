@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, CalendarClock, CalendarDays, List, Loader2, MapPin, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { blockedMessage, heldNotice } from "@/lib/post-moderation";
+import { DraftWithAi } from "@/components/DraftWithAi";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,12 +16,13 @@ import { useTeamPermissions, useTeamRoster } from "@/lib/team-roster";
 import { createTeamPost, deleteTeamPost, updateTeamPost } from "@/lib/team-posts.functions";
 import { getTeamRosterOverview } from "@/lib/tryouts.functions";
 import { TeamEventsCalendar, EventWaiverStatus } from "@/components/team/TeamEventsCalendar";
+import { EventAvailabilitySummary } from "@/components/team/EventAvailabilitySummary";
 
 export const Route = createFileRoute("/teams/$teamId/events")({
   head: () =>
     pageHead({
-      title: "Tryouts & camps — ballaCity",
-      description: "Manage team tryouts and camps with a calendar of events, RSVPs and signed waivers.",
+      title: "Tryouts & camps — BallaCity",
+      description: "Manage team tryouts and camps with a calendar of events, RSVPs, roster availability and signed waivers.",
       noindex: true,
     }),
   ssr: false,
@@ -62,6 +65,7 @@ function TeamEventsPage() {
     enabled: perms.canInvite,
     refetchInterval: 20_000,
   });
+  const availabilityByEvent = new Map((overview.data?.events ?? []).map((event) => [event.id, event.availability]));
   const summaries = new Map((overview.data?.events ?? []).map((event) => {
     const registered = event.rsvps.filter((rsvp) => rsvp.status === "registered");
     return [event.id, { going: registered.length, signed: registered.filter((rsvp) => rsvp.waiver).length }];
@@ -143,6 +147,7 @@ function TeamEventsPage() {
           {e.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{e.location}</p>}
           <p className="flex items-center gap-2"><Users className="h-4 w-4" />{going} going{e.spots_max ? ` · ${left} spots left` : ""} · {e.price ? `$${e.price}` : "Free"}</p>
           <EventWaiverStatus summary={summaries.get(e.id)} required={!!overview.data?.waiverVersion} loading={overview.isPending} error={overview.isError} />
+          {overview.data && <EventAvailabilitySummary members={overview.data.members} answers={availabilityByEvent.get(e.id) ?? []} />}
         </div>
       </li>
     );
@@ -237,13 +242,16 @@ function EventDialog({ teamId, initial, onClose, onSaved }: { teamId: string; in
     };
     setBusy(true);
     try {
-      if (initial) await update({ data: { id: initial.id, ...payload } });
-      else await create({ data: { teamId, ...payload } });
-      toast.success(initial ? "Event updated" : "Event posted");
+      const result = initial
+        ? await update({ data: { id: initial.id, ...payload } })
+        : await create({ data: { teamId, ...payload } });
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success(initial ? "Event updated" : "Event posted");
       onSaved();
       onClose();
-    } catch {
-      toast.error("Couldn't save. Please try again.");
+    } catch (e) {
+      toast.error(blockedMessage(e) ?? "Couldn't save. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -270,6 +278,7 @@ function EventDialog({ teamId, initial, onClose, onSaved }: { teamId: string; in
             <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
           </div>
           <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
+          <DraftWithAi kind={f.kind} title={f.title} body={f.body} onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))} />
           <Button className="w-full" disabled={busy} onClick={save}>{initial ? "Save changes" : "Post event"}</Button>
         </div>
       </DialogContent>

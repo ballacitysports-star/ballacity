@@ -8,7 +8,8 @@ import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useJoinGate } from "@/lib/live-status";
-import { GameDistance } from "@/components/GameDistance";
+import { GamePlaceDistance } from "@/components/GameDistance";
+import { spotsOpenLabel } from "@/lib/spots-urgency";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -99,11 +100,14 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
             </span>
             <span className="inline-flex items-center gap-1 truncate">
               <MapPin className="h-3 w-3 text-coral" />
-              <GameDistance game={game} />
+              <GamePlaceDistance game={game} />
             </span>
-            <span className="inline-flex items-center gap-1 tabular-nums">
+            <span
+              className="inline-flex shrink-0 items-center gap-1 tabular-nums"
+              title={`${joinedCount} of ${game.maxPlayers} joined`}
+            >
               <Users className="h-3 w-3 text-lime" />
-              {joinedCount}/{game.maxPlayers}
+              {spotsOpenLabel(spotsLeft, { short: true })}
             </span>
           </div>
           {game.orgId && (

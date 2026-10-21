@@ -24,6 +24,7 @@ const VALUE_LABELS: Record<string, string> = {
   peers: "peers",
   private: "private",
   guardian: "guardian review",
+  members: "signed-in members",
   city: "city only",
   region: "region only",
 };
@@ -68,6 +69,45 @@ export function describeFamilyActivity(entry: {
       return { title: "Family link invited", detail: relationshipDetail(ctx) };
     case "link.revoked":
       return { title: "Family link ended", detail: null };
+    case "family_post.team_shared":
+      return { title: "Family clip shared with a team", detail: null };
+    case "family_post.team_unshared":
+      return { title: "Family clip made private again", detail: null };
+    case "family_post.child_view_changed":
+      return {
+        title: "Child's view of family clips changed",
+        detail: ctx["enabled"] === true ? "Your child can watch them" : "Your child can no longer watch them",
+      };
+    case "teen_reel.team_approved":
+      return { title: "Reel approved for a team", detail: "The team's members and coaches can watch it" };
+    case "teen_reel.team_revoked":
+      return { title: "Reel taken back to guardian only", detail: null };
+    case "teen_reel.deleted_by_guardian":
+      return { title: "Reel deleted by a guardian", detail: null };
+    case "child.analytics_share_changed":
+      return {
+        title: "Analytics sharing with coaches changed",
+        detail: ctx["enabled"] === true ? "Shared with a team's coaches" : "No longer shared with a team's coaches",
+      };
+    case "child.public_xp_changed":
+      return {
+        title: "Public level and XP changed",
+        detail: ctx["enabled"] === true ? "Level, XP and milestone badges are shown on the Player Card" : "Level and XP are no longer shown publicly",
+      };
+    case "family_post.sharing_changed": {
+      const what = ctx["kind"] === "team" ? "Team sharing" : "Private links";
+      return {
+        title: "Family clip sharing changed",
+        detail: `${what} turned ${ctx["enabled"] === true ? "on" : "off"}`,
+      };
+    }
+    case "family_post.link_created":
+      return {
+        title: "Private share link created",
+        detail: typeof ctx["days"] === "number" ? `Valid for ${ctx["days"]} days` : null,
+      };
+    case "family_post.link_revoked":
+      return { title: "Private share link turned off", detail: null };
     default:
       break;
   }

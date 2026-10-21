@@ -214,6 +214,8 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   // Pick venmo + submit proof.
   await page.getByRole("button", { name: /venmo/i }).first().click();
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
   await expect(submitBtn).toBeVisible({ timeout: 10_000 });
   const insertReq = page.waitForRequest(
     (req) => req.method() === "POST" && isTable(req.url(), "payment_submissions"),

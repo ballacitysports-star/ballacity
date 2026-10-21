@@ -33,6 +33,22 @@ export const getPublishedLegalDocuments = createServerFn({ method: "GET" }).hand
   },
 );
 
+/**
+ * Loader for informational legal pages. The published rows only supply the
+ * version history and any newer text; the document itself is bundled, and
+ * `effectiveVersion` already falls back to that when nothing is published. So
+ * a failed fetch must not fail the route — these pages have to stay readable.
+ */
+export async function loadPublishedLegalDocuments(): Promise<{
+  published: PublishedLegalDocument[];
+}> {
+  try {
+    return { published: await getPublishedLegalDocuments() };
+  } catch {
+    return { published: [] };
+  }
+}
+
 export type AdminLegalDocument = PublishedLegalDocument & {
   created_by: string | null;
   created_at: string;

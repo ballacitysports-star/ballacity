@@ -35,6 +35,8 @@ import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
+import { LogoWithInitialsField } from "@/components/org/LogoWithInitialsField";
+import { teamInitials, teamLogoUrl } from "@/lib/team-avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { SESSION_TYPES } from "@/lib/sport-config";
 import { AgeGroupPicker } from "@/components/AgeGroupPicker";
@@ -52,6 +54,9 @@ import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import { normalizeRefundPolicy, type RefundPolicy } from "@/lib/refund-policy";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -133,6 +138,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
   const [rules, setRules] = useState<AvailabilityRule[]>(org.availabilityRules ?? []);
   const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
+  const [cancelCutoff, setCancelCutoff] = useState<number>(normalizeCutoff(org.cancelCutoffMin));
+  const initialRefund = normalizeRefundPolicy(org.refundRule, org.lateRefundPct);
+  const [refund, setRefund] = useState<RefundPolicy>(initialRefund);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
@@ -262,7 +270,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
   // Branding
   const [accent, setAccent] = useState(org.accent);
-  const [avatar, setAvatar] = useState(org.avatar);
+  // The logo and the initials are kept apart (older teams stored a logo URL
+  // in `avatar`, which these helpers understand).
+  const [logoUrl, setLogoUrl] = useState(
+    teamLogoUrl({ avatar: org.avatar, avatar_url: org.avatarUrl }) ?? "",
+  );
+  const [avatar, setAvatar] = useState(
+    org.avatarInitials ?? teamInitials({ avatar: org.avatar, avatar_url: org.avatarUrl }),
+  );
   const [cover, setCover] = useState<string>(org.cover);
   const [customCover, setCustomCover] = useState<boolean>(() => {
     const c = org.cover;
@@ -320,7 +335,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
     );
   }
 
-  const computedAvatar = avatar || initials(name || "OR");
+  const computedInitials = avatar || initials(name || "OR");
+  // What cards render: the logo when there is one, else the initials.
+  const computedAvatar = logoUrl || computedInitials;
 
   const handlePreview: Org = {
     ...org,
@@ -332,6 +349,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
     sports: sports.length ? sports : org.sports,
     cover,
     avatar: computedAvatar,
+    avatarUrl: logoUrl || undefined,
+    avatarInitials: computedInitials,
     accent,
     bio,
     achievements,
@@ -435,6 +454,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
       sports,
       cover,
       avatar: computedAvatar,
+      avatarUrl: logoUrl,
+      avatarInitials: computedInitials,
       accent,
       bio,
       achievements,
@@ -463,6 +484,15 @@ export function EditOrgScreen({ org }: { org: Org }) {
       availabilityOverrides: kind === "coach" ? overrides : undefined,
       availabilityRules: kind === "coach" ? rules : undefined,
       timezone: kind === "coach" ? timezone : undefined,
+      // Only written when changed, so saving never depends on the column otherwise.
+      cancelCutoffMin:
+        kind === "coach" && cancelCutoff !== normalizeCutoff(org.cancelCutoffMin)
+          ? cancelCutoff
+          : undefined,
+      ...(kind === "coach" &&
+      (refund.rule !== initialRefund.rule || refund.latePct !== initialRefund.latePct)
+        ? { refundRule: refund.rule, lateRefundPct: refund.latePct }
+        : {}),
       venueAddresses:
         kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
@@ -494,6 +524,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
       sports,
       cover,
       computedAvatar,
+      computedInitials,
       accent,
       bio,
       achievements,
@@ -762,19 +793,21 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section title="Profile photo">
-                <ImageUploader
-                  kind="avatar"
+                <LogoWithInitialsField
+                  logoUrl={logoUrl}
+                  onLogoChange={setLogoUrl}
+                  initials={avatar}
+                  onInitialsChange={setAvatar}
+                  defaultInitials={initials(name || "OR")}
                   bucket="trainer-avatars"
                   pathPrefix={user?.id ?? org.id}
-                  value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
-                  onChange={setAvatar}
-                  onClear={() => setAvatar("")}
                 />
               </Section>
 
               <Section title="Cover image">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}
@@ -930,7 +963,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                           orgResults.data.length === 0 &&
                           !orgResults.isLoading && (
                             <div className="text-[11px] text-muted-foreground">
-                              No match on ballaCity.
+                              No match on BallaCity.
                             </div>
                           )}
                         {placesResults.data?.suggestions &&
@@ -1112,6 +1145,36 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section
+                title="Cancellation cutoff"
+                hint="Players can still cancel after this, but it's recorded as late and lowers their reliability."
+              >
+                <select
+                  value={cancelCutoff}
+                  onChange={(e) => setCancelCutoff(Number(e.target.value) || 0)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  aria-label="Cancellation cutoff"
+                >
+                  {CANCEL_CUTOFF_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </Section>
+
+              <Section
+                title="Refunds"
+                hint="What players get back when they cancel or don't show up. Players agree to this before booking."
+              >
+                <RefundPolicyFields
+                  idPrefix="trainer-refund"
+                  value={refund}
+                  onChange={setRefund}
+                  cutoffMin={cancelCutoff}
+                />
+              </Section>
+
+              <Section
                 title="Availability"
                 hint="Set weekly windows and tap any date up to 6 months out to override or close it."
               >
@@ -1170,19 +1233,6 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     </button>
                   ))}
                 </div>
-              </Section>
-
-              <Section title="Avatar initials">
-                <input
-                  value={avatar}
-                  onChange={(e) => setAvatar(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder={initials(name || "OR")}
-                  maxLength={3}
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
-                />
-                <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  Auto-generated from your name — edit if you like.
-                </p>
               </Section>
 
               <Section title="Live preview">
@@ -1515,33 +1565,23 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 </div>
               </Section>
 
-              <Section title="Avatar initials">
-                <input
-                  value={avatar}
-                  onChange={(e) => setAvatar(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder={initials(name || "OR")}
-                  maxLength={3}
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
-                />
-                <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  Auto-generated from your name — edit if you like.
-                </p>
-              </Section>
-
               <Section title="Team logo">
-                <ImageUploader
-                  kind="avatar"
+                <LogoWithInitialsField
+                  logoUrl={logoUrl}
+                  onLogoChange={setLogoUrl}
+                  initials={avatar}
+                  onInitialsChange={setAvatar}
+                  defaultInitials={initials(name || "OR")}
                   bucket="team-avatars"
                   pathPrefix={user?.id ?? org.id}
-                  value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
-                  onChange={setAvatar}
-                  onClear={() => setAvatar("")}
+                  logo
                 />
               </Section>
 
               <Section title="Cover image">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}

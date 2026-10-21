@@ -1,0 +1,59 @@
+name: Database tests
+
+# Replays every migration (supabase/migrations and drizzle/migrations together)
+# into a throwaway Postgres and runs the SQL tests in supabase/tests; see
+# scripts/db-test.mjs. No secrets, and no access to any real database: the
+# Postgres below exists only for this job.
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "drizzle/migrations/**"
+      - "scripts/db-test.mjs"
+      - ".github/workflows/db-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "drizzle/migrations/**"
+      - "scripts/db-test.mjs"
+      - ".github/workflows/db-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: db-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db:
+    name: Replay migrations and run SQL tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Supabase runs Postgres 17.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make sure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Replay migrations and run SQL tests
+        run: node scripts/db-test.mjs

@@ -41,6 +41,12 @@ export function LegalConsent({
     (d) => !types || types.includes(d.type as ConsentDocumentType),
   );
 
+  // effectiveVersion() carries `content` only for a published row, so a
+  // document without it is still the bundled placeholder copy.
+  const anyPlaceholder = docs.some(
+    (d) => !effectiveVersion(d.type as ConsentDocumentType, published).content,
+  );
+
   return (
     <div className={`space-y-2 ${className ?? ""}`}>
       {docs.map((doc) => {
@@ -88,8 +94,8 @@ export function LegalConsent({
         );
       })}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        These documents are placeholder drafts pending legal review. ballaCity does not process
-        payments or supervise games.
+        {anyPlaceholder ? "These documents are placeholder drafts pending legal review. " : ""}
+        BallaCity does not process payments or supervise games.
       </p>
     </div>
   );

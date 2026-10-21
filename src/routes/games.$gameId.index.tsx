@@ -9,6 +9,7 @@ import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { trackEvent } from "@/lib/analytics";
+import { getPublicGameSeo } from "@/lib/city-pages.functions";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,7 +24,7 @@ import {
   MessageCircle,
   Star,
   Check,
-  CreditCard,
+  Wallet,
   X as XIcon,
   Pencil,
   Play,
@@ -39,6 +40,7 @@ import {
   Ban,
   UserCheck,
   UserX,
+  BellRing,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
@@ -65,7 +67,8 @@ import { DEFAULT_GAME_REMINDER_OFFSETS, saveMyGameReminderOffsets } from "@/lib/
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
@@ -123,9 +126,27 @@ import {
   type JoinRequest,
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
+import { playAttentionPing } from "@/lib/attention-ping";
+import {
+  PAYMENT_HOLD_OPTIONS,
+  formatHoldRemaining,
+  holdExpiresAt,
+  useNow,
+  usePaymentHoldSweep,
+} from "@/lib/payment-hold";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { refundTermsDisplay } from "@/lib/refund-policy";
+import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
+import {
+  CANCEL_CUTOFF_PRESETS,
+  cancelPolicyNote,
+  isLateCancel,
+  lateCancelWarning,
+  normalizeCutoff,
+} from "@/lib/cancel-window";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
@@ -198,6 +219,9 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
+/** Real hosts are reviewed by auth user id; sample games keep the demo id. */
+const hostReviewId = (game?: { hostUserId?: string; host: { username: string } } | null) =>
+  game?.hostUserId ?? hostIdFor(game?.host.username ?? "");
 
 export const Route = createFileRoute("/games/$gameId/")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -225,38 +249,42 @@ export const Route = createFileRoute("/games/$gameId/")({
     return out;
   },
 
-  loader: ({ params }) => {
-    return { gameId: params.gameId };
+  loader: async ({ params }) => {
+    // Public facts for the page head. A failed read must not break the page:
+    // the head falls back to a generic, noindex description.
+    const seo = await getPublicGameSeo({ data: { id: params.gameId } }).catch(() => null);
+    return { gameId: params.gameId, seo };
   },
   head: ({ loaderData, params }) => {
-    const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
-    const name = game?.title ?? "Pickup game";
+    const seo = loaderData?.seo ?? null;
+    const name = seo?.title ?? "Pickup game";
     return pageHead({
       path: `/games/${params.gameId}`,
-      title: `${name} — ballaCity`,
+      title: `${name} — BallaCity`,
       description: (
-        game?.description ??
-        "See the details for this pickup game and request to join on ballaCity."
+        seo?.description || "See the details for this pickup game and request to join on BallaCity."
       ).slice(0, 155),
       ogType: "article",
+      // Private, cancelled, past and youth games are never indexed.
+      noindex: !seo?.indexable,
       image: ogImageUrl({
         kind: "game",
         title: name,
-        subtitle: game
-          ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ")
-          : "Pickup game on ballaCity",
-        meta: game
-          ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"]
+        subtitle: seo
+          ? [seo.sport, seo.neighborhood || seo.location].filter(Boolean).join(" • ")
+          : "Pickup game on BallaCity",
+        meta: seo
+          ? [formatGameWhen({ date: seo.date }), seo.location, seo.price ? `$${seo.price}` : "Free"]
           : [],
       }),
-      jsonLd: game
+      jsonLd: seo?.indexable
         ? {
             "@context": "https://schema.org",
             "@type": "SportsEvent",
-            name: game.title,
-            startDate: game.date,
-            location: { "@type": "Place", name: game.location, address: game.neighborhood },
-            sport: game.sport,
+            name: seo.title,
+            startDate: seo.date,
+            location: { "@type": "Place", name: seo.location, address: seo.neighborhood },
+            sport: seo.sport,
             url: `https://ballacity.com/games/${params.gameId}`,
           }
         : undefined,
@@ -342,6 +370,7 @@ function GameDetail() {
   const participationDecision = canChildFeature("game_participation");
   const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const refundTerms = useGameRefundTerms(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -451,9 +480,9 @@ function GameDetail() {
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
 
-  const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
+  const hostReviews = useReviewsFor(hostReviewId(game));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
-  const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
+  const canReviewHost = useCanReview(hostReviewId(game));
 
   // Policy players must be able to read before joining.
   const viewerPolicy = useMemo<GamePolicy>(
@@ -467,6 +496,9 @@ function GameDetail() {
         allowWaitlist: game?.allowWaitlist ?? true,
         entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
         requiresApproval: settings ? !!settings.requires_approval : true,
+        refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
+        lateRefundPct: settings?.late_refund_pct ?? 0,
+        cancelCutoffMin: game?.cancelCutoffMin,
         refundPolicy: settings?.refund_policy ?? "",
         gameRules: game?.gameRules ?? "",
       }),
@@ -813,6 +845,15 @@ function GameDetail() {
     ...DEFAULT_GAME_REMINDER_OFFSETS,
   ]);
 
+  // Spot holds: sweep expired holds while the page is open and tick the
+  // countdown. Hooks, so they stay above the early returns below.
+  const holdMinutes = (flowSettings ?? settings)?.payment_hold_minutes ?? null;
+  usePaymentHoldSweep(
+    game?.id,
+    Number(settings?.entry_fee ?? game?.price ?? 0) > 0 && !!holdMinutes,
+  );
+  const now = useNow();
+
   if (!game && !lookupComplete) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
@@ -836,6 +877,12 @@ function GameDetail() {
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
+  const myHoldExpiresAt = holdExpiresAt({
+    approvedAt: myReq?.status === "approved" ? myReq.reviewed_at : null,
+    holdMinutes,
+    gameStartsAt: game.date,
+  });
+  const myHoldLabel = myHoldExpiresAt ? formatHoldRemaining(myHoldExpiresAt.getTime() - now) : null;
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
   const hostRequiresApproval = settings ? !!settings.requires_approval : true;
@@ -965,8 +1012,14 @@ function GameDetail() {
             );
         }
         toast("You left the game.");
-        // Notify host in real time that a player left.
-        if (gameHostId && user && gameHostId !== user.id) {
+        // Notify host in real time that a player left. A late leave gets its
+        // own "cancelled late" notice from the database instead.
+        if (
+          gameHostId &&
+          user &&
+          gameHostId !== user.id &&
+          !isLateCancel(game.date, game.cancelCutoffMin)
+        ) {
           const who = myProfile?.name || emailLocalPart(user.email) || "A player";
           void createNotification({
             user_id: gameHostId,
@@ -1496,12 +1549,53 @@ function GameDetail() {
                 <div className="font-display text-sm font-bold">You're invited to this game</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   The host invited you personally{inviteFrom ? "" : ""}. Tap{" "}
-                  {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"}{" "}
-                  below to confirm your spot.
+                  {requiresApproval ? "“Request Spot”" : isPaid ? "“Pay Host”" : "“Join Run”"} below
+                  to confirm your spot.
                 </p>
               </div>
             </div>
           ))}
+
+        {/* Refund status for a payment the refund policy has been applied to. */}
+        {!isHost &&
+          (() => {
+            const r = mySubs.find(
+              (x) =>
+                x.refund_status === "owed" ||
+                x.refund_status === "refunded" ||
+                x.refund_status === "kept",
+            );
+            if (!r) return null;
+            const amt = `$${Number(r.refund_amount ?? 0).toFixed(2)}`;
+            const copy =
+              r.refund_status === "owed"
+                ? {
+                    title: `Refund owed to you · ${amt}`,
+                    body: "The host has been told. They send it back directly in their payment app — BallaCity doesn't hold money.",
+                    cls: "border-amber-500/40 bg-amber-500/10",
+                  }
+                : r.refund_status === "refunded"
+                  ? {
+                      title: `Refund sent · ${amt}`,
+                      body: "The host marked your refund as sent. Check your payment app; if it hasn't arrived, message the host.",
+                      cls: "border-lime/40 bg-lime/10",
+                    }
+                  : {
+                      title: "Fee not refunded",
+                      body: "Under the host's refund policy, this fee was kept.",
+                      cls: "border-border bg-surface",
+                    };
+            return (
+              <div
+                className={`rounded-2xl border p-4 ${copy.cls}`}
+                role="status"
+                aria-live="polite"
+              >
+                <div className="font-display text-sm font-bold">{copy.title}</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{copy.body}</p>
+              </div>
+            );
+          })()}
 
         {/* Payment-required banner (shows when approved-but-unpaid or payment rejected) */}
         {!isHost && (
@@ -1543,29 +1637,35 @@ function GameDetail() {
                   tone: "warn",
                 },
                 payment_pending: {
-                  title: "Payment due",
-                  body: "Submit payment to lock your spot on the roster.",
+                  title: myHoldLabel
+                    ? `Approved · Pay host directly to lock your spot · ⏳ ${myHoldLabel}`
+                    : "Approved · Pay host directly to lock your spot",
+                  body: myHoldLabel
+                    ? `Send your $${fee} fee to the host and submit proof before the hold runs out, or your spot goes to the next player.`
+                    : `Send your $${fee} fee to the host and submit proof — your spot isn't locked until they confirm it.`,
                   tone: "warn",
                 },
                 payment_submitted: {
-                  title: "Payment sent — waiting on host to confirm",
-                  body: "The host is reviewing your proof. You'll be confirmed once they verify.",
+                  title: "Proof sent · Awaiting host confirmation",
+                  body: "Your proof is with the host. You'll be confirmed the moment they verify it.",
                   tone: "info",
                 },
                 payment_rejected: {
-                  title: "Payment declined — resubmit to keep your spot",
+                  title: myHoldLabel
+                    ? `Payment declined by host · Resubmit proof or message host · ⏳ ${myHoldLabel}`
+                    : "Payment declined by host · Resubmit proof or message host",
                   body:
                     myReq.reviewer_notes ||
                     "The host couldn't verify your last payment. Send new proof to lock your spot.",
                   tone: "bad",
                 },
                 payment_verified: {
-                  title: "Payment confirmed — you're on the roster",
+                  title: "You're in! Payment confirmed",
                   body: "You're all set. See you at the game!",
                   tone: "ok",
                 },
                 confirmed: {
-                  title: "Payment confirmed — you're on the roster",
+                  title: "You're in! Payment confirmed",
                   body: "You're all set. See you at the game!",
                   tone: "ok",
                 },
@@ -1683,16 +1783,21 @@ function GameDetail() {
               Record<string, { text: string; tone: "warn" | "info" | "ok" | "bad" }>
             > = {
               payment_pending: {
-                text: "Payment due — submit payment to lock your spot",
+                text: myHoldLabel
+                  ? `Approved · Pay host directly to lock your spot · ⏳ ${myHoldLabel}`
+                  : "Approved · Pay host directly to lock your spot",
                 tone: "warn",
               },
               payment_submitted: {
-                text: "Payment sent — waiting on host to confirm",
+                text: "Proof sent · Awaiting host confirmation",
                 tone: "info",
               },
-              payment_rejected: { text: "Payment declined — resubmit below", tone: "bad" },
-              payment_verified: { text: "Payment verified — you're on the roster", tone: "ok" },
-              confirmed: { text: "Payment verified — you're on the roster", tone: "ok" },
+              payment_rejected: {
+                text: "Payment declined by host · Resubmit proof or message host",
+                tone: "bad",
+              },
+              payment_verified: { text: "You're in! Payment confirmed", tone: "ok" },
+              confirmed: { text: "You're in! Payment confirmed", tone: "ok" },
             };
             const entry = stripCopy[myFlowStatus];
             if (!entry) return null;
@@ -1870,7 +1975,7 @@ function GameDetail() {
               to="/review/new"
               search={
                 {
-                  revieweeId: hostIdFor(game.host.username),
+                  revieweeId: hostReviewId(game),
                   revieweeKind: "host",
                   revieweeName: game.host.name,
                   kind: "player",
@@ -1910,7 +2015,7 @@ function GameDetail() {
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection
-                revieweeId={hostIdFor(game.host.username)}
+                revieweeId={hostReviewId(game)}
                 revieweeKind="host"
                 revieweeName={game.host.name}
                 isOwner={ownsViaGame}
@@ -1929,7 +2034,7 @@ function GameDetail() {
               <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — ballaCity does not
+              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — BallaCity does not
               supervise play or inspect venues.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1972,12 +2077,13 @@ function GameDetail() {
         </div>
 
         {/* Payment settings summary */}
-        {(settings?.payment_deadline ||
+        {(isPaid ||
+          settings?.payment_deadline ||
           settings?.refund_policy ||
           settings?.payment_instructions) && (
           <div className="rounded-3xl border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
-              <CreditCard className="h-4 w-4 text-lime" />
+              <Wallet className="h-4 w-4 text-lime" />
               <h2 className="section-eyebrow text-muted-foreground">Payment settings</h2>
             </div>
             <div className="space-y-3">
@@ -1989,10 +2095,29 @@ function GameDetail() {
                   </div>
                 </div>
               )}
-              {settings?.refund_policy && (
+              {isPaid && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
-                  <p className="text-sm leading-relaxed">{settings.refund_policy}</p>
+                  {(() => {
+                    const display = refundTermsDisplay(refundTerms, game.cancelCutoffMin);
+                    if (!display)
+                      return (
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          The host hasn't posted refund terms yet.
+                        </p>
+                      );
+                    return (
+                      <>
+                        <p className="text-sm leading-relaxed">{display.summary}</p>
+                        {display.hostNote && (
+                          <p className="mt-1 text-sm leading-relaxed">
+                            <span className="font-semibold">Host's note: </span>
+                            {display.hostNote}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               {settings?.payment_instructions && (
@@ -2416,8 +2541,12 @@ function GameDetail() {
                 gameTitle={game.title}
                 startsAt={game.date}
                 isPaid={isPaid}
+                fee={fee}
                 hostId={user?.id ?? ""}
                 roster={liveRoster}
+                approvedPlayerIds={hostRequests
+                  .filter((r) => r.status === "approved")
+                  .map((r) => r.player_id)}
                 busyId={attendanceBusy}
                 onMarkAttendance={(id, v) => void handleAttendance(id, v)}
               />
@@ -2490,6 +2619,39 @@ function GameDetail() {
               <p className="mt-1 text-[11px] text-muted-foreground">
                 New signups stop automatically this long before kickoff. Approved players can still
                 pay.
+              </p>
+            </div>
+            <div className="mt-3">
+              <label
+                htmlFor="cancel-cutoff"
+                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Cancellation cutoff
+              </label>
+              <select
+                id="cancel-cutoff"
+                value={String(normalizeCutoff(game.cancelCutoffMin))}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 0;
+                  void updateHostedGame(game.id, { cancelCutoffMin: v } as never).catch(() => {});
+                  toast.success(
+                    v > 0
+                      ? `Cancellations within ${cutoffAmountLabel(v)} of start will count as late.`
+                      : "Players can cancel any time without a late mark.",
+                  );
+                }}
+                disabled={gate.joinState === "completed"}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {CANCEL_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Players can still cancel after this, but it's recorded as a late cancellation and
+                counts against their reliability like a no-show.
               </p>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -2623,6 +2785,17 @@ function GameDetail() {
                 .filter((r) => r.status === "approved")
                 .filter((r) => (rosterHydrated ? liveIds.has(r.player_id) : true));
               const approvedIds = new Set(approvedReqs.map((r) => r.player_id));
+              // On a paid game a player isn't a participant until their payment
+              // is verified, so an approved-but-unpaid player is (correctly)
+              // missing from the live roster. Show them in their own group so
+              // the host can see who still owes the fee and nudge them, without
+              // counting them as confirmed.
+              const awaitingPaymentReqs =
+                isPaid && rosterHydrated
+                  ? hostRequests
+                      .filter((r) => r.status === "approved")
+                      .filter((r) => !liveIds.has(r.player_id))
+                  : [];
               // Realtime participants that aren't already surfaced via an
               // approved join request. Falls back to placeholder rows only
               // while hydrating and the cached count says there should be
@@ -2701,6 +2874,9 @@ function GameDetail() {
                             req={r}
                             gameTitle={game.title}
                             feeRequired={isPaid}
+                            fee={fee}
+                            holdMinutes={settings?.payment_hold_minutes ?? null}
+                            gameStartsAt={game.date}
                             onOptimistic={applyOptimisticReview}
                           />
                         ))}
@@ -2776,6 +2952,31 @@ function GameDetail() {
                       </>
                     )}
                   </div>
+
+                  {awaitingPaymentReqs.length > 0 && (
+                    <div className="mt-4">
+                      <h2 className="section-eyebrow text-amber-500 mb-2">
+                        Awaiting payment · {awaitingPaymentReqs.length}
+                      </h2>
+                      <p className="mb-2 text-[11px] text-muted-foreground">
+                        Approved, but their spot isn't locked until you confirm their payment.
+                      </p>
+                      <div className="space-y-2">
+                        {awaitingPaymentReqs.map((r) => (
+                          <RosterPlayerRow
+                            key={r.id}
+                            req={r}
+                            gameTitle={game.title}
+                            feeRequired={isPaid}
+                            fee={fee}
+                            holdMinutes={settings?.payment_hold_minutes ?? null}
+                            gameStartsAt={game.date}
+                            onOptimistic={applyOptimisticReview}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               );
             })()}
@@ -2831,7 +3032,7 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(describeMessagingError(e));
+                  toast.error(describeMessagingError(e, undefined, "host"));
                 } finally {
                   setMessaging(false);
                 }
@@ -2840,7 +3041,8 @@ function GameDetail() {
             >
               <MessageCircle className="h-5 w-5" />
             </button>
-            {!isParentMode && !isHost &&
+            {!isParentMode &&
+              !isHost &&
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
@@ -2852,10 +3054,16 @@ function GameDetail() {
                 // revoked stays available.
                 const consentBlocksNewJoin = !alreadyInFlow && !participationDecision.allowed;
                 const canJoinAction = alreadyInFlow || spotsLeft > 0;
+                const waitlistCta =
+                  spotsLeft <= 0 &&
+                  !alreadyInFlow &&
+                  !lockedForNewJoin &&
+                  !consentBlocksNewJoin &&
+                  viewerGate.waitlistOpen;
                 const buttonDisabled =
                   requesting ||
                   processing ||
-                  !canJoinAction ||
+                  (!canJoinAction && !waitlistCta) ||
                   lockedForNewJoin ||
                   consentBlocksNewJoin;
                 const hasPaymentAttempt =
@@ -2872,7 +3080,7 @@ function GameDetail() {
                     ? "Payment pending · View status"
                     : latestSub?.status === "rejected"
                       ? "Payment rejected · Pay again"
-                      : `Pay host · $${fee.toFixed(2)}`;
+                      : `Pay Host · $${fee.toFixed(2)}`;
                 const LiveSpots = () => (
                   <span
                     className="inline-flex items-baseline"
@@ -2904,8 +3112,12 @@ function GameDetail() {
                         search={paymentSearch}
                         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime transition-colors"
                       >
-                        <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
+                        <Wallet className="h-4 w-4" /> {paymentCtaLabel}
                       </Link>
+                      {/* Approved but not paid yet: a way out without opening the pay page. */}
+                      <div className="mt-1.5 text-center">
+                        <LeaveFlowButton gameId={game.id} gameTitle={game.title} variant="link" />
+                      </div>
                     </motion.div>
                   );
                 }
@@ -2918,6 +3130,12 @@ function GameDetail() {
                           participationDecision.reason ||
                             "A parent or guardian must approve this account first.",
                         );
+                        return;
+                      }
+                      if (waitlistCta) {
+                        document
+                          .getElementById("waitlist")
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
                         return;
                       }
                       const wantsLeave = isConfirmed || (joined && !isPaid);
@@ -2987,19 +3205,19 @@ function GameDetail() {
                           className="inline-block h-2 w-2 rounded-full bg-coral animate-pulse"
                           aria-hidden
                         />
-                        Full · Waiting for a spot
+                        Join Waitlist
                       </>
                     ) : requiresApproval && !isApproved ? (
                       <>
-                        Request to join · <LiveSpots />
+                        Request Spot · <LiveSpots />
                       </>
                     ) : isPaid ? (
                       <>
-                        <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
+                        <Wallet className="h-4 w-4" /> Pay Host · ${fee.toFixed(2)}
                       </>
                     ) : (
                       <>
-                        Join free · <LiveSpots />
+                        Join Run · <LiveSpots />
                       </>
                     )}
                   </motion.button>
@@ -3011,6 +3229,10 @@ function GameDetail() {
 
       {isHost && editOpen && (
         <EditGameModal
+          // The editor seeds its fields from `settings` on mount; remount once
+          // they finish loading so a slow fetch can't leave the host's saved
+          // refund terms blank (and then overwrite them on save).
+          key={settings ? "settings-loaded" : "settings-pending"}
           game={game}
           hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
           settings={settings}
@@ -3028,14 +3250,26 @@ function GameDetail() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmAction === "leave" ? "Leave this game?" : "Join this game?"}
+              {confirmAction === "leave"
+                ? "Leave this game?"
+                : requiresApproval && !isApproved
+                  ? "Request a spot?"
+                  : "Join this run?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmAction === "leave"
                 ? "Your spot will open up for someone else. You can rejoin if there's still space."
-                : "You'll be added to the roster. You can leave later if plans change."}
+                : `You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirmAction === "leave" && isLateCancel(game.date, game.cancelCutoffMin) && (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
+            >
+              {lateCancelWarning(game.cancelCutoffMin)}
+            </p>
+          )}
           {confirmAction === "join" && (
             <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
           )}
@@ -3055,7 +3289,13 @@ function GameDetail() {
                   : undefined
               }
             >
-              {confirmAction === "leave" ? "Leave game" : "Join game"}
+              {confirmAction === "leave"
+                ? isLateCancel(game.date, game.cancelCutoffMin)
+                  ? "Leave anyway"
+                  : "Leave game"
+                : requiresApproval && !isApproved
+                  ? "Request Spot"
+                  : "Join Run"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3151,6 +3391,9 @@ function EditGameModal({
   const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
     () => new Set(settings?.accepted_method_ids ?? []),
   );
+  const [paymentHoldMinutes, setPaymentHoldMinutes] = useState<number | null>(
+    settings?.payment_hold_minutes ?? null,
+  );
   const [paymentDeadline, setPaymentDeadline] = useState<string>(
     settings?.payment_deadline ? settings.payment_deadline.slice(0, 16) : "",
   );
@@ -3167,6 +3410,9 @@ function EditGameModal({
       allowWaitlist: game.allowWaitlist ?? true,
       entryFee: Number(settings?.entry_fee ?? game.price ?? 0) || 0,
       requiresApproval: settings ? !!settings.requires_approval : true,
+      refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
+      lateRefundPct: settings?.late_refund_pct ?? 0,
+      cancelCutoffMin: game.cancelCutoffMin,
       refundPolicy: settings?.refund_policy ?? "",
       gameRules: game.gameRules ?? "",
     }),
@@ -3309,6 +3555,7 @@ function EditGameModal({
         allowWaitlist: editPolicy.allowWaitlist,
         cancellationPolicy: editPolicy.cancellationPolicy,
         cancellationNotes: editPolicy.cancellationNotes || null,
+        cancelCutoffMin: editPolicy.cancelCutoffMin,
         gameRules: editPolicy.gameRules || null,
         price: pr,
         indoor,
@@ -3336,7 +3583,15 @@ function EditGameModal({
           entry_fee: pr,
           accepted_method_ids: pr > 0 ? Array.from(acceptedMethodIds) : [],
           payment_deadline: paymentDeadline ? new Date(paymentDeadline).toISOString() : null,
+          // Only send the hold when it's set or the column is already live, so
+          // this save still works if the client ships before the migration.
+          ...(paymentHoldMinutes !== null || (settings && "payment_hold_minutes" in settings)
+            ? { payment_hold_minutes: pr > 0 ? paymentHoldMinutes : null }
+            : {}),
           refund_policy: refundPolicy.trim() || null,
+          ...(pr > 0
+            ? { refund_rule: editPolicy.refundRule, late_refund_pct: editPolicy.lateRefundPct }
+            : {}),
           payment_instructions: paymentInstructions.trim() || null,
           requires_approval: requiresApproval,
         });
@@ -3447,9 +3702,7 @@ function EditGameModal({
                         {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
                       <span className="truncate max-w-[10rem]">{a.name || "Loading…"}</span>
-                      <span className="micro-label opacity-70">
-                        {affLabel(a)}
-                      </span>
+                      <span className="micro-label opacity-70">{affLabel(a)}</span>
                     </button>
                   );
                 })}
@@ -3835,6 +4088,28 @@ function EditGameModal({
           )}
 
           {price > 0 && (
+            <Field label="Hold approved spots for">
+              <select
+                value={paymentHoldMinutes ?? ""}
+                onChange={(e) =>
+                  setPaymentHoldMinutes(e.target.value ? Number(e.target.value) : null)
+                }
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                {PAYMENT_HOLD_OPTIONS.map((o) => (
+                  <option key={o.label} value={o.minutes ?? ""}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Approved players who haven't sent payment by then lose the spot, and the next player
+                on the waitlist is notified. Holds never release after tip-off.
+              </p>
+            </Field>
+          )}
+
+          {price > 0 && (
             <Field label="Payment instructions (optional)">
               <textarea
                 value={paymentInstructions}
@@ -3991,9 +4266,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="micro-label text-muted-foreground mb-2">
-        Blocked players
-      </div>
+      <div className="micro-label text-muted-foreground mb-2">Blocked players</div>
       {blocked.length === 0 ? (
         <div className="text-xs text-muted-foreground">
           You haven't blocked anyone. Use the Block button on a request or roster row to prevent a
@@ -4023,14 +4296,23 @@ function RosterPlayerRow({
   req,
   gameTitle,
   feeRequired,
+  fee,
+  holdMinutes,
+  gameStartsAt,
   onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
   feeRequired: boolean;
+  fee: number;
+  holdMinutes: number | null;
+  gameStartsAt: string;
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [reminding, setReminding] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+  const navigate = useNavigate();
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("P");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -4054,6 +4336,12 @@ function RosterPlayerRow({
   >([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const paymentStatus: PaymentSubmissionStatus | "none" = latestSub?.status ?? "none";
+  // Last status this row rendered, so a realtime flip to "pending" can alert
+  // the host once (not on first load, and not on the host's own actions).
+  const paymentStatusRef = useRef(paymentStatus);
+  paymentStatusRef.current = paymentStatus;
+  const nameRef = useRef(name);
+  nameRef.current = name;
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
@@ -4061,7 +4349,7 @@ function RosterPlayerRow({
 
   useEffect(() => {
     let cancel = false;
-    const loadPayment = async () => {
+    const loadPayment = async (fromRealtime = false) => {
       const { data } = await supabase
         .from("payment_submissions")
         .select("id, status, screenshot_path")
@@ -4073,6 +4361,12 @@ function RosterPlayerRow({
       if (cancel) return;
       const d = data as { id: string; status: string; screenshot_path: string | null } | null;
       if (d && (d.status === "verified" || d.status === "pending" || d.status === "rejected")) {
+        if (fromRealtime && d.status === "pending" && paymentStatusRef.current !== "pending") {
+          playAttentionPing();
+          toast.info(`${nameRef.current} sent payment proof`, {
+            description: `${gameTitle} · tap View proof to confirm.`,
+          });
+        }
         setLatestSub({ id: d.id, status: d.status, screenshot_path: d.screenshot_path });
       } else {
         setLatestSub(null);
@@ -4110,7 +4404,7 @@ function RosterPlayerRow({
         (payload) => {
           const row = (payload.new ?? payload.old) as any;
           if (row?.game_id && row.game_id !== req.game_id) return;
-          loadPayment();
+          loadPayment(true);
         },
       )
       .subscribe();
@@ -4343,16 +4637,80 @@ function RosterPlayerRow({
     }
   };
 
+  const remindToPay = async () => {
+    if (reminding) return;
+    setReminding(true);
+    try {
+      await createNotification({
+        user_id: req.player_id,
+        type: "payment_reminder",
+        title: `Payment reminder · ${gameTitle}`.slice(0, 200),
+        body: `Your $${fee} spot for ${gameTitle} is held. Tap here to pay the host.`,
+        link: `/games/${req.game_id}/pay`,
+      });
+      toast.success(`Reminder sent to ${name}.`);
+    } catch {
+      toast.error("Couldn't send reminder.");
+    } finally {
+      setReminding(false);
+    }
+  };
+
+  const messagePlayer = async () => {
+    if (openingChat) return;
+    setOpeningChat(true);
+    try {
+      const conversationId = await getOrCreateDirectConversation(req.player_id, req.game_id);
+      const firstName = name.split(" ")[0] || name;
+      // Pre-fill (never auto-send) a nudge matched to where they are in the flow.
+      const draft = !feeRequired
+        ? `Hey ${firstName}, you're approved for ${gameTitle}! See you there.`
+        : paymentStatus === "verified"
+          ? `Hey ${firstName}, your spot for ${gameTitle} is confirmed. See you there!`
+          : paymentStatus === "pending"
+            ? `Hey ${firstName}, got your payment proof for ${gameTitle} — confirming it now.`
+            : `Hey ${firstName}, your spot is approved for ${gameTitle}! Please send your $${fee} fee to lock it in.`;
+      navigate({
+        to: "/messages/$conversationId",
+        params: { conversationId },
+        search: { draft },
+      });
+    } catch (e) {
+      toast.error(describeMessagingError(e, undefined, "game_player"));
+      setOpeningChat(false);
+    }
+  };
+
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
-  const paymentChip = !feeRequired
-    ? null
+  // One stage badge instead of a green "Approved" pill next to a payment chip:
+  // approval alone never reads as a confirmed, paid spot on fee games.
+  const stageBadge = !feeRequired
+    ? { label: "Approved", cls: "border-lime/40 bg-lime/10 text-lime", Icon: Check }
     : paymentStatus === "verified"
-      ? { label: "Paid", cls: "border-lime/40 bg-lime/10 text-lime" }
+      ? { label: "Spot Confirmed (Paid)", cls: "border-lime/40 bg-lime/10 text-lime", Icon: Check }
       : paymentStatus === "pending"
-        ? { label: "Payment pending", cls: "border-coral/40 bg-coral/10 text-coral" }
+        ? {
+            label: "Proof sent · Awaiting host confirmation",
+            cls: "border-sky-500/40 bg-sky-500/10 text-sky-500",
+            Icon: Wallet,
+          }
         : paymentStatus === "rejected"
-          ? { label: "Payment rejected", cls: "border-coral/50 bg-coral/15 text-coral" }
-          : { label: "Unpaid", cls: "border-border bg-secondary text-muted-foreground" };
+          ? {
+              label: "Payment declined by host · Resubmit proof or message host",
+              cls: "border-coral/50 bg-coral/15 text-coral",
+              Icon: Wallet,
+            }
+          : {
+              label: "Approved · Awaiting Payment",
+              cls: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+              Icon: Clock,
+            };
+  const canRemind = feeRequired && (paymentStatus === "none" || paymentStatus === "rejected");
+  const now = useNow();
+  const holdExpires = canRemind
+    ? holdExpiresAt({ approvedAt: req.reviewed_at, holdMinutes, gameStartsAt })
+    : null;
+  const holdMs = holdExpires ? holdExpires.getTime() - now : null;
 
   return (
     <div className="rounded-2xl border border-lime/30 bg-surface p-3">
@@ -4374,6 +4732,15 @@ function RosterPlayerRow({
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={messagePlayer}
+            disabled={openingChat}
+            aria-label={`Message ${name}`}
+            className="inline-flex items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-secondary disabled:opacity-50"
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Message
+          </button>
           <button
             type="button"
             onClick={remove}
@@ -4401,19 +4768,32 @@ function RosterPlayerRow({
           <Star className="h-3 w-3 text-muted-foreground" />
           Sportsmanship {fmt(sportsmanship)}
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
-          <Check className="h-3 w-3" /> Approved
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${stageBadge.cls}`}
+        >
+          <stageBadge.Icon className="h-3 w-3" /> {stageBadge.label}
         </span>
-        {paymentChip && (
+        {holdMs !== null && (
           <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${paymentChip.cls}`}
+            className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-background px-2 py-0.5 text-[10px] font-bold text-amber-500 tabular-nums"
+            title="The spot is released automatically if no payment arrives before the hold ends."
           >
-            <CreditCard className="h-3 w-3" /> {paymentChip.label}
+            ⏳ {holdMs > 0 ? formatHoldRemaining(holdMs) : "Releasing spot…"}
           </span>
         )}
       </div>
       {feeRequired && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {canRemind && (
+            <button
+              type="button"
+              onClick={remindToPay}
+              disabled={reminding || busy}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-500 disabled:opacity-50"
+            >
+              <BellRing className="h-3 w-3" /> Remind to Pay
+            </button>
+          )}
           {latestSub?.screenshot_path && (
             <button
               type="button"
@@ -4485,9 +4865,7 @@ function RosterPlayerRow({
       )}
       {feeRequired && historyOpen && (
         <div className="mt-2 rounded-xl border border-border bg-background/60 p-2.5">
-          <div className="mb-1.5 micro-label text-muted-foreground">
-            Verification history
-          </div>
+          <div className="mb-1.5 micro-label text-muted-foreground">Verification history</div>
           {historyLoading ? (
             <div className="text-[11px] text-muted-foreground">Loading…</div>
           ) : history.length === 0 ? (
@@ -4826,7 +5204,11 @@ async function notifyJoinReview(
 ) {
   let fee = 0;
   if (status === "approved") {
-    const { data } = await supabase.from("hosted_games").select("price").eq("id", gameId).maybeSingle();
+    const { data } = await supabase
+      .from("hosted_games")
+      .select("price")
+      .eq("id", gameId)
+      .maybeSingle();
     fee = Number(data?.price ?? 0);
   }
   const paid = status === "approved" && fee > 0;

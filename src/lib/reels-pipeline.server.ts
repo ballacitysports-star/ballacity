@@ -14,7 +14,16 @@ import { DEFAULT_AI_PROVIDER, type AiProviderConfig } from "@/lib/ai/config";
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { createLovableGatewayProvider } from "@/lib/ai/gateway.server";
 import type { AiMessagePart } from "@/lib/ai/provider";
+import { normalizePoseMetrics, poseAllowedForCohort, poseGrounding } from "@/lib/pose-metrics";
+import { DENSE_MAX_FRAMES } from "@/lib/reel-frames";
 import { analyticsAudience, analyticsText, normalizeAdvancedAnalytics } from "@/lib/reel-analytics";
+import {
+  PIPELINE_RUN_CAP_SECONDS,
+  claimedReelSeconds,
+  clipLengthProblem,
+} from "@/lib/ai/upload-limits";
+import { AiError } from "@/lib/ai/errors";
+import { loadClipLimits } from "@/lib/ai/upload-limits.server";
 
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
@@ -29,6 +38,7 @@ export const STEPS = [
   "analytics",
   "metadata",
   "hashtags",
+  "package",
   "thumbnail",
   "finalize",
 ] as const;
@@ -48,10 +58,14 @@ export type Reel = {
   frame_times?: number[] | null;
   audio_path?: string | null;
   style_prefs?: Record<string, any> | null;
+  /** Set on a family post: a parent's clip of their under-13 child. */
+  subject_child_id?: string | null;
+  /** Browser-side probe results; may carry body-tracking measurements under `pose`. */
+  media_meta?: Record<string, any> | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs,subject_child_id,media_meta";
 
 async function callLovableAI(prompt: string, system: string, ctx: StepCtx) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, ctx);
@@ -79,11 +93,18 @@ async function callLovableAIPartsWithModel(
   pickModel?: (p: AiProviderConfig) => string,
 ): Promise<{ data: unknown; model: string }> {
   const providerConfig = ctx.session?.config.provider ?? DEFAULT_AI_PROVIDER;
+  let signal: AbortSignal | undefined;
+  if (ctx.deadline != null) {
+    const remaining = ctx.deadline - Date.now();
+    if (remaining <= 0) throw processingTimeout();
+    signal = AbortSignal.timeout(remaining);
+  }
   const request = {
     system,
     prompt: "",
     parts: parts as AiMessagePart[],
     model: pickModel ? pickModel(providerConfig) : undefined,
+    signal,
   };
   if (ctx.session) {
     const out = await runAiCall(ctx.session, (provider) => provider.generateStructured(request));
@@ -148,7 +169,27 @@ async function audioBase64(
   }
 }
 
-type StepCtx = { supabaseAdmin: any; apiKey: string; session?: AiSession | null };
+type StepCtx = {
+  supabaseAdmin: any;
+  apiKey: string;
+  session?: AiSession | null;
+  /** Epoch ms when this run's processing-time budget ends. */
+  deadline?: number;
+};
+
+function processingTimeout() {
+  return new AiError("TIMEOUT", { detail: "reel run passed its processing-time limit" });
+}
+
+/** This run's budget: the tier's maxProcessingSeconds, never above the run cap. */
+async function runBudgetSeconds(supabaseAdmin: any, reel: Reel, session?: AiSession | null) {
+  if (session) return Math.min(session.limits.maxProcessingSeconds, PIPELINE_RUN_CAP_SECONDS);
+  try {
+    return (await loadClipLimits(supabaseAdmin, reel.user_id)).maxProcessingSeconds;
+  } catch {
+    return PIPELINE_RUN_CAP_SECONDS;
+  }
+}
 
 const STEP_RUNNERS: Record<
   Step,
@@ -419,7 +460,7 @@ const STEP_RUNNERS: Record<
   },
 
   /**
-   * Pro Analytics: a second, denser look at the footage (up to 16 frames) that
+   * Pro Analytics: a second, denser look at the footage (up to 32 frames when the athlete uploaded a dense capture) that
    * grades the athlete 0–100, ties biomechanics cues to timestamps, and writes
    * a playstyle archetype, style comps and a scout report. Runs on the
    * configurable `analyticsModel`. It does not depend on the reel's style, so a
@@ -431,14 +472,16 @@ const STEP_RUNNERS: Record<
     if (!progress.analysis?.summary) return { advanced_analytics: null };
     try {
       const images: { url: string; t: number | null }[] = [];
-      for (const p of sampleFrames(reel, 16)) {
+      for (const p of sampleFrames(reel, DENSE_MAX_FRAMES)) {
         const url = await frameDataUrl(ctx.supabaseAdmin, reel.user_id, p.path);
         if (url) images.push({ url, t: p.t });
       }
       if (images.length === 0) return { advanced_analytics: null };
 
       // No session (batch worker) means the age is unknown: development feedback only.
-      const cohort = ctx.session?.cohort ?? null;
+      // A family post is footage of an under-13 child, whoever uploaded it, so it
+      // gets the same limited version: no scout report, no pro comparisons.
+      const cohort = reel.subject_child_id ? "child_under_13" : (ctx.session?.cohort ?? null);
       const full = analyticsAudience(cohort) === "full";
       const stamps = images
         .map((im, i) => `frame ${i + 1}${im.t != null ? ` @ ${im.t}s` : ""}`)
@@ -451,6 +494,9 @@ const STEP_RUNNERS: Record<
         (progress.timeline ?? []).length
           ? `Play-by-play: ${(progress.timeline ?? []).map((e: { t: number; label: string }) => `${e.t}s ${e.label}`).join("; ")}`
           : "",
+        // Measured body-tracking numbers, only for adults and 16-17, never for a family
+        // post. Absent for everyone until a client records them, which changes nothing.
+        poseAllowedForCohort(cohort) ? poseGrounding(normalizePoseMetrics(reel.media_meta?.pose)) : "",
         `Frames in order: ${stamps}.`,
         "Grade this athlete's performance on the clip.",
       ]
@@ -531,6 +577,50 @@ const STEP_RUNNERS: Record<
         ? out.hashtags.map((h: unknown) => String(h)).slice(0, 8)
         : [],
     };
+  },
+  /**
+   * The post package the member reviews before posting: three caption variants,
+   * on-screen text cards and hashtags, written from everything the earlier steps
+   * learned. Stored in step_progress (not on the reel) so nothing is applied
+   * until the member picks it. A bonus: any failure just means the review card
+   * shows the caption already written, and never fails the reel.
+   */
+  package: async (reel, progress, ctx) => {
+    if (!progress.analysis?.summary && !progress.ai_caption) return { package: null };
+    try {
+      const { generateReelPackage } = await import("@/lib/reel-coach.server");
+      const pkg = await generateReelPackage(
+        ctx.apiKey,
+        {
+          id: reel.id,
+          title: reel.title,
+          game_title: reel.game_title ?? null,
+          status: "completed",
+          style_prefs: reel.style_prefs ?? null,
+          ai_title: progress.ai_title ?? null,
+          ai_caption: progress.ai_caption ?? null,
+          ai_hashtags: progress.ai_hashtags ?? [],
+          ai_sport: progress.sport ?? null,
+          ai_analysis: progress.analysis ?? null,
+          ai_moments: progress.moments ?? [],
+          ai_timeline: progress.timeline ?? [],
+          ai_edit_plan: progress.edit_plan ?? null,
+          ai_coaching: progress.coaching ?? null,
+          ai_transcript: progress.transcript ?? null,
+          suggested_clip: progress.suggested_clip ?? null,
+        },
+        { session: ctx.session },
+      );
+      return {
+        package: {
+          captions: pkg.captions,
+          hashtags: pkg.hashtags,
+          overlays: pkg.overlays,
+        },
+      };
+    } catch {
+      return { package: null };
+    }
   },
   /** Real thumbnail: the browser captured frames at upload time. */
   thumbnail: async (reel, progress) => {
@@ -740,6 +830,32 @@ export async function claimReel(supabaseAdmin: any, reel: Reel) {
   return (data?.length ?? 0) > 0;
 }
 
+/**
+ * Backstop for the plan's clip-length limit. The real check runs on upload, in
+ * finalizeVideoUpload; this catches a reel row written without it. Only a
+ * fresh reel is checked, so lowering a limit never fails one already under way
+ * and a restyle of a finished reel is never refused.
+ *
+ * Returns true when the reel was refused (and marked failed, not retried).
+ */
+export async function rejectIfOverClipLimits(supabaseAdmin: any, reel: Reel): Promise<boolean> {
+  if (reel.attempts !== 0 || firstStep(reel.processing_step) !== STEPS[0]) return false;
+  const limits = await loadClipLimits(supabaseAdmin, reel.user_id);
+  const problem = clipLengthProblem(claimedReelSeconds(reel), limits);
+  if (!problem) return false;
+  await supabaseAdmin
+    .from("highlight_reels")
+    .update({
+      status: "failed",
+      attempts: MAX_ATTEMPTS,
+      error_message: problem,
+      failed_at: new Date().toISOString(),
+      processing_started_at: null,
+    })
+    .eq("id", reel.id);
+  return true;
+}
+
 export async function processReel(
   reel: Reel,
   supabaseAdmin: any,
@@ -756,14 +872,22 @@ export async function processReel(
 
   progress._pipeline = snapshot(done, startStep, attempt);
 
-  if (!alreadyClaimed && !(await claimReel(supabaseAdmin, reel))) {
-    return { id: reel.id, status: "skipped" };
+  if (!alreadyClaimed) {
+    if (await rejectIfOverClipLimits(supabaseAdmin, reel)) {
+      return { id: reel.id, status: "rejected" };
+    }
+    if (!(await claimReel(supabaseAdmin, reel))) return { id: reel.id, status: "skipped" };
   }
 
+
+  // The plan's processing-time limit, per run. A run that passes it fails like
+  // any other error, so the next attempt resumes from the step it reached.
+  const deadline = Date.now() + (await runBudgetSeconds(supabaseAdmin, reel, session)) * 1000;
 
   try {
     for (let i = startIdx; i < STEPS.length; i++) {
       const step = STEPS[i];
+      if (Date.now() >= deadline) throw processingTimeout();
       // Announce the step *before* running it so the card shows what's happening now.
       progress._pipeline = snapshot(done, step, attempt);
       await supabaseAdmin
@@ -771,7 +895,12 @@ export async function processReel(
         .update({ step_progress: progress, last_step_at: new Date().toISOString() })
         .eq("id", reel.id);
 
-      const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey, session });
+      const patch = await STEP_RUNNERS[step](reel, progress, {
+        supabaseAdmin,
+        apiKey,
+        session,
+        deadline,
+      });
       Object.assign(progress, patch);
       done.push(step);
       progress._pipeline = snapshot(done, STEPS[i + 1] ?? null, attempt);
@@ -788,6 +917,7 @@ export async function processReel(
     progress._pipeline = { ...snapshot(done, null, attempt), percent: 100 };
 
     // Safety screening runs before the reel can become visible to anyone else.
+    // It gets no deadline: the processing-time limit never cuts a safety check short.
     const screening = await screenReelOutput(reel, progress, { supabaseAdmin, apiKey, session });
     if (screening.quarantined) {
       await supabaseAdmin.from("notifications").insert({

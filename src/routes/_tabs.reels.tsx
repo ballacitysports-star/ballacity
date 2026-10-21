@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ReelShareButton } from "@/components/reels/ReelShareButton";
+import { RecapShareButton } from "@/components/RecapShareButton";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -21,6 +23,7 @@ import { needsPlaybackConversion } from "@/lib/video-support";
 import {
   assertConverterReachable,
   convertToPlayableMp4,
+  stripVideoMetadata,
   ConverterUnavailableError,
 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
@@ -54,7 +57,14 @@ import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { validateVideoSize } from "@/lib/video-validation";
-import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
+import { finalizeVideoUpload, getMyClipLimits } from "@/lib/media-uploads.functions";
+import {
+  clipLengthProblem,
+  exceedsResolution,
+  resolutionProblem,
+  uploadSizeProblem,
+  type ClipLimits,
+} from "@/lib/ai/upload-limits";
 import { useAuth } from "@/hooks/use-auth";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
@@ -71,21 +81,44 @@ import {
   recapProgress,
   recapStepLabel,
   recapStepStates,
-  shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
-import { EyeOff, Film, Pencil, Share2, Trash2 } from "lucide-react";
+import { EyeOff, Film, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { ReelPostCard } from "@/components/reels/ReelPostCard";
+import { FamilyShareLinks } from "@/components/reels/FamilyShareLinks";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
+import { familyPostErrorMessage } from "@/lib/family-posts";
+import { useMyChildren } from "@/lib/child-safety";
+import { ReelProgress } from "@/components/reels/ReelProgress";
+import { teenReelState } from "@/lib/teen-reel-privacy";
+import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
+import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
+import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
+import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
+import { ReelPrivacyPanel } from "@/components/reels/ReelPrivacyPanel";
+import { useMyCohort } from "@/lib/youth-features";
+import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
 
 export const Route = createFileRoute("/_tabs/reels")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  // `child` is optional so the existing links to this page need no change.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { game: string; title: string; upload: string; child?: string } => ({
     game: typeof search.game === "string" ? search.game : "",
     title: typeof search.title === "string" ? search.title : "",
     upload: search.upload === "1" || search.upload === true ? "1" : "",
+    child: typeof search.child === "string" && search.child ? search.child : undefined,
   }),
   head: () =>
     pageHead({
       path: "/reels",
-      title: "Highlight reels — ballaCity",
+      title: "Highlight reels — BallaCity",
       description: "Turn your game footage into AI-edited highlight reels you can share.",
       noindex: true,
     }),
@@ -134,9 +167,26 @@ type Reel = {
   ai_advanced_analytics?: AdvancedAnalytics | null;
   style_prefs?: Record<string, any> | null;
   hidden_at?: string | null;
+  /** New uploads start as drafts, private to their owner until posted. */
+  is_draft?: boolean | null;
+  /** Set on a family post: a parent's private clip of their under-13 child. */
+  subject_child_id?: string | null;
+  /** 13-15 only: the one team a verified guardian approved, and who approved it. */
+  team_share_team_id?: string | null;
+  guardian_team_approved_by?: string | null;
 };
 
-function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
+function ReelCard({
+  reel,
+  onRetry,
+  prior,
+}: {
+  reel: Reel;
+  onRetry: (id: string) => Promise<void>;
+  /** The most recent earlier analysed reel in the same sport, for "since your last clip". */
+  prior?: { title: string; created_at: string; analytics: AdvancedAnalytics } | null;
+}) {
+  const { cohort: myCohort } = useMyCohort();
   const [thumb, setThumb] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -179,6 +229,34 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   }
 
   const isDone = reel.status === "completed";
+  const phase = reelPhase(reel);
+  const isDraft = phase === "draft";
+  const postPackage = normalizePostPackage(reel.step_progress?.package);
+
+  async function toggleHidden() {
+    setManageBusy("hide");
+    try {
+      await setReelHidden({ data: { reelId: reel.id, hidden: !reel.hidden_at } });
+      toast.success(
+        reel.hidden_at ? "Reel is visible on your profile again" : "Reel hidden from your profile",
+      );
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not update this reel");
+    } finally {
+      setManageBusy(null);
+    }
+  }
+
+  // A draft opens its player straight away, so the AI cut and the Pro analytics
+  // are in front of the member while they decide whether to post.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (isDraft && !autoOpened.current) {
+      autoOpened.current = true;
+      void handlePlay();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraft]);
   const displayTitle = reel.ai_title || reel.title;
   const isProcessing = reel.status === "processing";
   const attempt = recapAttempt(reel as unknown as RecapSummary);
@@ -201,10 +279,24 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{displayTitle}</p>
           <p className="text-xs text-muted-foreground">
-            {reel.status} · {new Date(reel.created_at).toLocaleDateString()}
+            {reel.subject_child_id
+              ? "Family post · only you can see this"
+              : isDraft
+                ? "Draft · only you can see this"
+                : phase === "posted"
+                  ? "Posted"
+                  : reel.status}{" "}
+            · {new Date(reel.created_at).toLocaleDateString()}
             {reel.used_free && " · free"}
             {reel.hidden_at && " · hidden on profile"}
           </p>
+          {myCohort === "teen_13_15" && !reel.subject_child_id && (
+            <p className="text-[11px] font-semibold text-lime">
+              {teenReelState(reel) === "team"
+                ? "Shared with your team's coaches and members · approved by your guardian"
+                : "Guardian only · not public"}
+            </p>
+          )}
           {reel.ai_caption && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
           )}
@@ -286,54 +378,41 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             </button>
           )}
         </div>
-        {isDone && reel.game_id && (
-          <button
-            onClick={async () => {
-              const r = await shareRecap(reel as unknown as RecapSummary, {
-                id: reel.game_id!,
-                title: reel.game_title || displayTitle,
-              });
-              if (r === "copied") toast.success("Highlight link copied");
-              if (r === "failed") toast.error("Could not share this highlight");
-            }}
+        {phase === "posted" && !reel.subject_child_id && (
+          <ReelShareButton
+            reelId={reel.id}
+            title={displayTitle}
+            caption={reel.ai_caption}
+            hashtags={reel.ai_hashtags}
+          />
+        )}
+        {isDone && reel.game_id && !reel.subject_child_id && (
+          <RecapShareButton
+            recap={reel as unknown as RecapSummary}
+            game={{ id: reel.game_id, title: reel.game_title || displayTitle }}
             className="shrink-0 rounded-full border border-border p-2 text-muted-foreground"
-            aria-label="Share highlight"
+            label="Share highlight"
           >
             <Share2 className="h-3.5 w-3.5" />
-          </button>
+          </RecapShareButton>
         )}
       </div>
-      {/* Visibility + deletion controls; realtime patches the row after each change. */}
+      {isDraft && (
+        <ReelPostCard
+          reelId={reel.id}
+          title={displayTitle}
+          currentCaption={reel.ai_caption}
+          currentHashtags={reel.ai_hashtags}
+          pkg={postPackage}
+          heldBySafety={!!reel.hidden_at}
+        />
+      )}
+
+      {isDone && reel.subject_child_id && <FamilyPostAudience reelId={reel.id} />}
+      {isDone && reel.subject_child_id && <FamilyShareLinks reelId={reel.id} />}
+
+      {/* Secondary actions live in one menu; realtime patches the row after each change. */}
       <div className="mt-2 flex items-center gap-2">
-        <button
-          onClick={async () => {
-            setManageBusy("hide");
-            try {
-              await setReelHidden({ data: { reelId: reel.id, hidden: !reel.hidden_at } });
-              toast.success(
-                reel.hidden_at
-                  ? "Reel is visible on your profile again"
-                  : "Reel hidden from your profile",
-              );
-            } catch (e: any) {
-              toast.error(e?.message ?? "Could not update this reel");
-            } finally {
-              setManageBusy(null);
-            }
-          }}
-          disabled={manageBusy !== null}
-          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
-          aria-label={reel.hidden_at ? "Show reel on profile" : "Hide reel from profile"}
-        >
-          {manageBusy === "hide" ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : reel.hidden_at ? (
-            <Eye className="h-3 w-3" />
-          ) : (
-            <EyeOff className="h-3 w-3" />
-          )}
-          {reel.hidden_at ? "Show on profile" : "Hide from profile"}
-        </button>
         {confirmDelete ? (
           <>
             <button
@@ -368,26 +447,45 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             </button>
           </>
         ) : (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            disabled={manageBusy !== null}
-            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-destructive disabled:opacity-50"
-            aria-label="Delete reel"
-          >
-            <Trash2 className="h-3 w-3" />
-            Delete
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                disabled={manageBusy !== null}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+                aria-label="More actions for this reel"
+              >
+                {manageBusy === "hide" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                )}
+                More
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {!isDraft && !reel.subject_child_id && (
+                <DropdownMenuItem onSelect={() => void toggleHidden()}>
+                  {reel.hidden_at ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  {reel.hidden_at ? "Show on profile" : "Hide from profile"}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onSelect={() => {
+                  setNameDraft(displayTitle);
+                  setRenaming(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="h-4 w-4" /> Delete…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-        <button
-          onClick={() => {
-            setNameDraft(displayTitle);
-            setRenaming(true);
-          }}
-          disabled={manageBusy !== null}
-          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
-        >
-          <Pencil className="h-3 w-3" /> Rename
-        </button>
       </div>
 
       {/* Name this highlight before it goes out on the public feed. */}
@@ -465,6 +563,21 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         />
       )}
 
+      {isDone &&
+        reel.ai_advanced_analytics &&
+        prior &&
+        (() => {
+          const followUp = compareToPrior(reel.ai_advanced_analytics!, {
+            id: "prior",
+            title: prior.title,
+            created_at: prior.created_at,
+            analytics: prior.analytics,
+          });
+          return followUp ? (
+            <ReelFollowUp followUp={followUp} drills={reel.ai_coaching?.drills ?? []} />
+          ) : null;
+        })()}
+
       {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
         <div className="mt-2">
           <button
@@ -477,11 +590,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           {showInsights && (
             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
               <p className="mb-2 text-[10px] italic text-muted-foreground">{AI_RESULTS_CAVEAT}</p>
-              {reel.ai_sport && (
-                <p className="micro-label text-lime">
-                  {reel.ai_sport}
-                </p>
-              )}
+              {reel.ai_sport && <p className="micro-label text-lime">{reel.ai_sport}</p>}
               {reel.ai_analysis?.summary && (
                 <p className="mt-1 text-xs text-muted-foreground">{reel.ai_analysis.summary}</p>
               )}
@@ -575,8 +684,23 @@ function ReelsPage() {
   const { isParentMode } = useParentMode();
   const navigate = useNavigate();
   const { can: canChildFeature } = useMyChildStatus();
+  const { cohort: myCohort } = useMyCohort();
   const uploadDecision = canChildFeature("video_upload");
-  const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
+  const {
+    game: gameId,
+    title: gameTitle,
+    upload: autoUpload,
+    child: childParam,
+  } = Route.useSearch();
+  // Family post: a parent's private clip of their under-13 child. Only a child this
+  // member is a verified guardian of counts; the database re-checks everything.
+  const { children: guardianChildren, isFetched: guardianChildrenLoaded } = useMyChildren();
+  const subjectChild = childParam
+    ? (guardianChildren.find(
+        (c) => c.childUserId === childParam &&
+          (c.cohort === "child_under_13" || c.cohort === "teen_13_15"),
+      ) ?? null)
+    : null;
   const {
     isActive,
     isPastDue,
@@ -671,6 +795,15 @@ function ReelsPage() {
   const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
+  // Earlier reels a clip can be compared with: the athlete's own finished, posted ones.
+  const trendPool = reels
+    .filter((r) => r.status === "completed" && !r.is_draft && !r.subject_child_id)
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      created_at: r.created_at,
+      analytics: r.ai_advanced_analytics,
+    }));
 
   const canGenerate = isActive || unlimitedReels || freeRemaining > 0;
   const lockedReason = !user
@@ -807,7 +940,16 @@ function ReelsPage() {
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(picked: File) {
+    let file = picked;
+    // Never fall back to an ordinary (potentially public) reel when the link asked
+    // for a family post but the guardian relationship can't be confirmed.
+    if (childParam && !subjectChild) {
+      toast.error(
+        "We couldn't confirm you're a parent or guardian of this child, so nothing was uploaded.",
+      );
+      return;
+    }
     if (!user) return;
     if (!uploadDecision.allowed) {
       toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
@@ -829,10 +971,41 @@ function ReelsPage() {
       const invalid = validateVideoSize({ bytes: file.size });
       if (invalid) throw new Error(invalid);
 
+      // The plan's clip limits, checked here so an over-limit clip is refused
+      // before minutes of conversion and upload. The server re-checks both on
+      // finalize; if this lookup fails, that check still stands.
+      const clipLimits: ClipLimits | null = await getMyClipLimits().catch(() => null);
+      const tooBig = clipLimits ? uploadSizeProblem(file.size, clipLimits) : null;
+      if (tooBig) throw new Error(tooBig);
+
       // What the clip actually is (length, size, which way up). Measured here
       // because the server runtime has no ffprobe; kept so a viewer's player and
       // a later support question both have the facts.
+      // A clip of a child leaves this device without its location, device or
+      // creation-time tags. Done before anything is stored, and the original is
+      // never kept: if it cannot be cleaned, nothing is uploaded.
+      if (subjectChild) {
+        await assertConverterReachable();
+        const cleanId = toast.loading("Removing location and device info… 0%");
+        const clean = await stripVideoMetadata(file, (r) =>
+          toast.loading(`Removing location and device info… ${Math.round(r * 100)}%`, {
+            id: cleanId,
+          }),
+        );
+        toast.dismiss(cleanId);
+        if (!clean) {
+          throw new Error(
+            "We couldn't remove the location info from this clip, so nothing was uploaded. Try a shorter clip, or a desktop browser.",
+          );
+        }
+        file = clean;
+      }
+
       const originalProbe = await probeVideo(file);
+      const tooLong = clipLimits
+        ? clipLengthProblem(originalProbe.durationSeconds, clipLimits)
+        : null;
+      if (tooLong) throw new Error(tooLong);
 
       // Convert BEFORE storing anything. This ordering is the whole fix: the
       // conversion used to run after the upload and after a container gate that
@@ -842,23 +1015,34 @@ function ReelsPage() {
       let playable: Blob = file;
       let converted = false;
       let processedInfo: (ProbedVideo & { bytes: number; pass: string }) | null = null;
-      const conversionAttempted = await needsPlaybackConversion(file);
+      // A clip over the plan's resolution is shrunk on the way through; the
+      // server refuses a served copy that is still too large.
+      const mustShrink = clipLimits ? exceedsResolution(originalProbe, clipLimits) : false;
+      const conversionAttempted = mustShrink || (await needsPlaybackConversion(file));
       if (conversionAttempted) {
         // Check the converter exists before promising anything. Without this a
         // missing wasm core reads as "your clip failed", sending the athlete off
         // to re-encode on a desktop over a problem only we can fix.
         await assertConverterReachable();
         const toastId = toast.loading("Making this clip play everywhere… 0%");
-        const result = await convertToPlayableMp4(file, (r, pass) =>
-          toast.loading(
-            pass === "standard"
-              ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
-              : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
-            { id: toastId },
-          ),
+        const result = await convertToPlayableMp4(
+          file,
+          (r, pass) =>
+            toast.loading(
+              pass === "standard"
+                ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
+                : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
+              { id: toastId },
+            ),
+          { maxLongEdge: clipLimits?.maxResolution },
         );
         if (!result) {
           toast.dismiss(toastId);
+          if (mustShrink && clipLimits) {
+            throw new Error(
+              `${resolutionProblem(originalProbe, clipLimits)} It couldn't be resized on this device. Record at a lower resolution, or try again on a desktop browser.`,
+            );
+          }
           // Every pass failed, so no copy of this clip would play. Refusing is
           // kinder than storing a reel that shows a dead player to everyone who
           // opens it; the two things that actually work are named so the athlete
@@ -878,7 +1062,7 @@ function ReelsPage() {
       }
 
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      let playbackPath: string | null = null;
+      const playbackPath: string | null = converted ? `${base}.h264.mp4` : null;
 
       // The original always lands at `base`. How it is finalized depends on
       // whether anything will ever play it: without a converted copy it IS the
@@ -887,22 +1071,54 @@ function ReelsPage() {
       // refusing exotic containers is the bug being fixed. Keeping it is not
       // sentimental — RepairPlaybackButton re-converts from `video_path`, so
       // discarding the original would make "Re-run fix" impossible.
-      const { error: upErr } = await supabase.storage
-        .from("highlight-videos")
-        .upload(base, file, { upsert: false });
-      if (upErr) throw upErr;
-      await finalizeVideoUpload({ data: { path: base, kind: converted ? "source" : "video" } });
+      //
+      // The two copies go up side by side, and the network transfer runs while
+      // the device measures movement and samples frames below, rather than each
+      // step waiting on the last. Finalizing still waits for both, in order: the
+      // playback copy's check removes the original if it fails.
+      const videoUpload = (async () => {
+        try {
+          const [orig, play] = await Promise.all([
+            supabase.storage.from("highlight-videos").upload(base, file, { upsert: false }),
+            playbackPath
+              ? supabase.storage
+                  .from("highlight-videos")
+                  .upload(playbackPath, playable, { upsert: true, contentType: "video/mp4" })
+              : Promise.resolve({ error: null }),
+          ]);
+          if (orig.error) throw orig.error;
+          if (play.error) throw play.error;
+          await finalizeVideoUpload({ data: { path: base, kind: converted ? "source" : "video" } });
+          // This is the copy the feed serves (`playback_path ?? video_path`), so
+          // it is the one that has to pass the sniff as a real MP4.
+          if (playbackPath) {
+            await finalizeVideoUpload({ data: { path: playbackPath, kind: "video" } });
+          }
+        } catch (e) {
+          // Both paths belong to this upload alone; don't leave either behind.
+          void supabase.storage
+            .from("highlight-videos")
+            .remove(playbackPath ? [base, playbackPath] : [base])
+            .catch(() => {});
+          throw e;
+        }
+      })();
+      // Awaited below; this only stops a failure surfacing as unhandled meanwhile.
+      videoUpload.catch(() => {});
 
-      if (converted) {
-        // This is the copy the feed serves (`playback_path ?? video_path`), so
-        // it is the one that has to pass the sniff as a real MP4.
-        const p = `${base}.h264.mp4`;
-        const { error: playErr } = await supabase.storage
-          .from("highlight-videos")
-          .upload(p, playable, { upsert: true, contentType: "video/mp4" });
-        if (playErr) throw playErr;
-        await finalizeVideoUpload({ data: { path: p, kind: "video" } });
-        playbackPath = p;
+      // Optional body tracking: adults and 16-17 only, never family clips. Only the
+      // summary is kept; a null result simply leaves pose out of the record.
+      let pose: PoseMetrics | null = null;
+      if (!subjectChild && poseAllowedForCohort(myCohort)) {
+        const poseToast = toast.loading("Measuring movement…");
+        try {
+          const { capturePoseMetrics } = await import("@/lib/pose-capture");
+          pose = await capturePoseMetrics(playable as File);
+        } catch {
+          pose = null;
+        } finally {
+          toast.dismiss(poseToast);
+        }
       }
       const mediaMeta = buildMediaMeta({
         file: { name: file.name, type: file.type, size: file.size },
@@ -912,6 +1128,7 @@ function ReelsPage() {
         // rather than stored, so a saved reel is always "ready" or "original"
         // and never "failed".
         conversionAttempted,
+        pose,
       });
 
       // Sample frames + audio in the browser: they become the real thumbnail and
@@ -922,30 +1139,41 @@ function ReelsPage() {
       // browser can't play, so on an .avi or .mkv the original would yield no
       // thumbnail and no AI input — converting first fixes those too, not just
       // playback.
-      const framePaths: string[] = [];
-      const frameTimes: number[] = [];
       const clipForFrames = converted
         ? new File([playable], `${file.name}.h264.mp4`, { type: "video/mp4" })
         : file;
-      const { frames, audio } = await captureClip(clipForFrames);
-      for (let i = 0; i < frames.length; i++) {
-        const framePath = `${base}.frame${i + 1}.jpg`;
-        const { error } = await supabase.storage
-          .from("highlight-videos")
-          .upload(framePath, frames[i].blob, { upsert: true, contentType: "image/jpeg" });
-        if (!error) {
-          framePaths.push(framePath);
-          frameTimes.push(frames[i].t);
-        }
-      }
-      let audioPath: string | null = null;
-      if (audio) {
-        const p = `${base}.audio.wav`;
-        const { error } = await supabase.storage
-          .from("highlight-videos")
-          .upload(p, audio, { upsert: true, contentType: "audio/wav" });
-        if (!error) audioPath = p;
-      }
+      // Paying members get a denser look (more frames) for Pro Analytics. In free mode
+      // everyone is "active", so that alone does not count.
+      const { frames, audio } = await captureClip(clipForFrames, {
+        dense: isActive && !access.freeMode,
+      });
+
+      // Nothing derived is stored for a clip the server refused.
+      await videoUpload;
+
+      // Frames and audio upload together; one that fails is simply left out.
+      const [frameResults, audioPath] = await Promise.all([
+        Promise.all(
+          frames.map(async (frame, i) => {
+            const framePath = `${base}.frame${i + 1}.jpg`;
+            const { error } = await supabase.storage
+              .from("highlight-videos")
+              .upload(framePath, frame.blob, { upsert: true, contentType: "image/jpeg" });
+            return error ? null : { path: framePath, t: frame.t };
+          }),
+        ),
+        (async () => {
+          if (!audio) return null;
+          const p = `${base}.audio.wav`;
+          const { error } = await supabase.storage
+            .from("highlight-videos")
+            .upload(p, audio, { upsert: true, contentType: "audio/wav" });
+          return error ? null : p;
+        })(),
+      ]);
+      const uploadedFrames = frameResults.filter((f) => f !== null);
+      const framePaths = uploadedFrames.map((f) => f.path);
+      const frameTimes = uploadedFrames.map((f) => f.t);
 
       const usedFree = !isActive;
       // Link to the game the athlete came from, or the auto-detected one.
@@ -955,31 +1183,44 @@ function ReelsPage() {
           ? { id: autoGame.id, title: autoGame.title, sport: autoGame.sport }
           : null;
       const chosenTitle = titleDraft.trim();
-      const { data: inserted, error: insErr } = await supabase
+      const reelRow = {
+        user_id: user.id,
+        title:
+          chosenTitle ||
+          (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
+        video_path: base,
+        playback_path: playbackPath,
+        media_meta: mediaMeta,
+        status: "processing",
+        used_free: usedFree,
+        environment: env,
+        game_id: linkedGame?.id ?? null,
+        game_title: linkedGame?.title ?? null,
+        // Seed the sport from the linked game so the public card is right even
+        // before the AI pass finishes; the pipeline refines it afterwards.
+        ai_sport: linkedGame?.sport ?? null,
+        frame_paths: framePaths.length > 0 ? framePaths : null,
+        frame_times: frameTimes.length > 0 ? frameTimes : null,
+        audio_path: audioPath,
+        style_prefs: styleRef.current,
+        ...(subjectChild ? { subject_child_id: subjectChild.childUserId } : {}),
+      };
+      // Starts private to its owner; they review it and tap Post. If the database
+      // predates drafts, fall back to the old behaviour rather than failing the upload.
+      let insertRes = await supabase
         .from("highlight_reels")
-        .insert({
-          user_id: user.id,
-          title:
-            chosenTitle ||
-            (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
-          video_path: base,
-          playback_path: playbackPath,
-          media_meta: mediaMeta,
-          status: "processing",
-          used_free: usedFree,
-          environment: env,
-          game_id: linkedGame?.id ?? null,
-          game_title: linkedGame?.title ?? null,
-          // Seed the sport from the linked game so the public card is right even
-          // before the AI pass finishes; the pipeline refines it afterwards.
-          ai_sport: linkedGame?.sport ?? null,
-          frame_paths: framePaths.length > 0 ? framePaths : null,
-          frame_times: frameTimes.length > 0 ? frameTimes : null,
-          audio_path: audioPath,
-          style_prefs: styleRef.current,
-        } as any)
+        // A family post is never public, so it skips the review-and-post step.
+        .insert((subjectChild ? reelRow : { ...reelRow, is_draft: true }) as any)
         .select("id")
         .maybeSingle();
+      if (insertRes.error && /is_draft/i.test(insertRes.error.message ?? "")) {
+        insertRes = await supabase
+          .from("highlight_reels")
+          .insert(reelRow as any)
+          .select("id")
+          .maybeSingle();
+      }
+      const { data: inserted, error: insErr } = insertRes;
       if (insErr) throw insErr;
 
       setTitleDraft("");
@@ -989,7 +1230,7 @@ function ReelsPage() {
       toast.error(
         e instanceof ConverterUnavailableError
           ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
-          : (e?.message ?? "Upload failed"),
+          : (familyPostErrorMessage(e) ?? e?.message ?? "Upload failed"),
       );
     } finally {
       setBusy(false);
@@ -1066,9 +1307,7 @@ function ReelsPage() {
 
       {gameId && (
         <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
-          <p className="micro-label text-lime">
-            Recap for finished game
-          </p>
+          <p className="micro-label text-lime">Recap for finished game</p>
           <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {gameReels.length > 0
@@ -1078,7 +1317,7 @@ function ReelsPage() {
         </section>
       )}
 
-      {/* Nothing is being charged while ballaCity is free, so a past-due
+      {/* Nothing is being charged while BallaCity is free, so a past-due
           warning would be alarming and meaningless. */}
       {isPastDue && access.showUpgradePrompts && (
         <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
@@ -1086,90 +1325,6 @@ function ReelsPage() {
           Payment past due — we're retrying. Update your card to avoid losing access.
         </div>
       )}
-
-      <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
-        {subLoading ? (
-          <p className="text-sm text-muted-foreground">Loading plan…</p>
-        ) : access.freeMode ? (
-          <div>
-            <p className="text-sm font-semibold text-lime">
-              Unlimited reels · Free{access.freeUntil ? " — limited time" : ""}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {access.notice}
-              {/* Same date as /plans, from the same resolved value, so the two
-                  screens can never tell a member different things. */}
-              {access.freeUntil ? ` Free through ${formatFullDay(access.freeUntil)}.` : ""}
-            </p>
-          </div>
-        ) : isActive ? (
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-lime">ballaCity+ · Unlimited reels</p>
-              <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
-            </div>
-            <button
-              onClick={handleManageBilling}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs"
-            >
-              Manage <ExternalLink className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">Free trial</p>
-                <p className="text-xs text-muted-foreground">
-                  {freeRemaining} of {freeAllowance} free reels left
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {freeUsed}/{freeAllowance} used
-              </span>
-            </div>
-            {/* No upgrade button on a build that cannot take a payment — it
-                would only lead to a checkout that immediately fails. */}
-            {paymentsConfigured && access.showUpgradePrompts && (
-              <button
-                onClick={handleSubscribe}
-                className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
-              >
-                {freeRemaining > 0
-                  ? `Upgrade to unlimited · ${plusPriceLabel}`
-                  : `Subscribe · ${plusPriceLabel}`}
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* In free mode `isActive` is true for everyone, which would hide this
-          list entirely — so key it on whether anything is actually sold. */}
-      {(access.freeMode || !isActive) && (
-        <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="mb-3 text-sm font-semibold">
-            {access.freeMode ? "Your account includes" : "Free account includes"}
-          </h2>
-          <ul className="space-y-2">
-            {freeTierFor(monetization).features.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <ReelStylePanel
-        value={style}
-        sport={activeSport}
-        onChange={(next) => {
-          setStyle(next);
-          saveReelStyleForSport(activeSport, next);
-        }}
-        disabled={busy}
-      />
 
       <section className="mx-5 mb-6">
         {/* Name the highlight before publishing — this is the title shown on the
@@ -1223,6 +1378,25 @@ function ReelsPage() {
           </label>
         )}
 
+        {subjectChild && (
+          <div className="mb-3 rounded-xl border border-lime/40 bg-lime/5 p-3">
+            <p className="micro-label text-lime">Family post</p>
+            <p className="mt-1 text-xs font-semibold">A clip of {subjectChild.displayName}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Guardian only by default. You can share it with your child's verified team and coaches after upload. It is never shown on the highlights feed, on a profile, or to
+              other members. Every clip is analysed by AI, which you control in the Parent Center.
+            </p>
+          </div>
+        )}
+        {childParam && guardianChildrenLoaded && !subjectChild && (
+          <p className="mb-3 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+            We couldn&apos;t confirm you&apos;re a parent or guardian of this child, so uploads are
+            paused. Open this from the Parent Center.
+          </p>
+        )}
+
+        <ReelPrivacyPanel cohort={subjectChild ? subjectChild.cohort : myCohort} familyPost={!!subjectChild} />
+
         <AiDisclosureNotice />
 
         <input
@@ -1275,10 +1449,32 @@ function ReelsPage() {
         )}
       </section>
 
-      <section className="mx-5 pb-24">
+      {/* The look is remembered per sport, so it starts collapsed: the upload is
+          the first thing on the page. */}
+      <details className="group mb-5">
+        <summary className="mx-5 mb-2 flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5 text-xs font-semibold text-muted-foreground">
+          <span>
+            Reel style · <span className="text-lime">{reelStyleSummary(style)}</span>
+          </span>
+          <span className="text-[10px] font-semibold text-lime group-open:hidden">Change</span>
+        </summary>
+        <ReelStylePanel
+          value={style}
+          sport={activeSport}
+          onChange={(next) => {
+            setStyle(next);
+            saveReelStyleForSport(activeSport, next);
+          }}
+          disabled={busy}
+        />
+      </details>
+
+      <section className="mx-5 mb-5">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {gameId ? "Recaps for this game" : "Your reels"}
         </h2>
+        {!gameId && <ReelProgress reels={reels} />}
+        {!gameId && <AnalyticsCoachShare className="mb-4" />}
         {visibleReels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {gameId
@@ -1287,9 +1483,36 @@ function ReelsPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {visibleReels.map((r) => (
-              <ReelCard key={r.id} reel={r} onRetry={kickOffProcessing} />
-            ))}
+            {visibleReels.map((r) => {
+              const found =
+                r.ai_advanced_analytics && !r.subject_child_id
+                  ? findPriorReel(
+                      {
+                        id: r.id,
+                        title: r.title,
+                        created_at: r.created_at,
+                        analytics: r.ai_advanced_analytics,
+                      },
+                      trendPool,
+                    )
+                  : null;
+              return (
+                <ReelCard
+                  key={r.id}
+                  reel={r}
+                  onRetry={kickOffProcessing}
+                  prior={
+                    found && found.analytics
+                      ? {
+                          title: found.title,
+                          created_at: found.created_at,
+                          analytics: found.analytics,
+                        }
+                      : null
+                  }
+                />
+              );
+            })}
           </ul>
         )}
         {gameId && reels.length > gameReels.length && (
@@ -1302,6 +1525,86 @@ function ReelsPage() {
           </Link>
         )}
       </section>
+
+      {/* Plan and what the account includes: needed rarely, so it sits below the reels. */}
+      <details className="mx-5 pb-24">
+        <summary className="mb-3 cursor-pointer list-none text-xs font-semibold text-muted-foreground">
+          Your plan &amp; what&apos;s included
+        </summary>
+        <section className="mb-5 rounded-2xl border border-border bg-surface p-5">
+          {subLoading ? (
+            <p className="text-sm text-muted-foreground">Loading plan…</p>
+          ) : access.freeMode ? (
+            <div>
+              <p className="text-sm font-semibold text-lime">
+                Unlimited reels · Free{access.freeUntil ? " — limited time" : ""}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {access.notice}
+                {/* Same date as /plans, from the same resolved value, so the two
+                  screens can never tell a member different things. */}
+                {access.freeUntil ? ` Free through ${formatFullDay(access.freeUntil)}.` : ""}
+              </p>
+            </div>
+          ) : isActive ? (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-lime">BallaCity+ · Unlimited reels</p>
+                <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
+              </div>
+              <button
+                onClick={handleManageBilling}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs"
+              >
+                Manage <ExternalLink className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Free trial</p>
+                  <p className="text-xs text-muted-foreground">
+                    {freeRemaining} of {freeAllowance} free reels left
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {freeUsed}/{freeAllowance} used
+                </span>
+              </div>
+              {/* No upgrade button on a build that cannot take a payment — it
+                would only lead to a checkout that immediately fails. */}
+              {paymentsConfigured && access.showUpgradePrompts && (
+                <button
+                  onClick={handleSubscribe}
+                  className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
+                >
+                  {freeRemaining > 0
+                    ? `Upgrade to unlimited · ${plusPriceLabel}`
+                    : `Subscribe · ${plusPriceLabel}`}
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* In free mode `isActive` is true for everyone, which would hide this
+          list entirely — so key it on whether anything is actually sold. */}
+        {(access.freeMode || !isActive) && (
+          <section className="mb-5 rounded-2xl border border-border bg-surface p-5">
+            <h2 className="mb-3 text-sm font-semibold">
+              {access.freeMode ? "Your account includes" : "Free account includes"}
+            </h2>
+            <ul className="space-y-2">
+              {freeTierFor(monetization).features.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </details>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -21,9 +22,11 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import {
   getConversationOther,
   listMessages,
+  upsertMessages,
   markConversationRead,
   sendMessage,
   uploadMessageAttachment,
+  discardMessageAttachment,
   unsendMessage,
   acceptConversation,
   declineConversation,
@@ -34,6 +37,14 @@ import {
   type Message,
   type MessageReaction,
 } from "@/lib/messages";
+import { compressImageForUpload } from "@/lib/image-compress";
+import {
+  createAttachmentUploader,
+  IDLE_UPLOADER,
+  isAbortError,
+  type AttachmentUploader,
+  type UploaderState,
+} from "@/lib/attachment-uploader";
 import { MessageAttachment } from "@/components/MessageAttachment";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
@@ -42,10 +53,14 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () =>
     pageHead({
-      title: "Chat — ballaCity",
-      description: "A private ballaCity conversation.",
+      title: "Chat — BallaCity",
+      description: "A private BallaCity conversation.",
       noindex: true,
     }),
+  // `draft` pre-fills the composer (e.g. a host nudging a player from the game
+  // roster). It is never sent automatically — the user still taps Send.
+  validateSearch: (s: Record<string, unknown>): { draft?: string } =>
+    typeof s.draft === "string" && s.draft.trim() ? { draft: s.draft.slice(0, 1000) } : {},
   component: Thread,
 });
 
@@ -58,6 +73,7 @@ type Other = {
 
 function Thread() {
   const { conversationId } = Route.useParams();
+  const { draft } = Route.useSearch();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { can: canChildFeature } = useMyChildStatus();
@@ -66,24 +82,48 @@ function Thread() {
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [other, setOther] = useState<Other | null>(null);
   const [isRequest, setIsRequest] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(draft ?? "");
   const [sending, setSending] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  // The picked attachment and its background upload; see attachment-uploader.
+  const [attach, setAttach] = useState<UploaderState>(IDLE_UPLOADER);
+  const pendingFile = attach.file;
+  const preparing = attach.phase === "preparing";
+  const uploading = preparing || attach.phase === "uploading";
+  const uploadPct = attach.pct;
+  const uploadError = attach.phase === "failed" ? attach.error : null;
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [reportMsg, setReportMsg] = useState<Message | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherPresent, setOtherPresent] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const uploaderRef = useRef<AttachmentUploader | null>(null);
+  const sendingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+
+  // One uploader per thread: a picked file's storage path embeds the
+  // conversation id, so it cannot follow the sender into another thread.
+  // Leaving stops any upload and removes a file that was never sent.
+  useEffect(() => {
+    const uploader = createAttachmentUploader(
+      {
+        compress: compressImageForUpload,
+        upload: (file, opts) => uploadMessageAttachment(conversationId, file, opts),
+        discard: discardMessageAttachment,
+      },
+      setAttach,
+    );
+    uploaderRef.current = uploader;
+    return () => {
+      uploader.dispose();
+      uploaderRef.current = null;
+      setAttach(IDLE_UPLOADER);
+    };
+  }, [conversationId]);
 
   const msgById = useMemo(() => {
     const m = new Map<string, Message>();
@@ -113,6 +153,8 @@ function Thread() {
   useEffect(() => {
     if (loading || !user) return;
     let cancelled = false;
+    // Messages of the thread we just left must not linger once loads merge by id.
+    setMsgs([]);
     (async () => {
       try {
         const [m, o, conv] = await Promise.all([
@@ -125,7 +167,9 @@ function Thread() {
             .maybeSingle(),
         ]);
         if (cancelled) return;
-        setMsgs(m);
+        // Merge rather than replace: a realtime message can land while this
+        // fetch is in flight, and replacing would drop it.
+        setMsgs((prev) => upsertMessages(prev, m));
         setOther(o);
         const accepted: string[] = ((conv.data as any)?.accepted_by ?? []) as string[];
         setIsRequest(!accepted.includes(user.id));
@@ -135,6 +179,18 @@ function Thread() {
         toast.error(e.message);
       }
     })();
+
+    let hasSubscribed = false;
+    const catchUp = async () => {
+      try {
+        const m = await listMessages(conversationId);
+        if (cancelled) return;
+        setMsgs((prev) => upsertMessages(prev, m));
+        void markConversationRead(conversationId);
+      } catch {
+        /* the next event or return to the tab tries again */
+      }
+    };
 
     const channel = supabase.channel(`thread-${conversationId}`, {
       config: { presence: { key: user.id } },
@@ -151,7 +207,12 @@ function Thread() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          setMsgs((prev) => [...prev, payload.new as Message]);
+          const added = payload.new as Message;
+          // The sender's own message is added when it is saved, and then
+          // arrives here again as the realtime echo.
+          setMsgs((prev) =>
+            prev.some((x) => x.id === added.id) ? prev : upsertMessages(prev, [added]),
+          );
           markConversationRead(conversationId);
         },
       )
@@ -206,11 +267,22 @@ function Thread() {
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ typing: false, at: Date.now() });
+          // Joined again after a drop (a locked phone, a network change):
+          // anything sent in the gap never arrived as an event, so fetch it.
+          if (hasSubscribed) void catchUp();
+          hasSubscribed = true;
         }
       });
 
+    // Coming back to the tab is the other moment events may have been missed.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void catchUp();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       if (typingTimer.current) clearTimeout(typingTimer.current);
       supabase.removeChannel(channel);
       channelRef.current = null;
@@ -227,6 +299,19 @@ function Thread() {
     isTypingRef.current = typing;
     channelRef.current?.track({ typing, at: Date.now() });
   };
+
+  // The draft lives in component state once loaded; drop it from the URL so a
+  // refresh after sending doesn't pre-fill the same message again.
+  useEffect(() => {
+    if (!draft) return;
+    navigate({
+      to: "/messages/$conversationId",
+      params: { conversationId },
+      search: {},
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTextChange = (v: string) => {
     setText(v);
@@ -245,88 +330,76 @@ function Thread() {
     );
   }
 
+  // Can anything be sent from this thread right now? In a message request, or
+  // while a guardian's approval is pending, it cannot — so a picked file waits
+  // for Send there instead of uploading something that may never go out.
+  const canSendNow = !isRequest && messagingDecision.allowed;
+
   const onPickFile = (file: File | null) => {
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) {
       toast.error("Max attachment size is 20MB.");
       return;
     }
-    setPendingFile(file);
-    setUploadError(null);
-    setUploadPct(0);
+    // A finished upload is being turned into a message; swapping the file now
+    // would delete the one that message points at.
+    if (sendingRef.current && !uploading) return;
+    // Start uploading straight away so the transfer overlaps with typing and
+    // Send has little or nothing left to wait for.
+    uploaderRef.current?.pick(file, canSendNow);
   };
 
-  const cancelUpload = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setUploading(false);
-    setUploadPct(0);
-  };
+  const cancelUpload = () => uploaderRef.current?.cancel();
 
   const clearPending = () => {
-    cancelUpload();
-    setPendingFile(null);
-    setUploadError(null);
+    if (sendingRef.current && !uploading) return;
+    uploaderRef.current?.clear();
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const doUpload = async (file: File) => {
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    setUploading(true);
-    setUploadError(null);
-    setUploadPct(0);
-    try {
-      const attachment = await uploadMessageAttachment(conversationId, file, {
-        signal: ctrl.signal,
-        onProgress: (p) => setUploadPct(p),
-      });
-      return attachment;
-    } finally {
-      abortRef.current = null;
-      setUploading(false);
-    }
-  };
-
-  const retryUpload = async () => {
-    if (!pendingFile) return;
-    try {
-      await doUpload(pendingFile);
-    } catch (e: any) {
-      if (e?.name !== "AbortError") setUploadError(e?.message ?? "Upload failed");
-    }
-  };
+  const retryUpload = () => uploaderRef.current?.retry();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter can fire again while the first send is still going; the Send
+    // button is disabled by then, the key is not.
+    if (sendingRef.current) return;
+    const uploader = uploaderRef.current;
+    if (!uploader) return;
     if (!text.trim() && !pendingFile) return;
-    if (uploading) return;
     if (!messagingDecision.allowed) {
       toast.error(
         messagingDecision.reason || "A parent or guardian must approve this account first.",
       );
       return;
     }
+    sendingRef.current = true;
     setSending(true);
     try {
-      let attachment = null;
-      if (pendingFile) attachment = await doUpload(pendingFile);
-      await sendMessage(conversationId, text, attachment, { replyToId: replyTo?.id ?? null });
+      // Usually already uploaded while the sender was typing; otherwise this
+      // waits for the upload in progress, or starts one.
+      const attachment = await uploader.ensure();
+      const sent = await sendMessage(conversationId, text, attachment, {
+        replyToId: replyTo?.id ?? null,
+      });
+      uploader.release();
+      // Show it now; the realtime echo of the same row is ignored by id.
+      if (sent) setMsgs((prev) => upsertMessages(prev, [sent]));
       setText("");
       setReplyTo(null);
-      setPendingFile(null);
-      setUploadError(null);
-      setUploadPct(0);
       setTypingState(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e: any) {
-      if (e?.name === "AbortError") {
+      if (isAbortError(e)) {
         toast.message("Upload cancelled");
       } else {
-        setUploadError(e?.message ?? "Send failed");
-        toast.error(e.message);
+        // A minor-messaging refusal at send time carries a reason code;
+        // never show the raw sentinel. A failed upload also shows on the
+        // attachment itself, with a retry.
+        toast.error(describeMessagingError(e, "Send failed", "chat"));
       }
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -740,11 +813,13 @@ function Thread() {
               <Paperclip className="h-3.5 w-3.5 shrink-0" />
               <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
               <span className="opacity-60 shrink-0">
-                {uploading
-                  ? `${uploadPct}%`
-                  : uploadError
-                    ? "Failed"
-                    : `${(pendingFile.size / 1024).toFixed(0)} KB`}
+                {preparing
+                  ? "Preparing…"
+                  : uploading
+                    ? `${uploadPct}%`
+                    : uploadError
+                      ? "Failed"
+                      : `${(pendingFile.size / 1024).toFixed(0)} KB`}
               </span>
               {uploading ? (
                 <button
@@ -768,8 +843,9 @@ function Thread() {
                   <button
                     type="button"
                     onClick={clearPending}
+                    disabled={sending}
                     aria-label="Remove attachment"
-                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background disabled:opacity-40"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -778,14 +854,15 @@ function Thread() {
                 <button
                   type="button"
                   onClick={clearPending}
+                  disabled={sending}
                   aria-label="Remove attachment"
-                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background disabled:opacity-40"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
-            {uploading && (
+            {uploading && !preparing && (
               <div className="h-1 rounded-full bg-background overflow-hidden">
                 <div
                   className="h-full bg-lime-gradient transition-all"
@@ -800,8 +877,9 @@ function Thread() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
             aria-label="Attach file"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface disabled:opacity-50"
           >
             <Paperclip className="h-4 w-4" />
           </button>
@@ -834,20 +912,12 @@ function Thread() {
           <button
             type="submit"
             disabled={
-              sending ||
-              uploading ||
-              isRequest ||
-              !messagingDecision.allowed ||
-              (!text.trim() && !pendingFile)
+              sending || isRequest || !messagingDecision.allowed || (!text.trim() && !pendingFile)
             }
             aria-label="Send"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
           >
-            {sending || uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </div>
       </form>

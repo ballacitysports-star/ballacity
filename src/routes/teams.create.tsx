@@ -8,8 +8,8 @@ export const Route = createFileRoute("/teams/create")({
   head: () =>
     pageHead({
       path: "/teams/create",
-      title: "Create a team profile — ballaCity",
-      description: "Set up your team on ballaCity to host games and manage your roster.",
+      title: "Create a team profile — BallaCity",
+      description: "Set up your team on BallaCity to host games and manage your roster.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmAction } from "./ConfirmAction";
+import { LandingListingsPanel } from "./LandingListingsPanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
 
 /**
@@ -32,10 +33,20 @@ import { sendTestPushToSelf } from "@/lib/push.functions";
  * other key keeps the raw editor, which is the escape hatch when a structured
  * UI cannot express something.
  */
-const STRUCTURED_KEYS = new Set(["monetization"]);
+const STRUCTURED_KEY_TABS: Record<string, string> = {
+  monetization: "Monetization",
+  landing_listings: "Ops & config",
+  ai_features: "AI controls",
+  ai_limits: "AI controls",
+  ai_provider: "AI controls",
+};
+const STRUCTURED_KEYS = new Set(Object.keys(STRUCTURED_KEY_TABS));
+
+// Keys whose editor is a card on this tab, so no pointer is needed.
+const EDITED_ON_THIS_TAB = new Set(["landing_listings"]);
 
 const STRUCTURED_KEYS_PRESENT = (rows: { key: string }[]) =>
-  rows.map((r) => r.key).filter((k) => STRUCTURED_KEYS.has(k));
+  rows.map((r) => r.key).filter((k) => STRUCTURED_KEYS.has(k) && !EDITED_ON_THIS_TAB.has(k));
 
 export function OpsTab() {
   const qc = useQueryClient();
@@ -95,6 +106,8 @@ export function OpsTab() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
+      <LandingListingsPanel />
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Feature flags & settings</CardTitle>
@@ -127,8 +140,8 @@ export function OpsTab() {
               className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground"
             >
               <span className="font-mono">{key}</span> is edited on the{" "}
-              <span className="font-medium">Monetization</span> tab, which understands its shape.
-              Editing it as raw JSON here would be easy to get wrong.
+              <span className="font-medium">{STRUCTURED_KEY_TABS[key]}</span> tab, which understands
+              its shape. Editing it as raw JSON here would be easy to get wrong.
             </div>
           ))}
 
@@ -221,7 +234,7 @@ export function OpsTab() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Live queues</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-xs">
           <Queue
             title="Join requests"
             rows={queues.data?.joins ?? []}
@@ -231,11 +244,6 @@ export function OpsTab() {
             title="Position waitlist"
             rows={queues.data?.waitlist ?? []}
             render={(r: any) => `${r.game_id} · ${r.position} · ${r.status}`}
-          />
-          <Queue
-            title="Highlight reels"
-            rows={queues.data?.reels ?? []}
-            render={(r: any) => `${r.title} · ${r.status} (${r.processing_step})`}
           />
           <Queue
             title="Org member requests"

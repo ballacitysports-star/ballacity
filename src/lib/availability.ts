@@ -5,6 +5,7 @@ import {
   parseTimeSlots,
   type TimeSlot,
 } from "./availability-timeslots";
+import type { AvailabilityIntent } from "./availability-levels";
 
 export type PlaceGeo = {
   lat: number;
@@ -21,6 +22,10 @@ export type PlayerAvailability = {
   user_id: string;
   sports: string[];
   skill_level: string;
+  /** Tiers per sport ({ sport: "Tier · Tier" }); see availability-levels. */
+  skill_levels: Record<string, string>;
+  /** Whether the player wants to play as a guest, try out for a team, or both. */
+  looking_for: AvailabilityIntent[];
   starts_on: string | null;
   ends_on: string | null;
   recurring_days: string[];
@@ -204,6 +209,8 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
     user_id: u.user.id,
     sports: input.sports ?? [],
     skill_level: input.skill_level ?? "All Levels",
+    skill_levels: input.skill_levels ?? {},
+    looking_for: input.looking_for ?? [],
     ...slotFields(input),
     city: input.city?.trim() || null,
     place_id: input.place_id ?? null,

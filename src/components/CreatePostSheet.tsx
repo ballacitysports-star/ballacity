@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { heldNotice } from "@/lib/post-moderation";
 import {
   Dialog,
   DialogContent,
@@ -12,18 +13,24 @@ import {
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
+import { ImageUploader } from "@/components/ImageUploader";
+import { DraftWithAi } from "@/components/DraftWithAi";
+import { useAuth } from "@/hooks/use-auth";
 import { createTeamPost } from "@/lib/team-posts.functions";
-import type { PostKind } from "@/lib/sample-data";
-import { POST_KIND_META } from "@/lib/sample-data";
+import type { PostKind, Sport } from "@/lib/sample-data";
+import { POST_KIND_META, toStoredCover } from "@/lib/sample-data";
 
 const KINDS: PostKind[] = ["announcement", "tryout", "pickup", "clinic", "recap"];
 
 export function CreatePostSheet({
   teamId,
+  sports = [],
   open,
   onOpenChange,
 }: {
   teamId: string;
+  /** The team's sports: their built-in covers are offered first as presets. */
+  sports?: Sport[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -40,15 +47,19 @@ export function CreatePostSheet({
   } | null>(null);
   const [price, setPrice] = useState("");
   const [spotsMax, setSpotsMax] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const { user } = useAuth();
   const [err, setErr] = useState<string | null>(null);
 
   const qc = useQueryClient();
   const createFn = useServerFn(createTeamPost);
   const mutation = useMutation({
     mutationFn: createFn,
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["team-posts", teamId] });
-      toast.success("Post published");
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success("Post published");
       setTitle("");
       setBody("");
       setEventDate("");
@@ -56,6 +67,7 @@ export function CreatePostSheet({
       setLocationGeo(null);
       setPrice("");
       setSpotsMax("");
+      setImageUrl("");
       setErr(null);
       onOpenChange(false);
     },
@@ -87,6 +99,8 @@ export function CreatePostSheet({
         lng: isEvent ? (locationGeo?.lng ?? null) : null,
         price: isEvent && price !== "" ? Number(price) : null,
         spotsMax: isEvent && spotsMax !== "" ? Number(spotsMax) : null,
+        // Built-in covers are sent by name; uploads by their storage URL.
+        imageUrl: imageUrl ? toStoredCover(imageUrl) : null,
       },
     });
   };
@@ -141,6 +155,17 @@ export function CreatePostSheet({
               className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm"
               maxLength={4000}
             />
+            <div className="mt-1.5">
+              <DraftWithAi
+                kind={kind}
+                title={title}
+                body={body}
+                onApply={(d) => {
+                  setTitle(d.title);
+                  setBody(d.body);
+                }}
+              />
+            </div>
           </div>
 
           {isEvent && (
@@ -206,6 +231,24 @@ export function CreatePostSheet({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Cover image (optional)
+            </label>
+            <div className="mt-1.5">
+              <ImageUploader
+                kind="cover"
+                bucket="team-covers"
+                pathPrefix={user?.id}
+                value={imageUrl}
+                onChange={setImageUrl}
+                onClear={() => setImageUrl("")}
+                presets={sports}
+                allowBgRemoval={false}
+              />
+            </div>
+          </div>
 
           {err && (
             <div className="rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">

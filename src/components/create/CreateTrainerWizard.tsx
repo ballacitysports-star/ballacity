@@ -325,6 +325,8 @@ export function CreateTrainerWizard() {
     verified: false,
     cover: draft.coverUrl ?? HERO_IMAGE,
     avatar: draft.avatarUrl ?? initials(draft.name || "OR"),
+    avatarUrl: draft.avatarUrl ?? undefined,
+    avatarInitials: initials(draft.name || "OR"),
     accent: "#a3ff12",
     followers: 0,
     roster: 0,
@@ -559,6 +561,7 @@ export function CreateTrainerWizard() {
               <Section title="Cover image (optional)">
                 <ImageUploader
                   kind="cover"
+                  bannerPreview
                   bucket="team-covers"
                   pathPrefix={user?.id}
                   value={draft.coverUrl ?? ""}
@@ -761,7 +764,7 @@ export function CreateTrainerWizard() {
                           orgResults.data.length === 0 &&
                           !orgResults.isLoading && (
                             <div className="text-[11px] text-muted-foreground">
-                              No match on ballaCity.
+                              No match on BallaCity.
                             </div>
                           )}
                         {placesResults.data?.suggestions &&

@@ -113,7 +113,7 @@ export function FacilityTrainerCard(props: CardProps) {
                 </span>
               </span>
             ) : (
-              <span>New on ballaCity</span>
+              <span>New on BallaCity</span>
             )}
             {city && (
               <span className="inline-flex items-center gap-1">
@@ -196,7 +196,7 @@ export function FacilityTrainerCard(props: CardProps) {
       </div>
       {!live && (
         <p className="mt-3 text-[11px] text-muted-foreground">
-          A sample profile showing how a trainer and a facility connect on ballaCity.
+          A sample profile showing how a trainer and a facility connect on BallaCity.
         </p>
       )}
     </article>

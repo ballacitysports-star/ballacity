@@ -163,11 +163,20 @@ export function matchesSportSkillFilter(
   postSkill: string | null | undefined,
   sports: string[],
   skills: SportSkillMap,
+  /**
+   * Tiers the post itself picked for a sport. These always count, alongside
+   * the author's profile tier, because the player chose them for this post.
+   */
+  postTiers?: (sport: string) => string[],
 ): boolean {
+  const postHas = (sportList: string[], tier: string) =>
+    !!postTiers && sportList.some((s) => postTiers(s).includes(tier));
   if (sports.length === 0) {
     const wantedAny = Object.values(skills).flatMap((v) => v.split(/·/).map((t) => t.trim()));
     if (wantedAny.length === 0) return true;
-    return wantedAny.some((w) => levelMatchesFilter(authorSportLevels, postSports, postSkill, w));
+    return wantedAny.some(
+      (w) => postHas(postSports, w) || levelMatchesFilter(authorSportLevels, postSports, postSkill, w),
+    );
   }
   const overlap = sports.filter((s) => postSports.some((p) => p.toLowerCase() === s.toLowerCase()));
   if (overlap.length === 0) return false;
@@ -175,8 +184,8 @@ export function matchesSportSkillFilter(
   if (constrained.length === 0) return true;
   // Any selected sport whose tier matches is enough (OR across sports).
   return constrained.some((s) =>
-    selectedTiersForSport(skills, s).some((tier) =>
-      levelMatchesFilter(authorSportLevels, [s], postSkill, tier),
+    selectedTiersForSport(skills, s).some(
+      (tier) => postHas([s], tier) || levelMatchesFilter(authorSportLevels, [s], postSkill, tier),
     ),
   );
 }

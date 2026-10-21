@@ -42,6 +42,9 @@ const ENTRIES: SitemapEntry[] = [
   { path: "/contact", changefreq: "yearly", priority: "0.5" },
   { path: "/terms", changefreq: "yearly", priority: "0.4" },
   { path: "/privacy", changefreq: "yearly", priority: "0.4" },
+  { path: "/payment-policy", changefreq: "yearly", priority: "0.4" },
+  { path: "/ai-disclosure", changefreq: "yearly", priority: "0.4" },
+  { path: "/youth-policy", changefreq: "yearly", priority: "0.4" },
 ];
 
 export const Route = createFileRoute("/sitemap.xml")({
@@ -49,7 +52,7 @@ export const Route = createFileRoute("/sitemap.xml")({
     handlers: {
       GET: async () => {
         // Don't advertise pages that sell nothing. The shop is switched off
-        // while ballaCity is free, and /plans has no prices on it, so both are
+        // while BallaCity is free, and /plans has no prices on it, so both are
         // dropped from the sitemap until monetization returns.
         //
         // Imported inside the handler: this route is part of the client graph
@@ -92,7 +95,23 @@ export const Route = createFileRoute("/sitemap.xml")({
           // A read failure must not break the sitemap; omitting gyms is safe.
         }
 
-        const entries = [...ENTRIES, ...facilityEntries].filter(
+        // Launch-city pages and public games, teams and trainers. Each rule
+        // for what is safe to list lives in city-seo; city pages below the
+        // listing threshold are left out so thin pages never get submitted.
+        let cityEntries: SitemapEntry[] = [];
+        try {
+          const { loadCitySitemapEntries } = await import("@/lib/city-sitemap.server");
+          cityEntries = await loadCitySitemapEntries();
+        } catch {
+          // A read failure must not break the sitemap; omitting them is safe.
+        }
+
+        const entries = [
+          { path: "/cities", changefreq: "weekly" as const, priority: "0.7" },
+          ...ENTRIES,
+          ...facilityEntries,
+          ...cityEntries,
+        ].filter(
           (e) =>
             (e.path !== "/shop" || merchEnabled) && (e.path !== "/plans" || subscriptionsEnabled),
         );

@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Star, Users } from "lucide-react";
+import { MapPin, Share2, Star, UserPlus, Users } from "lucide-react";
 import { ensureOrgById } from "@/lib/org-store";
 import { getTrainerOrg } from "@/lib/trainer-orgs.functions";
-import { GAMES, HERO_IMAGE, type Game, type Org } from "@/lib/sample-data";
+import { GAMES, HERO_IMAGE, resolveSportAsset, type Game, type Org } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
 import {
   ChannelPill,
@@ -16,9 +17,17 @@ import {
   channelPillClass,
 } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
-import { ACCOUNT_TYPE_META } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, hasLogoAvatar } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
+import { isImageUrl } from "@/components/OrgAvatarMark";
 import { hideFinishedGames } from "@/lib/game-time";
+import { collapseSeriesGames } from "@/lib/game-series";
+import { InvitePlayerDialog } from "@/components/team/InvitePlayerDialog";
+import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
+import { useTeamPendingInvites, useTeamRoster } from "@/lib/team-roster";
+import { TeamSetupChecklist } from "@/components/team/TeamSetupChecklist";
+import { teamSetupSteps } from "@/lib/team-setup";
+import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 type ViewModel = {
   name: string;
@@ -32,6 +41,8 @@ type ViewModel = {
   members: number | null;
   editTo: { to: string; params: Record<string, string | undefined> };
   publicTo: { to: string; params: Record<string, string | undefined> };
+  /** Public URL path, for sharing. */
+  publicPath: string;
 };
 
 /**
@@ -41,6 +52,7 @@ type ViewModel = {
  */
 export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
   const isGym = profile.kind === "gym";
+  const isTeam = profile.kind === "team";
   const refId = profile.refId ?? "";
 
   const teamQuery = useQuery({
@@ -56,22 +68,30 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
     staleTime: 30_000,
   });
 
+  // The real roster (team_members), so the member count matches the Roster tab.
+  const roster = useTeamRoster(isTeam && refId ? refId : undefined);
+  const pendingInvites = useTeamPendingInvites(isTeam && refId ? refId : undefined, isTeam);
+
   const hosted = useHostedGames();
   const games: Game[] = useMemo(() => {
     const pool = hideFinishedGames([...hosted, ...GAMES]);
     const seen = new Set<string>();
-    return pool
+    const mine = pool
       .filter((g) => (isGym ? g.orgId === refId : g.teamId === refId))
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    // One card per multi-day series (its next session), like the Feed.
+    return collapseSeriesGames(mine, "upcoming");
   }, [hosted, isGym, refId]);
 
   const reviews = useReviewsFor(refId);
   const revieweeKind: "trainer" | "team" = profile.kind === "trainer" ? "trainer" : "team";
   const rep = useMemo(() => computeReputation(reviews, revieweeKind), [reviews, revieweeKind]);
 
-  const [tab, setTab] = useState<"games" | "reviews">("games");
+  const [tab, setTab] = useState<"games" | "roster" | "reviews">("games");
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const vm: ViewModel | null = useMemo(() => {
     if (isGym) {
@@ -93,14 +113,17 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         name: org.name,
         handle: org.handle ?? null,
         bannerUrl: org.cover_url ?? null,
-        avatarUrl: org.avatar_url ?? null,
-        avatarFallback: org.avatar || profile.avatarFallback,
+        avatarUrl: org.avatar_url ?? (isImageUrl(org.avatar) ? org.avatar : null),
+        avatarFallback: isImageUrl(org.avatar)
+          ? profile.avatarFallback
+          : org.avatar || profile.avatarFallback,
         city: org.city ?? null,
         bio: org.bio ?? null,
         sports: org.sports ?? [],
         members: gymQuery.data?.members?.length ?? null,
         editTo: { to: "/orgs/$orgId/edit", params: { orgId: org.id } },
         publicTo: { to: "/orgs/$orgId", params: { orgId: org.id } },
+        publicPath: `/orgs/${org.id}`,
       };
     }
     const org = teamQuery.data as Org | undefined;
@@ -110,20 +133,23 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       name: org.name,
       handle: org.handle ?? null,
       bannerUrl: org.cover ?? null,
-      avatarUrl: null,
-      avatarFallback: org.avatar || profile.avatarFallback,
+      // The logo and the initials are separate (older rows kept a logo URL in
+      // `avatar`, which `avatarUrl` already accounts for); never print a URL.
+      avatarUrl: org.avatarUrl ?? (isImageUrl(org.avatar) ? org.avatar : null),
+      avatarFallback: org.avatarInitials || profile.avatarFallback,
       city: org.city ?? null,
       bio: org.bio ?? org.tagline ?? null,
       sports: org.sports ?? [],
-      members: org.roster ?? null,
+      members: roster.data?.length ?? org.roster ?? null,
       editTo: isTrainer
         ? { to: "/trainers/$trainerId/edit", params: { trainerId: org.id } }
         : { to: "/teams/$teamId/edit", params: { teamId: org.id } },
       publicTo: isTrainer
         ? { to: "/trainers/$trainerId", params: { trainerId: org.id } }
         : { to: "/teams/$teamId", params: { teamId: org.id } },
+      publicPath: isTrainer ? `/trainers/${org.id}` : `/teams/${org.id}`,
     };
-  }, [isGym, gymQuery.data, teamQuery.data, profile.kind, profile.avatarFallback]);
+  }, [isGym, gymQuery.data, teamQuery.data, roster.data, profile.kind, profile.avatarFallback]);
 
   const meta = ACCOUNT_TYPE_META[profile.kind];
 
@@ -141,6 +167,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         bannerUrl={vm.bannerUrl ?? HERO_IMAGE}
         avatarUrl={vm.avatarUrl}
         avatarFallback={vm.avatarFallback}
+        avatarShape={hasLogoAvatar(profile.kind) ? "logo" : "circle"}
         name={vm.name}
         nameBadge={
           <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
@@ -164,6 +191,19 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             >
               Edit {meta.label.toLowerCase()}
             </Link>
+            {/* Growing the roster and spreading the link come first for a new
+                team; the rest stay one swipe along the row. */}
+            {isTeam && (
+              <ChannelPill onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" /> Invite players
+              </ChannelPill>
+            )}
+            <ChannelPill onClick={() => setShareOpen(true)}>
+              <Share2 className="h-4 w-4" /> Share
+            </ChannelPill>
+            <Link to="/create" className={channelPillClass()}>
+              Host a game
+            </Link>
             <Link
               to={vm.publicTo.to}
               params={vm.publicTo.params as never}
@@ -171,12 +211,34 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             >
               View public page
             </Link>
-            <Link to="/create" className={channelPillClass()}>
-              Host a game
-            </Link>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
           </>
         }
+      />
+
+      {isTeam && refId && (
+        <InvitePlayerDialog
+          teamId={refId}
+          teamName={vm.name}
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+        />
+      )}
+      <ProfileShareCard
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        data={{
+          kind: profile.kind,
+          path: vm.publicPath,
+          displayName: vm.name,
+          username: vm.handle ?? undefined,
+          initials: vm.avatarFallback,
+          avatarUrl: vm.avatarUrl ?? undefined,
+          bio: vm.bio ?? undefined,
+          city: vm.city ?? undefined,
+          sports: vm.sports.map((name) => ({ name })),
+          reviewCount: rep.count,
+        }}
       />
 
       <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
@@ -208,12 +270,34 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       </ProfileAboutSheet>
 
       <div className="px-4">
+        {isTeam && refId && teamQuery.data && (
+          <TeamSetupChecklist
+            teamId={refId}
+            editTo={vm.editTo}
+            onInvite={() => setInviteOpen(true)}
+            steps={teamSetupSteps({
+              hasLogo: !!vm.avatarUrl,
+              // The untouched default cover doesn't count; an upload or a
+              // chosen preset does.
+              hasCover:
+                !!teamQuery.data.cover && resolveSportAsset(teamQuery.data.cover) !== HERO_IMAGE,
+              bio: teamQuery.data.bio,
+              gameCount: games.length,
+              invitedCount:
+                (roster.data?.filter((m) => m.role !== "owner").length ?? 0) +
+                (pendingInvites.data?.length ?? 0),
+            })}
+          />
+        )}
         <ChannelTabs
           className="mt-5"
           value={tab}
           onChange={setTab}
           tabs={[
             { k: "games" as const, label: "Games", count: games.length },
+            ...(isTeam
+              ? [{ k: "roster" as const, label: "Roster", count: roster.data?.length }]
+              : []),
             { k: "reviews" as const, label: "Reviews", count: rep.count },
           ]}
         />
@@ -238,6 +322,12 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             </div>
           )}
         </section>
+
+        {isTeam && refId && (
+          <section className={tab === "roster" ? "" : "hidden"}>
+            <TeamRosterPanel teamId={refId} teamName={vm.name} />
+          </section>
+        )}
 
         <section className={`mt-6 ${tab === "reviews" ? "" : "hidden"}`}>
           {vm.members != null && (

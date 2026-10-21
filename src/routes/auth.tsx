@@ -46,8 +46,8 @@ export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead({
       path: "/auth",
-      title: "Sign in — ballaCity",
-      description: "Sign in or create an ballaCity account to join and host pickup games.",
+      title: "Sign in — BallaCity",
+      description: "Sign in or create a BallaCity account to join and host pickup games.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) => {
@@ -570,7 +570,7 @@ function AuthPage() {
 
       <div className="px-4 mt-6 space-y-5">
         <div className="text-center">
-          <div className="font-display text-3xl font-bold">ballaCity</div>
+          <div className="font-display text-3xl font-bold">BallaCity</div>
           <p className="text-sm text-muted-foreground mt-1">
             Save games, write reviews, and build your reputation.
           </p>
@@ -882,7 +882,7 @@ function AuthPage() {
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               {mode === "signin"
-                ? "New to ballaCity? Create an account"
+                ? "New to BallaCity? Create an account"
                 : "Already have an account? Sign in"}
             </button>
 
@@ -897,6 +897,10 @@ function AuthPage() {
               ·{" "}
               <Link to="/cookies" className="underline">
                 Cookies
+              </Link>{" "}
+              ·{" "}
+              <Link to="/staff" className="underline">
+                Staff sign-in
               </Link>
             </p>
           </>

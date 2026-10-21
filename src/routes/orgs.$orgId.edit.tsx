@@ -21,11 +21,12 @@ import { parseHours } from "@/lib/org-hours";
 import { websiteHref } from "@/lib/org-listing";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { teamAvatarDisplay } from "@/lib/team-avatar";
 
 export const Route = createFileRoute("/orgs/$orgId/edit")({
   head: () =>
     pageHead({
-      title: "Edit gym — ballaCity",
+      title: "Edit gym — BallaCity",
       description: "Update your gym's details, hours, amenities, and photos.",
       noindex: true,
     }),
@@ -102,18 +103,22 @@ function EditOrg() {
     queryFn: async (): Promise<Member[]> => {
       const { data, error } = await supabase
         .from("trainer_org_members")
-        .select("id, trainer_id, user_id, role, teams:trainer_id(name, avatar)")
+        .select("id, trainer_id, user_id, role, teams:trainer_id(name, avatar, avatar_url)")
         .eq("org_id", orgId);
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => {
-        const t = r.teams as { name?: string | null; avatar?: string | null } | null;
+        const t = r.teams as {
+          name?: string | null;
+          avatar?: string | null;
+          avatar_url?: string | null;
+        } | null;
         return {
           id: r.id,
           trainer_id: r.trainer_id,
           user_id: r.user_id,
           role: r.role as Member["role"],
           trainer_name: t?.name ?? null,
-          trainer_avatar: t?.avatar ?? null,
+          trainer_avatar: t ? teamAvatarDisplay(t) || null : null,
         };
       });
     },

@@ -6,7 +6,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { CalendarDays, ShieldCheck, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { listChildrenActivity, type ChildGame } from "@/lib/guardian-activity.functions";
+import { toast } from "sonner";
+import {
+  cancelChildGame,
+  listChildrenActivity,
+  type ChildGame,
+} from "@/lib/guardian-activity.functions";
+import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
+import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
+import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
 
 export const Route = createFileRoute("/guardian")({
   head: () => ({
@@ -27,29 +35,97 @@ function fmt(d: string) {
   return new Date(d).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function GameRow({ g, child }: { g: ChildGame; child?: string }) {
+function GameRow({
+  g,
+  child,
+  childUserId,
+  onCancelled,
+}: {
+  g: ChildGame;
+  child?: string;
+  /** Set on upcoming games so the guardian can cancel for the child. */
+  childUserId?: string;
+  onCancelled?: () => void;
+}) {
+  const cancelFn = useServerFn(cancelChildGame);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const canCancel = !!childUserId && new Date(g.date).getTime() > Date.now();
+  const holds = g.status !== "requested";
+  const run = async () => {
+    if (!childUserId) return;
+    setBusy(true);
+    try {
+      const r = await cancelFn({ data: { childUserId, gameId: g.gameId } });
+      if (!r.ok) throw new Error(r.error);
+      toast.success(holds ? "Spot cancelled." : "Request withdrawn.");
+      setConfirming(false);
+      onCancelled?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not cancel.");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId: g.gameId }}
-      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3"
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{g.title}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {child ? `${child} · ` : ""}
-          {fmt(g.date)}
-          {g.location ? ` · ${g.location}` : ""}
-        </p>
-      </div>
-      <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-          g.status === "joined" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-        }`}
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <Link
+        to="/games/$gameId"
+        params={{ gameId: g.gameId }}
+        className="flex items-center justify-between gap-3"
       >
-        {g.status === "joined" ? "Going" : "Requested"}
-      </span>
-    </Link>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{g.title}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {child ? `${child} · ` : ""}
+            {fmt(g.date)}
+            {g.location ? ` · ${g.location}` : ""}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+            g.status === "joined"
+              ? "bg-primary/15 text-primary"
+              : g.status === "approved"
+                ? "bg-amber-500/15 text-amber-500"
+                : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {g.status === "joined" ? "Going" : g.status === "approved" ? "Approved" : "Requested"}
+        </span>
+      </Link>
+      {g.status === "approved" && (
+        <p className="mt-1 text-[11px] text-amber-500">
+          Approved by the host. If there's a fee, the spot isn't locked until it's paid.
+        </p>
+      )}
+      {canCancel && (
+        <div className="mt-2 text-right">
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="text-xs font-semibold text-coral underline-offset-2 hover:underline"
+          >
+            {holds ? "Cancel spot" : "Withdraw request"}
+          </button>
+        </div>
+      )}
+      <CancelForChildDialog
+        open={confirming}
+        title={holds ? `Cancel ${child ?? "your child"}'s spot?` : "Withdraw this request?"}
+        description={
+          holds
+            ? `${g.title} will open up for someone else and the host will be told. If a fee was paid, the host's refund policy decides what comes back; any refund is sent by the host directly.`
+            : `The request to join ${g.title} will be withdrawn.`
+        }
+        lateWarning={
+          holds && isLateCancel(g.date, g.cancelCutoffMin) ? lateCancelWarning(g.cancelCutoffMin) : null
+        }
+        busy={busy}
+        onConfirm={() => void run()}
+        onClose={() => setConfirming(false)}
+      />
+    </div>
   );
 }
 
@@ -77,7 +153,7 @@ function GuardianDashboard() {
   const kids = q.data ?? [];
   const shown = sel === "all" ? kids : kids.filter((k) => k.childUserId === sel);
   const upcoming = shown
-    .flatMap((k) => k.upcoming.map((g) => ({ g, child: k.name })))
+    .flatMap((k) => k.upcoming.map((g) => ({ g, child: k.name, childUserId: k.childUserId })))
     .sort((a, b) => a.g.date.localeCompare(b.g.date));
   const recent = shown
     .flatMap((k) => k.recent.map((g) => ({ g, child: k.name })))
@@ -96,6 +172,7 @@ function GuardianDashboard() {
       <Link to="/parent" className="mt-2 inline-block text-xs font-semibold text-primary underline">
         Settings, approvals and safety → Parent Center
       </Link>
+      <GuardianVideoUploadDialog className="mt-3" />
 
       {q.isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
@@ -134,7 +211,15 @@ function GuardianDashboard() {
               {upcoming.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No upcoming games.</p>
               ) : (
-                upcoming.map(({ g, child }) => <GameRow key={child + g.gameId} g={g} child={multi ? child : undefined} />)
+                upcoming.map(({ g, child, childUserId }) => (
+                  <GameRow
+                    key={child + g.gameId}
+                    g={g}
+                    child={multi ? child : undefined}
+                    childUserId={childUserId}
+                    onCancelled={() => void q.refetch()}
+                  />
+                ))
               )}
             </div>
           </section>

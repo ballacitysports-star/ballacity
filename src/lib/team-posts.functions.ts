@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { parsePostImage } from "@/lib/post-image";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -99,13 +100,36 @@ const CreateInput = z.object({
   lng: z.number().min(-180).max(180).nullable().optional(),
   price: z.number().int().min(0).max(100000).nullable().optional(),
   spotsMax: z.number().int().min(1).max(500).nullable().optional(),
+  /** Minutes before start after which cancelling counts as late; 0 = off. */
+  cancelCutoffMin: z.number().int().min(0).max(10080).optional(),
+  refundRule: z.enum(["until_cutoff", "before_start", "none"]).optional(),
+  lateRefundPct: z.number().int().min(0).max(100).optional(),
   pinned: z.boolean().optional(),
+  /** A built-in cover ("preset:basketball") or the poster's own team-covers upload. */
+  imageUrl: z.string().max(1000).nullable().optional(),
 });
 
 export const createTeamPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateInput.parse(input))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    // Screen before insert so blocked text is never stored.
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "team_posts",
+      context: mod.TEAM_POST_CONTEXT,
+      fields: { title: data.title, body: data.body, location: data.location },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    const image = parsePostImage(data.imageUrl, {
+      userId: context.userId,
+      supabaseUrl: process.env.SUPABASE_URL ?? "",
+    });
+    if (!image.ok) throw new Error(image.message);
+
     const { data: row, error } = await context.supabase
       .from("team_posts" as any)
       .insert({
@@ -122,12 +146,21 @@ export const createTeamPost = createServerFn({ method: "POST" })
         lng: data.lng ?? null,
         price: data.price ?? null,
         spots_max: data.spotsMax ?? null,
+        // Left to the database default (2 hours) unless the poster picked one.
+        ...(data.cancelCutoffMin !== undefined ? { cancel_cutoff_min: data.cancelCutoffMin } : {}),
+        ...(data.refundRule !== undefined ? { refund_rule: data.refundRule } : {}),
+        ...(data.lateRefundPct !== undefined ? { late_refund_pct: data.lateRefundPct } : {}),
         pinned: data.pinned ?? false,
+        // Only sent when there is one, so text-only posts keep working even
+        // if the image_url migration hasn't reached the database yet.
+        ...(image.value ? { image_url: image.value } : {}),
       } as any)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return row;
+    const created = row as unknown as Record<string, unknown> & { id: string };
+    const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", created.id, screen);
+    return { ...created, moderation_status: status, held: status !== "approved" };
   });
 
 export const deleteTeamPost = createServerFn({ method: "POST" })
@@ -159,21 +192,54 @@ export const updateTeamPost = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "team_posts",
+      id: data.id,
+      context: mod.TEAM_POST_CONTEXT,
+      fields: { title: data.title, body: data.body, location: data.location },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    // Counted, not RETURNING: an edit re-queues the post, which can hide it from
+    // a manager editing someone else's post before the screen settles it.
+    const { count, error } = await context.supabase
       .from("team_posts")
-      .update({
-        kind: data.kind,
-        title: data.title,
-        body: data.body ?? "",
-        event_date: data.eventDate,
-        location: data.location,
-        price: data.price,
-        spots_max: data.spotsMax,
-      })
-      .eq("id", data.id)
-      .select("id")
-      .maybeSingle();
+      .update(
+        {
+          kind: data.kind,
+          title: data.title,
+          body: data.body ?? "",
+          event_date: data.eventDate,
+          location: data.location,
+          price: data.price,
+          spots_max: data.spotsMax,
+        },
+        { count: "exact" },
+      )
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
-    if (!row) throw new Error("You can't edit this post.");
-    return { ok: true };
+    if (!count) throw new Error("You can't edit this post.");
+    const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", data.id, screen);
+    return { ok: true, held: status !== "approved" };
+  });
+
+/** "Draft with AI": turns the member's notes into a title and description. Adults only. */
+export const suggestTeamPostDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        kind: PostKind,
+        notes: z.string().trim().min(10, "Add a few notes first.").max(1000),
+        title: z.string().max(200).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { draftTeamPost } = await import("@/lib/post-assist.server");
+    return draftTeamPost(supabaseAdmin, { userId: context.userId, ...data });
   });

@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { describeFamilyActivity } from "@/lib/family-activity";
 
 describe("describeFamilyActivity", () => {
+  it("words the members sharing choice in plain language", () => {
+    const d = describeFamilyActivity({
+      action: "controls.changed",
+      context: { media_visibility: "members" },
+    });
+    expect(d.detail).toContain("Video visibility");
+    expect(d.detail).toContain("signed-in members");
+  });
+
   it("labels control creation", () => {
     expect(describeFamilyActivity({ action: "controls.created" })).toEqual({
       title: "Safety settings created",
@@ -54,5 +63,82 @@ describe("describeFamilyActivity", () => {
 
   it("tolerates a null context", () => {
     expect(describeFamilyActivity({ action: "controls.changed", context: null }).detail).toBeNull();
+  });
+});
+
+describe("family clip visibility in the activity trail", () => {
+  it("words team sharing and the child's view", () => {
+    expect(describeFamilyActivity({ action: "family_post.team_shared" }).title).toBe(
+      "Family clip shared with a team",
+    );
+    expect(describeFamilyActivity({ action: "family_post.team_unshared" }).title).toBe(
+      "Family clip made private again",
+    );
+    expect(
+      describeFamilyActivity({ action: "family_post.child_view_changed", context: { enabled: false } })
+        .detail,
+    ).toContain("no longer");
+    expect(
+      describeFamilyActivity({ action: "family_post.child_view_changed", context: { enabled: true } })
+        .detail,
+    ).toContain("can watch");
+  });
+});
+
+describe("family post share links in the activity trail", () => {
+  it("describes creating and turning off a private link", () => {
+    expect(
+      describeFamilyActivity({ action: "family_post.link_created", context: { days: 14 } }),
+    ).toEqual({ title: "Private share link created", detail: "Valid for 14 days" });
+    expect(describeFamilyActivity({ action: "family_post.link_revoked" }).title).toBe(
+      "Private share link turned off",
+    );
+  });
+});
+
+describe("family clip sharing toggles in the activity trail", () => {
+  it("words each switch", () => {
+    expect(
+      describeFamilyActivity({
+        action: "family_post.sharing_changed",
+        context: { kind: "team", enabled: true },
+      }).detail,
+    ).toBe("Team sharing turned on");
+    expect(
+      describeFamilyActivity({
+        action: "family_post.sharing_changed",
+        context: { kind: "link", enabled: false },
+      }).detail,
+    ).toBe("Private links turned off");
+  });
+});
+
+describe("public XP toggle in the activity trail", () => {
+  it("words both states", () => {
+    expect(
+      describeFamilyActivity({ action: "child.public_xp_changed", context: { enabled: true } }).detail,
+    ).toContain("shown on the Player Card");
+    expect(
+      describeFamilyActivity({ action: "child.public_xp_changed", context: { enabled: false } }).detail,
+    ).toContain("no longer");
+  });
+});
+
+describe("coach analytics sharing in the activity trail", () => {
+  it("words both states", () => {
+    expect(
+      describeFamilyActivity({ action: "child.analytics_share_changed", context: { enabled: true } }).detail,
+    ).toContain("Shared with");
+    expect(
+      describeFamilyActivity({ action: "child.analytics_share_changed", context: { enabled: false } }).detail,
+    ).toContain("No longer");
+  });
+});
+
+describe("teen reel approvals in the activity trail", () => {
+  it("words approve, revoke and delete", () => {
+    expect(describeFamilyActivity({ action: "teen_reel.team_approved" }).title).toBe("Reel approved for a team");
+    expect(describeFamilyActivity({ action: "teen_reel.team_revoked" }).title).toContain("guardian only");
+    expect(describeFamilyActivity({ action: "teen_reel.deleted_by_guardian" }).title).toContain("deleted");
   });
 });

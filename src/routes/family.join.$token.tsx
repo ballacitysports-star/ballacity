@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/family/join/$token")({
   head: () =>
     pageHead({
-      title: "Join your family on ballaCity",
+      title: "Join your family on BallaCity",
       description:
-        "Accept a parent or guardian invitation so they can manage your ballaCity safety settings.",
+        "Accept a parent or guardian invitation so they can manage your BallaCity safety settings.",
       noindex: true,
     }),
   ssr: false,

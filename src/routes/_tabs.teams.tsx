@@ -25,6 +25,8 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
+import { useUserLocation } from "@/lib/geo";
+import { orgDistance } from "@/lib/org-distance";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 
 type SortBy = "nearest" | "followers" | "name";
@@ -34,13 +36,6 @@ const TEAM_SORTS = [
   { value: "followers" as const, label: "Most followers" },
   { value: "name" as const, label: "Name A–Z" },
 ];
-
-// Deterministic pseudo-distance (miles) from a string, so sort order is stable.
-function pseudoDistance(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return Math.round(((h % 400) / 10 + 0.3) * 10) / 10; // 0.3 – 40.3 mi
-}
 
 // URL-persisted Teams state. Refreshing or sharing the URL restores the
 // exact view: search text, sport, availability, sort, and the view/density
@@ -162,6 +157,7 @@ function TeamsPage() {
   }, []);
 
   const orgs = useAllOrgs();
+  const { coords } = useUserLocation();
 
   const list = useMemo(() => {
     const isRecruiting = (o: (typeof orgs)[number]) => {
@@ -186,14 +182,20 @@ function TeamsPage() {
         return cadenceMatches(o, avail);
       })
       .filter((o) => matchesOrgQuery(o, q));
-    const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
+    const withDist = filtered.map((o) => ({ o, dist: orgDistance(o, coords) }));
     withDist.sort((a, b) => {
-      if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "nearest") {
+        // Teams we can't measure sort last, then alphabetically.
+        const ax = a.dist?.mi ?? Infinity;
+        const bx = b.dist?.mi ?? Infinity;
+        if (ax !== bx) return ax - bx;
+        return a.o.name.localeCompare(b.o.name);
+      }
       if (sortBy === "followers") return b.o.followers - a.o.followers;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sports, q, sortBy, avail]);
+  }, [orgs, sports, q, sortBy, avail, coords]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "team") ?? orgs.find((o) => o.kind === "team");
@@ -312,9 +314,12 @@ function TeamsPage() {
           {list.map(({ o, dist }, i) => (
             <div key={o.id} className="relative">
               <OrgCard org={o} index={i} />
-              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                <Distance mi={dist} decimals={1} />
-              </span>
+              {dist && (
+                <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                  {dist.approx && "~"}
+                  <Distance mi={dist.mi} decimals={dist.mi < 10 ? 1 : 0} />
+                </span>
+              )}
             </div>
           ))}
           {list.length === 0 && (

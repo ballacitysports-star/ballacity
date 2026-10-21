@@ -25,6 +25,7 @@ import {
   type PaymentMethod,
   type PaymentSubmission,
   type GamePaymentSettings,
+  markRefundSent,
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { hostCancelPaymentSubmission } from "@/lib/payments";
@@ -454,9 +455,79 @@ export function HostPaymentsPanel({
     return <PaymentsUnavailableCard reason={paymentsGate.reason} />;
   }
 
+  const refundRows = rows.filter(
+    (r) => r.refund_status === "owed" || r.refund_status === "refunded",
+  );
+  const owedTotal = refundRows
+    .filter((r) => r.refund_status === "owed")
+    .reduce((n, r) => n + Number(r.refund_amount ?? 0), 0);
+
+  const markRefunded = async (row: HostRow) => {
+    setBusyId(row.id);
+    try {
+      await markRefundSent(row.id);
+      toast.success(`Marked $${Number(row.refund_amount ?? 0).toFixed(2)} refunded to ${row.playerName}.`);
+      void load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not update the refund.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PaymentPoliciesCard gameId={gameId} settings={settings} isHost />
+      {refundRows.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/40 bg-surface p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-display text-base font-bold">Refunds</div>
+            {owedTotal > 0 && (
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-500">
+                ${owedTotal.toFixed(2)} owed
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Worked out from your refund policy. Send each one in your payment app, then mark it
+            refunded so the player knows.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {refundRows.map((r) => (
+              <li
+                key={`refund-${r.id}`}
+                className="flex items-center gap-3 rounded-xl border border-border bg-background p-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{r.playerName}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    ${Number(r.refund_amount ?? 0).toFixed(2)} ({r.refund_pct ?? 0}%) ·{" "}
+                    {r.refund_reason === "game_cancelled"
+                      ? "You cancelled the game"
+                      : r.refund_reason === "no_show"
+                        ? "No-show"
+                        : "Player cancelled"}
+                  </div>
+                </div>
+                {r.refund_status === "owed" ? (
+                  <button
+                    type="button"
+                    disabled={busyId === r.id}
+                    onClick={() => void markRefunded(r)}
+                    className="shrink-0 rounded-full border border-lime/50 bg-lime/15 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-50"
+                  >
+                    Mark refunded
+                  </button>
+                ) : (
+                  <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                    Refunded
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* Header */}
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-3">
@@ -498,7 +569,7 @@ export function HostPaymentsPanel({
           </div>
         </div>
         <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
-          {PAYMENT_DISCLAIMER} Confirming here only marks the player paid in ballaCity — it does not
+          {PAYMENT_DISCLAIMER} Confirming here only marks the player paid in BallaCity — it does not
           move money.
         </p>
         {settings?.entry_fee != null && (

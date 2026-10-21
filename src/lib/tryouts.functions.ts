@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { normalizeCutoff } from "@/lib/cancel-window";
+import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -30,6 +32,11 @@ export type TryoutListing = {
   price: number | null;
   spotsMax: number | null;
   spotsTaken: number;
+  /** Minutes before start after which cancelling counts as late. 0 = off. */
+  cancelCutoffMin: number;
+  /** Refund rule for the fee (see lib/refund-policy). */
+  refundRule: string;
+  lateRefundPct: number;
   teamId: string;
   teamName: string;
   teamAvatar: string | null;
@@ -42,7 +49,7 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
     try {
     const { data, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,refund_rule,late_refund_pct,team_id,teams!inner(name,avatar,sports)")
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
       .gte("event_date", new Date().toISOString())
@@ -62,6 +69,9 @@ export const listUpcomingTryouts = createServerFn({ method: "GET" }).handler(
       price: r.price,
       spotsMax: r.spots_max,
       spotsTaken: r.spots_taken ?? 0,
+      cancelCutoffMin: normalizeCutoff(r.cancel_cutoff_min),
+      refundRule: r.refund_rule ?? "until_cutoff",
+      lateRefundPct: Number(r.late_refund_pct ?? 0) || 0,
       teamId: r.team_id,
       teamName: r.teams?.name ?? "Team",
       teamAvatar: r.teams?.avatar ?? null,
@@ -101,6 +111,92 @@ export const getTryoutRsvpContext = createServerFn({ method: "GET" })
       registered: (rs.data ?? []).filter((r) => r.status === "registered").map((r) => r.user_id),
       signed: ((sigs as any).data ?? []).map((s: any) => s.signer_user_id as string),
     };
+  });
+
+/**
+ * Signed-in: ids of the tryouts/camps the caller, or a child they're linked to,
+ * is registered for. Lets the listing and event page show "Registered" and a
+ * way to cancel without opening the RSVP dialog first.
+ */
+export const listMyTryoutRegistrations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<string[]> => {
+    const sb = context.supabase;
+    const kids = await sb.rpc("guardian_children_overview");
+    const ids = [
+      context.userId,
+      ...((kids.data ?? []) as any[]).map((k) => k.child_user_id as string),
+    ];
+    const { data } = await sb
+      .from("tryout_rsvps")
+      .select("post_id")
+      .in("user_id", ids)
+      .eq("status", "registered");
+    return [...new Set((data ?? []).map((r) => r.post_id as string))];
+  });
+
+export type MyTryoutSignup = {
+  postId: string;
+  kind: "tryout" | "clinic";
+  title: string;
+  eventDate: string | null;
+  location: string | null;
+  price: number | null;
+  teamName: string;
+  cancelCutoffMin: number;
+  /** Who is registered: the caller, or a child they're linked to. */
+  attendeeId: string;
+  attendeeName: string;
+  isChild: boolean;
+};
+
+/**
+ * Signed-in: upcoming tryouts/camps the caller, or a linked child, is
+ * registered for — enough to list them and cancel each one.
+ */
+export const listMyTryoutSignups = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MyTryoutSignup[]> => {
+    const sb = context.supabase;
+    const kids = await sb.rpc("guardian_children_overview");
+    const children = ((kids.data ?? []) as any[]).map((k) => ({
+      id: k.child_user_id as string,
+      name: (k.display_name as string | null) ?? "Child",
+    }));
+    const nameOf = new Map<string, string>([[context.userId, "You"], ...children.map((c) => [c.id, c.name] as [string, string])]);
+    const { data: rsvps } = await sb
+      .from("tryout_rsvps")
+      .select("post_id,user_id")
+      .in("user_id", [...nameOf.keys()])
+      .eq("status", "registered");
+    const rows = rsvps ?? [];
+    if (rows.length === 0) return [];
+    const { data: posts } = await publicClient()
+      .from("team_posts")
+      .select("id,kind,title,event_date,location,price,cancel_cutoff_min,teams!inner(name)")
+      .in("id", [...new Set(rows.map((r) => r.post_id as string))])
+      .is("hidden_at", null)
+      .gte("event_date", new Date().toISOString());
+    const byId = new Map((posts ?? []).map((p: any) => [p.id as string, p]));
+    return rows
+      .filter((r) => byId.has(r.post_id as string))
+      .map((r) => {
+        const p: any = byId.get(r.post_id as string);
+        return {
+          postId: p.id,
+          kind: p.kind,
+          title: p.title,
+          eventDate: p.event_date,
+          location: p.location,
+          price: p.price,
+          teamName: p.teams?.name ?? "Team",
+          cancelCutoffMin: normalizeCutoff(p.cancel_cutoff_min),
+          attendeeId: r.user_id as string,
+          attendeeName: nameOf.get(r.user_id as string) ?? "Player",
+          isChild: r.user_id !== context.userId,
+        };
+      })
+      .sort((a, b) => +new Date(a.eventDate ?? 0) - +new Date(b.eventDate ?? 0));
   });
 
 const ERRORS: Record<string, string> = {
@@ -145,9 +241,28 @@ export const cancelTryoutRsvp = createServerFn({ method: "POST" })
       _on_behalf_of: data.onBehalfOf as any,
     });
     if (error) return { ok: false as const, error: friendly(error.message) };
+    const attendeeId = data.onBehalfOf ?? context.userId;
+    // The database records a late cancellation on its own; read it back so the
+    // team's notice can say so.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: late } = await supabaseAdmin
+      .from("late_cancellations" as never)
+      .select("minutes_before,cutoff_min")
+      .eq("user_id", attendeeId)
+      .eq("kind", "tryout")
+      .eq("ref_id", data.postId)
+      .gte("created_at", new Date(Date.now() - 5 * 60_000).toISOString())
+      .maybeSingle();
+    const l = late as { minutes_before: number; cutoff_min: number } | null;
     const { notifyTryoutSignup } = await import("./tryout-alerts.server");
-    await notifyTryoutSignup({ postId: data.postId, actorId: context.userId, attendeeId: data.onBehalfOf ?? context.userId, action: "cancelled" });
-    return { ok: true as const };
+    await notifyTryoutSignup({
+      postId: data.postId,
+      actorId: context.userId,
+      attendeeId,
+      action: "cancelled",
+      late: l ? { minutesBefore: l.minutes_before, cutoffMin: l.cutoff_min } : null,
+    });
+    return { ok: true as const, late: !!l };
   });
 
 /** Teams the caller can post tryouts for. */
@@ -173,12 +288,13 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
     });
     if (!isManager) throw new Error("Only owners, managers and coaches can view this.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [members, posts, rsvps, waiver, evals] = await Promise.all([
+    const [members, posts, rsvps, waiver, evals, availability] = await Promise.all([
       supabaseAdmin.from("team_members").select("user_id,role,jersey_number,position").eq("team_id", data.teamId),
       supabaseAdmin.from("team_posts").select("id,title,kind,event_date,spots_max,spots_taken").eq("team_id", data.teamId).in("kind", ["tryout", "clinic"]).order("event_date", { ascending: false }),
       supabaseAdmin.from("tryout_rsvps").select("id,post_id,user_id,registered_by,status,created_at").eq("team_id", data.teamId),
       supabaseAdmin.from("team_waivers").select("id,version").eq("team_id", data.teamId).eq("published", true).maybeSingle(),
       context.supabase.from("tryout_evaluations").select("rsvp_id,post_id,attended").eq("team_id", data.teamId),
+      supabaseAdmin.from("team_event_availability").select("post_id,user_id,status,note,set_by").eq("team_id", data.teamId),
     ]);
     const attendedByPost = new Map<string, number>();
     for (const e of evals.data ?? []) {
@@ -208,6 +324,14 @@ export const getTeamRosterOverview = createServerFn({ method: "GET" })
             ...person(r.user_id), status: r.status, byGuardian: r.registered_by !== r.user_id, at: r.created_at,
             isMember: (members.data ?? []).some((m) => m.user_id === r.user_id),
           })),
+          availability: (availability.data ?? [])
+            .filter((a) => a.post_id === p.id)
+            .map((a): AvailabilityAnswer => ({
+              userId: a.user_id,
+              status: a.status as AvailabilityStatus,
+              note: a.note,
+              byGuardian: !!a.set_by && a.set_by !== a.user_id,
+            })),
         };
       }),
     };
@@ -275,7 +399,7 @@ export const getTryout = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<TryoutListing | null> => {
     const { data: r, error } = await publicClient()
       .from("team_posts")
-      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,team_id,teams!inner(name,avatar,sports)")
+      .select("id,kind,title,body,event_date,location,price,spots_max,spots_taken,cancel_cutoff_min,refund_rule,late_refund_pct,team_id,teams!inner(name,avatar,sports)")
       .eq("id", data.postId)
       .in("kind", ["tryout", "clinic"])
       .is("hidden_at", null)
@@ -285,6 +409,9 @@ export const getTryout = createServerFn({ method: "GET" })
     return {
       id: x.id, kind: x.kind, title: x.title, body: x.body ?? "", eventDate: x.event_date,
       location: x.location, price: x.price, spotsMax: x.spots_max, spotsTaken: x.spots_taken ?? 0,
+      cancelCutoffMin: normalizeCutoff(x.cancel_cutoff_min),
+      refundRule: x.refund_rule ?? "until_cutoff",
+      lateRefundPct: Number(x.late_refund_pct ?? 0) || 0,
       teamId: x.team_id, teamName: x.teams?.name ?? "Team", teamAvatar: x.teams?.avatar ?? null, sports: x.teams?.sports ?? [],
     };
   });

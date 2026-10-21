@@ -1,10 +1,11 @@
-import { useSyncExternalStore } from "react";
+import { weightedCriterion, weightedStats } from "@/lib/reputation-engine";
 
 export type ReviewerKind = "player" | "trainer" | "team" | "host";
 export type RevieweeKind = "player" | "trainer" | "team" | "host";
 
 export type Review = {
   id: string;
+  reviewerId?: string; // auth user id of the author (database reviews)
   kind: ReviewerKind; // who is leaving the review
   revieweeKind: RevieweeKind; // who the review is about
   revieweeId: string;
@@ -23,6 +24,9 @@ export type Review = {
   isPrivate?: boolean; // private feedback (only visible to reviewee)
   helpfulCount?: number;
   flagged?: boolean; // hidden after moderation
+  aiMismatch?: boolean; // rating contradicts the text (AI check); counts for less
+  gameId?: string; // game this review is about, when game-based
+  sport?: string;
 };
 
 export const REVIEWER_META: Record<
@@ -327,65 +331,16 @@ const initial: Review[] = [
   },
 ];
 
-// -------------------------- store --------------------------
+// -------------------------- demo data --------------------------
+// The seed above only backs demo entities (sample-data ids that are not real
+// accounts) and the signed-out "me" preview. Real reviews live in the database
+// and are read through `@/lib/reviews-db`.
 
-let reviews: Review[] = [...initial];
-const listeners = new Set<() => void>();
-let version = 0;
-
-function emit() {
-  version++;
-  listeners.forEach((l) => l());
+export function demoReviewsFor(revieweeId: string): Review[] {
+  return initial.filter((r) => r.revieweeId === revieweeId);
 }
 
-export function addReview(
-  r: Omit<Review, "id" | "date" | "helpfulCount"> & { id?: string; date?: string },
-) {
-  const full: Review = {
-    id: r.id ?? `rv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    date: r.date ?? new Date().toISOString(),
-    helpfulCount: 0,
-    ...r,
-  };
-  // Naive spam/toxicity gate: very short body or banned terms = auto-flag.
-  const banned = /\b(idiot|stupid|trash|loser|hate)\b/i;
-  if (full.body.trim().length < 8 || banned.test(full.body)) full.flagged = true;
-  reviews = [full, ...reviews];
-  emit();
-  return full;
-}
-
-export function markHelpful(id: string) {
-  reviews = reviews.map((r) =>
-    r.id === id ? { ...r, helpfulCount: (r.helpfulCount ?? 0) + 1 } : r,
-  );
-  emit();
-}
-
-export function reportReview(id: string) {
-  reviews = reviews.map((r) => (r.id === id ? { ...r, flagged: true } : r));
-  emit();
-}
-
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-export function getReviewsFor(revieweeId: string): Review[] {
-  return reviews.filter((r) => r.revieweeId === revieweeId);
-}
-
-export function useReviewsFor(revieweeId: string): Review[] {
-  useSyncExternalStore(
-    subscribe,
-    () => version,
-    () => version,
-  );
-  return getReviewsFor(revieweeId);
-}
-
-export function getAllReviewees(): {
+export function demoReviewees(): {
   revieweeId: string;
   revieweeKind: RevieweeKind;
   revieweeName: string;
@@ -394,7 +349,7 @@ export function getAllReviewees(): {
     string,
     { revieweeId: string; revieweeKind: RevieweeKind; revieweeName: string }
   >();
-  for (const r of reviews) {
+  for (const r of initial) {
     if (!map.has(r.revieweeId)) {
       map.set(r.revieweeId, {
         revieweeId: r.revieweeId,
@@ -404,19 +359,6 @@ export function getAllReviewees(): {
     }
   }
   return Array.from(map.values());
-}
-
-export function useAllReviewees(): {
-  revieweeId: string;
-  revieweeKind: RevieweeKind;
-  revieweeName: string;
-}[] {
-  useSyncExternalStore(
-    subscribe,
-    () => version,
-    () => version,
-  );
-  return getAllReviewees();
 }
 
 // -------------------------- reputation --------------------------
@@ -431,8 +373,18 @@ export type Reputation = {
   topStrengths: { key: string; label: string; avg: number }[];
   aiSummary: string;
   verifiedShare: number; // 0..1
+  /** Platform-prior-shrunk, recency/verification-weighted average. Use for ranking. */
+  adjustedAvg: number;
+  /** Reviews counted at full strength after weighting. */
+  effectiveCount: number;
+  /** 0..1 — how settled the rating is. */
+  confidence: number;
+  /** Too little evidence to treat the score as established. */
+  provisional: boolean;
   recentTrend: "up" | "down" | "flat";
 };
+
+const reviewerKey = (r: Review) => r.reviewerId ?? (r.reviewerHandle || r.reviewerName);
 
 export function computeReputation(list: Review[], kind: RevieweeKind): Reputation {
   const visible = list.filter((r) => !r.flagged && !r.isPrivate);
@@ -448,13 +400,17 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
   );
 
   const criteria = CRITERIA[kind];
-  const criteriaAverages = criteria.map((c) => {
-    const values = visible
-      .map((r) => r.scores?.[c.key])
-      .filter((v): v is number => typeof v === "number");
-    const a = values.length ? values.reduce((x, y) => x + y, 0) / values.length : 0;
-    return { key: c.key, label: c.label, avg: a };
-  });
+  const weightable = visible.map((r) => ({
+    ...r,
+    reviewerKey: reviewerKey(r),
+    mismatch: r.aiMismatch,
+  }));
+  const stats = weightedStats(weightable);
+  const criteriaAverages = criteria.map((c) => ({
+    key: c.key,
+    label: c.label,
+    avg: weightedCriterion(weightable, c.key),
+  }));
   const topStrengths = [...criteriaAverages]
     .filter((c) => c.avg > 0)
     .sort((a, b) => b.avg - a.avg)
@@ -462,9 +418,10 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
 
   const verifiedShare = count ? visible.filter((r) => r.verified).length / count : 0;
 
-  // Trust score: avg quality (60%) + volume curve (20%) + verified share (15%) + diversity (5%)
-  const quality = (avg / 5) * 60;
-  const volume = Math.min(1, count / 12) * 20;
+  // Trust score: shrunk weighted quality (60%) + effective volume (20%) +
+  // verified share (15%) + reviewer diversity (5%). See reputation-engine.ts.
+  const quality = count ? (stats.adjustedAvg / 5) * 60 : 0;
+  const volume = Math.min(1, stats.effectiveCount / 12) * 20;
   const verified = verifiedShare * 15;
   const diversity = (Math.min(4, Object.keys(byKind).length) / 4) * 5;
   const trustScore = Math.round(quality + volume + verified + diversity);
@@ -492,6 +449,10 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
     topStrengths,
     aiSummary,
     verifiedShare,
+    adjustedAvg: stats.adjustedAvg,
+    effectiveCount: stats.effectiveCount,
+    confidence: stats.confidence,
+    provisional: stats.provisional,
     recentTrend,
   };
 }

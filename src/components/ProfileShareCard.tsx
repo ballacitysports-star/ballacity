@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ShareSheet } from "@/components/ShareSheet";
 import { Copy, Check, Share2, MapPin, ShieldCheck, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,10 +16,10 @@ import { ogImageUrl } from "@/lib/seo";
 export type ProfileShareKind = "player" | "team" | "trainer" | "gym";
 
 const KIND_LABEL: Record<ProfileShareKind, string> = {
-  player: "ballaCity player",
-  team: "ballaCity team",
-  trainer: "ballaCity trainer",
-  gym: "ballaCity gym",
+  player: "BallaCity player",
+  team: "BallaCity team",
+  trainer: "BallaCity trainer",
+  gym: "BallaCity gym",
 };
 
 const KIND_TITLE: Record<ProfileShareKind, string> = {
@@ -109,7 +110,7 @@ async function copyText(text: string) {
 }
 
 /**
- * Share dialog showing a clean ballaCity preview card built from a profile's
+ * Share dialog showing a clean BallaCity preview card built from a profile's
  * About-section highlights, with native share / copy-link actions. Works for
  * every profile type (player, team, trainer, gym).
  */
@@ -123,6 +124,7 @@ export function ProfileShareCard({
   data: ProfileShareData;
 }) {
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const lines = useMemo(() => highlightLines(data), [data]);
   const bioSnippet = (data.bio ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
   const kindLabel = KIND_LABEL[data.kind];
@@ -146,18 +148,7 @@ export function ProfileShareCard({
 
   const shareText = [data.displayName, bioSnippet, ...lines].filter(Boolean).join("\n");
 
-  const handleShare = async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `${data.displayName} on ballaCity`, text: shareText, url });
-        return;
-      }
-    } catch (e: any) {
-      if (e?.name === "AbortError") return;
-    }
-    const ok = await copyText(`${shareText}\n${url}`);
-    toast[ok ? "success" : "error"](ok ? "Card copied to clipboard" : "Couldn't share this card");
-  };
+  const handleShare = () => setShareOpen(true);
 
   const handleCopyLink = async () => {
     const ok = await copyText(url);
@@ -176,7 +167,7 @@ export function ProfileShareCard({
         <DialogHeader>
           <DialogTitle>{KIND_TITLE[data.kind]}</DialogTitle>
           <DialogDescription>
-            A clean ballaCity preview card with the About highlights.
+            A clean BallaCity preview card with the About highlights.
           </DialogDescription>
         </DialogHeader>
 
@@ -242,6 +233,16 @@ export function ProfileShareCard({
         >
           Open shareable image
         </a>
+        <ShareSheet
+          content={{
+            title: `${data.displayName} on BallaCity`,
+            text: shareText,
+            url,
+            hashtags: data.sports?.[0]?.name ? [data.sports[0].name] : [],
+          }}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
       </DialogContent>
     </Dialog>
   );

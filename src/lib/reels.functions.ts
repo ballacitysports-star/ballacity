@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
+import { sanitizePostCopy } from "@/lib/reel-post";
 
 /**
  * AI/video processing is opt-out for adults (Settings → Privacy) and
@@ -36,7 +37,7 @@ export const processMyReels = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
     const { withAiSession } = await import("@/lib/ai/session.server");
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, claimReel, processReel } =
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, claimReel, processReel, rejectIfOverClipLimits } =
       await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -55,8 +56,13 @@ export const processMyReels = createServerFn({ method: "POST" })
 
     const results = [];
     for (const reel of (rows ?? []) as any[]) {
-      // Claim before opening an AI job so an overlapping request neither runs
-      // the pipeline twice nor reserves quota for work it will not do.
+      // Both before opening an AI job, so a refused or overlapping run never
+      // reserves quota for work it will not do.
+      if (await rejectIfOverClipLimits(supabaseAdmin, reel)) {
+        results.push({ id: reel.id, status: "rejected" });
+        continue;
+      }
+      // Claim so an overlapping request never runs the pipeline twice.
       if (!(await claimReel(supabaseAdmin, reel))) continue;
       results.push(
         await withAiSession(
@@ -87,7 +93,12 @@ export const askReelCoach = createServerFn({ method: "POST" })
       return {
         reelId: input.reelId,
         question: question.slice(0, 1000),
-        history: (input.history ?? []).slice(-8),
+        history: (Array.isArray(input.history) ? input.history : [])
+          .slice(-8)
+          .map((h) => ({
+            role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+            content: String(h?.content ?? "").slice(0, 2000),
+          })),
       };
     },
   )
@@ -122,7 +133,15 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     if (!input?.reelId) throw new Error("reelId is required");
     return {
       reelId: input.reelId,
-      tone: input.tone ? String(input.tone).slice(0, 120) : undefined,
+      // Tone is a short style label interpolated into the system prompt:
+      // keep only plain words so it can't carry extra instructions.
+      tone: input.tone
+        ? String(input.tone)
+            .replace(/[^a-zA-Z ,-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 40) || undefined
+        : undefined,
     };
   })
   .handler(async ({ data, context }) => {
@@ -212,7 +231,7 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
         processing_step: regen.processing_step,
         step_progress: regen.step_progress,
         style_prefs: data.style,
-      },
+      } as Parameters<typeof processReel>[0],
       supabaseAdmin,
       apiKey,
     );
@@ -339,6 +358,71 @@ export const applyReelCopy = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { updated: true, heldForReview: held.hidden };
+  });
+
+/**
+ * Posts a draft reel, saving the copy the member picked on the review card in
+ * the same step. New uploads start as drafts, visible only to their owner.
+ *
+ * Posting only clears `is_draft`. It never touches `hidden_at`, so a safety hold
+ * or moderation action keeps applying, and the audience rules (age, guardian
+ * lock) are still enforced by the database when anyone else reads the reel.
+ * The copy goes through the same safety screen as `applyReelCopy`: blocked copy
+ * stops the post, borderline copy posts but keeps the reel owner-only for review.
+ */
+export const postReel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      reelId: string;
+      title?: string;
+      caption?: string;
+      hashtags?: string[];
+      overlays?: { at: string; text: string }[];
+    }) => {
+      if (!input?.reelId) throw new Error("reelId is required");
+      return {
+        reelId: input.reelId,
+        copy: sanitizePostCopy({
+          title: input.title,
+          caption: input.caption,
+          hashtags: input.hashtags,
+          overlays: input.overlays,
+        }),
+      };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const { data: reel, error: readErr } = await context.supabase
+      .from("highlight_reels")
+      .select("id,status,is_draft")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    if (!reel) throw new Error("Reel not found");
+    if ((reel as any).status !== "completed") {
+      throw new Error("This reel is still processing — post it once it's ready.");
+    }
+
+    const patch: Record<string, any> = { ...data.copy };
+    const held =
+      Object.keys(patch).length > 0
+        ? await screenUserCopy(context.userId, data.reelId, patch, "postReel")
+        : { blocked: false, hidden: false, message: "" };
+    if (held.blocked) throw new Error(held.message);
+
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update({
+        ...patch,
+        is_draft: false,
+        ...(held.hidden ? { hidden_at: new Date().toISOString() } : {}),
+      } as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { posted: true, heldForReview: held.hidden };
   });
 
 /**
@@ -840,4 +924,26 @@ export const suggestGameForReel = createServerFn({ method: "GET" })
       sport: (best.sport as string) ?? null,
       date: (best.date as string) ?? null,
     };
+  });
+
+/**
+ * Whether family posts (a parent's private clip of their under-13 child) are
+ * switched on. Off unless `app_settings.family_posts` says {"enabled": true}; a
+ * missing row or any read failure means off. The database enforces the same
+ * switch, so this only decides whether the UI offers the button.
+ */
+export const getFamilyPostsEnabled = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "family_posts")
+        .maybeSingle();
+      return { enabled: (data?.value as { enabled?: unknown } | null)?.enabled === true };
+    } catch {
+      return { enabled: false };
+    }
   });

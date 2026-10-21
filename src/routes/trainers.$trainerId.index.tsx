@@ -24,7 +24,8 @@ import { GAMES, type Org } from "@/lib/sample-data";
 import { ensureOrgById, isMyOrg } from "@/lib/org-store";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
 import { BookSessionSheet, type BookPrefill } from "@/components/BookSessionSheet";
@@ -61,16 +62,16 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
     const name = o?.name ?? "Trainer";
     return pageHead({
       path: `/trainers/${params.trainerId}`,
-      title: `${name} — Trainer on ballaCity`,
+      title: `${name} — Trainer on BallaCity`,
       description: (
         o?.bio ||
         o?.tagline ||
-        `Book sessions with ${name} on ballaCity: session types, venues, and availability.`
+        `Book sessions with ${name} on BallaCity: session types, venues, and availability.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "trainer",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Trainer on ballaCity",
+        subtitle: o?.tagline ?? o?.city ?? "Trainer on BallaCity",
         meta: [o?.sports?.[0], o?.city, "Book a session"],
       }),
       noindex: !o,

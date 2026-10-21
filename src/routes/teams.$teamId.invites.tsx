@@ -10,7 +10,7 @@ import { InviteTracker } from "@/components/team/manage/InviteTracker";
 export const Route = createFileRoute("/teams/$teamId/invites")({
   head: () =>
     pageHead({
-      title: "Roster invites — ballaCity",
+      title: "Roster invites — BallaCity",
       description: "Invite athletes to your team, track replies and collect waivers.",
       noindex: true,
     }),

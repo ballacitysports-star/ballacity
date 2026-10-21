@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { isLegalReviewed } from "@/lib/legal-review";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,9 +34,9 @@ export const Route = createFileRoute("/account/privacy")({
   head: () =>
     pageHead({
       path: "/account/privacy",
-      title: "Privacy — ballaCity",
+      title: "Privacy — BallaCity",
       description:
-        "Control who can see your ballaCity profile, how precisely your location is shared, who can message or invite you, and delete your account.",
+        "Control who can see your BallaCity profile, how precisely your location is shared, who can message or invite you, and delete your account.",
       noindex: true,
     }),
   component: PrivacySettingsPage,
@@ -112,7 +113,7 @@ function PrivacySettingsPage() {
 
       <main className="page-shell-narrow pb-4">
         <p className="px-4 pt-4 text-xs text-muted-foreground">
-          ballaCity never shares your live position or a street address. Availability locations are
+          BallaCity never shares your live position or a street address. Availability locations are
           stored as an approximate area only.
         </p>
 
@@ -256,7 +257,7 @@ function PrivacySettingsPage() {
           <SettingsStaticRow
             icon={Sparkles}
             label="AI video & highlight processing"
-            description="Allow ballaCity to analyze your uploaded clips to generate titles, captions and coaching notes."
+            description="Allow BallaCity to analyze your uploaded clips to generate titles, captions and coaching notes."
             trailing={
               <Switch
                 checked={prefs.ai_processing}
@@ -301,9 +302,11 @@ function PrivacySettingsPage() {
                 <span className="font-semibold text-foreground">Retained:</span> safety records
                 (reports and blocks filed about your account) and required security logs.
               </p>
-              <p className="micro-label">
-                Legal review required — retention periods are placeholders.
-              </p>
+              {isLegalReviewed("retention") ? null : (
+                <p className="micro-label">
+                  Legal review required — retention periods are placeholders.
+                </p>
+              )}
             </div>
           </SettingsStaticRow>
           <DeleteAccountButton />

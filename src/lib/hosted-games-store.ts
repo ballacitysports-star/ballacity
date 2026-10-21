@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
-import { imageFor, ME } from "@/lib/sample-data";
+import { normalizeCutoff } from "@/lib/cancel-window";
+import { imageFor, ME, resolveSportAsset, toStoredCover } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
@@ -94,6 +95,7 @@ type DbRow = {
   completed_at?: string | null;
   joins_closed: boolean;
   signup_cutoff_min?: number | null;
+  cancel_cutoff_min?: number | null;
   min_age?: number | null;
   max_age?: number | null;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
@@ -152,7 +154,7 @@ function rowToGame(r: DbRow): Game {
     isPrivate: !!r.is_private,
     urgent: r.urgent ?? undefined,
     trending: r.trending ?? undefined,
-    image: r.image || imageFor(r.sport as Sport),
+    image: resolveSportAsset(r.image) || imageFor(r.sport as Sport),
     description: r.description,
     equipment: r.equipment ?? [],
     status: (r.status as Game["status"]) ?? undefined,
@@ -161,6 +163,7 @@ function rowToGame(r: DbRow): Game {
     completedAt: r.completed_at ?? null,
     joinsClosed: !!r.joins_closed,
     signupCutoffMin: Number(r.signup_cutoff_min ?? 0) || 0,
+    cancelCutoffMin: normalizeCutoff(r.cancel_cutoff_min),
     minAge: r.min_age ?? null,
     maxAge: r.max_age ?? null,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
@@ -200,7 +203,8 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     is_private: !!g.isPrivate,
     urgent: !!g.urgent,
     trending: !!g.trending,
-    image: g.image && g.image !== imageFor(g.sport) ? g.image : "",
+    image:
+      g.image && resolveSportAsset(g.image) !== imageFor(g.sport) ? toStoredCover(g.image) : "",
     description: g.description ?? "",
     equipment: g.equipment ?? [],
     status: g.status ?? null,
@@ -220,6 +224,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     allow_waitlist: g.allowWaitlist ?? true,
     cancellation_policy: g.cancellationPolicy || "flexible",
     cancellation_notes: g.cancellationNotes ?? null,
+    cancel_cutoff_min: normalizeCutoff(g.cancelCutoffMin),
     game_rules: g.gameRules ?? null,
   } as TablesInsert<"hosted_games">;
 }
@@ -344,6 +349,8 @@ export type HostedGameInput = {
   allowWaitlist?: boolean;
   cancellationPolicy?: string | null;
   cancellationNotes?: string | null;
+  /** Minutes before start that cancelling counts as late / the refund rule changes. */
+  cancelCutoffMin?: number;
   gameRules?: string | null;
 };
 
@@ -394,6 +401,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     allowWaitlist: input.allowWaitlist ?? true,
     cancellationPolicy: input.cancellationPolicy || "flexible",
     cancellationNotes: input.cancellationNotes ?? null,
+    cancelCutoffMin: normalizeCutoff(input.cancelCutoffMin),
     gameRules: input.gameRules ?? null,
   };
 
@@ -518,7 +526,10 @@ export async function updateHostedGame(
   if (patch.indoor !== undefined) dbPatch.indoor = patch.indoor;
   if (patch.isPrivate !== undefined) dbPatch.is_private = patch.isPrivate;
   if (patch.image !== undefined) {
-    dbPatch.image = patch.image && patch.image !== imageFor(updated.sport) ? patch.image : "";
+    dbPatch.image =
+      patch.image && resolveSportAsset(patch.image) !== imageFor(updated.sport)
+        ? toStoredCover(patch.image)
+        : "";
   }
   if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   if (patch.status !== undefined) dbPatch.status = patch.status;
@@ -528,6 +539,11 @@ export async function updateHostedGame(
   if ((patch as { signupCutoffMin?: number }).signupCutoffMin !== undefined) {
     dbPatch.signup_cutoff_min =
       Number((patch as { signupCutoffMin?: number }).signupCutoffMin) || 0;
+  }
+  if ((patch as { cancelCutoffMin?: number }).cancelCutoffMin !== undefined) {
+    (dbPatch as Record<string, unknown>).cancel_cutoff_min = normalizeCutoff(
+      (patch as { cancelCutoffMin?: number }).cancelCutoffMin,
+    );
   }
   if ((patch as { minAge?: number | null }).minAge !== undefined) {
     dbPatch.min_age = (patch as { minAge?: number | null }).minAge ?? null;

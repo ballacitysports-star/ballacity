@@ -1,14 +1,28 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeCutoff } from "@/lib/cancel-window";
 
-export type ChildTeam = { teamId: string; name: string; role: string; jersey: number | null; position: string | null };
+export type ChildTeam = {
+  teamId: string;
+  name: string;
+  role: string;
+  jersey: number | null;
+  position: string | null;
+};
 export type ChildGame = {
   gameId: string;
   title: string;
   sport: string;
   date: string;
   location: string | null;
-  status: "joined" | "requested";
+  /**
+   * joined: on the roster · approved: host approved but the spot isn't locked
+   * yet (e.g. unpaid) · requested: waiting on the host.
+   */
+  status: "joined" | "approved" | "requested";
+  /** Minutes before start after which cancelling counts as late. 0 = off. */
+  cancelCutoffMin: number;
 };
 export type ChildActivity = {
   childUserId: string;
@@ -34,6 +48,8 @@ export type ChildTryout = {
   attended: boolean | null;
   score: number | null;
   notes: string | null;
+  /** Minutes before start after which cancelling counts as late. 0 = off. */
+  cancelCutoffMin: number;
 };
 export type ChildInvite = {
   id: string;
@@ -93,9 +109,9 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
       supabaseAdmin.from("game_participants").select("game_id,user_id").in("user_id", ids),
       supabaseAdmin
         .from("join_requests")
-        .select("game_id,player_id")
+        .select("game_id,player_id,status")
         .in("player_id", ids)
-        .eq("status", "pending"),
+        .in("status", ["pending", "approved"]),
     ]);
     const inv = await supabaseAdmin
       .from("team_invites")
@@ -123,6 +139,8 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
             .select("id,team_id,kind,title,body,event_date,created_at")
             .in("team_id", memberTeamIds)
             .is("hidden_at", null)
+            // Service-role read: apply the AI text screen the RLS gate would.
+            .eq("moderation_status", "approved")
             .order("created_at", { ascending: false })
             .limit(30)
         : Promise.resolve({ data: [] as never[] }),
@@ -132,42 +150,80 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
       .select("id,post_id,team_id,user_id,status")
       .in("user_id", ids)
       .neq("status", "cancelled");
-    const rsvps = (rs.data ?? []) as { id: string; post_id: string; team_id: string; user_id: string }[];
+    const rsvps = (rs.data ?? []) as {
+      id: string;
+      post_id: string;
+      team_id: string;
+      user_id: string;
+    }[];
     const [tp, ev] = await Promise.all([
       rsvps.length
-        ? supabaseAdmin.from("team_posts").select("id,title,event_date,location,share_scores,share_notes").in("id", [...new Set(rsvps.map((r) => r.post_id))])
+        ? supabaseAdmin
+            .from("team_posts")
+            .select("*")
+            .in("id", [...new Set(rsvps.map((r) => r.post_id))])
         : Promise.resolve({ data: [] as never[] }),
       rsvps.length
-        ? supabaseAdmin.from("tryout_evaluations").select("rsvp_id,attended,score,notes").in("rsvp_id", rsvps.map((r) => r.id))
+        ? supabaseAdmin
+            .from("tryout_evaluations")
+            .select("rsvp_id,attended,score,notes")
+            .in(
+              "rsvp_id",
+              rsvps.map((r) => r.id),
+            )
         : Promise.resolve({ data: [] as never[] }),
     ]);
     for (const r of rsvps) if (!teamIds.includes(r.team_id)) teamIds.push(r.team_id);
-    const postById = new Map(((tp.data ?? []) as { id: string; title: string | null; event_date: string | null; location: string | null; share_scores: boolean; share_notes: boolean }[]).map((x) => [x.id, x]));
-    const evalById = new Map(((ev.data ?? []) as { rsvp_id: string; attended: boolean | null; score: number | null; notes: string | null }[]).map((x) => [x.rsvp_id, x]));
+    const postById = new Map(
+      (
+        (tp.data ?? []) as {
+          id: string;
+          title: string | null;
+          event_date: string | null;
+          location: string | null;
+          share_scores: boolean;
+          share_notes: boolean;
+          cancel_cutoff_min?: number | null;
+        }[]
+      ).map((x) => [x.id, x]),
+    );
+    const evalById = new Map(
+      (
+        (ev.data ?? []) as {
+          rsvp_id: string;
+          attended: boolean | null;
+          score: number | null;
+          notes: string | null;
+        }[]
+      ).map((x) => [x.rsvp_id, x]),
+    );
     const gameIds = [
-      ...new Set([...(gp.data ?? []).map((r) => r.game_id), ...(jr.data ?? []).map((r) => r.game_id)]),
+      ...new Set([
+        ...(gp.data ?? []).map((r) => r.game_id),
+        ...(jr.data ?? []).map((r) => r.game_id),
+      ]),
     ];
     const [teams, games] = await Promise.all([
       teamIds.length
         ? supabaseAdmin.from("teams").select("id,name").in("id", teamIds)
         : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       gameIds.length
-        ? supabaseAdmin
-            .from("hosted_games")
-            .select("id,title,sport,date,location,cancelled_at")
-            .in("id", gameIds)
+        ? supabaseAdmin.from("hosted_games").select("*").in("id", gameIds)
         : Promise.resolve({ data: [] as never[] }),
     ]);
     const teamName = new Map((teams.data ?? []).map((t) => [t.id, t.name]));
     const gameById = new Map(
-      ((games.data ?? []) as {
-        id: string;
-        title: string;
-        sport: string;
-        date: string;
-        location: string | null;
-        cancelled_at: string | null;
-      }[]).map((g) => [g.id, g]),
+      (
+        (games.data ?? []) as {
+          id: string;
+          title: string;
+          sport: string;
+          date: string;
+          location: string | null;
+          cancelled_at: string | null;
+          cancel_cutoff_min?: number | null;
+        }[]
+      ).map((g) => [g.id, g]),
     );
     const now = Date.now();
 
@@ -175,11 +231,27 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
       const mk = (gid: string, status: ChildGame["status"]): ChildGame | null => {
         const g = gameById.get(gid);
         if (!g || g.cancelled_at) return null;
-        return { gameId: g.id, title: g.title, sport: g.sport, date: g.date, location: g.location, status };
+        return {
+          gameId: g.id,
+          title: g.title,
+          sport: g.sport,
+          date: g.date,
+          location: g.location,
+          status,
+          cancelCutoffMin: normalizeCutoff(g.cancel_cutoff_min),
+        };
       };
+      const onRoster = new Set(
+        (gp.data ?? []).filter((r) => r.user_id === k.child_user_id).map((r) => r.game_id),
+      );
       const all = [
-        ...(gp.data ?? []).filter((r) => r.user_id === k.child_user_id).map((r) => mk(r.game_id, "joined")),
-        ...(jr.data ?? []).filter((r) => r.player_id === k.child_user_id).map((r) => mk(r.game_id, "requested")),
+        ...(gp.data ?? [])
+          .filter((r) => r.user_id === k.child_user_id)
+          .map((r) => mk(r.game_id, "joined")),
+        // Approved but not on the roster yet (e.g. unpaid) still holds a spot; pending is a request.
+        ...(jr.data ?? [])
+          .filter((r) => r.player_id === k.child_user_id && !onRoster.has(r.game_id))
+          .map((r) => mk(r.game_id, r.status === "approved" ? "approved" : "requested")),
       ].filter((g): g is ChildGame => !!g);
       const kidTeams = new Set(
         (tm.data ?? []).filter((r) => r.user_id === k.child_user_id).map((r) => r.team_id),
@@ -217,7 +289,15 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
             createdAt: r.created_at,
             guardianApproved: !!r.guardian_approved_at,
           })),
-        waivers: ((wv.data ?? []) as { id: string; team_id: string; title: string; version: string; content: string }[])
+        waivers: (
+          (wv.data ?? []) as {
+            id: string;
+            team_id: string;
+            title: string;
+            version: string;
+            content: string;
+          }[]
+        )
           .filter((w) => kidTeams.has(w.team_id))
           .map((w) => {
             const sig = (sg.data ?? []).find(
@@ -234,10 +314,17 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
               signedByGuardian: !!sig && !!sig.signed_by && sig.signed_by !== k.child_user_id,
             };
           }),
-        updates: ((posts.data ?? []) as {
-          id: string; team_id: string; kind: string; title: string | null; body: string | null;
-          event_date: string | null; created_at: string;
-        }[])
+        updates: (
+          (posts.data ?? []) as {
+            id: string;
+            team_id: string;
+            kind: string;
+            title: string | null;
+            body: string | null;
+            event_date: string | null;
+            created_at: string;
+          }[]
+        )
           .filter((p) => kidTeams.has(p.team_id))
           .slice(0, 10)
           .map((p) => ({
@@ -256,15 +343,41 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
             const p = postById.get(r.post_id)!;
             const e = evalById.get(r.id);
             return {
-              rsvpId: r.id, postId: r.post_id, teamId: r.team_id,
+              rsvpId: r.id,
+              postId: r.post_id,
+              teamId: r.team_id,
               teamName: teamName.get(r.team_id) ?? "Team",
-              title: p.title, eventDate: p.event_date, location: p.location,
+              title: p.title,
+              eventDate: p.event_date,
+              location: p.location,
               attended: e?.attended ?? null,
               score: p.share_scores ? (e?.score ?? null) : null,
-              notes: p.share_notes ? (e?.notes || null) : null,
+              notes: p.share_notes ? e?.notes || null : null,
+              cancelCutoffMin: normalizeCutoff(p.cancel_cutoff_min),
             };
           })
           .sort((a, b) => (a.eventDate ?? "").localeCompare(b.eventDate ?? "")),
       };
     });
+  });
+
+/**
+ * A guardian cancels their linked child's game spot (an approved spot, a
+ * roster spot, or a pending request). Done in the database by
+ * `guardian_cancel_child_game`, which re-checks the guardian link itself, and
+ * runs as the guardian so the late-cancellation and refund rules apply as if
+ * the child had cancelled. Tryouts use `cancelTryoutRsvp` with `onBehalfOf`.
+ */
+export const cancelChildGame = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ childUserId: z.string().uuid(), gameId: z.string().min(1).max(200) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("guardian_cancel_child_game", {
+      _child: data.childUserId,
+      _game: data.gameId,
+    });
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
   });

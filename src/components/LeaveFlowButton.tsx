@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +15,9 @@ import {
 import { useMyFlowStatus, isUuid, type PlayerFlowStatus } from "@/lib/game-flow-status";
 import { cancelMyJoinRequest, withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
+import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
 import { supabase } from "@/integrations/supabase/client";
+import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
 
 export type LeaveFlowVariant = "link" | "danger";
 
@@ -77,22 +79,6 @@ const COPY: Record<
   },
 };
 
-async function clearPendingSubmissions(gameId: string) {
-  try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    await supabase
-      .from("payment_submissions")
-      .delete()
-      .eq("game_id", gameId)
-      .eq("player_id", uid)
-      .eq("status", "pending");
-  } catch {
-    /* best effort */
-  }
-}
-
 export function LeaveFlowButton({
   gameId,
   gameTitle,
@@ -112,6 +98,26 @@ export function LeaveFlowButton({
   const { status } = useMyFlowStatus(isUuid(gameId) ? gameId : undefined);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [timing, setTiming] = useState<{ date: string; cutoff: number | null } | null>(null);
+
+  // Start time and cutoff, read when the dialog opens so the late-cancel
+  // warning is current without every caller passing game details in.
+  useEffect(() => {
+    if (!open || !isUuid(gameId)) return;
+    let alive = true;
+    void supabase
+      .from("hosted_games")
+      .select("*")
+      .eq("id", gameId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const g = data as { date?: string; cancel_cutoff_min?: number | null } | null;
+        if (alive && g?.date) setTiming({ date: g.date, cutoff: g.cancel_cutoff_min ?? null });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, gameId]);
 
   const action = actionFor(status);
   if (!action) return null;
@@ -126,9 +132,11 @@ export function LeaveFlowButton({
         await clearPendingSubmissions(gameId);
         await withdrawMyApprovedJoinRequest(gameId);
         leaveGame(gameId);
+        void notifyHostOfLeave(gameId, gameTitle);
       } else {
         await withdrawMyApprovedJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
+        void notifyHostOfLeave(gameId, gameTitle);
       }
       toast.success(copy.success);
       setOpen(false);
@@ -171,6 +179,16 @@ export function LeaveFlowButton({
             <AlertDialogTitle>{copy.title}</AlertDialogTitle>
             <AlertDialogDescription>{copy.description(gameTitle)}</AlertDialogDescription>
           </AlertDialogHeader>
+          {/* Only an approved/confirmed spot can be a late cancellation; a
+              pending request isn't holding one. */}
+          {action !== "cancel" && timing && isLateCancel(timing.date, timing.cutoff) && (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
+            >
+              {lateCancelWarning(timing.cutoff)}
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Keep my spot</AlertDialogCancel>
             <AlertDialogAction

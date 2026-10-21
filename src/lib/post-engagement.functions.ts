@@ -54,6 +54,8 @@ export const listComments = createServerFn({ method: "GET" })
       .select("id, subject_type, subject_id, author_id, body, deleted_at, created_at")
       .eq("subject_type", data.subjectType)
       .eq("subject_id", data.subjectId)
+      // A moderator's Hide. RLS enforces it too; this keeps it explicit.
+      .is("hidden_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as any[];
@@ -99,6 +101,17 @@ export const createComment = createServerFn({ method: "POST" })
     Subject.extend({ body: z.string().trim().min(1).max(1000) }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    // Screen before insert so blocked text is never stored.
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "post_comments",
+      context: mod.COMMENT_CONTEXT,
+      fields: { comment: data.body },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
     const { data: row, error } = await context.supabase
       .from("post_comments" as any)
       .insert({
@@ -110,7 +123,9 @@ export const createComment = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    return row;
+    const id = (row as unknown as { id: string }).id;
+    const status = await mod.settlePostModeration(supabaseAdmin, "post_comments", id, screen);
+    return { id, held: status !== "approved" };
   });
 
 export const updateComment = createServerFn({ method: "POST" })
@@ -119,14 +134,27 @@ export const updateComment = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), body: z.string().trim().min(1).max(1000) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "post_comments",
+      id: data.id,
+      context: mod.COMMENT_CONTEXT,
+      fields: { comment: data.body },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    const { count, error } = await context.supabase
       .from("post_comments" as any)
-      .update({ body: data.body } as any)
+      .update({ body: data.body } as any, { count: "exact" })
       .eq("id", data.id)
       .eq("author_id", context.userId)
       .is("deleted_at", null);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    if (!count) throw new Error("You can't edit this comment.");
+    const status = await mod.settlePostModeration(supabaseAdmin, "post_comments", data.id, screen);
+    return { ok: true, held: status !== "approved" };
   });
 
 export const deleteComment = createServerFn({ method: "POST" })

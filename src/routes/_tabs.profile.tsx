@@ -18,8 +18,10 @@ import { GameCardSkeleton } from "@/components/GameCardSkeleton";
 import { InfiniteList } from "@/components/InfiniteList";
 import { EmptyRequestsState } from "@/components/EmptyRequestsState";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { HERO_IMAGE } from "@/lib/sample-data";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -33,12 +35,13 @@ import {
   listMyJoinRequests,
   listHostJoinRequests,
   cancelMyJoinRequest,
-  withdrawMyApprovedJoinRequest,
   reviewJoinRequest,
   type JoinRequest,
 } from "@/lib/payments";
-import { leaveGame } from "@/lib/games-store";
-import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
+import { withdrawFromGame } from "@/lib/leave-game";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { MySignups } from "@/components/profile/MySignups";
+import { groupProfileGames } from "@/lib/game-series";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -75,9 +78,9 @@ export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
     pageHead({
       path: "/profile",
-      title: "Your profile — ballaCity",
+      title: "Your profile — BallaCity",
       description:
-        "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
+        "Your BallaCity profile: sports, skill levels, availability, games, and reviews.",
       noindex: true,
     }),
   // URL-persisted requests filter (all/host/player).
@@ -133,27 +136,10 @@ function PlayerProfile() {
   const follow = useFollow(profileUser?.id ?? "");
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
-  const upcomingGroups = useMemo(() => {
-    const ids = new Set(joinedGameIds);
-    const pool = [...hosted, ...GAMES];
-    const seen = new Set<string>();
-    const isHosting = (g: Game) =>
-      Boolean(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id);
-    const relevant = pool
-      .filter((game) => ids.has(game.id) || isHosting(game))
-      .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
-      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-    const live = hideFinishedGames(relevant);
-    const finished = onlyFinishedGames(relevant).sort((a, b) => gameEndsAt(b) - gameEndsAt(a));
-    return {
-      hosting: live.filter(isHosting),
-      playing: live.filter((g) => !isHosting(g)),
-      total: live.length,
-      archiveHosting: finished.filter(isHosting),
-      archivePlaying: finished.filter((g) => !isHosting(g)),
-      archiveTotal: finished.length,
-    };
-  }, [joinedGameIds, hosted, profileUser]);
+  const upcomingGroups = useMemo(
+    () => groupProfileGames([...hosted, ...GAMES], new Set(joinedGameIds), profileUser?.id),
+    [joinedGameIds, hosted, profileUser?.id],
+  );
 
   // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
@@ -663,8 +649,7 @@ function PlayerProfile() {
                             const prev = myRequests;
                             setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
                             try {
-                              await withdrawMyApprovedJoinRequest(r.game_id);
-                              leaveGame(r.game_id);
+                              await withdrawFromGame(r.game_id, g.title);
                               toast("You withdrew from the game.");
                             } catch (e: any) {
                               setMyRequests(prev);
@@ -719,6 +704,11 @@ function PlayerProfile() {
           )}
         </section>
 
+        {/* Tryouts, camps and trainer sessions — cancellable from here */}
+        <div className={activeTab === "games" ? "" : "hidden"}>
+          <MySignups />
+        </div>
+
         {/* Pickup / Playing */}
         <section className={`mt-6 ${activeTab === "games" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -742,7 +732,15 @@ function PlayerProfile() {
               items={upcomingGroups.playing}
               pageSize={6}
               keyFor={(g) => g.id}
-              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderItem={(g, i) => (
+                <div>
+                  <GameCard game={g} index={i} />
+                  {/* Cancel / withdraw / leave, whichever fits where they are in the flow. */}
+                  <div className="mt-1.5 text-right">
+                    <LeaveFlowButton gameId={g.id} gameTitle={g.title} variant="link" />
+                  </div>
+                </div>
+              )}
               renderSkeleton={() => <GameCardSkeleton />}
               resetKey="playing"
             />
@@ -892,6 +890,7 @@ function PlayerProfile() {
 
         {/* Reviews tab — inline */}
         <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
+          <SkillRatingCard userId={user?.id} isOwner />
           <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
         </div>
 

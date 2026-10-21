@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { computeAthleteProgress, type AthleteProgress } from "@/lib/athlete-xp";
+import { teamAvatarDisplay } from "@/lib/team-avatar";
 
 export type PassportTeam = {
   id: string;
@@ -33,9 +35,11 @@ export type PlayerPassport = {
   teams: PassportTeam[];
   accolades: PassportAccolade[];
   upcomingRuns: PassportRun[];
+  /** Null for minors or when the player hides games played. */
+  progress?: AthleteProgress | null;
 };
 
-const EMPTY: PlayerPassport = { teams: [], accolades: [], upcomingRuns: [] };
+const EMPTY: PlayerPassport = { teams: [], accolades: [], upcomingRuns: [], progress: null };
 const MINOR_COHORTS = ["child_under_13", "teen_13_15", "teen_16_17"];
 
 /**
@@ -71,7 +75,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
 
     const { data: memberRows } = await supabaseAdmin
       .from("team_members")
-      .select("role, teams(id, name, handle, avatar, kind, hidden_at)")
+      .select("role, teams(id, name, handle, avatar, avatar_url, kind, hidden_at)")
       .eq("user_id", userId)
       .limit(20);
     const teams: PassportTeam[] = [];
@@ -82,6 +86,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         name: string;
         handle: string | null;
         avatar: string | null;
+        avatar_url?: string | null;
         kind: string | null;
         hidden_at: string | null;
       } | null;
@@ -92,14 +97,14 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         id: t.id,
         name: t.name,
         handle: t.handle,
-        avatar: t.avatar,
+        avatar: teamAvatarDisplay(t) || null,
         kind: t.kind,
         role: row.role,
       });
     }
 
     // Minors: team badges only, never where they've been or will be.
-    if (isMinor) return { teams, accolades: [], upcomingRuns: [] };
+    if (isMinor) return { teams, accolades: [], upcomingRuns: [], progress: null };
 
     const [rsvpRes, joinRes] = await Promise.all([
       supabaseAdmin
@@ -108,11 +113,16 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         .eq("user_id", userId)
         .limit(50),
       showGames
-        ? supabaseAdmin.from("game_participants").select("game_id").eq("user_id", userId).limit(200)
-        : Promise.resolve({ data: [] as { game_id: string }[] }),
+        ? supabaseAdmin
+            .from("game_participants")
+            .select("game_id, attended")
+            .eq("user_id", userId)
+            .limit(500)
+        : Promise.resolve({ data: [] as { game_id: string; attended: boolean | null }[] }),
     ]);
 
     let accolades: PassportAccolade[] = [];
+    let attendedTryouts = 0;
     const rsvps = rsvpRes.data ?? [];
     if (rsvps.length > 0) {
       const { data: evals } = await supabaseAdmin
@@ -124,6 +134,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         )
         .eq("attended", true);
       const attended = new Set((evals ?? []).map((e) => e.rsvp_id));
+      attendedTryouts = attended.size;
       const postIds = rsvps.filter((r) => attended.has(r.id)).map((r) => r.post_id);
       if (postIds.length > 0) {
         const { data: posts } = await supabaseAdmin
@@ -176,5 +187,44 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
       }));
     }
 
-    return { teams, accolades, upcomingRuns };
+    let progress: AthleteProgress | null = null;
+    if (showGames) {
+      const marked = (joinRes.data ?? []).filter((r) => r.attended != null);
+      const [datesRes, hostedRes, lateRes] = await Promise.all([
+        marked.length
+          ? supabaseAdmin
+              .from("hosted_games")
+              .select("id, date")
+              .in(
+                "id",
+                marked.map((r) => r.game_id),
+              )
+          : Promise.resolve({ data: [] as { id: string; date: string }[] }),
+        supabaseAdmin
+          .from("hosted_games")
+          .select("id", { count: "exact", head: true })
+          .eq("host_id", userId)
+          .is("cancelled_at", null)
+          .lt("date", new Date().toISOString()),
+        supabaseAdmin
+          .from("late_cancellations")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("cancelled_by", userId),
+      ]);
+      const dateOf = new Map((datesRes.data ?? []).map((g) => [g.id, +new Date(g.date)]));
+      const history = [...marked]
+        .sort((a, b) => (dateOf.get(b.game_id) ?? 0) - (dateOf.get(a.game_id) ?? 0))
+        .map((r) => r.attended === true);
+      progress = computeAthleteProgress({
+        attendedRuns: history.filter(Boolean).length,
+        noShows: history.filter((x) => !x).length,
+        lateCancels: lateRes.count ?? 0,
+        hostedGames: hostedRes.count ?? 0,
+        attendedTryouts,
+        attendanceHistory: history,
+      });
+    }
+
+    return { teams, accolades, upcomingRuns, progress };
   });

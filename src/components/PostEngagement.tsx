@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Pencil, SmilePlus, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
+import { heldNotice } from "@/lib/post-moderation";
 import {
   REACTION_EMOJI,
   createComment,
@@ -99,7 +100,9 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
 
   const createMut = useMutation({
     mutationFn: (text: string) => createCommentFn({ data: { subjectType, subjectId, body: text } }),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const held = heldNotice(result);
+      if (held) toast.message(held);
       setBody("");
       qc.invalidateQueries({ queryKey: commentsKey });
     },
@@ -115,7 +118,9 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
   const updateMut = useMutation({
     mutationFn: ({ id, body }: { id: string; body: string }) =>
       updateCommentFn({ data: { id, body } }),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const held = heldNotice(result);
+      if (held) toast.message(held);
       setEditingId(null);
       setEditBody("");
       qc.invalidateQueries({ queryKey: commentsKey });

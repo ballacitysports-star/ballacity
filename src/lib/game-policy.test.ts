@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CANCELLATION_POLICIES,
   defaultGamePolicy,
   normalizeGamePolicy,
   validateGamePolicy,
@@ -51,5 +52,14 @@ describe("game policy", () => {
   it("covers the eight host acknowledgment topics", () => {
     expect(HOST_ACK_ITEMS).toHaveLength(8);
     expect(new Set(HOST_ACK_ITEMS.map((i) => i.id)).size).toBe(8);
+  });
+});
+
+describe("cancellation policy presets and the cutoff", () => {
+  it("each named preset promises a cutoff that matches its label", () => {
+    const byId = Object.fromEntries(CANCELLATION_POLICIES.map((p) => [p.id, p.cutoffMin]));
+    expect(byId.standard).toBe(1440); // "Cancel 24h ahead"
+    expect(byId.strict).toBeGreaterThan(byId.standard as number);
+    expect(byId.custom).toBeNull(); // custom leaves the host's cutoff alone
   });
 });

@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, CalendarRange, MapPin, Users, Wallet, BellRing, Share2, Check } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarRange, MapPin, Users, Wallet, BellRing, Share2 } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatGameWhen } from "@/lib/format";
+import { ShareSheet } from "@/components/ShareSheet";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { HostGamesCalendar } from "@/components/games/HostGamesCalendar";
 
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/host")({
   head: () =>
     pageHead({
       path: "/host",
-      title: "Host Dashboard — ballaCity",
+      title: "Host Dashboard — BallaCity",
       description: "Manage your hosted games, unpaid players and payment reminders.",
       noindex: true,
     }),
@@ -44,28 +44,13 @@ function HostDashboard() {
     nav({ to: "/host", search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }), replace: true });
 
   const [games, setGames] = useState<HostedGame[] | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
-  const shareGame = async (g: HostedGame) => {
-    const url = `${window.location.origin}/games/${g.id}`;
-    const text = `Join my game "${g.title}" on ballaCity — ${formatGameWhen({ date: g.date })}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: g.title, text, url });
-        return;
-      } catch {
-        /* user cancelled or share unsupported — fall through to copy */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      window.prompt("Copy this invite link:", url);
-    }
-    setCopiedId(g.id);
-    toast.success("Invite link copied — send it to your players");
-    setTimeout(() => setCopiedId((c) => (c === g.id ? null : c)), 2000);
-  };
+  const gameShare = (g: HostedGame) => ({
+    title: g.title,
+    text: `Join my game "${g.title}" on BallaCity — ${formatGameWhen({ date: g.date })}`,
+    url: `${window.location.origin}/games/${g.id}`,
+  });
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -197,20 +182,21 @@ function HostDashboard() {
                 </div>
               </div>
               {!g.cancelled_at && (
-                <button
-                  onClick={() => void shareGame(g)}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-lime/40 hover:text-foreground"
-                >
-                  {copiedId === g.id ? (
-                    <>
-                      <Check className="h-3.5 w-3.5 text-lime" /> Link copied
-                    </>
-                  ) : (
-                    <>
-                      <Share2 className="h-3.5 w-3.5" /> Share invite link
-                    </>
+                <>
+                  <button
+                    onClick={() => setSharingId(g.id)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-lime/40 hover:text-foreground"
+                  >
+                    <Share2 className="h-3.5 w-3.5" /> Share invite link
+                  </button>
+                  {sharingId === g.id && (
+                    <ShareSheet
+                      content={gameShare(g)}
+                      open
+                      onOpenChange={(o) => !o && setSharingId(null)}
+                    />
                   )}
-                </button>
+                </>
               )}
             </div>
           ))}

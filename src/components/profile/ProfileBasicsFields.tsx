@@ -53,6 +53,7 @@ export function ProfileBasicsFields({
       <Field label="Cover photo">
         <ImageUploader
           kind="cover"
+          bannerPreview
           bucket="covers"
           pathPrefix={userId}
           value={value.coverUrl ?? ""}

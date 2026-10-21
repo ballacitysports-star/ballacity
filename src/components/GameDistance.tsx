@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { MapPin } from "lucide-react";
 import { Distance } from "@/components/Distance";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { useGameDistance } from "@/lib/game-distance";
+import { gamePlaceLabel } from "@/lib/game-place";
 import type { Game } from "@/lib/sample-data";
 
 type GameGeo = Pick<Game, "lat" | "lng" | "pseudoGeo" | "distanceMi">;
@@ -23,12 +24,21 @@ export function GameDistance({
   decimals,
   className,
   showPrompt = true,
+  prefix,
+  whenUnavailable,
 }: {
   game: GameGeo;
   decimals?: number;
   className?: string;
   /** Show a tappable "Enable location" hint when we lack the viewer's position. */
   showPrompt?: boolean;
+  /** Rendered just before the distance, only when there is one (e.g. a separator). */
+  prefix?: ReactNode;
+  /**
+   * Rendered instead of the "Enable location" / "Distance unavailable" text when
+   * no distance can be shown. Pass `null` to render nothing.
+   */
+  whenUnavailable?: ReactNode;
 }) {
   const { mi, reason, status, remembered, explanation, error, requestLocation } =
     useGameDistance(game);
@@ -70,6 +80,7 @@ export function GameDistance({
   if (mi != null) {
     const value = (
       <span className={className} title={explanation ?? undefined}>
+        {prefix}
         <Distance mi={mi} decimals={decimals ?? (mi < 10 ? 1 : 0)} />
         {remembered ? <span className="ml-1 opacity-70">· approx</span> : null}
       </span>
@@ -91,6 +102,8 @@ export function GameDistance({
     );
   }
 
+  if (whenUnavailable !== undefined) return <>{whenUnavailable}</>;
+
   if (reason === "no-viewer-location" && showPrompt) {
     const label =
       status === "denied" || status === "unsupported" ? "Set location" : "Enable location";
@@ -100,6 +113,36 @@ export function GameDistance({
   return (
     <span className={className} title={explanation ?? undefined}>
       Distance unavailable
+    </span>
+  );
+}
+
+/**
+ * Where a game is, for cards and list rows: the venue (or city) and, when the
+ * viewer's location is on, the distance after it. Without a known place it
+ * falls back to the distance / "Enable location" prompt.
+ */
+export function GamePlaceDistance({
+  game,
+  className,
+}: {
+  game: GameGeo & Pick<Game, "location" | "neighborhood">;
+  className?: string;
+}) {
+  const place = gamePlaceLabel(game);
+  if (!place) return <GameDistance game={game} className={className} />;
+  return (
+    <span className={`inline-flex min-w-0 items-center ${className ?? ""}`}>
+      <span className="truncate" title={game.location || undefined}>
+        {place}
+      </span>
+      <GameDistance
+        game={game}
+        showPrompt={false}
+        prefix={<span aria-hidden> · </span>}
+        whenUnavailable={null}
+        className="shrink-0 whitespace-nowrap"
+      />
     </span>
   );
 }

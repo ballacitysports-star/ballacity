@@ -243,6 +243,8 @@ test("pay is blocked while pending; after approval exactly one submission is cre
     .first()
     .click();
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
   await expect(submitBtn).toBeVisible({ timeout: 10_000 });
 
   // Submit the one legitimate payment via the approved path.

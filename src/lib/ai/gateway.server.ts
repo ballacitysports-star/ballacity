@@ -86,17 +86,22 @@ export async function rawChat(body: {
   tools?: readonly any[];
   json?: boolean;
   modalities?: string[];
+  signal?: AbortSignal;
 }): Promise<{ message: any; usage: AiTokenUsage; model: string }> {
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) throw new AiError("FEATURE_DISABLED", { detail: "AI key not configured" });
 
   let lastError: AiError | null = null;
 
+  const timedOut = () => new AiError("TIMEOUT", { detail: "call cancelled at its deadline" });
+
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    if (body.signal?.aborted) throw timedOut();
     let res: Response;
     try {
       res = await fetch(GATEWAY_URL, {
         method: "POST",
+        signal: body.signal,
         headers: {
           "Lovable-API-Key": key,
           "X-Lovable-AIG-SDK": "manual-worker",
@@ -111,6 +116,7 @@ export async function rawChat(body: {
         }),
       });
     } catch (e) {
+      if (body.signal?.aborted) throw timedOut();
       lastError = toAiError(e);
       if (attempt === MAX_TRIES) throw lastError;
       await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
@@ -134,6 +140,7 @@ export async function rawChat(body: {
     }
 
     const data = (await res.json().catch(() => null)) as Record<string, any> | null;
+    if (body.signal?.aborted) throw timedOut();
     return {
       message: data?.["choices"]?.[0]?.message ?? null,
       usage: usageFrom(data?.["usage"]),
@@ -150,8 +157,10 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
     parts: AiMessagePart[];
     system: string;
     json: boolean;
+    signal?: AbortSignal;
   }): Promise<{ content: string; usage: AiTokenUsage; model: string }> {
     const raw = await rawChat({
+      signal: input.signal,
       model: input.model,
       messages: [
         { role: "system", content: input.system },
@@ -176,6 +185,7 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
       parts: partsFor(req),
       system: req.system,
       json: false,
+      signal: req.signal,
     });
     return { text: stripFence(out.content), model: out.model, usage: out.usage };
   }
@@ -188,6 +198,7 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
       parts: partsFor(req),
       system: req.system,
       json: true,
+      signal: req.signal,
     });
     return { data: parseJsonLoose<T>(out.content), model: out.model, usage: out.usage };
   }

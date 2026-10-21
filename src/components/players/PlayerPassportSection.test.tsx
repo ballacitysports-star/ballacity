@@ -43,7 +43,7 @@ describe("PlayerPassportView", () => {
           teams: [
             {
               id: "t1",
-              name: "Balacity 14U",
+              name: "BallaCity 14U",
               handle: null,
               avatar: "🏀",
               kind: "team",
@@ -64,7 +64,7 @@ describe("PlayerPassportView", () => {
               title: "Spring Tryout",
               kind: "tryout",
               teamId: "t1",
-              teamName: "Balacity 14U",
+              teamName: "BallaCity 14U",
               date: null,
             },
           ],
@@ -83,7 +83,7 @@ describe("PlayerPassportView", () => {
     );
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual(["/teams/t1", "/trainers/c1", "/tryouts/p1", "/games/g1"]);
-    expect(screen.getByText(/Attended Spring Tryout · Balacity 14U/)).toBeTruthy();
+    expect(screen.getByText(/Attended Spring Tryout · BallaCity 14U/)).toBeTruthy();
     expect(screen.getByTestId("venue").textContent).toBe("org-1");
   });
 });

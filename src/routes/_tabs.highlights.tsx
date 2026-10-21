@@ -30,14 +30,14 @@ export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
     pageHead({
       path: "/highlights",
-      title: "Highlight feed — ballaCity",
+      title: "Highlight feed — BallaCity",
       description:
-        "Scroll the latest player highlight reels on ballaCity: basketball, soccer, and every other pickup sport, linked to the games they came from.",
+        "Scroll the latest player highlight reels on BallaCity: basketball, soccer, and every other pickup sport, linked to the games they came from.",
       ogType: "website",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
-        name: "ballaCity highlight feed",
+        name: "BallaCity highlight feed",
       },
     }),
   component: HighlightFeedPage,

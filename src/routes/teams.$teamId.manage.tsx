@@ -12,11 +12,12 @@ import { InvitesTab } from "@/components/team/manage/InvitesTab";
 import { SettingsTab } from "@/components/team/manage/SettingsTab";
 import { WaiverTab } from "@/components/team/manage/WaiverTab";
 import { RsvpsTab } from "@/components/team/manage/RsvpsTab";
+import { TeamAnalyticsPanel } from "@/components/teams/TeamAnalyticsPanel";
 
 export const Route = createFileRoute("/teams/$teamId/manage")({
   head: () =>
     pageHead({
-      title: "Manage team — ballaCity",
+      title: "Manage team — BallaCity",
       description: "Manage your team's roster, invitations and ownership.",
       noindex: true,
     }),
@@ -116,6 +117,7 @@ function ManageTeam() {
           <TabsTrigger value="rsvps">RSVPs &amp; waivers</TabsTrigger>
           <TabsTrigger value="invites">Invitations</TabsTrigger>
           <TabsTrigger value="waiver">Waiver</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="pt-4">
@@ -133,6 +135,9 @@ function ManageTeam() {
         </TabsContent>
         <TabsContent value="waiver" className="pt-4">
           <WaiverTab teamId={teamId} teamName={teamName} />
+        </TabsContent>
+        <TabsContent value="analytics" className="pt-4">
+          <TeamAnalyticsPanel teamId={teamId} />
         </TabsContent>
         <TabsContent value="settings" className="pt-4">
           <SettingsTab teamId={teamId} teamName={teamName} />

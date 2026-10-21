@@ -1,5 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getFamilyPostsEnabled } from "@/lib/reels.functions";
+import { TeenReelReview } from "@/components/child/TeenReelReview";
+import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
+import { getChildPublicXp, setChildPublicXp } from "@/lib/public-xp.functions";
+import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
+import {
+  getChildFamilySharing,
+  getChildFamilyView,
+  setChildFamilySharing,
+  setChildFamilyView,
+} from "@/lib/family-clips.functions";
+import type { GuardianChild } from "@/lib/child-safety.functions";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
@@ -32,9 +46,9 @@ export const Route = createFileRoute("/parent/")({
   head: () =>
     pageHead({
       path: "/parent",
-      title: "Parent Center — ballaCity",
+      title: "Parent Center — BallaCity",
       description:
-        "Manage your child's ballaCity account: messaging, video visibility, discoverability, data requests and consent.",
+        "Manage your child's BallaCity account: messaging, video visibility, discoverability, data requests and consent.",
       noindex: true,
     }),
   ssr: false,
@@ -58,6 +72,153 @@ const MEDIA_OPTIONS: Array<{
   { value: "guardian", label: "Guardian review", hint: "You see everything they upload." },
   { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
 ];
+
+/**
+ * Family post: add a private clip of an under-13 child to the parent's own reels.
+ * Only shown while the family_posts switch is on. The clip is never public or
+ * visible to other members; the database enforces that and the guardian link.
+ */
+function FamilyPostLink({ child }: { child: GuardianChild }) {
+  const fetchEnabled = useServerFn(getFamilyPostsEnabled);
+  const { data } = useQuery({
+    queryKey: ["family-posts-enabled"],
+    queryFn: () => fetchEnabled(),
+    staleTime: 60_000,
+  });
+  const qc = useQueryClient();
+  const getViewFn = useServerFn(getChildFamilyView);
+  const setViewFn = useServerFn(setChildFamilyView);
+  const getShareFn = useServerFn(getChildFamilySharing);
+  const setShareFn = useServerFn(setChildFamilySharing);
+  const enabled = data?.enabled === true && child.cohort === "child_under_13";
+  const { data: sharing } = useQuery({
+    queryKey: ["child-family-sharing", child.childUserId],
+    queryFn: () => getShareFn({ data: { childUserId: child.childUserId } }),
+    enabled,
+  });
+  const shareRows = [
+    {
+      kind: "link" as const,
+      checked: sharing?.links === true,
+      label: "Allow private links",
+      hint: "You can send one clip at a time to someone, such as a coach or relative. Links expire and you can turn them off.",
+    },
+    {
+      kind: "team" as const,
+      checked: sharing?.team === true,
+      label: "Allow sharing with a team",
+      hint: "You can let one team that includes them watch a clip. Never anyone under 13.",
+    },
+  ];
+  const { data: view } = useQuery({
+    queryKey: ["child-family-view", child.childUserId],
+    queryFn: () => getViewFn({ data: { childUserId: child.childUserId } }),
+    enabled,
+  });
+  if (!enabled) return null;
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <div className="text-sm font-semibold">Add a clip of {child.displayName}</div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Upload to your own reels and tag it to {child.displayName}. Only you can see it: it never
+        appears on the highlights feed, on a profile, or to other members.
+      </p>
+      {child.controls.aiAnalysis ? (
+        <GuardianVideoUploadDialog childUserId={child.childUserId} className="mt-2" />
+      ) : (
+        <p className="mt-2 text-xs font-semibold text-amber-300">
+          Turn on &ldquo;AI video analysis&rdquo; below first. Every clip is analysed by AI.
+        </p>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold">{child.displayName} can watch these clips</div>
+          <p className="text-[11px] text-muted-foreground">
+            Read-only, on their own account. They can&apos;t edit, delete or share them.
+          </p>
+        </div>
+        <Switch
+          checked={view?.enabled ?? true}
+          onCheckedChange={async (v) => {
+            try {
+              await setViewFn({ data: { childUserId: child.childUserId, enabled: v } });
+              await qc.invalidateQueries({ queryKey: ["child-family-view", child.childUserId] });
+              toast.success("Setting saved");
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not save this setting");
+            }
+          }}
+          aria-label={`${child.displayName} can watch family clips`}
+        />
+      </div>
+      {shareRows.map((row) => (
+        <div
+          key={row.kind}
+          className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3"
+        >
+          <div className="min-w-0">
+            <div className="text-xs font-semibold">{row.label}</div>
+            <p className="text-[11px] text-muted-foreground">{row.hint} Off until you turn it on.</p>
+          </div>
+          <Switch
+            checked={row.checked}
+            onCheckedChange={async (v) => {
+              try {
+                await setShareFn({ data: { childUserId: child.childUserId, kind: row.kind, enabled: v } });
+                await qc.invalidateQueries({ queryKey: ["child-family-sharing", child.childUserId] });
+                await qc.invalidateQueries({ queryKey: ["family-share-enabled"] });
+                await qc.invalidateQueries({ queryKey: ["family-team-share-enabled"] });
+                toast.success(v ? "Turned on" : "Turned off, and anything already shared this way has been stopped");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Could not save this setting");
+              }
+            }}
+            aria-label={`${row.label} for ${child.displayName}`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Safe public XP: show this child's level, XP bar and milestone badges on their public
+ * Player Card. Off until the guardian turns it on. Never shows game dates, venues,
+ * streaks, reliability or attendance.
+ */
+function PublicXpToggle({ child }: { child: GuardianChild }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getChildPublicXp);
+  const setFn = useServerFn(setChildPublicXp);
+  const { data } = useQuery({
+    queryKey: ["child-public-xp", child.childUserId],
+    queryFn: () => getFn({ data: { childUserId: child.childUserId } }),
+  });
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">Show {child.displayName}&apos;s level and XP publicly</div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Their level, XP bar and milestone badges appear on their Player Card. Never game dates,
+          locations, streaks or attendance. Off until you turn it on.
+        </p>
+      </div>
+      <Switch
+        checked={data?.enabled === true}
+        onCheckedChange={async (v) => {
+          try {
+            await setFn({ data: { childUserId: child.childUserId, enabled: v } });
+            await qc.invalidateQueries({ queryKey: ["child-public-xp", child.childUserId] });
+            toast.success(v ? "Level and XP are now public" : "Level and XP are no longer public");
+          } catch (e: any) {
+            toast.error(e?.message ?? "Could not save this setting");
+          }
+        }}
+        aria-label={`Show ${child.displayName}'s level and XP publicly`}
+      />
+    </div>
+  );
+}
 
 function OptionRow<T extends string>({
   label,
@@ -215,6 +376,12 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       ) : null}
 
       <div className="mt-4 grid gap-4">
+        <FamilyPostLink child={child} />
+        {child.cohort === "teen_13_15" && (
+          <TeenReelReview childUserId={child.childUserId} childName={child.displayName} />
+        )}
+        <PublicXpToggle child={child} />
+        <AnalyticsCoachShare childUserId={child.childUserId} childName={child.displayName} />
         <OptionRow
           label="Messaging"
           value={c.messaging}
@@ -224,7 +391,12 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         <OptionRow
           label="Video visibility"
           value={c.mediaVisibility}
-          options={MEDIA_OPTIONS}
+          options={
+            // 13-15: team access is approved per reel in the list above, never by a blanket setting.
+            child.cohort === "teen_13_15"
+              ? MEDIA_OPTIONS.filter((o) => o.value !== "teammates")
+              : MEDIA_OPTIONS
+          }
           onChange={(v) => set({ media_visibility: v })}
         />
         {[
@@ -413,7 +585,7 @@ function ParentCenterPage() {
       <main className="page-shell-content py-10">
         <h1 className="page-title">Parent Center</h1>
         <p className="mt-2 page-subtitle">
-          Sign in with your adult account to manage a child&rsquo;s ballaCity account.
+          Sign in with your adult account to manage a child&rsquo;s BallaCity account.
         </p>
         <Link
           to="/auth"

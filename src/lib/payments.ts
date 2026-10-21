@@ -26,6 +26,11 @@ export type GamePaymentSettings = {
   entry_fee: number;
   accepted_method_ids: string[];
   payment_deadline: string | null;
+  /** Minutes an approved player has to pay before the spot auto-releases. */
+  payment_hold_minutes?: number | null;
+  /** Structured refund rule (see lib/refund-policy). */
+  refund_rule?: string | null;
+  late_refund_pct?: number | null;
   refund_policy: string | null;
   payment_instructions: string | null;
   requires_approval: boolean;
@@ -87,7 +92,19 @@ export type PaymentSubmission = {
   disputed_by?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  /** Set when the refund policy has been applied (see lib/refund-policy). */
+  refund_status?: "owed" | "refunded" | "kept" | null;
+  refund_amount?: number | null;
+  refund_pct?: number | null;
+  refund_reason?: "player_cancelled" | "no_show" | "game_cancelled" | null;
+  refunded_at?: string | null;
 };
+
+/** Host confirms they sent a refund the policy says is owed. */
+export async function markRefundSent(submissionId: string) {
+  const { error } = await supabase.rpc("mark_refund_sent", { _submission: submissionId });
+  if (error) throw error;
+}
 
 export const PAYMENT_TYPES: {
   id: PaymentType;
@@ -242,7 +259,9 @@ export async function saveMyPayPalAccount(merchantId: string, email?: string | n
   if (!u.user) throw new Error("Sign in to connect PayPal.");
   const clean = merchantId.trim();
   if (!/^[A-Za-z0-9]{3,64}$/.test(clean)) {
-    throw new Error("Enter your PayPal Merchant ID (13 letters/numbers, from your PayPal business settings).");
+    throw new Error(
+      "Enter your PayPal Merchant ID (13 letters/numbers, from your PayPal business settings).",
+    );
   }
   const { error } = await supabase.from("host_paypal_accounts").upsert({
     host_id: u.user.id,
@@ -272,6 +291,20 @@ export async function getGamePaymentSettings(gameId: string): Promise<GamePaymen
   return (data as GamePaymentSettings) ?? null;
 }
 
+/**
+ * The host's refund terms, readable by anyone who can see the game (the full
+ * settings row is restricted to the host and linked players).
+ */
+export async function getGameRefundTerms(gameId: string): Promise<{
+  refund_rule: string;
+  late_refund_pct: number;
+  refund_policy: string | null;
+} | null> {
+  const { data, error } = await supabase.rpc("get_game_refund_terms", { _game_id: gameId });
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
 export async function getMyGamePaymentSettings(
   gameId: string,
 ): Promise<GamePaymentSettings | null> {
@@ -292,6 +325,9 @@ export async function upsertGamePaymentSettings(input: {
   entry_fee: number;
   accepted_method_ids: string[];
   payment_deadline?: string | null;
+  payment_hold_minutes?: number | null;
+  refund_rule?: string;
+  late_refund_pct?: number;
   refund_policy?: string | null;
   payment_instructions?: string | null;
   requires_approval?: boolean;
@@ -306,7 +342,7 @@ export async function upsertGamePaymentSettings(input: {
   if (!u.user) throw new Error("Sign in to configure payments.");
   const payment_mode = input.payment_mode ?? "direct_host";
   if (payment_mode !== "direct_host") {
-    throw new Error("ballaCity does not process game payments yet — hosts collect directly.");
+    throw new Error("BallaCity does not process game payments yet — hosts collect directly.");
   }
   const { error } = await supabase
     .from("game_payment_settings")
@@ -433,7 +469,7 @@ export async function cancelMyPaymentSubmission(
   if (error) throw error;
 }
 
-/** Either party can flag a payment as disputed; ballaCity never moves money. */
+/** Either party can flag a payment as disputed; BallaCity never moves money. */
 export async function disputeMyPaymentSubmission(id: string, reason: string) {
   const trimmed = reason.trim().slice(0, 500);
   if (!trimmed) throw new Error("Tell us what went wrong with this payment.");

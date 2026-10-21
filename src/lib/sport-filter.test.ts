@@ -87,6 +87,19 @@ describe("matching", () => {
     ).toBe(true);
   });
 
+  it("also matches levels the post itself picked, even when the profile tier differs", () => {
+    const postTiers = (sport: string) => (sport === "Tennis" ? ["3.0", "4.5"] : []);
+    expect(
+      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], { Tennis: "4.5" }, postTiers),
+    ).toBe(true);
+    expect(matchesSportSkillFilter(levels, ["Tennis"], null, [], { Tennis: "4.5" }, postTiers)).toBe(
+      true,
+    );
+    expect(
+      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], { Tennis: "5.0" }, postTiers),
+    ).toBe(false);
+  });
+
   it("matches orgs on any selected sport", () => {
     expect(matchesSportList(["Soccer"], [])).toBe(true);
     expect(matchesSportList(["Soccer"], ["Baseball", "Soccer"])).toBe(true);

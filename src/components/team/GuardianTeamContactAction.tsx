@@ -61,7 +61,9 @@ export function GuardianTeamContactAction({ teamId }: { teamId: string }) {
         params: { conversationId },
       });
     } catch (error) {
-      toast.error(describeMessagingError(error, "Couldn't message this team leader."));
+      toast.error(
+        describeMessagingError(error, "Couldn't message this team leader.", "team_leader"),
+      );
     } finally {
       setOpeningUserId(null);
     }

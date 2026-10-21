@@ -55,7 +55,9 @@ import { LegalNotice } from "@/components/LegalNotice";
 
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
+import { normalizeRefundPolicy, refundDisclaimer, refundTermsDisplay } from "@/lib/refund-policy";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
@@ -130,7 +132,7 @@ function feeLabel(fee: number | null | undefined) {
 export const Route = createFileRoute("/games/$gameId/pay")({
   head: () =>
     pageHead({
-      title: "Pay for your spot — ballaCity",
+      title: "Pay for your spot — BallaCity",
       description: "Submit payment for your approved spot in this game.",
       noindex: true,
     }),
@@ -193,6 +195,7 @@ function PayPage() {
   const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
@@ -766,6 +769,11 @@ function PayPage() {
           host_id={settings!.host_id}
           method={picked}
           extraInstructions={settings?.payment_instructions ?? null}
+          refundTerms={refundDisclaimer(
+            normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
+            game.cancelCutoffMin,
+            refundTerms?.refund_policy,
+          )}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             // Do NOT join the roster yet — player is only added after the
@@ -779,12 +787,27 @@ function PayPage() {
       )}
 
       {/* Footer: refund policy is collapsed by default; legal always shows */}
-      {settings?.refund_policy && (
-        <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
-          <summary className="cursor-pointer font-semibold">Refund policy</summary>
-          <p className="mt-2 text-muted-foreground">{settings.refund_policy}</p>
-        </details>
-      )}
+      <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
+        <summary className="cursor-pointer font-semibold">Refund policy</summary>
+        {(() => {
+          const display = refundTermsDisplay(refundTerms, game.cancelCutoffMin);
+          if (!display)
+            return (
+              <p className="mt-2 text-muted-foreground">The host hasn't posted refund terms yet.</p>
+            );
+          return (
+            <div className="mt-2 space-y-1 text-muted-foreground">
+              <p>{display.summary}</p>
+              {display.hostNote && (
+                <p>
+                  <span className="font-semibold text-foreground">Host's note: </span>
+                  {display.hostNote}
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </details>
 
       <LegalNotice />
     </div>
@@ -1172,6 +1195,7 @@ function PaymentInstructionsAndProof({
   host_id,
   method,
   extraInstructions,
+  refundTerms,
   onCancel,
   onSubmitted,
 }: {
@@ -1181,6 +1205,8 @@ function PaymentInstructionsAndProof({
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
+  /** The refund disclaimer the player must accept before submitting payment. */
+  refundTerms: string;
   onCancel: () => void;
   onSubmitted: () => void;
 }) {
@@ -1197,6 +1223,7 @@ function PaymentInstructionsAndProof({
   const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
   const [paidAmount, setPaidAmount] = useState(() => (fee && fee > 0 ? String(fee) : ""));
+  const [acceptedRefundTerms, setAcceptedRefundTerms] = useState(false);
   const deepLink = resolvePaymentDeepLink(method, fee, game_title);
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
@@ -1537,10 +1564,7 @@ function PaymentInstructionsAndProof({
         />
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label
-              htmlFor="paid-amount"
-              className="block micro-label text-muted-foreground mb-1"
-            >
+            <label htmlFor="paid-amount" className="block micro-label text-muted-foreground mb-1">
               Amount paid *
             </label>
             <div className="relative">
@@ -1568,10 +1592,7 @@ function PaymentInstructionsAndProof({
             )}
           </div>
           <div>
-            <label
-              htmlFor="paid-at"
-              className="block micro-label text-muted-foreground mb-1"
-            >
+            <label htmlFor="paid-at" className="block micro-label text-muted-foreground mb-1">
               Payment date *
             </label>
             <input
@@ -1630,10 +1651,19 @@ function PaymentInstructionsAndProof({
             </p>
           )}
         </div>
+        <label className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          <input
+            type="checkbox"
+            checked={acceptedRefundTerms}
+            onChange={(e) => setAcceptedRefundTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
+          />
+          <span>{refundTerms}</span>
+        </label>
         <PrimaryCTA
           type="button"
           onClick={() => void submitProof()}
-          disabled={uploadState === "uploading" || submitting}
+          disabled={uploadState === "uploading" || submitting || !acceptedRefundTerms}
           icon={<ShieldCheck className="h-4 w-4" />}
         >
           {submitting
@@ -1907,15 +1937,27 @@ function PayApprovalIndicator({
     >
   > = {
     requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
-    payment_pending: { label: "Payment due", tone: "warn", icon: "clock" },
-    payment_submitted: { label: "Payment sent — waiting on host", tone: "info", icon: "clock" },
-    payment_rejected: { label: "Payment declined — resubmit", tone: "bad", icon: "x" },
+    payment_pending: {
+      label: "Approved · Pay host directly to lock your spot",
+      tone: "warn",
+      icon: "clock",
+    },
+    payment_submitted: {
+      label: "Proof sent · Awaiting host confirmation",
+      tone: "info",
+      icon: "clock",
+    },
+    payment_rejected: {
+      label: "Payment declined by host · Resubmit proof or message host",
+      tone: "bad",
+      icon: "x",
+    },
     payment_verified: {
-      label: "Payment confirmed — you're on the roster",
+      label: "You're in! Payment confirmed",
       tone: "ok",
       icon: "shield",
     },
-    confirmed: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
+    confirmed: { label: "You're in! Payment confirmed", tone: "ok", icon: "shield" },
     rejected: { label: "Request declined", tone: "bad", icon: "x" },
   };
 

@@ -6,12 +6,19 @@
  * before launch.
  *
  * IMPORTANT (legal):
- * - ballaCity does NOT organize, supervise, or guarantee the safety of any game.
+ * - BallaCity does NOT organize, supervise, or guarantee the safety of any game.
  * - Host acknowledgments are a plain-language notice of responsibility. They are
  *   NOT a waiver or release of liability and are not universally enforceable.
  */
 
 import { LEGAL_REVIEW_LABEL, SAFETY_ACK_VERSION } from "@/lib/safety";
+import {
+  DEFAULT_REFUND_RULE,
+  normalizeRefundPolicy,
+  refundPolicySummary,
+  type RefundRule,
+} from "@/lib/refund-policy";
+import { DEFAULT_CANCEL_CUTOFF_MIN, normalizeCutoff } from "@/lib/cancel-window";
 
 export { LEGAL_REVIEW_LABEL, SAFETY_ACK_VERSION };
 
@@ -69,7 +76,7 @@ export const HOST_ACK_ITEMS: HostAckItem[] = [
   {
     id: "payment",
     label: "Payment info",
-    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not ballaCity.",
+    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not BallaCity.",
   },
 ];
 
@@ -79,7 +86,7 @@ export const HOST_ACK_CHECKBOX_LABEL =
 
 /** Configurable legal copy — pending review. */
 export const HOST_ACK_DISCLAIMER =
-  "ballaCity does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
+  "BallaCity does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
 
 // ---------------------------------------------------------------------------
 // Cancellation policy
@@ -90,24 +97,29 @@ export const CANCELLATION_POLICIES = [
     id: "flexible",
     label: "Flexible",
     short: "Cancel anytime",
+    /** Cancellation cutoff (minutes before start) this preset sets. */
+    cutoffMin: 120 as number | null,
     text: "Players can drop out any time before start. Refunds, if a fee was paid, are at the host's discretion.",
   },
   {
     id: "standard",
     label: "Standard",
     short: "Cancel 24h ahead",
+    cutoffMin: 1440 as number | null,
     text: "Players should drop out at least 24 hours before start so the host can fill the spot.",
   },
   {
     id: "strict",
     label: "Strict",
     short: "No late cancels",
+    cutoffMin: 2880 as number | null,
     text: "Spots are committed once approved. Late drop-outs may not be refunded and can affect reliability.",
   },
   {
     id: "custom",
     label: "Custom",
     short: "Host's own policy",
+    cutoffMin: null as number | null,
     text: "The host set their own cancellation terms — read them below.",
   },
 ] as const;
@@ -149,6 +161,13 @@ export type GamePolicy = {
   /** Entry fee in dollars; 0 = free. */
   entryFee: number;
   requiresApproval: boolean;
+  /** Structured refund rule; the time frame is the game's cancellation cutoff. */
+  refundRule: RefundRule;
+  /** Share refunded for late cancellations and no-shows (0 = fee kept). */
+  lateRefundPct: number;
+  /** Minutes before start that the refund rule's cutoff falls. */
+  cancelCutoffMin: number;
+  /** Optional extra refund notes from the host. */
   refundPolicy: string;
   gameRules: string;
 };
@@ -165,6 +184,9 @@ export function defaultGamePolicy(maxPlayers = 10): GamePolicy {
     allowWaitlist: true,
     entryFee: 0,
     requiresApproval: true,
+    refundRule: DEFAULT_REFUND_RULE,
+    lateRefundPct: 0,
+    cancelCutoffMin: DEFAULT_CANCEL_CUTOFF_MIN,
     refundPolicy: "",
     gameRules: "",
   };
@@ -189,6 +211,11 @@ export function normalizeGamePolicy(input: Partial<GamePolicy> | null | undefine
     allowWaitlist: input?.allowWaitlist ?? true,
     entryFee: Math.max(0, Number(input?.entryFee ?? 0) || 0),
     requiresApproval: input?.requiresApproval ?? true,
+    ...(() => {
+      const r = normalizeRefundPolicy(input?.refundRule, input?.lateRefundPct);
+      return { refundRule: r.rule, lateRefundPct: r.latePct };
+    })(),
+    cancelCutoffMin: normalizeCutoff(input?.cancelCutoffMin),
     refundPolicy: (input?.refundPolicy ?? "").trim(),
     gameRules: (input?.gameRules ?? "").trim(),
   };
@@ -212,10 +239,6 @@ export function validateGamePolicy(policy: GamePolicy): PolicyValidation {
   }
   if (policy.cancellationPolicy === "custom" && !policy.cancellationNotes.trim()) {
     return { ok: false, error: "Describe your custom cancellation policy." };
-  }
-  if (policy.entryFee > 0 && !policy.requiresApproval && !policy.refundPolicy.trim()) {
-    // Not fatal for publishing, but paid games should say something about refunds.
-    return { ok: false, error: "Add refund information for a paid game." };
   }
   return { ok: true };
 }
@@ -245,7 +268,7 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
     critical: true,
     value:
       policy.entryFee > 0
-        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. ballaCity doesn't process payments.`
+        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. BallaCity doesn't process payments.`
         : "Free to join — the host isn't collecting an entry fee here.",
   });
 
@@ -273,9 +296,16 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
       id: "refund",
       label: "Refunds",
       critical: true,
-      value:
-        policy.refundPolicy ||
-        "The host hasn't posted refund terms — ask before you pay, since ballaCity can't issue refunds.",
+      value: [
+        refundPolicySummary(
+          { rule: policy.refundRule, latePct: policy.lateRefundPct },
+          policy.cancelCutoffMin,
+        ),
+        policy.refundPolicy,
+        "Refunds come from the host directly — BallaCity can't hold or return money.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     });
   }
 

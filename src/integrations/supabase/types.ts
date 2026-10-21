@@ -287,6 +287,35 @@ export type Database = {
           },
         ]
       }
+      analytics_team_shares: {
+        Row: {
+          created_at: string
+          set_by: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          set_by: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          set_by?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_team_shares_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -519,6 +548,9 @@ export type Database = {
           ai_analysis: boolean
           child_user_id: string
           created_at: string
+          family_posts_child_view: boolean
+          family_posts_link_sharing: boolean
+          family_posts_team_sharing: boolean
           game_participation: boolean
           location_precision: string
           media_visibility: string
@@ -528,6 +560,7 @@ export type Database = {
           public_profile: boolean
           public_profile_authorized_at: string | null
           public_profile_authorized_by: string | null
+          public_xp: boolean
           social_discovery: boolean
           updated_at: string
           updated_by: string | null
@@ -536,6 +569,9 @@ export type Database = {
           ai_analysis?: boolean
           child_user_id: string
           created_at?: string
+          family_posts_child_view?: boolean
+          family_posts_link_sharing?: boolean
+          family_posts_team_sharing?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string
@@ -545,6 +581,7 @@ export type Database = {
           public_profile?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
+          public_xp?: boolean
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -553,6 +590,9 @@ export type Database = {
           ai_analysis?: boolean
           child_user_id?: string
           created_at?: string
+          family_posts_child_view?: boolean
+          family_posts_link_sharing?: boolean
+          family_posts_team_sharing?: boolean
           game_participation?: boolean
           location_precision?: string
           media_visibility?: string
@@ -562,6 +602,7 @@ export type Database = {
           public_profile?: boolean
           public_profile_authorized_at?: string | null
           public_profile_authorized_by?: string | null
+          public_xp?: boolean
           social_discovery?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -699,6 +740,50 @@ export type Database = {
         }
         Relationships: []
       }
+      family_post_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          last_viewed_at: string | null
+          reel_id: string
+          revoked_at: string | null
+          token_hash: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          last_viewed_at?: string | null
+          reel_id: string
+          revoked_at?: string | null
+          token_hash: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          reel_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_post_links_reel_id_fkey"
+            columns: ["reel_id"]
+            isOneToOne: false
+            referencedRelation: "highlight_reels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feed_preferences: {
         Row: {
           created_at: string
@@ -790,10 +875,13 @@ export type Database = {
           game_id: string
           host_id: string
           id: string
+          late_refund_pct: number
           payment_deadline: string | null
+          payment_hold_minutes: number | null
           payment_instructions: string | null
           payment_mode: string
           refund_policy: string | null
+          refund_rule: string
           requires_approval: boolean
           updated_at: string
         }
@@ -804,10 +892,13 @@ export type Database = {
           game_id: string
           host_id: string
           id?: string
+          late_refund_pct?: number
           payment_deadline?: string | null
+          payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
+          refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
         }
@@ -818,10 +909,13 @@ export type Database = {
           game_id?: string
           host_id?: string
           id?: string
+          late_refund_pct?: number
           payment_deadline?: string | null
+          payment_hold_minutes?: number | null
           payment_instructions?: string | null
           payment_mode?: string
           refund_policy?: string | null
+          refund_rule?: string
           requires_approval?: boolean
           updated_at?: string
         }
@@ -1010,8 +1104,11 @@ export type Database = {
           frame_times: number[] | null
           game_id: string | null
           game_title: string | null
+          guardian_team_approved_at: string | null
+          guardian_team_approved_by: string | null
           hidden_at: string | null
           id: string
+          is_draft: boolean
           last_step_at: string | null
           media_meta: Json | null
           playback_path: string | null
@@ -1020,7 +1117,9 @@ export type Database = {
           status: string
           step_progress: Json
           style_prefs: Json | null
+          subject_child_id: string | null
           suggested_clip: Json | null
+          team_share_team_id: string | null
           thumbnail_path: string | null
           title: string
           used_free: boolean
@@ -1051,8 +1150,11 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          guardian_team_approved_at?: string | null
+          guardian_team_approved_by?: string | null
           hidden_at?: string | null
           id?: string
+          is_draft?: boolean
           last_step_at?: string | null
           media_meta?: Json | null
           playback_path?: string | null
@@ -1061,7 +1163,9 @@ export type Database = {
           status?: string
           step_progress?: Json
           style_prefs?: Json | null
+          subject_child_id?: string | null
           suggested_clip?: Json | null
+          team_share_team_id?: string | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
@@ -1092,8 +1196,11 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          guardian_team_approved_at?: string | null
+          guardian_team_approved_by?: string | null
           hidden_at?: string | null
           id?: string
+          is_draft?: boolean
           last_step_at?: string | null
           media_meta?: Json | null
           playback_path?: string | null
@@ -1102,14 +1209,24 @@ export type Database = {
           status?: string
           step_progress?: Json
           style_prefs?: Json | null
+          subject_child_id?: string | null
           suggested_clip?: Json | null
+          team_share_team_id?: string | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
           user_id?: string
           video_path?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "highlight_reels_team_share_team_id_fkey"
+            columns: ["team_share_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       host_payment_methods: {
         Row: {
@@ -1179,6 +1296,7 @@ export type Database = {
           all_day: boolean
           allow_waitlist: boolean
           arrive_early_min: number
+          cancel_cutoff_min: number
           cancellation_notes: string | null
           cancellation_policy: string
           cancellation_reason: string | null
@@ -1233,6 +1351,7 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
           cancellation_reason?: string | null
@@ -1287,6 +1406,7 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
           cancellation_reason?: string | null
@@ -1469,6 +1589,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      late_cancellations: {
+        Row: {
+          cancelled_by: string | null
+          created_at: string
+          cutoff_min: number
+          event_at: string
+          id: string
+          kind: string
+          minutes_before: number
+          owner_id: string | null
+          ref_id: string
+          team_id: string | null
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_by?: string | null
+          created_at?: string
+          cutoff_min: number
+          event_at: string
+          id?: string
+          kind: string
+          minutes_before: number
+          owner_id?: string | null
+          ref_id: string
+          team_id?: string | null
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_by?: string | null
+          created_at?: string
+          cutoff_min?: number
+          event_at?: string
+          id?: string
+          kind?: string
+          minutes_before?: number
+          owner_id?: string | null
+          ref_id?: string
+          team_id?: string | null
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       legal_consents: {
         Row: {
@@ -2254,6 +2419,12 @@ export type Database = {
           payment_method_id: string | null
           payment_type: string | null
           player_id: string
+          refund_amount: number | null
+          refund_pct: number | null
+          refund_reason: string | null
+          refund_settled_at: string | null
+          refund_status: string | null
+          refunded_at: string | null
           reviewed_at: string | null
           reviewer_notes: string | null
           screenshot_path: string | null
@@ -2276,6 +2447,12 @@ export type Database = {
           payment_method_id?: string | null
           payment_type?: string | null
           player_id: string
+          refund_amount?: number | null
+          refund_pct?: number | null
+          refund_reason?: string | null
+          refund_settled_at?: string | null
+          refund_status?: string | null
+          refunded_at?: string | null
           reviewed_at?: string | null
           reviewer_notes?: string | null
           screenshot_path?: string | null
@@ -2298,6 +2475,12 @@ export type Database = {
           payment_method_id?: string | null
           payment_type?: string | null
           player_id?: string
+          refund_amount?: number | null
+          refund_pct?: number | null
+          refund_reason?: string | null
+          refund_settled_at?: string | null
+          refund_status?: string | null
+          refunded_at?: string | null
           reviewed_at?: string | null
           reviewer_notes?: string | null
           screenshot_path?: string | null
@@ -2432,10 +2615,12 @@ export type Database = {
           id: string
           lat: number | null
           lng: number | null
+          looking_for: string[]
           note: string | null
           place_id: string | null
           recurring_days: string[]
           skill_level: string
+          skill_levels: Json
           sports: string[]
           starts_on: string | null
           status: string
@@ -2454,10 +2639,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          looking_for?: string[]
           note?: string | null
           place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
+          skill_levels?: Json
           sports?: string[]
           starts_on?: string | null
           status?: string
@@ -2476,10 +2663,12 @@ export type Database = {
           id?: string
           lat?: number | null
           lng?: number | null
+          looking_for?: string[]
           note?: string | null
           place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
+          skill_levels?: Json
           sports?: string[]
           starts_on?: string | null
           status?: string
@@ -2556,6 +2745,7 @@ export type Database = {
           deleted_at: string | null
           hidden_at: string | null
           id: string
+          moderation_status: string
           subject_id: string
           subject_type: string
           updated_at: string
@@ -2567,6 +2757,7 @@ export type Database = {
           deleted_at?: string | null
           hidden_at?: string | null
           id?: string
+          moderation_status?: string
           subject_id: string
           subject_type: string
           updated_at?: string
@@ -2578,6 +2769,7 @@ export type Database = {
           deleted_at?: string | null
           hidden_at?: string | null
           id?: string
+          moderation_status?: string
           subject_id?: string
           subject_type?: string
           updated_at?: string
@@ -2850,6 +3042,74 @@ export type Database = {
         }
         Relationships: []
       }
+      reputation_insights: {
+        Row: {
+          generated_at: string
+          growth: string[]
+          model: string | null
+          review_count: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths: string[]
+          summary: string
+        }
+        Insert: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id: string
+          reviewee_kind: string
+          strengths?: string[]
+          summary: string
+        }
+        Update: {
+          generated_at?: string
+          growth?: string[]
+          model?: string | null
+          review_count?: number
+          reviewee_id?: string
+          reviewee_kind?: string
+          strengths?: string[]
+          summary?: string
+        }
+        Relationships: []
+      }
+      review_ai_analysis: {
+        Row: {
+          created_at: string
+          mismatch: boolean
+          model: string | null
+          review_id: string
+          sentiment: number | null
+          traits: string[]
+        }
+        Insert: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Update: {
+          created_at?: string
+          mismatch?: boolean
+          model?: string | null
+          review_id?: string
+          sentiment?: number | null
+          traits?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_ai_analysis_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_helpfuls: {
         Row: {
           created_at: string
@@ -2876,12 +3136,39 @@ export type Database = {
           },
         ]
       }
+      review_reports: {
+        Row: {
+          created_at: string
+          reporter_id: string
+          review_id: string
+        }
+        Insert: {
+          created_at?: string
+          reporter_id: string
+          review_id: string
+        }
+        Update: {
+          created_at?: string
+          reporter_id?: string
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_reports_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           body: string
           context: string | null
           created_at: string
           flagged: boolean
+          game_id: string | null
           helpful_count: number
           id: string
           is_private: boolean
@@ -2892,6 +3179,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores: Json
+          sport: string | null
           title: string | null
           verified: boolean
         }
@@ -2900,6 +3188,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -2910,6 +3199,7 @@ export type Database = {
           reviewee_name: string
           reviewer_id: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -2918,6 +3208,7 @@ export type Database = {
           context?: string | null
           created_at?: string
           flagged?: boolean
+          game_id?: string | null
           helpful_count?: number
           id?: string
           is_private?: boolean
@@ -2928,6 +3219,7 @@ export type Database = {
           reviewee_name?: string
           reviewer_id?: string
           scores?: Json
+          sport?: string | null
           title?: string | null
           verified?: boolean
         }
@@ -3014,6 +3306,87 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_ratings: {
+        Row: {
+          hidden: boolean
+          high: number
+          label: string
+          low: number
+          mu: number
+          report: Json | null
+          report_at: string | null
+          self_tier: string | null
+          sigma: number
+          signals: Json
+          sport: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          hidden?: boolean
+          high: number
+          label: string
+          low: number
+          mu: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          sigma: number
+          signals?: Json
+          sport: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          hidden?: boolean
+          high?: number
+          label?: string
+          low?: number
+          mu?: number
+          report?: Json | null
+          report_at?: string | null
+          self_tier?: string | null
+          sigma?: number
+          signals?: Json
+          sport?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skill_votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          sport: string
+          subject_id: string
+          vote: number
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          sport?: string
+          subject_id?: string
+          vote?: number
+          voter_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -3073,6 +3446,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      team_event_availability: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          post_id: string
+          set_by: string | null
+          status: string
+          team_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          post_id: string
+          set_by?: string | null
+          status: string
+          team_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          post_id?: string
+          set_by?: string | null
+          status?: string
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_event_availability_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "team_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_event_availability_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_invites: {
         Row: {
@@ -3175,18 +3599,23 @@ export type Database = {
         Row: {
           author_id: string
           body: string
+          cancel_cutoff_min: number
           created_at: string
           event_date: string | null
           formatted_address: string | null
           hidden_at: string | null
           id: string
+          image_url: string | null
           kind: string
           lat: number | null
+          late_refund_pct: number
           lng: number | null
           location: string | null
+          moderation_status: string
           pinned: boolean
           place_id: string | null
           price: number | null
+          refund_rule: string
           share_notes: boolean
           share_scores: boolean
           spots_max: number | null
@@ -3198,18 +3627,23 @@ export type Database = {
         Insert: {
           author_id: string
           body?: string
+          cancel_cutoff_min?: number
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind: string
           lat?: number | null
+          late_refund_pct?: number
           lng?: number | null
           location?: string | null
+          moderation_status?: string
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          refund_rule?: string
           share_notes?: boolean
           share_scores?: boolean
           spots_max?: number | null
@@ -3221,18 +3655,23 @@ export type Database = {
         Update: {
           author_id?: string
           body?: string
+          cancel_cutoff_min?: number
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind?: string
           lat?: number | null
+          late_refund_pct?: number
           lng?: number | null
           location?: string | null
+          moderation_status?: string
           pinned?: boolean
           place_id?: string | null
           price?: number | null
+          refund_rule?: string
           share_notes?: boolean
           share_scores?: boolean
           spots_max?: number | null
@@ -3390,9 +3829,11 @@ export type Database = {
           availability_rules: Json
           availability_slots: Json
           avatar: string
+          avatar_url: string | null
           bio: string
           cadence: string | null
           cadences: Json
+          cancel_cutoff_min: number
           city: string
           claimed_at: string | null
           cover: string
@@ -3408,6 +3849,7 @@ export type Database = {
           home_court: string | null
           id: string
           kind: string
+          late_refund_pct: number
           league: string | null
           listed_at: string | null
           listed_by: string | null
@@ -3420,6 +3862,7 @@ export type Database = {
           rating_max: string | null
           rating_min: string | null
           rating_system: string | null
+          refund_rule: string
           session_types: string[]
           skill_max: number
           skill_min: number
@@ -3442,9 +3885,11 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json
+          cancel_cutoff_min?: number
           city?: string
           claimed_at?: string | null
           cover?: string
@@ -3460,6 +3905,7 @@ export type Database = {
           home_court?: string | null
           id: string
           kind: string
+          late_refund_pct?: number
           league?: string | null
           listed_at?: string | null
           listed_by?: string | null
@@ -3472,6 +3918,7 @@ export type Database = {
           rating_max?: string | null
           rating_min?: string | null
           rating_system?: string | null
+          refund_rule?: string
           session_types?: string[]
           skill_max?: number
           skill_min?: number
@@ -3494,9 +3941,11 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json
+          cancel_cutoff_min?: number
           city?: string
           claimed_at?: string | null
           cover?: string
@@ -3512,6 +3961,7 @@ export type Database = {
           home_court?: string | null
           id?: string
           kind?: string
+          late_refund_pct?: number
           league?: string | null
           listed_at?: string | null
           listed_by?: string | null
@@ -3524,6 +3974,7 @@ export type Database = {
           rating_max?: string | null
           rating_min?: string | null
           rating_system?: string | null
+          refund_rule?: string
           session_types?: string[]
           skill_max?: number
           skill_min?: number
@@ -4105,6 +4556,10 @@ export type Database = {
         }
         Returns: Json
       }
+      analytics_share_active: {
+        Args: { _team: string; _user: string }
+        Returns: boolean
+      }
       approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
@@ -4137,6 +4592,7 @@ export type Database = {
         Args: { _on_behalf_of?: string; _post_id: string }
         Returns: undefined
       }
+      check_worker_secret: { Args: { _provided: string }; Returns: boolean }
       child_features_locked: { Args: { _user: string }; Returns: boolean }
       child_game_participation_allowed: {
         Args: { _user: string }
@@ -4146,6 +4602,13 @@ export type Database = {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
       }
+      coach_analytics_athletes: {
+        Args: { _team: string; _viewer: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
+      coach_analytics_enabled: { Args: never; Returns: boolean }
       confirm_device_pairing: { Args: never; Returns: boolean }
       create_device_pairing: {
         Args: {
@@ -4237,6 +4700,27 @@ export type Database = {
         Returns: undefined
       }
       expire_stale_data_exports: { Args: never; Returns: number }
+      family_child_allows: {
+        Args: { _child: string; _kind: string }
+        Returns: boolean
+      }
+      family_post_viewer_access: {
+        Args: { _reel_id: string; _viewer: string }
+        Returns: string
+      }
+      family_posts_enabled: { Args: never; Returns: boolean }
+      family_posts_visible_to: {
+        Args: { _viewer: string }
+        Returns: {
+          caption: string
+          created_at: string
+          reel_id: string
+          title: string
+          via: string
+        }[]
+      }
+      family_share_enabled: { Args: never; Returns: boolean }
+      family_team_share_enabled: { Args: never; Returns: boolean }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
@@ -4261,6 +4745,14 @@ export type Database = {
         Args: { _game_id: string }
         Returns: {
           merchant_id: string
+        }[]
+      }
+      get_game_refund_terms: {
+        Args: { _game_id: string }
+        Returns: {
+          late_refund_pct: number
+          refund_policy: string
+          refund_rule: string
         }[]
       }
       get_host_payment_methods: {
@@ -4303,6 +4795,10 @@ export type Database = {
       guardian_approve_team_invite: {
         Args: { _approve?: boolean; _invite: string }
         Returns: undefined
+      }
+      guardian_cancel_child_game: {
+        Args: { _child: string; _game: string }
+        Returns: string
       }
       guardian_children_overview: {
         Args: never
@@ -4385,6 +4881,7 @@ export type Database = {
       is_minor: { Args: { _user: string }; Returns: boolean }
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
+      is_self_or_guardian: { Args: { _player: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: {
         Args: { _team: string; _user: string }
@@ -4467,6 +4964,7 @@ export type Database = {
           state: string
         }[]
       }
+      mark_refund_sent: { Args: { _submission: string }; Returns: undefined }
       minor_handle_unsafe: {
         Args: { _cohort: string; _handle: string }
         Returns: boolean
@@ -4474,6 +4972,10 @@ export type Database = {
       minor_messaging_allowed: {
         Args: { _a: string; _b: string }
         Returns: boolean
+      }
+      minor_messaging_block: {
+        Args: { _a: string; _b: string }
+        Returns: string
       }
       minor_messaging_block_reason: {
         Args: { _a: string; _b: string }
@@ -4488,6 +4990,7 @@ export type Database = {
           members: number
         }[]
       }
+      minutes_phrase: { Args: { _m: number }; Returns: string }
       moderate_gym_review: {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
@@ -4526,11 +5029,34 @@ export type Database = {
           status: string
         }[]
       }
+      my_reviewable: {
+        Args: { _kind?: string; _reviewee_id?: string }
+        Returns: {
+          closes_at: string
+          context: string
+          game_id: string
+          happened_at: string
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          sport: string
+        }[]
+      }
       notify_guardians: {
         Args: {
           _body: string
           _child: string
           _link: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
+      notify_guardians_of: {
+        Args: {
+          _body: string
+          _link: string
+          _player: string
           _title: string
           _type: string
         }
@@ -4555,6 +5081,16 @@ export type Database = {
           review_count: number
           teams_count: number
           verified_review_count: number
+        }[]
+      }
+      player_trait_counts: {
+        Args: { _user: string }
+        Returns: {
+          communicative: number
+          fair_play: number
+          on_time: number
+          positive: number
+          respectful: number
         }[]
       }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
@@ -4615,8 +5151,22 @@ export type Database = {
           id: string
         }[]
       }
+      public_xp_enabled: { Args: { _user: string }; Returns: boolean }
       publish_legal_document: { Args: { _id: string }; Returns: string }
       publish_team_waiver: { Args: { _id: string }; Returns: string }
+      record_late_cancellation: {
+        Args: {
+          _cutoff: number
+          _event_at: string
+          _kind: string
+          _owner: string
+          _ref: string
+          _team: string
+          _title: string
+          _user: string
+        }
+        Returns: boolean
+      }
       record_session_heartbeat: {
         Args: { _timezone?: string }
         Returns: string
@@ -4629,6 +5179,20 @@ export type Database = {
         }[]
       }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
+      refund_pct_for: {
+        Args: {
+          _late_pct: number
+          _phase: string
+          _reason: string
+          _rule: string
+        }
+        Returns: number
+      }
+      release_expired_payment_holds: {
+        Args: { _game_id?: string }
+        Returns: number
+      }
+      report_review: { Args: { _review_id: string }; Returns: undefined }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
@@ -4645,9 +5209,49 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_family_post_link: {
+        Args: { _token_hash: string }
+        Returns: {
+          caption: string
+          owner_id: string
+          playback_path: string
+          reel_id: string
+          thumbnail_path: string
+          title: string
+          video_path: string
+        }[]
+      }
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
         Returns: undefined
+      }
+      review_eligibility: {
+        Args: { _kind: string; _reviewee_id: string; _reviewer: string }
+        Returns: {
+          context: string
+          game_id: string
+          happened_at: string
+          sport: string
+        }[]
+      }
+      review_ring_suspects: {
+        Args: { _days?: number }
+        Returns: {
+          a_to_b: number
+          avg_rating: number
+          b_to_a: number
+          user_a: string
+          user_b: string
+        }[]
+      }
+      review_uniform_raters: {
+        Args: { _min?: number }
+        Returns: {
+          avg_rating: number
+          reviewer_id: string
+          reviews: number
+          stddev_rating: number
+        }[]
       }
       revoke_device_pairing: {
         Args: { _child_user_id: string }
@@ -4687,6 +5291,18 @@ export type Database = {
           review_required: boolean
           status: string
         }[]
+      }
+      set_skill_rating_hidden: {
+        Args: { _hidden: boolean; _sport: string }
+        Returns: undefined
+      }
+      set_team_event_availability: {
+        Args: { _note?: string; _post: string; _status: string | null; _user: string }
+        Returns: undefined
+      }
+      settle_paid_spot: {
+        Args: { _game: string; _player: string; _reason: string }
+        Returns: string
       }
       shares_game_or_chat: {
         Args: { _a: string; _b: string }
@@ -4741,6 +5357,20 @@ export type Database = {
           _user: string
         }
         Returns: undefined
+      }
+      teen_reel_viewer_access: {
+        Args: { _reel_id: string; _viewer: string }
+        Returns: string
+      }
+      teen_reels_visible_to: {
+        Args: { _viewer: string }
+        Returns: {
+          caption: string
+          created_at: string
+          reel_id: string
+          title: string
+          via: string
+        }[]
       }
       tier_for_price_id: { Args: { _price_id: string }; Returns: string }
       transfer_team_ownership: {

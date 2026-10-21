@@ -33,7 +33,7 @@ export const Route = createFileRoute("/players/add")({
   head: () =>
     pageHead({
       path: "/players/add",
-      title: "Add your child — ballaCity",
+      title: "Add your child — BallaCity",
       description:
         "Add your child's player profile to your account. They don't need an email or password.",
       noindex: true,

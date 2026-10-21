@@ -642,6 +642,7 @@ function Create() {
                 allowWaitlist: effectivePolicy.allowWaitlist,
                 cancellationPolicy: effectivePolicy.cancellationPolicy,
                 cancellationNotes: effectivePolicy.cancellationNotes || null,
+                cancelCutoffMin: effectivePolicy.cancelCutoffMin,
                 gameRules: effectivePolicy.gameRules || null,
               });
 
@@ -660,6 +661,12 @@ function Create() {
                   accepted_method_ids: [],
                   requires_approval: requiresApproval,
                   refund_policy: effectivePolicy.refundPolicy || null,
+                  ...(price > 0
+                    ? {
+                        refund_rule: effectivePolicy.refundRule,
+                        late_refund_pct: effectivePolicy.lateRefundPct,
+                      }
+                    : {}),
                 });
               } catch (err: any) {
                 toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");

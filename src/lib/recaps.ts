@@ -42,8 +42,10 @@ const STEP_ORDER = [
   "timeline",
   "editplan",
   "coach",
+  "analytics",
   "metadata",
   "hashtags",
+  "package",
   "thumbnail",
   "finalize",
   "completed",
@@ -56,8 +58,10 @@ export const RECAP_STEPS = [
   "timeline",
   "editplan",
   "coach",
+  "analytics",
   "metadata",
   "hashtags",
+  "package",
   "thumbnail",
   "finalize",
 ] as const;
@@ -70,8 +74,10 @@ const STEP_LABELS: Record<string, string> = {
   timeline: "Building play-by-play",
   editplan: "Planning the cut",
   coach: "Coaching notes",
+  analytics: "Grading your performance",
   metadata: "Writing title & caption",
   hashtags: "Picking hashtags",
+  package: "Drafting your post",
   thumbnail: "Building thumbnail",
   finalize: "Finishing up",
   completed: "Ready",
@@ -192,29 +198,4 @@ export function buildRecapShare(
     .filter(Boolean)
     .join("\n");
   return { url, text, title: recap ? recapDisplayTitle(recap) : game.title };
-}
-
-/** Shares via the native sheet when available, otherwise copies to the clipboard. */
-export async function shareRecap(
-  recap: RecapSummary | null,
-  game: { id: string; title: string },
-): Promise<"shared" | "copied" | "failed"> {
-  if (typeof window === "undefined") return "failed";
-  const { url, text, title } = buildRecapShare(recap, game, window.location.origin);
-  try {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({ title, text, url });
-      return "shared";
-    }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    return "copied";
-  } catch (e: any) {
-    if (e?.name === "AbortError") return "shared";
-    try {
-      await navigator.clipboard.writeText(`${text}\n${url}`);
-      return "copied";
-    } catch {
-      return "failed";
-    }
-  }
 }

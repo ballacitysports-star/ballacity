@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+# Private links a parent shares to one clip: never crawl or index.
+Disallow: /family-share/
 
 Sitemap: https://ballacity.com/sitemap.xml

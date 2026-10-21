@@ -37,6 +37,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { OrgAvatarMark } from "@/components/OrgAvatarMark";
 import {
   getTrainerOrg,
   getTrainerOrgContact,
@@ -67,15 +68,15 @@ export const Route = createFileRoute("/orgs/$orgId/")({
     const name = org?.name ?? "Gym";
     return pageHead({
       path: `/orgs/${params.orgId}`,
-      title: `${name} — ${org?.category || "Gym"} on ballaCity`,
+      title: `${name} — ${org?.category || "Gym"} on BallaCity`,
       description: (
         org?.bio ||
-        `${name}${org?.city ? ` in ${org.city}` : ""} on ballaCity: hours, amenities, upcoming runs, and how to book a court.`
+        `${name}${org?.city ? ` in ${org.city}` : ""} on BallaCity: hours, amenities, upcoming runs, and how to book a court.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "venue",
         title: name,
-        subtitle: org?.city ?? org?.address ?? "Gym on ballaCity",
+        subtitle: org?.city ?? org?.address ?? "Gym on BallaCity",
         meta: [org?.city, "Hours & amenities", "Member reviews"],
       }),
       noindex: !org,
@@ -228,8 +229,8 @@ function OrgPage() {
                     params={{ trainerId: t.id }}
                     className="flex items-center gap-3 rounded-xl border border-border/50 bg-background px-3 py-2 hover:border-lime/60"
                   >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-lime/15 text-sm">
-                      {t.avatar || "T"}
+                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-lime/15 text-sm">
+                      <OrgAvatarMark avatar={t.avatar} fallback="T" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium truncate">{t.name}</div>

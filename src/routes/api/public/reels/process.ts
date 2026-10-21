@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { authorizeWorker, unauthorizedResponse } from "@/lib/worker-auth.server";
 import {
   BATCH_SIZE,
   MAX_ATTEMPTS,
@@ -15,25 +16,7 @@ export const Route = createFileRoute("/api/public/reels/process")({
         // Restrict this expensive endpoint to callers that present the shared
         // worker secret. Prevents anonymous internet visitors from burning
         // Lovable AI credits by hammering the URL.
-        const workerSecret = process.env.REELS_WORKER_SECRET;
-        if (workerSecret) {
-          const provided =
-            request.headers.get("x-worker-secret") ??
-            request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-            "";
-          if (provided !== workerSecret) {
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
-        } else {
-          // Fail closed when the secret hasn't been configured yet.
-          return new Response(JSON.stringify({ error: "REELS_WORKER_SECRET not configured" }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
+        if ((await authorizeWorker(request)) !== "ok") return unauthorizedResponse();
 
         const apiKey = process.env.LOVABLE_API_KEY;
         if (!apiKey) {

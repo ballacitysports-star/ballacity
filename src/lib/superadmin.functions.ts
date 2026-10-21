@@ -360,9 +360,7 @@ export const superadminSuspendUser = createServerFn({ method: "POST" })
 export const superadminDeleteUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { userId: string; reason?: string }) =>
-    z
-      .object({ userId: z.string().uuid(), reason: z.string().max(500).optional() })
-      .parse(d),
+    z.object({ userId: z.string().uuid(), reason: z.string().max(500).optional() }).parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -458,6 +456,7 @@ export const superadminListContent = createServerFn({ method: "POST" })
       offset?: number;
       onlyHidden?: boolean;
       onlyVisible?: boolean;
+      onlyHeld?: boolean;
     }) =>
       z
         .object({
@@ -467,6 +466,7 @@ export const superadminListContent = createServerFn({ method: "POST" })
           offset: z.number().int().min(0).optional(),
           onlyHidden: z.boolean().optional(),
           onlyVisible: z.boolean().optional(),
+          onlyHeld: z.boolean().optional(),
         })
         .parse(d),
   )
@@ -498,9 +498,21 @@ export const superadminListContent = createServerFn({ method: "POST" })
       }
     }
 
+    // AI-held or never-screened text (posts and comments).
+    if (data.onlyHeld && cfg.textStatusCol) {
+      const statusCol: string = cfg.textStatusCol;
+      q = (q as any).in(statusCol, ["pending", "held"]);
+    }
+
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
-    return { rows: rows ?? [], total: count ?? 0, label: cfg.label, hideCol: cfg.hideCol };
+    return {
+      rows: rows ?? [],
+      total: count ?? 0,
+      label: cfg.label,
+      hideCol: cfg.hideCol,
+      textStatusCol: (cfg.textStatusCol ?? null) as string | null,
+    };
   });
 
 export const superadminModerate = createServerFn({ method: "POST" })
@@ -524,6 +536,8 @@ export const superadminModerate = createServerFn({ method: "POST" })
           "reopen_report",
           "unverify",
           "verify",
+          "approve_text",
+          "hold_text",
         ]),
         reason: z.string().max(500).optional(),
       })
@@ -577,6 +591,14 @@ export const superadminModerate = createServerFn({ method: "POST" })
         break;
       case "unverify":
         patch = { verified: false };
+        break;
+      case "approve_text":
+        if (!cfg.textStatusCol) throw new Error("This item has no text review.");
+        patch = { [cfg.textStatusCol]: "approved" };
+        break;
+      case "hold_text":
+        if (!cfg.textStatusCol) throw new Error("This item has no text review.");
+        patch = { [cfg.textStatusCol]: "held" };
         break;
     }
 
@@ -938,4 +960,19 @@ export const superadminAuditLog = createServerFn({ method: "POST" })
     }
     const { data: rows, count } = await q;
     return { rows: rows ?? [], total: count ?? 0 };
+  });
+
+/** Read-only abuse signals for reviews: mutual high-rating pairs and uniform raters. */
+export const superadminReviewSignals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context);
+    // Called as the signed-in superadmin: the SQL functions check is_moderator(auth.uid()).
+    const [rings, uniform] = await Promise.all([
+      context.supabase.rpc("review_ring_suspects", { _days: 60 }),
+      context.supabase.rpc("review_uniform_raters", { _min: 6 }),
+    ]);
+    if (rings.error) throw new Error(rings.error.message);
+    if (uniform.error) throw new Error(uniform.error.message);
+    return { rings: rings.data ?? [], uniform: uniform.data ?? [] };
   });

@@ -23,6 +23,7 @@ import {
   ORGS,
   GAMES,
   POST_KIND_META,
+  resolveSportAsset,
   type PostKind,
   type Org,
   type OrgPost,
@@ -30,6 +31,7 @@ import {
 import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { GuardianTeamContactAction } from "@/components/team/GuardianTeamContactAction";
+import { TeamEventAvailabilityCard } from "@/components/team/TeamEventAvailabilityCard";
 import { useTeamPermissions } from "@/lib/team-roster";
 import { SignTeamWaiverCard } from "@/components/team/SignTeamWaiverCard";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
@@ -39,7 +41,8 @@ import { PostDetailsDialog } from "@/components/PostDetailsDialog";
 
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
 import { CreatePostSheet } from "@/components/CreatePostSheet";
@@ -48,6 +51,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
 import { Trash2 } from "lucide-react";
 import { hideFinishedGames } from "@/lib/game-time";
+import { OrgAvatarMark } from "@/components/OrgAvatarMark";
 import {
   Dialog,
   DialogContent,
@@ -66,12 +70,12 @@ export const Route = createFileRoute("/teams/$teamId/")({
       description: (
         o?.bio ||
         o?.tagline ||
-        `Follow ${name} on ballaCity: roster, games, tryouts, and reviews.`
+        `Follow ${name} on BallaCity: roster, games, tryouts, and reviews.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "team",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Team on ballaCity",
+        subtitle: o?.tagline ?? o?.city ?? "Team on BallaCity",
         meta: [o?.sports?.[0], o?.city, "Roster & games"],
       }),
       jsonLd: o
@@ -196,6 +200,7 @@ function TeamPage() {
             ? { taken: r.spots_taken ?? 0, max: r.spots_max }
             : undefined,
         pinned: !!r.pinned,
+        imageUrl: r.image_url ? resolveSportAsset(String(r.image_url)) : undefined,
       })),
     [postsQuery.data],
   );
@@ -214,7 +219,12 @@ function TeamPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <button className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label={`Share ${org.name}`}
+          className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+        >
           <Share2 className="h-4 w-4" />
         </button>
       </div>
@@ -231,13 +241,13 @@ function TeamPage() {
             initial={{ scale: 0, rotate: -8 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 16 }}
-            className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
+            className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
             style={{
               background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)`,
               boxShadow: `0 12px 40px -10px ${org.accent}88`,
             }}
           >
-            {org.avatar}
+            <OrgAvatarMark avatar={org.avatar} fallback={org.name.slice(0, 2).toUpperCase()} />
           </motion.div>
           <div className="mb-2 flex items-center gap-2">
             {canEdit && (
@@ -497,6 +507,7 @@ function TeamPage() {
         {tab === "roster" && (
           <>
             <SignTeamWaiverCard teamId={org.id} teamName={org.name} />
+            <TeamEventAvailabilityCard teamId={org.id} />
             <TeamRosterPanel teamId={org.id} teamName={org.name} />
           </>
         )}
@@ -591,7 +602,7 @@ function TeamPage() {
               }
             >
               <p className="text-sm text-muted-foreground">
-                Active on ballaCity since {org.founded}.
+                Active on BallaCity since {org.founded}.
               </p>
             </Section>
           </div>
@@ -637,7 +648,12 @@ function TeamPage() {
         </Dialog>
 
         {canEdit && (
-          <CreatePostSheet teamId={org.id} open={composerOpen} onOpenChange={setComposerOpen} />
+          <CreatePostSheet
+            teamId={org.id}
+            sports={org.sports}
+            open={composerOpen}
+            onOpenChange={setComposerOpen}
+          />
         )}
       </div>
       <PostDetailsDialog

@@ -294,6 +294,8 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
     .first()
     .click();
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
+  // Paying requires accepting the host's refund terms first.
+  await page.getByRole("checkbox", { name: /refund terms/i }).check();
   await expect(submitBtn).toBeVisible({ timeout: 10_000 });
   await submitBtn.click();
 

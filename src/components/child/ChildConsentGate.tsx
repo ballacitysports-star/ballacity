@@ -9,6 +9,9 @@ const HIDDEN_PREFIXES = [
   "/privacy",
   "/terms",
   "/community-guidelines",
+  "/youth-policy",
+  "/ai-disclosure",
+  "/payment-policy",
   "/account/legal",
   "/contact",
   "/auth",
@@ -24,7 +27,7 @@ const HIDDEN_PREFIXES = [
  * (see `useMyChildStatus().can(...)`) reflect it in the UI too.
  */
 export function ChildConsentGate() {
-  const { status, consentBlocked, state, isLoading, policy } = useMyChildStatus();
+  const { status, consentBlocked, state, isLoading } = useMyChildStatus();
   const location = useLocation();
 
   if (isLoading || !status || !consentBlocked) return null;
@@ -39,17 +42,11 @@ export function ChildConsentGate() {
         <ShieldAlert className="h-4 w-4 shrink-0 text-primary" aria-hidden />
         <p className="min-w-0 flex-1 text-muted-foreground">
           <span className="font-semibold text-foreground">
-            {revoked
-              ? "A parent or guardian turned this account off."
-              : pending
-                ? "Waiting for your parent or guardian."
-                : "A parent or guardian needs to approve this account."}
+            {revoked ? "A parent or guardian turned this account off." : "Parent approval needed ·"}
           </span>{" "}
           {revoked
             ? "Games, messages, videos and comments stay off until they approve again."
-            : pending
-              ? "Games, messages, videos and comments stay off until they confirm."
-              : `Because you're under ${policy.parentalConsentMaxAge + 1}, games, messages, videos and comments stay off until they do. You can still look around.`}
+            : "Pickup games, messaging, and video uploads are locked until your parent confirms your account."}
         </p>
         <Link
           to="/onboarding/child"

@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
-import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
@@ -26,7 +25,6 @@ import { toast } from "sonner";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { getOrCreateDirectConversation } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
 import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
@@ -34,17 +32,21 @@ import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
 import { kmToMi, formatDistance } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { computeReputation } from "@/lib/reviews";
+import { useReviewsFor } from "@/lib/reviews-db";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { PlayerShareCard } from "@/components/PlayerShareCard";
+import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
+import { parseIntents, postTiersForSport } from "@/lib/availability-levels";
 import { BadgeList } from "@/components/BadgeList";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
@@ -63,13 +65,13 @@ export const Route = createFileRoute("/players/$userId")({
       path: `/players/${params.userId}`,
       title: "Player Profile | BallaCity Sports Profile",
       description:
-        "See this player's sports, skill levels, availability, badges, and reviews on ballaCity.",
+        "See this player's sports, skill levels, availability, badges, and reviews on BallaCity.",
       ogType: "profile",
       image: ogImageUrl({
         kind: "player",
         title: "Player profile",
         subtitle: "Sports, availability, badges, and reviews",
-        meta: ["ballaCity player"],
+        meta: ["BallaCity player"],
       }),
       jsonLd: {
         "@context": "https://schema.org",
@@ -625,6 +627,7 @@ function PlayerProfilePage() {
 
         {/* Badges — earned from attendance reliability + sportsmanship */}
         {badges.length > 0 && <BadgeList className="mt-6" badgeIds={badges} />}
+        <SkillRatingCard userId={userId} isOwner={user?.id === userId} />
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
@@ -668,9 +671,13 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="section-eyebrow text-muted-foreground">Looking to play</span>
-        <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-          {a.skill_level}
-        </span>
+        {parseIntents(a.looking_for).length > 0 ? (
+          <AvailabilityIntentBadges value={a.looking_for} className="justify-end" />
+        ) : (
+          <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+            {a.skill_level}
+          </span>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {a.sports.length === 0 ? (
@@ -678,12 +685,18 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
         ) : (
           a.sports.map((s) => {
             const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+            const tiers = postTiersForSport(a, s);
             return (
               <span
                 key={s}
-                className="rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold"
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold"
               >
                 {emoji} {s}
+                {tiers.length > 0 && (
+                  <span className="rounded-full bg-lime/15 px-1.5 text-[10px] font-bold text-lime">
+                    {tiers.join(" · ")}
+                  </span>
+                )}
               </span>
             );
           })

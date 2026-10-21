@@ -476,6 +476,7 @@ export function OrgForm({
             <div className="text-xs font-semibold text-muted-foreground mb-2">Logo</div>
             <ImageUploader
               kind="avatar"
+              logo
               bucket="org-avatars"
               pathPrefix={userId}
               value={value.avatarUrl}
@@ -487,6 +488,7 @@ export function OrgForm({
             <div className="text-xs font-semibold text-muted-foreground mb-2">Cover image</div>
             <ImageUploader
               kind="cover"
+              bannerPreview
               bucket="org-covers"
               pathPrefix={userId}
               value={value.coverUrl}
@@ -614,7 +616,7 @@ export function OrgForm({
             <span className="block text-[11px] text-muted-foreground">
               Where players reserve a court (CourtReserve, Mindbody, your own page). &ldquo;Book
               court&rdquo; opens it in a new tab. Leave it empty to receive court inquiries in
-              ballaCity instead — no fees either way.
+              BallaCity instead — no fees either way.
             </span>
           </label>
         </Section>

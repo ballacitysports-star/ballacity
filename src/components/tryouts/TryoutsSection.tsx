@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarClock, MapPin, Megaphone, Users } from "lucide-react";
 import { toast } from "sonner";
+import { blockedMessage, heldNotice } from "@/lib/post-moderation";
+import { DraftWithAi } from "@/components/DraftWithAi";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -15,10 +17,25 @@ import {
   getTryoutRsvpContext,
   rsvpTryout,
   cancelTryoutRsvp,
+  listMyTryoutRegistrations,
   listMyManagedTeams,
   type TryoutListing,
 } from "@/lib/tryouts.functions";
 import { createTeamPost } from "@/lib/team-posts.functions";
+import { RefundPolicyFields } from "@/components/RefundPolicyFields";
+import {
+  DEFAULT_REFUND_RULE,
+  normalizeRefundPolicy,
+  refundDisclaimer,
+  type RefundPolicy,
+} from "@/lib/refund-policy";
+import {
+  CANCEL_CUTOFF_PRESETS,
+  DEFAULT_CANCEL_CUTOFF_MIN,
+  cancelPolicyNote,
+  isLateCancel,
+  lateCancelWarning,
+} from "@/lib/cancel-window";
 
 const KIND_LABEL = { tryout: "Tryout", clinic: "Camp / Clinic" } as const;
 
@@ -34,6 +51,7 @@ export function TryoutsSection() {
   const { data = [], isLoading } = useQuery({ queryKey: ["tryouts", "upcoming"], queryFn: () => list() });
   const [active, setActive] = useState<TryoutListing | null>(null);
   const [posting, setPosting] = useState(false);
+  const mine = useMyTryoutRegistrations();
 
   const requireAuth = (fn: () => void) =>
     user ? fn() : navigate({ to: "/auth", search: { next: "/#tryouts" } as any });
@@ -82,9 +100,15 @@ export function TryoutsSection() {
                   {t.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{t.location}</p>}
                   {left != null && <p className="flex items-center gap-2"><Users className="h-4 w-4" />{left === 0 ? "Full" : `${left} spots left`}</p>}
                 </div>
-                <Button className="mt-4 rounded-full" variant="secondary" disabled={left === 0} onClick={() => requireAuth(() => setActive(t))}>
-                  {left === 0 ? "Full" : "RSVP"}
-                </Button>
+                {mine.has(t.id) ? (
+                  <Button className="mt-4 rounded-full" variant="outline" onClick={() => requireAuth(() => setActive(t))}>
+                    Registered ✓ · Manage
+                  </Button>
+                ) : (
+                  <Button className="mt-4 rounded-full" variant="secondary" disabled={left === 0} onClick={() => requireAuth(() => setActive(t))}>
+                    {left === 0 ? "Full" : "RSVP"}
+                  </Button>
+                )}
               </li>
             );
           })}
@@ -95,6 +119,18 @@ export function TryoutsSection() {
       {posting && <PostTryoutDialog onClose={() => setPosting(false)} />}
     </section>
   );
+}
+
+/** Ids of the events the signed-in user (or a linked child) is registered for. */
+export function useMyTryoutRegistrations(): Set<string> {
+  const { user } = useAuth();
+  const fn = useServerFn(listMyTryoutRegistrations);
+  const { data } = useQuery({
+    queryKey: ["tryouts", "mine", user?.id ?? null],
+    queryFn: () => fn(),
+    enabled: !!user,
+  });
+  return new Set(data ?? []);
 }
 
 export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose: () => void }) {
@@ -108,6 +144,9 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const [who, setWho] = useState<string>("me");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [acceptedRefund, setAcceptedRefund] = useState(false);
+  const paid = Number(tryout.price ?? 0) > 0;
 
   const target = who === "me" ? user?.id : who;
   const onBehalf = who === "me" ? null : who;
@@ -117,6 +156,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ctxKey });
     qc.invalidateQueries({ queryKey: ["tryouts", "upcoming"] });
+    qc.invalidateQueries({ queryKey: ["tryouts", "mine"] });
   };
 
   const submit = async () => {
@@ -133,6 +173,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.success("Registration cancelled");
+    setConfirmingCancel(false);
     refresh();
   };
 
@@ -151,7 +192,7 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
             {ctx.children.length > 0 && (
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Who's attending?</label>
-                <select className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" value={who} onChange={(e) => { setWho(e.target.value); setAgree(false); }}>
+                <select className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" value={who} onChange={(e) => { setWho(e.target.value); setAgree(false); setConfirmingCancel(false); }}>
                   <option value="me">Me</option>
                   {ctx.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -160,7 +201,28 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
             {isRegistered ? (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-lime">Registered ✓</p>
-                <Button variant="outline" disabled={busy} onClick={doCancel}>Cancel registration</Button>
+                {confirmingCancel ? (
+                  <div className="space-y-3 rounded-lg border border-coral/40 bg-coral/10 p-3">
+                    <p className="text-sm">
+                      Cancel {onBehalf ? `${ctx.children.find((c) => c.id === onBehalf)?.name ?? "your child"}'s` : "your"} spot
+                      at {tryout.title}? {tryout.teamName} will be told and the spot opens up for someone else.
+                      {tryout.price ? " If you already paid the team, ask them about a refund." : ""}
+                    </p>
+                    {isLateCancel(tryout.eventDate, tryout.cancelCutoffMin) && (
+                      <p role="alert" className="text-xs font-semibold text-amber-500">
+                        {lateCancelWarning(tryout.cancelCutoffMin)}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(false)}>Keep my spot</Button>
+                      <Button variant="destructive" disabled={busy} onClick={doCancel}>
+                        {busy ? "Cancelling…" : "Yes, cancel"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(true)}>Cancel registration</Button>
+                )}
               </div>
             ) : (
               <>
@@ -177,9 +239,31 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                 {needsWaiver && !agree && (
                   <p className="text-xs font-semibold text-coral">Check the waiver box above to continue.</p>
                 )}
-                <Button className="w-full" disabled={busy || (needsWaiver && !agree)} onClick={submit}>
+                {paid && (
+                  <label className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                    <Checkbox
+                      checked={acceptedRefund}
+                      onCheckedChange={(v) => setAcceptedRefund(v === true)}
+                      aria-label="I understand the refund terms"
+                    />
+                    <span>
+                      {refundDisclaimer(
+                        normalizeRefundPolicy(tryout.refundRule, tryout.lateRefundPct),
+                        tryout.cancelCutoffMin,
+                      )}
+                    </span>
+                  </label>
+                )}
+                <Button
+                  className="w-full"
+                  disabled={busy || (needsWaiver && !agree) || (paid && !acceptedRefund)}
+                  onClick={submit}
+                >
                   {needsWaiver ? "Sign waiver & RSVP" : "RSVP"}
                 </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  {cancelPolicyNote(tryout.cancelCutoffMin)}
+                </p>
               </>
             )}
           </div>
@@ -194,7 +278,8 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
   const teamsFn = useServerFn(listMyManagedTeams);
   const create = useServerFn(createTeamPost);
   const { data: teams } = useQuery({ queryKey: ["tryouts", "my-teams"], queryFn: () => teamsFn() });
-  const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "" });
+  const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "", cancelCutoff: String(DEFAULT_CANCEL_CUTOFF_MIN) });
+  const [refund, setRefund] = useState<RefundPolicy>({ rule: DEFAULT_REFUND_RULE, latePct: 0 });
   const [busy, setBusy] = useState(false);
   const teamId = f.teamId || teams?.[0]?.id || "";
 
@@ -202,20 +287,26 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
     if (!teamId || !f.title.trim() || !f.date) return toast.error("Team, title and date are required.");
     setBusy(true);
     try {
-      await create({
+      const result = await create({
         data: {
           teamId, kind: f.kind, title: f.title.trim(), body: f.body,
           eventDate: new Date(f.date).toISOString(),
           location: f.location || null,
           spotsMax: f.spots ? Number(f.spots) : null,
           price: f.price ? Number(f.price) : null,
+          cancelCutoffMin: Number(f.cancelCutoff) || 0,
+          ...(f.price && Number(f.price) > 0
+            ? { refundRule: refund.rule, lateRefundPct: refund.latePct }
+            : {}),
         },
       });
-      toast.success("Posted! Players can now RSVP.");
+      const held = heldNotice(result);
+      if (held) toast.message(held);
+      else toast.success("Posted! Players can now RSVP.");
       qc.invalidateQueries({ queryKey: ["tryouts", "upcoming"] });
       onClose();
-    } catch {
-      toast.error("Couldn't post. Please try again.");
+    } catch (e) {
+      toast.error(blockedMessage(e) ?? "Couldn't post. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -252,7 +343,29 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
               <Input type="number" min={1} placeholder="Spots (optional)" value={f.spots} onChange={(e) => setF({ ...f, spots: e.target.value })} />
               <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
             </div>
+            <label className="block text-xs font-semibold text-muted-foreground">
+              Cancellation cutoff
+              <select
+                className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm font-normal text-foreground"
+                value={f.cancelCutoff}
+                onChange={(e) => setF({ ...f, cancelCutoff: e.target.value })}
+              >
+                {CANCEL_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              <span className="mt-1 block font-normal">Cancelling after this counts as late and lowers the player's reliability.</span>
+            </label>
+            {f.price && Number(f.price) > 0 && (
+              <RefundPolicyFields
+                idPrefix="post-refund"
+                value={refund}
+                onChange={setRefund}
+                cutoffMin={Number(f.cancelCutoff) || 0}
+              />
+            )}
             <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
+            <DraftWithAi kind={f.kind} title={f.title} body={f.body} onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))} />
             <Button className="w-full" disabled={busy} onClick={submit}>Post</Button>
           </div>
         )}
