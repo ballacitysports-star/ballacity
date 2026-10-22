@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -34,8 +35,17 @@ export const Route = createFileRoute("/messages/")({
       noindex: true,
     }),
   validateSearch: zodValidator(searchSchema),
-  component: MessagesInbox,
+  component: MessagesInboxGate,
 });
+
+/** A signed-out visitor gets a sample inbox; the real page mounts only for a member. */
+function MessagesInboxGate() {
+  return (
+    <PreviewGate tab="messages">
+      <MessagesInbox />
+    </PreviewGate>
+  );
+}
 
 function MessagesInbox() {
   const { user, loading } = useAuth();

@@ -7,7 +7,8 @@
  * real page is simply never mounted for a signed-out visitor.
  */
 
-export type PreviewTab = "feed" | "players" | "teams" | "trainers" | "reels" | "create" | "profile";
+export type PreviewTab =
+  "feed" | "players" | "teams" | "trainers" | "reels" | "messages" | "create" | "profile";
 
 export type PreviewRow = {
   title: string;
@@ -72,11 +73,28 @@ const trainers: PreviewRow[] = [
 ].map((r, i) => ({ ...r, person: `Coach ${person(i + 1)}` }));
 
 const reels: PreviewRow[] = [
-  { title: "Sunday hat trick", detail: "Sample highlight · 0:24 · AI-generated" },
-  { title: "Buzzer-beater from the corner", detail: "Sample highlight · 0:18 · AI-generated" },
-  { title: "Spike of the week", detail: "Sample highlight · 0:12 · AI-generated" },
-  { title: "Rally of the night", detail: "Sample highlight · 0:31 · AI-generated" },
-  { title: "Best saves", detail: "Sample highlight · 0:27 · AI-generated" },
+  { title: "Sunday hat trick", detail: "Soccer · Sample highlight · 0:24 · AI-generated" },
+  {
+    title: "Buzzer-beater from the corner",
+    detail: "Basketball · Sample highlight · 0:18 · AI-generated",
+  },
+  { title: "Spike of the week", detail: "Volleyball · Sample highlight · 0:12 · AI-generated" },
+  { title: "Rally of the night", detail: "Tennis · Sample highlight · 0:31 · AI-generated" },
+  { title: "Best saves", detail: "Soccer · Sample highlight · 0:27 · AI-generated" },
+  {
+    title: "Dink battle at the net",
+    detail: "Pickleball · Sample highlight · 0:21 · AI-generated",
+  },
+  { title: "Fourth-quarter lockdown", detail: "Football · Sample highlight · 0:29 · AI-generated" },
+  { title: "Negative-split finish", detail: "Running · Sample highlight · 0:16 · AI-generated" },
+].map((r, i) => ({ ...r, person: `By ${person(i + 1)}` }));
+
+const messages: PreviewRow[] = [
+  { title: "Sample Person 1", detail: "Want to run a game Saturday? · 2m" },
+  { title: "Sample Hoopers", detail: "Sample Person 2: Practice moved to 7 PM · 1h" },
+  { title: "Sample Person 3", detail: "Thanks for hosting, see you next week · Yesterday" },
+  { title: "Sample Court Coaching", detail: "Your Tuesday session is confirmed · Mon" },
+  { title: "Sample Person 4", detail: "Can I bring a friend to Sunday pickup? · Sun" },
 ];
 
 export const PREVIEW_CONFIGS: Record<PreviewTab, PreviewConfig> = {
@@ -124,6 +142,21 @@ export const PREVIEW_CONFIGS: Record<PreviewTab, PreviewConfig> = {
     headerAction: "Upload a clip",
     rowAction: "Share",
     rows: reels,
+  },
+  messages: {
+    title: "Messages",
+    subtitle: "Chat with players, teams, trainers and gyms.",
+    cta: "Create a free account to message players and teams",
+    rowAction: "Open",
+    rows: messages,
+    locked: {
+      title: "A conversation",
+      lines: [
+        "Sample Person 1: Want to run a game Saturday?",
+        "You: Sure, what time works?",
+        "Sample Person 1: 10 AM at Sample Park.",
+      ],
+    },
   },
   create: {
     title: "Host a game",
