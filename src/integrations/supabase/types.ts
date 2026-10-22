@@ -1725,6 +1725,89 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_candidates: {
+        Row: {
+          address: string | null
+          category: string | null
+          city: string | null
+          confidence: number
+          created_at: string
+          created_listing_id: string | null
+          description: string | null
+          duplicate_of: Json | null
+          fingerprint: string
+          id: string
+          name: string
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          run_id: string | null
+          source: string
+          source_url: string
+          sports: string[]
+          state: string | null
+          status: string
+          subject_type: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          confidence?: number
+          created_at?: string
+          created_listing_id?: string | null
+          description?: string | null
+          duplicate_of?: Json | null
+          fingerprint: string
+          id?: string
+          name: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id?: string | null
+          source: string
+          source_url: string
+          sports?: string[]
+          state?: string | null
+          status?: string
+          subject_type: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          confidence?: number
+          created_at?: string
+          created_listing_id?: string | null
+          description?: string | null
+          duplicate_of?: Json | null
+          fingerprint?: string
+          id?: string
+          name?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id?: string | null
+          source?: string
+          source_url?: string
+          sports?: string[]
+          state?: string | null
+          status?: string
+          subject_type?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_candidates_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "listing_discovery_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_claims: {
         Row: {
           created_at: string
@@ -1767,6 +1850,101 @@ export type Database = {
           subject_type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      listing_discovery_pages: {
+        Row: {
+          candidates: number
+          fetched_at: string
+          host: string
+          outcome: string
+          run_id: string | null
+          url: string
+        }
+        Insert: {
+          candidates?: number
+          fetched_at?: string
+          host: string
+          outcome: string
+          run_id?: string | null
+          url: string
+        }
+        Update: {
+          candidates?: number
+          fetched_at?: string
+          host?: string
+          outcome?: string
+          run_id?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_discovery_pages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "listing_discovery_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_discovery_runs: {
+        Row: {
+          area_id: string
+          created_at: string
+          created_by: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          lock_until: string | null
+          log: Json
+          max_pages: number
+          pages: Json
+          pages_done: number
+          seen_hosts: string[]
+          stats: Json
+          status: string
+          tasks: Json
+          types: string[]
+          updated_at: string
+        }
+        Insert: {
+          area_id: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          lock_until?: string | null
+          log?: Json
+          max_pages?: number
+          pages?: Json
+          pages_done?: number
+          seen_hosts?: string[]
+          stats?: Json
+          status?: string
+          tasks?: Json
+          types: string[]
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          lock_until?: string | null
+          log?: Json
+          max_pages?: number
+          pages?: Json
+          pages_done?: number
+          seen_hosts?: string[]
+          stats?: Json
+          status?: string
+          tasks?: Json
+          types?: string[]
+          updated_at?: string
         }
         Relationships: []
       }
