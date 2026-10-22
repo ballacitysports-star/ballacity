@@ -404,6 +404,12 @@ export const ME = {
 
 export type OrgKind = "team" | "coach";
 export type PostKind = "tryout" | "pickup" | "clinic" | "announcement" | "recap";
+/**
+ * What a team can post today. "pickup" is no longer one of them: a pickup game is
+ * a game, hosted from Host a game and listed in the feed. It stays in `PostKind`
+ * only so an old post of that kind can still be shown.
+ */
+export type TeamPostKind = Exclude<PostKind, "pickup">;
 
 export type OrgPost = {
   id: string;

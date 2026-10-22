@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Sparkles, Undo2 } from "lucide-react";
 import { suggestTeamPostDraft } from "@/lib/team-posts.functions";
-import type { PostKind } from "@/lib/sample-data";
+import type { TeamPostKind } from "@/lib/sample-data";
 
 /** The server needs at least this much to write from (matches suggestTeamPostDraft). */
 export const DRAFT_MIN_NOTES = 10;
@@ -21,7 +21,7 @@ export function DraftWithAi({
   body,
   onApply,
 }: {
-  kind: PostKind;
+  kind: TeamPostKind;
   title: string;
   body: string;
   onApply: (text: PostDraftText) => void;

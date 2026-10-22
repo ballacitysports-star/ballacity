@@ -38,7 +38,8 @@ function viewerClient() {
   });
 }
 
-const PostKind = z.enum(["tryout", "pickup", "clinic", "announcement", "recap"]);
+// Not "pickup": a pickup game is hosted as a game and listed in the feed, not posted on a team.
+const PostKind = z.enum(["tryout", "clinic", "announcement", "recap"]);
 
 export const listTeamPosts = createServerFn({ method: "GET" })
   .inputValidator((input) => z.object({ teamId: z.string().min(1) }).parse(input))

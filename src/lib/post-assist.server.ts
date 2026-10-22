@@ -14,13 +14,12 @@ import { AiError } from "@/lib/ai/errors";
 import { withAiSession } from "@/lib/ai/session.server";
 import { TEAM_POST_CONTEXT, screenPostText } from "@/lib/post-moderation.server";
 
-export const POST_ASSIST_KINDS = ["announcement", "tryout", "pickup", "clinic", "recap"] as const;
+export const POST_ASSIST_KINDS = ["announcement", "tryout", "clinic", "recap"] as const;
 export type PostAssistKind = (typeof POST_ASSIST_KINDS)[number];
 
 const KIND_LABEL: Record<PostAssistKind, string> = {
   announcement: "team announcement",
   tryout: "tryout invitation",
-  pickup: "pickup game invitation",
   clinic: "clinic / camp invitation",
   recap: "game recap",
 };

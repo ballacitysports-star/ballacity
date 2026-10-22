@@ -72,7 +72,7 @@ describe("parsePostDraft", () => {
 });
 
 describe("draftTeamPost", () => {
-  const input = { userId: "u1", kind: "pickup" as const, notes: "pickup friday 6pm at the park" };
+  const input = { userId: "u1", kind: "clinic" as const, notes: "clinic friday 6pm at the park" };
 
   it("returns a screened draft", async () => {
     generateStructured.mockResolvedValue({ data: { title: "Friday pickup", body: "Join us." } });
