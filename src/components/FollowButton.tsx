@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Loader2, UserCheck, UserPlus } from "lucide-react";
+import { Clock, Loader2, UserCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFollow } from "@/lib/follows";
 
@@ -11,7 +11,7 @@ type Props = {
 };
 
 /**
- * Shared Follow / Following toggle so profiles and the highlight feed behave
+ * Shared Follow / Requested / Following toggle so profiles and the highlight feed behave
  * identically. Signed-out viewers get a sign-in link instead of a dead button.
  */
 export function FollowButton({ userId, size = "md", className = "" }: Props) {
@@ -38,14 +38,18 @@ export function FollowButton({ userId, size = "md", className = "" }: Props) {
     );
   }
 
+  const label = follow.isFollowing ? "Following" : follow.requested ? "Requested" : "Follow";
+  const settled = follow.isFollowing || follow.requested;
+
   return (
     <button
       type="button"
       onClick={() => follow.toggle()}
       disabled={follow.pending || follow.loading}
-      aria-pressed={follow.isFollowing}
+      aria-pressed={settled}
+      aria-label={follow.requested ? "Requested. Tap to withdraw your follow request" : undefined}
       className={`${base} ${
-        follow.isFollowing
+        settled
           ? "border border-border text-muted-foreground hover:border-coral hover:text-coral"
           : "bg-lime-gradient text-primary-foreground"
       } disabled:opacity-60 ${className}`}
@@ -54,10 +58,12 @@ export function FollowButton({ userId, size = "md", className = "" }: Props) {
         <Loader2 className={`${icon} animate-spin`} />
       ) : follow.isFollowing ? (
         <UserCheck className={icon} />
+      ) : follow.requested ? (
+        <Clock className={icon} />
       ) : (
         <UserPlus className={icon} />
       )}
-      {follow.isFollowing ? "Following" : "Follow"}
+      {label}
     </button>
   );
 }

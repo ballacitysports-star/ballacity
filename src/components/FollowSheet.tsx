@@ -230,11 +230,21 @@ function FollowRow({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (isFollowing) await unfollowUser(user.id);
-      else await followUser(user.id);
+      if (isFollowing) {
+        await unfollowUser(user.id);
+        return "unfollowed" as const;
+      }
+      return followUser(user.id);
     },
     onMutate: () => {
       setOptimisticFollows(!isFollowing);
+    },
+    onSuccess: (outcome) => {
+      // An account that needs approval only gets a request, not a follow.
+      if (outcome === "requested") {
+        setOptimisticFollows(false);
+        toast.success("Follow request sent");
+      }
     },
     onError: (e: any) => {
       setOptimisticFollows(isFollowing);

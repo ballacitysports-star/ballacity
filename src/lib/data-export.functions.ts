@@ -63,6 +63,12 @@ const CATEGORY_QUERIES: Record<
       column: "follower_id",
       columns: "followee_id, created_at",
     },
+    {
+      key: "follow_requests_sent",
+      table: "follow_requests",
+      column: "requester_id",
+      columns: "target_id, created_at",
+    },
   ],
   preferences: [
     {
@@ -70,7 +76,7 @@ const CATEGORY_QUERIES: Record<
       table: "privacy_preferences",
       column: "user_id",
       columns:
-        "profile_visibility, location_precision, show_sports, show_games_played, allow_messages, allow_invites, marketing_emails, ai_processing, ai_training_opt_in, ai_disclosure_ack_at, updated_at",
+        "profile_visibility, require_follow_approval, location_precision, show_sports, show_games_played, allow_messages, allow_invites, marketing_emails, ai_processing, ai_training_opt_in, ai_disclosure_ack_at, updated_at",
     },
     {
       key: "notification_preferences",
