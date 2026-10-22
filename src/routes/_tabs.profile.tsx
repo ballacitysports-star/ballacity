@@ -77,6 +77,7 @@ import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { FamilyCard } from "@/components/child/FamilyCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -471,16 +472,6 @@ function PlayerProfile() {
               <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
             </ChannelPill>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
-            {isParentMode ? (
-              <>
-                <Link to="/guardian" className={channelPillClass()}>
-                  Kids
-                </Link>
-                <Link to="/parent" className={channelPillClass()}>
-                  Parent Center
-                </Link>
-              </>
-            ) : null}
             <Link to="/settings" className={channelPillClass()}>
               Settings
             </Link>
@@ -490,6 +481,12 @@ function PlayerProfile() {
           </>
         }
       />
+
+      {isParentMode ? (
+        <div className="mx-4 mt-4">
+          <FamilyCard />
+        </div>
+      ) : null}
 
       <ProfileVisibilityRow />
 
