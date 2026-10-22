@@ -224,8 +224,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
             </div>
           )}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {/* Wraps when the host's skill/age text is long, instead of running under the message button and spots count. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
               {hostUserId ? (
                 <button
                   type="button"
@@ -260,7 +261,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               ) : (
                 <span className="truncate">{game.host.name}</span>
               )}
-              <span className="shrink-0 text-foreground">· {game.skill}</span>
+              <span className="min-w-0 text-foreground">· {game.skill}</span>
               {fit !== "open" && (
                 <span
                   className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
@@ -276,12 +277,12 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 </span>
               )}
               {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
-                <span className="shrink-0 text-muted-foreground">
+                <span className="text-muted-foreground">
                   · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
                 </span>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
               {hostUserId && (
                 <button
                   type="button"
