@@ -30,6 +30,7 @@ const ENTRY_POINTS: Record<string, { file: string; feature: AiFeature }> = {
   previewReelStyle: { file: "src/lib/reels.functions.ts", feature: "reel_style" },
   removeBackground: { file: "src/lib/bg-remove.functions.ts", feature: "background_remove" },
   draftTeamPost: { file: "src/lib/post-assist.server.ts", feature: "post_assist" },
+  generateStudioDraft: { file: "src/lib/content-studio.server.ts", feature: "content_studio" },
   extractPageOrganizations: {
     file: "src/lib/discovery/extract.server.ts",
     feature: "listing_discovery",
@@ -180,6 +181,20 @@ describe("post writing help is adults only", () => {
       const work = vi.fn();
       await expect(
         withAiSession({ admin, userId: "kid", feature: "post_assist" }, work as any),
+      ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
+      expect(work).not.toHaveBeenCalled();
+      expect(admin.calls).not.toContain("ai_reserve_quota");
+    }
+  });
+});
+
+describe("content studio drafting is adults only", () => {
+  it("content_studio is refused for every minor cohort before any AI work", async () => {
+    for (const cohort of AGE_COHORTS.filter((c) => c !== "adult")) {
+      const admin = makeAdmin({ consented: true, cohort });
+      const work = vi.fn();
+      await expect(
+        withAiSession({ admin, userId: "kid", feature: "content_studio" }, work as any),
       ).rejects.toThrow(AI_ERROR_MESSAGES.PARENT_APPROVAL_REQUIRED);
       expect(work).not.toHaveBeenCalled();
       expect(admin.calls).not.toContain("ai_reserve_quota");
