@@ -1,10 +1,11 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { GAMES } from "@/lib/sample-data";
+import { GAMES, type Game } from "@/lib/sample-data";
+import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import {
   type PaymentMethod,
@@ -28,22 +29,11 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
       description: "Set the entry fee, accepted payment methods, and refund policy for your game.",
       noindex: true,
     }),
-  loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
-  },
-  notFoundComponent: () => (
-    <RouteFallback
-      title="Game not found"
-      message="It may have wrapped up or been cancelled."
-      action={
-        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
-          Back to feed
-        </Link>
-      }
-    />
-  ),
+  // Real games live in the hosted-games store / database, not the sample list.
+  loader: ({ params }) => ({
+    gameId: params.gameId,
+    game: GAMES.find((g) => g.id === params.gameId) ?? null,
+  }),
   errorComponent: ({ reset }) => (
     <RouteFallback
       title="Couldn't open payment setup"
@@ -58,8 +48,56 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
   component: SetupPage,
 });
 
+function GameNotFound() {
+  return (
+    <RouteFallback
+      title="Game not found"
+      message="It may have wrapped up or been cancelled."
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
+  );
+}
+
 function SetupPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId, game: loaderGame } = Route.useLoaderData();
+  const hostedGames = useHostedGames();
+  const [remoteGame, setRemoteGame] = useState<Game | null>(null);
+  const [lookedUp, setLookedUp] = useState(false);
+  const game = hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null;
+
+  useEffect(() => {
+    if (game) return;
+    let cancelled = false;
+    fetchHostedGame(gameId)
+      .then((found) => {
+        if (!cancelled) setRemoteGame(found);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLookedUp(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only look up once per game id; `game` is the thing being looked for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
+
+  if (!game) {
+    return lookedUp ? (
+      <GameNotFound />
+    ) : (
+      <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+    );
+  }
+  return <SetupForm game={game} />;
+}
+
+function SetupForm({ game }: { game: Game }) {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -73,6 +111,9 @@ function SetupPage() {
   const [refundPolicy, setRefundPolicy] = useState("");
   const [instructions, setInstructions] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
+  // Deadline, refund rules and instructions have sensible defaults, so they
+  // start folded away unless this game already changed them.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [paypal, setPaypal] = useState<HostPayPalAccount | null>(null);
   const [paypalMerchantId, setPaypalMerchantId] = useState("");
@@ -105,6 +146,16 @@ function SetupPage() {
         setRefundPolicy(s.refund_policy ?? "");
         setInstructions(s.payment_instructions ?? "");
         setRequiresApproval(!!s.requires_approval);
+        const policy = normalizeRefundPolicy(s.refund_rule, s.late_refund_pct);
+        if (
+          s.payment_deadline ||
+          s.refund_policy ||
+          s.payment_instructions ||
+          policy.rule !== DEFAULT_REFUND_RULE ||
+          policy.latePct !== 0
+        ) {
+          setAdvancedOpen(true);
+        }
       }
     })();
   }, [user, game.id]);
@@ -329,45 +380,59 @@ function SetupPage() {
         )}
       </section>
 
-      <section>
-        <Label>Payment deadline (optional)</Label>
-        <input
-          type="datetime-local"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-        />
-      </section>
+      <details
+        open={advancedOpen}
+        onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+        className="rounded-2xl border border-border bg-surface p-4"
+      >
+        <summary className="cursor-pointer text-sm font-semibold">
+          Advanced: deadline, refunds, instructions
+        </summary>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Defaults: no deadline, refundable until the cancellation cutoff.
+        </p>
+        <div className="mt-4 space-y-5">
+          <section>
+            <Label>Payment deadline (optional)</Label>
+            <input
+              type="datetime-local"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+            />
+          </section>
 
-      <section>
-        <Label>Refund policy</Label>
-        <RefundPolicyFields
-          value={refundRule}
-          onChange={setRefundRule}
-          cutoffMin={game.cancelCutoffMin}
-          idPrefix="setup-refund"
-          className="mb-3"
-        />
-        <Label>Refund notes (optional)</Label>
-        <textarea
-          rows={3}
-          value={refundPolicy}
-          onChange={(e) => setRefundPolicy(e.target.value)}
-          placeholder="e.g. Rain-outs are refunded in full."
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
-        />
-      </section>
+          <section>
+            <Label>Refund policy</Label>
+            <RefundPolicyFields
+              value={refundRule}
+              onChange={setRefundRule}
+              cutoffMin={game.cancelCutoffMin}
+              idPrefix="setup-refund"
+              className="mb-3"
+            />
+            <Label>Refund notes (optional)</Label>
+            <textarea
+              rows={3}
+              value={refundPolicy}
+              onChange={(e) => setRefundPolicy(e.target.value)}
+              placeholder="e.g. Rain-outs are refunded in full."
+              className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
+            />
+          </section>
 
-      <section>
-        <Label>Payment instructions (optional)</Label>
-        <textarea
-          rows={3}
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder="e.g. Include your full name in the payment note."
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
-        />
-      </section>
+          <section>
+            <Label>Payment instructions (optional)</Label>
+            <textarea
+              rows={3}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="e.g. Include your full name in the payment note."
+              className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
+            />
+          </section>
+        </div>
+      </details>
 
       <LegalNotice />
 
