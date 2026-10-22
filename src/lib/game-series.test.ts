@@ -80,6 +80,19 @@ describe("groupProfileGames", () => {
     hostUserId: "me",
   });
 
+  it("lists a game the host hid under Hosting, and one a player joined under Playing", () => {
+    const pool = [
+      { ...hostGame("mine", "2026-10-24T18:00:00Z"), hidden: true },
+      { ...day("theirs", "2026-10-25T18:00:00Z"), hostUserId: "other", hidden: true },
+      { ...day("not-mine", "2026-10-26T18:00:00Z"), hostUserId: "other", hidden: true },
+    ];
+    const now = +new Date("2026-10-20T12:00:00Z");
+    const g = groupProfileGames(pool, new Set(["theirs"]), "me", now);
+    expect(g.hosting.map((x) => x.id)).toEqual(["mine"]);
+    expect(g.playing.map((x) => x.id)).toEqual(["theirs"]);
+    expect(g.total).toBe(2);
+  });
+
   it("collapses a hosted weekend series to the next session in Hosting", () => {
     const pool = [
       hostGame("sat", "2026-10-24T18:00:00Z", "wk"),

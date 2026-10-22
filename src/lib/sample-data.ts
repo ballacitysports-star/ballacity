@@ -83,6 +83,8 @@ export type Game = {
   price: number; // 0 = free
   indoor: boolean;
   isPrivate: boolean;
+  /** Hidden from the public (by its host or a moderator); only set for people who may still see it. */
+  hidden?: boolean;
   urgent?: boolean;
   trending?: boolean;
   image: string;
