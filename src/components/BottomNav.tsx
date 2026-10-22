@@ -1,14 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import {
-  Home,
-  Users,
-  Shield,
-  Clapperboard,
-  Heart,
-  CalendarDays,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { Compass, Home, MessageCircle, Plus, UserRound } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -18,25 +9,31 @@ type NavItem = {
   to: string;
   label: string;
   icon?: typeof Home;
+  /** Draw the icon as an outline even when active (filling it would hide its detail). */
+  outline?: boolean;
   match?: (pathname: string) => boolean;
   render?: (active: boolean) => React.ReactNode;
 };
 
 /**
- * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Highlights, Activity, Profile.
+ * Five-tab bottom bar: Home, Discover (players, teams, trainers, gyms), Host, Inbox, Me.
  *
  * The order and the active-route rules come from TABS, which the swipe
  * gesture also steps through — so paging sideways always lands on the tab
  * sitting next to the current one in this bar.
  */
-const presentation: Record<string, Pick<NavItem, "icon" | "render">> = {
+const presentation: Record<string, Pick<NavItem, "icon" | "render" | "outline">> = {
   "/feed": { icon: Home },
-  "/players": { icon: Users },
-  "/teams": { icon: Shield },
-  "/highlights": { icon: Clapperboard },
-  "/notifications": { icon: Heart },
-  "/guardian": { icon: CalendarDays },
-  "/parent": { icon: ShieldCheck },
+  "/players": { icon: Compass, outline: true },
+  "/create": {
+    // The one action in the bar: a filled button so hosting is never hard to find.
+    render: () => (
+      <span className="grid h-9 w-12 place-items-center rounded-2xl bg-lime-gradient text-primary-foreground glow-lime">
+        <Plus className="h-5 w-5" strokeWidth={2.8} aria-hidden />
+      </span>
+    ),
+  },
+  "/messages": { icon: MessageCircle },
   "/profile": {
     render: (active) => <MyAvatar ringWhenActive active={active} />,
   },
@@ -78,7 +75,7 @@ export function BottomNav() {
           <Icon
             className={`h-6 w-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
             strokeWidth={iconStroke}
-            fill={active ? "currentColor" : "none"}
+            fill={active && !it.outline ? "currentColor" : "none"}
           />
         ) : null}
         {/* A shape cue as well as a colour cue, so the active tab is still

@@ -48,9 +48,23 @@ describe("tab resolution", () => {
     expect(TABS[tabIndexForPath("/pickup")]?.to).toBe("/feed");
   });
 
-  it("folds discover and trainers into the players tab", () => {
-    expect(TABS[tabIndexForPath("/discover")]?.to).toBe("/players");
-    expect(TABS[tabIndexForPath("/trainers")]?.to).toBe("/players");
+  it("folds players, teams, trainers, gyms and discover into the Discover tab", () => {
+    for (const p of ["/discover", "/trainers", "/teams", "/teams/abc", "/orgs", "/orgs/abc"]) {
+      expect(TABS[tabIndexForPath(p)]?.to).toBe("/players");
+    }
+  });
+
+  it("puts messages and alerts in the Inbox, and highlights under Me", () => {
+    for (const p of ["/messages", "/messages/abc", "/notifications"]) {
+      expect(TABS[tabIndexForPath(p)]?.to).toBe("/messages");
+    }
+    for (const p of ["/profile", "/profile/edit", "/highlights", "/reels"]) {
+      expect(TABS[tabIndexForPath(p)]?.to).toBe("/profile");
+    }
+  });
+
+  it("has the five tabs in order", () => {
+    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Host", "Inbox", "Me"]);
   });
 
   it("does not treat a detail route as a tab", () => {
@@ -59,28 +73,30 @@ describe("tab resolution", () => {
     expect(isTabPath("/settings")).toBe(false);
   });
 
-  it("uses family destinations in Parent Mode", () => {
-    expect(PARENT_TABS.map((tab) => tab.to)).toEqual([
-      "/feed",
-      "/players",
-      "/teams",
-      "/guardian",
-      "/parent",
-      "/notifications",
-    ]);
-    expect(PARENT_TABS[tabIndexForPath("/guardian", PARENT_TABS)]?.to).toBe("/guardian");
-    expect(PARENT_TABS[tabIndexForPath("/parent/consent/abc", PARENT_TABS)]?.to).toBe("/parent");
+  it("uses the same bar in Parent Mode; family tools live under Me", () => {
+    expect(PARENT_TABS.map((tab) => tab.to)).toEqual(TABS.map((tab) => tab.to));
   });
 });
 
 describe("adjacentTab", () => {
   it("steps forward when the finger travels left", () => {
     expect(adjacentTab("/feed", "left")).toBe("/players");
-    expect(adjacentTab("/players", "left")).toBe("/teams");
+    expect(adjacentTab("/players", "left")).toBe("/messages");
   });
 
   it("steps backward when the finger travels right", () => {
-    expect(adjacentTab("/teams", "right")).toBe("/players");
+    expect(adjacentTab("/messages", "right")).toBe("/players");
+  });
+
+  it("skips Host in both directions", () => {
+    expect(adjacentTab("/players", "left")).not.toBe("/create");
+    expect(adjacentTab("/messages", "right")).not.toBe("/create");
+  });
+
+  it("never pages into or out of Host, which is a form", () => {
+    expect(adjacentTab("/create", "left")).toBeNull();
+    expect(adjacentTab("/create", "right")).toBeNull();
+    expect(isTabPath("/create")).toBe(false);
   });
 
   it("stops at both ends rather than wrapping", () => {
@@ -90,11 +106,6 @@ describe("adjacentTab", () => {
 
   it("returns null for a route that is not a tab", () => {
     expect(adjacentTab("/games/abc", "left")).toBeNull();
-  });
-
-  it("steps through guardian destinations in Parent Mode", () => {
-    expect(adjacentTab("/teams", "left", PARENT_TABS)).toBe("/guardian");
-    expect(adjacentTab("/guardian", "left", PARENT_TABS)).toBe("/parent");
   });
 });
 
@@ -194,7 +205,7 @@ describe("resolveSwipeIntent", () => {
   });
 
   it("pages to the previous tab when dragging right on a tab route", () => {
-    const intent = resolveSwipeIntent({ ...base, pathname: "/teams", startX: 200, dx: 200 });
+    const intent = resolveSwipeIntent({ ...base, pathname: "/messages", startX: 200, dx: 200 });
     expect(intent).toEqual({ kind: "tab", to: "/players" });
   });
 

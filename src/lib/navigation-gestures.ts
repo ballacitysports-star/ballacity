@@ -17,11 +17,16 @@ export type TabDef = {
   to: string;
   label: string;
   match: (pathname: string) => boolean;
+  /** False for a tab that is an action, not a place: swiping never pages into or out of it. */
+  pageable?: boolean;
 };
 
 /**
  * The bottom bar renders these in order and the swipe gesture steps through
- * the same list, so the two can never disagree about what "next tab" means.
+ * the pageable ones, so the two can never disagree about what "next tab" means.
+ *
+ * Players, Teams, Trainers and Gyms are one Discover tab (see DiscoverTabs).
+ * Messages and alerts share the Inbox tab. Highlights live under Me.
  */
 export const TABS: TabDef[] = [
   {
@@ -31,52 +36,42 @@ export const TABS: TabDef[] = [
   },
   {
     to: "/players",
-    label: "Players",
+    label: "Discover",
     match: (p) =>
-      p.startsWith("/players") || p.startsWith("/discover") || p.startsWith("/trainers"),
+      p.startsWith("/players") ||
+      p.startsWith("/discover") ||
+      p.startsWith("/trainers") ||
+      p.startsWith("/teams") ||
+      p === "/orgs" ||
+      p.startsWith("/orgs/"),
   },
   {
-    to: "/teams",
-    label: "Teams",
-    match: (p) => p.startsWith("/teams"),
+    to: "/create",
+    label: "Host",
+    match: (p) => p === "/create" || p.startsWith("/create/"),
+    pageable: false,
   },
   {
-    to: "/highlights",
-    label: "Highlights",
-    match: (p) => p === "/highlights" || p.startsWith("/highlights"),
-  },
-  {
-    to: "/notifications",
-    label: "Activity",
+    to: "/messages",
+    label: "Inbox",
     match: (p) => p.startsWith("/notifications") || p.startsWith("/messages"),
   },
   {
     to: "/profile",
-    label: "Profile",
-    match: (p) => p.startsWith("/profile"),
+    label: "Me",
+    match: (p) =>
+      p.startsWith("/profile") ||
+      p === "/highlights" ||
+      p.startsWith("/highlights/") ||
+      p === "/reels",
   },
 ];
 
-/** Guardian base accounts browse normally but manage family activity here. */
-export const PARENT_TABS: TabDef[] = [
-  TABS[0],
-  TABS[1],
-  TABS[2],
-  {
-    to: "/guardian",
-    label: "Kids",
-    match: (p) => p === "/guardian" || p.startsWith("/guardian/"),
-  },
-  {
-    to: "/parent",
-    label: "Parent Center",
-    match: (p) => p === "/parent" || p.startsWith("/parent/"),
-  },
-  TABS[4],
-];
+/** Guardians use the same bar; Kids and Parent Center are reached from Me. */
+export const PARENT_TABS: TabDef[] = TABS;
 
-export function tabsForMode(parentMode = false): TabDef[] {
-  return parentMode ? PARENT_TABS : TABS;
+export function tabsForMode(_parentMode = false): TabDef[] {
+  return TABS;
 }
 
 /** Index of the tab owning `pathname`, or -1 when the route is not a tab. */
@@ -85,7 +80,13 @@ export function tabIndexForPath(pathname: string, tabs: TabDef[] = TABS): number
 }
 
 export function isTabPath(pathname: string, tabs: TabDef[] = TABS): boolean {
-  return tabIndexForPath(pathname, tabs) !== -1;
+  // An action tab (Host) is a form, not a page to swipe away from: it keeps the edge back gesture.
+  return (
+    tabIndexForPath(
+      pathname,
+      tabs.filter((t) => t.pageable !== false),
+    ) !== -1
+  );
 }
 
 /**
@@ -99,11 +100,12 @@ export function adjacentTab(
   direction: "left" | "right",
   tabs: TabDef[] = TABS,
 ): string | null {
-  const index = tabIndexForPath(pathname, tabs);
+  const paged = tabs.filter((t) => t.pageable !== false);
+  const index = tabIndexForPath(pathname, paged);
   if (index === -1) return null;
   const next = direction === "left" ? index + 1 : index - 1;
-  if (next < 0 || next >= tabs.length) return null;
-  return tabs[next]?.to ?? null;
+  if (next < 0 || next >= paged.length) return null;
+  return paged[next]?.to ?? null;
 }
 
 /** How far from the left edge a drag must start to count as a back gesture. */

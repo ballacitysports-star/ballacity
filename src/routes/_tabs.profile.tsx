@@ -75,6 +75,7 @@ import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow"
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { useParentMode } from "@/hooks/use-parent-mode";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -134,6 +135,7 @@ function PlayerProfile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
+  const { isParentMode } = useParentMode();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -456,6 +458,19 @@ function PlayerProfile() {
               <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
             </ChannelPill>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
+            <Link to="/highlights" className={channelPillClass()}>
+              Highlights
+            </Link>
+            {isParentMode ? (
+              <>
+                <Link to="/guardian" className={channelPillClass()}>
+                  Kids
+                </Link>
+                <Link to="/parent" className={channelPillClass()}>
+                  Parent Center
+                </Link>
+              </>
+            ) : null}
             <Link to="/settings" className={channelPillClass()}>
               Settings
             </Link>
