@@ -204,8 +204,7 @@ test("payment verified by host updates pay screen to confirmed state", async ({ 
   await expect(methodButton).toBeVisible({ timeout: 10_000 });
   await methodButton.click();
 
-  await page.locator("#paid-amount").fill("15");
-  await page.locator("#paid-at").fill(new Date().toISOString().slice(0, 10));
+  // Amount (the $15 fee) and date (today) are prefilled and tucked away.
 
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
   // Paying requires accepting the host's refund terms first.

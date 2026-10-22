@@ -1227,6 +1227,9 @@ function PaymentInstructionsAndProof({
   const deepLink = resolvePaymentDeepLink(method, fee, game_title);
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
+  // With a known fee the amount and date are prefilled, so the extra fields
+  // stay folded away; they open on their own if one fails validation.
+  const [detailsOpen, setDetailsOpen] = useState(() => !(fee && fee > 0));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   // Persist "opened" across the round-trip so a hard refresh, a webview
@@ -1390,6 +1393,7 @@ function PaymentInstructionsAndProof({
         if (typeof key === "string" && !fieldErrors[key]) fieldErrors[key] = issue.message;
       }
       setErrors(fieldErrors);
+      setDetailsOpen(true);
       toast.error("Please fix the highlighted fields.");
       return;
     }
@@ -1562,95 +1566,111 @@ function PaymentInstructionsAndProof({
           onClear={clearProof}
           maxBytes={MAX_UPLOAD_BYTES}
         />
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label htmlFor="paid-amount" className="block micro-label text-muted-foreground mb-1">
-              Amount paid *
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                $
-              </span>
+        <details
+          open={detailsOpen}
+          onToggle={(e) => setDetailsOpen(e.currentTarget.open)}
+          className="rounded-xl border border-border bg-background/40 p-3"
+        >
+          <summary className="cursor-pointer text-xs font-semibold">
+            {fee && fee > 0
+              ? `Add details (paid $${paidAmount || fee}, optional)`
+              : "Payment details"}
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  htmlFor="paid-amount"
+                  className="block micro-label text-muted-foreground mb-1"
+                >
+                  Amount paid *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    $
+                  </span>
+                  <input
+                    id="paid-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    placeholder="0.00"
+                    aria-invalid={!!errors.paidAmount}
+                    aria-describedby={errors.paidAmount ? "paid-amount-err" : undefined}
+                    className={`w-full rounded-xl border bg-background pl-6 pr-3 py-2 text-sm outline-none focus:border-lime ${
+                      errors.paidAmount ? "border-coral" : "border-border"
+                    }`}
+                  />
+                </div>
+                {errors.paidAmount && (
+                  <p id="paid-amount-err" className="mt-1 text-[11px] text-coral">
+                    {errors.paidAmount}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="paid-at" className="block micro-label text-muted-foreground mb-1">
+                  Payment date *
+                </label>
+                <input
+                  id="paid-at"
+                  type="date"
+                  value={paidAt}
+                  max={toLocalDateInputValue(new Date())}
+                  onChange={(e) => setPaidAt(e.target.value)}
+                  aria-invalid={!!errors.paidAt}
+                  aria-describedby={errors.paidAt ? "paid-at-err" : undefined}
+                  className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+                    errors.paidAt ? "border-coral" : "border-border"
+                  }`}
+                />
+                {errors.paidAt && (
+                  <p id="paid-at-err" className="mt-1 text-[11px] text-coral">
+                    {errors.paidAt}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div>
               <input
-                id="paid-amount"
-                type="text"
-                inputMode="decimal"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                placeholder="0.00"
-                aria-invalid={!!errors.paidAmount}
-                aria-describedby={errors.paidAmount ? "paid-amount-err" : undefined}
-                className={`w-full rounded-xl border bg-background pl-6 pr-3 py-2 text-sm outline-none focus:border-lime ${
-                  errors.paidAmount ? "border-coral" : "border-border"
+                value={ref}
+                onChange={(e) => setRef(e.target.value)}
+                placeholder="Transaction ID (optional)"
+                maxLength={120}
+                aria-invalid={!!errors.transactionRef}
+                aria-describedby={errors.transactionRef ? "tx-ref-err" : undefined}
+                className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+                  errors.transactionRef ? "border-coral" : "border-border"
                 }`}
               />
+              {errors.transactionRef && (
+                <p id="tx-ref-err" className="mt-1 text-[11px] text-coral">
+                  {errors.transactionRef}
+                </p>
+              )}
             </div>
-            {errors.paidAmount && (
-              <p id="paid-amount-err" className="mt-1 text-[11px] text-coral">
-                {errors.paidAmount}
-              </p>
-            )}
+            <div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="Notes for host (optional)"
+                aria-invalid={!!errors.notes}
+                aria-describedby={errors.notes ? "notes-err" : undefined}
+                className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none ${
+                  errors.notes ? "border-coral" : "border-border"
+                }`}
+              />
+              {errors.notes && (
+                <p id="notes-err" className="mt-1 text-[11px] text-coral">
+                  {errors.notes}
+                </p>
+              )}
+            </div>
           </div>
-          <div>
-            <label htmlFor="paid-at" className="block micro-label text-muted-foreground mb-1">
-              Payment date *
-            </label>
-            <input
-              id="paid-at"
-              type="date"
-              value={paidAt}
-              max={toLocalDateInputValue(new Date())}
-              onChange={(e) => setPaidAt(e.target.value)}
-              aria-invalid={!!errors.paidAt}
-              aria-describedby={errors.paidAt ? "paid-at-err" : undefined}
-              className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
-                errors.paidAt ? "border-coral" : "border-border"
-              }`}
-            />
-            {errors.paidAt && (
-              <p id="paid-at-err" className="mt-1 text-[11px] text-coral">
-                {errors.paidAt}
-              </p>
-            )}
-          </div>
-        </div>
-        <div>
-          <input
-            value={ref}
-            onChange={(e) => setRef(e.target.value)}
-            placeholder="Transaction ID (optional)"
-            maxLength={120}
-            aria-invalid={!!errors.transactionRef}
-            aria-describedby={errors.transactionRef ? "tx-ref-err" : undefined}
-            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
-              errors.transactionRef ? "border-coral" : "border-border"
-            }`}
-          />
-          {errors.transactionRef && (
-            <p id="tx-ref-err" className="mt-1 text-[11px] text-coral">
-              {errors.transactionRef}
-            </p>
-          )}
-        </div>
-        <div>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            maxLength={500}
-            placeholder="Notes for host (optional)"
-            aria-invalid={!!errors.notes}
-            aria-describedby={errors.notes ? "notes-err" : undefined}
-            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none ${
-              errors.notes ? "border-coral" : "border-border"
-            }`}
-          />
-          {errors.notes && (
-            <p id="notes-err" className="mt-1 text-[11px] text-coral">
-              {errors.notes}
-            </p>
-          )}
-        </div>
+        </details>
         <label className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <input
             type="checkbox"

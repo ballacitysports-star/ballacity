@@ -198,10 +198,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   await methodButton.click();
 
   // Proof form is now visible.
-  const amountInput = page.locator("#paid-amount");
-  await expect(amountInput).toBeVisible({ timeout: 10_000 });
-  await amountInput.fill("15");
-  await page.locator("#paid-at").fill(new Date().toISOString().slice(0, 10));
+  // Amount (the $15 fee) and date (today) are prefilled and tucked under "Add details".
+  await expect(page.getByText(/add details/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#paid-amount")).toBeHidden();
 
   // Submit — proof screenshot is optional in the current UX.
   const submitBtn = page.getByRole("button", { name: /i have paid/i });

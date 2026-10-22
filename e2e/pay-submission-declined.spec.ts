@@ -210,8 +210,7 @@ test("declined submission shows actionable error and stays on the pay screen", a
   await expect(methodButton).toBeVisible({ timeout: 10_000 });
   await methodButton.click();
 
-  await page.locator("#paid-amount").fill("15");
-  await page.locator("#paid-at").fill(new Date().toISOString().slice(0, 10));
+  // Amount (the $15 fee) and date (today) are prefilled and tucked away.
 
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
   // Paying requires accepting the host's refund terms first.
@@ -244,6 +243,7 @@ test("declined submission shows actionable error and stays on the pay screen", a
   // Submit button is still enabled so the user can retry from the same
   // context without losing form state.
   await expect(submitBtn).toBeEnabled();
+  await page.getByText(/add details/i).click();
   await expect(page.locator("#paid-amount")).toHaveValue("15");
 
   // Retry: second POST succeeds and the timeline advances to pending.
