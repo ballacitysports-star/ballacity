@@ -17,6 +17,7 @@
 // together, so they are replayed together in timestamp order (a drizzle entry's
 // time is `when` in its journal; at the same instant ours goes first).
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,7 +115,17 @@ try {
       let sql = readFileSync(migration.path, "utf8");
       if (stripMaintain) sql = sql.replace(/,\s*MAINTAIN\b/gi, "");
       r = psql(dbName, ["-1"], sql);
-      if (r.status !== 0) fail(`Migration failed to apply: ${migration.name}`, r.stderr);
+      if (r.status !== 0) {
+        // The same migration committed to both folders applies twice. Most are
+        // repeatable and harmless; one that creates a table is not, and the error
+        // alone ("already exists") does not say why. Name the other copy.
+        const digest = (m) => createHash("sha256").update(readFileSync(m.path)).digest("hex");
+        const twin = migrations.find((m) => m !== migration && digest(m) === digest(migration));
+        const hint = twin
+          ? `\nThis file is identical to ${twin.name}, which is also replayed. Keep one: if Lovable already applied the drizzle copy, remove the supabase/migrations one.`
+          : "";
+        fail(`Migration failed to apply: ${migration.name}${hint}`, r.stderr);
+      }
     }
     console.log(
       `Replayed ${migrations.length} migrations in ${((Date.now() - started) / 1000).toFixed(1)}s.`,

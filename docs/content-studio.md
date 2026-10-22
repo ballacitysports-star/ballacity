@@ -103,12 +103,14 @@ says so.
 
 ## Deployment
 
-The two migrations are additive and ship like every other file in
-`supabase/migrations` (applied through Lovable; never by hand on the canonical
-project):
+The two migrations are additive and ship like every other migration file (applied
+through Lovable; never by hand on the canonical project):
 
-- `20261022120000_content_studio.sql`: new tables, policies and routines only.
-- `20261022130000_listing_claim_review.sql`: new nullable claim columns, one
+- `drizzle/migrations/0023_content_studio.sql`: new tables, policies and routines
+  only. (This was also committed as an identical `supabase/migrations` file, which
+  made a replay fail with "relation already exists"; only the drizzle copy, the one
+  Lovable applied, is kept.)
+- `supabase/migrations/20261022130000_listing_claim_review.sql`: new nullable claim columns, one
   widened CHECK (adds `needs_info`), the one-open-claim index widened to cover it,
   three new routines, and four existing claim routines replaced with the same
   bodies plus the new checks.

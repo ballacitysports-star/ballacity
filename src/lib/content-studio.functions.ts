@@ -4,7 +4,7 @@
  * Every handler re-checks the caller's role on the server: staff
  * (`is_moderator`) for sources and drafts, superadmin for approval, publishing,
  * the destination Page and settings. The status transitions that matter are
- * made by the database routines in 20261022120000_content_studio.sql, which
+ * made by the database routines in drizzle/migrations/0023_content_studio.sql, which
  * check the role again and refuse anything else, so a hidden button is never the
  * only thing standing in the way.
  */
