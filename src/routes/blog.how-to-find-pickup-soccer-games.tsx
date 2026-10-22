@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
-import { useAuth } from "@/hooks/use-auth";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { guideBySlug } from "@/lib/sports-guide";
 
@@ -71,7 +70,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Article() {
-  const { user } = useAuth();
   const soccer = guideBySlug("soccer");
 
   return (
@@ -204,22 +202,13 @@ function Article() {
         <section className="mt-8 rounded-2xl border border-border bg-surface px-4 py-4">
           <h2 className="text-sm font-bold">Play soccer this week</h2>
           <div className="mt-3 grid gap-2">
-            {user ? (
-              <Link
-                to="/feed"
-                search={{ sport: "Soccer" }}
-                className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
-              >
-                Find soccer games near you
-              </Link>
-            ) : (
-              <Link
-                to="/cities"
-                className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
-              >
-                Find soccer games near you
-              </Link>
-            )}
+            <Link
+              to="/feed"
+              search={{ sport: "Soccer" }}
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
+            >
+              Find soccer games near you
+            </Link>
             <Link
               to="/create"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-4 text-sm font-semibold"
