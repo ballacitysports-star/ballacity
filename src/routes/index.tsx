@@ -206,7 +206,7 @@ function Landing() {
               className="enter-up mt-7 flex flex-wrap gap-3"
             >
               <Link
-                to="/feed"
+                to="/cities"
                 className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
               >
                 Find a game near me <ArrowRight className="h-4 w-4" />
