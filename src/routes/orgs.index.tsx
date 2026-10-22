@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { DiscoverTabs } from "@/components/navigation/DiscoverTabs";
 import { pageHead } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +17,9 @@ export const Route = createFileRoute("/orgs/")({
       description:
         "Browse gyms, courts, and sports complexes on BallaCity. See photos, live hours, amenities, and book a court.",
     }),
+  // The Discover strip carries a search over from Players, Teams and Trainers.
+  validateSearch: (s: Record<string, unknown>): { q?: string } =>
+    typeof s.q === "string" && s.q.trim() ? { q: s.q.slice(0, 80) } : {},
   component: OrgsIndex,
 });
 
@@ -29,9 +33,17 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 function OrgsIndex() {
-  const [text, setText] = useState("");
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const [text, setText] = useState(search.q ?? "");
   const [selected, setSelected] = useState<ReadonlySet<DirectoryFilterId>>(new Set());
   const q = useDebounced(text.trim(), 250);
+
+  // Keep the URL in step with the box, so the Discover strip can carry it on.
+  useEffect(() => {
+    if ((search.q ?? "") === q) return;
+    void navigate({ search: q ? { q } : {}, replace: true });
+  }, [q, search.q, navigate]);
 
   // Re-evaluate "open now" as the clock moves.
   const [now, setNow] = useState(() => new Date());
@@ -62,6 +74,7 @@ function OrgsIndex() {
 
   return (
     <div className="page-shell-content pt-4 pb-40 space-y-4">
+      <DiscoverTabs bare />
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="page-title">Gyms &amp; courts.</h1>
