@@ -76,15 +76,15 @@ describe("sample content has specific dates and times", () => {
   it("teams say what kind of listing they are, each in its own words", () => {
     const rows = rowsOf("teams");
     const kinds = rows.map((r) => r.chips?.[0]);
-    // Tryouts, pickup, clinic, recruiting, group run, camp and scrimmage are all different things.
+    // What a team offers the public: ways to join it. Games and runs go in the feed; practices stay with the roster.
     for (const kind of [
       "Tryouts",
-      "Pickup",
       "Clinic",
       "Recruiting",
-      "Group run",
       "Camp",
-      "Scrimmage",
+      "Season sign-ups",
+      "Membership",
+      "Positions open",
     ]) {
       expect(kinds).toContain(kind);
     }
@@ -96,6 +96,14 @@ describe("sample content has specific dates and times", () => {
       expect(r.chips?.some((c) => /open spots?/.test(c))).toBe(true);
     }
     expect(new Set(rows.map((r) => r.detail)).size).toBe(rows.length);
+  });
+
+  it("team listings never show practices, pickup games, scrimmages or group runs", () => {
+    for (const r of rowsOf("teams")) {
+      expect(`${r.title} ${r.detail} ${(r.chips ?? []).join(" ")}`).not.toMatch(
+        /practice|pickup|scrimmage|group run|drop-in/i,
+      );
+    }
   });
 
   it("reels show length, posted date and counts; messages show a time or day", () => {
