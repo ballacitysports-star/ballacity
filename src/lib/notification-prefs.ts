@@ -145,7 +145,8 @@ export function categoryFor(type: string): NotifCategory {
     type.startsWith("safety") ||
     type.startsWith("security") ||
     type === "account_suspended" ||
-    type === "account_warning"
+    type === "account_warning" ||
+    type === "guardian_approval_needed"
   )
     return "safety";
   if (type === "nearby_game" || type === "new_nearby_game") return "nearbyGames";
