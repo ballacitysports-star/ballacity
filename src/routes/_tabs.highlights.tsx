@@ -26,7 +26,7 @@ import {
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useAuth } from "@/hooks/use-auth";
-import { SampleRows } from "@/components/public/SignedOutPreview";
+import { SampleRows, SignUpPrompt } from "@/components/public/SignedOutPreview";
 import { SportFilterBar } from "@/components/reels/SportFilterBar";
 import { SAMPLE_REELS } from "@/lib/preview-samples";
 
@@ -202,6 +202,18 @@ function HighlightFeedPage() {
       </header>
 
       <main className="page-shell-flush">
+        {!user ? (
+          <div className="mx-4 mt-4">
+            <SignUpPrompt
+              label="Create a free account to make your first reel"
+              next={
+                search.sport
+                  ? `/highlights?sport=${encodeURIComponent(search.sport)}`
+                  : "/highlights"
+              }
+            />
+          </div>
+        ) : null}
         {sport && !loading && !error && !showingSamples ? (
           <p
             className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground"
@@ -244,13 +256,6 @@ function HighlightFeedPage() {
                 </button>
               </p>
             )}
-            <Link
-              to="/auth"
-              search={{ next: "/highlights", mode: "signup" }}
-              className="flex w-full items-center justify-center rounded-2xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground glow-lime"
-            >
-              Create a free account to make your first reel
-            </Link>
           </div>
         ) : items.length === 0 ? (
           <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border p-8 text-center">
