@@ -5,6 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyBirthdayLock } from "@/lib/birthday-lock";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import {
@@ -42,7 +43,8 @@ const searchSchema = z.object({
 
 /** Only accept an in-app path, never another origin or an onboarding loop. */
 function safeNext(next: string | undefined): string | null {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return null;
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\"))
+    return null;
   if (next.startsWith("/onboarding") || next.startsWith("/auth")) return null;
   return next;
 }
@@ -161,6 +163,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     : ["Basics", "Sports", "Location", "Next steps"];
   const locationStep = stepLabels.indexOf("Location");
 
+  const { data: birthdayLock } = useMyBirthdayLock(Boolean(user));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
@@ -524,6 +527,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
               userId={user?.id}
               value={basics}
               birthdayError={birthdayError}
+              birthdayLocked={birthdayLock?.locked === true}
+              compact
               onChange={(patch) => {
                 setBasics((b) => ({ ...b, ...patch }));
                 if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
