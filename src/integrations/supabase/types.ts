@@ -1326,11 +1326,13 @@ export type Database = {
           max_players: number
           min_age: number | null
           min_players: number
+          moderator_hidden_at: string | null
           neighborhood: string
           org_hidden_at: string | null
           org_hidden_by: string | null
           org_id: string | null
           org_official: boolean
+          owner_hidden_at: string | null
           positions_needed: Json
           price: number
           reminder_offsets: number[]
@@ -1381,11 +1383,13 @@ export type Database = {
           max_players?: number
           min_age?: number | null
           min_players?: number
+          moderator_hidden_at?: string | null
           neighborhood?: string
           org_hidden_at?: string | null
           org_hidden_by?: string | null
           org_id?: string | null
           org_official?: boolean
+          owner_hidden_at?: string | null
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -1436,11 +1440,13 @@ export type Database = {
           max_players?: number
           min_age?: number | null
           min_players?: number
+          moderator_hidden_at?: string | null
           neighborhood?: string
           org_hidden_at?: string | null
           org_hidden_by?: string | null
           org_id?: string | null
           org_official?: boolean
+          owner_hidden_at?: string | null
           positions_needed?: Json
           price?: number
           reminder_offsets?: number[]
@@ -3164,6 +3170,7 @@ export type Database = {
       }
       reviews: {
         Row: {
+          answers: Json
           body: string
           context: string | null
           created_at: string
@@ -3174,16 +3181,19 @@ export type Database = {
           is_private: boolean
           kind: string
           rating: number
+          recommend: string | null
           reviewee_id: string
           reviewee_kind: string
           reviewee_name: string
           reviewer_id: string
           scores: Json
           sport: string | null
+          tags: string[]
           title: string | null
           verified: boolean
         }
         Insert: {
+          answers?: Json
           body: string
           context?: string | null
           created_at?: string
@@ -3194,16 +3204,19 @@ export type Database = {
           is_private?: boolean
           kind: string
           rating: number
+          recommend?: string | null
           reviewee_id: string
           reviewee_kind: string
           reviewee_name: string
           reviewer_id: string
           scores?: Json
           sport?: string | null
+          tags?: string[]
           title?: string | null
           verified?: boolean
         }
         Update: {
+          answers?: Json
           body?: string
           context?: string | null
           created_at?: string
@@ -3214,12 +3227,14 @@ export type Database = {
           is_private?: boolean
           kind?: string
           rating?: number
+          recommend?: string | null
           reviewee_id?: string
           reviewee_kind?: string
           reviewee_name?: string
           reviewer_id?: string
           scores?: Json
           sport?: string | null
+          tags?: string[]
           title?: string | null
           verified?: boolean
         }
@@ -3612,6 +3627,8 @@ export type Database = {
           lng: number | null
           location: string | null
           moderation_status: string
+          moderator_hidden_at: string | null
+          owner_hidden_at: string | null
           pinned: boolean
           place_id: string | null
           price: number | null
@@ -3640,6 +3657,8 @@ export type Database = {
           lng?: number | null
           location?: string | null
           moderation_status?: string
+          moderator_hidden_at?: string | null
+          owner_hidden_at?: string | null
           pinned?: boolean
           place_id?: string | null
           price?: number | null
@@ -3668,6 +3687,8 @@ export type Database = {
           lng?: number | null
           location?: string | null
           moderation_status?: string
+          moderator_hidden_at?: string | null
+          owner_hidden_at?: string | null
           pinned?: boolean
           place_id?: string | null
           price?: number | null
@@ -3854,7 +3875,9 @@ export type Database = {
           listed_at: string | null
           listed_by: string | null
           losses: number
+          moderator_hidden_at: string | null
           name: string
+          owner_hidden_at: string | null
           owner_id: string | null
           positions_needed: Json
           primary_venue: string | null
@@ -3910,7 +3933,9 @@ export type Database = {
           listed_at?: string | null
           listed_by?: string | null
           losses?: number
+          moderator_hidden_at?: string | null
           name: string
+          owner_hidden_at?: string | null
           owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
@@ -3966,7 +3991,9 @@ export type Database = {
           listed_at?: string | null
           listed_by?: string | null
           losses?: number
+          moderator_hidden_at?: string | null
           name?: string
+          owner_hidden_at?: string | null
           owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
@@ -4160,7 +4187,9 @@ export type Database = {
           id: string
           listed_at: string | null
           listed_by: string | null
+          moderator_hidden_at: string | null
           name: string
+          owner_hidden_at: string | null
           owner_id: string | null
           phone: string | null
           photos: string[]
@@ -4191,7 +4220,9 @@ export type Database = {
           id?: string
           listed_at?: string | null
           listed_by?: string | null
+          moderator_hidden_at?: string | null
           name: string
+          owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
           photos?: string[]
@@ -4222,7 +4253,9 @@ export type Database = {
           id?: string
           listed_at?: string | null
           listed_by?: string | null
+          moderator_hidden_at?: string | null
           name?: string
+          owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
           photos?: string[]
@@ -5234,6 +5267,7 @@ export type Database = {
           sport: string
         }[]
       }
+      review_question_keys: { Args: { _kind: string }; Returns: string[] }
       review_ring_suspects: {
         Args: { _days?: number }
         Returns: {
@@ -5244,6 +5278,7 @@ export type Database = {
           user_b: string
         }[]
       }
+      review_tag_keys: { Args: { _kind: string }; Returns: string[] }
       review_uniform_raters: {
         Args: { _min?: number }
         Returns: {
@@ -5283,6 +5318,10 @@ export type Database = {
         Args: { _game: string; _hidden: boolean }
         Returns: undefined
       }
+      set_listing_hidden: {
+        Args: { _hidden: boolean; _id: string; _kind: string }
+        Returns: string
+      }
       set_my_birthday: {
         Args: { _dob: string }
         Returns: {
@@ -5297,7 +5336,7 @@ export type Database = {
         Returns: undefined
       }
       set_team_event_availability: {
-        Args: { _note?: string; _post: string; _status: string | null; _user: string }
+        Args: { _note?: string; _post: string; _status: string; _user: string }
         Returns: undefined
       }
       settle_paid_spot: {
