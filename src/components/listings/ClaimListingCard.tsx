@@ -15,8 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
-import { listingErrorMessage, useClaimListing, useMyClaim } from "@/lib/listings";
+import {
+  CLAIM_RELATIONSHIPS,
+  CLAIM_RELATIONSHIP_LABEL,
+  listingErrorMessage,
+  useClaimListing,
+  useMyClaim,
+  type ClaimRelationship,
+} from "@/lib/listings";
 import type { ListingSubjectType } from "@/lib/listings.functions";
 
 /**
@@ -36,10 +44,85 @@ export function ClaimListingCard({
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [evidence, setEvidence] = useState("");
+  const [relationship, setRelationship] = useState<ClaimRelationship | "">("");
+  const [attest, setAttest] = useState(false);
+  const [reply, setReply] = useState("");
+  const [replyEvidence, setReplyEvidence] = useState("");
   const { data: claim } = useMyClaim(subjectType, subjectId);
-  const { submit, withdraw } = useClaimListing(subjectType, subjectId);
+  const { submit, withdraw, respond } = useClaimListing(subjectType, subjectId);
 
   const noun = subjectType === "gym" ? "gym" : "team";
+
+  if (claim?.status === "needs_info") {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="space-y-3 p-4">
+          <div>
+            <p className="font-medium">A moderator needs more information</p>
+            {claim.infoRequest && (
+              <p className="mt-1 rounded-md bg-muted p-3 text-sm">{claim.infoRequest}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="claim-reply">Your answer</Label>
+            <Textarea
+              id="claim-reply"
+              rows={3}
+              maxLength={600}
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+            />
+            <Label htmlFor="claim-reply-evidence">Supporting link (optional)</Label>
+            <Input
+              id="claim-reply-evidence"
+              value={replyEvidence}
+              onChange={(e) => setReplyEvidence(e.target.value)}
+              placeholder="https://"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={!reply.trim() || respond.isPending}
+              onClick={() =>
+                respond.mutate(
+                  {
+                    claimId: claim.id,
+                    message: reply.trim(),
+                    evidenceUrl: replyEvidence.trim() || undefined,
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success("Sent. Your claim is back with the moderators.");
+                      setReply("");
+                      setReplyEvidence("");
+                    },
+                    onError: (e) => toast.error(listingErrorMessage(e)),
+                  },
+                )
+              }
+            >
+              {respond.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send answer
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={withdraw.isPending}
+              onClick={() =>
+                withdraw.mutate(claim.id, {
+                  onSuccess: () => toast.success("Claim withdrawn"),
+                  onError: (e) => toast.error(listingErrorMessage(e)),
+                })
+              }
+            >
+              Withdraw
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (claim?.status === "pending") {
     return (
@@ -116,6 +199,22 @@ export function ClaimListingCard({
 
           <div className="space-y-3">
             <div className="space-y-2">
+              <Label htmlFor="claim-relationship">Your connection</Label>
+              <select
+                id="claim-relationship"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={relationship}
+                onChange={(e) => setRelationship(e.target.value as ClaimRelationship | "")}
+              >
+                <option value="">Choose one…</option>
+                {CLAIM_RELATIONSHIPS.map((r) => (
+                  <option key={r} value={r}>
+                    {CLAIM_RELATIONSHIP_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="claim-message">Why is this yours?</Label>
               <Textarea
                 id="claim-message"
@@ -138,7 +237,19 @@ export function ClaimListingCard({
                 onChange={(e) => setEvidence(e.target.value)}
                 placeholder="https://"
               />
+              <p className="text-xs text-muted-foreground">
+                Share a public page that shows your role (a league roster, your official website).
+                Never send passwords, login codes or private documents.
+              </p>
             </div>
+            <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+              A claim lets you manage this BallaCity listing only. It doesn't give anyone access to
+              a Facebook Page or post, or make you the owner of content posted elsewhere.
+            </p>
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox checked={attest} onCheckedChange={(v) => setAttest(v === true)} />
+              What I've said is accurate, and I'm authorized to manage this {noun}.
+            </label>
           </div>
 
           <DialogFooter>
@@ -146,16 +257,23 @@ export function ClaimListingCard({
               Cancel
             </Button>
             <Button
-              disabled={message.trim().length < 10 || submit.isPending}
+              disabled={message.trim().length < 10 || !relationship || !attest || submit.isPending}
               onClick={() =>
                 submit.mutate(
-                  { message: message.trim(), evidenceUrl: evidence.trim() || undefined },
+                  {
+                    relationship: relationship as ClaimRelationship,
+                    attest,
+                    message: message.trim(),
+                    evidenceUrl: evidence.trim() || undefined,
+                  },
                   {
                     onSuccess: () => {
                       toast.success("Claim sent for review");
                       setOpen(false);
                       setMessage("");
                       setEvidence("");
+                      setRelationship("");
+                      setAttest(false);
                     },
                     onError: (e) => toast.error(listingErrorMessage(e)),
                   },
