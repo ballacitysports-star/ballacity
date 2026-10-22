@@ -1,29 +1,19 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { cn } from "@/lib/utils";
-import {
-  PREVIEW_CONFIGS,
-  PREVIEW_VISIBLE_ROWS,
-  type PreviewRow,
-  type PreviewTab,
-} from "@/lib/preview-samples";
+import { PREVIEW_CONFIGS, type PreviewRow, type PreviewTab } from "@/lib/preview-samples";
 
 /**
  * What a signed-out visitor sees on a tab: the page's usual layout, filled with
- * invented sample content, and the parts only members get drawn blurred.
+ * invented sample content.
  *
- * The blur is presentation. It stands in front of sample text from
- * `preview-samples`, which holds no real data, so removing it in the browser
- * reveals nothing. The signed-in page is never mounted for a signed-out visitor
- * (see PreviewGate), so no member query runs and no member data is sent.
+ * Everything shown comes from `preview-samples`, which holds no real data. The
+ * signed-in page is never mounted for a signed-out visitor (see PreviewGate), so
+ * no member query runs and no member data is sent. The buttons are drawn but
+ * inert: the way in is the sign-up prompt.
  */
 export function SignedOutPreview({ tab, next }: { tab: PreviewTab; next: string }) {
   const config = PREVIEW_CONFIGS[tab];
   const rows = config.rows ?? [];
-  const clearRows = rows.slice(0, PREVIEW_VISIBLE_ROWS);
-  const blurredRows = rows.slice(PREVIEW_VISIBLE_ROWS);
-
-  const cta = <SignUpPrompt label={config.cta} next={next} />;
 
   return (
     <div data-testid="signed-out-preview" className="page-shell space-y-5 py-6">
@@ -32,11 +22,7 @@ export function SignedOutPreview({ tab, next }: { tab: PreviewTab; next: string 
           <h1 className="page-title">{config.title}</h1>
           <p className="page-subtitle mt-1">{config.subtitle}</p>
         </div>
-        {config.headerAction ? (
-          <Blurred className="shrink-0">
-            <FakeButton>{config.headerAction}</FakeButton>
-          </Blurred>
-        ) : null}
+        {config.headerAction ? <FakeButton>{config.headerAction}</FakeButton> : null}
       </div>
 
       <p
@@ -51,18 +37,19 @@ export function SignedOutPreview({ tab, next }: { tab: PreviewTab; next: string 
         to see the real thing.
       </p>
 
-      {blurredRows.length === 0 ? cta : null}
+      <SignUpPrompt label={config.cta} next={next} />
 
       {config.fields ? (
         <div className="space-y-3">
           {config.fields.map((field) => (
             <div key={field}>
               <p className="mb-1 text-sm font-medium text-foreground">{field}</p>
-              <Blurred className="block w-full">
-                <div className="h-11 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-muted-foreground">
-                  Sample value
-                </div>
-              </Blurred>
+              <div
+                inert
+                className="h-11 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-muted-foreground"
+              >
+                Sample value
+              </div>
             </div>
           ))}
         </div>
@@ -70,7 +57,7 @@ export function SignedOutPreview({ tab, next }: { tab: PreviewTab; next: string 
 
       {rows.length > 0 ? (
         <ul className="space-y-3">
-          {clearRows.map((row) => (
+          {rows.map((row) => (
             <PreviewListRow
               key={row.title}
               row={row}
@@ -81,122 +68,57 @@ export function SignedOutPreview({ tab, next }: { tab: PreviewTab; next: string 
         </ul>
       ) : null}
 
-      {blurredRows.length > 0 ? (
-        <div className="relative min-h-56">
-          <Blurred className="block w-full">
-            <ul className="space-y-3">
-              {blurredRows.map((row) => (
-                <PreviewListRow
-                  key={row.title}
-                  row={row}
-                  action={config.rowAction}
-                  avatar={config.showAvatars !== false}
-                  wholeRow
-                />
-              ))}
-            </ul>
-          </Blurred>
-          <div className="absolute inset-x-0 top-2 z-10 px-1">{cta}</div>
-        </div>
-      ) : null}
-
       {config.locked ? (
         <section>
           <h2 className="mb-2 text-base font-semibold text-foreground">{config.locked.title}</h2>
-          <Blurred className="block w-full">
-            <div className="space-y-2 rounded-2xl border border-border bg-surface p-4 text-sm text-foreground">
-              {config.locked.lines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-          </Blurred>
+          <div className="space-y-2 rounded-2xl border border-border bg-surface p-4 text-sm text-foreground">
+            {config.locked.lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
         </section>
       ) : null}
     </div>
   );
 }
 
-/** Content a signed-out visitor can see the shape of but not read or use. */
-function Blurred({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      inert
-      className={cn("pointer-events-none inline-block select-none blur-[6px]", className)}
-    >
-      {children}
-    </div>
-  );
-}
-
+/** A button as the real page draws it, but not clickable. */
 function FakeButton({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-sm font-bold text-primary-foreground">
+    <span
+      inert
+      className="pointer-events-none inline-flex shrink-0 select-none items-center rounded-full bg-lime-gradient px-4 py-1.5 text-sm font-bold text-primary-foreground"
+    >
       {children}
     </span>
   );
 }
 
-/**
- * One sample row. The person's name, their avatar and the action button are
- * always blurred; `wholeRow` is used by the blur wrapper above, which already
- * hides the entire row.
- */
 function PreviewListRow({
   row,
   action,
   avatar,
-  wholeRow = false,
 }: {
   row: PreviewRow;
   action?: string;
   avatar: boolean;
-  wholeRow?: boolean;
 }) {
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-      {!avatar ? null : wholeRow ? (
-        <span className="h-11 w-11 shrink-0 rounded-full bg-secondary" />
-      ) : (
-        <Blurred className="shrink-0">
-          <span className="block h-11 w-11 rounded-full bg-secondary" />
-        </Blurred>
-      )}
+      {avatar ? <span className="h-11 w-11 shrink-0 rounded-full bg-secondary" /> : null}
       <div className="min-w-0 flex-1">
-        {row.titleIsPerson && !wholeRow ? (
-          <Blurred>
-            <p className="font-semibold text-foreground">{row.title}</p>
-          </Blurred>
-        ) : (
-          <p className="truncate font-semibold text-foreground">{row.title}</p>
-        )}
+        <p className="truncate font-semibold text-foreground">{row.title}</p>
         <p className="text-sm text-muted-foreground">{row.detail}</p>
-        {row.person ? (
-          wholeRow ? (
-            <p className="truncate text-xs text-muted-foreground">{row.person}</p>
-          ) : (
-            <Blurred>
-              <span className="text-xs text-muted-foreground">{row.person}</span>
-            </Blurred>
-          )
-        ) : null}
+        {row.person ? <p className="truncate text-xs text-muted-foreground">{row.person}</p> : null}
       </div>
-      {action ? (
-        wholeRow ? (
-          <FakeButton>{action}</FakeButton>
-        ) : (
-          <Blurred className="shrink-0">
-            <FakeButton>{action}</FakeButton>
-          </Blurred>
-        )
-      ) : null}
+      {action ? <FakeButton>{action}</FakeButton> : null}
     </li>
   );
 }
 
 function SignUpPrompt({ label, next }: { label: string; next: string }) {
   return (
-    <div className="rounded-2xl border border-lime/40 bg-background/95 p-4 text-center shadow-lg">
+    <div className="rounded-2xl border border-lime/40 bg-surface p-4 text-center">
       <p className="text-sm font-semibold text-foreground">{label}</p>
       <Link
         to="/auth"
