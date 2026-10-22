@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Compass, Home, MessageCircle, Plus, UserRound } from "lucide-react";
+import { Clapperboard, Compass, Home, MessageCircle, UserRound } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -17,7 +17,7 @@ type NavItem = {
 };
 
 /**
- * Five-tab bottom bar: Home, Discover (players, teams, trainers, gyms), Host, Inbox, Me.
+ * Five-tab bottom bar: Home, Discover (players, teams, trainers, gyms), Reels, Inbox, Me.
  *
  * The order and the active-route rules come from TABS, which the swipe
  * gesture also steps through — so paging sideways always lands on the tab
@@ -26,14 +26,7 @@ type NavItem = {
 const presentation: Record<string, Pick<NavItem, "icon" | "render" | "outline">> = {
   "/feed": { icon: Home },
   "/players": { icon: Compass, outline: true },
-  "/create": {
-    // The one action in the bar: a filled button so hosting is never hard to find.
-    render: () => (
-      <span className="grid h-9 w-12 place-items-center rounded-2xl bg-lime-gradient text-primary-foreground glow-lime">
-        <Plus className="h-5 w-5" strokeWidth={2.8} aria-hidden />
-      </span>
-    ),
-  },
+  "/highlights": { icon: Clapperboard },
   "/messages": { icon: MessageCircle },
   "/profile": {
     render: (active) => <MyAvatar ringWhenActive active={active} />,

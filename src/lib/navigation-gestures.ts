@@ -26,7 +26,7 @@ export type TabDef = {
  * the pageable ones, so the two can never disagree about what "next tab" means.
  *
  * Players, Teams, Trainers and Gyms are one Discover tab (see DiscoverTabs).
- * Messages and alerts share the Inbox tab. Highlights live under Me.
+ * Messages and alerts share the Inbox tab. Hosting a game is the Host button on Home.
  */
 export const TABS: TabDef[] = [
   {
@@ -46,10 +46,9 @@ export const TABS: TabDef[] = [
       p.startsWith("/orgs/"),
   },
   {
-    to: "/create",
-    label: "Host",
-    match: (p) => p === "/create" || p.startsWith("/create/"),
-    pageable: false,
+    to: "/highlights",
+    label: "Reels",
+    match: (p) => p === "/highlights" || p.startsWith("/highlights/") || p === "/reels",
   },
   {
     to: "/messages",
@@ -59,11 +58,7 @@ export const TABS: TabDef[] = [
   {
     to: "/profile",
     label: "Me",
-    match: (p) =>
-      p.startsWith("/profile") ||
-      p === "/highlights" ||
-      p.startsWith("/highlights/") ||
-      p === "/reels",
+    match: (p) => p.startsWith("/profile"),
   },
 ];
 

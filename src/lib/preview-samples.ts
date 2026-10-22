@@ -131,6 +131,7 @@ export const PREVIEW_CONFIGS: Record<PreviewTab, PreviewConfig> = {
     title: "Find a game",
     subtitle: "Pickup games near you, by sport, skill and time.",
     cta: "Create a free account to see real games near you",
+    headerAction: "Host",
     rowAction: "Join",
     rows: games,
   },
