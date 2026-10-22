@@ -1,10 +1,11 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { GAMES } from "@/lib/sample-data";
+import { GAMES, type Game } from "@/lib/sample-data";
+import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import {
   type PaymentMethod,
@@ -28,22 +29,11 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
       description: "Set the entry fee, accepted payment methods, and refund policy for your game.",
       noindex: true,
     }),
-  loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
-  },
-  notFoundComponent: () => (
-    <RouteFallback
-      title="Game not found"
-      message="It may have wrapped up or been cancelled."
-      action={
-        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
-          Back to feed
-        </Link>
-      }
-    />
-  ),
+  // Real games live in the hosted-games store / database, not the sample list.
+  loader: ({ params }) => ({
+    gameId: params.gameId,
+    game: GAMES.find((g) => g.id === params.gameId) ?? null,
+  }),
   errorComponent: ({ reset }) => (
     <RouteFallback
       title="Couldn't open payment setup"
@@ -58,8 +48,56 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
   component: SetupPage,
 });
 
+function GameNotFound() {
+  return (
+    <RouteFallback
+      title="Game not found"
+      message="It may have wrapped up or been cancelled."
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
+  );
+}
+
 function SetupPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId, game: loaderGame } = Route.useLoaderData();
+  const hostedGames = useHostedGames();
+  const [remoteGame, setRemoteGame] = useState<Game | null>(null);
+  const [lookedUp, setLookedUp] = useState(false);
+  const game = hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null;
+
+  useEffect(() => {
+    if (game) return;
+    let cancelled = false;
+    fetchHostedGame(gameId)
+      .then((found) => {
+        if (!cancelled) setRemoteGame(found);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLookedUp(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only look up once per game id; `game` is the thing being looked for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
+
+  if (!game) {
+    return lookedUp ? (
+      <GameNotFound />
+    ) : (
+      <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+    );
+  }
+  return <SetupForm game={game} />;
+}
+
+function SetupForm({ game }: { game: Game }) {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
