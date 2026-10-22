@@ -73,8 +73,29 @@ describe("sample content has specific dates and times", () => {
     }
   });
 
-  it("teams show their next practice or game", () => {
-    for (const r of rowsOf("teams")) expect(r.detail).toMatch(DATE);
+  it("teams say what kind of listing they are, each in its own words", () => {
+    const rows = rowsOf("teams");
+    const kinds = rows.map((r) => r.chips?.[0]);
+    // Tryouts, pickup, clinic, recruiting, group run, camp and scrimmage are all different things.
+    for (const kind of [
+      "Tryouts",
+      "Pickup",
+      "Clinic",
+      "Recruiting",
+      "Group run",
+      "Camp",
+      "Scrimmage",
+    ]) {
+      expect(kinds).toContain(kind);
+    }
+    expect(new Set(kinds).size).toBe(rows.length);
+    for (const r of rows) {
+      expect(r.detail).toMatch(DATE);
+      expect(r.detail).toMatch(/\d{1,2}:\d{2} [AP]M/);
+      expect(r.detail.length).toBeGreaterThan(60);
+      expect(r.chips?.some((c) => /open spots?/.test(c))).toBe(true);
+    }
+    expect(new Set(rows.map((r) => r.detail)).size).toBe(rows.length);
   });
 
   it("reels show length, posted date and counts; messages show a time or day", () => {
