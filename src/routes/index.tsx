@@ -251,7 +251,7 @@ function Landing() {
           <div className="flex items-end justify-between mb-6">
             <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
             <Link
-              to="/feed"
+              to="/cities"
               className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
             >
               See all <ArrowRight className="h-4 w-4" />
@@ -388,7 +388,7 @@ function Landing() {
                 "Collect signed waivers — parents sign for minors",
               ],
               cta: { to: "/teams/create" as const, label: "Create a team" },
-              cta2: { to: "/teams" as const, label: "Browse teams" },
+              cta2: { to: "/cities" as const, label: "Browse teams" },
             },
             {
               icon: ClipboardList,
@@ -590,10 +590,10 @@ function Landing() {
               Join the players running it back tonight.
             </p>
             <Link
-              to="/feed"
+              to="/cities"
               className="inline-flex items-center gap-2 mt-7 rounded-full bg-lime-gradient px-7 py-4 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
             >
-              Open BallaCity <ArrowRight className="h-4 w-4" />
+              Find games in your city <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
