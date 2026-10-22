@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { kmToMi, miToKm } from "./distance";
+import {
+  kmToMi,
+  miToKm,
+  DISTANCE_SLIDER_STOPS,
+  MAX_DISTANCE_MI,
+  distanceFromSliderIndex,
+  distanceSliderIndex,
+} from "./distance";
 
 describe("distance helpers", () => {
   describe("kmToMi", () => {
@@ -43,5 +50,30 @@ describe("distance helpers", () => {
         expect(kmToMi(miToKm(mi))).toBe(mi);
       }
     });
+  });
+});
+
+describe("distance slider stops", () => {
+  it("round-trips every stop in miles and kilometres", () => {
+    for (const unit of ["mi", "km"] as const) {
+      for (let i = 0; i < DISTANCE_SLIDER_STOPS.length; i++) {
+        const mi = distanceFromSliderIndex(i, unit);
+        expect(mi).not.toBeNull();
+        expect(distanceSliderIndex(mi, unit)).toBe(i);
+      }
+    }
+  });
+
+  it("puts any distance at the far end", () => {
+    const last = DISTANCE_SLIDER_STOPS.length;
+    expect(distanceFromSliderIndex(last, "mi")).toBeNull();
+    expect(distanceSliderIndex(null, "mi")).toBe(last);
+    expect(distanceSliderIndex(0, "mi")).toBe(last);
+    expect(distanceSliderIndex(MAX_DISTANCE_MI, "km")).toBe(last);
+  });
+
+  it("snaps a saved in-between value to the nearest stop", () => {
+    expect(DISTANCE_SLIDER_STOPS[distanceSliderIndex(12, "mi")]).toBe(10);
+    expect(DISTANCE_SLIDER_STOPS[distanceSliderIndex(10, "km")]).toBe(15);
   });
 });

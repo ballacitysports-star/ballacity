@@ -89,13 +89,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { kmToMi, miToKm, distancePresets, MAX_DISTANCE_MI } from "@/lib/distance";
+import { kmToMi, miToKm, MAX_DISTANCE_MI } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
+import { DistanceSlider } from "@/components/DistanceSlider";
 import {
   formatSportLevel,
   levelTiers,
@@ -890,11 +891,6 @@ function PlayersFilterBody({
   setSortBy: (v: PlayersSortBy) => void;
 }) {
   const unit = useDistanceUnit();
-  // Round presets in the viewer's unit; the stored value stays in miles.
-  const presets = distancePresets(unit).map((p) => ({
-    ...p,
-    mi: Math.round(p.mi * 100) / 100,
-  }));
   return (
     <>
       <SortSection value={sortBy} onChange={setSortBy} options={PLAYER_SORTS} />
@@ -922,20 +918,12 @@ function PlayersFilterBody({
       </FilterSection>
 
       <FilterSection label="Max travel distance">
-        <div className="flex flex-wrap gap-2">
-          <Chip active={maxDistance === 0} onClick={() => setMaxDistance(0)}>
-            Any
-          </Chip>
-          {presets.map(({ mi, label }) => (
-            <Chip
-              key={label}
-              active={Math.abs(maxDistance - mi) < 0.01}
-              onClick={() => setMaxDistance(mi)}
-            >
-              ≤ {label}
-            </Chip>
-          ))}
-        </div>
+        <DistanceSlider
+          valueMi={maxDistance > 0 ? maxDistance : null}
+          onChange={(mi) => setMaxDistance(mi ?? 0)}
+          unit={unit}
+          label="Max travel distance"
+        />
       </FilterSection>
 
       <FilterSection label="Age range">
