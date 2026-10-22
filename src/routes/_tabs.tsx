@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { PendingSetupRedirect } from "@/components/PendingSetupRedirect";
 import { LegalReacceptGate } from "@/components/legal/LegalReacceptGate";
 import { ChildConsentGate } from "@/components/child/ChildConsentGate";
+import { DiscoverTabs } from "@/components/navigation/DiscoverTabs";
 
 export const Route = createFileRoute("/_tabs")({
   component: TabsLayout,
@@ -13,6 +14,7 @@ function TabsLayout() {
       <PendingSetupRedirect />
       <LegalReacceptGate />
       <ChildConsentGate />
+      <DiscoverTabs />
       <Outlet />
     </div>
   );
