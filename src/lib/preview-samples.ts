@@ -11,7 +11,7 @@
  */
 
 export type PreviewTab =
-  "feed" | "players" | "teams" | "trainers" | "reels" | "messages" | "create" | "profile";
+  "feed" | "players" | "teams" | "trainers" | "orgs" | "reels" | "messages" | "create" | "profile";
 
 export type PreviewRow = {
   title: string;
@@ -402,6 +402,13 @@ export const PREVIEW_CONFIGS: Record<PreviewTab, PreviewConfig> = {
     cta: "Create a free account to book a trainer",
     rowAction: "Book",
     rows: built.trainers,
+  },
+  orgs: {
+    title: "Venues",
+    subtitle: "Gyms, courts and fields to play at.",
+    cta: "Create a free account to find venues near you",
+    rowAction: "View",
+    rows: built.gyms,
   },
   reels: {
     title: "Reels",
