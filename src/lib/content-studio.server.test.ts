@@ -17,6 +17,20 @@ const {
 
 const KEY = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i)));
 
+/**
+ * Flips one bit of the sealed value's ciphertext or IV. Done on the decoded bytes:
+ * swapping the last base64 characters is not a real change when they only carry
+ * padding bits, and that made an earlier version of this test fail about 1 run in 16.
+ */
+function flipBit(sealed: string, part: "iv" | "ct", byteIndex: number): string {
+  const [v, iv, ct] = sealed.split(".");
+  const target = part === "iv" ? iv! : ct!;
+  const bytes = Uint8Array.from(atob(target), (c) => c.charCodeAt(0));
+  bytes[byteIndex] ^= 0x01;
+  const changed = btoa(String.fromCharCode(...bytes));
+  return part === "iv" ? `${v}.${changed}.${ct}` : `${v}.${iv}.${changed}`;
+}
+
 describe("page token encryption", () => {
   it("round-trips, and never stores the token in the clear", async () => {
     const sealed = await encryptToken("EAAG-secret-token", KEY);
@@ -33,11 +47,34 @@ describe("page token encryption", () => {
     const sealed = await encryptToken("t", KEY);
     const other = btoa(String.fromCharCode(...Array.from({ length: 32 }, () => 7)));
     await expect(decryptToken(sealed, other)).rejects.toThrow();
-    const [v, iv, ct] = sealed.split(".");
-    const flipped = `${v}.${iv}.${ct.slice(0, -2)}${ct.endsWith("A=") ? "B=" : "A="}`;
-    await expect(decryptToken(flipped, KEY)).rejects.toThrow();
+    await expect(decryptToken(flipBit(sealed, "ct", 0), KEY)).rejects.toThrow();
+    await expect(decryptToken(flipBit(sealed, "iv", 0), KEY)).rejects.toThrow();
     await expect(decryptToken("plain-token", KEY)).rejects.toThrow("TOKEN_FORMAT");
     await expect(encryptToken("t", btoa("short"))).rejects.toThrow("32 bytes");
+  });
+});
+
+describe("page token tampering", () => {
+  it("rejects a flipped bit in any byte of the ciphertext or the IV, every time", async () => {
+    // A short token has a short ciphertext (token + 16-byte tag), the case that used to slip through.
+    for (const token of ["t", "EAAG-a-longer-page-token-0123456789"]) {
+      const sealed = await encryptToken(token, KEY);
+      const [, iv, ct] = sealed.split(".");
+      const ctBytes = atob(ct!).length;
+      for (let i = 0; i < ctBytes; i++) {
+        await expect(decryptToken(flipBit(sealed, "ct", i), KEY)).rejects.toThrow();
+      }
+      for (let i = 0; i < atob(iv!).length; i++) {
+        await expect(decryptToken(flipBit(sealed, "iv", i), KEY)).rejects.toThrow();
+      }
+    }
+  });
+
+  it("rejects a truncated ciphertext", async () => {
+    const sealed = await encryptToken("t", KEY);
+    const [v, iv, ct] = sealed.split(".");
+    const cut = btoa(atob(ct!).slice(0, -1));
+    await expect(decryptToken(`${v}.${iv}.${cut}`, KEY)).rejects.toThrow();
   });
 });
 
