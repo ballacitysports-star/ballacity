@@ -24,6 +24,7 @@ import { AiControlsPanel } from "@/components/superadmin/AiControlsPanel";
 import { LiveListingsTab } from "@/components/superadmin/LiveListingsTab";
 import { DiscoveryTab } from "@/components/superadmin/DiscoveryTab";
 import { ReelsWorkerTab } from "@/components/superadmin/ReelsWorkerTab";
+import { ContentStudioTab } from "@/components/superadmin/ContentStudioTab";
 import { ListingsClaimsPanel } from "@/components/admin/ListingsClaimsPanel";
 import { LegalPublishingPanel } from "@/components/admin/LegalPublishingPanel";
 
@@ -44,7 +45,12 @@ function SuperadminPage() {
   const check = useServerFn(superadminCheck);
   const [authReady, setAuthReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
-  const [tab, setTab] = useState("overview");
+  // A deep link (e.g. the return from Facebook's connect dialog) can open a tab.
+  const [tab, setTab] = useState(() =>
+    typeof window === "undefined"
+      ? "overview"
+      : new URLSearchParams(window.location.search).get("tab") || "overview",
+  );
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -122,6 +128,7 @@ function SuperadminPage() {
           <TabsTrigger value="listings-live">Live listings</TabsTrigger>
           <TabsTrigger value="discovery">Discovery</TabsTrigger>
           <TabsTrigger value="moderation">Content</TabsTrigger>
+          <TabsTrigger value="content-studio">Content studio</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="monetization">Monetization</TabsTrigger>
@@ -147,6 +154,9 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="moderation" className="pt-3">
           <ModerationTab />
+        </TabsContent>
+        <TabsContent value="content-studio" className="pt-3">
+          <ContentStudioTab />
         </TabsContent>
         <TabsContent value="images" className="pt-3">
           <ImagesTab />

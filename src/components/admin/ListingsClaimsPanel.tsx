@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/select";
 import { ConfirmAction } from "@/components/superadmin/ConfirmAction";
 import { ORG_CATEGORIES } from "@/lib/org-listing";
-import { listingErrorMessage } from "@/lib/listings";
+import {
+  CLAIM_RELATIONSHIP_LABEL,
+  type ClaimRelationship,
+  listingErrorMessage,
+} from "@/lib/listings";
 import {
   listUnclaimedListings,
   createUnclaimedListing,
@@ -80,7 +84,7 @@ function ClaimsQueue() {
   const review = useServerFn(reviewClaim);
   const [confirm, setConfirm] = useState<{
     claimId: string;
-    action: "approve" | "deny";
+    action: "approve" | "deny" | "request_info";
     who: string;
     what: string;
   } | null>(null);
@@ -91,10 +95,15 @@ function ClaimsQueue() {
   });
 
   const act = useMutation({
-    mutationFn: (v: { claimId: string; action: "approve" | "deny"; reason: string }) =>
-      review({ data: { claimId: v.claimId, action: v.action, reason: v.reason || undefined } }),
-    onSuccess: () => {
-      toast.success("Claim reviewed");
+    mutationFn: (v: {
+      claimId: string;
+      action: "approve" | "deny" | "request_info";
+      reason: string;
+    }) => review({ data: { claimId: v.claimId, action: v.action, reason: v.reason || undefined } }),
+    onSuccess: (_r, v) => {
+      toast.success(
+        v.action === "request_info" ? "Question sent to the claimant" : "Claim reviewed",
+      );
       setConfirm(null);
       qc.invalidateQueries({ queryKey: ["listing-claims-queue"] });
       qc.invalidateQueries({ queryKey: ["unclaimed-listings"] });
@@ -124,13 +133,46 @@ function ClaimsQueue() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {c.claimantName} wants to manage this {c.subjectType}
                 </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <Badge variant="outline">
+                    {c.relationship
+                      ? (CLAIM_RELATIONSHIP_LABEL[c.relationship as ClaimRelationship] ??
+                        c.relationship)
+                      : "Connection not stated"}
+                  </Badge>
+                  <Badge variant={c.attestedAt ? "outline" : "destructive"}>
+                    {c.attestedAt ? "Attested accurate" : "No attestation"}
+                  </Badge>
+                  {c.status === "needs_info" && (
+                    <Badge variant="secondary">Waiting on the claimant</Badge>
+                  )}
+                  {c.competingClaims > 0 && (
+                    <Badge variant="destructive">
+                      {c.competingClaims} competing claim{c.competingClaims > 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <Badge variant="secondary" className="shrink-0">
                 {new Date(c.createdAt).toLocaleDateString()}
               </Badge>
             </div>
 
-            {c.message && <p className="rounded-md bg-muted p-3 text-sm">{c.message}</p>}
+            {c.message && (
+              <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{c.message}</p>
+            )}
+            {c.infoRequest && (
+              <p className="rounded-md border p-3 text-sm">
+                <span className="font-medium">Asked: </span>
+                {c.infoRequest}
+              </p>
+            )}
+            {c.competingClaims > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Compare the evidence before approving: approving one claim declines the others. The
+                first claim filed is not automatically the right one.
+              </p>
+            )}
             {c.evidenceUrl && (
               <p className="truncate text-sm">
                 Evidence:{" "}
@@ -148,6 +190,7 @@ function ClaimsQueue() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
+                disabled={c.status !== "pending"}
                 onClick={() =>
                   setConfirm({
                     claimId: c.id,
@@ -173,6 +216,22 @@ function ClaimsQueue() {
               >
                 Deny
               </Button>
+              {c.status === "pending" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setConfirm({
+                      claimId: c.id,
+                      action: "request_info",
+                      who: c.claimantName,
+                      what: c.subjectName,
+                    })
+                  }
+                >
+                  Request info
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -184,15 +243,25 @@ function ClaimsQueue() {
         title={
           confirm?.action === "approve"
             ? `Hand ${confirm?.what} to ${confirm?.who}?`
-            : `Deny ${confirm?.who}'s claim?`
+            : confirm?.action === "request_info"
+              ? `Ask ${confirm?.who} for more information`
+              : `Deny ${confirm?.who}'s claim?`
         }
         description={
           confirm?.action === "approve"
             ? "They become the owner and can manage the roster, which lets them message and see media from any under-16 member. Any other pending claim on this listing is denied."
-            : "They keep no access. They can file a new claim later."
+            : confirm?.action === "request_info"
+              ? "Your note is sent to the claimant as written. Ask for public proof only — never passwords, login codes or private documents."
+              : "They keep no access. They can file a new claim later."
         }
         confirmWord={confirm?.action === "approve" ? "APPROVE" : undefined}
-        confirmLabel={confirm?.action === "approve" ? "Approve claim" : "Deny claim"}
+        confirmLabel={
+          confirm?.action === "approve"
+            ? "Approve claim"
+            : confirm?.action === "request_info"
+              ? "Send question"
+              : "Deny claim"
+        }
         pending={act.isPending}
         onConfirm={(reason) =>
           confirm && act.mutate({ claimId: confirm.claimId, action: confirm.action, reason })

@@ -47,8 +47,8 @@ export const getPublicReel = createServerFn({ method: "GET" })
         )
         .eq("id", data.id)
         .maybeSingle();
-      if (error || !r || (r as any).subject_child_id) return { found: false };
-      const row = r as any;
+      if (error || !r || r.subject_child_id) return { found: false };
+      const row = r;
 
       const owner = row.user_id as string;
       const quarantined = await quarantinedMediaPaths(supabaseAdmin, [

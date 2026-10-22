@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, Copy, Facebook, MessageCircle, Share2 } from "lucide-react";
+import { Check, Copy, Download, Facebook, Loader2, MessageCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -39,12 +39,28 @@ export function ShareSheet({
   content,
   open,
   onOpenChange,
+  onDownload,
 }: {
   content: ShareContent;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Owner-only: save the video to post it from the Instagram or TikTok app. */
+  onDownload?: () => Promise<void>;
 }) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const download = async () => {
+    if (!onDownload) return;
+    setDownloading(true);
+    try {
+      await onDownload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't download the video");
+    } finally {
+      setDownloading(false);
+    }
+  };
   const canNative = typeof navigator !== "undefined" && !!navigator.share;
 
   const copyAll = async () => {
@@ -100,6 +116,21 @@ export function ShareSheet({
             </Button>
           )}
         </div>
+        {onDownload && (
+          <div className="space-y-1">
+            <Button variant="outline" className="w-full" onClick={download} disabled={downloading}>
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download video
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              For Instagram or TikTok: download, upload it in their app, then paste the caption.
+            </p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
