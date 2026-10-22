@@ -27,7 +27,10 @@ import { useReelRealtime } from "@/hooks/use-reel-realtime";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useAuth } from "@/hooks/use-auth";
 import { SampleRows } from "@/components/public/SignedOutPreview";
+import { SportFilterBar } from "@/components/reels/SportFilterBar";
 import { SAMPLE_REELS } from "@/lib/preview-samples";
+
+const SAMPLE_SPORTS = Array.from(new Set(SAMPLE_REELS.map((r) => r.sport ?? ""))).filter(Boolean);
 
 export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
@@ -43,6 +46,9 @@ export const Route = createFileRoute("/_tabs/highlights")({
         name: "BallaCity highlight feed",
       },
     }),
+  // The chosen sport is in the URL, so a filtered feed can be shared and survives a refresh.
+  validateSearch: (s: Record<string, unknown>): { sport?: string } =>
+    typeof s.sport === "string" && s.sport.trim() ? { sport: s.sport.trim().slice(0, 40) } : {},
   component: HighlightFeedPage,
 });
 
@@ -51,7 +57,11 @@ function HighlightFeedPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<HighlightFeedItem[]>([]);
   const [sports, setSports] = useState<string[]>([]);
-  const [sport, setSport] = useState<string | null>(null);
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const sport = search.sport ?? null;
+  const setSport = (next: string | null) =>
+    void navigate({ search: next ? { sport: next } : {}, replace: true });
   const [sort, setSort] = useState<SortMode>("newest");
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +156,11 @@ function HighlightFeedPage() {
   }, [loadMore]);
 
   const visible = sortItems(items, sort);
+  // Nothing public yet and nobody signed in: show labelled samples, filtered the same way.
+  const showingSamples = !loading && !error && items.length === 0 && !user;
+  const sampleRows = SAMPLE_REELS.filter(
+    (r) => !sport || r.sport?.toLowerCase() === sport.toLowerCase(),
+  );
 
   return (
     <div className="min-h-dvh bg-background">
@@ -179,16 +194,28 @@ function HighlightFeedPage() {
           </button>
         </div>
 
-        {/* Stories rail — one ring per sport, doubling as the filter. */}
-        <div className="page-shell-flush flex gap-4 overflow-x-auto px-4 pb-3">
-          <StoryRing active={!sport} onClick={() => setSport(null)} label="All" />
-          {sports.map((s) => (
-            <StoryRing key={s} active={sport === s} onClick={() => setSport(s)} label={s} />
-          ))}
-        </div>
+        <SportFilterBar
+          sports={showingSamples ? SAMPLE_SPORTS : sports}
+          selected={sport}
+          onSelect={setSport}
+        />
       </header>
 
       <main className="page-shell-flush">
+        {sport && !loading && !error && !showingSamples ? (
+          <p
+            className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            <span>
+              {sport} · {visible.length} {visible.length === 1 ? "reel" : "reels"}
+              {done ? "" : "+"}
+            </span>
+            <button type="button" onClick={() => setSport(null)} className="font-bold text-lime">
+              Clear
+            </button>
+          </p>
+        ) : null}
         {loading ? (
           <div className="grid place-items-center py-16">
             <LoadingState label="Loading highlights…" />
@@ -201,9 +228,22 @@ function HighlightFeedPage() {
               onRetry={() => window.location.reload()}
             />
           </div>
-        ) : items.length === 0 && !user && !sport ? (
+        ) : showingSamples ? (
           <div className="mx-4 mt-6 space-y-4">
-            <SampleRows rows={SAMPLE_REELS} action="Share" heading="Sample highlights" />
+            {sampleRows.length > 0 ? (
+              <SampleRows rows={sampleRows} action="Share" heading="Sample highlights" />
+            ) : (
+              <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No sample highlights for {sport}.{" "}
+                <button
+                  type="button"
+                  onClick={() => setSport(null)}
+                  className="font-bold text-lime"
+                >
+                  Show all sports
+                </button>
+              </p>
+            )}
             <Link
               to="/auth"
               search={{ next: "/highlights", mode: "signup" }}
@@ -262,39 +302,6 @@ const SORT_LABEL: Record<SortMode, string> = {
 };
 
 /** Circular story bubble used as the sport filter, Instagram-style. */
-function StoryRing({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-16 shrink-0 flex-col items-center gap-1"
-    >
-      <span
-        className={`grid h-16 w-16 place-items-center rounded-full p-[2px] ${
-          active ? "bg-gradient-to-tr from-lime via-lime/70 to-primary" : "bg-border"
-        }`}
-      >
-        <span className="grid h-full w-full place-items-center rounded-full bg-background">
-          <span className="grid h-[calc(100%-4px)] w-[calc(100%-4px)] place-items-center rounded-full bg-surface text-sm font-black uppercase text-foreground">
-            {label.slice(0, 2)}
-          </span>
-        </span>
-      </span>
-      <span className="w-full truncate text-center text-[11px] capitalize text-muted-foreground">
-        {label}
-      </span>
-    </button>
-  );
-}
-
 type SortMode = "newest" | "oldest" | "sport";
 
 /** Client-side ordering for the reels already loaded into the scroll list. */
