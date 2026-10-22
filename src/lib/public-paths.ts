@@ -25,7 +25,8 @@ export function isPublicFacilityPath(pathname: string): boolean {
 /**
  * The tabs a signed-out visitor sees as a sample preview of the real page.
  * `/highlights` is not listed: it is already open and shows public reels only.
- * `/discover` is not listed either: it only redirects to `/feed`.
+ * `/messages` previews only the inbox; a conversation (`/messages/<id>`) stays behind
+ * sign-in. `/discover` is not listed either: it only redirects to `/feed`.
  */
 export const SIGNED_OUT_PREVIEW_TABS = [
   "/feed",
@@ -33,6 +34,7 @@ export const SIGNED_OUT_PREVIEW_TABS = [
   "/teams",
   "/trainers",
   "/reels",
+  "/messages",
   "/create",
   "/profile",
 ] as const;
