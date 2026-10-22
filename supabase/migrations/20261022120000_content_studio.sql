@@ -22,7 +22,8 @@
 --
 -- Status transitions that matter (approved, publishing, published, failed) can
 -- only happen inside the routines below, which open the transaction-local flag
--- app.content_studio. The pattern is the one guard_listing_owner_change uses.
+-- app.content_studio around their one UPDATE and close it straight after, so a
+-- later statement in the same transaction is not privileged by accident.
 --
 -- Rollback: every object here is new. To remove, drop in reverse order:
 --   the functions, then content_publish_attempts, content_approvals (after
@@ -372,6 +373,7 @@ BEGIN
   UPDATE public.content_drafts
     SET status = 'approved', approval_id = _approval, rejection_reason = NULL, updated_by = _me
     WHERE id = _d.id;
+  PERFORM set_config('app.content_studio', '', true);
 
   INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, after)
   VALUES (_me, 'content.draft_approved', 'content_draft', _d.id::text,
@@ -395,6 +397,7 @@ BEGIN
     SET status = 'rejected', approval_id = NULL,
         rejection_reason = NULLIF(btrim(COALESCE(_reason, '')), ''), updated_by = _me
     WHERE id = _d.id;
+  PERFORM set_config('app.content_studio', '', true);
 
   INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, reason)
   VALUES (_me, 'content.draft_rejected', 'content_draft', _d.id::text,
@@ -468,6 +471,7 @@ BEGIN
 
   PERFORM set_config('app.content_studio', 'on', true);
   UPDATE public.content_drafts SET status = 'publishing', updated_by = _me WHERE id = _d.id;
+  PERFORM set_config('app.content_studio', '', true);
 
   INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, after)
   VALUES (_me, 'content.publish_started', 'content_draft', _d.id::text,
@@ -506,6 +510,7 @@ BEGIN
   UPDATE public.content_drafts
     SET status = CASE WHEN _succeeded THEN 'published' ELSE 'failed' END
     WHERE id = _t.draft_id;
+  PERFORM set_config('app.content_studio', '', true);
 
   INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, after)
   VALUES (_t.started_by,

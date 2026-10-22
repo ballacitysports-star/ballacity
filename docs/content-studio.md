@@ -7,33 +7,34 @@ needed before production use.
 
 ## What exists
 
-| Area | Where | Notes |
-| --- | --- | --- |
-| Sources (submitted links) | `content_sources`, `submitStudioSource`, `updateStudioSource` | Links are parsed and normalised, never fetched. Duplicate links map to one record. |
-| Listings from sources | `linkStudioSourceToListing` + existing `createUnclaimedListing` | Creates an *unclaimed* team or gym; a real owner claims it. |
-| AI drafts | `generateStudioDraftWithAi`, `content-studio.server.ts` | Shared AI gate, new adults-only `content_studio` feature, safety-screened. |
-| Manual drafts and edits | `createStudioDraft`, `updateStudioDraft` | Links must be `https://ballacity.com`. |
-| Approval | `approve_content_draft` / `reject_content_draft` | Superadmin only. Bound to an exact version and its sha256. |
-| Publishing | `publishStudioDraft` → `begin_content_publish` / `finish_content_publish` | Superadmin only, off by default, needs Meta credentials. |
-| Page connection | `startMetaConnect`, `/api/public/content-studio/meta-callback`, `disconnectMetaPage` | Meta OAuth. Tokens encrypted server-side. |
-| Settings | `app_settings.content_studio` | Discovery, AI drafts, publishing, listing creation. Publishing defaults to off. |
-| UI | Superadmin → **Content studio** tab | Sources, drafts and approval, published log, Page and settings. |
-| Claims | `20261022130000_listing_claim_review.sql`, `ClaimListingCard`, `ListingsClaimsPanel` | Relationship, attestation, needs-info, no self-review. |
+| Area                                                | Where                                                                                | Notes                                                                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sources (submitted links)                           | `content_sources`, `submitStudioSource`, `updateStudioSource`                        | Links are parsed and normalised, never fetched. Duplicate links map to one record.                                                                                                                    |
+| Listings from sources                               | `linkStudioSourceToListing` + existing `createUnclaimedListing`                      | Creates an _unclaimed_ team or gym; a real owner claims it.                                                                                                                                           |
+| AI drafts                                           | `generateStudioDraftWithAi`, `content-studio.server.ts`                              | Shared AI gate, new adults-only `content_studio` feature, safety-screened.                                                                                                                            |
+| Manual drafts and edits                             | `createStudioDraft`, `updateStudioDraft`                                             | Links must be `https://ballacity.com`.                                                                                                                                                                |
+| Approval                                            | `approve_content_draft` / `reject_content_draft`                                     | Superadmin only. Bound to an exact version and its sha256.                                                                                                                                            |
+| Publishing                                          | `publishStudioDraft` → `begin_content_publish` / `finish_content_publish`            | Superadmin only, off by default, needs Meta credentials.                                                                                                                                              |
+| Page connection                                     | `startMetaConnect`, `/api/public/content-studio/meta-callback`, `disconnectMetaPage` | Meta OAuth. Tokens encrypted server-side.                                                                                                                                                             |
+| Settings                                            | `app_settings.content_studio`                                                        | Discovery, AI drafts, publishing, listing creation. Publishing defaults to off.                                                                                                                       |
+| UI                                                  | Superadmin → **Content studio** tab                                                  | Sources, drafts and approval, published log, Page and settings.                                                                                                                                       |
+| Claims                                              | `20261022130000_listing_claim_review.sql`, `ClaimListingCard`, `ListingsClaimsPanel` | Relationship, attestation, needs-info, no self-review.                                                                                                                                                |
+| Web listing discovery (separate, already on `main`) | `listing_candidates`, Superadmin discovery tab                                       | Finds teams, gyms and trainers on the open web and OpenStreetMap. Studio sources are submitted links for content. Both create listings only through `create_unclaimed_team` / `create_unclaimed_gym`. |
 
 ## Who can do what
 
 Every rule below is enforced on the server and in the database. The UI only
 reflects it.
 
-| Action | Who | Enforced by |
-| --- | --- | --- |
-| Read the studio | Staff (`is_moderator`: admin, moderator, superadmin) | RLS `staff read …` policies; server fns `assertStaff` |
-| Submit or edit sources, write drafts | Staff | Server fns (service role); no client write grants exist |
-| Approve, reject, publish, pick the destination Page, change settings | Superadmin | Definer routines check `is_superadmin(auth.uid())`; server fns check too |
-| Record a publish result | Server only | `finish_content_publish` is executable by `service_role` only |
-| Read a Page token | Nobody through the API | `social_page_tokens` has no grants or policies for `anon`/`authenticated` |
-| File a claim | Any signed-in user | `submit_listing_claim_details` |
-| Review a claim | A moderator who is **not** the claimant | `OWN_CLAIM` check in approve, deny and request-info |
+| Action                                                               | Who                                                  | Enforced by                                                               |
+| -------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| Read the studio                                                      | Staff (`is_moderator`: admin, moderator, superadmin) | RLS `staff read …` policies; server fns `assertStaff`                     |
+| Submit or edit sources, write drafts                                 | Staff                                                | Server fns (service role); no client write grants exist                   |
+| Approve, reject, publish, pick the destination Page, change settings | Superadmin                                           | Definer routines check `is_superadmin(auth.uid())`; server fns check too  |
+| Record a publish result                                              | Server only                                          | `finish_content_publish` is executable by `service_role` only             |
+| Read a Page token                                                    | Nobody through the API                               | `social_page_tokens` has no grants or policies for `anon`/`authenticated` |
+| File a claim                                                         | Any signed-in user                                   | `submit_listing_claim_details`                                            |
+| Review a claim                                                       | A moderator who is **not** the claimant              | `OWN_CLAIM` check in approve, deny and request-info                       |
 
 A verified listing claim makes the claimant the owner of that BallaCity listing
 only. It grants no Facebook access, no access to other listings, and no way
@@ -90,12 +91,12 @@ Discovery is user-submitted links only.
 
 ### Server environment (no values here)
 
-| Variable | Purpose |
-| --- | --- |
-| `META_APP_ID` | Meta app id |
-| `META_APP_SECRET` | Meta app secret (server only) |
+| Variable                   | Purpose                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `META_APP_ID`              | Meta app id                                                                                         |
+| `META_APP_SECRET`          | Meta app secret (server only)                                                                       |
 | `CONTENT_STUDIO_TOKEN_KEY` | 32 random bytes, base64. Encrypts Page tokens (AES-256-GCM). Losing it means reconnecting the Page. |
-| `META_REDIRECT_URI` | Optional; defaults to the ballacity.com callback |
+| `META_REDIRECT_URI`        | Optional; defaults to the ballacity.com callback                                                    |
 
 Without the first three, connecting and publishing are disabled, and the UI
 says so.
@@ -117,34 +118,41 @@ superadmin turns it on after Meta is set up.
 
 ## Verification
 
-**Database.** The full chain (327 Supabase migrations, including both new ones, and 21 Drizzle migrations, in
-timestamp order) was replayed on vanilla Postgres 16 with
-`docs/verification/supabase-stubs.sql` in a database named `replay`. Every
-routine was then called as the `authenticated` role with the caller's id in
-`request.jwt.claim.sub`, as PostgREST does.
+**Database.** `bun run test:db` replays the whole chain on a blank Postgres 16
+(Supabase migrations and Drizzle migrations, in timestamp order) and runs every
+file in `supabase/tests`. Result: **210 passed, 0 failed**. That includes the
+existing suites and the schema invariants (RLS on every table, `search_path`
+pinned on every definer function, the anonymous allow-lists).
 
-- `docs/verification/content-studio.sql`: 42/42 pass. Covers reads by role,
-  token isolation, approval by role and version, approval immutability, an edit
-  voiding the approval, version forgery, idempotent publishing, the
-  single-publisher rule, locking during and after publishing, failure and retry,
-  destination change and the audit trail.
-- `docs/verification/listing-claim-review.sql`: 34/34 pass. Covers no
-  self-approval, deny or info-request on one's own claim; relationship and
-  attestation required; immutability after filing; duplicate and competing
-  claims; the needs-info round trip; approval declining rivals; owner takeover
-  still blocked; and the legacy path still working.
+- `supabase/tests/60_content_studio.test.sql` covers reads by role, token
+  isolation, approval by role and version, the approval hash, immutability, an
+  edit withdrawing the approval, version forgery, the single-publisher rule,
+  locking during and after publishing, failure and retry, a destination change
+  and the audit trail.
+- `supabase/tests/70_listing_claim_review.test.sql` covers no self-review,
+  relationship and attestation, immutability after filing, duplicate and
+  competing claims, the needs-info round trip, approval declining rivals, owner
+  takeover still blocked, and the legacy path.
 
-The self-approval gap was reproduced on the same replay **before** the fix: a
-moderator listed a team, claimed it, approved it and became its owner.
+Two defects were found by running these, and fixed before merge:
+
+- **Self-approval.** In the existing claim code, a moderator could list a team,
+  claim it, approve their own claim and become its owner. This was reproduced
+  first, then fixed.
+- **Leaking flag.** The workflow flag was left on for the rest of the transaction
+  after a privileged write, so a later statement in the same transaction could
+  forge a draft's version. Each routine now switches it off straight after its
+  write. This was not reachable through the API (one request is one
+  transaction), but it was fragile.
 
 **Application.**
 
-| Check | Result |
-| --- | --- |
-| `tsc --noEmit` | clean |
-| `vitest run` | 1575 passed, 22 skipped (backend-only integration specs) |
-| `eslint` on every new or changed file | no new problems |
-| `vite build` | passes with `NODE_OPTIONS=--max-old-space-size=8192` |
+| Check                                 | Result                                                   |
+| ------------------------------------- | -------------------------------------------------------- |
+| `tsc --noEmit`                        | clean                                                    |
+| `vitest run`                          | 1575 passed, 22 skipped (backend-only integration specs) |
+| `eslint` on every new or changed file | no new problems                                          |
+| `vite build`                          | passes with `NODE_OPTIONS=--max-old-space-size=8192`     |
 
 The default 2 GB Node heap runs out during `vite build` in this environment, and
 current `main` fails the same way without these changes. Lovable's build
@@ -156,11 +164,11 @@ data was read or changed.
 
 ## Not done, and why
 
-| Item | Why | What it needs |
-| --- | --- | --- |
-| Revoking an approved claim | It takes ownership away from a live team or gym. The owner row, roster membership and account profile created on approval would all need unwinding, and roster membership controls messaging with minors. | An agreed design for what happens to the roster and profile, then the same replay-and-test treatment |
-| Disputes that freeze management | Freezing an owner's edits means changing RLS on `teams` and `trainer_orgs`. | A decision on what a dispute freezes |
-| Private evidence uploads | Claims take a public link today. A private bucket needs storage policies and a retention rule. | A retention decision |
-| Listing-manager dashboard | Owners already manage claimed teams and gyms through the existing team and org pages. | Confirmation that a separate dashboard is wanted |
-| Scheduling | No worker exists to publish at a set time. | A scheduled job (cron) with the same `begin_content_publish` path |
-| Moderator access to the studio | The studio lives in the superadmin console. Moderators have the server permissions, but no screen. | A decision to mount it in `/admin` too |
+| Item                            | Why                                                                                                                                                                                                       | What it needs                                                                                        |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Revoking an approved claim      | It takes ownership away from a live team or gym. The owner row, roster membership and account profile created on approval would all need unwinding, and roster membership controls messaging with minors. | An agreed design for what happens to the roster and profile, then the same replay-and-test treatment |
+| Disputes that freeze management | Freezing an owner's edits means changing RLS on `teams` and `trainer_orgs`.                                                                                                                               | A decision on what a dispute freezes                                                                 |
+| Private evidence uploads        | Claims take a public link today. A private bucket needs storage policies and a retention rule.                                                                                                            | A retention decision                                                                                 |
+| Listing-manager dashboard       | Owners already manage claimed teams and gyms through the existing team and org pages.                                                                                                                     | Confirmation that a separate dashboard is wanted                                                     |
+| Scheduling                      | No worker exists to publish at a set time.                                                                                                                                                                | A scheduled job (cron) with the same `begin_content_publish` path                                    |
+| Moderator access to the studio  | The studio lives in the superadmin console. Moderators have the server permissions, but no screen.                                                                                                        | A decision to mount it in `/admin` too                                                               |
