@@ -17,7 +17,7 @@ import type { GuardianChild } from "@/lib/child-safety.functions";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
-import { useAuth } from "@/hooks/use-auth";
+import { signOut, useAuth } from "@/hooks/use-auth";
 import { useFamilyRoster } from "@/lib/family-roster";
 import {
   useChildFootprint,
@@ -158,17 +158,27 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
         >
           <div className="min-w-0">
             <div className="text-xs font-semibold">{row.label}</div>
-            <p className="text-[11px] text-muted-foreground">{row.hint} Off until you turn it on.</p>
+            <p className="text-[11px] text-muted-foreground">
+              {row.hint} Off until you turn it on.
+            </p>
           </div>
           <Switch
             checked={row.checked}
             onCheckedChange={async (v) => {
               try {
-                await setShareFn({ data: { childUserId: child.childUserId, kind: row.kind, enabled: v } });
-                await qc.invalidateQueries({ queryKey: ["child-family-sharing", child.childUserId] });
+                await setShareFn({
+                  data: { childUserId: child.childUserId, kind: row.kind, enabled: v },
+                });
+                await qc.invalidateQueries({
+                  queryKey: ["child-family-sharing", child.childUserId],
+                });
                 await qc.invalidateQueries({ queryKey: ["family-share-enabled"] });
                 await qc.invalidateQueries({ queryKey: ["family-team-share-enabled"] });
-                toast.success(v ? "Turned on" : "Turned off, and anything already shared this way has been stopped");
+                toast.success(
+                  v
+                    ? "Turned on"
+                    : "Turned off, and anything already shared this way has been stopped",
+                );
               } catch (e: any) {
                 toast.error(e?.message ?? "Could not save this setting");
               }
@@ -197,7 +207,9 @@ function PublicXpToggle({ child }: { child: GuardianChild }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
       <div className="min-w-0">
-        <div className="text-sm font-semibold">Show {child.displayName}&apos;s level and XP publicly</div>
+        <div className="text-sm font-semibold">
+          Show {child.displayName}&apos;s level and XP publicly
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">
           Their level, XP bar and milestone badges appear on their Player Card. Never game dates,
           locations, streaks or attendance. Off until you turn it on.
@@ -574,6 +586,16 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
 
 function ParentCenterPage() {
   const { user, loading } = useAuth();
+  // Same device-level sign-out as Settings (see signOut() in @/hooks/use-auth).
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Signed out");
+      window.location.href = "/auth";
+    } catch {
+      toast.error("Couldn't sign out");
+    }
+  };
   const { children, isLoading } = useMyChildren();
   const roster = useFamilyRoster();
   const { requests } = useParentRequests();
@@ -611,7 +633,10 @@ function ParentCenterPage() {
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>
-      <Link to="/guardian" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+      <Link
+        to="/guardian"
+        className="mt-2 inline-block text-xs font-semibold text-primary underline"
+      >
         See your kids' teams and games → Guardian Dashboard
       </Link>
 
@@ -693,7 +718,17 @@ function ParentCenterPage() {
         <Link to="/contact" className="font-semibold text-primary underline">
           Contact support
         </Link>
+        <Link to="/settings" className="font-semibold text-primary underline">
+          Settings
+        </Link>
       </div>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="mt-4 min-h-11 rounded-full border border-border px-4 text-sm font-semibold hover:border-lime/40"
+      >
+        Sign out
+      </button>
       <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
         {CHILD_POLICY_DISCLAIMER}
       </p>

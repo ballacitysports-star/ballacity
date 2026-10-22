@@ -117,6 +117,7 @@ import { Route as TeamsTeamIdTryoutsRouteImport } from './routes/teams.$teamId.t
 import { Route as TeamsTeamIdWaiverRouteImport } from './routes/teams.$teamId.waiver'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
+import { Route as ApiPublicContentStudioMetaCallbackRouteImport } from './routes/api/public/content-studio/meta-callback'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
 import { Route as ApiPublicPaymentsReleaseHoldsRouteImport } from './routes/api/public/payments/release-holds'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
@@ -668,6 +669,12 @@ const TrainersTrainerIdEditRoute = TrainersTrainerIdEditRouteImport.update({
   path: '/trainers/$trainerId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicContentStudioMetaCallbackRoute =
+  ApiPublicContentStudioMetaCallbackRouteImport.update({
+    id: '/api/public/content-studio/meta-callback',
+    path: '/api/public/content-studio/meta-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicNotificationsFlushRoute =
   ApiPublicNotificationsFlushRouteImport.update({
     id: '/api/public/notifications/flush',
@@ -816,6 +823,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
+  '/api/public/content-studio/meta-callback': typeof ApiPublicContentStudioMetaCallbackRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -931,6 +939,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
+  '/api/public/content-studio/meta-callback': typeof ApiPublicContentStudioMetaCallbackRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -1049,6 +1058,7 @@ export interface FileRoutesById {
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
+  '/api/public/content-studio/meta-callback': typeof ApiPublicContentStudioMetaCallbackRoute
   '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -1167,6 +1177,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
+    | '/api/public/content-studio/meta-callback'
     | '/api/public/notifications/flush'
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
@@ -1282,6 +1293,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId'
     | '/teams/$teamId'
     | '/trainers/$trainerId'
+    | '/api/public/content-studio/meta-callback'
     | '/api/public/notifications/flush'
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
@@ -1399,6 +1411,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
+    | '/api/public/content-studio/meta-callback'
     | '/api/public/notifications/flush'
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
@@ -1504,6 +1517,7 @@ export interface RootRouteChildren {
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
+  ApiPublicContentStudioMetaCallbackRoute: typeof ApiPublicContentStudioMetaCallbackRoute
   ApiPublicNotificationsFlushRoute: typeof ApiPublicNotificationsFlushRoute
   ApiPublicPaymentsReleaseHoldsRoute: typeof ApiPublicPaymentsReleaseHoldsRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
@@ -2271,6 +2285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainersTrainerIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/content-studio/meta-callback': {
+      id: '/api/public/content-studio/meta-callback'
+      path: '/api/public/content-studio/meta-callback'
+      fullPath: '/api/public/content-studio/meta-callback'
+      preLoaderRoute: typeof ApiPublicContentStudioMetaCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/notifications/flush': {
       id: '/api/public/notifications/flush'
       path: '/api/public/notifications/flush'
@@ -2464,6 +2485,8 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
+  ApiPublicContentStudioMetaCallbackRoute:
+    ApiPublicContentStudioMetaCallbackRoute,
   ApiPublicNotificationsFlushRoute: ApiPublicNotificationsFlushRoute,
   ApiPublicPaymentsReleaseHoldsRoute: ApiPublicPaymentsReleaseHoldsRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,

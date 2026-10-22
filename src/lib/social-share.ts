@@ -64,3 +64,31 @@ export function platformShareUrl(platform: SharePlatform, c: ShareContent): stri
       return `https://wa.me/?text=${q(buildCaption(c, { withUrl: true }))}`;
   }
 }
+
+/** Path of one reel's public page. isPublicReelPath must match every path this builds. */
+export function publicReelPath(reelId: string): string {
+  return `/reels/${encodeURIComponent(reelId)}`;
+}
+
+/**
+ * True only for one reel's public page (/reels/<id>), so the root AuthGate lets a
+ * signed-out visitor open a shared link. Deliberately not a /reels prefix: the
+ * /reels tab itself is the signed-in studio and must stay gated.
+ */
+export function isPublicReelPath(pathname: string): boolean {
+  return /^\/reels\/[^/]+\/?$/.test(pathname);
+}
+
+/** A safe download filename for a reel, keeping the stored file's extension. */
+export function reelDownloadName(title: string, storagePath: string): string {
+  const ext = /\.(mp4|mov|m4v|webm)$/i.exec(storagePath)?.[1]?.toLowerCase() ?? "mp4";
+  const slug = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return `${slug || "ballacity-reel"}.${ext}`;
+}
