@@ -20,6 +20,7 @@ import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
+import { FamilyInboxSection } from "@/components/child/FamilyInboxSection";
 import { PreviewGate } from "@/components/public/PreviewGate";
 
 const searchSchema = z.object({
@@ -158,6 +159,8 @@ function MessagesInbox() {
         </Link>
         <h1 className="page-title">Inbox</h1>
       </div>
+
+      <FamilyInboxSection className="mb-4" />
 
       {/* Top-level Messages vs Alerts */}
       <div className="flex gap-2 mb-4 border-b border-border">

@@ -318,7 +318,10 @@ export function useTeamRosterActions(teamId: string) {
         _role: v.role,
         _message: v.message ?? null,
       }),
-    onSuccess: invalidate,
+    onSuccess: (inviteId) => {
+      invalidate();
+      void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("team_invite", inviteId));
+    },
   });
 
   const cancelInvite = useMutation({

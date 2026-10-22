@@ -543,7 +543,10 @@ export async function createJoinRequest(input: {
       .single();
 
   const { data, error } = await attemptInsert();
-  if (!error && data) return data as JoinRequest;
+  if (!error && data) {
+    void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", (data as JoinRequest).id));
+    return data as JoinRequest;
+  }
 
   // 23505 = unique_violation. Either (player_id, idempotency_key) or the
   // (game_id, player_id) constraint fired. If the existing row is 'rejected',
@@ -592,6 +595,7 @@ export async function createJoinRequest(input: {
           // Trigger raises P0001 with a human-readable message for cap/cooldown.
           throw new Error(retryErr.message);
         }
+        void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", prev.id));
         return retryData as JoinRequest;
       }
       return prev;
