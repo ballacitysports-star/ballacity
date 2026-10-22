@@ -5,6 +5,7 @@ import {
   isPublicTeamPath,
   isPublicTrainerPath,
   isSignedOutPreviewPath,
+  showsSignedOutBar,
   isSignedOutPublicPath,
 } from "./public-paths";
 
@@ -146,5 +147,27 @@ describe("isSignedOutPreviewPath", () => {
     }
     expect(isSignedOutPublicPath("/notifications")).toBe(false);
     expect(isSignedOutPublicPath("/messages/abc")).toBe(false);
+  });
+});
+
+describe("showsSignedOutBar", () => {
+  it("draws the bottom bar on the tab previews and on the public Reels and Gyms pages", () => {
+    for (const p of [
+      "/feed",
+      "/players",
+      "/messages",
+      "/profile",
+      "/highlights",
+      "/highlights/",
+      "/orgs",
+    ]) {
+      expect(showsSignedOutBar(p)).toBe(true);
+    }
+  });
+
+  it("does not draw it on detail pages, sign-in or the marketing page", () => {
+    for (const p of ["/", "/auth", "/games/x", "/teams/x", "/orgs/x", "/highlights/x", "/terms"]) {
+      expect(showsSignedOutBar(p)).toBe(false);
+    }
   });
 });
