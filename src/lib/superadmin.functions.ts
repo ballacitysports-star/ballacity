@@ -627,25 +627,6 @@ export const superadminModerate = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/**
- * Payment health numbers for the admin Payments tab. Runs as the signed-in
- * user, not the service role, so the database's own superadmin check applies
- * on top of the one here.
- */
-export const superadminPaymentHealth = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { days?: number } | undefined) =>
-    z.object({ days: z.number().int().min(1).max(730).optional() }).parse(d ?? {}),
-  )
-  .handler(async ({ context, data }) => {
-    await assertSuperadmin(context);
-    const { data: health, error } = await (context.supabase.rpc as any)("payment_health_metrics", {
-      _days: data.days ?? 90,
-    });
-    if (error) throw new Error("Couldn't load payment health.");
-    return health as import("@/lib/payment-health").PaymentHealth;
-  });
-
 export const superadminListPayments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { limit?: number } | undefined) =>

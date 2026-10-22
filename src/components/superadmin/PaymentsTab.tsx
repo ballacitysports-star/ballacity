@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PaymentHealthCard } from "@/components/superadmin/PaymentHealthCard";
 
 export function PaymentsTab() {
   const qc = useQueryClient();
@@ -36,7 +35,6 @@ export function PaymentsTab() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      <PaymentHealthCard />
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Payment submissions</CardTitle>
