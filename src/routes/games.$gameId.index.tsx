@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
@@ -695,8 +696,12 @@ function GameDetail() {
     }
   };
 
+  // Whether the live list still has this game. When the host hides it the list
+  // drops it (a hidden game is not in the feed), but the host and anyone who
+  // joined may still open it, so that flip must trigger a lookup by id.
+  const inLiveList = hosted.some((g) => g.id === gameId);
   useEffect(() => {
-    if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
+    if (GAMES.some((g) => g.id === gameId) || inLiveList) {
       setLookupComplete(true);
       return;
     }
@@ -719,7 +724,7 @@ function GameDetail() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId]);
+  }, [gameId, inLiveList]);
 
   // Re-run status/roster fetches whenever the viewed game OR the signed-in
   // user changes so switching games or accounts always yields fresh data
@@ -2751,6 +2756,11 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            {!game.isPrivate ? (
+              <div className="mt-2">
+                <ListingVisibilityToggle kind="game" id={game.id} />
+              </div>
+            ) : null}
             {!game.cancelledAt && game.status !== "cancelled" ? (
               <button
                 type="button"

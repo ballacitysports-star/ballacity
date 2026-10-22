@@ -83,6 +83,8 @@ export type Game = {
   price: number; // 0 = free
   indoor: boolean;
   isPrivate: boolean;
+  /** Hidden from the public (by its host or a moderator); only set for people who may still see it. */
+  hidden?: boolean;
   urgent?: boolean;
   trending?: boolean;
   image: string;
@@ -417,6 +419,10 @@ export type OrgPost = {
   pinned?: boolean;
   /** Cover image: an uploaded URL or a built-in cover saved by name. */
   imageUrl?: string;
+  authorId?: string;
+  /** Set only for the people who may see a hidden post: its author and the team's managers. */
+  ownerHidden?: boolean;
+  moderatorHidden?: boolean;
 };
 
 export type Org = {

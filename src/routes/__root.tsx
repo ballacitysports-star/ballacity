@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
-import { isSignedOutPreviewPath, isSignedOutPublicPath } from "@/lib/public-paths";
+import { isSignedOutPublicPath, showsSignedOutBar } from "@/lib/public-paths";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { StaffBar } from "@/components/staff/StaffBar";
@@ -294,7 +294,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
       <head>
         {GA_ID ? (
           <>
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`} />
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`}
+            />
             <script dangerouslySetInnerHTML={{ __html: GA_INIT_SCRIPT }} />
           </>
         ) : null}
@@ -481,7 +484,6 @@ const PUBLIC_ROUTES = [
   // City pages list only public games, teams and gyms, read through the
   // allowlisted public columns (see city-pages.functions.ts), and are indexed.
   "/cities",
-
 
   // Shareable, sign-in-free surface.
   "/highlights",
@@ -915,7 +917,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <>
         <ManagedSessionBanner />
         {children}
-        {(user || isSignedOutPreviewPath(pathname)) && <BottomNav />}
+        {(user || showsSignedOutBar(pathname)) && <BottomNav />}
       </>
     );
   }

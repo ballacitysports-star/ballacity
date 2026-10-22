@@ -136,7 +136,7 @@ function PreviewListRow({
   avatar: boolean;
 }) {
   return (
-    <li className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+    <li className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
       {avatar ? (
         row.sport ? (
           <SampleImage sport={row.sport} className="h-14 w-14 shrink-0 rounded-xl" />
@@ -144,7 +144,7 @@ function PreviewListRow({
           <span className="h-11 w-11 shrink-0 rounded-full bg-secondary" />
         )
       ) : null}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-40">
         <p className="truncate font-semibold text-foreground">{row.title}</p>
         <p className="text-sm text-muted-foreground">{row.detail}</p>
         {row.person ? <p className="truncate text-xs text-muted-foreground">{row.person}</p> : null}
@@ -161,12 +161,16 @@ function PreviewListRow({
           </ul>
         ) : null}
       </div>
-      {action ? <FakeButton>{action}</FakeButton> : null}
+      {action ? (
+        <span className="ml-auto">
+          <FakeButton>{action}</FakeButton>
+        </span>
+      ) : null}
     </li>
   );
 }
 
-function SignUpPrompt({ label, next }: { label: string; next: string }) {
+export function SignUpPrompt({ label, next }: { label: string; next: string }) {
   return (
     <div className="rounded-2xl border border-lime/40 bg-surface p-4 text-center">
       <p className="text-sm font-semibold text-foreground">{label}</p>
