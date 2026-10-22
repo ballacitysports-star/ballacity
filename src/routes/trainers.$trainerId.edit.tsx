@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ensureOrgById, getOrgById } from "@/lib/org-store";
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/trainers/$trainerId/edit")({
       </Link>
     </div>
   ),
-  component: EditTrainerRoute,
+  component: withRequireAuth(EditTrainerRoute),
 });
 
 function EditTrainerRoute() {

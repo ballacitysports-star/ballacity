@@ -22,6 +22,7 @@ import { YouthTab } from "@/components/superadmin/YouthTab";
 import { AttentionStrip } from "@/components/superadmin/AttentionStrip";
 import { AiControlsPanel } from "@/components/superadmin/AiControlsPanel";
 import { LiveListingsTab } from "@/components/superadmin/LiveListingsTab";
+import { DiscoveryTab } from "@/components/superadmin/DiscoveryTab";
 import { ReelsWorkerTab } from "@/components/superadmin/ReelsWorkerTab";
 import { ContentStudioTab } from "@/components/superadmin/ContentStudioTab";
 import { ListingsClaimsPanel } from "@/components/admin/ListingsClaimsPanel";
@@ -125,6 +126,7 @@ function SuperadminPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users &amp; profiles</TabsTrigger>
           <TabsTrigger value="listings-live">Live listings</TabsTrigger>
+          <TabsTrigger value="discovery">Discovery</TabsTrigger>
           <TabsTrigger value="moderation">Content</TabsTrigger>
           <TabsTrigger value="content-studio">Content studio</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
@@ -146,6 +148,9 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="listings-live" className="pt-3">
           <LiveListingsTab />
+        </TabsContent>
+        <TabsContent value="discovery" className="pt-3">
+          <DiscoveryTab />
         </TabsContent>
         <TabsContent value="moderation" className="pt-3">
           <ModerationTab />

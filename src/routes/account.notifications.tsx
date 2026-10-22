@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/account/notifications")({
       description: "Choose which BallaCity notifications you get in-app and as push alerts.",
       noindex: true,
     }),
-  component: NotificationSettingsPage,
+  component: withRequireAuth(NotificationSettingsPage),
 });
 
 const SECTIONS: Array<{ title: string; note?: string; categories: NotifCategory[] }> = [

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildConversationList, type ConversationListInput } from "./messages";
+import {
+  buildConversationList,
+  upsertMessages,
+  type ConversationListInput,
+  type Message,
+} from "./messages";
 
 const ME = "me-user-id";
 const THEM = "them-user-id";
@@ -139,5 +144,48 @@ describe("buildConversationList — preview and unread", () => {
   it("treats an attachment-only message as having no text preview", () => {
     const [row] = buildConversationList(input({ lastByConv: { c1: { body: null } } }));
     expect(row!.last_message).toBeNull();
+  });
+});
+
+describe("upsertMessages", () => {
+  const msg = (id: string, at: string, over: Partial<Message> = {}): Message => ({
+    id,
+    conversation_id: "c1",
+    sender_id: THEM,
+    body: id,
+    read_at: null,
+    created_at: at,
+    ...over,
+  });
+  const A = msg("a", "2026-10-20T10:00:00.000000+00:00");
+  const B = msg("b", "2026-10-20T10:01:00.000000+00:00");
+  const C = msg("c", "2026-10-20T10:02:00.000000+00:00");
+
+  it("never shows a message twice", () => {
+    expect(upsertMessages([A, B], [B])).toEqual([A, B]);
+    expect(upsertMessages([A, B], [A, B, C])).toEqual([A, B, C]);
+  });
+
+  it("keeps a message that arrived while a fetch was in flight", () => {
+    // The event for C landed first; the fetch that started earlier lacks it.
+    expect(upsertMessages([C], [A, B])).toEqual([A, B, C]);
+  });
+
+  it("puts messages in send order whichever way they arrive", () => {
+    expect(upsertMessages([C, A], [B]).map((m) => m.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("takes the fetched copy when both have the message", () => {
+    const read = { ...B, read_at: "2026-10-20T10:05:00.000000+00:00" };
+    expect(upsertMessages([B], [read])[0]!.read_at).toBe(read.read_at);
+  });
+
+  it("returns the same list when there is nothing to add", () => {
+    const current = [A, B];
+    expect(upsertMessages(current, [])).toBe(current);
+  });
+
+  it("starts a list from nothing", () => {
+    expect(upsertMessages([], [B, A]).map((m) => m.id)).toEqual(["a", "b"]);
   });
 });

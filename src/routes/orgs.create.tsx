@@ -1,3 +1,4 @@
+import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useState } from "react";
@@ -30,9 +31,11 @@ export const Route = createFileRoute("/orgs/create")({
     finish: search.finish ? 1 : undefined,
   }),
   component: () => (
-    <AccountTypeGate requires="gym">
-      <CreateOrg />
-    </AccountTypeGate>
+    <RequireAuth>
+      <AccountTypeGate requires="gym">
+        <CreateOrg />
+      </AccountTypeGate>
+    </RequireAuth>
   ),
 });
 

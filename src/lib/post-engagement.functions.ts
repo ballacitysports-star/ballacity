@@ -54,6 +54,8 @@ export const listComments = createServerFn({ method: "GET" })
       .select("id, subject_type, subject_id, author_id, body, deleted_at, created_at")
       .eq("subject_type", data.subjectType)
       .eq("subject_id", data.subjectId)
+      // A moderator's Hide. RLS enforces it too; this keeps it explicit.
+      .is("hidden_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as any[];

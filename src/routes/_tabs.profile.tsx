@@ -4,7 +4,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Shield, Clock, Star, Crown, Users, Clapperboard, Loader2 } from "lucide-react";
+import { Settings, Clock, Star, Crown, Users, Clapperboard, Loader2 } from "lucide-react";
 import { GameRecapPanel, ReelManageRow } from "@/components/GameRecapPanel";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { RECAP_COLUMNS, type RecapSummary } from "@/lib/recaps";
@@ -71,6 +71,7 @@ import {
 } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
+import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow";
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 
@@ -412,11 +413,6 @@ function PlayerProfile() {
         avatarUrl={me.avatarUrl}
         avatarFallback={me.avatar}
         name={me.name}
-        nameBadge={
-          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-            <Shield className="h-3 w-3" /> Verified
-          </span>
-        }
         meta={[
           me.username,
           age != null ? `${age}` : null,
@@ -459,6 +455,8 @@ function PlayerProfile() {
           </>
         }
       />
+
+      <ProfileVisibilityRow />
 
       <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
         {me.bio && (

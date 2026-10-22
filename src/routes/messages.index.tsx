@@ -62,14 +62,26 @@ function MessagesInbox() {
       }
     };
     load();
+    let hasSubscribed = false;
     const channel = supabase
       .channel(`inbox-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, load)
-      .subscribe();
+      .subscribe((status) => {
+        // Joined again after a drop: events in the gap never arrived.
+        if (status === "SUBSCRIBED") {
+          if (hasSubscribed) void load();
+          hasSubscribed = true;
+        }
+      });
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
   }, [user?.id, loading]);
@@ -126,6 +138,7 @@ function MessagesInbox() {
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/feed"
+          aria-label="Back to feed"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />

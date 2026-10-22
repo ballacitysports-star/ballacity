@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Sparkles, Undo2 } from "lucide-react";
 import { heldNotice } from "@/lib/post-moderation";
 import {
   Dialog,
@@ -14,18 +13,24 @@ import {
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
-import { createTeamPost, suggestTeamPostDraft } from "@/lib/team-posts.functions";
-import type { PostKind } from "@/lib/sample-data";
-import { POST_KIND_META } from "@/lib/sample-data";
+import { ImageUploader } from "@/components/ImageUploader";
+import { DraftWithAi } from "@/components/DraftWithAi";
+import { useAuth } from "@/hooks/use-auth";
+import { createTeamPost } from "@/lib/team-posts.functions";
+import type { PostKind, Sport } from "@/lib/sample-data";
+import { POST_KIND_META, toStoredCover } from "@/lib/sample-data";
 
 const KINDS: PostKind[] = ["announcement", "tryout", "pickup", "clinic", "recap"];
 
 export function CreatePostSheet({
   teamId,
+  sports = [],
   open,
   onOpenChange,
 }: {
   teamId: string;
+  /** The team's sports: their built-in covers are offered first as presets. */
+  sports?: Sport[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -42,28 +47,12 @@ export function CreatePostSheet({
   } | null>(null);
   const [price, setPrice] = useState("");
   const [spotsMax, setSpotsMax] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const { user } = useAuth();
   const [err, setErr] = useState<string | null>(null);
-  const [drafting, setDrafting] = useState(false);
-  /** What the member had before the AI draft, so one tap puts it back. */
-  const [beforeDraft, setBeforeDraft] = useState<{ title: string; body: string } | null>(null);
 
   const qc = useQueryClient();
   const createFn = useServerFn(createTeamPost);
-  const draftFn = useServerFn(suggestTeamPostDraft);
-
-  const draftWithAi = async () => {
-    setDrafting(true);
-    try {
-      const draft = await draftFn({ data: { kind, notes: body, title: title || null } });
-      setBeforeDraft({ title, body });
-      setTitle(draft.title);
-      setBody(draft.body);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
-    } finally {
-      setDrafting(false);
-    }
-  };
   const mutation = useMutation({
     mutationFn: createFn,
     onSuccess: (result) => {
@@ -78,8 +67,8 @@ export function CreatePostSheet({
       setLocationGeo(null);
       setPrice("");
       setSpotsMax("");
+      setImageUrl("");
       setErr(null);
-      setBeforeDraft(null);
       onOpenChange(false);
     },
     onError: (e: any) => {
@@ -110,6 +99,8 @@ export function CreatePostSheet({
         lng: isEvent ? (locationGeo?.lng ?? null) : null,
         price: isEvent && price !== "" ? Number(price) : null,
         spotsMax: isEvent && spotsMax !== "" ? Number(spotsMax) : null,
+        // Built-in covers are sent by name; uploads by their storage URL.
+        imageUrl: imageUrl ? toStoredCover(imageUrl) : null,
       },
     });
   };
@@ -164,33 +155,17 @@ export function CreatePostSheet({
               className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm"
               maxLength={4000}
             />
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={draftWithAi}
-                disabled={drafting || body.trim().length < 10}
-                className="inline-flex items-center gap-1 rounded-full border border-lime/40 px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40"
-              >
-                <Sparkles className="h-3 w-3" /> {drafting ? "Drafting…" : "Draft with AI"}
-              </button>
-              {beforeDraft && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTitle(beforeDraft.title);
-                    setBody(beforeDraft.body);
-                    setBeforeDraft(null);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-                >
-                  <Undo2 className="h-3 w-3" /> Undo
-                </button>
-              )}
+            <div className="mt-1.5">
+              <DraftWithAi
+                kind={kind}
+                title={title}
+                body={body}
+                onApply={(d) => {
+                  setTitle(d.title);
+                  setBody(d.body);
+                }}
+              />
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Jot rough notes above and AI writes the title and details from them. It only uses what
-              you wrote — check dates, prices and places before you publish.
-            </p>
           </div>
 
           {isEvent && (
@@ -256,6 +231,24 @@ export function CreatePostSheet({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Cover image (optional)
+            </label>
+            <div className="mt-1.5">
+              <ImageUploader
+                kind="cover"
+                bucket="team-covers"
+                pathPrefix={user?.id}
+                value={imageUrl}
+                onChange={setImageUrl}
+                onClear={() => setImageUrl("")}
+                presets={sports}
+                allowBgRemoval={false}
+              />
+            </div>
+          </div>
 
           {err && (
             <div className="rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">

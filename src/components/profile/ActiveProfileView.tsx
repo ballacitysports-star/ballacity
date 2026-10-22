@@ -17,7 +17,7 @@ import {
   channelPillClass,
 } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
-import { ACCOUNT_TYPE_META } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META, hasLogoAvatar } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
 import { isImageUrl } from "@/components/OrgAvatarMark";
 import { hideFinishedGames } from "@/lib/game-time";
@@ -133,12 +133,10 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
       name: org.name,
       handle: org.handle ?? null,
       bannerUrl: org.cover ?? null,
-      // Teams/trainers store an uploaded logo as a URL in `avatar`; never
-      // print that URL as text.
-      avatarUrl: isImageUrl(org.avatar) ? org.avatar : null,
-      avatarFallback: isImageUrl(org.avatar)
-        ? profile.avatarFallback
-        : org.avatar || profile.avatarFallback,
+      // The logo and the initials are separate (older rows kept a logo URL in
+      // `avatar`, which `avatarUrl` already accounts for); never print a URL.
+      avatarUrl: org.avatarUrl ?? (isImageUrl(org.avatar) ? org.avatar : null),
+      avatarFallback: org.avatarInitials || profile.avatarFallback,
       city: org.city ?? null,
       bio: org.bio ?? org.tagline ?? null,
       sports: org.sports ?? [],
@@ -169,7 +167,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
         bannerUrl={vm.bannerUrl ?? HERO_IMAGE}
         avatarUrl={vm.avatarUrl}
         avatarFallback={vm.avatarFallback}
-        avatarShape={profile.kind === "trainer" ? "circle" : "logo"}
+        avatarShape={hasLogoAvatar(profile.kind) ? "logo" : "circle"}
         name={vm.name}
         nameBadge={
           <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">

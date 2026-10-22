@@ -12,6 +12,7 @@ import { formatWhen } from "@/lib/format";
 import { Link } from "@tanstack/react-router";
 import { ShareSheet } from "@/components/ShareSheet";
 import { PostEngagement } from "@/components/PostEngagement";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 export type PostDetailsTeam = {
   id: string;
@@ -57,6 +58,16 @@ export function PostDetailsDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-0">
+          {post.imageUrl && (
+            <ResponsiveImage
+              src={post.imageUrl}
+              alt=""
+              aspect={16 / 9}
+              sizes="(min-width: 640px) 512px, 100vw"
+              baseWidth={640}
+              className="aspect-video w-full object-cover"
+            />
+          )}
           <div className="p-5">
             <DialogHeader className="space-y-3 text-left">
               <div className="flex items-center justify-between gap-3">

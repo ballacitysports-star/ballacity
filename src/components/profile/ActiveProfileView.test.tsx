@@ -138,6 +138,25 @@ describe("ActiveProfileView actions", () => {
     );
   });
 
+  it("shows the logo when the team has one, and its own initials when not", async () => {
+    const { ensureOrgById } = await import("@/lib/org-store");
+    vi.mocked(ensureOrgById).mockResolvedValueOnce({
+      ...org,
+      avatar: "https://cdn.example/logo.png",
+      avatarUrl: "https://cdn.example/logo.png",
+      avatarInitials: "BS",
+    });
+    const withLogo = renderView("team");
+    await screen.findByRole("heading", { name: /Ballacity Scout 14U/ });
+    expect(withLogo.container.querySelector("header img")).toBeTruthy();
+    cleanup();
+
+    renderView("team");
+    await screen.findByRole("heading", { name: /Ballacity Scout 14U/ });
+    expect(document.querySelector("header img")).toBeNull();
+    expect(document.querySelector("header")?.textContent).toContain("BS");
+  });
+
   it("offers Share but not roster invites to a trainer", async () => {
     renderView("trainer");
     expect(await screen.findByRole("button", { name: /^share$/i })).toBeTruthy();

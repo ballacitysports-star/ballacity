@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/family-clips")({
       description: "Clips shared with you by a parent.",
       noindex: true,
     }),
-  component: FamilyClipsPage,
+  component: withRequireAuth(FamilyClipsPage),
 });
 
 function FamilyClipsPage() {

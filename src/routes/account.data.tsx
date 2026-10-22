@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/account/data")({
         "Download a copy of your BallaCity data, see how long each kind of information is kept, and what happens when you delete your account.",
       noindex: true,
     }),
-  component: DataExportPage,
+  component: withRequireAuth(DataExportPage),
 });
 
 const TONE_CLASS: Record<string, string> = {

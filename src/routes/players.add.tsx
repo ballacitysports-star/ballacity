@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -40,7 +41,7 @@ export const Route = createFileRoute("/players/add")({
     }),
   validateSearch: searchSchema,
   ssr: false,
-  component: AddChildPage,
+  component: withRequireAuth(AddChildPage),
 });
 
 const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { parsePostImage } from "@/lib/post-image";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -104,6 +105,8 @@ const CreateInput = z.object({
   refundRule: z.enum(["until_cutoff", "before_start", "none"]).optional(),
   lateRefundPct: z.number().int().min(0).max(100).optional(),
   pinned: z.boolean().optional(),
+  /** A built-in cover ("preset:basketball") or the poster's own team-covers upload. */
+  imageUrl: z.string().max(1000).nullable().optional(),
 });
 
 export const createTeamPost = createServerFn({ method: "POST" })
@@ -120,6 +123,12 @@ export const createTeamPost = createServerFn({ method: "POST" })
       fields: { title: data.title, body: data.body, location: data.location },
     });
     if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    const image = parsePostImage(data.imageUrl, {
+      userId: context.userId,
+      supabaseUrl: process.env.SUPABASE_URL ?? "",
+    });
+    if (!image.ok) throw new Error(image.message);
 
     const { data: row, error } = await context.supabase
       .from("team_posts" as any)
@@ -142,6 +151,9 @@ export const createTeamPost = createServerFn({ method: "POST" })
         ...(data.refundRule !== undefined ? { refund_rule: data.refundRule } : {}),
         ...(data.lateRefundPct !== undefined ? { late_refund_pct: data.lateRefundPct } : {}),
         pinned: data.pinned ?? false,
+        // Only sent when there is one, so text-only posts keep working even
+        // if the image_url migration hasn't reached the database yet.
+        ...(image.value ? { image_url: image.value } : {}),
       } as any)
       .select("*")
       .single();

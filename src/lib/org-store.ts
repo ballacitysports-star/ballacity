@@ -1,5 +1,13 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { ORGS, resolveSportAsset, type Org, type OrgKind, type Sport } from "./sample-data";
+import { splitTeamAvatar, teamAvatarDisplay, teamInitials, teamLogoUrl } from "@/lib/team-avatar";
+import {
+  ORGS,
+  resolveSportAsset,
+  toStoredCover,
+  type Org,
+  type OrgKind,
+  type Sport,
+} from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
@@ -18,6 +26,7 @@ type TeamRow = {
   achievements: string[];
   accent: string;
   avatar: string;
+  avatar_url?: string | null;
   cover: string;
   league: string | null;
   home_court: string | null;
@@ -86,7 +95,9 @@ function rowToOrg(row: TeamRow): Org {
     sports: (row.sports as Sport[]) ?? [],
     verified: row.verified,
     cover: resolveSportAsset(row.cover),
-    avatar: row.avatar,
+    avatar: teamAvatarDisplay(row),
+    avatarUrl: teamLogoUrl(row) ?? undefined,
+    avatarInitials: teamInitials(row),
     accent: row.accent,
     followers: row.followers,
     roster: kind === "team" ? staff.length : 0,
@@ -147,6 +158,19 @@ function rowToOrg(row: TeamRow): Org {
   };
 }
 
+/** `avatar` (initials) and, only when there is one, `avatar_url` (logo) for a new team. */
+function teamAvatarColumns(org: Org) {
+  const cols = splitTeamAvatar({
+    avatar: org.avatarInitials ?? org.avatar,
+    avatarUrl: org.avatarUrl,
+  });
+  return {
+    avatar: cols.avatar ?? "",
+    // Only sent when set, so teams without a logo never depend on the column.
+    ...(cols.avatar_url ? { avatar_url: cols.avatar_url } : {}),
+  };
+}
+
 function orgToInsert(org: Org) {
   return {
     id: org.id,
@@ -160,8 +184,8 @@ function orgToInsert(org: Org) {
     bio: org.bio,
     achievements: org.achievements,
     accent: org.accent,
-    avatar: org.avatar,
-    cover: org.cover,
+    ...teamAvatarColumns(org),
+    cover: toStoredCover(org.cover),
     league: org.league ?? null,
     home_court: org.homeCourt ?? null,
     wins: org.record?.w ?? 0,
@@ -317,8 +341,20 @@ export async function updateOrg(
   if (patch.bio !== undefined) mapped.bio = patch.bio;
   if (patch.achievements !== undefined) mapped.achievements = patch.achievements;
   if (patch.accent !== undefined) mapped.accent = patch.accent;
-  if (patch.avatar !== undefined) mapped.avatar = patch.avatar;
-  if (patch.cover !== undefined) mapped.cover = patch.cover;
+  if (
+    patch.avatar !== undefined ||
+    patch.avatarUrl !== undefined ||
+    patch.avatarInitials !== undefined
+  ) {
+    Object.assign(
+      mapped,
+      splitTeamAvatar({
+        avatar: patch.avatarInitials ?? patch.avatar,
+        avatarUrl: patch.avatarUrl,
+      }),
+    );
+  }
+  if (patch.cover !== undefined) mapped.cover = toStoredCover(patch.cover);
   if (patch.league !== undefined) mapped.league = patch.league ?? null;
   if (patch.homeCourt !== undefined) mapped.home_court = patch.homeCourt ?? null;
   if (patch.record !== undefined) {

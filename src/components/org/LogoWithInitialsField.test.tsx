@@ -29,49 +29,61 @@ import { LogoWithInitialsField } from "./LogoWithInitialsField";
 
 afterEach(cleanup);
 
-function Harness({ initial }: { initial: string }) {
-  const [avatar, setAvatar] = useState(initial);
+function Harness({
+  initialLogo = "",
+  initialInitials = "",
+}: {
+  initialLogo?: string;
+  initialInitials?: string;
+}) {
+  const [logo, setLogo] = useState(initialLogo);
+  const [initials, setInitials] = useState(initialInitials);
   return (
     <>
       <LogoWithInitialsField
-        value={avatar}
-        onChange={setAvatar}
+        logoUrl={logo}
+        onLogoChange={setLogo}
+        initials={initials}
+        onInitialsChange={setInitials}
         defaultInitials="BS"
         bucket="team-avatars"
         pathPrefix="u-1"
         logo
       />
-      <output data-testid="avatar">{avatar}</output>
+      <output data-testid="logo">{logo}</output>
+      <output data-testid="initials">{initials}</output>
     </>
   );
 }
 
 describe("LogoWithInitialsField", () => {
   it("offers initials while there is no logo", () => {
-    render(<Harness initial="" />);
+    render(<Harness />);
     const input = screen.getByLabelText("Initials") as HTMLInputElement;
     expect(input.placeholder).toBe("BS");
     fireEvent.change(input, { target: { value: "bsx9" } });
-    expect(screen.getByTestId("avatar").textContent).toBe("BSX");
+    expect(screen.getByTestId("initials").textContent).toBe("BSX");
+    expect(screen.getByTestId("logo").textContent).toBe("");
   });
 
-  it("hides the initials once a logo is uploaded and never shows its URL as text", () => {
-    render(<Harness initial="BS" />);
+  it("hides the initials input once a logo is uploaded, keeping the initials", () => {
+    render(<Harness initialInitials="BS" />);
     fireEvent.click(screen.getByRole("button", { name: "Upload" }));
     expect(screen.queryByLabelText("Initials")).toBeNull();
     expect(screen.getByTestId("uploader-value").textContent).toBe("https://cdn.example/logo.png");
+    expect(screen.getByTestId("initials").textContent).toBe("BS");
   });
 
-  it("brings the initials back when the logo is removed", () => {
-    render(<Harness initial="https://cdn.example/logo.png" />);
+  it("brings the typed initials back when the logo is removed", () => {
+    render(<Harness initialLogo="https://cdn.example/logo.png" initialInitials="BS" />);
     expect(screen.queryByLabelText("Initials")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.getByLabelText("Initials")).toBeTruthy();
-    expect(screen.getByTestId("avatar").textContent).toBe("");
+    expect((screen.getByLabelText("Initials") as HTMLInputElement).value).toBe("BS");
+    expect(screen.getByTestId("logo").textContent).toBe("");
   });
 
-  it("passes initials to the uploader as no image", () => {
-    render(<Harness initial="BS" />);
+  it("passes the logo, and only the logo, to the uploader", () => {
+    render(<Harness initialInitials="BS" />);
     expect(screen.getByTestId("uploader-value").textContent).toBe("");
   });
 });

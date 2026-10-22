@@ -3605,6 +3605,7 @@ export type Database = {
           formatted_address: string | null
           hidden_at: string | null
           id: string
+          image_url: string | null
           kind: string
           lat: number | null
           late_refund_pct: number
@@ -3632,6 +3633,7 @@ export type Database = {
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind: string
           lat?: number | null
           late_refund_pct?: number
@@ -3659,6 +3661,7 @@ export type Database = {
           formatted_address?: string | null
           hidden_at?: string | null
           id?: string
+          image_url?: string | null
           kind?: string
           lat?: number | null
           late_refund_pct?: number
@@ -3826,6 +3829,7 @@ export type Database = {
           availability_rules: Json
           availability_slots: Json
           avatar: string
+          avatar_url: string | null
           bio: string
           cadence: string | null
           cadences: Json
@@ -3881,6 +3885,7 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json
@@ -3936,6 +3941,7 @@ export type Database = {
           availability_rules?: Json
           availability_slots?: Json
           avatar?: string
+          avatar_url?: string | null
           bio?: string
           cadence?: string | null
           cadences?: Json

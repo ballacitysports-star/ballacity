@@ -41,6 +41,14 @@ export function isAccountType(v: unknown): v is AccountType {
 }
 
 /**
+ * Teams and gyms are shown with a logo (rounded square); players and trainers
+ * are people (circle). One rule so every avatar surface agrees.
+ */
+export function hasLogoAvatar(kind: AccountType): boolean {
+  return kind === "team" || kind === "gym";
+}
+
+/**
  * The one question put to a new member: what are you here to do?
  *
  * A *role* is what someone recognises themselves as: four cards, the same at

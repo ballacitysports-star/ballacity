@@ -1,3 +1,4 @@
+import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { Loader2, ShieldOff } from "lucide-react";
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/account/blocked")({
       noindex: true,
     }),
   ssr: false,
-  component: BlockedUsersPage,
+  component: withRequireAuth(BlockedUsersPage),
 });
 
 function BlockedUsersPage() {

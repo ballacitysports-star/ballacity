@@ -105,6 +105,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   // Branding
   const [accent, setAccent] = useState(ACCENTS[0].hex);
   const [avatar, setAvatar] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [cover, setCover] = useState<string>(HERO_IMAGE);
   const [customCover, setCustomCover] = useState(false);
   const [skillMin, setSkillMin] = useState(1);
@@ -159,7 +160,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const showTeamBlocks = !isCoach && hasTeamSport(sports);
   const showDistances = hasRunning(sports);
 
-  const computedAvatar = avatar || initials(name || "Open Run");
+  const computedInitials = avatar || initials(name || "Open Run");
+  // What cards render: the logo when there is one, else the initials.
+  const computedAvatar = logoUrl || computedInitials;
 
   const canNext = useMemo(() => {
     if (step === 0)
@@ -186,6 +189,8 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     verified: false,
     cover,
     avatar: computedAvatar,
+    avatarUrl: logoUrl || undefined,
+    avatarInitials: computedInitials,
     accent,
     followers: 0,
     roster: isCoach ? 0 : staff.length,
@@ -1193,8 +1198,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
 
               <Section title={isCoach ? "Trainer photo" : "Team logo"}>
                 <LogoWithInitialsField
-                  value={avatar}
-                  onChange={setAvatar}
+                  logoUrl={logoUrl}
+                  onLogoChange={setLogoUrl}
+                  initials={avatar}
+                  onInitialsChange={setAvatar}
                   defaultInitials={initials(name || "OR")}
                   bucket={isCoach ? "trainer-avatars" : "team-avatars"}
                   pathPrefix={user?.id}

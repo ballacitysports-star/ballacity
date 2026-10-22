@@ -9,6 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import { manualChunks } from "./build/manual-chunks";
 
 // `.env.production` holds the publishable backend URL and key, committed
 // because the managed .env is not available to the deploy build. Vite only
@@ -101,26 +102,11 @@ export default defineConfig({
       client: {
         define: publicBackendDefine,
         build: {
-      // Split large third-party libraries out of the shared entry chunk so the
-      // first paint of / and /profile only downloads what it needs, and heavy
-      // libs used by a subset of routes load on demand (and cache separately).
-      rollupOptions: {
-        output: {
-          manualChunks(id: string) {
-            if (!id.includes("node_modules")) return;
-            if (/[\\/]node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/.test(id))
-              return "vendor-motion";
-            if (/[\\/]node_modules[\\/]zod[\\/]/.test(id)) return "vendor-zod";
-            if (/[\\/]node_modules[\\/]@supabase[\\/](realtime-js|storage-js|functions-js|phoenix)/.test(id))
-              return "vendor-supabase-extras";
-            if (/[\\/]node_modules[\\/](@radix-ui|@floating-ui|cmdk|embla-carousel|vaul)[\\/]/.test(id))
-              return "vendor-ui";
-            if (/[\\/]node_modules[\\/](recharts|d3-|victory)/.test(id)) return "vendor-charts";
-            if (/[\\/]node_modules[\\/](date-fns|react-hook-form|@hookform)[\\/]/.test(id))
-              return "vendor-forms";
-            return;
-          },
-            },
+          // Split large third-party libraries out of the shared entry chunk so
+          // the first paint of / and /profile only downloads what it needs
+          // (rules and rationale live in build/manual-chunks.ts).
+          rollupOptions: {
+            output: { manualChunks },
           },
         },
       },

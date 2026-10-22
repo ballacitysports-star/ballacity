@@ -1,11 +1,12 @@
-/**
- * Teams and trainers keep either short initials/emoji or an uploaded logo URL
- * in the same `avatar` field. Renders the logo as an image when it is a URL,
- * otherwise the text — so a logo URL is never printed as text.
- */
-export const isImageUrl = (v: string | null | undefined): v is string =>
-  /^(https?:|data:|blob:)/.test(v ?? "");
+import { isImageUrl } from "@/lib/team-avatar";
 
+export { isImageUrl };
+
+/**
+ * Renders a team's or trainer's mark from the single display value cards use:
+ * the logo as an image when it is a URL, otherwise the text — so a logo URL is
+ * never printed as text.
+ */
 export function OrgAvatarMark({
   avatar,
   fallback,

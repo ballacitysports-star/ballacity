@@ -325,6 +325,8 @@ export function CreateTrainerWizard() {
     verified: false,
     cover: draft.coverUrl ?? HERO_IMAGE,
     avatar: draft.avatarUrl ?? initials(draft.name || "OR"),
+    avatarUrl: draft.avatarUrl ?? undefined,
+    avatarInitials: initials(draft.name || "OR"),
     accent: "#a3ff12",
     followers: 0,
     roster: 0,

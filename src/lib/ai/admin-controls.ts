@@ -45,6 +45,10 @@ export const AI_FEATURE_META: Record<AiFeature, { label: string; description: st
     description:
       "Drafts posts for the official BallaCity Facebook Page from a staff-reviewed source. Every draft needs a superadmin approval before it can be published.",
   },
+  listing_discovery: {
+    label: "Listing discovery",
+    description: "Superadmin: reads public web pages to suggest teams, gyms and trainers.",
+  },
   skill_assessment: {
     label: "Skill assessment",
     description: "AI-assisted skill ratings from peer input.",

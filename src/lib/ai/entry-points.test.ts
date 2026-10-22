@@ -31,6 +31,10 @@ const ENTRY_POINTS: Record<string, { file: string; feature: AiFeature }> = {
   removeBackground: { file: "src/lib/bg-remove.functions.ts", feature: "background_remove" },
   draftTeamPost: { file: "src/lib/post-assist.server.ts", feature: "post_assist" },
   generateStudioDraft: { file: "src/lib/content-studio.server.ts", feature: "content_studio" },
+  extractPageOrganizations: {
+    file: "src/lib/discovery/extract.server.ts",
+    feature: "listing_discovery",
+  },
 };
 
 function baseConfig(): AiConfig {
