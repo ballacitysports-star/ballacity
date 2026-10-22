@@ -170,7 +170,7 @@ function PreviewListRow({
   );
 }
 
-function SignUpPrompt({ label, next }: { label: string; next: string }) {
+export function SignUpPrompt({ label, next }: { label: string; next: string }) {
   return (
     <div className="rounded-2xl border border-lime/40 bg-surface p-4 text-center">
       <p className="text-sm font-semibold text-foreground">{label}</p>
