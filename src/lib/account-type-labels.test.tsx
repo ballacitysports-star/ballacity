@@ -21,7 +21,7 @@ import { RolePicker } from "@/components/RolePicker";
  * slash pairs ("Team / Club", "Trainer / Coach", "Gym / Facility").
  *
  * The role picker at sign-up and in onboarding is a separate vocabulary: it
- * names ROLES (Player, Parent / Guardian, Team / Coach, Facility / Gym), the
+ * names ROLES (Player, Parent / Guardian, Team / Coach, Facility / Venue), the
  * words people recognise themselves by, and the product asked for those words,
  * including "Coach" and "Facility". It does not rename the profile types they
  * lead to: ACCOUNT_TYPE_META and every screen below keep the canonical names.
@@ -52,7 +52,7 @@ describe("ACCOUNT_TYPE_META canonical vocabulary", () => {
     ["player", "Player", "Players"],
     ["team", "Team", "Teams"],
     ["trainer", "Trainer", "Trainers"],
-    ["gym", "Gym", "Gyms"],
+    ["gym", "Venue", "Venues"],
   ] as const)("uses canonical label/plural for %s", (type, label, plural) => {
     const meta = ACCOUNT_TYPE_META[type];
     expect(meta.label).toBe(label);
@@ -91,7 +91,7 @@ describe("RolePicker (sign-up and onboarding)", () => {
       ["🏃", "Player"],
       ["👪", "Parent / Guardian"],
       ["👥", "Team / Coach"],
-      ["🏢", "Facility / Gym"],
+      ["🏢", "Facility / Venue"],
     ]);
   });
 
@@ -100,7 +100,7 @@ describe("RolePicker (sign-up and onboarding)", () => {
       Player: "Athletes looking for games and runs",
       "Parent / Guardian": "Parents managing kids' sports schedules",
       "Team / Coach": "Coaches and captains organizing squads",
-      "Facility / Gym": "Venue owners and sports facilities",
+      "Facility / Venue": "Venue owners and sports facilities",
     });
   });
 

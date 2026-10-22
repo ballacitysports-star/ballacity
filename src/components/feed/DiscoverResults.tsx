@@ -152,7 +152,7 @@ export function DiscoverResults({
   if (grouped || cat === "gyms") {
     sections.push({
       id: "gyms",
-      title: "Gyms & Courts",
+      title: "Venues",
       count: gyms.length,
       body: (
         <ul className="grid gap-3 sm:grid-cols-2">

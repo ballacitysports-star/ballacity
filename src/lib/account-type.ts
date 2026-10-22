@@ -29,10 +29,10 @@ export const ACCOUNT_TYPE_META: Record<
     blurb: "Offer sessions and manage your availability.",
   },
   gym: {
-    label: "Gym",
-    plural: "Gyms",
+    label: "Venue",
+    plural: "Venues",
     emoji: "🏢",
-    blurb: "Run a gym with trainers and members.",
+    blurb: "Run a gym, court or field with trainers and members.",
   },
 };
 
@@ -95,7 +95,7 @@ export const SETUPS: Record<SetupId, SetupMeta> = {
     label: "Coach",
     blurb: "Offer sessions and manage your availability",
   },
-  facility: { accountType: "gym", to: "/orgs/create", label: "Facility / Gym" },
+  facility: { accountType: "gym", to: "/orgs/create", label: "Facility / Venue" },
 };
 
 export type RoleMeta = {
@@ -134,7 +134,7 @@ export const ROLES: readonly RoleMeta[] = [
   {
     id: "facility",
     emoji: "🏢",
-    label: "Facility / Gym",
+    label: "Facility / Venue",
     blurb: "Venue owners and sports facilities",
     setups: ["facility"],
   },

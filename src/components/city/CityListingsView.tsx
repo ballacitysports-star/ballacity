@@ -138,7 +138,7 @@ export function CityListingsView({
 
         {listings.gyms.length > 0 && (
           <section className="mt-8">
-            <h2 className="text-lg font-bold">Gyms &amp; courts</h2>
+            <h2 className="text-lg font-bold">Venues</h2>
             <ul className="mt-3 grid gap-3">
               {listings.gyms.map((gym) => (
                 <li key={gym.id}>

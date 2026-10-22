@@ -334,7 +334,7 @@ function CreateListing() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="gym">Gym or venue</SelectItem>
+              <SelectItem value="gym">Venue</SelectItem>
               <SelectItem value="team">Team or coach</SelectItem>
             </SelectContent>
           </Select>

@@ -51,7 +51,7 @@ export function ClaimListingCard({
   const { data: claim } = useMyClaim(subjectType, subjectId);
   const { submit, withdraw, respond } = useClaimListing(subjectType, subjectId);
 
-  const noun = subjectType === "gym" ? "gym" : "team";
+  const noun = subjectType === "gym" ? "venue" : "team";
 
   if (claim?.status === "needs_info") {
     return (

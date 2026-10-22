@@ -96,7 +96,7 @@ const KIND_LABEL: Record<ListingKind, string> = {
   post: "Team post",
   team: "Team",
   trainer: "Trainer profile",
-  gym: "Gym",
+  gym: "Venue",
 };
 
 function HiddenListingsPage() {

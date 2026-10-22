@@ -11,7 +11,7 @@ import {
 /**
  * The single question at sign-up and in onboarding: what are you here to do?
  *
- * Four roles. Player, Parent / Guardian and Facility / Gym each have one setup,
+ * Four roles. Player, Parent / Guardian and Facility / Venue each have one setup,
  * so tapping the card answers it. Team / Coach has two, so tapping it asks which
  * one — on this same screen, not on another — and `value` stays null until that
  * is answered.

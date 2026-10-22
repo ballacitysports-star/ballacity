@@ -397,7 +397,7 @@ function TrainersPage() {
     <div className="page-shell-content pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="page-title">
-          {mode === "gyms" ? "Gyms & organizations." : "Trainers & gyms."}
+          {mode === "gyms" ? "Venues & organizations." : "Trainers & venues."}
         </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {mode === "gyms" ? (
@@ -427,7 +427,7 @@ function TrainersPage() {
         {(
           [
             { id: "trainers", label: "Trainers", Icon: GraduationCap },
-            { id: "gyms", label: "Gyms", Icon: Building2 },
+            { id: "gyms", label: "Venues", Icon: Building2 },
           ] as const
         ).map((t) => {
           const active = mode === t.id;
@@ -834,7 +834,7 @@ function GymsView({
         <EmptyState
           icon={<Building2 className="h-6 w-6" aria-hidden />}
           title="No gyms listed yet"
-          description="Gyms and organizations near you will appear here. You can add yours in a minute."
+          description="Venues and organizations near you will appear here. You can add yours in a minute."
           action={
             <Link
               to="/orgs/create"

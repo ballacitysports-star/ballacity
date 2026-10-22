@@ -3,7 +3,7 @@ export const DISCOVER_CATEGORIES = [
   { id: "all", label: "All" },
   { id: "runs", label: "Pickup Runs" },
   { id: "teams", label: "Teams & Tryouts" },
-  { id: "gyms", label: "Gyms & Courts" },
+  { id: "gyms", label: "Venues" },
   { id: "trainers", label: "Trainers" },
 ] as const;
 
