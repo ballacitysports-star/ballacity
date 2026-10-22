@@ -16,7 +16,7 @@ export const Route = createFileRoute("/orgs/")({
   head: () =>
     pageHead({
       path: "/orgs",
-      title: "Gyms & courts — BallaCity",
+      title: "Venues — BallaCity",
       description:
         "Browse gyms, courts, and sports complexes on BallaCity. See photos, live hours, amenities, and book a court.",
     }),
@@ -81,7 +81,7 @@ function OrgsIndex() {
       <DiscoverTabs bare />
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="page-title">Gyms &amp; courts.</h1>
+          <h1 className="page-title">Venues.</h1>
           <p className="mt-1 page-subtitle">
             See the courts, check live hours, and book a spot to play.
           </p>

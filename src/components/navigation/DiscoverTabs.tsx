@@ -5,7 +5,7 @@ const SECTIONS = [
   { to: "/players", label: "Players" },
   { to: "/teams", label: "Teams" },
   { to: "/trainers", label: "Trainers" },
-  { to: "/orgs", label: "Gyms" },
+  { to: "/orgs", label: "Venues" },
 ] as const;
 
 /** The search text in the current page's URL, which the strip carries to the next section. */
@@ -15,7 +15,7 @@ export function carriedQuery(search: unknown): string {
 }
 
 /**
- * Players, Teams, Trainers and Gyms are one place in the bottom bar ("Discover");
+ * Players, Teams, Trainers and Venues are one place in the bottom bar ("Discover");
  * this strip switches between them. `bare` drops its own page padding for a page that already has some. What you typed in a search box follows you,
  * so one search can be tried against each.
  */

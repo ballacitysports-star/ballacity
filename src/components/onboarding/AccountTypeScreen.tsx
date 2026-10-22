@@ -29,7 +29,7 @@ const AGE_WAIT_MS = 3000;
  *
  * One selection, then straight to that setup: Player to the sport and position
  * wizard, Parent / Guardian to Add your child, Team / Coach to the team or coach
- * setup, Facility / Gym to the facility setup. There is no second question.
+ * setup, Facility / Venue to the facility setup. There is no second question.
  *
  * `onResolved` fires after a type is saved, with the setup they chose (which is
  * what decides where they go; the type is only what is stored);

@@ -49,7 +49,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
     <div className="rounded-2xl border border-border/60 bg-surface p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-lime" />
-        <h3 className="section-title">Gym</h3>
+        <h3 className="section-title">Gym or venue</h3>
       </div>
 
       {current ? (
@@ -90,9 +90,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
         <>
           {(invites.data ?? []).length > 0 && (
             <div className="space-y-2">
-              <div className="micro-label text-muted-foreground">
-                Pending invites
-              </div>
+              <div className="micro-label text-muted-foreground">Pending invites</div>
               {invites.data!.map((inv) => (
                 <div
                   key={inv.id}
@@ -260,7 +258,7 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Gym name"
+        placeholder="Gym or venue name"
         className="h-9"
       />
       <Input
@@ -292,7 +290,7 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
             await createTrainerOrg({
               data: { name, handle, trainerId, city: city || undefined, bio: bio || undefined },
             });
-            toast.success("Gym created");
+            toast.success("Venue created");
             onDone();
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Failed to create");

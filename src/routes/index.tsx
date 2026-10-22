@@ -228,7 +228,7 @@ function Landing() {
                 visible.tryouts && ["#tryouts", "📋 Tryouts & camps"],
                 visible.availability && ["#availability", "🙋 Get found"],
                 ["#for-teams", "🧢 Teams & trainers"],
-                ["#for-facilities", "🏢 Gyms & facilities"],
+                ["#for-facilities", "🏢 Venues & facilities"],
               ]
                 .filter((x): x is string[] => !!x)
                 .map(([href, label]) => (
@@ -454,7 +454,7 @@ function Landing() {
         </ul>
       </section>
 
-      {/* Gyms & facilities */}
+      {/* Venues & facilities */}
       <section
         id="for-facilities"
         className="page-shell py-16"
@@ -607,7 +607,7 @@ function Landing() {
               Sports Guide
             </Link>
             <Link to="/orgs" className="hover:text-foreground">
-              Teams & Gyms
+              Teams & Venues
             </Link>
             <Link to="/terms" className="hover:text-foreground">
               Terms of Service
