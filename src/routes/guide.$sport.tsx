@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
+import { useAuth } from "@/hooks/use-auth";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { guideBySlug } from "@/lib/sports-guide";
 
@@ -84,6 +85,7 @@ function List({ title, items }: { title: string; items: string[] }) {
 }
 
 function SportGuidePage() {
+  const { user } = useAuth();
   const { guide } = Route.useLoaderData();
 
   return (
@@ -144,13 +146,22 @@ function SportGuidePage() {
         <section className="mt-8 rounded-2xl border border-border bg-surface px-4 py-4">
           <h2 className="text-sm font-bold">Get started on BallaCity</h2>
           <div className="mt-3 grid gap-2">
-            <Link
-              to="/feed"
-              search={{ sport: guide.sport }}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
-            >
-              Find {guide.sport.toLowerCase()} near you
-            </Link>
+            {user ? (
+              <Link
+                to="/feed"
+                search={{ sport: guide.sport }}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
+              >
+                Find {guide.sport.toLowerCase()} near you
+              </Link>
+            ) : (
+              <Link
+                to="/cities"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-lime px-4 text-sm font-bold text-primary-foreground"
+              >
+                Find {guide.sport.toLowerCase()} near you
+              </Link>
+            )}
             <Link
               to="/create"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-4 text-sm font-semibold"
