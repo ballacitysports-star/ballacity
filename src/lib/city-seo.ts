@@ -128,6 +128,27 @@ export function toPublicTeam(row: PublicTeamRow): PublicTeam | null {
   };
 }
 
+/** The few facts a signed-out visitor sees of a trainer. No rates, availability, venues or contact details. */
+export type PublicTrainer = Omit<PublicTeam, "openSpots" | "founded">;
+
+/**
+ * Null for a hidden profile, a team (its page is `/teams/<id>`), or a trainer who
+ * works with kids or teens.
+ */
+export function toPublicTrainer(row: PublicTeamRow): PublicTrainer | null {
+  if (row.kind !== "coach" || !isPublicOrg(row)) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    handle: row.handle,
+    city: row.city,
+    sports: row.sports ?? [],
+    tagline: row.tagline,
+    bio: row.bio ? row.bio.slice(0, PUBLIC_TEAM_BIO_MAX) : null,
+    verified: row.verified === true,
+  };
+}
+
 export function guideSlugForSport(sport: string): string | undefined {
   return SPORT_GUIDES.find((g) => g.sport.toLowerCase() === sport.toLowerCase())?.slug;
 }

@@ -1,4 +1,9 @@
-import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useLocation } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
+import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
+import { PublicTrainerPreview } from "@/components/teams/PublicTrainerPreview";
+import { getPublicTrainer } from "@/lib/city-pages.functions";
+import type { PublicTrainer } from "@/lib/city-seo";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -58,7 +63,7 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
   ),
 
   head: ({ loaderData, params }) => {
-    const o = loaderData as Org | undefined;
+    const o = (loaderData as TrainerLoaderData | undefined)?.org ?? undefined;
     const name = o?.name ?? "Trainer";
     return pageHead({
       path: `/trainers/${params.trainerId}`,
@@ -89,15 +94,18 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
   },
   // Whole teams need a session, which only the browser has.
   ssr: false,
-  loader: async ({ params }) => {
-    const org = await ensureOrgById(params.trainerId);
-    if (!org) throw notFound();
-    if (org.kind !== "coach") {
+  loader: async ({ params }): Promise<TrainerLoaderData> => {
+    const org = (await ensureOrgById(params.trainerId)) ?? null;
+    if (org && org.kind !== "coach") {
       throw redirect({ to: "/teams/$teamId", params: { teamId: org.id }, replace: true });
     }
-    return org;
+    // No session: only the public facts, which the signed-out page shows.
+    const pub = org
+      ? null
+      : await getPublicTrainer({ data: { id: params.trainerId } }).catch(() => null);
+    return { org, pub };
   },
-  component: TrainerPage,
+  component: TrainerRoute,
   errorComponent: () => (
     <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this trainer.</p>
@@ -109,7 +117,13 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
       </Link>
     </div>
   ),
-  notFoundComponent: () => (
+  notFoundComponent: TrainerNotFound,
+});
+
+type TrainerLoaderData = { org: Org | null; pub: PublicTrainer | null };
+
+function TrainerNotFound() {
+  return (
     <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Trainer not found.</p>
       <Link
@@ -119,11 +133,42 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
         Back to Trainers
       </Link>
     </div>
-  ),
-});
+  );
+}
 
-function TrainerPage() {
-  const org = Route.useLoaderData() as Org;
+/**
+ * Signed-out visitors (a shared link) get the short public preview; booking,
+ * rates, availability and reviews are the signed-in page below.
+ */
+function TrainerRoute() {
+  const { user, loading } = useAuth();
+  const { trainerId } = Route.useParams();
+  const { org } = Route.useLoaderData() as TrainerLoaderData;
+  const { pathname, searchStr } = useLocation();
+  if (loading) return <AuthRedirectSkeleton label="Loading trainer…" />;
+  if (!user) return <PublicTrainerPreview trainerId={trainerId} next={`${pathname}${searchStr}`} />;
+  return <SignedInTrainer trainerId={trainerId} loaded={org} />;
+}
+
+/** The loader ran before the session was known on a hard load; fetch the trainer here then. */
+function SignedInTrainer({ trainerId, loaded }: { trainerId: string; loaded: Org | null }) {
+  const query = useQuery({
+    queryKey: ["org", trainerId],
+    queryFn: async () => (await ensureOrgById(trainerId)) ?? null,
+    enabled: !loaded,
+  });
+  const org = loaded ?? query.data ?? null;
+  if (!org) {
+    return query.isPending ? (
+      <AuthRedirectSkeleton label="Loading trainer…" />
+    ) : (
+      <TrainerNotFound />
+    );
+  }
+  return <TrainerPage org={org} />;
+}
+
+function TrainerPage({ org }: { org: Org }) {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
 
@@ -785,9 +830,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
         {icon}
         {value}
       </div>
-      <div className="micro-label text-muted-foreground mt-0.5">
-        {label}
-      </div>
+      <div className="micro-label text-muted-foreground mt-0.5">{label}</div>
     </div>
   );
 }

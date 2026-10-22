@@ -9,9 +9,11 @@ import {
   isPublicUpcomingGame,
   sportForGuideSlug,
   toPublicTeam,
+  toPublicTrainer,
   type CityGameRow,
   type CityListings,
   type PublicTeam,
+  type PublicTrainer,
   type PublicTeamRow,
 } from "./city-seo";
 import { cityBounds, cityBySlug } from "./launch-cities";
@@ -132,6 +134,23 @@ export const getPublicTeam = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error || !row) return null;
     return toPublicTeam(row as unknown as PublicTeamRow);
+  });
+
+/**
+ * One trainer for a signed-out visitor, from the same public columns as a team.
+ * Rates, session types, availability and venues are not public. Null for a
+ * hidden profile, a team, or a trainer aimed at under-18s.
+ */
+export const getPublicTrainer = createServerFn({ method: "GET" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1).max(64) }).parse(d))
+  .handler(async ({ data }): Promise<PublicTrainer | null> => {
+    const { data: row, error } = await publicClient()
+      .from("teams")
+      .select(PUBLIC_TEAM_COLUMNS)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) return null;
+    return toPublicTrainer(row as unknown as PublicTeamRow);
   });
 
 export const getPublicGameSeo = createServerFn({ method: "GET" })

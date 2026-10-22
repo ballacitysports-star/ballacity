@@ -17,6 +17,11 @@ export function isPublicTeamPath(pathname: string): boolean {
   return /^\/teams\/(?!create(?:\/|$))[^/]+\/?$/.test(pathname);
 }
 
+/** A single trainer: a short public preview. `/trainers` itself is the tab preview. */
+export function isPublicTrainerPath(pathname: string): boolean {
+  return /^\/trainers\/(?!create(?:\/|$))[^/]+\/?$/.test(pathname);
+}
+
 /** The facility directory and a single facility's page, both built for the public. */
 export function isPublicFacilityPath(pathname: string): boolean {
   return /^\/orgs\/?$/.test(pathname) || /^\/orgs\/(?!create(?:\/|$))[^/]+\/?$/.test(pathname);
@@ -50,6 +55,7 @@ export function isSignedOutPublicPath(pathname: string): boolean {
   return (
     isPublicGamePath(pathname) ||
     isPublicTeamPath(pathname) ||
+    isPublicTrainerPath(pathname) ||
     isPublicFacilityPath(pathname) ||
     isSignedOutPreviewPath(pathname)
   );
