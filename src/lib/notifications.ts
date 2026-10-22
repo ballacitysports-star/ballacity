@@ -89,7 +89,11 @@ export async function markAllNotificationsRead() {
     .is("read_at", null);
 }
 
-export function useUnreadNotificationCount() {
+/**
+ * `scope` keeps each caller's realtime channel separate: two components asking
+ * for the same channel name at once would subscribe to it twice.
+ */
+export function useUnreadNotificationCount(scope = "") {
   const { user } = useAuth();
   const [count, setCount] = useState(0);
 
@@ -110,7 +114,7 @@ export function useUnreadNotificationCount() {
     fetchCount();
 
     const channel = supabase
-      .channel(`notif-count-${user.id}`)
+      .channel(`notif-count-${scope}${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },

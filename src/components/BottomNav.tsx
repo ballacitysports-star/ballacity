@@ -4,6 +4,7 @@ import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useAuth } from "@/hooks/use-auth";
+import { useUnreadNotificationCount } from "@/lib/notifications";
 
 type NavItem = {
   to: string;
@@ -46,6 +47,8 @@ export function BottomNav() {
   const { pathname } = useLocation();
   const { isParentMode } = useParentMode();
   const { user } = useAuth();
+  // Alerts and message notifications are the same table, so one count covers the whole Inbox.
+  const inboxUnread = useUnreadNotificationCount("nav-");
   const items: NavItem[] = tabsForMode(isParentMode).map((tab) => ({
     to: tab.to,
     label: tab.label,
@@ -86,7 +89,18 @@ export function BottomNav() {
             active ? "bg-lime opacity-100" : "opacity-0"
           }`}
         />
-        <span className="sr-only">{it.label}</span>
+        {it.to === "/messages" && inboxUnread > 0 ? (
+          <span
+            aria-hidden
+            className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white"
+          >
+            {inboxUnread > 9 ? "9+" : inboxUnread}
+          </span>
+        ) : null}
+        <span className="sr-only">
+          {it.label}
+          {it.to === "/messages" && inboxUnread > 0 ? `, ${inboxUnread} unread` : ""}
+        </span>
       </Link>
     );
   };
