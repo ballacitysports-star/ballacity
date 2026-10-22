@@ -3,7 +3,7 @@
  * (pay, edit, members, manage) have a further segment and stay behind sign-in.
  *
  * The tab pages are the exception to "public data only": a signed-out visitor
- * gets a static, blurred preview with sample content (see SignedOutPreview),
+ * gets a static preview with sample content (see SignedOutPreview),
  * never the signed-in page itself.
  */
 
@@ -23,7 +23,7 @@ export function isPublicFacilityPath(pathname: string): boolean {
 }
 
 /**
- * The tabs a signed-out visitor sees as a blurred preview of the real page.
+ * The tabs a signed-out visitor sees as a sample preview of the real page.
  * `/highlights` is not listed: it is already open and shows public reels only.
  * `/discover` is not listed either: it only redirects to `/feed`.
  */

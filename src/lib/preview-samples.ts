@@ -4,17 +4,15 @@
  * Everything here is invented and ships in the bundle. It must stay that way:
  * this file imports nothing from Supabase or a server function, so a signed-out
  * browser is never sent a real member's name, photo, roster or message. The
- * blur on top is presentation only and is not what protects anyone.
+ * real page is simply never mounted for a signed-out visitor.
  */
 
 export type PreviewTab = "feed" | "players" | "teams" | "trainers" | "reels" | "create" | "profile";
 
 export type PreviewRow = {
   title: string;
-  /** True when the title is a person's name, so it is blurred like any other. */
-  titleIsPerson?: boolean;
   detail: string;
-  /** A person's name or handle. Always blurred, even in the rows left clear. */
+  /** A made-up name or handle. */
   person?: string;
 };
 
@@ -23,21 +21,18 @@ export type PreviewConfig = {
   subtitle: string;
   /** What the sign-up prompt promises, e.g. "See real games near you". */
   cta: string;
-  /** A button the real page shows in its header (blurred here). */
+  /** A button the real page shows in its header (inert here). */
   headerAction?: string;
-  /** What each row's button says on the real page (blurred here). */
+  /** What each row's button says on the real page (inert here). */
   rowAction?: string;
   /** Whether rows carry a person's or team's avatar. Defaults to true. */
   showAvatars?: boolean;
   rows?: PreviewRow[];
-  /** Fields of a form page, drawn as blurred inputs. */
+  /** Fields of a form page, drawn as inert inputs. */
   fields?: string[];
-  /** A member-only section (roster, chat, messages), drawn blurred. */
+  /** A member-only section (roster, chat, messages), drawn in full. */
   locked?: { title: string; lines: string[] };
 };
-
-/** Rows shown clearly before the blur starts. */
-export const PREVIEW_VISIBLE_ROWS = 3;
 
 const person = (n: number) => `Sample Person ${n}`;
 
@@ -58,7 +53,7 @@ const players: PreviewRow[] = [
   { title: "Sample Player 4", detail: "Tennis · Intermediate · Available weekends" },
   { title: "Sample Player 5", detail: "Pickleball · Beginner · Available evenings" },
   { title: "Sample Player 6", detail: "Football · Advanced · Available weekends" },
-].map((r, i) => ({ ...r, titleIsPerson: true, person: `@sample${i + 1}` }));
+].map((r, i) => ({ ...r, person: `@sample${i + 1}` }));
 
 const teams: PreviewRow[] = [
   { title: "Sample Hoopers", detail: "Basketball · Adult rec league · 2 open spots" },

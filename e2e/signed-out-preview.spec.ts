@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * E2E: a signed-out visitor can open each tab and sees a blurred sample
+ * E2E: a signed-out visitor can open each tab and sees a sample
  * preview of it, not a redirect to sign-in and not the signed-in page.
  *
  * The preview is static sample content, so these run signed out with or without
@@ -32,10 +32,8 @@ for (const tab of TABS) {
     expect(href.searchParams.get("mode")).toBe("signup");
     expect(href.searchParams.get("next")).toContain(`/${tab}`);
 
-    // Blurred areas can't be clicked, focused or read by assistive tech.
-    const blurred = page.locator('[aria-hidden="true"][inert]');
-    expect(await blurred.count()).toBeGreaterThan(0);
-    await expect(blurred.first()).toHaveCSS("pointer-events", "none");
+    // The sample content is shown in full, with nothing blurred.
+    await expect(page.getByTestId("signed-out-preview").locator('[class*="blur"]')).toHaveCount(0);
 
     // Nothing was fetched on a member's behalf.
     expect(supabaseRequests, "a signed-out preview must not call the database").toEqual([]);
