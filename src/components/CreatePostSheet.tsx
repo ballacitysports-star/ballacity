@@ -13,14 +13,15 @@ import {
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
+import { Link } from "@tanstack/react-router";
 import { ImageUploader } from "@/components/ImageUploader";
 import { DraftWithAi } from "@/components/DraftWithAi";
 import { useAuth } from "@/hooks/use-auth";
 import { createTeamPost } from "@/lib/team-posts.functions";
-import type { PostKind, Sport } from "@/lib/sample-data";
+import type { Sport, TeamPostKind } from "@/lib/sample-data";
 import { POST_KIND_META, toStoredCover } from "@/lib/sample-data";
 
-const KINDS: PostKind[] = ["announcement", "tryout", "pickup", "clinic", "recap"];
+const KINDS: TeamPostKind[] = ["announcement", "tryout", "clinic", "recap"];
 
 export function CreatePostSheet({
   teamId,
@@ -34,7 +35,7 @@ export function CreatePostSheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const [kind, setKind] = useState<PostKind>("announcement");
+  const [kind, setKind] = useState<TeamPostKind>("announcement");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -78,7 +79,7 @@ export function CreatePostSheet({
     },
   });
 
-  const isEvent = kind === "tryout" || kind === "pickup" || kind === "clinic";
+  const isEvent = kind === "tryout" || kind === "clinic";
 
   const onSubmit = () => {
     if (!title.trim()) {
@@ -110,7 +111,7 @@ export function CreatePostSheet({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>New post</DialogTitle>
-          <DialogDescription>Share news, a tryout, pickup, clinic, or recap.</DialogDescription>
+          <DialogDescription>Share news, a tryout, a clinic, or a recap.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -132,6 +133,16 @@ export function CreatePostSheet({
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Running a pickup game? Games are hosted as games and show in the feed.{" "}
+              <Link
+                to="/create"
+                onClick={() => onOpenChange(false)}
+                className="font-semibold text-lime underline"
+              >
+                Host a game
+              </Link>
+            </p>
           </div>
 
           <div>

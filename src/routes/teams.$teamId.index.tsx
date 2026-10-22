@@ -137,7 +137,6 @@ export const Route = createFileRoute("/teams/$teamId/")({
 const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "all", label: "All posts" },
   { key: "tryout", label: "🎯 Tryouts" },
-  { key: "pickup", label: "🏃 Pickups" },
   { key: "clinic", label: "🧠 Clinics" },
   { key: "announcement", label: "📣 News" },
 ];

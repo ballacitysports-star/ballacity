@@ -15,6 +15,11 @@ vi.mock("@/lib/team-posts.functions", () => ({
   }),
   suggestTeamPostDraft: vi.fn(),
 }));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u-1" } }) }));
 vi.mock("@/components/LocationAutocomplete", () => ({ LocationAutocomplete: () => null }));
 vi.mock("@/components/PrimaryCTA", () => ({
@@ -108,5 +113,20 @@ describe("CreatePostSheet cover image", () => {
     publish();
     await waitFor(() => expect(sent.calls).toHaveLength(1));
     expect((sent.calls[0] as { data: { imageUrl: null } }).data.imageUrl).toBeNull();
+  });
+});
+
+describe("CreatePostSheet kinds", () => {
+  it("does not offer Pickup, and points a pickup game to Host a game", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <CreatePostSheet teamId="t1" open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+    for (const k of ["Announcement", "Tryout", "Clinic", "Recap"]) {
+      expect(screen.getByRole("button", { name: new RegExp(k) })).toBeTruthy();
+    }
+    expect(screen.queryByRole("button", { name: /Pickup/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Host a game" }).getAttribute("href")).toBe("/create");
   });
 });
