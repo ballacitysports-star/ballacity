@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { SampleImage } from "@/components/public/SampleImage";
 import { PREVIEW_CONFIGS, type PreviewRow, type PreviewTab } from "@/lib/preview-samples";
 
 /**
@@ -105,7 +106,13 @@ function PreviewListRow({
 }) {
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-      {avatar ? <span className="h-11 w-11 shrink-0 rounded-full bg-secondary" /> : null}
+      {avatar ? (
+        row.sport ? (
+          <SampleImage sport={row.sport} className="h-14 w-14 shrink-0 rounded-xl" />
+        ) : (
+          <span className="h-11 w-11 shrink-0 rounded-full bg-secondary" />
+        )
+      ) : null}
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-foreground">{row.title}</p>
         <p className="text-sm text-muted-foreground">{row.detail}</p>
