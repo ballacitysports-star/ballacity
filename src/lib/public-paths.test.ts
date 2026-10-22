@@ -81,7 +81,7 @@ describe("isSignedOutPublicPath", () => {
     expect(isSignedOutPublicPath("/orgs/x")).toBe(true);
     expect(isSignedOutPublicPath("/feed")).toBe(true);
     // Beneath a tab, and the private pages, stay behind sign-in.
-    for (const p of ["/players/x", "/trainers/x", "/profile/edit", "/messages", "/settings"]) {
+    for (const p of ["/players/x", "/trainers/x", "/profile/edit", "/messages/x", "/settings"]) {
       expect(isSignedOutPublicPath(p)).toBe(false);
     }
   });
@@ -89,7 +89,16 @@ describe("isSignedOutPublicPath", () => {
 
 describe("isSignedOutPreviewPath", () => {
   it("previews each tab, with or without a trailing slash", () => {
-    for (const p of ["/feed", "/players", "/teams", "/trainers", "/reels", "/create", "/profile"]) {
+    for (const p of [
+      "/feed",
+      "/players",
+      "/teams",
+      "/trainers",
+      "/reels",
+      "/messages",
+      "/create",
+      "/profile",
+    ]) {
       expect(isSignedOutPreviewPath(p)).toBe(true);
       expect(isSignedOutPreviewPath(`${p}/`)).toBe(true);
       expect(isSignedOutPublicPath(p)).toBe(true);
@@ -103,7 +112,7 @@ describe("isSignedOutPreviewPath", () => {
       "/players/add",
       "/reels/abc",
       "/notifications",
-      "/messages",
+      "/messages/abc",
       "/settings",
       "/admin",
       "/parent",
@@ -112,6 +121,6 @@ describe("isSignedOutPreviewPath", () => {
       expect(isSignedOutPreviewPath(p)).toBe(false);
     }
     expect(isSignedOutPublicPath("/notifications")).toBe(false);
-    expect(isSignedOutPublicPath("/messages")).toBe(false);
+    expect(isSignedOutPublicPath("/messages/abc")).toBe(false);
   });
 });
