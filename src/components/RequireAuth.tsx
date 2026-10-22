@@ -17,7 +17,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     if (!loading && !user) {
       navigate({
         to: "/auth",
-        search: { next: `${pathname}${searchStr}` } as any,
+        search: { next: `${pathname}${searchStr}` },
         replace: true,
       });
     }
