@@ -609,6 +609,275 @@ export type Database = {
         }
         Relationships: []
       }
+      content_approvals: {
+        Row: {
+          approved_at: string
+          approved_by: string | null
+          destination_page_id: string
+          draft_id: string
+          draft_version: number
+          id: string
+          payload: Json
+          payload_hash: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by?: string | null
+          destination_page_id: string
+          draft_id: string
+          draft_version: number
+          id?: string
+          payload: Json
+          payload_hash: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string | null
+          destination_page_id?: string
+          draft_id?: string
+          draft_version?: number
+          id?: string
+          payload?: Json
+          payload_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_approvals_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "content_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_drafts: {
+        Row: {
+          ai_generated: boolean
+          approval_id: string | null
+          channel: string
+          created_at: string
+          created_by: string | null
+          facts: Json
+          hashtags: string[]
+          id: string
+          kind: string
+          link_url: string | null
+          message: string
+          rejection_reason: string | null
+          source_attribution: string | null
+          source_id: string | null
+          status: string
+          subject_id: string | null
+          subject_type: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          ai_generated?: boolean
+          approval_id?: string | null
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          facts?: Json
+          hashtags?: string[]
+          id?: string
+          kind?: string
+          link_url?: string | null
+          message: string
+          rejection_reason?: string | null
+          source_attribution?: string | null
+          source_id?: string | null
+          status?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          ai_generated?: boolean
+          approval_id?: string | null
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          facts?: Json
+          hashtags?: string[]
+          id?: string
+          kind?: string
+          link_url?: string | null
+          message?: string
+          rejection_reason?: string | null
+          source_attribution?: string | null
+          source_id?: string | null
+          status?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_drafts_approval_fk"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "content_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_drafts_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "content_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_publish_attempts: {
+        Row: {
+          approval_id: string
+          destination_page_id: string
+          draft_id: string
+          error_code: string | null
+          error_message: string | null
+          external_post_id: string | null
+          finished_at: string | null
+          id: string
+          idempotency_key: string
+          started_at: string
+          started_by: string | null
+          status: string
+        }
+        Insert: {
+          approval_id: string
+          destination_page_id: string
+          draft_id: string
+          error_code?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key: string
+          started_at?: string
+          started_by?: string | null
+          status?: string
+        }
+        Update: {
+          approval_id?: string
+          destination_page_id?: string
+          draft_id?: string
+          error_code?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string
+          started_at?: string
+          started_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_publish_attempts_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "content_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_publish_attempts_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "content_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_sources: {
+        Row: {
+          age_group: string | null
+          ai_confidence: number | null
+          city: string | null
+          created_at: string
+          details_verified: Json
+          event_starts_at: string | null
+          id: string
+          linked_subject_id: string | null
+          linked_subject_type: string | null
+          listing_kind: string | null
+          location: string | null
+          normalized_url: string
+          notes: string | null
+          opportunity: string | null
+          org_name: string | null
+          platform: string
+          source_kind: string
+          sport: string | null
+          status: string
+          submitted_by: string | null
+          summary: string | null
+          title: string | null
+          updated_at: string
+          url: string
+          url_host: string
+        }
+        Insert: {
+          age_group?: string | null
+          ai_confidence?: number | null
+          city?: string | null
+          created_at?: string
+          details_verified?: Json
+          event_starts_at?: string | null
+          id?: string
+          linked_subject_id?: string | null
+          linked_subject_type?: string | null
+          listing_kind?: string | null
+          location?: string | null
+          normalized_url: string
+          notes?: string | null
+          opportunity?: string | null
+          org_name?: string | null
+          platform: string
+          source_kind?: string
+          sport?: string | null
+          status?: string
+          submitted_by?: string | null
+          summary?: string | null
+          title?: string | null
+          updated_at?: string
+          url: string
+          url_host: string
+        }
+        Update: {
+          age_group?: string | null
+          ai_confidence?: number | null
+          city?: string | null
+          created_at?: string
+          details_verified?: Json
+          event_starts_at?: string | null
+          id?: string
+          linked_subject_id?: string | null
+          linked_subject_type?: string | null
+          listing_kind?: string | null
+          location?: string | null
+          normalized_url?: string
+          notes?: string | null
+          opportunity?: string | null
+          org_name?: string | null
+          platform?: string
+          source_kind?: string
+          sport?: string | null
+          status?: string
+          submitted_by?: string | null
+          summary?: string | null
+          title?: string | null
+          updated_at?: string
+          url?: string
+          url_host?: string
+        }
+        Relationships: []
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -3580,6 +3849,101 @@ export type Database = {
         }
         Relationships: []
       }
+      social_oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          state_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          state_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          state_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      social_page_connections: {
+        Row: {
+          connected_at: string
+          connected_by: string | null
+          granted_scopes: string[]
+          id: string
+          is_destination: boolean
+          last_checked_at: string | null
+          last_error: string | null
+          page_id: string
+          page_name: string
+          provider: string
+          status: string
+        }
+        Insert: {
+          connected_at?: string
+          connected_by?: string | null
+          granted_scopes?: string[]
+          id?: string
+          is_destination?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          page_id: string
+          page_name: string
+          provider?: string
+          status?: string
+        }
+        Update: {
+          connected_at?: string
+          connected_by?: string | null
+          granted_scopes?: string[]
+          id?: string
+          is_destination?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          page_id?: string
+          page_name?: string
+          provider?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      social_page_tokens: {
+        Row: {
+          connection_id: string
+          token_ciphertext: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          token_ciphertext: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          token_ciphertext?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_page_tokens_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: true
+            referencedRelation: "social_page_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -4771,6 +5135,10 @@ export type Database = {
         Args: { _team: string; _user: string }
         Returns: boolean
       }
+      approve_content_draft: {
+        Args: { _draft: string; _expected_version: number }
+        Returns: string
+      }
       approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
@@ -4783,6 +5151,17 @@ export type Database = {
         Returns: string
       }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
+      begin_content_publish: {
+        Args: { _draft: string; _idempotency_key: string }
+        Returns: {
+          approval_id: string
+          attempt_id: string
+          attempt_status: string
+          created: boolean
+          destination_page_id: string
+          payload: Json
+        }[]
+      }
       blocked_image_paths: {
         Args: never
         Returns: {
@@ -4821,6 +5200,14 @@ export type Database = {
       }
       coach_analytics_enabled: { Args: never; Returns: boolean }
       confirm_device_pairing: { Args: never; Returns: boolean }
+      content_draft_payload: {
+        Args: {
+          _d: Database["public"]["Tables"]["content_drafts"]["Row"]
+          _page: string
+        }
+        Returns: Json
+      }
+      content_payload_hash: { Args: { _payload: Json }; Returns: string }
       create_device_pairing: {
         Args: {
           _child_user_id: string
@@ -4932,6 +5319,16 @@ export type Database = {
       }
       family_share_enabled: { Args: never; Returns: boolean }
       family_team_share_enabled: { Args: never; Returns: boolean }
+      finish_content_publish: {
+        Args: {
+          _attempt: string
+          _error_code: string
+          _error_message: string
+          _external_post_id: string
+          _succeeded: boolean
+        }
+        Returns: undefined
+      }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
@@ -5399,6 +5796,10 @@ export type Database = {
         }
         Returns: number
       }
+      reject_content_draft: {
+        Args: { _draft: string; _reason: string }
+        Returns: undefined
+      }
       release_expired_payment_holds: {
         Args: { _game_id?: string }
         Returns: number
@@ -5490,6 +5891,10 @@ export type Database = {
       }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
+        Returns: undefined
+      }
+      set_content_destination_page: {
+        Args: { _connection: string }
         Returns: undefined
       }
       set_game_hidden_from_org: {
