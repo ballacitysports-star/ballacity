@@ -148,6 +148,27 @@
       "when": 1792114120561,
       "tag": "0020_add_post_text_moderation_status",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792690431564,
+      "tag": "0021_freeze_payment_claim_metadata_on_dispute",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792690492162,
+      "tag": "0022_listing_discovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792690606594,
+      "tag": "0023_content_studio",
+      "breakpoints": true
     }
   ]
 }
