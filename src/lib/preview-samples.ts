@@ -180,8 +180,8 @@ function buildRows(now: Date) {
     {
       title: "Sample FC",
       sport: "Soccer",
-      detail: `Open pickup, one short for 7-v-7 · ${next(SUN)} · 5:00 PM · Sample Fields. Show up, get a bib, play. No commitment and no sign-up fee.`,
-      chips: ["Pickup", "1 open spot", "$5"],
+      detail: `Spring season sign-ups for our adult 7-v-7 side · register by ${next(FRI)} · first game ${next(SUN)} · 5:00 PM · Sample Fields. Ten games, jersey included.`,
+      chips: ["Season sign-ups", "1 open spot", "$85 / season"],
     },
     {
       title: "Sample Spikers",
@@ -198,8 +198,8 @@ function buildRows(now: Date) {
     {
       title: "Sample Runners",
       sport: "Running",
-      detail: `Weekly group run · ${next(WED)} · 6:00 PM · Sample Trail. Easy 5K at a conversational pace, with a coffee stop after.`,
-      chips: ["Group run", "5 open spots", "Free"],
+      detail: `Open membership for our adult running club · welcome night ${next(WED)} · 6:00 PM · Sample Trail. Members get a training plan and race-day meetups.`,
+      chips: ["Membership", "5 open spots", "$12 / month"],
     },
     {
       title: "Sample Pitchers",
@@ -210,8 +210,8 @@ function buildRows(now: Date) {
     {
       title: "Sample Gridiron",
       sport: "Football",
-      detail: `Scrimmage against another local team · ${next(SUN)} · 1:00 PM · Sample Field. We need two linemen and a kicker; pads are not required.`,
-      chips: ["Scrimmage", "3 open spots", "$10"],
+      detail: `Looking for two linemen and a kicker for the fall flag season · meet the coaches ${next(SUN)} · 1:00 PM · Sample Field. Pads are not required.`,
+      chips: ["Positions open", "3 open spots", "$10"],
     },
   ].map((r, i) => ({ ...r, person: `Captain ${person(i + 1)}` }));
 
