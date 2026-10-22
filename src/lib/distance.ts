@@ -78,3 +78,38 @@ export function formatDistanceFromKm(
   const value = unit === "km" ? valueKm : valueKm / KM_PER_MI;
   return `${value.toFixed(decimals)} ${unit}`;
 }
+
+/**
+ * Stops on the distance slider, in the viewer's unit. Dense where people
+ * choose (a few miles to a few dozen), sparse further out; the last stop is
+ * "any distance". A fixed table, so a value maps to a stop and back exactly.
+ */
+export const DISTANCE_SLIDER_STOPS = [
+  1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500,
+] as const;
+
+/** Slider position for a limit in miles; the last position means any distance. */
+export function distanceSliderIndex(
+  valueMi: number | null | undefined,
+  unit: DistanceUnit,
+): number {
+  const any = DISTANCE_SLIDER_STOPS.length;
+  if (valueMi == null || Number.isNaN(valueMi) || valueMi <= 0) return any;
+  if (valueMi >= MAX_DISTANCE_MI) return any;
+  const inUnit = unit === "km" ? valueMi * KM_PER_MI : valueMi;
+  let best = 0;
+  for (let i = 1; i < DISTANCE_SLIDER_STOPS.length; i++) {
+    if (
+      Math.abs(DISTANCE_SLIDER_STOPS[i] - inUnit) < Math.abs(DISTANCE_SLIDER_STOPS[best] - inUnit)
+    )
+      best = i;
+  }
+  return best;
+}
+
+/** The limit in miles for a slider position, or null for any distance. */
+export function distanceFromSliderIndex(index: number, unit: DistanceUnit): number | null {
+  const stop = DISTANCE_SLIDER_STOPS[Math.round(index)];
+  if (stop == null) return null;
+  return unit === "km" ? stop / KM_PER_MI : stop;
+}

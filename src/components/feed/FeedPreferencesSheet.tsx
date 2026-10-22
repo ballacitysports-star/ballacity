@@ -4,7 +4,7 @@ import { Bookmark, BookmarkPlus, Check, Trash2, X } from "lucide-react";
 import { FilterSection } from "@/components/FilterSheet";
 import { SortSection } from "@/components/filters/SortSection";
 import { SPORTS, type Sport } from "@/lib/sample-data";
-import { distancePresets } from "@/lib/distance";
+import { DistanceSlider } from "@/components/DistanceSlider";
 import {
   useFeedPrefs,
   setFeedPrefs,
@@ -190,7 +190,6 @@ export function FeedPreferencesBody() {
   const profile = useMyProfile();
   const hasCity = Boolean(profile?.city?.trim());
   const unit = useDistanceUnit();
-  const presets = distancePresets(unit);
   const sections = prefs.sections;
 
   /** Any filter edit drops the "unchanged saved view" link unless it matches again. */
@@ -279,34 +278,12 @@ export function FeedPreferencesBody() {
             to filter by distance.
           </p>
         )}
-        <div className={`flex flex-wrap gap-2 ${hasCity ? "" : "pointer-events-none opacity-50"}`}>
-          <button
-            onClick={() => patch({ maxDistanceMi: null })}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-              prefs.maxDistanceMi == null
-                ? "border-lime bg-lime text-primary-foreground"
-                : "border-border bg-surface"
-            }`}
-          >
-            Any
-          </button>
-          {presets.map(({ mi, label }) => {
-            const active = prefs.maxDistanceMi != null && Math.abs(prefs.maxDistanceMi - mi) < 0.01;
-            return (
-              <button
-                key={label}
-                onClick={() => patch({ maxDistanceMi: mi })}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  active
-                    ? "border-lime bg-lime text-primary-foreground"
-                    : "border-border bg-surface"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <DistanceSlider
+          valueMi={prefs.maxDistanceMi}
+          onChange={(mi) => patch({ maxDistanceMi: mi })}
+          unit={unit}
+          disabled={!hasCity}
+        />
       </FilterSection>
 
       <FilterSection label="Narrow results · Price">
