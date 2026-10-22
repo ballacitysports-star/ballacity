@@ -21,15 +21,17 @@ describe("privacyBandFor", () => {
 
 describe("band copy", () => {
   it("states the agreed line for each age group", () => {
-    expect(BAND_COPY.under_13.summary).toBe("Private to your family and approved team spaces. Never public.");
+    expect(BAND_COPY.under_13.summary).toBe(
+      "Private to your family and approved team spaces. Never public.",
+    );
     expect(BAND_COPY.teen_13_15.summary).toBe(
       "Private by default. A verified guardian may share with approved teams and coaches. Not shown publicly.",
     );
     expect(BAND_COPY.teen_16_17.summary).toBe(
-      "Visible to signed-in BallaCity members when shared. Public discovery is off.",
+      "Private by default. Approved followers can watch if you allow it. Never public.",
     );
     expect(BAND_COPY.adult.summary).toBe(
-      "Private until you post. Posted reels appear on your profile and public Highlights.",
+      "Private until you post. By default posted reels are public; you can limit them to followers.",
     );
   });
 
@@ -40,7 +42,9 @@ describe("band copy", () => {
       expect(all).not.toContain("signed-in members");
     }
     expect(BAND_COPY.teen_13_15.never.join(" ")).toContain("Share links");
-    expect(TEEN_RESTRICTION).toBe("This reel will not appear on public profiles, search, or Highlights.");
+    expect(TEEN_RESTRICTION).toBe(
+      "This reel will not appear on public profiles, search, or Highlights.",
+    );
   });
 });
 
@@ -53,7 +57,9 @@ describe("teen reel options", () => {
     expect(teenReelState({})).toBe("guardian");
     expect(teenReelState({ team_share_team_id: "T1" })).toBe("guardian");
     expect(teenReelState({ guardian_team_approved_by: "g" })).toBe("guardian");
-    expect(teenReelState({ team_share_team_id: "T1", guardian_team_approved_by: "g" })).toBe("team");
+    expect(teenReelState({ team_share_team_id: "T1", guardian_team_approved_by: "g" })).toBe(
+      "team",
+    );
   });
 });
 

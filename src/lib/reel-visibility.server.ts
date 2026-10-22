@@ -11,8 +11,9 @@ import { createClient } from "@supabase/supabase-js";
  *
  * The client bearer attacher sends an Authorization header on every server-fn
  * call, so a signed-in visitor can be recognised here — but a missing or
- * invalid token is not an error, it simply means "anonymous". Reels from
- * 16-17 year olds ('members' audience) are only shown when this returns an id.
+ * invalid token is not an error, it simply means "anonymous". The id is passed to
+ * the SQL readers, which decide what that person may watch (public reels, and
+ * followers-only reels from people they follow).
  */
 export async function optionalSupabaseUserId(): Promise<string | null> {
   try {
@@ -43,13 +44,13 @@ export async function optionalSupabaseUserId(): Promise<string | null> {
  */
 export async function eligibleFeedReelIds(
   admin: any,
-  args: { cursor: string | null; sport: string | null; limit: number; includeMembers: boolean },
+  args: { cursor: string | null; sport: string | null; limit: number; viewerId: string | null },
 ): Promise<string[]> {
   const { data, error } = await admin.rpc("public_reel_feed_ids", {
     _cursor: args.cursor,
     _sport: args.sport,
     _limit: args.limit,
-    _include_members: args.includeMembers,
+    _viewer: args.viewerId,
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as any[]).map((r) => String(r.id));
@@ -58,12 +59,12 @@ export async function eligibleFeedReelIds(
 /** Ids of one user's reels the caller may see, newest first. */
 export async function eligibleUserReelIds(
   admin: any,
-  args: { userId: string; limit: number; includeMembers: boolean },
+  args: { userId: string; limit: number; viewerId: string | null },
 ): Promise<string[]> {
   const { data, error } = await admin.rpc("public_user_reel_ids", {
     _user_id: args.userId,
     _limit: args.limit,
-    _include_members: args.includeMembers,
+    _viewer: args.viewerId,
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as any[]).map((r) => String(r.id));

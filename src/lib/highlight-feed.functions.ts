@@ -58,14 +58,14 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
 
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
-    // Age-cohort gate lives in SQL: children and locked child accounts are
-    // never returned, and 16-17 year olds only for signed-in viewers.
+    // The audience gate lives in SQL: children and locked child accounts are
+    // never returned, and a followers-only reel only for someone who follows.
     const viewerId = await optionalSupabaseUserId();
     const ids = await eligibleFeedReelIds(supabaseAdmin, {
       cursor: data.cursor,
       sport: data.sport,
       limit: data.limit + 1,
-      includeMembers: viewerId !== null,
+      viewerId,
     });
     if (ids.length === 0) return { items: [] as HighlightFeedItem[], nextCursor: null };
 
@@ -196,7 +196,7 @@ export const listHighlightFeedSports = createServerFn({ method: "GET" }).handler
   const { data, error } = await supabaseAdmin.rpc(
     "public_reel_feed_sports" as never,
     {
-      _include_members: viewerId !== null,
+      _viewer: viewerId,
     } as never,
   );
   if (error) throw new Error(error.message);

@@ -38,6 +38,7 @@ SELECT t.eq(
       'private_sec.guardian_public_profile(_user uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
       'private_sec.reel_publicly_visible(_reel_id uuid)',
+      'private_sec.reel_thread_allowed(_subject_type text, _subject_id text)',
       'private_sec.roster_row_visible(_team_id text, _member_user_id uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',

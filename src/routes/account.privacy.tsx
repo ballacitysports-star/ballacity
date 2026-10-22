@@ -2,7 +2,16 @@ import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { isLegalReviewed } from "@/lib/legal-review";
 import { BackHeader } from "@/components/layout/BackHeader";
-import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2, UserCheck } from "lucide-react";
+import {
+  Clapperboard,
+  Download,
+  Eye,
+  MapPin,
+  MessageSquare,
+  Sparkles,
+  Trash2,
+  UserCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";
@@ -17,12 +26,17 @@ import {
   CONTACT_SCOPE_OPTIONS,
   LOCATION_PRECISION_OPTIONS,
   PROFILE_VISIBILITY_OPTIONS,
+  REEL_AUDIENCE_OPTIONS,
+  reelAudienceChoices,
+  shownReelAudience,
   useMyPrivacy,
   type ContactScope,
   type LocationPrecision,
   type PrivacyPreferences,
   type ProfileVisibility,
+  type ReelAudience,
 } from "@/lib/privacy";
+import { useMyAgeCohort } from "@/lib/my-age-cohort";
 import {
   AVATAR_VISIBILITY_OPTIONS,
   DEFAULT_AVATAR_VISIBILITY,
@@ -98,6 +112,8 @@ function PrivacySettingsPage() {
   const avatar = useAvatarVisibility();
   const { category } = useMyAgeCategory();
   const isMinor = isMinorCategory(category);
+  const { cohort, loading: cohortLoading } = useMyAgeCohort();
+  const reelChoices = reelAudienceChoices(cohort);
 
   const save = async (patch: Partial<PrivacyPreferences>) => {
     try {
@@ -225,6 +241,41 @@ function PrivacySettingsPage() {
             }
           />
         </SettingsGroup>
+
+        {cohortLoading ? null : (
+          <SettingsGroup title="Reels">
+            <SettingsStaticRow icon={Clapperboard} label="Who can watch your reels" />
+            {reelChoices.length === 0 ? (
+              <SettingsStaticRow>
+                <p className="text-xs text-muted-foreground">
+                  Your reels are private. A parent or guardian decides who else can watch them, and
+                  they are never shown on public Highlights.
+                </p>
+              </SettingsStaticRow>
+            ) : (
+              <>
+                <SettingsStaticRow>
+                  <OptionList
+                    name="Who can watch your reels"
+                    value={shownReelAudience(prefs.reel_audience, cohort)}
+                    options={REEL_AUDIENCE_OPTIONS.filter((o) => reelChoices.includes(o.value))}
+                    disabled={isLoading || saving}
+                    onChange={(v: ReelAudience) => save({ reel_audience: v })}
+                  />
+                </SettingsStaticRow>
+                {cohort === "teen_16_17" ? (
+                  <SettingsStaticRow>
+                    <p className="text-xs text-muted-foreground">
+                      Reels from 16 and 17-year-olds are never public. An adult who follows you also
+                      has to share a team with you to watch, and your parent or guardian can always
+                      watch.
+                    </p>
+                  </SettingsStaticRow>
+                ) : null}
+              </>
+            )}
+          </SettingsGroup>
+        )}
 
         <SettingsGroup title="Location">
           <SettingsStaticRow icon={MapPin} label="How your location is shared" />

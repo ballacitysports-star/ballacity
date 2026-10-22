@@ -738,10 +738,10 @@ export const setReelsHidden = createServerFn({ method: "POST" })
  * player card. Signed URLs are minted server-side because the storage bucket
  * only allows owners to read objects directly.
  *
- * The age-cohort audience gate is applied in SQL (`public_user_reel_ids`, which
- * uses `public.reel_audience`): reels from children and locked child accounts
- * are never returned, and reels from 16-17 year olds only for signed-in
- * viewers — matching the "Anyone can view visible completed reels" policy.
+ * The audience gate is applied in SQL (`public_user_reel_ids`, which uses
+ * `public.reel_visible_to`): reels from children and locked child accounts are
+ * never returned, a followers-only or private reel only for someone it is open
+ * to — matching the "Anyone can view visible completed reels" policy.
  */
 export const listPublicReels = createServerFn({ method: "GET" })
   .inputValidator((input: { userId: string }) => {
@@ -761,7 +761,7 @@ export const listPublicReels = createServerFn({ method: "GET" })
     const ids = await eligibleUserReelIds(supabaseAdmin, {
       userId: data.userId,
       limit: 12,
-      includeMembers: viewerId !== null,
+      viewerId,
     });
     if (ids.length === 0) return [];
 

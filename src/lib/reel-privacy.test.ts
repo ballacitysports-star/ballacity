@@ -14,16 +14,27 @@ describe("reelPrivacyFor", () => {
   });
   it("16-17 and adults get no guardian selector", () => {
     expect(reelPrivacyFor("teen_16_17").options).toHaveLength(0);
-    expect(reelPrivacyFor("adult").summary).toContain("public Highlights");
+    expect(reelPrivacyFor("adult").detail).toContain("public Highlights");
   });
 });
 
 describe("adult reel privacy copy", () => {
-  it("describes drafts and public posts only, with no team-only or members option", () => {
+  it("describes drafts, public posts and the followers choice, with no team-only or members option", () => {
     const p = reelPrivacyFor("adult");
     const text = `${p.summary} ${p.detail}`.toLowerCase();
     expect(text).toContain("public");
+    expect(text).toContain("followers");
     expect(text).not.toContain("team-only");
-    expect(text).not.toContain("members");
+    expect(text).not.toContain("signed-in");
+  });
+});
+
+describe("16-17 reel privacy copy", () => {
+  it("says never public and no longer promises every signed-in member", () => {
+    const p = reelPrivacyFor("teen_16_17");
+    const text = `${p.summary} ${p.detail}`.toLowerCase();
+    expect(text).toContain("never public");
+    expect(text).toContain("followers");
+    expect(text).not.toContain("signed-in members when shared");
   });
 });

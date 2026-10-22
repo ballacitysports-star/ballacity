@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
  */
 
 export type ProfileVisibility = "public" | "members" | "private";
+/** Who can watch your posted reels. Minors have fewer choices; the database enforces it. */
+export type ReelAudience = "public" | "followers" | "private";
 export type LocationPrecision = "approximate" | "city" | "hidden";
 export type ContactScope = "everyone" | "shared" | "nobody";
 
@@ -21,6 +23,8 @@ export type PrivacyPreferences = {
    * Always on for anyone under 18; the database enforces that, this only reflects it.
    */
   require_follow_approval: boolean;
+  /** Who can watch your posted reels: everyone, your followers, or only you. */
+  reel_audience: ReelAudience;
   location_precision: LocationPrecision;
   show_sports: boolean;
   show_games_played: boolean;
@@ -42,6 +46,7 @@ export type PrivacyPreferences = {
 export const DEFAULT_PRIVACY: PrivacyPreferences = {
   profile_visibility: "public",
   require_follow_approval: false,
+  reel_audience: "public",
   location_precision: "approximate",
   show_sports: true,
   show_games_played: true,
@@ -75,6 +80,50 @@ export const PROFILE_VISIBILITY_OPTIONS: Array<{
     description: "Your profile is hidden from everyone else. You can still join games.",
   },
 ];
+
+export const REEL_AUDIENCE_OPTIONS: Array<{
+  value: ReelAudience;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "public",
+    label: "Everyone",
+    description:
+      "Anyone, including visitors without an account, can watch. Shown on public Highlights.",
+  },
+  {
+    value: "followers",
+    label: "Followers",
+    description: "Only people you have approved as followers can watch.",
+  },
+  {
+    value: "private",
+    label: "Only me",
+    description: "Only you can watch your reels.",
+  },
+];
+
+/**
+ * The choices an age group is offered. Under 16 has none: reels are private and a
+ * guardian decides. 16-17 is never public. The database enforces all of this; this
+ * only decides what to show.
+ */
+export function reelAudienceChoices(cohort: string | null | undefined): ReelAudience[] {
+  if (cohort === "child_under_13" || cohort === "teen_13_15") return [];
+  if (cohort === "teen_16_17") return ["followers", "private"];
+  return ["public", "followers", "private"];
+}
+
+/** What to show as selected: a minor's stored value can lag the floor the database applies. */
+export function shownReelAudience(
+  stored: ReelAudience,
+  cohort: string | null | undefined,
+): ReelAudience {
+  const choices = reelAudienceChoices(cohort);
+  if (choices.length === 0) return "private";
+  return choices.includes(stored) ? stored : "private";
+}
 
 export const LOCATION_PRECISION_OPTIONS: Array<{
   value: LocationPrecision;

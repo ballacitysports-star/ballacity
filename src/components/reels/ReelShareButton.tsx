@@ -4,11 +4,13 @@ import { ShareSheet } from "@/components/ShareSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { publicReelPath, reelDownloadName } from "@/lib/social-share";
 import { useMyCohort } from "@/lib/youth-features";
+import { useMyPrivacy } from "@/lib/privacy";
 
 /**
- * Share a posted reel via its public page. Only shown to adults: the page itself
- * serves only reels whose reel_audience() is 'public' (server-side), so this is a
- * convenience, not the gate.
+ * Share a posted reel via its public page. Only shown to adults whose reels are public:
+ * the page itself serves only reels whose reel_audience() is 'public' (server-side), so
+ * this is a convenience, not the gate. A followers-only or private account has nothing
+ * a link could open.
  * Never rendered for family clips — the caller checks subject_child_id.
  *
  * Download is offered here, on the owner's own reel, and never on the public page.
@@ -30,8 +32,9 @@ export function ReelShareButton({
   videoPath: string | null;
 }) {
   const { cohort } = useMyCohort();
+  const { prefs } = useMyPrivacy();
   const [open, setOpen] = useState(false);
-  if (cohort !== "adult") return null;
+  if (cohort !== "adult" || prefs.reel_audience !== "public") return null;
 
   const download = async () => {
     if (!videoPath) throw new Error("This reel has no video to download");

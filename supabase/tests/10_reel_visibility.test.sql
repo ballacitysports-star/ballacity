@@ -4,7 +4,8 @@
 -- member can actually read through the table.
 --
 --   adult         draft: nobody else.  Posted: everyone, signed in or not.
---   16-17         posted reels: signed-in members only, never anonymous.
+--   16-17         never public. Private by default; followers only if they choose
+--                 (see 120_reel_audience.test.sql).
 --   13-15         never public; the guardian-approved team path is in
 --                 20_teen_team_sharing.test.sql.
 --   under 13      never public.
@@ -20,7 +21,7 @@ SELECT t.reel('adultowner', 'adult'), t.reel('teenold', 'teenold'),
        t.reel('teenmid', 'teenmid'), t.reel('kidyoung', 'kid');
 
 SELECT t.eq(public.reel_audience(t.id('reel-adult')), 'public', 'adult posted reel is public');
-SELECT t.eq(public.reel_audience(t.id('reel-teenold')), 'members', '16-17 posted reel is members only');
+SELECT t.eq(public.reel_audience(t.id('reel-teenold')), 'private', '16-17 posted reel is private by default');
 SELECT t.eq(public.reel_audience(t.id('reel-teenmid')), 'none', '13-15 reel is never public');
 SELECT t.eq(public.reel_audience(t.id('reel-kid')), 'none', 'under-13 reel is never public');
 
@@ -54,7 +55,7 @@ SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel
 
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-adult'')'), 1, 'a signed-in stranger sees the adult reel');
-SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-teenold'')'), 1, 'a signed-in stranger sees the 16-17 reel');
+SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-teenold'')'), 0, 'a signed-in stranger does not see the 16-17 reel');
 SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-teenmid'')'), 0, 'a signed-in stranger does not see the 13-15 reel');
 SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-kid'')'), 0, 'a signed-in stranger does not see the under-13 reel');
 SELECT t.eq(t.count('SELECT 1 FROM public.highlight_reels WHERE id = t.id(''reel-family'')'), 0, 'a signed-in stranger does not see a family clip');

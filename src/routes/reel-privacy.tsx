@@ -75,6 +75,10 @@ function ReelPrivacyPage() {
             team, or the viewer leaves the team, access stops straight away.
           </li>
           <li>For players under 13, a parent adds clips to their own reels, and they are never public.</li>
+          <li>
+            Players aged 16 and 17 are never public. They can let followers they have approved watch. An adult
+            follower also has to share a team with them, and their parent or guardian can always watch.
+          </li>
         </ul>
 
         <h2 className="pt-3 font-display text-base font-bold">Moderation and safety</h2>

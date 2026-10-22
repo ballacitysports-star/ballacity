@@ -61,23 +61,35 @@ export const BAND_COPY: Record<PrivacyBand, BandCopy> = {
     never: [
       "Public profiles, search or the highlights feed",
       "All signed-in members",
+      "Followers",
       "Share links",
     ],
   },
   teen_16_17: {
     band: "teen_16_17",
     ageLabel: "16 to 17",
-    summary: "Visible to signed-in BallaCity members when shared. Public discovery is off.",
-    audiences: ["Signed-in BallaCity members, once you post the reel.", "You, always."],
-    never: ["Anonymous visitors", "Search engines", "Public discovery"],
+    summary: "Private by default. Approved followers can watch if you allow it. Never public.",
+    audiences: [
+      "You, always, and your verified parent or guardian.",
+      "If you choose Followers: people you have approved who follow you. An adult follower also has to share a team with you.",
+    ],
+    never: [
+      "Anonymous visitors",
+      "All signed-in members",
+      "Public Highlights or discovery",
+      "Search engines",
+    ],
   },
   adult: {
     band: "adult",
     ageLabel: "18 and over",
-    summary: "Private until you post. Posted reels appear on your profile and public Highlights.",
+    summary:
+      "Private until you post. By default posted reels are public; you can limit them to followers.",
     audiences: [
       "Drafts: only you.",
-      "Posted reels: anyone, on your profile and the public Highlights feed.",
+      "Everyone (the default): anyone, on your profile and the public Highlights feed.",
+      "Followers: only people you have approved as followers.",
+      "Only me: only you.",
     ],
     never: [],
   },

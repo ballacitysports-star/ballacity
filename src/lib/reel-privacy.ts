@@ -3,13 +3,7 @@
  * database (reel_audience / family_post_viewer_access) stays the authority.
  */
 export type ReelPrivacyCohort =
-  | "child_under_13"
-  | "teen_13_15"
-  | "teen_16_17"
-  | "adult"
-  | "unknown"
-  | null
-  | undefined;
+  "child_under_13" | "teen_13_15" | "teen_16_17" | "adult" | "unknown" | null | undefined;
 
 export interface ReelPrivacyInfo {
   summary: string;
@@ -29,8 +23,7 @@ export function reelPrivacyFor(
       summary: under13
         ? "Private to your family and approved team spaces. Never public."
         : "Private by default. A verified guardian may share with approved teams and coaches. Not shown publicly.",
-      detail:
-        "This reel will not appear on public profiles, search, or Highlights.",
+      detail: "This reel will not appear on public profiles, search, or Highlights.",
       options: [
         { label: "Guardian only", note: "Default", locked: false, isDefault: true },
         {
@@ -45,17 +38,19 @@ export function reelPrivacyFor(
   }
   if (cohort === "teen_16_17") {
     return {
-      summary: "Visible to signed-in BallaCity members when shared. Public discovery is off.",
-      detail: "Your reel won't appear for signed-out visitors or in public search.",
+      summary: "Private by default. Approved followers can watch if you allow it. Never public.",
+      detail:
+        "Your reel won't appear for signed-out visitors, in public search, or on public Highlights. You can let followers you've approved watch from Privacy settings.",
       options: [],
       guardianControlled: false,
     };
   }
   return {
-    // Adults have two states today: a draft only they can see, and a posted reel
-    // that is public. Say exactly that; there is no team-only or members choice.
-    summary: "Private until you post. Posted reels appear on your profile and public Highlights.",
-    detail: "Drafts are visible only to you. Once you post a reel, anyone can see it on your profile and public Highlights.",
+    // Adults choose in Privacy settings: everyone (the default), followers, or only them.
+    summary:
+      "Private until you post. By default posted reels are public; you can limit them to followers.",
+    detail:
+      "Drafts are visible only to you. By default a posted reel appears on your profile and public Highlights. In Privacy settings you can limit your reels to your followers, or to only you.",
     options: [],
     guardianControlled: false,
   };
