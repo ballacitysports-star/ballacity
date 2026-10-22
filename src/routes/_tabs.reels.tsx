@@ -104,6 +104,7 @@ import { FamilyPostAudience } from "@/components/reels/FamilyPostAudience";
 import { ReelPrivacyPanel } from "@/components/reels/ReelPrivacyPanel";
 import { useMyCohort } from "@/lib/youth-features";
 import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 export const Route = createFileRoute("/_tabs/reels")({
   // `child` is optional so the existing links to this page need no change.
@@ -122,8 +123,17 @@ export const Route = createFileRoute("/_tabs/reels")({
       description: "Turn your game footage into AI-edited highlight reels you can share.",
       noindex: true,
     }),
-  component: ReelsPage,
+  component: ReelsPageGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function ReelsPageGate() {
+  return (
+    <PreviewGate tab="reels">
+      <ReelsPage />
+    </PreviewGate>
+  );
+}
 
 type Reel = {
   id: string;

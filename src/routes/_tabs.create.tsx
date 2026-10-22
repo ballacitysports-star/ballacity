@@ -75,6 +75,7 @@ import { recordSafetyAck } from "@/lib/safety-acks";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -96,8 +97,17 @@ export const Route = createFileRoute("/_tabs/create")({
         : undefined,
     kind: isFacilityEventKind(search.kind) ? search.kind : undefined,
   }),
-  component: Create,
+  component: CreateGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function CreateGate() {
+  return (
+    <PreviewGate tab="create">
+      <Create />
+    </PreviewGate>
+  );
+}
 
 function Create() {
   const nav = useNavigate();

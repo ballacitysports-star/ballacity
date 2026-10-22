@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
-import { isSignedOutPublicPath } from "@/lib/public-paths";
+import { isSignedOutPreviewPath, isSignedOutPublicPath } from "@/lib/public-paths";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { StaffBar } from "@/components/staff/StaffBar";
@@ -914,7 +914,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <>
         <ManagedSessionBanner />
         {children}
-        {user && <BottomNav />}
+        {(user || isSignedOutPreviewPath(pathname)) && <BottomNav />}
       </>
     );
   }

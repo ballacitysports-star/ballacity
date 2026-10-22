@@ -74,6 +74,7 @@ import { ChannelTabs } from "@/components/profile/ChannelTabs";
 import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow";
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -86,8 +87,17 @@ export const Route = createFileRoute("/_tabs/profile")({
     }),
   // URL-persisted requests filter (all/host/player).
   validateSearch: zodValidator(z.object({ req: fallback(z.string(), "").default("") })),
-  component: ProfileRoute,
+  component: ProfileRouteGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function ProfileRouteGate() {
+  return (
+    <PreviewGate tab="profile">
+      <ProfileRoute />
+    </PreviewGate>
+  );
+}
 
 /**
  * The Profile tab follows the account's active profile: the personal player

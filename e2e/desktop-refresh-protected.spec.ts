@@ -87,16 +87,18 @@ for (const route of PROTECTED_ROUTES) {
 test("signed-out refresh on a protected route still redirects to /auth", async ({ page }) => {
   test.skip(!STORAGE_KEY, "Requires the managed auth storage key.");
   // Sanity check: the guard should still send unauthenticated users to
-  // /auth?next=/feed. This ensures the "stay on page" fix didn't over-correct.
+  // /auth?next=/notifications. This ensures the "stay on page" fix didn't
+  // over-correct. (/feed is not used here: a signed-out visitor now gets a
+  // blurred sample preview of it, see SignedOutPreview.)
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate((key) => window.localStorage.removeItem(key!), STORAGE_KEY!);
 
-  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 15_000 });
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/notifications(?:\?|$)/);
 });
 
 test("unusable persisted session exits the loader and redirects to sign-in", async ({ page }) => {
@@ -115,10 +117,10 @@ test("unusable persisted session exits the loader and redirects to sign-in", asy
     await route.abort("failed");
   });
 
-  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 15_000 });
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/notifications(?:\?|$)/);
 });

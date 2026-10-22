@@ -1,8 +1,18 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, Shield, Clapperboard, Heart, CalendarDays, ShieldCheck } from "lucide-react";
+import {
+  Home,
+  Users,
+  Shield,
+  Clapperboard,
+  Heart,
+  CalendarDays,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useAuth } from "@/hooks/use-auth";
 
 type NavItem = {
   to: string;
@@ -32,14 +42,18 @@ const presentation: Record<string, Pick<NavItem, "icon" | "render">> = {
   },
 };
 
+/** The profile tab for a signed-out visitor, who has no avatar to load. */
+const signedOutProfile: Pick<NavItem, "icon"> = { icon: UserRound };
+
 export function BottomNav() {
   const { pathname } = useLocation();
   const { isParentMode } = useParentMode();
+  const { user } = useAuth();
   const items: NavItem[] = tabsForMode(isParentMode).map((tab) => ({
     to: tab.to,
     label: tab.label,
     match: tab.match,
-    ...presentation[tab.to],
+    ...(tab.to === "/profile" && !user ? signedOutProfile : presentation[tab.to]),
   }));
 
   const PUBLIC_PATHS = ["/auth", "/reset-password"];
