@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -23,12 +24,26 @@ function publicClient() {
   });
 }
 
+/**
+ * The caller's own client when they are signed in, otherwise the anonymous one.
+ * A post's author and its team's managers can see posts the public cannot (one
+ * still being screened, one they hid); the database decides, not this code.
+ */
+function viewerClient() {
+  const bearer = getRequest()?.headers.get("authorization");
+  if (!bearer?.startsWith("Bearer ")) return publicClient();
+  return createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: bearer } },
+  });
+}
+
 const PostKind = z.enum(["tryout", "pickup", "clinic", "announcement", "recap"]);
 
 export const listTeamPosts = createServerFn({ method: "GET" })
   .inputValidator((input) => z.object({ teamId: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
-    const sb = publicClient();
+    const sb = viewerClient();
     const { data: rows, error } = await sb
       .from("team_posts" as any)
       .select("*")

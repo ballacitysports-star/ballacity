@@ -42,6 +42,7 @@ import { SignTeamWaiverCard } from "@/components/team/SignTeamWaiverCard";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
+import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
 
 import { GameCard } from "@/components/GameCard";
@@ -205,6 +206,7 @@ function SignedInTeam({ teamId, loaded }: { teamId: string; loaded: Org | null }
 }
 
 function TeamPage({ org }: { org: Org }) {
+  const { user } = useAuth();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab: "posts" | "roster" | "about" | "games" =
@@ -264,6 +266,9 @@ function TeamPage({ org }: { org: Org }) {
             : undefined,
         pinned: !!r.pinned,
         imageUrl: r.image_url ? resolveSportAsset(String(r.image_url)) : undefined,
+        authorId: r.author_id ?? undefined,
+        ownerHidden: !!r.owner_hidden_at,
+        moderatorHidden: !!r.moderator_hidden_at,
       })),
     [postsQuery.data],
   );
@@ -482,6 +487,12 @@ function TeamPage({ org }: { org: Org }) {
           </div>
         )}
 
+        {(canEdit || canManage) && (
+          <div className="mt-4">
+            <ListingVisibilityToggle kind="team" id={org.id} />
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
           {(["posts", "roster", "about", "games"] as const).map((t) => (
@@ -542,6 +553,24 @@ function TeamPage({ org }: { org: Org }) {
                 posts.map((p, i) => (
                   <div key={p.id} className="relative">
                     <PostCard post={p} index={i} onClick={() => setOpenPost(p)} />
+                    {p.ownerHidden || p.moderatorHidden ? (
+                      <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
+                        {p.moderatorHidden ? "Hidden by moderators" : "Hidden from public"}
+                      </span>
+                    ) : null}
+                    {(canEdit || p.authorId === user?.id) && (
+                      <div className="absolute top-3 right-12">
+                        <ListingVisibilityToggle
+                          kind="post"
+                          id={p.id}
+                          variant="icon"
+                          state={{
+                            ownerHidden: !!p.ownerHidden,
+                            moderatorHidden: !!p.moderatorHidden,
+                          }}
+                        />
+                      </div>
+                    )}
                     {canEdit && (
                       <button
                         onClick={() => {
@@ -736,9 +765,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
         {icon}
         {value}
       </div>
-      <div className="micro-label text-muted-foreground mt-0.5">
-        {label}
-      </div>
+      <div className="micro-label text-muted-foreground mt-0.5">{label}</div>
     </div>
   );
 }

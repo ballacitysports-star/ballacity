@@ -7,6 +7,7 @@ import { ParentCenterSection } from "@/components/child/ParentCenterSection";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Bell,
+  EyeOff,
   Building2,
   ChevronRight,
   CreditCard,
@@ -116,6 +117,12 @@ const SECTIONS: Section[] = [
   {
     title: "Preferences",
     items: [
+      {
+        to: "/account/hidden",
+        label: "Hidden listings",
+        description: "Games, posts, teams, profiles and gyms you hid",
+        icon: EyeOff,
+      },
       {
         to: "/account/notifications",
         label: "Notifications",
