@@ -1,13 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
+import { SampleImage } from "@/components/public/SampleImage";
 import { formatWhen } from "@/lib/format";
 import { listingCount, type CityListings } from "@/lib/city-seo";
 import { cityLabel, type LaunchCity } from "@/lib/launch-cities";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
 
 const card =
-  "block rounded-2xl border border-border bg-surface px-4 py-3 transition-colors hover:border-lime/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 transition-colors hover:border-lime/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
  * Body shared by /cities/$city and /cities/$city/$sport. Plain links and
@@ -36,7 +37,8 @@ export function CityListingsView({
           {sport
             ? `Upcoming ${sport.name.toLowerCase()} runs, teams and trainers around ${city.name}. `
             : `Upcoming runs, teams, trainers and gyms around ${city.name}. `}
-          Pick a game, check the skill level and spots left, then request to join.
+          Pick a game, check the skill level and spots left, then request to join. Pictures are
+          sample images for each sport, not photos of the listing.
         </p>
 
         {!sport && (
@@ -68,13 +70,16 @@ export function CityListingsView({
               {listings.games.map((g) => (
                 <li key={g.id}>
                   <Link to="/games/$gameId" params={{ gameId: g.id }} className={card}>
-                    <span className="block text-base font-bold">{g.title}</span>
-                    <span className="mt-1 block text-sm text-muted-foreground">
-                      {g.sport} · {formatWhen(g.date)}
-                    </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {[g.location, g.neighborhood].filter(Boolean).join(" · ")} ·{" "}
-                      {g.price ? `$${g.price}` : "Free"}
+                    <SampleImage sport={g.sport} className="h-14 w-14 shrink-0 rounded-xl" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-bold">{g.title}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {g.sport} · {formatWhen(g.date)}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {[g.location, g.neighborhood].filter(Boolean).join(" · ")} ·{" "}
+                        {g.price ? `$${g.price}` : "Free"}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -90,9 +95,15 @@ export function CityListingsView({
               {listings.teams.map((t) => (
                 <li key={t.id}>
                   <Link to="/teams/$teamId" params={{ teamId: t.id }} className={card}>
-                    <span className="block text-base font-bold">{t.name}</span>
-                    <span className="mt-1 block text-sm text-muted-foreground">
-                      {t.tagline || (t.sports ?? []).join(", ")}
+                    <SampleImage
+                      sport={(t.sports ?? [])[0]}
+                      className="h-14 w-14 shrink-0 rounded-xl"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-bold">{t.name}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {t.tagline || (t.sports ?? []).join(", ")}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -108,9 +119,15 @@ export function CityListingsView({
               {listings.trainers.map((t) => (
                 <li key={t.id}>
                   <Link to="/trainers/$trainerId" params={{ trainerId: t.id }} className={card}>
-                    <span className="block text-base font-bold">{t.name}</span>
-                    <span className="mt-1 block text-sm text-muted-foreground">
-                      {t.tagline || (t.sports ?? []).join(", ")}
+                    <SampleImage
+                      sport={(t.sports ?? [])[0]}
+                      className="h-14 w-14 shrink-0 rounded-xl"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-bold">{t.name}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {t.tagline || (t.sports ?? []).join(", ")}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -126,12 +143,15 @@ export function CityListingsView({
               {listings.gyms.map((gym) => (
                 <li key={gym.id}>
                   <Link to="/orgs/$orgId" params={{ orgId: gym.id }} className={card}>
-                    <span className="block text-base font-bold">{gym.name}</span>
-                    {gym.category && (
-                      <span className="mt-1 block text-sm text-muted-foreground">
-                        {gym.category}
-                      </span>
-                    )}
+                    <SampleImage sport={gym.category} className="h-14 w-14 shrink-0 rounded-xl" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-bold">{gym.name}</span>
+                      {gym.category && (
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {gym.category}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 </li>
               ))}

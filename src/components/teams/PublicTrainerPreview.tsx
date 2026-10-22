@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Lock, MapPin, ShieldCheck } from "lucide-react";
 import { PublicPreviewFrame } from "@/components/public/PublicPreviewFrame";
+import { SampleImage } from "@/components/public/SampleImage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPublicTrainer } from "@/lib/city-pages.functions";
 import type { PublicTrainer } from "@/lib/city-seo";
@@ -39,6 +40,7 @@ export function PublicTrainerPreview({ trainerId, next }: { trainerId: string; n
     >
       {trainer ? (
         <section className="space-y-4">
+          <SampleImage sport={trainer.sports[0]} caption className="h-40 rounded-2xl sm:h-52" />
           <p className="page-eyebrow">Trainer</p>
           <h1 className="page-title flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="min-w-0 break-words">{trainer.name}</span>

@@ -1,5 +1,6 @@
 import { CalendarClock, Lock, MapPin, Tag } from "lucide-react";
 import { PublicPreviewFrame } from "@/components/public/PublicPreviewFrame";
+import { SampleImage } from "@/components/public/SampleImage";
 import { formatGameWhen } from "@/lib/format";
 import { SPORTS } from "@/lib/sample-data";
 import type { PublicGameSeo } from "@/lib/city-pages.functions";
@@ -21,6 +22,7 @@ export function PublicGamePreview({ seo, next }: { seo: PublicGameSeo | null; ne
     >
       {open ? (
         <section className="space-y-4">
+          <SampleImage sport={open.sport} caption className="h-40 rounded-2xl sm:h-52" />
           <p className="page-eyebrow">
             {sport ? <span aria-hidden>{sport.emoji} </span> : null}
             {open.sport}

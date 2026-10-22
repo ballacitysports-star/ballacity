@@ -175,6 +175,12 @@ export function imageFor(sport: Sport) {
   return sportImage[sport];
 }
 
+/** A sample photo for a sport name (any case), or the basketball hero when it is unknown or missing. */
+export function sampleImageForSport(name: string | null | undefined): string {
+  const sport = name ? sportByKey(name) : undefined;
+  return sport ? sportImage[sport] : HERO_IMAGE;
+}
+
 const SPORT_ASSET_RE = /\/assets\/sport-([a-z]+)[-.][^/]*$/;
 const PRESET_PREFIX = "preset:";
 

@@ -15,6 +15,8 @@ export type PreviewRow = {
   detail: string;
   /** A made-up name or handle. */
   person?: string;
+  /** Sport whose sample picture the row shows. */
+  sport?: string;
 };
 
 export type PreviewConfig = {
@@ -37,6 +39,16 @@ export type PreviewConfig = {
 
 const person = (n: number) => `Sample Person ${n}`;
 
+const GAME_SPORTS = [
+  "Basketball",
+  "Soccer",
+  "Volleyball",
+  "Tennis",
+  "Football",
+  "Running",
+  "Pickleball",
+];
+
 const games: PreviewRow[] = [
   { title: "Sunday pickup basketball", detail: "Sample Park · Sun 10:00 AM · 6 spots open" },
   { title: "5-a-side soccer", detail: "Sample Fields · Sun 4:00 PM · 3 spots open" },
@@ -45,7 +57,9 @@ const games: PreviewRow[] = [
   { title: "Flag football scrimmage", detail: "Sample Field · Wed 6:00 PM · 10 spots open" },
   { title: "Morning run club", detail: "Sample Trail · Thu 6:30 AM · 12 spots open" },
   { title: "Pickleball round robin", detail: "Sample Courts · Fri 5:30 PM · 4 spots open" },
-].map((r, i) => ({ ...r, person: `Hosted by ${person(i + 1)}` }));
+].map((r, i) => ({ ...r, sport: GAME_SPORTS[i], person: `Hosted by ${person(i + 1)}` }));
+
+const PLAYER_SPORTS = ["Basketball", "Soccer", "Volleyball", "Tennis", "Pickleball", "Football"];
 
 const players: PreviewRow[] = [
   { title: "Sample Player 1", detail: "Basketball · Intermediate · Available weekends" },
@@ -54,7 +68,9 @@ const players: PreviewRow[] = [
   { title: "Sample Player 4", detail: "Tennis · Intermediate · Available weekends" },
   { title: "Sample Player 5", detail: "Pickleball · Beginner · Available evenings" },
   { title: "Sample Player 6", detail: "Football · Advanced · Available weekends" },
-].map((r, i) => ({ ...r, person: `@sample${i + 1}` }));
+].map((r, i) => ({ ...r, sport: PLAYER_SPORTS[i], person: `@sample${i + 1}` }));
+
+const TEAM_SPORTS = ["Basketball", "Soccer", "Volleyball", "Tennis", "Running"];
 
 const teams: PreviewRow[] = [
   { title: "Sample Hoopers", detail: "Basketball · Adult rec league · 2 open spots" },
@@ -62,7 +78,9 @@ const teams: PreviewRow[] = [
   { title: "Sample Spikers", detail: "Volleyball · Adult rec league · 3 open spots" },
   { title: "Sample Aces", detail: "Tennis · Adult doubles · 2 open spots" },
   { title: "Sample Runners", detail: "Running · Open to all adults · 5 open spots" },
-].map((r, i) => ({ ...r, person: `Captain ${person(i + 1)}` }));
+].map((r, i) => ({ ...r, sport: TEAM_SPORTS[i], person: `Captain ${person(i + 1)}` }));
+
+const TRAINER_SPORTS = ["Basketball", "Soccer", "Tennis", "Running", "Running"];
 
 const trainers: PreviewRow[] = [
   { title: "Sample Skills Training", detail: "Basketball · Shooting and ball handling" },
@@ -70,7 +88,18 @@ const trainers: PreviewRow[] = [
   { title: "Sample Court Coaching", detail: "Tennis · Serve and return clinics" },
   { title: "Sample Strength Studio", detail: "Strength · Small-group sessions" },
   { title: "Sample Swim Coach", detail: "Swimming · Adult stroke technique" },
-].map((r, i) => ({ ...r, person: `Coach ${person(i + 1)}` }));
+].map((r, i) => ({ ...r, sport: TRAINER_SPORTS[i], person: `Coach ${person(i + 1)}` }));
+
+const REEL_SPORTS = [
+  "Soccer",
+  "Basketball",
+  "Volleyball",
+  "Tennis",
+  "Soccer",
+  "Pickleball",
+  "Football",
+  "Running",
+];
 
 const reels: PreviewRow[] = [
   { title: "Sunday hat trick", detail: "Soccer · Sample highlight · 0:24 · AI-generated" },
@@ -87,7 +116,7 @@ const reels: PreviewRow[] = [
   },
   { title: "Fourth-quarter lockdown", detail: "Football · Sample highlight · 0:29 · AI-generated" },
   { title: "Negative-split finish", detail: "Running · Sample highlight · 0:16 · AI-generated" },
-].map((r, i) => ({ ...r, person: `By ${person(i + 1)}` }));
+].map((r, i) => ({ ...r, sport: REEL_SPORTS[i], person: `By ${person(i + 1)}` }));
 
 const messages: PreviewRow[] = [
   { title: "Sample Person 1", detail: "Want to run a game Saturday? · 2m" },
