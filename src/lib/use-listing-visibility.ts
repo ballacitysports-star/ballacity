@@ -47,6 +47,7 @@ export function useSetListingHidden(kind: ListingKind, id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: key(kind, id) });
       void qc.invalidateQueries({ queryKey: ["hidden-listings"] });
+      void qc.invalidateQueries({ queryKey: ["my-hidden-games"] });
       // Lists that show this listing to others.
       void qc.invalidateQueries({ queryKey: ["team-posts"] });
       void qc.invalidateQueries({ queryKey: ["public-team"] });

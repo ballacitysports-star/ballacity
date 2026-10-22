@@ -28,7 +28,8 @@ import type { User } from "@supabase/supabase-js";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useHostedGames } from "@/lib/hosted-games-store";
+import { useQuery } from "@tanstack/react-query";
+import { fetchMyHiddenGames, useHostedGames } from "@/lib/hosted-games-store";
 import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import {
@@ -149,9 +150,21 @@ function PlayerProfile() {
   const follow = useFollow(profileUser?.id ?? "");
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
+  // The feed leaves hidden games out; the people linked to one still list it.
+  const hiddenMine = useQuery({
+    queryKey: ["my-hidden-games", profileUser?.id],
+    enabled: !!profileUser,
+    staleTime: 15_000,
+    queryFn: fetchMyHiddenGames,
+  });
   const upcomingGroups = useMemo(
-    () => groupProfileGames([...hosted, ...GAMES], new Set(joinedGameIds), profileUser?.id),
-    [joinedGameIds, hosted, profileUser?.id],
+    () =>
+      groupProfileGames(
+        [...hosted, ...(hiddenMine.data ?? []), ...GAMES],
+        new Set(joinedGameIds),
+        profileUser?.id,
+      ),
+    [joinedGameIds, hosted, hiddenMine.data, profileUser?.id],
   );
 
   // Pending / recently-reviewed join requests for player and host views

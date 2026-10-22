@@ -152,6 +152,7 @@ function rowToGame(r: DbRow): Game {
     price: Number(r.price) || 0,
     indoor: !!r.indoor,
     isPrivate: !!r.is_private,
+    hidden: !!r.hidden_at,
     urgent: r.urgent ?? undefined,
     trending: r.trending ?? undefined,
     image: resolveSportAsset(r.image) || imageFor(r.sport as Sport),
@@ -455,6 +456,23 @@ export async function hideGameFromOrg(gameId: string, hidden: boolean): Promise<
     _hidden: hidden,
   });
   if (error) throw error;
+}
+
+/**
+ * Hidden games the signed-in person may still see: their own as host, and ones
+ * they joined or asked to join when only the host hid them. The feed leaves
+ * hidden games out, so this is how the profile keeps listing them. The database
+ * decides which rows come back; nothing is filtered by owner here.
+ */
+export async function fetchMyHiddenGames(): Promise<Game[]> {
+  const { data, error } = await supabase
+    .from("hosted_games")
+    .select("*")
+    .not("hidden_at", "is", null)
+    .order("date", { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return ((data as DbRow[] | null) ?? []).map(rowToGame);
 }
 
 export function getHostedGame(id: string): Game | undefined {

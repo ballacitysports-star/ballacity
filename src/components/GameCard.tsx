@@ -194,6 +194,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <GamePlaceDistance game={game} />
             </span>
             {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
+            {game.hidden ? (
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                Hidden
+              </span>
+            ) : null}
           </div>
           {game.orgId && (
             <div className="flex min-w-0">
