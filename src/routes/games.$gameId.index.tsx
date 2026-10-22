@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
@@ -2751,6 +2752,11 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            {!game.isPrivate ? (
+              <div className="mt-2">
+                <ListingVisibilityToggle kind="game" id={game.id} />
+              </div>
+            ) : null}
             {!game.cancelledAt && game.status !== "cancelled" ? (
               <button
                 type="button"

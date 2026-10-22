@@ -52,6 +52,7 @@ import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
 import { Route as AccountAiPrivacyRouteImport } from './routes/account.ai-privacy'
 import { Route as AccountBlockedRouteImport } from './routes/account.blocked'
 import { Route as AccountDataRouteImport } from './routes/account.data'
+import { Route as AccountHiddenRouteImport } from './routes/account.hidden'
 import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
 import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
@@ -340,6 +341,11 @@ const AccountBlockedRoute = AccountBlockedRouteImport.update({
 const AccountDataRoute = AccountDataRouteImport.update({
   id: '/account/data',
   path: '/account/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountHiddenRoute = AccountHiddenRouteImport.update({
+  id: '/account/hidden',
+  path: '/account/hidden',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountLegalRoute = AccountLegalRouteImport.update({
@@ -758,6 +764,7 @@ export interface FileRoutesByFullPath {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
@@ -875,6 +882,7 @@ export interface FileRoutesByTo {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
@@ -993,6 +1001,7 @@ export interface FileRoutesById {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
@@ -1112,6 +1121,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
@@ -1229,6 +1239,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
@@ -1346,6 +1357,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
@@ -1455,6 +1467,7 @@ export interface RootRouteChildren {
   AccountAiPrivacyRoute: typeof AccountAiPrivacyRoute
   AccountBlockedRoute: typeof AccountBlockedRoute
   AccountDataRoute: typeof AccountDataRoute
+  AccountHiddenRoute: typeof AccountHiddenRoute
   AccountLegalRoute: typeof AccountLegalRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountPrivacyRoute: typeof AccountPrivacyRoute
@@ -1828,6 +1841,13 @@ declare module '@tanstack/react-router' {
       path: '/account/data'
       fullPath: '/account/data'
       preLoaderRoute: typeof AccountDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/hidden': {
+      id: '/account/hidden'
+      path: '/account/hidden'
+      fullPath: '/account/hidden'
+      preLoaderRoute: typeof AccountHiddenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/legal': {
@@ -2423,6 +2443,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountAiPrivacyRoute: AccountAiPrivacyRoute,
   AccountBlockedRoute: AccountBlockedRoute,
   AccountDataRoute: AccountDataRoute,
+  AccountHiddenRoute: AccountHiddenRoute,
   AccountLegalRoute: AccountLegalRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountPrivacyRoute: AccountPrivacyRoute,

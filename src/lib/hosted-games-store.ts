@@ -471,7 +471,8 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
     .from("hosted_games")
     .select("*")
     .eq("id", id)
-    .is("hidden_at", null)
+    // No `hidden_at` filter: the database already hides a hidden game from
+    // everyone but its host (and, when only the host hid it, its players).
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;

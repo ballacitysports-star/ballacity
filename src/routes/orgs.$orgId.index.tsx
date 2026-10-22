@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { OrgAvatarMark } from "@/components/OrgAvatarMark";
+import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import {
   getTrainerOrg,
   getTrainerOrgContact,
@@ -202,6 +203,8 @@ function OrgPage() {
       {!!auth.user && access.data?.unclaimed && (
         <ClaimListingCard subjectType="gym" subjectId={orgId} name={org.name} />
       )}
+
+      {isAdmin && <ListingVisibilityToggle kind="gym" id={orgId} />}
 
       <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
 

@@ -46,6 +46,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
 import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -457,6 +458,7 @@ function TrainerPage({ org }: { org: Org }) {
         {/* About */}
         {tab === "about" && (
           <div className="mt-5 space-y-5">
+            {canEdit && <ListingVisibilityToggle kind="trainer" id={org.id} />}
             {canEdit && <TrainerProfileChecklist org={org} />}
             {canEdit && <TrainerOrgSection trainerId={org.id} />}
             <Section title="Bio">
