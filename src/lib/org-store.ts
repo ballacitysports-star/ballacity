@@ -245,6 +245,13 @@ export async function hydrateOrgs(): Promise<void> {
   hydratePromise = (async () => {
     try {
       await refreshCurrentUser();
+      // The full team list needs a session. A signed-out visitor (and the
+      // server, which has no session) reads the public preview instead, and
+      // we stay un-hydrated so the next call after sign-in loads it.
+      if (!currentUserId) {
+        hydratePromise = null;
+        return;
+      }
       const rows = (await listTeams()) as TeamRow[];
       for (const row of rows) mergeRow(row);
       emit();
@@ -260,6 +267,13 @@ if (typeof window !== "undefined") {
   supabase.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
       hydratePromise = null;
+      if (event === "SIGNED_OUT") {
+        // Whole rows are for signed-in viewers; don't keep them in memory after sign-out.
+        ORGS.length = 0;
+        myOrgIds.clear();
+        ownerByOrgId.clear();
+        emit();
+      }
       void hydrateOrgs();
     }
   });
@@ -268,6 +282,8 @@ if (typeof window !== "undefined") {
   supabase
     .channel("public:teams")
     .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (payload) => {
+      // A signed-out visitor only ever gets a few public columns, never a whole row.
+      if (!currentUserId) return;
       if (payload.eventType === "DELETE") {
         const oldRow = payload.old as { id?: string } | null;
         const id = oldRow?.id;

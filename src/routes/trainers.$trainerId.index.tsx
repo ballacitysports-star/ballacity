@@ -87,6 +87,8 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
         : undefined,
     });
   },
+  // Whole teams need a session, which only the browser has.
+  ssr: false,
   loader: async ({ params }) => {
     const org = await ensureOrgById(params.trainerId);
     if (!org) throw notFound();

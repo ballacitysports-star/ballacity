@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, redirect, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicTeamPreview } from "@/components/teams/PublicTeamPreview";
@@ -32,6 +32,8 @@ import {
   type OrgPost,
 } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
+import { getPublicTeam } from "@/lib/city-pages.functions";
+import type { PublicTeam } from "@/lib/city-seo";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { GuardianTeamContactAction } from "@/components/team/GuardianTeamContactAction";
 import { TeamEventAvailabilityCard } from "@/components/team/TeamEventAvailabilityCard";
@@ -65,29 +67,33 @@ import {
 
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
-    const o = (loaderData ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
-    const name = o?.name ?? "Team";
+    // The server has no viewer, so a crawler gets only the public facts; a
+    // signed-in browser has the whole team.
+    const loaded = loaderData as TeamLoaderData | undefined;
+    const t: TeamHeadFacts | undefined =
+      loaded?.org ?? loaded?.pub ?? ORGS.find((x) => x.id === params.teamId);
+    const name = t?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
       title: `${name} | BallaCity Sports Team`,
       description: (
-        o?.bio ||
-        o?.tagline ||
+        t?.bio ||
+        t?.tagline ||
         `Follow ${name} on BallaCity: roster, games, tryouts, and reviews.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "team",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Team on BallaCity",
-        meta: [o?.sports?.[0], o?.city, "Roster & games"],
+        subtitle: t?.tagline ?? t?.city ?? "Team on BallaCity",
+        meta: [t?.sports?.[0], t?.city, "Roster & games"],
       }),
-      jsonLd: o
+      jsonLd: t
         ? {
             "@context": "https://schema.org",
             "@type": "SportsTeam",
-            name: o.name,
-            sport: o.sports?.join(", "),
-            address: o.city ?? undefined,
+            name: t.name,
+            sport: t.sports?.join(", "),
+            address: t.city ?? undefined,
             url: `https://ballacity.com/teams/${params.teamId}`,
           }
         : undefined,
@@ -114,24 +120,16 @@ export const Route = createFileRoute("/teams/$teamId/")({
       </Link>
     </div>
   ),
-  notFoundComponent: () => (
-    <div className="page-shell-content pt-24 text-center">
-      <p className="text-muted-foreground">Team not found.</p>
-      <Link
-        to="/teams"
-        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-      >
-        Back to Teams
-      </Link>
-    </div>
-  ),
-  loader: async ({ params }) => {
-    const org = await ensureOrgById(params.teamId);
-    if (!org) throw notFound();
-    if (org.kind === "coach") {
+  notFoundComponent: TeamNotFound,
+  loader: async ({ params }): Promise<TeamLoaderData> => {
+    // Whole teams need a session, which the server and signed-out visitors
+    // don't have: they get the public facts instead and the page decides.
+    const org = (await ensureOrgById(params.teamId)) ?? null;
+    if (org?.kind === "coach") {
       throw redirect({ to: "/trainers/$trainerId", params: { trainerId: org.id }, replace: true });
     }
-    return org;
+    const pub = org ? null : await getPublicTeam({ data: { id: params.teamId } }).catch(() => null);
+    return { org, pub };
   },
 });
 
@@ -147,17 +145,66 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
  * Signed-out visitors (a shared link, a search result) get the short public
  * preview; the roster, posts and actions are the signed-in page below.
  */
+type TeamLoaderData = { org: Org | null; pub: PublicTeam | null };
+
+type TeamHeadFacts = {
+  name: string;
+  bio?: string | null;
+  tagline?: string | null;
+  city?: string | null;
+  sports?: string[];
+};
+
+function TeamNotFound() {
+  return (
+    <div className="page-shell-content pt-24 text-center">
+      <p className="text-muted-foreground">Team not found.</p>
+      <Link
+        to="/teams"
+        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+      >
+        Back to Teams
+      </Link>
+    </div>
+  );
+}
+
 function TeamRoute() {
   const { user, loading } = useAuth();
   const { teamId } = Route.useParams();
+  const { org } = Route.useLoaderData() as TeamLoaderData;
   const { pathname, searchStr } = useLocation();
   if (loading) return <AuthRedirectSkeleton label="Loading team…" />;
   if (!user) return <PublicTeamPreview teamId={teamId} next={`${pathname}${searchStr}`} />;
-  return <TeamPage />;
+  return <SignedInTeam teamId={teamId} loaded={org} />;
 }
 
-function TeamPage() {
-  const org = Route.useLoaderData() as Org;
+/**
+ * The loader runs on the server for a hard load, where there is no session and
+ * so no team; in that case the signed-in browser fetches it here.
+ */
+function SignedInTeam({ teamId, loaded }: { teamId: string; loaded: Org | null }) {
+  const navigate = Route.useNavigate();
+  const query = useQuery({
+    queryKey: ["org", teamId],
+    queryFn: async () => (await ensureOrgById(teamId)) ?? null,
+    enabled: !loaded,
+  });
+  const org = loaded ?? query.data ?? null;
+  const isCoach = org?.kind === "coach";
+  useEffect(() => {
+    if (isCoach) {
+      void navigate({ to: "/trainers/$trainerId", params: { trainerId: teamId }, replace: true });
+    }
+  }, [isCoach, navigate, teamId]);
+  if (!org) {
+    return query.isPending ? <AuthRedirectSkeleton label="Loading team…" /> : <TeamNotFound />;
+  }
+  if (isCoach) return <AuthRedirectSkeleton label="Loading profile…" />;
+  return <TeamPage org={org} />;
+}
+
+function TeamPage({ org }: { org: Org }) {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab: "posts" | "roster" | "about" | "games" =
