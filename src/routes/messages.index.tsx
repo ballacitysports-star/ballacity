@@ -16,6 +16,8 @@ import { UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
+import { useUnreadNotificationCount } from "@/lib/notifications";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
 import { PreviewGate } from "@/components/public/PreviewGate";
@@ -98,6 +100,7 @@ function MessagesInbox() {
 
   const primary = useMemo(() => convs.filter((c) => !c.is_request), [convs]);
   const requests = useMemo(() => convs.filter((c) => c.is_request), [convs]);
+  const alertUnread = useUnreadNotificationCount("inbox-");
   const msgUnread = useMemo(() => primary.reduce((n, c) => n + c.unread, 0), [primary]);
 
   if (!loading && !user) {
@@ -170,11 +173,20 @@ function MessagesInbox() {
         <TopTabButton active={top === "alerts"} onClick={() => setTop("alerts")}>
           <Bell className="h-4 w-4" />
           Alerts
+          {alertUnread > 0 && (
+            <span className="ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-coral px-1.5 text-[10px] font-bold text-white">
+              {alertUnread > 9 ? "9+" : alertUnread}
+            </span>
+          )}
         </TopTabButton>
       </div>
 
       {top === "alerts" ? (
-        <NotificationsPanel />
+        <>
+          {/* Invitations need an answer, so they sit above the passive feed. */}
+          <TeamInvitesInbox className="mb-5" />
+          <NotificationsPanel />
+        </>
       ) : (
         <>
           <div className="flex gap-2 mb-4 border-b border-border">
