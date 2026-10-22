@@ -2,13 +2,8 @@ import { MapPin } from "lucide-react";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { Field } from "@/components/profile/ProfileFormPrimitives";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
-import {
-  MAX_DISTANCE_MI,
-  clampDistanceMi,
-  kmToMi,
-  maxDistanceInUnit,
-  miToKm,
-} from "@/lib/distance";
+import { DistanceSlider } from "@/components/DistanceSlider";
+import { MAX_DISTANCE_MI, clampDistanceMi, maxDistanceInUnit, miToKm } from "@/lib/distance";
 
 export type ProfileLocationValue = {
   /** City name, same field as the basics city. */
@@ -16,9 +11,6 @@ export type ProfileLocationValue = {
   /** Saved search radius, canonical in miles. */
   searchRadiusMi: number;
 };
-
-const STEPS_MI = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, MAX_DISTANCE_MI];
-const STEPS_KM = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 
 /**
  * Canonical "Location preference" fields (city + search radius). Rendered by
@@ -37,15 +29,6 @@ export function ProfileLocationFields({
   const capInUnit = maxDistanceInUnit(unit);
   const radiusMi = clampDistanceMi(value.searchRadiusMi || 25) as number;
   const display = Math.round(unit === "km" ? miToKm(radiusMi) : radiusMi);
-
-  const setFromUnit = (v: number) => {
-    const mi = unit === "km" ? kmToMi(v) : v;
-    onChange({ searchRadiusMi: clampDistanceMi(Math.round(mi)) as number });
-  };
-
-  const chips = (unit === "km" ? STEPS_KM : STEPS_MI)
-    .filter((v) => v <= capInUnit)
-    .concat(capInUnit);
 
   return (
     <>
@@ -74,37 +57,19 @@ export function ProfileLocationFields({
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {Array.from(new Set(chips)).map((v) => {
-            const active = display === v;
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setFromUnit(v)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  active
-                    ? "border-lime bg-lime text-primary-foreground"
-                    : "border-border bg-surface text-foreground"
-                }`}
-              >
-                {v === capInUnit
-                  ? `${v.toLocaleString("en-US")} ${unit} (anywhere)`
-                  : `${v} ${unit}`}
-              </button>
-            );
-          })}
+        <div className="mt-3">
+          <DistanceSlider
+            valueMi={radiusMi >= MAX_DISTANCE_MI ? null : radiusMi}
+            onChange={(mi) =>
+              onChange({
+                searchRadiusMi:
+                  mi == null ? MAX_DISTANCE_MI : (clampDistanceMi(Math.round(mi)) as number),
+              })
+            }
+            unit={unit}
+            label="Search radius"
+          />
         </div>
-
-        <input
-          type="number"
-          min={1}
-          max={capInUnit}
-          value={display}
-          onChange={(e) => setFromUnit(Number(e.target.value) || 1)}
-          aria-label={`Search radius in ${unit === "km" ? "kilometers" : "miles"}`}
-          className="mt-3 w-full rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-lime/60"
-        />
       </Field>
     </>
   );

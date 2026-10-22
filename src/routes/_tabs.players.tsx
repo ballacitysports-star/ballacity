@@ -89,7 +89,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { kmToMi, miToKm, MAX_DISTANCE_MI } from "@/lib/distance";
+import { kmToMi, miToKm, maxDistanceInUnit } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
@@ -1546,14 +1546,18 @@ function PostAvailabilityDialog({
               />
             </div>
             <div>
-              <Label htmlFor="radius">Radius ({unit})</Label>
-              <Input
-                id="radius"
-                type="number"
-                min={1}
-                max={MAX_DISTANCE_MI}
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value) || 0)}
+              <Label>Travel radius</Label>
+              <DistanceSlider
+                valueMi={
+                  radius >= maxDistanceInUnit(unit) ? null : unit === "km" ? radius / 1.609344 : radius
+                }
+                onChange={(mi) =>
+                  setRadius(
+                    mi == null ? maxDistanceInUnit(unit) : Math.round(unit === "km" ? miToKm(mi) : mi),
+                  )
+                }
+                unit={unit}
+                label="Travel radius"
               />
             </div>
           </div>
