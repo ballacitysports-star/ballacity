@@ -158,7 +158,7 @@ function OrgPage() {
     queryFn: () => getMyOrgAccess({ data: { orgId } }),
     enabled: !!auth.user,
   });
-  const isOwner = !!auth.user && !!org && org.owner_id === auth.user.id;
+  const isOwner = !!auth.user && !!access.data?.isOwner;
   const isAdmin = isOwner || !!access.data?.isAdmin;
 
   const gymReviews = useGymReviews(orgId);
@@ -199,7 +199,7 @@ function OrgPage() {
         </div>
       </OrgListingHeader>
 
-      {org.owner_id === null && (
+      {!!auth.user && access.data?.unclaimed && (
         <ClaimListingCard subjectType="gym" subjectId={orgId} name={org.name} />
       )}
 
