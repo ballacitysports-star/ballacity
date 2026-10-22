@@ -50,6 +50,7 @@ export const RETENTION_RULES: RetentionRule[] = [
       "notification_preferences",
       "feed_preferences",
       "follows",
+      "follow_requests",
     ],
   },
   {

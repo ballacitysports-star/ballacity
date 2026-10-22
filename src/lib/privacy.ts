@@ -16,6 +16,11 @@ export type ContactScope = "everyone" | "shared" | "nobody";
 
 export type PrivacyPreferences = {
   profile_visibility: ProfileVisibility;
+  /**
+   * A private account: people must ask to follow and the account approves each one.
+   * Always on for anyone under 18; the database enforces that, this only reflects it.
+   */
+  require_follow_approval: boolean;
   location_precision: LocationPrecision;
   show_sports: boolean;
   show_games_played: boolean;
@@ -36,6 +41,7 @@ export type PrivacyPreferences = {
 
 export const DEFAULT_PRIVACY: PrivacyPreferences = {
   profile_visibility: "public",
+  require_follow_approval: false,
   location_precision: "approximate",
   show_sports: true,
   show_games_played: true,

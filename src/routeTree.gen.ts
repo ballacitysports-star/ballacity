@@ -52,6 +52,7 @@ import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
 import { Route as AccountAiPrivacyRouteImport } from './routes/account.ai-privacy'
 import { Route as AccountBlockedRouteImport } from './routes/account.blocked'
 import { Route as AccountDataRouteImport } from './routes/account.data'
+import { Route as AccountFollowRequestsRouteImport } from './routes/account.follow-requests'
 import { Route as AccountHiddenRouteImport } from './routes/account.hidden'
 import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
@@ -341,6 +342,11 @@ const AccountBlockedRoute = AccountBlockedRouteImport.update({
 const AccountDataRoute = AccountDataRouteImport.update({
   id: '/account/data',
   path: '/account/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountFollowRequestsRoute = AccountFollowRequestsRouteImport.update({
+  id: '/account/follow-requests',
+  path: '/account/follow-requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountHiddenRoute = AccountHiddenRouteImport.update({
@@ -764,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/follow-requests': typeof AccountFollowRequestsRoute
   '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
@@ -882,6 +889,7 @@ export interface FileRoutesByTo {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/follow-requests': typeof AccountFollowRequestsRoute
   '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
@@ -1001,6 +1009,7 @@ export interface FileRoutesById {
   '/account/ai-privacy': typeof AccountAiPrivacyRoute
   '/account/blocked': typeof AccountBlockedRoute
   '/account/data': typeof AccountDataRoute
+  '/account/follow-requests': typeof AccountFollowRequestsRoute
   '/account/hidden': typeof AccountHiddenRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
@@ -1121,6 +1130,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/follow-requests'
     | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
@@ -1239,6 +1249,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/follow-requests'
     | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
@@ -1357,6 +1368,7 @@ export interface FileRouteTypes {
     | '/account/ai-privacy'
     | '/account/blocked'
     | '/account/data'
+    | '/account/follow-requests'
     | '/account/hidden'
     | '/account/legal'
     | '/account/notifications'
@@ -1467,6 +1479,7 @@ export interface RootRouteChildren {
   AccountAiPrivacyRoute: typeof AccountAiPrivacyRoute
   AccountBlockedRoute: typeof AccountBlockedRoute
   AccountDataRoute: typeof AccountDataRoute
+  AccountFollowRequestsRoute: typeof AccountFollowRequestsRoute
   AccountHiddenRoute: typeof AccountHiddenRoute
   AccountLegalRoute: typeof AccountLegalRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
@@ -1841,6 +1854,13 @@ declare module '@tanstack/react-router' {
       path: '/account/data'
       fullPath: '/account/data'
       preLoaderRoute: typeof AccountDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/follow-requests': {
+      id: '/account/follow-requests'
+      path: '/account/follow-requests'
+      fullPath: '/account/follow-requests'
+      preLoaderRoute: typeof AccountFollowRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/hidden': {
@@ -2443,6 +2463,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountAiPrivacyRoute: AccountAiPrivacyRoute,
   AccountBlockedRoute: AccountBlockedRoute,
   AccountDataRoute: AccountDataRoute,
+  AccountFollowRequestsRoute: AccountFollowRequestsRoute,
   AccountHiddenRoute: AccountHiddenRoute,
   AccountLegalRoute: AccountLegalRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,

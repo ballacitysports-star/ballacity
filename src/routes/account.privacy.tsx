@@ -2,7 +2,7 @@ import { withRequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { isLegalReviewed } from "@/lib/legal-review";
 import { BackHeader } from "@/components/layout/BackHeader";
-import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
+import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";
@@ -193,6 +193,35 @@ function PrivacySettingsPage() {
                 onCheckedChange={(v) => save({ show_online_status: v })}
                 aria-label="Show online status"
               />
+            }
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="Followers">
+          <SettingsStaticRow
+            icon={UserCheck}
+            label="Private account"
+            description={
+              isMinor
+                ? "Always on under 18. Followers need approval."
+                : "Approve each person who follows you."
+            }
+            trailing={
+              <Switch
+                checked={isMinor || prefs.require_follow_approval}
+                disabled={isLoading || saving || isMinor}
+                onCheckedChange={(v) => save({ require_follow_approval: v })}
+                aria-label="Private account"
+              />
+            }
+          />
+          <SettingsLinkRow
+            to="/account/follow-requests"
+            label="Followers and requests"
+            description={
+              isMinor
+                ? "A parent or guardian reviews follow requests."
+                : "Approve requests and remove followers."
             }
           />
         </SettingsGroup>

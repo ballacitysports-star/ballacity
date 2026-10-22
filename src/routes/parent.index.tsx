@@ -39,6 +39,7 @@ import { GuardianApprovalsDashboard } from "@/components/child/GuardianApprovals
 import { GuardianProfileCard } from "@/components/child/GuardianProfileCard";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
+import { FollowRequestsPanel } from "@/components/follow/FollowRequestsPanel";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 
@@ -392,6 +393,15 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         {child.cohort === "teen_13_15" && (
           <TeenReelReview childUserId={child.childUserId} childName={child.displayName} />
         )}
+        <section className="rounded-2xl border border-border bg-surface p-4">
+          <h3 className="text-sm font-semibold">Follow requests for {child.displayName}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {child.displayName}&apos;s account is private. Nobody can follow them until you approve.
+          </p>
+          <div className="mt-3">
+            <FollowRequestsPanel targetUserId={child.childUserId} who={child.displayName} />
+          </div>
+        </section>
         <PublicXpToggle child={child} />
         <AnalyticsCoachShare childUserId={child.childUserId} childName={child.displayName} />
         <OptionRow
