@@ -5,6 +5,7 @@ import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
+import { useFamilyPending } from "@/lib/use-family-pending";
 
 type NavItem = {
   to: string;
@@ -82,6 +83,7 @@ export function BottomNav() {
             active ? "bg-lime opacity-100" : "opacity-0"
           }`}
         />
+        {it.to === "/profile" && isParentMode ? <FamilyBadge /> : null}
         {it.to === "/messages" && inboxUnread > 0 ? (
           <span
             aria-hidden
@@ -112,3 +114,23 @@ export function BottomNav() {
 }
 
 export type { NavItem };
+
+/**
+ * A count on the Me tab for a parent when something waits on them. Its own
+ * component so the children are only loaded for parent accounts.
+ */
+function FamilyBadge() {
+  const { pending } = useFamilyPending();
+  if (pending.total === 0) return null;
+  return (
+    <>
+      <span className="sr-only">{`, ${pending.total} waiting on you`}</span>
+      <span
+        aria-hidden
+        className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white"
+      >
+        {pending.total > 9 ? "9+" : pending.total}
+      </span>
+    </>
+  );
+}
