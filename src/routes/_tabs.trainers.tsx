@@ -47,6 +47,7 @@ import { useTrainerDirectoryData } from "@/lib/trainer-directory-data";
 import { AGE_GROUPS, matchesAgeGroup, parseAgeGroup, type AgeGroupId } from "@/lib/age-groups";
 
 import { Slider } from "@/components/ui/slider";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 type SortBy = "nearest" | "soonest" | "followers" | "rate" | "rating" | "name";
 
@@ -116,8 +117,17 @@ export const Route = createFileRoute("/_tabs/trainers")({
       noindex: true,
     }),
   validateSearch: zodValidator(trainersSearchSchema),
-  component: TrainersPage,
+  component: TrainersPageGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function TrainersPageGate() {
+  return (
+    <PreviewGate tab="trainers">
+      <TrainersPage />
+    </PreviewGate>
+  );
+}
 
 function TrainersPage() {
   const { user } = useAuth();

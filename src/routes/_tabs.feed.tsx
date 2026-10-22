@@ -38,6 +38,7 @@ import { z } from "zod";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -68,8 +69,17 @@ export const Route = createFileRoute("/_tabs/feed")({
       noindex: true,
     }),
   validateSearch: zodValidator(feedSearchSchema),
-  component: Feed,
+  component: FeedGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function FeedGate() {
+  return (
+    <PreviewGate tab="feed">
+      <Feed />
+    </PreviewGate>
+  );
+}
 
 function Feed() {
   const search = Route.useSearch();

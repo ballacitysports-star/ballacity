@@ -30,6 +30,7 @@ import { orgDistance } from "@/lib/org-distance";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { featuredRecruitingTeam, openSpotCount } from "@/lib/team-recruiting";
 import { spotsOpenLabel } from "@/lib/spots-urgency";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 type SortBy = "nearest" | "followers" | "name";
 
@@ -62,8 +63,17 @@ export const Route = createFileRoute("/_tabs/teams")({
       noindex: true,
     }),
   validateSearch: zodValidator(teamsSearchSchema),
-  component: TeamsPage,
+  component: TeamsPageGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function TeamsPageGate() {
+  return (
+    <PreviewGate tab="teams">
+      <TeamsPage />
+    </PreviewGate>
+  );
+}
 
 function TeamsPage() {
   const { user } = useAuth();

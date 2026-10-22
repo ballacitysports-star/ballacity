@@ -3,6 +3,7 @@ import {
   isPublicFacilityPath,
   isPublicGamePath,
   isPublicTeamPath,
+  isSignedOutPreviewPath,
   isSignedOutPublicPath,
 } from "./public-paths";
 
@@ -74,12 +75,43 @@ describe("isPublicFacilityPath", () => {
 });
 
 describe("isSignedOutPublicPath", () => {
-  it("combines the three, and nothing else", () => {
+  it("combines the four, and nothing else", () => {
     expect(isSignedOutPublicPath("/games/x")).toBe(true);
     expect(isSignedOutPublicPath("/teams/x")).toBe(true);
     expect(isSignedOutPublicPath("/orgs/x")).toBe(true);
-    for (const p of ["/feed", "/players/x", "/trainers/x", "/profile", "/messages", "/settings"]) {
+    expect(isSignedOutPublicPath("/feed")).toBe(true);
+    // Beneath a tab, and the private pages, stay behind sign-in.
+    for (const p of ["/players/x", "/trainers/x", "/profile/edit", "/messages", "/settings"]) {
       expect(isSignedOutPublicPath(p)).toBe(false);
     }
+  });
+});
+
+describe("isSignedOutPreviewPath", () => {
+  it("previews each tab, with or without a trailing slash", () => {
+    for (const p of ["/feed", "/players", "/teams", "/trainers", "/reels", "/create", "/profile"]) {
+      expect(isSignedOutPreviewPath(p)).toBe(true);
+      expect(isSignedOutPreviewPath(`${p}/`)).toBe(true);
+      expect(isSignedOutPublicPath(p)).toBe(true);
+    }
+  });
+
+  it("keeps everything beneath a tab, and the private tabs, behind sign-in", () => {
+    for (const p of [
+      "/teams/create",
+      "/profile/edit",
+      "/players/add",
+      "/reels/abc",
+      "/notifications",
+      "/messages",
+      "/settings",
+      "/admin",
+      "/parent",
+      "/guardian",
+    ]) {
+      expect(isSignedOutPreviewPath(p)).toBe(false);
+    }
+    expect(isSignedOutPublicPath("/notifications")).toBe(false);
+    expect(isSignedOutPublicPath("/messages")).toBe(false);
   });
 });

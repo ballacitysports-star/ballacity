@@ -124,6 +124,7 @@ import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { Shield } from "lucide-react";
 import { InviteToTeamDialog, useMyRecruitingTeams } from "@/components/players/InviteToTeamDialog";
+import { PreviewGate } from "@/components/public/PreviewGate";
 
 type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
 
@@ -168,8 +169,17 @@ export const Route = createFileRoute("/_tabs/players")({
       noindex: true,
     }),
   validateSearch: zodValidator(playersSearchSchema),
-  component: PlayersPage,
+  component: PlayersPageGate,
 });
+
+/** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
+function PlayersPageGate() {
+  return (
+    <PreviewGate tab="players">
+      <PlayersPage />
+    </PreviewGate>
+  );
+}
 
 // One-time upgrade of the pre-snapshot localStorage keys into the single
 // "openrun:players-search" snapshot that usePersistedSearch reads. Runs at
