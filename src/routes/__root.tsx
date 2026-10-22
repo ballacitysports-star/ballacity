@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
+import { isPublicGamePath } from "@/lib/public-paths";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { StaffBar } from "@/components/staff/StaffBar";
@@ -477,6 +478,9 @@ const PUBLIC_ROUTES = [
   "/guide",
   // Articles are public, indexable content.
   "/blog",
+  // City pages list only public games, teams and gyms, read through the
+  // allowlisted public columns (see city-pages.functions.ts), and are indexed.
+  "/cities",
 
 
   // Shareable, sign-in-free surface.
@@ -585,6 +589,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const isPublic =
     pathname === "/" ||
+    // Only a signed-out visitor gets the public game preview. A signed-in member
+    // still goes through the age and account-type steps below on a game link.
+    (!user && isPublicGamePath(pathname)) ||
     PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
     // A shared reel page; an exact match, since a /reels prefix would open the studio tab.
     isPublicReelPath(pathname);

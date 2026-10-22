@@ -106,6 +106,8 @@ export type PublicGameSeo = {
   neighborhood: string;
   price: number;
   description: string;
+  /** All-day games show a date, never a clock time. */
+  allDay: boolean;
   /** False for private, hidden, cancelled, past, or youth games: noindex. */
   indexable: boolean;
 };
@@ -115,11 +117,11 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<PublicGameSeo | null> => {
     const { data: row, error } = await publicClient()
       .from("hosted_games")
-      .select(`${CITY_GAME_COLUMNS},description`)
+      .select(`${CITY_GAME_COLUMNS},description,all_day`)
       .eq("id", data.id)
       .maybeSingle();
     if (error || !row) return null;
-    const g = row as unknown as CityGameRow & { description: string };
+    const g = row as unknown as CityGameRow & { description: string; all_day: boolean };
     // Never describe a youth or private game to a crawler.
     const indexable = isPublicUpcomingGame(g);
     return {
@@ -131,6 +133,7 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
       neighborhood: indexable ? g.neighborhood : "",
       price: g.price,
       description: indexable ? g.description : "",
+      allDay: !!g.all_day,
       indexable,
     };
   });
