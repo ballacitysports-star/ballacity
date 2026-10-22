@@ -458,9 +458,6 @@ function PlayerProfile() {
               <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
             </ChannelPill>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
-            <Link to="/highlights" className={channelPillClass()}>
-              Highlights
-            </Link>
             {isParentMode ? (
               <>
                 <Link to="/guardian" className={channelPillClass()}>

@@ -3,7 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CalendarSearch, List, Map as MapIcon, RefreshCw, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Bell, MessageCircle, MapPin } from "lucide-react";
+import { Bell, MessageCircle, MapPin, Plus } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -360,7 +360,6 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-
   const positionSport =
     chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0
       ? (chipSelected[0] as Sport)
@@ -507,6 +506,12 @@ function Feed() {
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
+          <Link
+            to="/create"
+            className="inline-flex h-10 items-center gap-1 rounded-full bg-lime-gradient px-3.5 text-sm font-bold text-primary-foreground glow-lime"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.8} aria-hidden /> Host
+          </Link>
           <Link
             to="/messages"
             className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"

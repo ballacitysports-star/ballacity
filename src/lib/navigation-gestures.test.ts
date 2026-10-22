@@ -54,17 +54,23 @@ describe("tab resolution", () => {
     }
   });
 
-  it("puts messages and alerts in the Inbox, and highlights under Me", () => {
+  it("puts the highlights feed and the reel studio under Reels", () => {
+    for (const p of ["/highlights", "/reels"]) {
+      expect(TABS[tabIndexForPath(p)]?.to).toBe("/highlights");
+    }
+  });
+
+  it("puts messages and alerts in the Inbox, and the highlights feed and studio under Reels", () => {
     for (const p of ["/messages", "/messages/abc", "/notifications"]) {
       expect(TABS[tabIndexForPath(p)]?.to).toBe("/messages");
     }
-    for (const p of ["/profile", "/profile/edit", "/highlights", "/reels"]) {
+    for (const p of ["/profile", "/profile/edit"]) {
       expect(TABS[tabIndexForPath(p)]?.to).toBe("/profile");
     }
   });
 
   it("has the five tabs in order", () => {
-    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Host", "Inbox", "Me"]);
+    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Reels", "Inbox", "Me"]);
   });
 
   it("does not treat a detail route as a tab", () => {
@@ -81,21 +87,21 @@ describe("tab resolution", () => {
 describe("adjacentTab", () => {
   it("steps forward when the finger travels left", () => {
     expect(adjacentTab("/feed", "left")).toBe("/players");
-    expect(adjacentTab("/players", "left")).toBe("/messages");
+    expect(adjacentTab("/players", "left")).toBe("/highlights");
   });
 
   it("steps backward when the finger travels right", () => {
-    expect(adjacentTab("/messages", "right")).toBe("/players");
+    expect(adjacentTab("/highlights", "right")).toBe("/players");
   });
 
-  it("skips Host in both directions", () => {
-    expect(adjacentTab("/players", "left")).not.toBe("/create");
-    expect(adjacentTab("/messages", "right")).not.toBe("/create");
+  it("pages through every tab in bar order", () => {
+    expect(adjacentTab("/players", "left")).toBe("/highlights");
+    expect(adjacentTab("/highlights", "left")).toBe("/messages");
+    expect(adjacentTab("/messages", "left")).toBe("/profile");
   });
 
-  it("never pages into or out of Host, which is a form", () => {
+  it("treats /create as a form, not a tab: no tab swiping there", () => {
     expect(adjacentTab("/create", "left")).toBeNull();
-    expect(adjacentTab("/create", "right")).toBeNull();
     expect(isTabPath("/create")).toBe(false);
   });
 
@@ -206,7 +212,7 @@ describe("resolveSwipeIntent", () => {
 
   it("pages to the previous tab when dragging right on a tab route", () => {
     const intent = resolveSwipeIntent({ ...base, pathname: "/messages", startX: 200, dx: 200 });
-    expect(intent).toEqual({ kind: "tab", to: "/players" });
+    expect(intent).toEqual({ kind: "tab", to: "/highlights" });
   });
 
   it("does nothing at the first tab dragging right", () => {
