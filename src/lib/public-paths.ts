@@ -60,3 +60,14 @@ export function isSignedOutPublicPath(pathname: string): boolean {
     isSignedOutPreviewPath(pathname)
   );
 }
+
+/**
+ * Where a signed-out visitor also gets the bottom bar: the tab previews, plus the
+ * two public pages that are tabs of their own (Reels is the highlights feed,
+ * and Gyms is part of Discover). Without this the bar vanishes the moment a
+ * visitor taps Reels.
+ */
+export function showsSignedOutBar(pathname: string): boolean {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return isSignedOutPreviewPath(pathname) || path === "/highlights" || path === "/orgs";
+}
