@@ -123,6 +123,7 @@ describe("isSignedOutPreviewPath", () => {
       "/messages",
       "/create",
       "/profile",
+      "/orgs",
     ]) {
       expect(isSignedOutPreviewPath(p)).toBe(true);
       expect(isSignedOutPreviewPath(`${p}/`)).toBe(true);
@@ -160,13 +161,22 @@ describe("showsSignedOutBar", () => {
       "/highlights",
       "/highlights/",
       "/orgs",
+      "/orgs/x",
     ]) {
       expect(showsSignedOutBar(p)).toBe(true);
     }
   });
 
   it("does not draw it on detail pages, sign-in or the marketing page", () => {
-    for (const p of ["/", "/auth", "/games/x", "/teams/x", "/orgs/x", "/highlights/x", "/terms"]) {
+    for (const p of [
+      "/",
+      "/auth",
+      "/games/x",
+      "/teams/x",
+      "/orgs/create",
+      "/highlights/x",
+      "/terms",
+    ]) {
       expect(showsSignedOutBar(p)).toBe(false);
     }
   });

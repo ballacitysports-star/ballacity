@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  ArrowLeft,
   Building2,
   MapPin,
   Users,
@@ -97,7 +98,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
       onRetry={reset}
       action={
         <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
-          Back to gyms
+          Back to venues
         </Link>
       }
     />
@@ -186,6 +187,13 @@ function OrgPage() {
 
   return (
     <div className="page-shell-content pt-4 pb-40 space-y-6">
+      <Link
+        to="/orgs"
+        aria-label="Back to venues"
+        className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Link>
       <OrgListingHeader
         org={(orgWithContact ?? org) as unknown as OrgListingRow}
         memberCount={members.length}
