@@ -40,6 +40,11 @@ export const AI_FEATURE_META: Record<AiFeature, { label: string; description: st
   },
   review_assist: { label: "Review assist", description: "Helps a member write a review." },
   post_assist: { label: "Post assist", description: "Drafts a team post from a member's notes." },
+  content_studio: {
+    label: "Content studio",
+    description:
+      "Drafts posts for the official BallaCity Facebook Page from a staff-reviewed source. Every draft needs a superadmin approval before it can be published.",
+  },
   listing_discovery: {
     label: "Listing discovery",
     description: "Superadmin: reads public web pages to suggest teams, gyms and trainers.",

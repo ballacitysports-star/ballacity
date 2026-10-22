@@ -33,6 +33,8 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `30_guardian_gates.test.sql`            | Minors need a guardian to join a team or a game; waivers; withdrawn consent locks a child out                                                                    |
 | `40_profile_and_family_guards.test.sql` | Users cannot lift their own suspension or change their age; the rules for posting a clip of a child                                                              |
 | `50_post_moderation.test.sql`           | Posts and comments start pending, edits go back to pending, a moderator's Hide holds and the author cannot undo it                                               |
+| `60_content_studio.test.sql`            | Only a superadmin approves or publishes; an approval is bound to the exact text and Page; editing withdraws it; one post per approval; Page tokens unreadable    |
+| `70_listing_claim_review.test.sql`      | Nobody reviews their own listing claim; claims state a relationship and an attestation; the needs-info round trip; a claim grants nothing until approved         |
 
 ## Writing a test
 
