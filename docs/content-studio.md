@@ -18,7 +18,7 @@ needed before production use.
 | Page connection | `startMetaConnect`, `/api/public/content-studio/meta-callback`, `disconnectMetaPage` | Meta OAuth. Tokens encrypted server-side. |
 | Settings | `app_settings.content_studio` | Discovery, AI drafts, publishing, listing creation. Publishing defaults to off. |
 | UI | Superadmin → **Content studio** tab | Sources, drafts and approval, published log, Page and settings. |
-| Claims | `20261021130000_listing_claim_review.sql`, `ClaimListingCard`, `ListingsClaimsPanel` | Relationship, attestation, needs-info, no self-review. |
+| Claims | `20261022130000_listing_claim_review.sql`, `ClaimListingCard`, `ListingsClaimsPanel` | Relationship, attestation, needs-info, no self-review. |
 
 ## Who can do what
 
@@ -106,8 +106,8 @@ The two migrations are additive and ship like every other file in
 `supabase/migrations` (applied through Lovable; never by hand on the canonical
 project):
 
-- `20261021120000_content_studio.sql`: new tables, policies and routines only.
-- `20261021130000_listing_claim_review.sql`: new nullable claim columns, one
+- `20261022120000_content_studio.sql`: new tables, policies and routines only.
+- `20261022130000_listing_claim_review.sql`: new nullable claim columns, one
   widened CHECK (adds `needs_info`), the one-open-claim index widened to cover it,
   three new routines, and four existing claim routines replaced with the same
   bodies plus the new checks.

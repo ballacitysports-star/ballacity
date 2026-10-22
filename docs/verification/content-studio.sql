@@ -1,4 +1,4 @@
--- Behaviour checks for 20261021120000_content_studio.sql. Run against a database where the
+-- Behaviour checks for 20261022120000_content_studio.sql. Run against a database where the
 -- full migration chain has been replayed on top of supabase-stubs.sql (see docs/content-studio.md).
 -- Prints one PASS/FAIL row per check and a final count.
 \set ON_ERROR_STOP 1

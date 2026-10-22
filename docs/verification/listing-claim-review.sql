@@ -1,4 +1,4 @@
--- Behaviour checks for 20261021130000_listing_claim_review.sql. Same setup as content-studio.sql.
+-- Behaviour checks for 20261022130000_listing_claim_review.sql. Same setup as content-studio.sql.
 \set ON_ERROR_STOP 1
 SET client_min_messages = warning;
 CREATE OR REPLACE FUNCTION pg_temp.act(_uid uuid) RETURNS void LANGUAGE plpgsql AS $$
