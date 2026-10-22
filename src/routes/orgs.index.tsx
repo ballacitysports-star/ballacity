@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { DiscoverTabs } from "@/components/navigation/DiscoverTabs";
+import { SampleRows } from "@/components/public/SignedOutPreview";
+import { SAMPLE_GYMS } from "@/lib/preview-samples";
+import { useAuth } from "@/hooks/use-auth";
 import { pageHead } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -33,6 +36,7 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 function OrgsIndex() {
+  const { user, loading: authLoading } = useAuth();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const [text, setText] = useState(search.q ?? "");
@@ -122,6 +126,17 @@ function OrgsIndex() {
           <button type="button" onClick={() => refetch()} className="font-semibold text-lime">
             Try again
           </button>
+        </div>
+      ) : rows.length === 0 && !filtered && !user && !authLoading ? (
+        <div className="space-y-4">
+          <SampleRows rows={SAMPLE_GYMS} action="View" heading="Sample gyms" />
+          <Link
+            to="/auth"
+            search={{ next: "/orgs", mode: "signup" }}
+            className="flex w-full items-center justify-center rounded-2xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground glow-lime"
+          >
+            Create a free account to find gyms near you
+          </Link>
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">

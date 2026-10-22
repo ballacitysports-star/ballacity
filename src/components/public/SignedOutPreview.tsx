@@ -95,6 +95,37 @@ function FakeButton({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Sample rows for a real page that has nothing to show a signed-out visitor yet
+ * (no public gyms, no public highlights). Labelled as samples, like the tab previews.
+ */
+export function SampleRows({
+  rows,
+  action,
+  heading,
+}: {
+  rows: PreviewRow[];
+  action?: string;
+  heading: string;
+}) {
+  return (
+    <section aria-label={heading} className="space-y-3">
+      <p
+        role="note"
+        className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted-foreground"
+      >
+        <strong className="font-semibold text-foreground">{heading}.</strong> These are examples,
+        not real listings or people. Dates and times are invented.
+      </p>
+      <ul className="space-y-3">
+        {rows.map((row) => (
+          <PreviewListRow key={row.title} row={row} action={action} avatar />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function PreviewListRow({
   row,
   action,
@@ -117,6 +148,18 @@ function PreviewListRow({
         <p className="truncate font-semibold text-foreground">{row.title}</p>
         <p className="text-sm text-muted-foreground">{row.detail}</p>
         {row.person ? <p className="truncate text-xs text-muted-foreground">{row.person}</p> : null}
+        {row.chips && row.chips.length > 0 ? (
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {row.chips.map((chip) => (
+              <li
+                key={chip}
+                className="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-foreground"
+              >
+                {chip}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       {action ? <FakeButton>{action}</FakeButton> : null}
     </li>

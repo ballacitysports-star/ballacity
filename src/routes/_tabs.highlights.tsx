@@ -25,6 +25,9 @@ import {
 } from "@/lib/highlight-feed.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useAuth } from "@/hooks/use-auth";
+import { SampleRows } from "@/components/public/SignedOutPreview";
+import { SAMPLE_REELS } from "@/lib/preview-samples";
 
 export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
@@ -45,6 +48,7 @@ export const Route = createFileRoute("/_tabs/highlights")({
 
 function HighlightFeedPage() {
   const { isParentMode } = useParentMode();
+  const { user } = useAuth();
   const [items, setItems] = useState<HighlightFeedItem[]>([]);
   const [sports, setSports] = useState<string[]>([]);
   const [sport, setSport] = useState<string | null>(null);
@@ -196,6 +200,17 @@ function HighlightFeedPage() {
               description="Something went wrong while loading highlights. Check your connection and try again."
               onRetry={() => window.location.reload()}
             />
+          </div>
+        ) : items.length === 0 && !user && !sport ? (
+          <div className="mx-4 mt-6 space-y-4">
+            <SampleRows rows={SAMPLE_REELS} action="Share" heading="Sample highlights" />
+            <Link
+              to="/auth"
+              search={{ next: "/highlights", mode: "signup" }}
+              className="flex w-full items-center justify-center rounded-2xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground glow-lime"
+            >
+              Create a free account to make your first reel
+            </Link>
           </div>
         ) : items.length === 0 ? (
           <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border p-8 text-center">
@@ -428,9 +443,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             View comments
           </button>
         )}
-        <p className="pt-0.5 micro-label text-muted-foreground">
-          {relativeTime(item.createdAt)}
-        </p>
+        <p className="pt-0.5 micro-label text-muted-foreground">{relativeTime(item.createdAt)}</p>
         {showComments && (
           <div className="pt-1">
             <PostEngagement subjectType="highlight_reel" subjectId={item.id} />
