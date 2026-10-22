@@ -47,3 +47,17 @@ test("notifications stays behind sign-in", async ({ page }) => {
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 30_000 });
   expect(new URL(page.url()).searchParams.get("next")).toBe("/notifications");
 });
+
+test("the landing page's main buttons open the app preview, not the city pages", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.getByRole("link", { name: /Find a game near me/ }).click();
+  await expect(page.getByTestId("signed-out-preview")).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\/feed(\?|$)/);
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.getByRole("link", { name: /^Browse teams/ }).click();
+  await expect(page.getByTestId("signed-out-preview")).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\/teams(\?|$)/);
+});
