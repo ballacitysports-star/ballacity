@@ -3,6 +3,7 @@ import {
   isPublicFacilityPath,
   isPublicGamePath,
   isPublicTeamPath,
+  isPublicTrainerPath,
   isSignedOutPreviewPath,
   isSignedOutPublicPath,
 } from "./public-paths";
@@ -60,6 +61,22 @@ describe("isPublicTeamPath", () => {
   });
 });
 
+describe("isPublicTrainerPath", () => {
+  it("opens a single trainer's page", () => {
+    expect(isPublicTrainerPath("/trainers/abc123")).toBe(true);
+    expect(isPublicTrainerPath("/trainers/abc123/")).toBe(true);
+    expect(isPublicTrainerPath("/trainers/created-coach")).toBe(true);
+  });
+
+  it("keeps booking, editing and the create flow behind sign-in", () => {
+    for (const p of ["edit", "book", "availability", "sessions"]) {
+      expect(isPublicTrainerPath(`/trainers/abc123/${p}`)).toBe(false);
+    }
+    expect(isPublicTrainerPath("/trainers/create")).toBe(false);
+    expect(isPublicTrainerPath("/trainers")).toBe(false);
+  });
+});
+
 describe("isPublicFacilityPath", () => {
   it("opens the directory and a single facility", () => {
     expect(isPublicFacilityPath("/orgs")).toBe(true);
@@ -80,8 +97,9 @@ describe("isSignedOutPublicPath", () => {
     expect(isSignedOutPublicPath("/teams/x")).toBe(true);
     expect(isSignedOutPublicPath("/orgs/x")).toBe(true);
     expect(isSignedOutPublicPath("/feed")).toBe(true);
+    expect(isSignedOutPublicPath("/trainers/x")).toBe(true);
     // Beneath a tab, and the private pages, stay behind sign-in.
-    for (const p of ["/players/x", "/trainers/x", "/profile/edit", "/messages", "/settings"]) {
+    for (const p of ["/players/x", "/trainers/x/edit", "/profile/edit", "/messages", "/settings"]) {
       expect(isSignedOutPublicPath(p)).toBe(false);
     }
   });

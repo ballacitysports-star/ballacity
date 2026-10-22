@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toPublicTeam, type PublicTeamRow } from "./city-seo";
+import { toPublicTeam, toPublicTrainer, type PublicTeamRow } from "./city-seo";
 
 const row = (over: Partial<PublicTeamRow> = {}): PublicTeamRow => ({
   id: "t1",
@@ -77,5 +77,29 @@ describe("toPublicTeam", () => {
 
   it("trims a very long bio", () => {
     expect(toPublicTeam(row({ bio: "x".repeat(2000) }))?.bio?.length).toBe(400);
+  });
+});
+
+describe("toPublicTrainer", () => {
+  const coach = (over: Partial<PublicTeamRow> = {}) => row({ kind: "coach", ...over });
+
+  it("returns the public facts of a trainer, with no team-only or private fields", () => {
+    const t = toPublicTrainer(
+      coach({ rate_per_hour: 80, session_types: ["1:1"], availability_slots: [] } as never),
+    );
+    expect(Object.keys(t ?? {}).sort()).toEqual(
+      ["bio", "city", "handle", "id", "name", "sports", "tagline", "verified"].sort(),
+    );
+  });
+
+  it("is not a team, and a team is not a trainer", () => {
+    expect(toPublicTrainer(row())).toBeNull();
+    expect(toPublicTeam(coach())).toBeNull();
+  });
+
+  it("hides a hidden trainer and one who works with kids or teens", () => {
+    expect(toPublicTrainer(coach({ hidden_at: "2026-10-01T00:00:00Z" }))).toBeNull();
+    expect(toPublicTrainer(coach({ age_groups: ["youth"] }))).toBeNull();
+    expect(toPublicTrainer(coach({ age_groups: ["adult", "teen"] }))).toBeNull();
   });
 });
