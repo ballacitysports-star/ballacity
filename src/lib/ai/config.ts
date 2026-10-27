@@ -21,6 +21,7 @@ export const AI_FEATURES = [
   "review_insights",
   "review_assist",
   "post_assist",
+  "support_assistant",
   "content_studio",
   "listing_discovery",
   "skill_assessment",
@@ -110,6 +111,8 @@ export const DEFAULT_AI_FEATURES: AiFeaturesConfig = {
     review_assist: { enabled: true, cohorts: ADULT_ONLY },
     // Writing help for team posts. Adults only, like review_assist.
     post_assist: { enabled: true, cohorts: ADULT_ONLY },
+    // Help-center chat. Adults only: under-18 accounts get the written answers, not a chat.
+    support_assistant: { enabled: true, cohorts: ADULT_ONLY },
     // Staff drafting posts for the official BallaCity Page. Adults only; staff-only at the entry point.
     content_studio: { enabled: true, cohorts: ADULT_ONLY },
     // Superadmin discovery of teams, gyms and trainers from public web pages.
@@ -155,6 +158,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       review_insights: { daily: 20, monthly: 200 },
       review_assist: { daily: 10, monthly: 100 },
       post_assist: { daily: 10, monthly: 100 },
+      support_assistant: { daily: 20, monthly: 200 },
       content_studio: { daily: 30, monthly: 300 },
       // Same for every plan: one extraction per page, driven only from Superadmin.
       listing_discovery: { daily: 300, monthly: 3000 },
@@ -174,6 +178,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       review_insights: { daily: 60, monthly: 600 },
       review_assist: { daily: 40, monthly: 400 },
       post_assist: { daily: 40, monthly: 400 },
+      support_assistant: { daily: 40, monthly: 400 },
       content_studio: { daily: 30, monthly: 300 },
       // Same for every plan: one extraction per page, driven only from Superadmin.
       listing_discovery: { daily: 300, monthly: 3000 },
@@ -193,6 +198,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       review_insights: { daily: 100, monthly: 1000 },
       review_assist: { daily: 60, monthly: 600 },
       post_assist: { daily: 80, monthly: 800 },
+      support_assistant: { daily: 60, monthly: 600 },
       content_studio: { daily: 30, monthly: 300 },
       // Same for every plan: one extraction per page, driven only from Superadmin.
       listing_discovery: { daily: 300, monthly: 3000 },
@@ -212,6 +218,7 @@ export const DEFAULT_AI_LIMITS: AiLimitsConfig = {
       review_insights: { daily: 150, monthly: 1500 },
       review_assist: { daily: 80, monthly: 800 },
       post_assist: { daily: 100, monthly: 1000 },
+      support_assistant: { daily: 60, monthly: 600 },
       content_studio: { daily: 30, monthly: 300 },
       // Same for every plan: one extraction per page, driven only from Superadmin.
       listing_discovery: { daily: 300, monthly: 3000 },
