@@ -27,9 +27,13 @@ export const Route = createFileRoute("/orgs/")({
 /** A signed-out visitor gets sample venues; the real directory mounts only for a member. */
 function OrgsIndexGate() {
   return (
-    <PreviewGate tab="orgs">
-      <OrgsIndex />
-    </PreviewGate>
+    <>
+      {/* Above the gate, so the sample preview has the strip too. */}
+      <DiscoverTabs />
+      <PreviewGate tab="orgs">
+        <OrgsIndex />
+      </PreviewGate>
+    </>
   );
 }
 
@@ -83,8 +87,7 @@ function OrgsIndex() {
   };
 
   return (
-    <div className="page-shell-content pt-4 pb-40 space-y-4">
-      <DiscoverTabs bare />
+    <div className="page-shell-content pt-3 pb-40 space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="page-title">Venues.</h1>
