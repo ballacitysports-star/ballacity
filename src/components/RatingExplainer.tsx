@@ -12,10 +12,17 @@ export function RatingExplainer({ className = "" }: { className?: string }) {
           <h3 className="font-bold text-foreground">Reputation (conduct)</h3>
           <p>
             Only people who actually played, trained or teamed up with someone can review them,
-            within 14 days of a game. Newer reviews count more than old ones, repeat reviews from
-            the same person count less each time, and a profile with only a few reviews is pulled
-            toward the platform average until more come in — that is what "Provisional" means. A
-            review whose stars clearly contradict its own words counts for half.
+            within 14 days of a game, and the role shown on a review (player or host) comes from
+            that game, not from the reviewer. Reviews older than a month gradually count for less,
+            repeat reviews from the same person count less each time, and a review whose stars
+            clearly contradict its own words counts for half.
+          </p>
+          <p className="mt-2">
+            The trust score is a cautious estimate: the low end of what the reviews so far suggest.
+            It starts out modest, climbs as consistent good reviews come in, and a poor review
+            always pulls it down. Profiles show "New" until their first review and "Provisional"
+            while there are only a few. Levels need both a score and enough recent reviews: Rising
+            needs 3, Pro 5, Elite 15 and Legend 40.
           </p>
         </section>
         <section>

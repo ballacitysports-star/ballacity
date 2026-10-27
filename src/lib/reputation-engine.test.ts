@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ENGINE, recencyWeight, reviewWeights, weightedStats } from "@/lib/reputation-engine";
-import { computeReputation, type Review } from "@/lib/reviews";
+import {
+  REPUTATION_LEVELS,
+  computeReputation,
+  levelFor,
+  trustLabel,
+  type Review,
+} from "@/lib/reviews";
 
 const NOW = Date.parse("2026-10-12T00:00:00Z");
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
@@ -12,9 +18,12 @@ const r = (rating: number, who: string, d = 1, verified = true) => ({
 });
 
 describe("reputation engine", () => {
-  it("halves a review's weight after the half-life and floors it", () => {
-    expect(recencyWeight(daysAgo(0), NOW)).toBeCloseTo(1);
-    expect(recencyWeight(daysAgo(ENGINE.halfLifeDays), NOW)).toBeCloseTo(0.5);
+  it("counts recent reviews fully, then halves weight per half-life, with a floor", () => {
+    expect(recencyWeight(daysAgo(0), NOW)).toBe(1);
+    expect(recencyWeight(daysAgo(ENGINE.recencyGraceDays), NOW)).toBe(1);
+    expect(recencyWeight(daysAgo(ENGINE.recencyGraceDays + ENGINE.halfLifeDays), NOW)).toBeCloseTo(
+      0.5,
+    );
     expect(recencyWeight(daysAgo(5000), NOW)).toBe(ENGINE.recencyFloor);
   });
 
@@ -73,5 +82,95 @@ describe("reputation engine", () => {
     expect(rep.adjustedAvg).toBeLessThan(5);
     expect(rep.provisional).toBe(true);
     expect(rep.trustScore).toBeLessThan(70);
+  });
+});
+
+describe("trust score and levels", () => {
+  const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+  let seq = 0;
+  const review = (rating: number, daysAgo = 0): Review => {
+    seq += 1;
+    return {
+      id: `t${seq}`,
+      kind: "player",
+      revieweeKind: "player",
+      revieweeId: "x",
+      revieweeName: "X",
+      reviewerName: `R${seq}`,
+      reviewerHandle: "",
+      reviewerAvatar: "RR",
+      reviewerId: `r${seq}`,
+      rating,
+      body: "played a fair game",
+      date: at(daysAgo),
+      verified: true,
+    };
+  };
+  const many = (n: number, rating: number, daysAgo = 0) =>
+    Array.from({ length: n }, () => review(rating, daysAgo));
+  const rep = (list: Review[]) => computeReputation(list, "player");
+
+  it("shows no score before the first review", () => {
+    const r = rep([]);
+    expect(r.trustScore).toBe(0);
+    expect(trustLabel(r)).toBe("New");
+    expect(r.level.name).toBe("Rookie");
+  });
+
+  it("never lets one review, good or bad, lift someone past Rookie", () => {
+    const bad = rep([review(1)]);
+    const good = rep([review(5)]);
+    expect(bad.level.name).toBe("Rookie");
+    expect(good.level.name).toBe("Rookie");
+    expect(bad.trustScore).toBeLessThan(good.trustScore);
+    expect(trustLabel(good)).toBe(String(good.trustScore));
+  });
+
+  it("lowers the score when a poor review arrives, at any history size", () => {
+    for (const n of [1, 3, 10, 30]) {
+      const base = many(n, 5);
+      for (const poor of [1, 2]) {
+        expect(rep([...base, review(poor)]).trustScore).toBeLessThan(rep(base).trustScore);
+      }
+    }
+  });
+
+  it("raises the score as consistent good reviews accumulate", () => {
+    const scores = [1, 3, 10, 30].map((n) => rep(many(n, 5)).trustScore);
+    expect([...scores].sort((a, b) => a - b)).toEqual(scores);
+    expect(new Set(scores).size).toBe(scores.length);
+  });
+
+  it("gates each level on evidence as well as score", () => {
+    // Reviews from this week: recency makes each worth a hair under 1.
+    expect(rep(many(3, 5, 4)).level.name).toBe("Rising");
+    expect(rep(many(5, 5, 4)).level.name).toBe("Pro");
+    expect(rep(many(10, 5, 4)).level.name).toBe("Pro"); // high score, too little evidence for Elite
+    expect(rep(many(15, 5, 4)).level.name).toBe("Elite");
+    expect(rep(many(39, 5, 4)).level.name).toBe("Elite"); // Legend needs 40
+    expect(rep(many(40, 5, 4)).level.name).toBe("Legend");
+  });
+
+  it("does not round a thin record up a level", () => {
+    // Three reviews from ~5 months ago are worth about 2.4 today: not yet Rising.
+    expect(rep(many(3, 5, 150)).level.name).toBe("Rookie");
+  });
+
+  it("counts old reviews as less evidence", () => {
+    // 40 glowing reviews from a year ago are not 40 reviews' worth of evidence today.
+    expect(rep(many(40, 5, 365)).level.name).not.toBe("Legend");
+  });
+
+  it("gives no free points: the score is exactly the cautious estimate", () => {
+    const list = [review(5), review(4), review(5), review(3)];
+    const stats = weightedStats(list.map((r) => ({ ...r, reviewerKey: r.reviewerId! })));
+    expect(rep(list).trustScore).toBe(stats.cautiousScore);
+    expect(stats.lowerBound).toBeLessThan(stats.adjustedAvg);
+  });
+
+  it("requires both bars in levelFor", () => {
+    expect(levelFor(95, 2).name).toBe("Rookie");
+    expect(levelFor(60, 100).name).toBe("Rising");
+    expect(levelFor(0, 0)).toBe(REPUTATION_LEVELS[0]);
   });
 });

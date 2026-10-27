@@ -99,13 +99,16 @@ export const REVIEWEE_META: Record<RevieweeKind, { label: string; emoji: string 
   host: { label: "Host", emoji: "🎯" },
 };
 
-// Reputation tier ladder (gamified levels)
+// Reputation tier ladder (gamified levels). A level needs both a trust score
+// (`min`) and enough evidence (`minEvidence`, in effective reviews: recent,
+// verified, distinct reviewers count fully), so a handful of glowing reviews
+// can't make someone Elite overnight.
 export const REPUTATION_LEVELS = [
-  { min: 0, name: "Rookie", emoji: "🌱", color: "text-muted-foreground" },
-  { min: 40, name: "Rising", emoji: "⚡", color: "text-sky-400" },
-  { min: 60, name: "Pro", emoji: "🔥", color: "text-lime" },
-  { min: 75, name: "Elite", emoji: "💎", color: "text-coral" },
-  { min: 90, name: "Legend", emoji: "👑", color: "text-amber-400" },
+  { min: 0, minEvidence: 0, name: "Rookie", emoji: "🌱", color: "text-muted-foreground" },
+  { min: 55, minEvidence: 3, name: "Rising", emoji: "⚡", color: "text-sky-400" },
+  { min: 70, minEvidence: 5, name: "Pro", emoji: "🔥", color: "text-lime" },
+  { min: 80, minEvidence: 15, name: "Elite", emoji: "💎", color: "text-coral" },
+  { min: 88, minEvidence: 40, name: "Legend", emoji: "👑", color: "text-amber-400" },
 ] as const;
 
 // -------------------------- seed data --------------------------
@@ -386,6 +389,28 @@ export type Reputation = {
 
 const reviewerKey = (r: Review) => r.reviewerId ?? (r.reviewerHandle || r.reviewerName);
 
+/**
+ * Highest level whose score and evidence bars are both met. Evidence is counted
+ * to the nearest whole review: recency weighting makes even today's reviews
+ * worth a hair under 1, and three reviews from this week should read as three.
+ */
+export function levelFor(
+  trustScore: number,
+  effectiveCount: number,
+): (typeof REPUTATION_LEVELS)[number] {
+  const evidence = Math.round(effectiveCount);
+  return (
+    [...REPUTATION_LEVELS]
+      .reverse()
+      .find((l) => trustScore >= l.min && evidence >= l.minEvidence) ?? REPUTATION_LEVELS[0]
+  );
+}
+
+/** What to print where a trust score goes: the number, or "New" before any reviews. */
+export function trustLabel(rep: Pick<Reputation, "count" | "trustScore">): string {
+  return rep.count > 0 ? String(rep.trustScore) : "New";
+}
+
 export function computeReputation(list: Review[], kind: RevieweeKind): Reputation {
   const visible = list.filter((r) => !r.flagged && !r.isPrivate);
   const count = visible.length;
@@ -418,15 +443,13 @@ export function computeReputation(list: Review[], kind: RevieweeKind): Reputatio
 
   const verifiedShare = count ? visible.filter((r) => r.verified).length / count : 0;
 
-  // Trust score: shrunk weighted quality (60%) + effective volume (20%) +
-  // verified share (15%) + reviewer diversity (5%). See reputation-engine.ts.
-  const quality = count ? (stats.adjustedAvg / 5) * 60 : 0;
-  const volume = Math.min(1, stats.effectiveCount / 12) * 20;
-  const verified = verifiedShare * 15;
-  const diversity = (Math.min(4, Object.keys(byKind).length) / 4) * 5;
-  const trustScore = Math.round(quality + volume + verified + diversity);
+  // Trust score: the cautious estimate of the true average (low end of its
+  // likely range) on 0–100. It rises only as recent, consistent reviews pile
+  // up, and a poor review always lowers it. With no reviews there is no score
+  // (0, shown as "New"). See reputation-engine.ts.
+  const trustScore = count ? stats.cautiousScore : 0;
 
-  const level = [...REPUTATION_LEVELS].reverse().find((l) => trustScore >= l.min)!;
+  const level = levelFor(trustScore, count ? stats.effectiveCount : 0);
 
   // Recent trend: last 3 vs prior 3
   const sorted = [...visible].sort((a, b) => +new Date(b.date) - +new Date(a.date));

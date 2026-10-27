@@ -36,7 +36,7 @@ import { PlayerPassportSection } from "@/components/players/PlayerPassportSectio
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { computeReputation } from "@/lib/reviews";
+import { computeReputation, trustLabel } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
@@ -453,7 +453,7 @@ function PlayerProfilePage() {
             name: s.name,
             level: s.level ? formatSportLevel(s.level as any) : null,
           })),
-          trustScore: rep.trustScore,
+          trustScore: rep.count ? rep.trustScore : undefined,
           reviewCount: rep.count,
           linkCount: links.length,
         }}
@@ -529,7 +529,7 @@ function PlayerProfilePage() {
                 label="Reputation"
                 badge={
                   <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                    {rep.trustScore}
+                    {trustLabel(rep)}
                   </span>
                 }
               >
