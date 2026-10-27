@@ -843,6 +843,19 @@ export function can(
     };
   }
 
+  // The database honours a guardian's "Can join games" switch for every minor
+  // who has a guardian (the Parent Center shows it for all of them), not only
+  // the under-13s whose default is off. Say so here instead of letting the join
+  // button fail.
+  if (
+    feature === "game_participation" &&
+    subject.controls &&
+    !subject.controls.gameParticipation &&
+    (cohort === "teen_13_15" || cohort === "teen_16_17")
+  ) {
+    return { allowed: false, level, reason: "A parent or guardian has turned this off." };
+  }
+
   return { allowed: true, level, reason: null };
 }
 

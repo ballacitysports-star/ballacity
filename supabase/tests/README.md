@@ -25,17 +25,25 @@ platform the migrations assume (the API roles and their default grants, the `aut
 
 ## The files
 
-| File                                    | Protects                                                                                                                                                         |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `00_schema_invariants.test.sql`         | RLS on every table; `search_path` pinned on every `SECURITY DEFINER` function; allow-lists for what anonymous visitors can call or write; family data is private |
-| `10_reel_visibility.test.sql`           | `reel_audience()` by age: adult public, 16-17 members, 13-15 and under-13 never public, drafts, hidden reels and family clips private                            |
-| `20_teen_team_sharing.test.sql`         | A 13-15 reel reaches a team only with a verified guardian's approval, and stops the moment any condition stops holding                                           |
-| `30_guardian_gates.test.sql`            | Minors need a guardian to join a team or a game; waivers; withdrawn consent locks a child out                                                                    |
-| `40_profile_and_family_guards.test.sql` | Users cannot lift their own suspension or change their age; the rules for posting a clip of a child                                                              |
-| `50_post_moderation.test.sql`           | Posts and comments start pending, edits go back to pending, a moderator's Hide holds and the author cannot undo it                                               |
-| `60_content_studio.test.sql`            | Only a superadmin approves or publishes; an approval is bound to the exact text and Page; editing withdraws it; one post per approval; Page tokens unreadable    |
-| `70_listing_claim_review.test.sql`      | Nobody reviews their own listing claim; claims state a relationship and an attestation; the needs-info round trip; a claim grants nothing until approved         |
-| `110_follow_approval.test.sql`          | Private accounts: following waits for approval; every minor always needs it; under 16 only a guardian can answer; no direct writes to follows / requests         |
+| File                                    | Protects                                                                                                                                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `00_schema_invariants.test.sql`         | RLS on every table; `search_path` pinned on every `SECURITY DEFINER` function; allow-lists for what anonymous visitors can call or write; family data is private       |
+| `10_reel_visibility.test.sql`           | `reel_audience()` by age: adult public, 16-17 members, 13-15 and under-13 never public, drafts, hidden reels and family clips private                                  |
+| `20_teen_team_sharing.test.sql`         | A 13-15 reel reaches a team only with a verified guardian's approval, and stops the moment any condition stops holding                                                 |
+| `30_guardian_gates.test.sql`            | Minors need a guardian to join a team or a game; waivers; withdrawn consent locks a child out                                                                          |
+| `40_profile_and_family_guards.test.sql` | Users cannot lift their own suspension or change their age; the rules for posting a clip of a child                                                                    |
+| `50_post_moderation.test.sql`           | Posts and comments start pending, edits go back to pending, a moderator's Hide holds and the author cannot undo it                                                     |
+| `60_content_studio.test.sql`            | Only a superadmin approves or publishes; an approval is bound to the exact text and Page; editing withdraws it; one post per approval; Page tokens unreadable          |
+| `70_listing_claim_review.test.sql`      | Nobody reviews their own listing claim; claims state a relationship and an attestation; the needs-info round trip; a claim grants nothing until approved               |
+| `110_follow_approval.test.sql`          | Private accounts: following waits for approval; every minor always needs it; under 16 only a guardian can answer; no direct writes to follows / requests               |
+| `120_game_join_gate.test.sql`           | A player cannot skip host approval or the entry fee, join an ended game or a full one; a guardian's "Can join games" switch and withdrawn consent hold for every minor |
+
+## Races
+
+A test file runs in one session, so it cannot show two requests arriving together. `scripts/db-test.mjs` runs
+the races after the files: it commits a small game, opens real sessions against it, checks the outcome and
+removes it. Today that is two players taking the last seat of a game (`--only race` runs just that, about four
+seconds). Add a race there when a rule depends on the order things happen in, not only on what is stored.
 
 ## Writing a test
 

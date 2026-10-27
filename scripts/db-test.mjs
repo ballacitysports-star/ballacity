@@ -16,7 +16,7 @@
 // holds the ones Lovable writes and applies itself. The live schema is both
 // together, so they are replayed together in timestamp order (a drizzle entry's
 // time is `when` in its journal; at the same instant ours goes first).
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -102,6 +102,66 @@ if (!reuse) {
   if (r.status !== 0) fail(`Could not create ${dbName}.`, r.stderr);
 }
 
+// -- races ------------------------------------------------------------------
+// A test file runs in one session, so it cannot show two requests arriving
+// together. These open real sessions against committed rows, then remove them.
+function session(script) {
+  return new Promise((resolve) => {
+    const child = spawn("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", dbName], {
+      env: { ...process.env, PGOPTIONS: "-c search_path=public,extensions" },
+    });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (out += d));
+    child.on("close", (code) => resolve({ code, out }));
+    child.stdin.end(script);
+  });
+}
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+
+const RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id = 'race-last-seat';
+  DELETE FROM auth.users WHERE id IN (t.id('racehost'), t.id('racea'), t.id('raceb'));`;
+
+// Two players take the last seat at the same moment. The first holds its
+// transaction open after inserting; the second arrives while it does. Without a
+// lock on the game, the second counts an empty seat too and both get in.
+async function lastSeatRace() {
+  psql(dbName, [], RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racehost', 35), t.person('racea', 25), t.person('raceb', 26);
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players)
+       VALUES ('race-last-seat', t.id('racehost'), 'basketball', 'Last seat', now() + interval '2 days', 1);
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       VALUES ('race-last-seat', t.id('racehost'), 0, false);`,
+  );
+  if (r.status !== 0) fail("The race test could not set up its game.", r.stderr);
+  const join = (who, hold) =>
+    `BEGIN; SELECT t.as_user(t.id('${who}'));
+     INSERT INTO public.game_participants (game_id, user_id) VALUES ('race-last-seat', t.id('${who}'));
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const first = session(join("racea", true));
+  await pause(1000);
+  const second = session(join("raceb", false));
+  const results = await Promise.all([first, second]);
+  const seats = psql(dbName, [
+    "-At",
+    "-c",
+    "SELECT count(*) FROM public.game_participants WHERE game_id = 'race-last-seat'",
+  ]).stdout.trim();
+  psql(dbName, [], RACE_CLEANUP);
+  const lost = results.filter((x) => x.code !== 0);
+  return [
+    ["two players racing for the last seat leave one on the roster", seats === "1"],
+    [
+      "and the other is told the roster is full",
+      lost.length === 1 && lost[0].out.includes("GAME_FULL"),
+    ],
+  ];
+}
+
 let exitCode = 0;
 try {
   if (!reuse) {
@@ -141,7 +201,8 @@ try {
     const files = readdirSync(join(root, "supabase/tests"))
       .filter((f) => f.endsWith(".test.sql") && (!only || f.includes(only)))
       .sort();
-    if (files.length === 0) fail("No test files matched.");
+    const raceSelected = !only || "race".includes(only);
+    if (files.length === 0 && !raceSelected) fail("No test files matched.");
 
     let passed = 0;
     let failed = 0;
@@ -177,6 +238,14 @@ try {
       } else if (assertions === 0) {
         failed += 1;
         console.log(`  NOT OK - ${file} ran no assertions`);
+      }
+    }
+    if (raceSelected) {
+      console.log("\nraces");
+      for (const [name, ok] of await lastSeatRace()) {
+        if (ok) passed += 1;
+        else failed += 1;
+        console.log(`  ${ok ? "ok" : "NOT OK"} - ${name}`);
       }
     }
     console.log(`\n${passed} passed, ${failed} failed`);

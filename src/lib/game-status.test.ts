@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   resolveGameStatus,
@@ -114,5 +115,34 @@ describe("joinGateErrorMessage", () => {
     expect(joinGateErrorMessage({ message: "GAME_SIGNUP_CLOSED: ..." })).toMatch(/closed/i);
     expect(joinGateErrorMessage({ message: "GAME_FULL: ..." })).toMatch(/waitlist/i);
     expect(joinGateErrorMessage({ message: "boom" })).toMatch(/Couldn't join/i);
+  });
+
+  it("says what is missing when approval, payment or a guardian is", () => {
+    expect(joinGateErrorMessage({ message: "GAME_APPROVAL_REQUIRED: ..." })).toMatch(
+      /host has to approve/i,
+    );
+    expect(joinGateErrorMessage({ message: "GAME_PAYMENT_REQUIRED: ..." })).toMatch(/entry fee/i);
+    expect(joinGateErrorMessage({ message: "GUARDIAN_APPROVAL_REQUIRED: ..." })).toMatch(
+      /guardian/i,
+    );
+    expect(joinGateErrorMessage({ message: "AGE_VERIFICATION_REQUIRED: ..." })).toMatch(
+      /date of birth/i,
+    );
+    expect(joinGateErrorMessage({ message: "CHILD_GAME_PARTICIPATION_BLOCKED: ..." })).toMatch(
+      /guardian/i,
+    );
+  });
+
+  it("has a sentence for every code the join gate can raise", () => {
+    const sql = readFileSync(
+      new URL("../../supabase/migrations/20261027120000_join_gate_hardening.sql", import.meta.url),
+      "utf8",
+    );
+    const gate = sql.slice(sql.indexOf("FUNCTION public.enforce_game_join_gate"));
+    const codes = [...gate.matchAll(/RAISE EXCEPTION '([A-Z_]+):/g)].map((m) => m[1]!);
+    expect(codes.length).toBeGreaterThanOrEqual(7);
+    for (const code of codes) {
+      expect(joinGateErrorMessage({ message: `${code}: x` }), code).not.toMatch(/Couldn't join/i);
+    }
   });
 });

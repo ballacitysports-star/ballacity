@@ -10,6 +10,10 @@ let hydrated = false;
 let hydratingPromise: Promise<void> | null = null;
 let realtimeAttached = false;
 let currentUserId: string | null = null;
+// Games whose join is being written right now: a refresh must not take them away.
+const inFlight = new Set<string>();
+let lastHydratedAt = 0;
+const REHYDRATE_AFTER_MS = 30_000;
 const EMPTY_SNAPSHOT = "[]";
 
 function loadJoinedGames() {
@@ -61,8 +65,15 @@ async function hydrateFromDb(userId: string) {
     .select("game_id")
     .eq("user_id", userId);
   if (error) return;
-  // Merge DB truth in; keep local-only entries for sample (non-DB) games.
-  (data ?? []).forEach((r) => joined.add(r.game_id));
+  lastHydratedAt = Date.now();
+  // The database is the truth. A game the host removed us from, or that we left
+  // on another device, while this one was offline would otherwise read "joined"
+  // for good: the saved list only ever grew. Joins still being written stay.
+  const onRoster = new Set((data ?? []).map((r) => r.game_id));
+  Array.from(joined).forEach((id) => {
+    if (!onRoster.has(id) && !inFlight.has(id)) joined.delete(id);
+  });
+  onRoster.forEach((id) => joined.add(id));
   saveJoinedGames();
   emit();
 }
@@ -114,6 +125,16 @@ function ensureRealtime() {
 
   if (currentUserId) attach(currentUserId);
 
+  // A phone that was in a pocket missed realtime events; check the roster again
+  // when the app comes back (at most every 30 seconds).
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || !currentUserId) return;
+      if (Date.now() - lastHydratedAt < REHYDRATE_AFTER_MS) return;
+      void hydrateFromDb(currentUserId);
+    });
+  }
+
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_IN" || event === "USER_UPDATED") {
       const uid = session?.user?.id ?? null;
@@ -137,32 +158,59 @@ function ensureRealtime() {
   });
 }
 
-export function joinGame(id: string, position?: string) {
+/**
+ * Join a game. Resolves once the server has answered: true when the player is on
+ * the roster (including when they already were), false when it refused or they
+ * are signed out; the player has been told why. The list updates straight away
+ * so the button responds, and is put back if the join fails.
+ */
+export async function joinGame(id: string, position?: string): Promise<boolean> {
   loadJoinedGames();
-  if (joined.has(id)) return;
+  if (joined.has(id) && !inFlight.has(id)) return true;
+  if (inFlight.has(id)) return false;
+  inFlight.add(id);
   joined.add(id);
   saveJoinedGames();
   emit();
-  // Best-effort DB write; realtime will confirm.
-  void (async () => {
+
+  const undo = () => {
+    joined.delete(id);
+    saveJoinedGames();
+    emit();
+  };
+
+  try {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
-    if (!uid) return;
+    if (!uid) {
+      undo();
+      const { toast } = await import("sonner");
+      toast.error("Sign in to join games.");
+      return false;
+    }
     const insert: TablesInsert<"game_participants"> = { game_id: id, user_id: uid };
     if (position && position.trim()) insert.position = position.trim();
     const { error } = await supabase.from("game_participants").insert(insert);
+    // A duplicate means they were already on the roster, which is the outcome they wanted.
     if (error && error.code !== "23505") {
-      // Roll back on real failures (e.g. FK / RLS). Duplicate is fine.
-      joined.delete(id);
-      saveJoinedGames();
-      emit();
-      // The server-side join gate rejects cancelled/ended/closed/full games.
-      // Tell the player why instead of silently un-joining them.
+      undo();
+      // The server-side join gate rejects cancelled/ended/closed/full games and
+      // anything that needs a host's or guardian's approval first. Tell the
+      // player why instead of silently un-joining them.
       const { joinGateErrorMessage } = await import("@/lib/game-status");
       const { toast } = await import("sonner");
       toast.error(joinGateErrorMessage(error));
+      return false;
     }
-  })();
+    return true;
+  } catch {
+    undo();
+    const { toast } = await import("sonner");
+    toast.error("Couldn't reach BallaCity. Check your connection and try again.");
+    return false;
+  } finally {
+    inFlight.delete(id);
+  }
 }
 
 export function leaveGame(id: string) {

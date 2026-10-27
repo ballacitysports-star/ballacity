@@ -569,6 +569,9 @@ function GameDetail() {
   // fire during the teardown and would otherwise refetch the (still-
   // committing) rows and re-hydrate the "Payment verified" strip.
   const leavingRef = useRef(false);
+  // The approved-player fallback below tries once per approval/payment state, so
+  // a join the server keeps refusing (roster filled up) doesn't toast on every refresh.
+  const autoJoinTriedRef = useRef<string | null>(null);
 
   const refreshStatus = async () => {
     if (!game) return;
@@ -587,7 +590,13 @@ function GameDetail() {
       // Join CTA would flip to "leave" and hide the Pay flow after approval.
       const feeOwed = Number(s?.entry_fee ?? game.price ?? 0) > 0;
       const paidOk = subs[0]?.status === "verified";
-      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) joinGame(game.id);
+      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) {
+        const attempt = `${req.id}:${subs[0]?.id ?? ""}:${subs[0]?.status ?? ""}`;
+        if (autoJoinTriedRef.current !== attempt) {
+          autoJoinTriedRef.current = attempt;
+          void joinGame(game.id);
+        }
+      }
     } catch {}
   };
 
@@ -1052,7 +1061,7 @@ function GameDetail() {
         // Rollback optimistic state.
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        if (wasJoined) joinGame(game.id);
+        if (wasJoined) void joinGame(game.id);
         toast.error(e.message ?? "Could not leave.");
       } finally {
         leavingRef.current = false;
@@ -1186,7 +1195,11 @@ function GameDetail() {
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
-    joinGame(game.id, preselectedPosition);
+    // Wait for the server: a full roster, a closed game or a missing approval
+    // answers with its own message, and neither the "You're in!" toast nor the
+    // host's notification should go out for a join that did not happen.
+    const joinedOk = await joinGame(game.id, preselectedPosition);
+    if (!joinedOk) return;
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
