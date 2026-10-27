@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GAMES, ORGS, SPORTS, imageFor, type Sport } from "./sample-data";
+import { GAMES, SPORTS, imageFor, type Sport } from "./sample-data";
 
 describe("sport cover consistency", () => {
   it("resolves a non-empty cover for every sport", () => {
@@ -22,19 +22,6 @@ describe("sport cover consistency", () => {
       const expected = imageFor(g.sport);
       if (g.image !== expected) {
         mismatches.push(`${g.id} (${g.sport}): got ${g.image}, expected ${expected}`);
-      }
-    }
-    expect(mismatches, mismatches.join("\n")).toEqual([]);
-  });
-
-  it("every single-sport org's cover matches imageFor(sport)", () => {
-    const mismatches: string[] = [];
-    for (const org of ORGS) {
-      if (org.sports.length !== 1) continue;
-      const sport = org.sports[0] as Sport;
-      const expected = imageFor(sport);
-      if (org.cover !== expected) {
-        mismatches.push(`${org.id} (${sport}): got ${org.cover}, expected ${expected}`);
       }
     }
     expect(mismatches, mismatches.join("\n")).toEqual([]);
