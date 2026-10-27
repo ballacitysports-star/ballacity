@@ -101,6 +101,13 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user || startedSetup.current) return;
+    // A returning member has nothing to route through first: go straight on.
+    // A member who has not picked a role is caught by the app shell's own
+    // account-type check, so the profile lookup below is only for a pending setup.
+    if (!startSetupOf(user)) {
+      router.navigate({ to: readLastVisited() ?? "/feed", replace: true });
+      return;
+    }
     let cancelled = false;
     (async () => {
       const { data } = await supabase
