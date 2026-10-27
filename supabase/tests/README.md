@@ -37,6 +37,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `70_listing_claim_review.test.sql`      | Nobody reviews their own listing claim; claims state a relationship and an attestation; the needs-info round trip; a claim grants nothing until approved         |
 | `110_follow_approval.test.sql`          | Private accounts: following waits for approval; every minor always needs it; under 16 only a guardian can answer; no direct writes to follows / requests         |
 | `120_minor_messaging.test.sql`          | Who may start a conversation with a minor: age rules, guardian controls, a guardian reaches only their own children, no client path around the function         |
+| `130_storage_policies.test.sql`         | Payment proofs, message attachments and highlight videos stay with their owners and participants; nobody writes into another folder; a quarantined clip is unreadable |
 
 ## Writing a test
 
