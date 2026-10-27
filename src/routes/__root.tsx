@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { isSignedOutPublicPath, showsSignedOutBar } from "@/lib/public-paths";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
+import { SupportAssistantHost } from "@/components/support/SupportAssistantHost";
 import { BottomNav } from "@/components/BottomNav";
 import { StaffBar } from "@/components/staff/StaffBar";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
@@ -1140,6 +1141,7 @@ function RootComponent() {
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <SessionHeartbeat />
+        <SupportAssistantHost />
         <DebugModeToggle />
       </ClientOnly>
     </QueryClientProvider>

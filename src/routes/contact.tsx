@@ -1,9 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Flag, Mail, MessageSquare, ShieldOff } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Flag,
+  Mail,
+  MessageCircleQuestion,
+  MessageSquare,
+  ShieldOff,
+} from "lucide-react";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import { EMERGENCY_NOTICE } from "@/lib/safety";
 import { pageHead } from "@/lib/seo";
 import { SUPPORT_EMAIL } from "@/lib/trust";
+import { openSupport } from "@/lib/support/support-store";
 
 export const Route = createFileRoute("/contact")({
   head: () =>
@@ -33,7 +42,26 @@ function ContactPage() {
           here.
         </p>
 
-        <section className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
+        <section className="mt-5 rounded-2xl border border-lime/30 bg-lime/5 px-4 py-4">
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <MessageCircleQuestion className="h-4 w-4 text-lime" aria-hidden />
+            Ask BallaCity Help
+          </h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            Quick answers about paying hosts, joining games, tryouts, and kids' accounts. Signed-in
+            members can also ask our AI assistant, which answers from BallaCity's written help and
+            can point you to a person when you need one.
+          </p>
+          <button
+            type="button"
+            onClick={() => openSupport()}
+            className="mt-3 inline-flex min-h-10 items-center rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground"
+          >
+            Open Help
+          </button>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-border bg-surface px-4 py-4">
           <h2 className="flex items-center gap-2 text-sm font-bold">
             <Mail className="h-4 w-4 text-lime" aria-hidden />
             Email support
