@@ -68,7 +68,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
     }
   }
 
-  async function useAsCaption(text: string) {
+  async function applyAsCaption(text: string) {
     try {
       await applyReelCopy({ data: { reelId, caption: text } });
       toast.success("Caption updated");
@@ -284,7 +284,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
               <p className="whitespace-pre-wrap">{m.content}</p>
               {m.role === "assistant" && (
                 <button
-                  onClick={() => useAsCaption(m.content)}
+                  onClick={() => applyAsCaption(m.content)}
                   className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-lime underline"
                 >
                   <Sparkles className="h-3 w-3" /> Use as caption

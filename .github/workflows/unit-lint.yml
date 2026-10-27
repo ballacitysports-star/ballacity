@@ -57,3 +57,13 @@ jobs:
       - name: Run lint
         run: bun run lint
         continue-on-error: true
+
+      # Blocking, unlike the full lint above: a hook called after an early
+      # return changes the hook count between renders and crashes the page.
+      # The backlog for this rule is zero, so any new hit is a regression.
+      - name: Lint (rules of hooks must pass)
+        run: |
+          if bunx eslint src --quiet --format unix | grep "react-hooks/rules-of-hooks"; then
+            echo "A hook is called conditionally; see the lines above."
+            exit 1
+          fi
