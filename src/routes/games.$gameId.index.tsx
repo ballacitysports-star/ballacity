@@ -74,6 +74,7 @@ import { useReviewsFor } from "@/lib/reviews-db";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
+import { BalancedTeamsPanel } from "@/components/games/BalancedTeamsPanel";
 import {
   cancelGame,
   completeGame,
@@ -2902,6 +2903,18 @@ function GameDetail() {
                         ))}
                       </div>
                     </div>
+                  ) : null}
+                  {/* Balanced teams: host-only, from confirmed players who
+                      haven't been marked no-shows. Suggestion only; nothing saved. */}
+                  {isHost &&
+                  !game.cancelledAt &&
+                  liveRoster.filter((p) => p.attended !== false).length >= 4 ? (
+                    <BalancedTeamsPanel
+                      sport={game.sport}
+                      players={liveRoster
+                        .filter((p) => p.attended !== false)
+                        .map((p) => ({ userId: p.userId, displayName: p.displayName }))}
+                    />
                   ) : null}
                   <div className="space-y-2">
                     {totalConfirmed === 0 ? (
