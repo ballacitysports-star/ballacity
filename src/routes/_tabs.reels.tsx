@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Eye,
   Circle,
+  Gauge,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
@@ -1308,12 +1309,20 @@ function ReelsPage() {
           <h1 className="page-title">AI Highlight Reels</h1>
         </div>
         <p className="mt-1 page-subtitle">Upload a clip and let AI generate your highlight.</p>
-        <Link
-          to="/highlights"
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
-        >
-          <Film className="h-3.5 w-3.5" /> Browse the public highlight feed
-        </Link>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            to="/highlights"
+            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+          >
+            <Film className="h-3.5 w-3.5" /> Browse the public highlight feed
+          </Link>
+          <Link
+            to="/motion"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-bold"
+          >
+            <Gauge className="h-3.5 w-3.5" /> Review a clip frame by frame
+          </Link>
+        </div>
       </header>
 
       {gameId && (
