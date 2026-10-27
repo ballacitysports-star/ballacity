@@ -104,6 +104,11 @@ function MessagesInbox() {
   const alertUnread = useUnreadNotificationCount("inbox-");
   const msgUnread = useMemo(() => primary.reduce((n, c) => n + c.unread, 0), [primary]);
 
+  // Warm photos for every thread in both tabs, not just the visible ones.
+  usePrefetchUserAvatars(
+    useMemo(() => [...primary, ...requests].map((c) => c.other_user_id), [primary, requests]),
+  );
+
   if (!loading && !user) {
     return (
       <div className="page-shell-narrow pt-10 text-center">
@@ -120,11 +125,6 @@ function MessagesInbox() {
   }
 
   const list = msgTab === "primary" ? primary : requests;
-
-  // Warm photos for every thread in both tabs, not just the visible ones.
-  usePrefetchUserAvatars(
-    useMemo(() => [...primary, ...requests].map((c) => c.other_user_id), [primary, requests]),
-  );
 
   const handleAccept = async (id: string) => {
     try {

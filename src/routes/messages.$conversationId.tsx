@@ -320,6 +320,12 @@ function Thread() {
     typingTimer.current = setTimeout(() => setTypingState(false), 2500);
   };
 
+  const lastSeenId = useMemo(() => {
+    if (!user) return null;
+    const mine = msgs.filter((m) => m.sender_id === user.id && m.read_at);
+    return mine.length ? mine[mine.length - 1].id : null;
+  }, [msgs, user?.id]);
+
   if (!loading && !user) {
     return (
       <div className="page-shell-narrow pt-10 text-center text-sm">
@@ -449,12 +455,6 @@ function Thread() {
       toast.error(e.message);
     }
   };
-
-  const lastSeenId = useMemo(() => {
-    if (!user) return null;
-    const mine = msgs.filter((m) => m.sender_id === user.id && m.read_at);
-    return mine.length ? mine[mine.length - 1].id : null;
-  }, [msgs, user?.id]);
 
   return (
     <div className="flex h-dvh flex-col bg-background pb-[calc(env(safe-area-inset-bottom)+6rem)]">

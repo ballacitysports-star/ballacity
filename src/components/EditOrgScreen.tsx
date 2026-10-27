@@ -311,30 +311,6 @@ export function EditOrgScreen({ org }: { org: Org }) {
     return false;
   }, [kind, step, name, handle, sports, city, bio, venueAddresses, verifiedVenues]);
 
-  if (!isMyOrg(org.id)) {
-    const isCoach = org.kind === "coach";
-    return (
-      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 pt-24 text-center">
-        <div className="grid h-12 w-12 place-items-center rounded-full bg-destructive/10 text-destructive">
-          <ShieldAlert className="h-6 w-6" />
-        </div>
-        <h1 className="text-lg font-bold">Editing not allowed</h1>
-        <p className="text-sm text-muted-foreground">
-          {isCoach
-            ? "Only the trainer who created this profile can edit it."
-            : "Only the owner of this organization can edit it."}
-        </p>
-        <Link
-          to={isCoach ? "/trainers/$trainerId" : "/teams/$teamId"}
-          params={isCoach ? { trainerId: org.id } : { teamId: org.id }}
-          className="mt-2 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-        >
-          Back to profile
-        </Link>
-      </div>
-    );
-  }
-
   const computedInitials = avatar || initials(name || "OR");
   // What cards render: the logo when there is one, else the initials.
   const computedAvatar = logoUrl || computedInitials;
@@ -551,6 +527,31 @@ export function EditOrgScreen({ org }: { org: Org }) {
     validate: validateOrg,
     save: persistOrg,
   });
+
+  // After every hook: returning earlier would change how many hooks run between renders.
+  if (!isMyOrg(org.id)) {
+    const isCoach = org.kind === "coach";
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 pt-24 text-center">
+        <div className="grid h-12 w-12 place-items-center rounded-full bg-destructive/10 text-destructive">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h1 className="text-lg font-bold">Editing not allowed</h1>
+        <p className="text-sm text-muted-foreground">
+          {isCoach
+            ? "Only the trainer who created this profile can edit it."
+            : "Only the owner of this organization can edit it."}
+        </p>
+        <Link
+          to={isCoach ? "/trainers/$trainerId" : "/teams/$teamId"}
+          params={isCoach ? { trainerId: org.id } : { teamId: org.id }}
+          className="mt-2 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+        >
+          Back to profile
+        </Link>
+      </div>
+    );
+  }
 
   async function save() {
     const invalid = validateOrg();
