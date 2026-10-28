@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OVERPASS_ENDPOINTS, fetchOverpass } from "./sources.server";
+import {
+  FIRECRAWL_GATEWAY_URL,
+  OVERPASS_ENDPOINTS,
+  fetchOverpass,
+  firecrawlConfigured,
+  firecrawlRequest,
+  searchWeb,
+} from "./sources.server";
 
 const ENDPOINTS = [
   "https://one.example/api",
@@ -16,6 +23,9 @@ const good = () =>
 
 afterEach(() => {
   delete process.env["OVERPASS_URL"];
+  delete process.env["FIRECRAWL_API_KEY"];
+  delete process.env["LOVABLE_API_KEY"];
+  vi.unstubAllGlobals();
 });
 
 describe("fetchOverpass", () => {
@@ -98,5 +108,73 @@ describe("fetchOverpass", () => {
       OVERPASS_ENDPOINTS[0],
       OVERPASS_ENDPOINTS[2],
     ]);
+  });
+});
+
+describe("Firecrawl through the connector gateway", () => {
+  const connect = () => {
+    process.env["FIRECRAWL_API_KEY"] = "conn-key";
+    process.env["LOVABLE_API_KEY"] = "lov-key";
+  };
+
+  it("is on only when both the connection key and the gateway key are present", () => {
+    expect(firecrawlConfigured()).toBe(false);
+    process.env["FIRECRAWL_API_KEY"] = "conn-key";
+    expect(firecrawlConfigured()).toBe(false);
+    process.env["LOVABLE_API_KEY"] = "lov-key";
+    expect(firecrawlConfigured()).toBe(true);
+    delete process.env["FIRECRAWL_API_KEY"];
+    expect(firecrawlConfigured()).toBe(false);
+  });
+
+  it("posts to the gateway with the Lovable key as bearer and the connection key beside it", async () => {
+    connect();
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}"));
+    await firecrawlRequest("/scrape", { url: "https://a.com" }, 5_000, fetchFn);
+    const [url, init] = fetchFn.mock.calls[0]!;
+    expect(url).toBe("https://connector-gateway.lovable.dev/firecrawl/v2/scrape");
+    expect(String(url).startsWith(FIRECRAWL_GATEWAY_URL)).toBe(true);
+    expect(init?.method).toBe("POST");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer lov-key");
+    expect(headers["X-Connection-Api-Key"]).toBe("conn-key");
+    expect(JSON.parse(String(init?.body))).toEqual({ url: "https://a.com" });
+  });
+
+  it("never sends the connection key to Firecrawl directly", async () => {
+    connect();
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}"));
+    await firecrawlRequest("/search", { query: "q" }, 5_000, fetchFn);
+    expect(String(fetchFn.mock.calls[0]![0])).not.toContain("api.firecrawl.dev");
+  });
+
+  it("refuses to call when it is not connected", async () => {
+    const fetchFn = vi.fn<typeof fetch>();
+    await expect(firecrawlRequest("/scrape", {}, 5_000, fetchFn)).rejects.toThrow(/not connected/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("searchWeb reads results (nested under data.web) from the gateway answer", async () => {
+    connect();
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: { web: [{ url: "https://gym.example", title: "Gym", description: "A gym" }] },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const hits = await searchWeb("gyms near me", 5);
+    expect(hits).toEqual([{ url: "https://gym.example", title: "Gym", description: "A gym" }]);
+    expect(String(fetchMock.mock.calls[0]![0])).toBe(
+      "https://connector-gateway.lovable.dev/firecrawl/v2/search",
+    );
+  });
+
+  it("searchWeb says web search is off when it is not connected, without calling out", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(searchWeb("x")).rejects.toThrow(/not configured/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

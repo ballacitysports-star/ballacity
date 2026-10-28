@@ -4,12 +4,15 @@
  *  - Pages: read directly, politely. robots.txt is checked first, redirects may
  *    not leave the site, size and time are capped, and only public http(s)
  *    addresses are ever requested. A page that renders in the browser with
- *    script (almost no text in the raw HTML) falls back to Firecrawl when a key
- *    is configured.
- *  - Web search and the script-rendering fallback: Firecrawl (FIRECRAWL_API_KEY).
+ *    script (almost no text in the raw HTML) falls back to Firecrawl when it is
+ *    connected.
+ *  - Web search and the script-rendering fallback: Firecrawl, reached through the
+ *    Lovable connector gateway (the same route the Maps and Stripe connectors take).
+ *    FIRECRAWL_API_KEY is the connection's key and travels in X-Connection-Api-Key;
+ *    LOVABLE_API_KEY authorises the gateway call.
  *  - OpenStreetMap leads: the Overpass API.
  *
- * The key is read from the server environment and never leaves it.
+ * Both keys are read from the server environment and never leave it.
  */
 
 import type { DiscoveryArea, DiscoveryType, OsmLead } from "@/lib/discovery/areas";
@@ -23,7 +26,8 @@ import {
   robotsFromResponse,
 } from "@/lib/discovery/urls";
 
-const FIRECRAWL_URL = "https://api.firecrawl.dev/v2";
+/** Firecrawl's own v2 paths (/scrape, /search) sit directly under the connector's id. */
+export const FIRECRAWL_GATEWAY_URL = "https://connector-gateway.lovable.dev/firecrawl/v2";
 /**
  * Public Overpass servers, tried in order. They are volunteer-run and go down or
  * fill up often (the first live run failed with HTTP 521 and 522 from the only
@@ -43,8 +47,37 @@ const MAX_PAGE_BYTES = 800_000;
 const MAX_ROBOTS_BYTES = 200_000;
 const MAX_REDIRECTS = 4;
 
+/** Gateway headers, or null when the connection or the gateway key is missing. */
+function firecrawlHeaders(): Record<string, string> | null {
+  const connectionKey = process.env["FIRECRAWL_API_KEY"];
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  if (!connectionKey || !lovableKey) return null;
+  return {
+    Authorization: `Bearer ${lovableKey}`,
+    "X-Connection-Api-Key": connectionKey,
+    "Content-Type": "application/json",
+  };
+}
+
 export function firecrawlConfigured(): boolean {
-  return Boolean(process.env["FIRECRAWL_API_KEY"]);
+  return firecrawlHeaders() !== null;
+}
+
+/** POSTs to a Firecrawl v2 path through the gateway. Throws when it is not connected. */
+export async function firecrawlRequest(
+  path: "/scrape" | "/search",
+  body: unknown,
+  timeoutMs: number,
+  fetchFn: typeof fetch = fetch,
+): Promise<Response> {
+  const headers = firecrawlHeaders();
+  if (!headers) throw new Error("Firecrawl is not connected (FIRECRAWL_API_KEY).");
+  return fetchFn(`${FIRECRAWL_GATEWAY_URL}${path}`, {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers,
+    body: JSON.stringify(body),
+  });
 }
 
 export type SearchHit = { url: string; title: string; description: string };
@@ -131,15 +164,13 @@ async function robotsAllows(url: string): Promise<boolean> {
 }
 
 async function firecrawlScrape(url: string): Promise<PageText | null> {
-  const key = process.env["FIRECRAWL_API_KEY"];
-  if (!key) return null;
+  if (!firecrawlConfigured()) return null;
   try {
-    const res = await fetch(`${FIRECRAWL_URL}/scrape`, {
-      method: "POST",
-      signal: AbortSignal.timeout(45_000),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
-    });
+    const res = await firecrawlRequest(
+      "/scrape",
+      { url, formats: ["markdown"], onlyMainContent: true },
+      45_000,
+    );
     if (!res.ok) return null;
     const json = (await res.json()) as {
       data?: { markdown?: string; metadata?: { title?: string; description?: string } };
@@ -192,16 +223,14 @@ export async function fetchPage(rawUrl: string): Promise<FetchResult> {
   }
 }
 
-/** Web search through Firecrawl. Throws when it is not configured or fails. */
+/** Web search through Firecrawl (via the gateway). Throws when it is not configured or fails. */
 export async function searchWeb(query: string, limit = 10): Promise<SearchHit[]> {
-  const key = process.env["FIRECRAWL_API_KEY"];
-  if (!key) throw new Error("Web search is not configured (FIRECRAWL_API_KEY).");
-  const res = await fetch(`${FIRECRAWL_URL}/search`, {
-    method: "POST",
-    signal: AbortSignal.timeout(40_000),
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query, limit, sources: ["web"], country: "US" }),
-  });
+  if (!firecrawlConfigured()) throw new Error("Web search is not configured (FIRECRAWL_API_KEY).");
+  const res = await firecrawlRequest(
+    "/search",
+    { query, limit, sources: ["web"], country: "US" },
+    40_000,
+  );
   if (!res.ok) throw new Error(`Web search failed (HTTP ${res.status}).`);
   const json = (await res.json()) as { data?: unknown };
   // Newer responses nest results under data.web; older ones return a bare array.
