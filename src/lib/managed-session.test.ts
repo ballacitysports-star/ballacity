@@ -91,7 +91,7 @@ describe("per-user client state", () => {
     );
   });
 
-  it("keeps a host's block list, which is keyed by host and exists nowhere else", () => {
+  it("leaves a host's old device-only block list alone: it is the only record of who they blocked", () => {
     expect(PER_USER_STORAGE_KEYS).not.toContain("openrun.blockedUsers.v1");
   });
 });

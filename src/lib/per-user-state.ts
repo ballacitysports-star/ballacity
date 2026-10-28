@@ -7,9 +7,10 @@
  * the previous one's cached games or replay their pending signup answers. Each
  * store re-hydrates from the database on the next page load.
  *
- * `openrun.blockedUsers.v1` is deliberately absent: it is already keyed by
- * host id, and it is the host's only copy of their block list, so clearing it
- * would destroy data rather than reset a cache.
+ * `openrun.blockedUsers.v1` is deliberately absent. Nothing reads it any more (a
+ * host's Block now records an account block in the database), but it is the only
+ * record on that device of who a host once blocked, so it is left alone rather
+ * than deleted or silently turned into real blocks.
  */
 export const PER_USER_STORAGE_KEYS = [
   "openrun.joinedGameIds.v1",
