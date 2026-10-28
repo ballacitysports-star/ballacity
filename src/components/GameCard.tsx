@@ -16,7 +16,7 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
+import { useMyFlowStatus, isGameId } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { GamePlaceDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
@@ -56,7 +56,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
   const gate = useJoinGate(game, { spotsLeft });
-  const { status: flowStatus } = useMyFlowStatus(user && isUuid(game.id) ? game.id : undefined);
+  const { status: flowStatus } = useMyFlowStatus(user && isGameId(game.id) ? game.id : undefined);
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
     e.preventDefault();

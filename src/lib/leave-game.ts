@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createNotification } from "@/lib/notifications";
-import { isUuid } from "@/lib/game-flow-status";
+import { isGameId } from "@/lib/game-flow-status";
 import { withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
 import { isLateCancel } from "@/lib/cancel-window";
@@ -30,7 +30,7 @@ export async function notifyHostOfLeave(gameId: string, fallbackTitle: string) {
   try {
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
-    if (!uid || !isUuid(gameId)) return;
+    if (!uid || !isGameId(gameId)) return;
     const [{ data: game }, { data: me }] = await Promise.all([
       supabase.from("hosted_games").select("*").eq("id", gameId).maybeSingle(),
       supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle(),

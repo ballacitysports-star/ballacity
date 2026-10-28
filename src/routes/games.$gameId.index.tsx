@@ -1231,7 +1231,9 @@ function GameDetail() {
     const gate = needsRiskAcknowledgment({
       signedIn: !!user,
       isHost,
-      alreadyJoined: viewerCountsAsJoined,
+      // Taking back a pending request or payment is not joining: never ask for
+      // the risk acknowledgment in front of it.
+      alreadyJoined: viewerCountsAsJoined || isPending,
       acknowledgedVersion: riskAckVersion ?? null,
     });
     if (gate) {
@@ -1770,6 +1772,17 @@ function GameDetail() {
                   <div className="min-w-0">
                     <div className="font-display text-sm font-bold">{entry.title}</div>
                     <p className="text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+                    {/* A request is the player's to take back until the host answers. */}
+                    {myFlowStatus === "requested" && (
+                      <div className="mt-3">
+                        <LeaveFlowButton
+                          gameId={game.id}
+                          gameTitle={game.title}
+                          variant="danger"
+                          onDone={() => void refreshStatus()}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1818,6 +1831,16 @@ function GameDetail() {
                             ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
                             : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
                   </p>
+                  {myReq.status === "pending" && (
+                    <div className="mt-3">
+                      <LeaveFlowButton
+                        gameId={game.id}
+                        gameTitle={game.title}
+                        variant="danger"
+                        onDone={() => void refreshStatus()}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             );

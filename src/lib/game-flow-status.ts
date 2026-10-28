@@ -129,8 +129,13 @@ export function computePlayerFlowStatus(input: {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export function isUuid(id: string | null | undefined): id is string {
-  return typeof id === "string" && UUID_RE.test(id);
+// Games hosted in the app get a text id such as `host-mvli8nwx-l71w`; every game
+// stored today has one, and none is a UUID. Anything else (a sample card, a
+// demo id) is not a game the database knows, so nothing is looked up for it.
+const HOSTED_GAME_ID_RE = /^host-[a-z0-9]+-[a-z0-9]+$/i;
+/** True when the id can name a stored game, so its status can be looked up. */
+export function isGameId(id: string | null | undefined): id is string {
+  return typeof id === "string" && (UUID_RE.test(id) || HOSTED_GAME_ID_RE.test(id));
 }
 
 async function fetchFlowInputs(gameId: string, userId: string) {
@@ -186,7 +191,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
   }, []);
 
   useEffect(() => {
-    if (!gameId || !userId || !isUuid(gameId)) {
+    if (!gameId || !userId || !isGameId(gameId)) {
       setStatus("none");
       setSettings(null);
       setLoading(false);

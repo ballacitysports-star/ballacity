@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useMyFlowStatus, isUuid, type PlayerFlowStatus } from "@/lib/game-flow-status";
+import { useMyFlowStatus, isGameId, type PlayerFlowStatus } from "@/lib/game-flow-status";
 import { cancelMyJoinRequest, withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
 import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
@@ -95,7 +95,7 @@ export function LeaveFlowButton({
   className?: string;
 }) {
   const navigate = useNavigate();
-  const { status } = useMyFlowStatus(isUuid(gameId) ? gameId : undefined);
+  const { status } = useMyFlowStatus(isGameId(gameId) ? gameId : undefined);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [timing, setTiming] = useState<{ date: string; cutoff: number | null } | null>(null);
@@ -103,7 +103,7 @@ export function LeaveFlowButton({
   // Start time and cutoff, read when the dialog opens so the late-cancel
   // warning is current without every caller passing game details in.
   useEffect(() => {
-    if (!open || !isUuid(gameId)) return;
+    if (!open || !isGameId(gameId)) return;
     let alive = true;
     void supabase
       .from("hosted_games")
