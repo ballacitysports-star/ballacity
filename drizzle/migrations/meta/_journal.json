@@ -176,6 +176,13 @@
       "when": 1793147924166,
       "tag": "0024_join_gate_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793147962776,
+      "tag": "0025_guardian_join_request_either_order",
+      "breakpoints": true
     }
   ]
 }
