@@ -113,14 +113,20 @@ function MessagesInbox() {
 
   const primary = useMemo(() => convs.filter((c) => !c.is_request), [convs]);
   const requests = useMemo(() => convs.filter((c) => c.is_request), [convs]);
-  const alertUnread = useUnreadNotificationCount("inbox-");
+  // A thread nobody has written in is a request on paper only; badges count the real ones.
+  const waitingRequests = useMemo(
+    () => requests.filter((c) => c.last_message !== null).length,
+    [requests],
+  );
+  // Messages have their own badge; the Alerts tab counts everything else.
+  const alertUnread = useUnreadNotificationCount("inbox-", { excludeType: "message" });
   const msgUnread = useMemo(() => primary.reduce((n, c) => n + c.unread, 0), [primary]);
 
   useEffect(() => {
     if (fetching || pickedTabRef.current) return;
     pickedTabRef.current = true;
-    if (primary.length === 0 && requests.length > 0) setMsgTab("requests");
-  }, [fetching, primary.length, requests.length]);
+    if (primary.length === 0 && waitingRequests > 0) setMsgTab("requests");
+  }, [fetching, primary.length, waitingRequests]);
 
   // Warm photos for every thread in both tabs, not just the visible ones.
   usePrefetchUserAvatars(
@@ -182,12 +188,12 @@ function MessagesInbox() {
         <TopTabButton active={top === "messages"} onClick={() => setTop("messages")}>
           <MessageCircle className="h-4 w-4" />
           Messages
-          {msgUnread + requests.length > 0 && (
+          {msgUnread + waitingRequests > 0 && (
             <span
               className="ml-1.5 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white"
-              aria-label={`${msgUnread} unread, ${requests.length} ${requests.length === 1 ? "request" : "requests"}`}
+              aria-label={`${msgUnread} unread, ${waitingRequests} ${waitingRequests === 1 ? "request" : "requests"}`}
             >
-              {msgUnread + requests.length > 9 ? "9+" : msgUnread + requests.length}
+              {msgUnread + waitingRequests > 9 ? "9+" : msgUnread + waitingRequests}
             </span>
           )}
         </TopTabButton>
@@ -221,9 +227,9 @@ function MessagesInbox() {
             </SubTabButton>
             <SubTabButton active={msgTab === "requests"} onClick={() => setMsgTab("requests")}>
               Requests
-              {requests.length > 0 && (
+              {waitingRequests > 0 && (
                 <span className="ml-2 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-                  {requests.length}
+                  {waitingRequests}
                 </span>
               )}
             </SubTabButton>
