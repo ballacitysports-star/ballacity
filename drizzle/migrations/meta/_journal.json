@@ -190,6 +190,13 @@
       "when": 1793147972480,
       "tag": "0026_team_members_no_direct_minor_add",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793147987624,
+      "tag": "0027_waitlist_notified_on_leave",
+      "breakpoints": true
     }
   ]
 }
