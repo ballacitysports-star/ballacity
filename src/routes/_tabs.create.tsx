@@ -77,6 +77,13 @@ import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { trackEvent } from "@/lib/analytics";
+import { BackButton } from "@/components/layout/BackButton";
+import {
+  clearCreateDraft,
+  loadCreateDraft,
+  saveCreateDraft,
+  type CreateDraft,
+} from "@/lib/create-draft";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -193,7 +200,11 @@ function Create() {
     const kept = serializeSkillTiers(sport, parseSkillTiers(sport, skill));
     if (kept !== skill) setSkill(kept);
   }, [sport, skill]);
-  const [price, setPrice] = useState(0);
+  // The fee is kept as typed so clearing the box to retype it doesn't read as
+  // "free" and switch the paid game off underneath the host.
+  const [paid, setPaid] = useState(false);
+  const [feeText, setFeeText] = useState("10");
+  const price = paid ? Math.max(0, Number(feeText) || 0) : 0;
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
@@ -327,6 +338,100 @@ function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // An unfinished form is kept on this device and offered back on return.
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftSettledRef = useRef(false);
+  useEffect(() => {
+    if (!user || draftSettledRef.current) return;
+    draftSettledRef.current = true;
+    let d: CreateDraft | null = null;
+    try {
+      d = loadCreateDraft(window.localStorage, user.id);
+    } catch {
+      d = null;
+    }
+    if (d) {
+      if (d.sport && SPORTS.some((x) => x.name === d.sport)) {
+        sportTouchedRef.current = true;
+        setSport(d.sport as Sport);
+      }
+      if (d.title !== undefined) setTitle(d.title);
+      if (d.description !== undefined) setDescription(d.description);
+      if (d.skill !== undefined) setSkill(d.skill);
+      if (d.paid !== undefined) setPaid(d.paid);
+      if (d.feeText !== undefined) setFeeText(d.feeText);
+      if (d.indoor !== undefined) setIndoor(d.indoor);
+      if (d.priv !== undefined) setPriv(d.priv);
+      if (d.requiresApproval !== undefined) setRequiresApproval(d.requiresApproval);
+      if (d.minAge !== undefined) setMinAge(d.minAge);
+      if (d.maxAge !== undefined) setMaxAge(d.maxAge);
+      if (d.signupCutoffMin !== undefined) setSignupCutoffMin(d.signupCutoffMin);
+      setDraftRestored(true);
+    }
+    setDraftChecked(true);
+  }, [user]);
+  const publishedRef = useRef(false);
+  useEffect(() => {
+    if (!user || !draftChecked) return;
+    const t = window.setTimeout(() => {
+      if (publishedRef.current) return;
+      try {
+        saveCreateDraft(window.localStorage, user.id, {
+          sport,
+          title,
+          description,
+          skill,
+          paid,
+          feeText,
+          indoor,
+          priv,
+          requiresApproval,
+          minAge,
+          maxAge,
+          signupCutoffMin,
+        });
+      } catch {
+        /* storage unavailable */
+      }
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [
+    user,
+    draftChecked,
+    sport,
+    title,
+    description,
+    skill,
+    paid,
+    feeText,
+    indoor,
+    priv,
+    requiresApproval,
+    minAge,
+    maxAge,
+    signupCutoffMin,
+  ]);
+  const discardDraft = () => {
+    setTitle("");
+    setDescription("");
+    setSkill(ANY_SKILL);
+    setPaid(false);
+    setFeeText("10");
+    setIndoor(false);
+    setPriv(false);
+    setRequiresApproval(true);
+    setMinAge(null);
+    setMaxAge(null);
+    setSignupCutoffMin(0);
+    setDraftRestored(false);
+    try {
+      if (user) clearCreateDraft(window.localStorage, user.id);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleLocationChange = (next: string) => {
     locationEditedRef.current = true;
     setLocation(next);
@@ -358,7 +463,7 @@ function Create() {
           </div>
           <Link
             to="/auth"
-            search={{ redirect: "/create" } as any}
+            search={{ next: "/create" }}
             className="inline-block w-full rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
           >
             Sign in to host a game
@@ -445,24 +550,11 @@ function Create() {
   return (
     <div className="page-shell-content pt-6">
       <div className="flex items-center gap-3 mb-5">
-        {orgIdParam ? (
-          <Link
-            to="/orgs/$orgId"
-            params={{ orgId: orgIdParam }}
-            aria-label="Back to facility"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        ) : (
-          <Link
-            to="/feed"
-            aria-label="Back to feed"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        )}
+        <BackButton
+          fallbackTo={orgIdParam ? `/orgs/${orgIdParam}` : "/feed"}
+          label={orgIdParam ? "Back to facility" : "Back"}
+          className="border border-border bg-surface"
+        />
         <h1 className="page-title">
           {postingOrg && postingOfficial ? "Post an event" : "Host a game"}
         </h1>
@@ -527,6 +619,20 @@ function Create() {
         <AvailabilityPromptBanner className="mb-4" />
       )}
 
+      {draftRestored && (
+        <div
+          role="status"
+          className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+        >
+          <span className="text-muted-foreground">
+            We kept your unfinished game. Set the date and venue, then publish.
+          </span>
+          <button type="button" onClick={discardDraft} className="shrink-0 font-semibold underline">
+            Start over
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -537,13 +643,17 @@ function Create() {
           }
           if (!user) {
             toast.error("Sign in to host a game");
-            nav({ to: "/auth", search: { redirect: "/create" } as any });
+            nav({ to: "/auth", search: { next: "/create" } });
             return;
           }
           if (!selectedAffiliation) {
             toast.error("Pick which team profile you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+            return;
+          }
+          if (paid && price < 1) {
+            toast.error("Enter an entry fee of at least $1, or turn off Paid game.");
             return;
           }
           const policyCheck = validateGamePolicy(effectivePolicy);
@@ -559,6 +669,9 @@ function Create() {
           }
           setPublishing(true);
 
+          let createdCount = 0;
+          let totalPlans = 0;
+          let firstGameId: string | null = null;
           try {
             // Compute one or many start times, each with its own length.
             let plans: GamePlan[];
@@ -579,6 +692,7 @@ function Create() {
               }
               plans = [whenRangeToPlan(when, eventTimeZone)];
             }
+            totalPlans = plans.length;
 
             // Build the host snapshot from the freshest profile available so
             // it never falls back to an email-prefix default when the
@@ -618,10 +732,15 @@ function Create() {
               } catch {
                 venue = null;
               }
+              if (!venue) {
+                toast.warning("We couldn't place that address on the map", {
+                  description:
+                    "The game will publish, but players won't see a distance. Pick the venue from the search suggestions to pin it.",
+                });
+              }
             }
 
             const cleanPositions = positionsCleanup(positionsNeeded);
-            let firstGameId: string | null = null;
             // One shared series id links all sessions of a multi-day event so
             // the feed renders a single card instead of one card per day.
             const seriesId = plans.length > 1 ? crypto.randomUUID() : undefined;
@@ -662,6 +781,7 @@ function Create() {
                 gameRules: effectivePolicy.gameRules || null,
               });
 
+              createdCount += 1;
               if (!firstGameId) firstGameId = game.id;
 
               // Record the host's responsibility acknowledgment for this game.
@@ -692,12 +812,26 @@ function Create() {
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
             trackEvent("create_game", { count: plans.length });
-            if (plans.length > 1) {
-              toast.success(`Created ${plans.length} games`);
-              nav({ to: "/feed" });
+            publishedRef.current = true;
+            try {
+              clearCreateDraft(window.localStorage, user.id);
+            } catch {
+              /* ignore */
+            }
+            toast.success(plans.length > 1 ? `Created ${plans.length} games` : "Game published");
+            // A series opens on its first date, not back on the feed, so the host sees it exist.
+            nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
+          } catch (err) {
+            const reason =
+              err instanceof Error && err.message ? err.message : "Please check your connection.";
+            if (createdCount > 0 && firstGameId) {
+              // Some dates are already live; trying again would duplicate them.
+              toast.error(
+                `Only ${createdCount} of ${totalPlans} games were published (${reason}). Check your hosted games before trying again.`,
+              );
+              nav({ to: "/games/$gameId", params: { gameId: firstGameId } });
             } else {
-              toast.success("Game published");
-              nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
+              toast.error(`Couldn't publish your game. ${reason}`);
             }
           } finally {
             setPublishing(false);
@@ -930,25 +1064,27 @@ function Create() {
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2.5 text-sm">
                   <DollarSign
-                    className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`}
+                    className={`h-4 w-4 ${paid ? "text-lime" : "text-muted-foreground"}`}
                   />
                   <span className="font-medium">Paid game</span>
                 </span>
                 <button
                   type="button"
-                  onClick={() => setPrice(price > 0 ? 0 : 10)}
-                  className={`relative h-6 w-10 rounded-full transition-colors ${price > 0 ? "bg-lime" : "bg-secondary"}`}
-                  aria-label="Toggle paid game"
+                  role="switch"
+                  aria-checked={paid}
+                  onClick={() => setPaid(!paid)}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${paid ? "bg-lime" : "bg-secondary"}`}
+                  aria-label="Paid game"
                 >
                   <motion.span
                     layout
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
-                    style={{ left: price > 0 ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                    style={{ left: paid ? "calc(100% - 1.375rem)" : "0.125rem" }}
                   />
                 </button>
               </div>
-              {price > 0 && (
+              {paid && (
                 <div className="mt-3 flex items-center gap-2">
                   <span className="section-eyebrow text-muted-foreground">Entry fee</span>
                   <div className="relative flex-1">
@@ -957,10 +1093,12 @@ function Create() {
                     </span>
                     <input
                       type="number"
+                      inputMode="decimal"
+                      aria-label="Entry fee in dollars"
                       min={1}
                       step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))}
+                      value={feeText}
+                      onChange={(e) => setFeeText(e.target.value)}
                       className="w-full rounded-xl border border-border bg-background pl-7 pr-3 py-2 text-sm outline-none focus:border-lime"
                     />
                   </div>
@@ -980,6 +1118,12 @@ function Create() {
               value={priv}
               onChange={setPriv}
             />
+            {priv && (
+              <p className="px-1 text-[11px] text-muted-foreground">
+                Only people you invite can see this game. To invite someone, open a player&apos;s
+                availability card on the Players tab and tap Invite.
+              </p>
+            )}
             <Toggle
               icon={<ShieldCheck className="h-4 w-4" />}
               label="Require my approval to join"
@@ -1076,9 +1220,7 @@ function Create() {
                   ? "Acknowledge host responsibilities"
                   : "Publish game"}
           </motion.button>
-          <p className="text-center text-xs text-muted-foreground pb-6">
-            Hosting is free. Pro hosts get unlimited games + analytics.
-          </p>
+          <p className="text-center text-xs text-muted-foreground pb-6">Hosting is free.</p>
         </fieldset>
       </form>
     </div>
@@ -1124,6 +1266,8 @@ function Toggle({
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={value}
       onClick={() => onChange(!value)}
       className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
     >
