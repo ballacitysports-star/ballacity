@@ -47,8 +47,11 @@ export default async function globalSetup() {
       }
     }),
   );
-  await verifyServedAppTarget(process.env.E2E_BASE_URL ?? "http://localhost:8080", target, (url) =>
-    fetch(url),
+  await verifyServedAppTarget(
+    process.env.E2E_BASE_URL ?? "http://localhost:8080",
+    target,
+    (url) => fetch(url),
+    { publishableKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY },
   );
 
   if (

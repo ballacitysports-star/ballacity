@@ -66,6 +66,18 @@ export class E2eTargetError extends Error {
   }
 }
 
+/**
+ * Every project reference is compared in one canonical form, so casing can never
+ * hide a production reference or make two sources look like they disagree.
+ */
+export function normalizeRef(ref: string): string {
+  return ref.trim().toLowerCase();
+}
+
+const REF_SHAPE = /^[a-z0-9]{20}$/;
+/** What a local Supabase instance may call itself (e.g. "local", "127"). Never an identity. */
+const LOCAL_LABEL_SHAPE = /^[a-z0-9_-]{1,32}$/;
+
 function present(v: string | undefined): v is string {
   return typeof v === "string" && v.trim() !== "";
 }
@@ -81,7 +93,7 @@ export function refFromSupabaseUrl(raw: string): string | "local" | null {
   const host = u.hostname.toLowerCase();
   if (LOCAL_HOSTS.has(host)) return "local";
   const m = /^([a-z0-9]{20})\.supabase\.(co|in)$/.exec(host);
-  return m ? m[1] : null;
+  return m ? normalizeRef(m[1]) : null;
 }
 
 function decodePayload(token: string): Record<string, unknown> | null {
@@ -107,18 +119,18 @@ function decodePayload(token: string): Record<string, unknown> | null {
 export function refFromJwt(token: string): string | null {
   const p = decodePayload(token);
   if (!p) return null;
-  if (typeof p.ref === "string" && p.ref) return p.ref;
+  if (typeof p.ref === "string" && p.ref.trim()) return normalizeRef(p.ref);
   if (typeof p.iss === "string") {
-    const m = /^https:\/\/([a-z0-9]{20})\.supabase\.(co|in)\//.exec(p.iss);
-    if (m) return m[1];
+    const m = /^https:\/\/([a-z0-9]{20})\.supabase\.(co|in)\//i.exec(p.iss);
+    if (m) return normalizeRef(m[1]);
   }
   return null;
 }
 
 /** `sb-<ref>-auth-token` -> `<ref>`. */
 export function refFromStorageKey(key: string): string | null {
-  const m = /^sb-([a-z0-9]{20})-auth-token$/.exec(key.trim());
-  return m ? m[1] : null;
+  const m = /^sb-([a-z0-9]{20})-auth-token$/i.exec(key.trim());
+  return m ? normalizeRef(m[1]) : null;
 }
 
 function refFromInjectedSession(env: Env): string | null | undefined {
@@ -152,8 +164,24 @@ export function checkBaseUrl(raw: string | undefined): string[] {
 
 export type Resolution = { ok: true; target: E2eTarget } | { ok: false; reasons: string[] };
 
+const URL_VARS = ["SUPABASE_URL", "VITE_SUPABASE_URL"] as const;
+const ID_VARS = ["SUPABASE_PROJECT_ID", "VITE_SUPABASE_PROJECT_ID"] as const;
+const KEY_VARS = [
+  "SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+] as const;
+
 /**
  * Decide whether this environment may run E2E. Pure: reads only `env`.
+ *
+ * Both halves of the app read their own variables. The browser reads VITE_*, the
+ * dev server's functions read SUPABASE_*, and vite.config.ts fills whichever is
+ * unset from .env.production, which names production. So a target is accepted only
+ * when BOTH URLs are set and agree. A remote target must also set BOTH project ids
+ * and every source must name the same designated sandbox. A local target must have
+ * both URLs local; a project id is then only a label, and is refused if it looks
+ * like a real project reference.
  *
  * @param extraProductionRefs references documented elsewhere in the repo as
  *   production (see documentedProductionRefs); merged into the block list.
@@ -163,8 +191,10 @@ export function resolveE2eTarget(
   extraProductionRefs: readonly string[] = [],
 ): Resolution {
   const reasons: string[] = [];
-  const production = new Set([...PRODUCTION_PROJECT_REFS, ...extraProductionRefs]);
-  const sandboxes = new Set(NON_PRODUCTION_E2E_PROJECT_REFS);
+  const production = new Set(
+    [...PRODUCTION_PROJECT_REFS, ...extraProductionRefs].map(normalizeRef),
+  );
+  const sandboxes = new Set(NON_PRODUCTION_E2E_PROJECT_REFS.map(normalizeRef));
 
   for (const ref of sandboxes) {
     if (production.has(ref)) {
@@ -176,39 +206,73 @@ export function resolveE2eTarget(
 
   reasons.push(...checkBaseUrl(env.E2E_BASE_URL));
 
-  // Every place a project can be named, labelled by where it came from.
-  const urls: Array<[string, string]> = [];
-  for (const k of ["SUPABASE_URL", "VITE_SUPABASE_URL"])
-    if (present(env[k])) urls.push([k, env[k]!]);
-  const ids: Array<[string, string]> = [];
-  for (const k of ["SUPABASE_PROJECT_ID", "VITE_SUPABASE_PROJECT_ID"])
-    if (present(env[k])) ids.push([k, env[k]!.trim()]);
-  const keys: Array<[string, string]> = [];
-  for (const k of [
-    "SUPABASE_PUBLISHABLE_KEY",
-    "VITE_SUPABASE_PUBLISHABLE_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-  ])
-    if (present(env[k])) keys.push([k, env[k]!]);
+  // --- URLs: both must be set. A missing one silently falls back to production. ---
+  const setUrls = URL_VARS.filter((k) => present(env[k]));
+  if (setUrls.length === 0) {
+    reasons.push(
+      "No Supabase URL is configured. The app would fall back to the production backend (vite.config.ts), so an unconfigured run is refused.",
+    );
+  } else {
+    for (const k of URL_VARS) {
+      if (!present(env[k])) {
+        reasons.push(
+          `${k} is not set. Both SUPABASE_URL (server functions) and VITE_SUPABASE_URL (browser) must be set: whichever is missing is filled in from .env.production, which names production.`,
+        );
+      }
+    }
+  }
 
   const claimed: Array<{ source: string; ref: string }> = [];
-  let sawLocalUrl = false;
-
-  for (const [name, value] of urls) {
-    const ref = refFromSupabaseUrl(value);
-    if (ref === "local") sawLocalUrl = true;
-    else if (ref) claimed.push({ source: name, ref });
-    else
+  let anyLocal = false;
+  let anyRemote = false;
+  for (const k of setUrls) {
+    const ref = refFromSupabaseUrl(env[k]!);
+    if (ref === "local") anyLocal = true;
+    else if (ref) {
+      anyRemote = true;
+      claimed.push({ source: k, ref });
+    } else {
       reasons.push(
-        `${name} does not name a Supabase project the guard can identify (host is neither local nor <ref>.supabase.co).`,
+        `${k} does not name a Supabase project the guard can identify (host is neither local nor <ref>.supabase.co).`,
       );
+    }
   }
-  for (const [name, value] of ids) claimed.push({ source: name, ref: value });
-  for (const [name, value] of keys) {
-    const ref = refFromJwt(value);
-    if (ref) claimed.push({ source: `${name} (ref claim)`, ref });
+  if (anyLocal && anyRemote) {
+    reasons.push("A local Supabase URL is set alongside a remote one. Use one or the other.");
+  }
+  // Local only when the URLs themselves say so; a project id can never make a target local.
+  const localTarget = anyLocal && !anyRemote;
+
+  // --- Project ids ---
+  for (const k of ID_VARS) {
+    if (!present(env[k])) continue;
+    const id = normalizeRef(env[k]!);
+    if (localTarget && !REF_SHAPE.test(id)) {
+      // A local instance's own label (e.g. "local", "127"). It identifies nothing.
+      if (!LOCAL_LABEL_SHAPE.test(id)) reasons.push(`${k} is not a valid local project label.`);
+    } else {
+      claimed.push({ source: k, ref: id });
+    }
+  }
+  if (anyRemote && !anyLocal) {
+    for (const k of ID_VARS) {
+      if (!present(env[k])) {
+        reasons.push(
+          `${k} is not set. A remote target needs both SUPABASE_PROJECT_ID and VITE_SUPABASE_PROJECT_ID, matching its URL.`,
+        );
+      }
+    }
+  }
+
+  // --- Keys carry a signed ref claim when they are JWTs ---
+  for (const k of KEY_VARS) {
+    if (!present(env[k])) continue;
+    const ref = refFromJwt(env[k]!);
+    if (ref) claimed.push({ source: `${k} (ref claim)`, ref });
     // Keys with no ref claim (local demo keys, newer opaque key formats) add nothing.
   }
+
+  // --- A pre-injected browser session names its project too ---
   const session = refFromInjectedSession(env);
   if (session === null) {
     reasons.push(
@@ -228,49 +292,29 @@ export function resolveE2eTarget(
     }
   }
 
-  // 2. The remote sources must name one project, and it must be a designated sandbox.
+  // 2. Every source must name one project.
   const refs = [...new Set(claimed.map((c) => c.ref))];
   if (refs.length > 1) {
     reasons.push(
       `The configured sources disagree about the project: ${claimed.map((c) => `${c.source}=${c.ref}`).join(", ")}.`,
     );
   }
-
-  if (sawLocalUrl && refs.length > 0) {
+  if (localTarget && refs.length > 0) {
     reasons.push(
-      "A local Supabase URL is set alongside a remote project reference. Use one or the other.",
+      `A local Supabase URL is set alongside a remote project reference (${refs.join(", ")}). Remove it or use a local label such as "local".`,
     );
   }
 
   if (reasons.length > 0) return { ok: false, reasons };
 
-  if (sawLocalUrl) {
-    // Every URL set must have been local, or it would have produced a ref above.
-    return { ok: true, target: { kind: "local" } };
-  }
+  if (localTarget) return { ok: true, target: { kind: "local" } };
 
-  if (urls.length === 0) {
-    reasons.push(
-      "No Supabase URL is configured. The app would fall back to the production backend (vite.config.ts), so an unconfigured run is refused.",
-    );
-    return { ok: false, reasons };
-  }
-
+  // 3. Remote: one agreed reference, and it must be a designated sandbox.
   const ref = refs[0];
   if (!ref || !sandboxes.has(ref)) {
     reasons.push(`Project ${ref ?? "(unknown)"} is not a designated E2E sandbox.`);
     return { ok: false, reasons };
   }
-
-  // The URL named it; require at least one independent source to agree.
-  const corroborated = claimed.some((c) => !c.source.endsWith("SUPABASE_URL"));
-  if (!corroborated) {
-    reasons.push(
-      `Project ${ref} is named only by the URL. Also set SUPABASE_PROJECT_ID (or a key carrying a ref claim) so the identity is confirmed by a second source.`,
-    );
-    return { ok: false, reasons };
-  }
-
   return { ok: true, target: { kind: "sandbox", ref } };
 }
 
@@ -293,12 +337,12 @@ export function assertSafeE2eTarget(
 export function documentedProductionRefs(readText: (path: string) => string | null): string[] {
   const out = new Set<string>();
   const toml = readText("supabase/config.toml");
-  const m1 = toml ? /^\s*project_id\s*=\s*"([a-z0-9]{20})"/m.exec(toml) : null;
-  if (m1) out.add(m1[1]);
+  const m1 = toml ? /^\s*project_id\s*=\s*"([a-z0-9]{20})"/im.exec(toml) : null;
+  if (m1) out.add(normalizeRef(m1[1]));
   const env = readText(".env.production");
   if (env) {
     for (const m of env.matchAll(/^\s*(?:VITE_)?SUPABASE_PROJECT_ID\s*=\s*"?([a-z0-9]{20})"?/gm))
-      out.add(m[1]);
+      out.add(normalizeRef(m[1]));
   }
   return [...out];
 }
@@ -306,28 +350,41 @@ export function documentedProductionRefs(readText: (path: string) => string | nu
 type FetchLike = (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
 
 /**
- * Looks at what the RUNNING app will actually talk to. The environment checked
- * above is the test process's; the dev server may have been started elsewhere with
- * different values. In dev, Vite serves the Supabase client module with its
+ * Looks at what the BROWSER half of the running app will talk to. The environment
+ * checked above is the test process's; the dev server may have been started elsewhere
+ * with different values. In dev, Vite serves the Supabase client module with its
  * environment inlined, so any `<ref>.supabase.co` it names is the project the
- * browser will use. Every reference found must equal `expected`, and at least one
- * must be found; a local target must find none.
+ * browser will use. Every reference found must equal the target, at least one must
+ * be found, and a local target must find none. When `expect.publishableKey` is given
+ * the served module must also contain that exact key (compared, never printed),
+ * which ties the served build to this environment rather than to a look-alike.
+ *
+ * What this CANNOT see: the dev server's own process environment. Server functions
+ * read SUPABASE_URL there (client.server.ts, auth-middleware.ts and the other
+ * `process.env.SUPABASE_URL` readers), and no served file or endpoint reports it.
+ * See the note on resolveE2eTarget: that half is only covered by requiring this
+ * process's environment to be complete, which is the same environment the dev
+ * server must be started from.
  */
 export async function verifyServedAppTarget(
   baseUrl: string,
   target: E2eTarget,
   fetchText: FetchLike,
+  expect: { publishableKey?: string } = {},
 ): Promise<void> {
   const base = baseUrl.replace(/\/+$/, "");
   const seen = new Set<string>();
   let sawLocal = false;
   let readAny = false;
+  let keyMatched = false;
+  const wantedKey = present(expect.publishableKey) ? expect.publishableKey.trim() : null;
   for (const path of ["/src/integrations/supabase/client.ts", "/"]) {
     try {
       const res = await fetchText(`${base}${path}`);
       if (!res.ok) continue;
       readAny = true;
       const body = await res.text();
+      if (wantedKey && body.includes(wantedKey)) keyMatched = true;
       for (const m of body.matchAll(/https?:\/\/([a-z0-9]{20})\.supabase\.(?:co|in)/gi))
         seen.add(m[1].toLowerCase());
       if (/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(body) && /supabase/i.test(body))
@@ -360,6 +417,11 @@ export async function verifyServedAppTarget(
       problems.push(
         "The running app does not appear to use a local Supabase; its backend cannot be confirmed.",
       );
+  }
+  if (readAny && wantedKey && !keyMatched) {
+    problems.push(
+      "The running app was not built with the publishable key from this environment (VITE_SUPABASE_PUBLISHABLE_KEY). It may have been started from a different environment.",
+    );
   }
   if (problems.length > 0) throw new E2eTargetError(problems);
 }

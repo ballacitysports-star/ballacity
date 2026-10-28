@@ -151,13 +151,15 @@ describe("an unknown or missing project is blocked", () => {
     ).toContain("identify");
   });
 
-  it("when the URL is the only source naming the project", () => {
+  it("when the project ids are missing, so only the URLs name the project", () => {
     const env = {
       E2E_BASE_URL: "http://localhost:8080",
       SUPABASE_URL: url(SANDBOX),
       VITE_SUPABASE_URL: url(SANDBOX),
     };
-    expect(reasonsOf(env)).toContain("second source");
+    const text = reasonsOf(env);
+    expect(text).toContain("SUPABASE_PROJECT_ID is not set");
+    expect(text).toContain("VITE_SUPABASE_PROJECT_ID is not set");
   });
 
   it("when an injected session cannot be identified", () => {
@@ -171,10 +173,8 @@ describe("a verified non-production project proceeds", () => {
     expect(assertSafeE2eTarget(sandboxEnv())).toEqual({ kind: "sandbox", ref: SANDBOX });
   });
 
-  it("with keys whose ref claims agree", () => {
+  it("with keys whose ref claims agree, in addition to the URLs and ids", () => {
     const env = sandboxEnv({
-      SUPABASE_PROJECT_ID: undefined,
-      VITE_SUPABASE_PROJECT_ID: undefined,
       SUPABASE_PUBLISHABLE_KEY: key({ role: "anon", ref: SANDBOX }),
       SUPABASE_SERVICE_ROLE_KEY: key({ role: "service_role", ref: SANDBOX }),
     });
@@ -358,12 +358,10 @@ describe("enforcement runs before any side effect", () => {
 
   it("global setup stops, with no client created, when the running app cannot be confirmed", async () => {
     setEnv({
-      E2E_BASE_URL: "http://localhost:8080",
-      SUPABASE_URL: url(SANDBOX),
-      SUPABASE_PROJECT_ID: SANDBOX,
+      ...sandboxEnv(),
       SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
       SUPABASE_SERVICE_ROLE_KEY: key({ ref: SANDBOX, role: "service_role" }),
-    });
+    } as Record<string, string>);
     fetchSpy.mockRejectedValue(new Error("ECONNREFUSED"));
     const { default: globalSetup } = await import("../../e2e/global-setup");
     await expect(globalSetup()).rejects.toMatchObject({ name: "E2eTargetError" });
@@ -392,5 +390,263 @@ describe("enforcement runs before any side effect", () => {
     vi.unstubAllEnvs();
     setEnv({ SUPABASE_URL: "http://127.0.0.1:54321", VITE_SUPABASE_URL: "http://127.0.0.1:54321" });
     await expect(import("../../playwright.config")).resolves.toBeDefined();
+  });
+});
+
+describe("references are compared in one canonical form", () => {
+  const upper = PROD.toUpperCase();
+  const mixed = PROD.slice(0, 10).toUpperCase() + PROD.slice(10);
+
+  it("blocks a mixed-case production id, by name and not only by disagreement", () => {
+    for (const id of [upper, mixed]) {
+      const text = reasonsOf(sandboxEnv({ SUPABASE_PROJECT_ID: id }));
+      expect(text).toContain("SUPABASE_PROJECT_ID names the PRODUCTION project");
+    }
+  });
+
+  it("blocks it when every id and URL agree on the same mixed-case production ref", () => {
+    const env = sandboxEnv({
+      SUPABASE_URL: `https://${upper}.supabase.co`,
+      VITE_SUPABASE_URL: `https://${mixed}.SUPABASE.CO`,
+      SUPABASE_PROJECT_ID: mixed,
+      VITE_SUPABASE_PROJECT_ID: upper,
+    });
+    const text = reasonsOf(env);
+    expect(text).toContain("PRODUCTION");
+    expect(text).not.toContain("disagree");
+  });
+
+  it("blocks mixed-case production refs in key claims, session issuer and storage key", () => {
+    expect(reasonsOf(sandboxEnv({ SUPABASE_SERVICE_ROLE_KEY: key({ ref: upper }) }))).toContain(
+      "PRODUCTION",
+    );
+    const session = JSON.stringify({
+      access_token: key({ iss: `https://${upper}.supabase.co/auth/v1` }),
+    });
+    expect(reasonsOf(sandboxEnv({ LOVABLE_BROWSER_SUPABASE_SESSION_JSON: session }))).toContain(
+      "PRODUCTION",
+    );
+    expect(
+      reasonsOf(sandboxEnv({ LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: `sb-${mixed}-auth-token` })),
+    ).toContain("PRODUCTION");
+  });
+
+  it("blocks a mixed-case reference documented elsewhere in the repo", () => {
+    const other = "zzzzzzzzzzzzzzzzzzzz";
+    const env = sandboxEnv({
+      SUPABASE_URL: url(other),
+      VITE_SUPABASE_URL: url(other),
+      SUPABASE_PROJECT_ID: other,
+      VITE_SUPABASE_PROJECT_ID: other,
+    });
+    expect(reasonsOf(env, [other.toUpperCase()])).toContain("PRODUCTION");
+    const text = {
+      "supabase/config.toml": `project_id = "${other}"\n`,
+      ".env.production": `SUPABASE_PROJECT_ID="${other.toUpperCase()}"\n`,
+    };
+    expect(documentedProductionRefs((f) => (text as Record<string, string>)[f] ?? null)).toEqual([
+      other,
+    ]);
+  });
+
+  it("treats a differently cased copy of the sandbox as the sandbox, not a conflict", () => {
+    const env = sandboxEnv({
+      SUPABASE_PROJECT_ID: SANDBOX.toUpperCase(),
+      VITE_SUPABASE_PROJECT_ID: ` ${SANDBOX} `,
+    });
+    expect(assertSafeE2eTarget(env)).toEqual({ kind: "sandbox", ref: SANDBOX });
+  });
+});
+
+describe("a remote target needs complete, consistent configuration", () => {
+  it.each(["SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_PROJECT_ID", "VITE_SUPABASE_PROJECT_ID"])(
+    "is blocked when %s is missing",
+    (name) => {
+      expect(reasonsOf(sandboxEnv({ [name]: undefined }))).toContain(`${name} is not set`);
+    },
+  );
+
+  it("is blocked when only the browser variables are set", () => {
+    const env = sandboxEnv({ SUPABASE_URL: undefined, SUPABASE_PROJECT_ID: undefined });
+    const text = reasonsOf(env);
+    expect(text).toContain("SUPABASE_URL is not set");
+    expect(text).toContain("SUPABASE_PROJECT_ID is not set");
+  });
+
+  it("is blocked when only the server variables are set", () => {
+    const env = sandboxEnv({ VITE_SUPABASE_URL: undefined, VITE_SUPABASE_PROJECT_ID: undefined });
+    expect(reasonsOf(env)).toContain("VITE_SUPABASE_URL is not set");
+  });
+
+  it("is blocked when the two URLs name different projects", () => {
+    expect(reasonsOf(sandboxEnv({ VITE_SUPABASE_URL: url(UNKNOWN) }))).toContain("disagree");
+  });
+
+  it("is blocked when the URL and a project id name different projects", () => {
+    expect(reasonsOf(sandboxEnv({ VITE_SUPABASE_PROJECT_ID: UNKNOWN }))).toContain("disagree");
+  });
+
+  it("is blocked when a key's ref claim names another project", () => {
+    expect(reasonsOf(sandboxEnv({ SUPABASE_PUBLISHABLE_KEY: key({ ref: UNKNOWN }) }))).toContain(
+      "disagree",
+    );
+  });
+
+  it("is blocked when every source agrees on an undesignated project", () => {
+    const env = sandboxEnv({
+      SUPABASE_URL: url(UNKNOWN),
+      VITE_SUPABASE_URL: url(UNKNOWN),
+      SUPABASE_PROJECT_ID: UNKNOWN,
+      VITE_SUPABASE_PROJECT_ID: UNKNOWN,
+    });
+    expect(reasonsOf(env)).toContain("not a designated E2E sandbox");
+  });
+});
+
+describe("local fixture workflows", () => {
+  const local = (over: Record<string, string | undefined> = {}) => ({
+    E2E_BASE_URL: "http://127.0.0.1:8080",
+    SUPABASE_URL: "http://127.0.0.1:54321",
+    VITE_SUPABASE_URL: "http://127.0.0.1:54321",
+    ...over,
+  });
+  const demoKeys = {
+    SUPABASE_PUBLISHABLE_KEY: key({ iss: "supabase-demo", role: "anon" }),
+    SUPABASE_SERVICE_ROLE_KEY: key({ iss: "supabase-demo", role: "service_role" }),
+  };
+
+  it.each(["local", "127", "Local", "my-local_1"])(
+    "allows a local Supabase with the local project label %s",
+    (label) => {
+      const env = local({
+        SUPABASE_PROJECT_ID: label,
+        VITE_SUPABASE_PROJECT_ID: label,
+        ...demoKeys,
+      });
+      expect(assertSafeE2eTarget(env)).toEqual({ kind: "local" });
+    },
+  );
+
+  it("still blocks a local target that sets only one of the two URLs", () => {
+    expect(reasonsOf(local({ VITE_SUPABASE_URL: undefined }))).toContain(
+      "VITE_SUPABASE_URL is not set",
+    );
+  });
+
+  it("refuses a local URL when the project id is a real-looking reference, designated or not", () => {
+    for (const id of [SANDBOX, PROD, UNKNOWN]) {
+      expect(reasonsOf(local({ SUPABASE_PROJECT_ID: id }))).toContain("remote project reference");
+    }
+  });
+
+  it("refuses a local project label that is not a plain label", () => {
+    expect(reasonsOf(local({ SUPABASE_PROJECT_ID: "a b!" }))).toContain(
+      "not a valid local project label",
+    );
+  });
+
+  it("does not let a local-looking label turn a remote URL into a local target", () => {
+    for (const label of ["local", "127", "localhost"]) {
+      const env = sandboxEnv({ SUPABASE_PROJECT_ID: label, VITE_SUPABASE_PROJECT_ID: label });
+      expect(reasonsOf(env)).toContain("disagree");
+    }
+  });
+
+  it("does not let a local-looking label make an unidentifiable host acceptable", () => {
+    const env = {
+      E2E_BASE_URL: "http://localhost:8080",
+      SUPABASE_URL: "https://api.example.com",
+      VITE_SUPABASE_URL: "https://api.example.com",
+      SUPABASE_PROJECT_ID: "local",
+      VITE_SUPABASE_PROJECT_ID: "local",
+    };
+    expect(reasonsOf(env)).toContain("identify");
+  });
+
+  it("does not let a local URL in one variable override a remote URL in the other", () => {
+    expect(reasonsOf(sandboxEnv({ VITE_SUPABASE_URL: "http://127.0.0.1:54321" }))).toContain(
+      "alongside a remote one",
+    );
+  });
+
+  it("does not let a local-looking host be a look-alike", () => {
+    expect(refFromSupabaseUrl("http://localhost.evil.test:54321")).toBeNull();
+    expect(refFromSupabaseUrl("http://127.0.0.1.nip.io:54321")).toBeNull();
+  });
+});
+
+describe("the server-side half cannot be observed, so completeness is required instead", () => {
+  const app = (body: string) => async () => ({ ok: true, text: async () => body });
+  const keyValue = key({ role: "anon", ref: SANDBOX });
+
+  it("requires the served build to carry the publishable key from this environment", async () => {
+    const t = { kind: "sandbox", ref: SANDBOX } as const;
+    await expect(
+      verifyServedAppTarget("http://localhost:8080", t, app(`"${url(SANDBOX)}" "${keyValue}"`), {
+        publishableKey: keyValue,
+      }),
+    ).resolves.toBeUndefined();
+    const other = key({ role: "anon", ref: SANDBOX, note: "someone else" });
+    const err = await verifyServedAppTarget(
+      "http://localhost:8080",
+      t,
+      app(`"${url(SANDBOX)}" "${other}"`),
+      { publishableKey: keyValue },
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(E2eTargetError);
+    expect(err.message).toContain("publishable key from this environment");
+    expect(err.message).not.toContain(keyValue);
+    expect(err.message).not.toContain(other);
+  });
+
+  it("skips the key comparison when no key is configured, but still checks the project", async () => {
+    const t = { kind: "sandbox", ref: SANDBOX } as const;
+    await expect(
+      verifyServedAppTarget("http://localhost:8080", t, app(`"${url(SANDBOX)}"`), {}),
+    ).resolves.toBeUndefined();
+    await expect(
+      verifyServedAppTarget("http://localhost:8080", t, app(`"${url(PROD)}"`), {}),
+    ).rejects.toBeInstanceOf(E2eTargetError);
+  });
+
+  it("states what it can and cannot verify in the guard's own documentation", () => {
+    const source = readFileSync("e2e/safety/target-guard.ts", "utf8");
+    expect(source).toContain("CANNOT see: the dev server's own process environment");
+  });
+});
+
+describe("partial or conflicting configuration stops global setup before any side effect", () => {
+  const createClient = vi.fn();
+  const fetchSpy = vi.fn();
+  beforeEach(() => {
+    vi.resetModules();
+    createClient.mockReset();
+    fetchSpy.mockReset();
+    vi.doMock("@supabase/supabase-js", () => ({ createClient }));
+    vi.stubGlobal("fetch", fetchSpy);
+    for (const k of Object.keys(process.env))
+      if (/SUPABASE|E2E_BASE_URL/.test(k)) vi.stubEnv(k, "");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.doUnmock("@supabase/supabase-js");
+  });
+
+  it.each([
+    ["only the server variables", { VITE_SUPABASE_URL: "", VITE_SUPABASE_PROJECT_ID: "" }],
+    ["only the browser variables", { SUPABASE_URL: "", SUPABASE_PROJECT_ID: "" }],
+    ["conflicting URLs", { VITE_SUPABASE_URL: url(UNKNOWN) }],
+    ["a mixed-case production id", { SUPABASE_PROJECT_ID: PROD.toUpperCase() }],
+    [
+      "remote URLs with local-looking ids",
+      { SUPABASE_PROJECT_ID: "local", VITE_SUPABASE_PROJECT_ID: "local" },
+    ],
+  ])("refuses %s without creating a client or fetching", async (_label, over) => {
+    for (const [k, v] of Object.entries({ ...sandboxEnv(), ...over })) vi.stubEnv(k, v ?? "");
+    const { default: globalSetup } = await import("../../e2e/global-setup");
+    await expect(globalSetup()).rejects.toMatchObject({ name: "E2eTargetError" });
+    expect(createClient).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
