@@ -101,7 +101,6 @@ export function AccountTypeScreen({
       }
       clearPendingAccountType();
       trackEvent("select_role", { role: choice, account_type: type });
-      toast.success("Account type set.");
       if (onResolved) {
         onResolved(type, choice);
         setBusy(false);
@@ -131,8 +130,6 @@ export function AccountTypeScreen({
 
   return (
     <OnboardingShell
-      step={2}
-      steps={2}
       title="Where do you want to start?"
       description="Pick what fits you now. You can add other profiles later and switch between them anytime."
       footer={
