@@ -12,7 +12,7 @@ vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/game-flow-status", () => ({
   useMyFlowStatus: () => ({ status: h.status }),
-  isUuid: () => true,
+  isGameId: () => true,
 }));
 vi.mock("@/lib/payments", () => ({
   cancelMyJoinRequest: h.cancel,
