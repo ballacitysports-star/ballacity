@@ -240,6 +240,10 @@ async function refreshCurrentUser() {
   }
 }
 
+// True once the first load has finished, whether or not it succeeded. Until then
+// an empty list means "not here yet", not "there are none".
+let settled = false;
+
 export async function hydrateOrgs(): Promise<void> {
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
@@ -254,9 +258,12 @@ export async function hydrateOrgs(): Promise<void> {
       }
       const rows = (await listTeams()) as TeamRow[];
       for (const row of rows) mergeRow(row);
+      settled = true;
       emit();
     } catch (e) {
       console.error("[org-store] hydrate failed", e);
+      settled = true;
+      emit();
     }
   })();
   return hydratePromise;
@@ -269,6 +276,7 @@ if (typeof window !== "undefined") {
       hydratePromise = null;
       if (event === "SIGNED_OUT") {
         // Whole rows are for signed-in viewers; don't keep them in memory after sign-out.
+        settled = false;
         ORGS.length = 0;
         myOrgIds.clear();
         ownerByOrgId.clear();
@@ -516,6 +524,15 @@ export function useMyOrgs(): Org[] {
     void hydrateOrgs();
   }, []);
   return getMyOrgs();
+}
+
+/** False until the first team load has finished, so a list can show a skeleton, not "none". */
+export function useOrgsSettled(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => settled,
+    () => false,
+  );
 }
 
 export function useAllOrgs(): Org[] {

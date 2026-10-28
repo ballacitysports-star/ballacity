@@ -10,8 +10,12 @@ export type AutosaveState = {
   error: string | null;
   /** Timestamp (ms) of the last successful save, or null. */
   savedAt: number | null;
-  /** Force a save now (bypasses the debounce). Safe to call repeatedly. */
-  flush: () => Promise<void>;
+  /**
+   * Force a save now (bypasses the debounce). Safe to call repeatedly.
+   * Resolves true when nothing is left unsaved, false when the latest value was
+   * refused (invalid) or failed to save.
+   */
+  flush: () => Promise<boolean>;
   /** Retry after an error. */
   retry: () => Promise<void>;
 };
@@ -67,16 +71,22 @@ export function useAutosave<T>({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef<Promise<void> | null>(null);
   const seqRef = useRef(0);
+  // Whether the most recent attempt left the latest value saved.
+  const okRef = useRef(true);
 
   const runSave = useCallback(async (): Promise<void> => {
     if (inFlightRef.current) return inFlightRef.current;
 
     const snapshot = valueRef.current;
     const fp = fingerprint(snapshot);
-    if (fp === baselineRef.current) return;
+    if (fp === baselineRef.current) {
+      okRef.current = true;
+      return;
+    }
 
     const invalid = validateRef.current?.(snapshot) ?? null;
     if (invalid) {
+      okRef.current = false;
       setReason(invalid);
       setStatus("invalid");
       return;
@@ -91,12 +101,14 @@ export function useAutosave<T>({
         await saveRef.current(snapshot);
         if (seq !== seqRef.current) return; // a newer save superseded this one
         baselineRef.current = fp;
+        okRef.current = true;
         setError(null);
         setSavedAt(Date.now());
         // Anything typed while saving keeps us dirty; the debounce picks it up.
         setStatus(fingerprint(valueRef.current) === fp ? "saved" : "dirty");
       } catch (e) {
         if (seq !== seqRef.current) return;
+        okRef.current = false;
         setError(e instanceof Error ? e.message : "Couldn't save");
         setStatus("error");
       } finally {
@@ -153,7 +165,12 @@ export function useAutosave<T>({
   const flush = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     await runSave();
+    return okRef.current;
   }, [runSave]);
 
-  return { status, reason, error, savedAt, flush, retry: flush };
+  const retry = useCallback(async () => {
+    await flush();
+  }, [flush]);
+
+  return { status, reason, error, savedAt, flush, retry };
 }

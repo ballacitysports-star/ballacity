@@ -8,7 +8,12 @@ import { Building2, Plus, Search } from "lucide-react";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 import { OrgDirectoryCard, type OrgDirectoryRow } from "@/components/org/OrgDirectoryCard";
 import { OrgFilterPills } from "@/components/org/OrgFilterPills";
-import { applyDirectoryFilters, type DirectoryFilterId } from "@/lib/org-directory-filters";
+import {
+  applyDirectoryFilters,
+  parseDirectoryFilters,
+  serializeDirectoryFilters,
+  type DirectoryFilterId,
+} from "@/lib/org-directory-filters";
 
 export const Route = createFileRoute("/orgs/")({
   head: () =>
@@ -19,8 +24,11 @@ export const Route = createFileRoute("/orgs/")({
         "Browse gyms, courts, and sports complexes on BallaCity. See photos, live hours, amenities, and book a court.",
     }),
   // The Discover strip carries a search over from Players, Teams and Trainers.
-  validateSearch: (s: Record<string, unknown>): { q?: string } =>
-    typeof s.q === "string" && s.q.trim() ? { q: s.q.slice(0, 80) } : {},
+  // `f` holds the quick-filter pills, so Back from a venue returns to the same list.
+  validateSearch: (s: Record<string, unknown>): { q?: string; f?: string } => ({
+    ...(typeof s.q === "string" && s.q.trim() ? { q: s.q.slice(0, 80) } : {}),
+    ...(typeof s.f === "string" && s.f.trim() ? { f: s.f.slice(0, 80) } : {}),
+  }),
   component: OrgsIndexGate,
 });
 
@@ -50,14 +58,25 @@ function OrgsIndex() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const [text, setText] = useState(search.q ?? "");
-  const [selected, setSelected] = useState<ReadonlySet<DirectoryFilterId>>(new Set());
+  const selected = useMemo(() => parseDirectoryFilters(search.f), [search.f]);
   const q = useDebounced(text.trim(), 250);
 
   // Keep the URL in step with the box, so the Discover strip can carry it on.
   useEffect(() => {
     if ((search.q ?? "") === q) return;
-    void navigate({ search: q ? { q } : {}, replace: true });
-  }, [q, search.q, navigate]);
+    void navigate({
+      search: { ...(q ? { q } : {}), ...(search.f ? { f: search.f } : {}) },
+      replace: true,
+    });
+  }, [q, search.q, search.f, navigate]);
+
+  const setSelected = (next: ReadonlySet<DirectoryFilterId>) => {
+    const f = serializeDirectoryFilters(next);
+    void navigate({
+      search: { ...(search.q ? { q: search.q } : {}), ...(f ? { f } : {}) },
+      replace: true,
+    });
+  };
 
   // Re-evaluate "open now" as the clock moves.
   const [now, setNow] = useState(() => new Date());
@@ -75,15 +94,14 @@ function OrgsIndex() {
   const rows = useMemo(() => applyDirectoryFilters(all, selected, now), [all, selected, now]);
   const filtered = !!q || selected.size > 0;
 
-  const toggle = (id: DirectoryFilterId) =>
-    setSelected((cur) => {
-      const next = new Set(cur);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  const toggle = (id: DirectoryFilterId) => {
+    const next = new Set(selected);
+    if (!next.delete(id)) next.add(id);
+    setSelected(next);
+  };
   const clearAll = () => {
-    setSelected(new Set());
     setText("");
+    void navigate({ search: {}, replace: true });
   };
 
   return (
@@ -99,7 +117,7 @@ function OrgsIndex() {
           to="/orgs/create"
           className="inline-flex items-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground glow-lime"
         >
-          <Plus className="h-4 w-4" strokeWidth={2.5} /> Create gym
+          <Plus className="h-4 w-4" strokeWidth={2.5} /> Create venue
         </Link>
       </header>
 
@@ -109,7 +127,7 @@ function OrgsIndex() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Search by name, city or address"
-          aria-label="Search facilities"
+          aria-label="Search venues"
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
@@ -131,7 +149,7 @@ function OrgsIndex() {
         </ul>
       ) : isError ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-          Couldn&apos;t load facilities.{" "}
+          Couldn&apos;t load venues.{" "}
           <button type="button" onClick={() => refetch()} className="font-semibold text-lime">
             Try again
           </button>
@@ -140,7 +158,7 @@ function OrgsIndex() {
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
           <div className="inline-flex items-center gap-2 text-sm">
             <Building2 className="h-4 w-4 text-lime" />{" "}
-            {filtered ? "No facilities match those filters." : "No gyms yet."}
+            {filtered ? "No venues match those filters." : "No venues yet."}
           </div>
           <div className="mt-3">
             {filtered ? (
@@ -157,7 +175,7 @@ function OrgsIndex() {
       ) : (
         <>
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            {rows.length} {rows.length === 1 ? "facility" : "facilities"}
+            {rows.length} {rows.length === 1 ? "venue" : "venues"}
           </p>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((o) => (

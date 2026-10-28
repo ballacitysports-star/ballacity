@@ -18,6 +18,23 @@ export function isDirectoryFilterId(v: unknown): v is DirectoryFilterId {
   return DIRECTORY_FILTERS.some((f) => f.id === v);
 }
 
+/** The pills as they are written in the URL: ids in their fixed order, comma-separated. */
+export function serializeDirectoryFilters(selected: ReadonlySet<DirectoryFilterId>): string {
+  return DIRECTORY_FILTERS.filter((f) => selected.has(f.id))
+    .map((f) => f.id)
+    .join(",");
+}
+
+/** Reads the pills back from the URL, ignoring anything that isn't a known id. */
+export function parseDirectoryFilters(raw: string | undefined | null): Set<DirectoryFilterId> {
+  const out = new Set<DirectoryFilterId>();
+  for (const part of (raw ?? "").split(",")) {
+    const id = part.trim();
+    if (isDirectoryFilterId(id)) out.add(id);
+  }
+  return out;
+}
+
 export type FilterableOrg = {
   category: string | null;
   amenities: string[] | null;

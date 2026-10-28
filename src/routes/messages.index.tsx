@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MessageCircle, Bell, Check, X as XIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MessageCircle, Bell, Check, X as XIcon } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
 import { FamilyInboxSection } from "@/components/child/FamilyInboxSection";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { BackButton } from "@/components/layout/BackButton";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -57,7 +58,11 @@ function MessagesInbox() {
   const nav = Route.useNavigate();
   const [convs, setConvs] = useState<ConversationWithMeta[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const [msgTab, setMsgTab] = useState<"primary" | "requests">("primary");
+  // Open on Requests once, when that is the only place anything is waiting.
+  const pickedTabRef = useRef(false);
 
   useEffect(() => {
     if (loading) return;
@@ -69,7 +74,14 @@ function MessagesInbox() {
     const load = async () => {
       try {
         const data = await listMyConversations();
-        if (!cancelled) setConvs(data);
+        if (!cancelled) {
+          setConvs(data);
+          setLoadFailed(false);
+        }
+      } catch {
+        // Keep what is already on screen on a refresh; only a first load that
+        // fails needs the retry state.
+        if (!cancelled) setLoadFailed(true);
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -97,12 +109,18 @@ function MessagesInbox() {
       document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, loading]);
+  }, [user?.id, loading, retryTick]);
 
   const primary = useMemo(() => convs.filter((c) => !c.is_request), [convs]);
   const requests = useMemo(() => convs.filter((c) => c.is_request), [convs]);
   const alertUnread = useUnreadNotificationCount("inbox-");
   const msgUnread = useMemo(() => primary.reduce((n, c) => n + c.unread, 0), [primary]);
+
+  useEffect(() => {
+    if (fetching || pickedTabRef.current) return;
+    pickedTabRef.current = true;
+    if (primary.length === 0 && requests.length > 0) setMsgTab("requests");
+  }, [fetching, primary.length, requests.length]);
 
   // Warm photos for every thread in both tabs, not just the visible ones.
   usePrefetchUserAvatars(
@@ -137,6 +155,9 @@ function MessagesInbox() {
   };
 
   const handleDecline = async (id: string) => {
+    if (!window.confirm("Decline this request? The conversation is removed from your inbox.")) {
+      return;
+    }
     try {
       await declineConversation(id);
       setConvs((prev) => prev.filter((c) => c.id !== id));
@@ -150,13 +171,7 @@ function MessagesInbox() {
   return (
     <div className="page-shell-content pt-6 pb-32">
       <div className="flex items-center gap-3 mb-5">
-        <Link
-          to="/feed"
-          aria-label="Back to feed"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        <BackButton fallbackTo="/feed" label="Back" className="border border-border bg-surface" />
         <h1 className="page-title">Inbox</h1>
       </div>
 
@@ -167,9 +182,12 @@ function MessagesInbox() {
         <TopTabButton active={top === "messages"} onClick={() => setTop("messages")}>
           <MessageCircle className="h-4 w-4" />
           Messages
-          {msgUnread > 0 && (
-            <span className="ml-1.5 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">
-              {msgUnread}
+          {msgUnread + requests.length > 0 && (
+            <span
+              className="ml-1.5 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white"
+              aria-label={`${msgUnread} unread, ${requests.length} ${requests.length === 1 ? "request" : "requests"}`}
+            >
+              {msgUnread + requests.length > 9 ? "9+" : msgUnread + requests.length}
             </span>
           )}
         </TopTabButton>
@@ -211,8 +229,32 @@ function MessagesInbox() {
             </SubTabButton>
           </div>
 
+          {msgTab === "requests" && !fetching && requests.length > 0 && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              Open a request to read it first. You can report or block the sender from there before
+              you accept.
+            </p>
+          )}
+
           {fetching ? (
             <ListSkeleton rows={4} label="Loading your messages…" />
+          ) : loadFailed && convs.length === 0 ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground"
+            >
+              Couldn&apos;t load your messages.{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setFetching(true);
+                  setRetryTick((n) => n + 1);
+                }}
+                className="font-semibold text-lime"
+              >
+                Try again
+              </button>
+            </div>
           ) : list.length === 0 ? (
             <EmptyState
               icon={<MessageCircle className="h-6 w-6" aria-hidden />}
@@ -277,17 +319,17 @@ function MessagesInbox() {
                     <div className="flex gap-1.5 shrink-0">
                       <button
                         onClick={() => handleAccept(c.id)}
-                        aria-label="Accept request"
-                        className="grid h-9 w-9 place-items-center rounded-full bg-lime-gradient text-primary-foreground"
+                        aria-label={`Accept request from ${c.other_display_name}`}
+                        className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-primary-foreground"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4" aria-hidden />
                       </button>
                       <button
                         onClick={() => handleDecline(c.id)}
-                        aria-label="Decline request"
-                        className="grid h-9 w-9 place-items-center rounded-full border border-border bg-background"
+                        aria-label={`Decline request from ${c.other_display_name}`}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background"
                       >
-                        <XIcon className="h-4 w-4" />
+                        <XIcon className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
                   ) : (

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
 import { useMyBirthdayLock } from "@/lib/birthday-lock";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () =>
@@ -93,6 +94,7 @@ function EditProfile() {
   );
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+  const syncToastShownRef = useRef(false);
   const [isDirty, setIsDirty] = useState(false);
   const [linksDirty, setLinksDirty] = useState(false);
   const profileSignature = profile
@@ -180,23 +182,6 @@ function EditProfile() {
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
     const initials = (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
 
-    setProfileOverrides(profileUser.id, {
-      name: trimmedName,
-      username: username.trim().slice(0, 30),
-      avatar: initials,
-      avatarUrl,
-      coverUrl,
-      city: trimmedCity,
-      bio: bio.trim().slice(0, 280),
-      birthday: birthdayClean,
-      graduatingClass: gradClean,
-      searchRadiusMi,
-      sports,
-      links: cleanedLinks,
-    });
-    // Keep the feed's distance filter aligned with the profile preference.
-    setFeedPrefs({ ...prefs, preferredSports, maxDistanceMi: searchRadiusMi });
-
     // Minor-safety: refuse identifying usernames before hitting the database.
     const safetyErr = validateProfileSafety({
       username,
@@ -228,6 +213,25 @@ function EditProfile() {
     const { saveProfileRow } = await import("@/lib/profile-payload");
     await saveProfileRow(supabase, profilePayload);
 
+    // Only once the server has accepted it: showing refused values as saved
+    // would leave them on screen until the next reload.
+    setProfileOverrides(profileUser.id, {
+      name: trimmedName,
+      username: username.trim().slice(0, 30),
+      avatar: initials,
+      avatarUrl,
+      coverUrl,
+      city: trimmedCity,
+      bio: bio.trim().slice(0, 280),
+      birthday: birthdayClean,
+      graduatingClass: gradClean,
+      searchRadiusMi,
+      sports,
+      links: cleanedLinks,
+    });
+    // Keep the feed's distance filter aligned with the profile preference.
+    setFeedPrefs({ ...prefs, preferredSports, maxDistanceMi: searchRadiusMi });
+
     // Mirror sports / skill level / location onto my open availability posts.
     const { syncAvailabilitiesFromProfile } = await import("@/lib/availability-sync");
     const syncedPosts = await syncAvailabilitiesFromProfile({
@@ -238,11 +242,15 @@ function EditProfile() {
     if (syncedPosts > 0) {
       await queryClient.invalidateQueries({ queryKey: ["my-availabilities"] });
       await queryClient.invalidateQueries({ queryKey: ["availabilities"] });
-      toast.success(
-        syncedPosts === 1
-          ? "Updated your availability post to match"
-          : `Updated ${syncedPosts} availability posts to match`,
-      );
+      // Autosave can sync on every pause in typing; say it once, not each time.
+      if (!syncToastShownRef.current) {
+        syncToastShownRef.current = true;
+        toast.success(
+          syncedPosts === 1
+            ? "Updated your availability post to match"
+            : `Updated ${syncedPosts} availability posts to match`,
+        );
+      }
     }
 
     // Onboarding skips its write when the fingerprint matches its last save.
@@ -289,7 +297,13 @@ function EditProfile() {
   });
 
   // After every hook: returning earlier would change how many hooks run between renders.
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="grid min-h-dvh place-items-center">
+        <LoadingState label="Loading your profile…" />
+      </div>
+    );
+  }
   if (!profileUser) {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
@@ -306,7 +320,26 @@ function EditProfile() {
   }
 
   const done = async () => {
-    await autosave.flush();
+    // Leaving with a refused or failed save would drop the edit without a word.
+    const ok = await autosave.flush();
+    if (!ok) {
+      toast.error(
+        validate()
+          ? `Not saved: ${validate()}.`
+          : "Your changes couldn't be saved. Check your connection and try again.",
+      );
+      return;
+    }
+    nav({ to: "/profile" });
+  };
+
+  const goBack = () => {
+    if (
+      (autosave.status === "invalid" || autosave.status === "error") &&
+      !window.confirm("Your latest changes haven't been saved. Leave without them?")
+    ) {
+      return;
+    }
     nav({ to: "/profile" });
   };
 
@@ -318,13 +351,14 @@ function EditProfile() {
   return (
     <div className="page-shell-content pt-6 pb-32">
       <div className="flex items-center justify-between gap-2 mb-5">
-        <Link
-          to="/profile"
+        <button
+          type="button"
+          onClick={goBack}
           aria-label="Back to profile"
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-4 w-4" />
-        </Link>
+        </button>
         <div className="min-w-0 flex-1 text-center">
           <h1 className="bar-title">Edit profile</h1>
           <SaveStatus {...autosave} variant="pill" className="mt-1" />
@@ -581,8 +615,6 @@ function EditProfile() {
           </Link>
         </div>
       </Section>
-
-
 
       <Section title="Your plan">
         <Link

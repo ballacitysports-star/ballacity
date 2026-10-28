@@ -17,8 +17,10 @@ import {
   Trash2,
   Check,
   Flag,
+  MoreVertical,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
+import { ThreadSafetyDialog } from "@/components/messages/ThreadSafetyDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
@@ -98,6 +100,9 @@ function Thread() {
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [reportMsg, setReportMsg] = useState<Message | null>(null);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  // Tapping a message reveals its actions: a phone has no hover to do it.
+  const [selectedMsg, setSelectedMsg] = useState<string | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherPresent, setOtherPresent] = useState(false);
   const uploaderRef = useRef<AttachmentUploader | null>(null);
@@ -466,11 +471,16 @@ function Thread() {
     <div
       className="fixed inset-x-0 top-0 flex h-dvh flex-col bg-background"
       // Sized to what the keyboard leaves visible, so the message box sits on it.
-      style={viewport ? { height: viewport.height, transform: `translateY(${viewport.offsetTop}px)` } : undefined}
+      style={
+        viewport
+          ? { height: viewport.height, transform: `translateY(${viewport.offsetTop}px)` }
+          : undefined
+      }
     >
       <header className="flex items-center gap-3 border-b border-border bg-background px-3 pb-2 pt-[max(env(safe-area-inset-top),0.5rem)] shrink-0">
         <Link
           to="/messages"
+          aria-label="Back to inbox"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -522,7 +532,27 @@ function Thread() {
             {otherPresent ? "Active now" : "Offline"}
           </div>
         </div>
+        {other?.user_id && (
+          <button
+            type="button"
+            onClick={() => setSafetyOpen(true)}
+            aria-label={`Report or block ${other.display_name}`}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-surface"
+          >
+            <MoreVertical className="h-5 w-5" aria-hidden />
+          </button>
+        )}
       </header>
+
+      {other?.user_id && (
+        <ThreadSafetyDialog
+          open={safetyOpen}
+          onOpenChange={setSafetyOpen}
+          userId={other.user_id}
+          displayName={other.display_name}
+          conversationId={conversationId}
+        />
+      )}
 
       {isRequest && (
         <div className="border-b border-border bg-surface/60 px-4 py-3 flex items-center gap-2 text-xs">
@@ -531,6 +561,15 @@ function Thread() {
             <div className="text-muted-foreground">
               Accept to reply. They won't be notified until you accept.
             </div>
+            {other?.user_id && (
+              <button
+                type="button"
+                onClick={() => setSafetyOpen(true)}
+                className="mt-1 font-semibold text-coral underline"
+              >
+                Report or block
+              </button>
+            )}
           </div>
           <button
             onClick={handleDecline}
@@ -617,25 +656,31 @@ function Thread() {
 
                   <div className="flex items-end gap-1">
                     {mine && !isDeleted && (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      <div
+                        className={`flex gap-1 transition-opacity ${
+                          selectedMsg === m.id
+                            ? "opacity-100"
+                            : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                        }`}
+                      >
                         <button
                           onClick={() => setReplyTo(m)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
                           aria-label="Reply"
                         >
                           <Reply className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setReactPickerFor(reactPickerFor === m.id ? null : m.id)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
                           aria-label="React"
                         >
                           <Smile className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setMenuFor(menuFor === m.id ? null : m.id)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
-                          aria-label="More"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
+                          aria-label="Unsend message"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -643,6 +688,9 @@ function Thread() {
                     )}
 
                     <div
+                      onClick={() =>
+                        !isDeleted && setSelectedMsg(selectedMsg === m.id ? null : m.id)
+                      }
                       onDoubleClick={() => !isDeleted && toggleReaction(m.id, "❤️")}
                       // The flattened corner (bottom-right on your own message,
                       // bottom-left on theirs) means sent and received still read
@@ -676,24 +724,30 @@ function Thread() {
                     </div>
 
                     {!mine && !isDeleted && (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      <div
+                        className={`flex gap-1 transition-opacity ${
+                          selectedMsg === m.id
+                            ? "opacity-100"
+                            : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                        }`}
+                      >
                         <button
                           onClick={() => setReactPickerFor(reactPickerFor === m.id ? null : m.id)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
                           aria-label="React"
                         >
                           <Smile className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setReplyTo(m)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
                           aria-label="Reply"
                         >
                           <Reply className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setReportMsg(m)}
-                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface"
                           aria-label="Report message"
                         >
                           <Flag className="h-3.5 w-3.5" />
