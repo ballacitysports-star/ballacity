@@ -1,4 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { isChatThreadPath } from "@/lib/chat-layout";
 import { Clapperboard, Compass, Home, MessageCircle, UserRound } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
@@ -53,6 +54,9 @@ export function BottomNav() {
   const PUBLIC_PATHS = ["/auth", "/reset-password"];
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (isPublic) return null;
+  // Inside a conversation the message box takes the bottom of the screen, as in
+  // any messaging app; the back arrow returns to the inbox and the tabs.
+  if (isChatThreadPath(pathname)) return null;
 
   const renderTab = (it: NavItem) => {
     const active = it.match ? it.match(pathname) : pathname === it.to;
