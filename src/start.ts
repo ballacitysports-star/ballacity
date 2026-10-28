@@ -2,6 +2,7 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 import { isRequestAbort } from "./lib/request-abort";
+import { isStaleServerFnError, STALE_SERVER_FN_HEADER } from "./lib/stale-server-fn";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 // Platform email routes authenticate themselves (signed webhook / API key) and
@@ -13,6 +14,12 @@ const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
   try {
     return await next();
   } catch (error) {
+    if (new URL(request.url).pathname.startsWith("/_serverFn/") && isStaleServerFnError(error)) {
+      return Response.json({ error: "App updated. Refresh to continue." }, {
+        status: 409,
+        headers: { [STALE_SERVER_FN_HEADER]: "1", "cache-control": "no-store" },
+      });
+    }
     if (request.signal.aborted || isRequestAbort(error)) {
       return new Response(null, { status: 499 });
     }
