@@ -140,6 +140,14 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
+import { useHasActiveGuardian } from "@/lib/use-has-guardian";
+import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
+import {
+  HOST_APPROVE_NOTE,
+  hostBadge,
+  joinWait,
+  playerWaitCopy,
+} from "@/lib/join-guardian-status";
 import { refundTermsDisplay } from "@/lib/refund-policy";
 import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import {
@@ -498,6 +506,22 @@ function GameDetail() {
   const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
+  const hasGuardian = useHasActiveGuardian();
+  // Host only: which requests come from a minor with a guardian, and whether the
+  // guardian has approved. Refetched when a request changes.
+  const guardianNeedsQuery = useQuery({
+    queryKey: [
+      "join-guardian-needs",
+      gameId,
+      hostRequests.map((r) => `${r.id}:${r.status}:${r.guardian_approved_at ? 1 : 0}`).join(","),
+    ],
+    enabled: isHost && hostRequests.length > 0,
+    staleTime: 30_000,
+    queryFn: () => getJoinGuardianNeeds({ data: { gameId } }),
+  });
+  const guardianNeedByRequest = new Map(
+    (guardianNeedsQuery.data ?? []).map((n) => [n.requestId, n] as const),
+  );
 
   const hostReviews = useReviewsFor(hostReviewId(game));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -940,6 +964,15 @@ function GameDetail() {
   //  - either there's no approval gate and they've joined locally, OR
   //    the host has confirmed/approved them (paid-verified or approved request).
   const viewerCountsAsJoined = !isHost && (isConfirmed || (joined && !requiresApproval && !isPaid));
+  // A minor's request needs the host and a guardian; say who is still to answer.
+  const myWait =
+    !isHost && myReq
+      ? joinWait({
+          hostStatus: myReq.status,
+          needsGuardian: hasGuardian,
+          guardianApproved: !!myReq.guardian_approved_at,
+        })
+      : null;
   // Prefer the live participant count from `game_participants` (updates in
   // real time when anyone joins/leaves on any device) and fall back to the
   // cached `game.joined` counter until hydration completes. When we already
@@ -1673,7 +1706,32 @@ function GameDetail() {
             Driven by the shared useMyFlowStatus so paid games always show
             "Payment due" (or the matching payment stage) until the host
             verifies the payment — never "You're approved / on the roster". */}
+        {myWait && (
+          <div
+            className="rounded-2xl border border-coral/40 bg-coral/10 p-4 flex items-start gap-3"
+            role="status"
+            aria-live="polite"
+            data-testid="waiting-on-parent"
+          >
+            <Clock className="h-5 w-5 shrink-0 mt-0.5 text-coral" />
+            <div className="min-w-0">
+              <div className="font-display text-sm font-bold">{playerWaitCopy(myWait).title}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">{playerWaitCopy(myWait).body}</p>
+              {myReq?.status === "pending" && (
+                <div className="mt-3">
+                  <LeaveFlowButton
+                    gameId={game.id}
+                    gameTitle={game.title}
+                    variant="danger"
+                    onDone={() => void refreshStatus()}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {!isHost &&
+          !myWait &&
           requiresApproval &&
           myReq &&
           (() => {
@@ -2840,6 +2898,7 @@ function GameDetail() {
                     ageReq={ageReq}
                     gameTitle={game.title}
                     onOptimistic={applyOptimisticReview}
+                    guardian={guardianNeedByRequest.get(r.id)}
                   />
                 ))}
               </div>
@@ -5008,12 +5067,15 @@ function HostRequestRow({
   gameTitle,
   ageReq,
   onOptimistic,
+  guardian,
 }: {
   req: JoinRequest;
   gameTitle: string;
   ageReq?: { minAge: number | null; maxAge: number | null };
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
+  guardian?: { needsGuardian: boolean; guardianApproved: boolean };
 }) {
+  const badge = guardian ? hostBadge(guardian) : null;
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [age, setAge] = useState<number | null>(null);
@@ -5080,6 +5142,18 @@ function HostRequestRow({
           {ageLabel && (
             <div className="text-[11px] font-semibold text-muted-foreground">🎂 {ageLabel}</div>
           )}
+          {badge && (
+            <span
+              data-testid="host-guardian-badge"
+              className={`mt-0.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                badge.tone === "ok"
+                  ? "border-lime/40 bg-lime/10 text-lime"
+                  : "border-coral/40 bg-coral/10 text-coral"
+              }`}
+            >
+              {badge.label}
+            </span>
+          )}
           {req.message && (
             <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>
           )}
@@ -5124,6 +5198,9 @@ function HostRequestRow({
           <span className="text-xs font-semibold uppercase">{req.status}</span>
         )}
       </div>
+      {req.status === "pending" && guardian?.needsGuardian && !guardian.guardianApproved && (
+        <p className="mt-2 text-[11px] text-muted-foreground">{HOST_APPROVE_NOTE}</p>
+      )}
     </div>
   );
 }
