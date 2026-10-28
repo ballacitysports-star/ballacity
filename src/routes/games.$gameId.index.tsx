@@ -4495,11 +4495,11 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="micro-label text-muted-foreground mb-2">Blocked players</div>
+      <div className="micro-label text-muted-foreground mb-2">Blocked on this device</div>
       {blocked.length === 0 ? (
         <div className="text-xs text-muted-foreground">
-          You haven't blocked anyone. Use the Block button on a request or roster row to prevent a
-          player from joining your games.
+          You haven't blocked anyone here. Players you block from a request or roster row are kept
+          on this device only. It's a reminder for you, not a ban.
         </div>
       ) : (
         <ul className="space-y-1.5">
@@ -4838,7 +4838,12 @@ function RosterPlayerRow({
   };
 
   const removeAndBlock = async () => {
-    if (!confirm(`Block ${name}? They won't be able to join your future games.`)) return;
+    if (
+      !confirm(
+        `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
+      )
+    )
+      return;
     setBusy(true);
     const rollback = onOptimistic(req.id, "rejected");
     try {
@@ -5270,7 +5275,11 @@ function HostRequestRow({
             <button
               disabled={busy}
               onClick={async () => {
-                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                if (
+                  !confirm(
+                    `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
+                  )
+                )
                   return;
                 // Only block once the decline actually went through.
                 if (!(await act("rejected", "Blocked by host"))) return;
@@ -5278,7 +5287,7 @@ function HostRequestRow({
                 toast.success(`${name} blocked.`);
               }}
               className="grid h-10 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
-              title="Block from your games"
+              title="Decline and add to this device's block list"
               aria-label={`Block ${name} from your games`}
             >
               Block
@@ -5465,7 +5474,11 @@ function HostPendingChip({
             <button
               disabled={busy}
               onClick={async () => {
-                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                if (
+                  !confirm(
+                    `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
+                  )
+                )
                   return;
                 // Only block once the decline actually went through.
                 if (!(await act("rejected", "Blocked by host"))) return;
@@ -5474,7 +5487,7 @@ function HostPendingChip({
               }}
               className="inline-flex items-center justify-center gap-1 rounded-xl border border-coral/60 bg-coral/10 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
             >
-              Block from your games
+              Decline &amp; block
             </button>
           </div>
         </motion.div>

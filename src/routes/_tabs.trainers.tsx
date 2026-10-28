@@ -1,9 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { matchesOrgQuery } from "@/lib/org-search";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
+import { Megaphone, GraduationCap, MapPin } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
 import { FilterBar } from "@/components/FilterBar";
@@ -117,6 +117,13 @@ export const Route = createFileRoute("/_tabs/trainers")({
       noindex: true,
     }),
   validateSearch: zodValidator(trainersSearchSchema),
+  // Venues have their own directory (the strip's Venues tab). Older links and
+  // bookmarks to this page's venue view land there, keeping any search text.
+  beforeLoad: ({ search }) => {
+    if (search.mode === "gyms") {
+      throw redirect({ to: "/orgs", search: search.q ? { q: search.q } : {}, replace: true });
+    }
+  },
   component: TrainersPageGate,
 });
 
@@ -137,7 +144,7 @@ function TrainersPage() {
   const navigate = useNavigate({ from: "/trainers" });
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
-  const { hydrated } = usePersistedSearch("openrun:trainers-search", search, "/trainers", {
+  const { hydrated } = usePersistedSearch("openrun:trainers-search-v2", search, "/trainers", {
     q: "",
     mode: "trainers",
     sport: "",
@@ -153,7 +160,6 @@ function TrainersPage() {
     density: "list",
   });
 
-  const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;
   const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
   const specialty: string = search.specialty || "";
@@ -380,92 +386,35 @@ function TrainersPage() {
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
 
-  const gymsList = useMemo(() => {
-    const rows = orgsListQuery.data ?? [];
-    const ql = q.trim().toLowerCase();
-    const filtered = ql
-      ? rows.filter((o) =>
-          `${o.name ?? ""} ${o.handle ?? ""} ${o.city ?? ""} ${o.bio ?? ""}`
-            .toLowerCase()
-            .includes(ql),
-        )
-      : rows;
-    return [...filtered].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-  }, [orgsListQuery.data, q]);
-
   return (
     <div className="page-shell-content pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="page-title">
-          {mode === "gyms" ? "Venues & organizations." : "Trainers & venues."}
-        </h1>
+        <h1 className="page-title">Trainers.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
-          {mode === "gyms" ? (
+          {coords && sortBy === "nearest" ? (
             <>
-              {gymsList.length} {gymsList.length === 1 ? "gym" : "gyms"}
-              {profile?.city ? <> · near {profile.city}</> : null}
-            </>
-          ) : profile?.city ? (
-            <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} · {list.length}{" "}
-              {list.length === 1 ? "result" : "results"}
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city || "you"} ·{" "}
+              {list.length} {list.length === 1 ? "result" : "results"}
             </>
           ) : (
             <>
-              {list.length} {list.length === 1 ? "result" : "results"} ·{" "}
-              <Link to="/profile/edit" className="text-lime font-semibold">
-                Set your city
-              </Link>{" "}
-              for nearby
+              {list.length} {list.length === 1 ? "result" : "results"}
+              {!profile?.city && !coords ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link to="/profile/edit" className="text-lime font-semibold">
+                    Set your city
+                  </Link>{" "}
+                  for nearby
+                </>
+              ) : null}
             </>
           )}
         </p>
       </motion.div>
 
-      {/* Trainers / Gyms tabs */}
-      <div className="mb-4 inline-flex rounded-full border border-border bg-surface p-1 text-xs font-bold">
-        {(
-          [
-            { id: "trainers", label: "Trainers", Icon: GraduationCap },
-            { id: "gyms", label: "Venues", Icon: Building2 },
-          ] as const
-        ).map((t) => {
-          const active = mode === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() =>
-                updateSearch({
-                  mode: t.id,
-                  // reset trainer-only filters when switching
-                  ...(t.id === "gyms"
-                    ? {
-                        sport: "",
-                        specialty: "",
-                        venue: "",
-                        orgId: "",
-                        avail: "any",
-                        radius: 0,
-                        age: "",
-                      }
-                    : {}),
-                })
-              }
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-colors ${
-                active
-                  ? "bg-lime text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={active}
-            >
-              <t.Icon className="h-3.5 w-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {mode === "trainers" && featured && (
+      {featured && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -483,11 +432,7 @@ function TrainersPage() {
         </motion.div>
       )}
 
-      {mode === "gyms" ? (
-        <GymsView gyms={gymsList} q={q} onQ={setQ} isLoading={orgsListQuery.isLoading} />
-      ) : (
-        <TrainersView />
-      )}
+      <TrainersView />
     </div>
   );
 
@@ -796,93 +741,4 @@ function TrainersPage() {
       </>
     );
   }
-}
-
-function GymsView({
-  gyms,
-  q,
-  onQ,
-  isLoading,
-}: {
-  gyms: Array<{
-    id: string;
-    name: string;
-    handle: string;
-    avatar: string | null;
-    city: string | null;
-    bio: string | null;
-    verified: boolean;
-  }>;
-  q: string;
-  onQ: (v: string) => void;
-  isLoading: boolean;
-}) {
-  return (
-    <>
-      <FilterBar
-        q={q}
-        onQChange={onQ}
-        searchPlaceholder="Search gyms by name, handle, city"
-        create={{ to: "/orgs/create", label: "Create a gym or organization" }}
-        sheetTitle="Filter gyms"
-        sheet={<div className="text-sm text-muted-foreground">More gym filters coming soon.</div>}
-      />
-
-      {isLoading ? (
-        <ListSkeleton rows={3} label="Loading gyms…" />
-      ) : gyms.length === 0 ? (
-        <EmptyState
-          icon={<Building2 className="h-6 w-6" aria-hidden />}
-          title="No gyms listed yet"
-          description="Venues and organizations near you will appear here. You can add yours in a minute."
-          action={
-            <Link
-              to="/orgs/create"
-              className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-            >
-              Add a gym
-            </Link>
-          }
-        />
-      ) : (
-        <div className="space-y-3 pb-6">
-          {gyms.map((g) => (
-            <Link
-              key={g.id}
-              to="/orgs/$orgId"
-              params={{ orgId: g.id }}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-lime/40"
-            >
-              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
-                {g.avatar && (g.avatar.startsWith("http") || g.avatar.startsWith("/")) ? (
-                  <img src={g.avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  (g.avatar || g.name.slice(0, 2)).toUpperCase().slice(0, 3)
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate font-display text-base font-bold">{g.name}</span>
-                  {g.verified && (
-                    <span className="rounded-full bg-lime/15 px-1.5 py-0.5 micro-label text-lime">
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  @{g.handle}
-                  {g.city ? <> · {g.city}</> : null}
-                </div>
-                {g.bio && (
-                  <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">
-                    {g.bio}
-                  </div>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </>
-  );
 }

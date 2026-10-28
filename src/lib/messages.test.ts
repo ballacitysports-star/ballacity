@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildConversationList,
+  previewOf,
   upsertMessages,
   type ConversationListInput,
   type Message,
@@ -141,9 +142,9 @@ describe("buildConversationList — preview and unread", () => {
     expect(rows[1]!.unread).toBe(0);
   });
 
-  it("treats an attachment-only message as having no text preview", () => {
+  it("gives an attachment-only message a neutral preview, not 'say hi'", () => {
     const [row] = buildConversationList(input({ lastByConv: { c1: { body: null } } }));
-    expect(row!.last_message).toBeNull();
+    expect(row!.last_message).toBe("Sent a message");
   });
 });
 
@@ -187,5 +188,21 @@ describe("upsertMessages", () => {
 
   it("starts a list from nothing", () => {
     expect(upsertMessages([], [B, A]).map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("previewOf", () => {
+  it("shows the text of the latest message", () => {
+    expect(previewOf({ body: "See you at 6" })).toBe("See you at 6");
+  });
+
+  it("does not invite a 'say hi' on a thread that has history but no text", () => {
+    expect(previewOf({ body: "" })).toBe("Sent a message");
+    expect(previewOf({ body: null })).toBe("Sent a message");
+    expect(previewOf({ body: "   " })).toBe("Sent a message");
+  });
+
+  it("is null only when the thread has no messages at all", () => {
+    expect(previewOf(undefined)).toBeNull();
   });
 });

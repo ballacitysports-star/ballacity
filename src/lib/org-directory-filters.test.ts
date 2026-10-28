@@ -3,6 +3,8 @@ import {
   DIRECTORY_FILTERS,
   applyDirectoryFilters,
   matchesDirectoryFilter,
+  parseDirectoryFilters,
+  serializeDirectoryFilters,
   type DirectoryFilterId,
   type FilterableOrg,
 } from "@/lib/org-directory-filters";
@@ -79,5 +81,24 @@ describe("applyDirectoryFilters", () => {
     const list = [a, b, c];
     applyDirectoryFilters(list, sel("indoor"), NOW);
     expect(list).toHaveLength(3);
+  });
+});
+
+describe("directory filters in the URL", () => {
+  it("round-trips in a fixed order, whatever order they were picked in", () => {
+    const picked = new Set<DirectoryFilterId>(["indoor", "open"]);
+    const text = serializeDirectoryFilters(picked);
+    expect(text).toBe("open,indoor");
+    expect([...parseDirectoryFilters(text)].sort()).toEqual(["indoor", "open"]);
+  });
+
+  it("is empty for no pills", () => {
+    expect(serializeDirectoryFilters(new Set())).toBe("");
+    expect(parseDirectoryFilters("").size).toBe(0);
+    expect(parseDirectoryFilters(undefined).size).toBe(0);
+  });
+
+  it("ignores unknown ids and stray spaces from a hand-edited link", () => {
+    expect([...parseDirectoryFilters("open, bogus ,,indoor")].sort()).toEqual(["indoor", "open"]);
   });
 });

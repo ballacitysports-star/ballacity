@@ -7,7 +7,8 @@ import { Megaphone, MapPin, Shield } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useAllOrgs } from "@/lib/org-store";
+import { useAllOrgs, useOrgsSettled } from "@/lib/org-store";
+import { ListSkeleton } from "@/components/ui/loading-state";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import {
@@ -169,6 +170,7 @@ function TeamsPage() {
   }, []);
 
   const orgs = useAllOrgs();
+  const orgsSettled = useOrgsSettled();
   const { coords } = useUserLocation();
 
   const list = useMemo(() => {
@@ -211,30 +213,28 @@ function TeamsPage() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="page-title">Teams & clubs.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
-          {profile?.city ? (
+          {coords && sortBy === "nearest" ? (
             <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} · {list.length}{" "}
-              {list.length === 1 ? "result" : "results"}
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city || "you"} ·{" "}
+              {list.length} {list.length === 1 ? "result" : "results"}
             </>
           ) : (
             <>
-              {list.length} {list.length === 1 ? "result" : "results"} ·{" "}
-              <Link to="/profile/edit" className="text-lime font-semibold">
-                Set your city
-              </Link>{" "}
-              for nearby
+              {list.length} {list.length === 1 ? "result" : "results"}
+              {!profile?.city && !coords ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link to="/profile/edit" className="text-lime font-semibold">
+                    Set your city
+                  </Link>{" "}
+                  for nearby
+                </>
+              ) : null}
             </>
           )}
         </p>
       </motion.div>
-
-      {/* Looking for coaches? Cross-link to /trainers */}
-      <div className="mb-4 text-xs text-muted-foreground">
-        Looking for a coach?{" "}
-        <Link to="/trainers" className="text-lime font-semibold">
-          Browse trainers →
-        </Link>
-      </div>
 
       {/* Featured banner: only a team that has posted open spots, linking to its page */}
       {featured && (
@@ -309,7 +309,9 @@ function TeamsPage() {
         <SortSummary value={sortBy} options={TEAM_SORTS} />
       </div>
 
-      {viewMode === "map" ? (
+      {!orgsSettled && orgs.length === 0 ? (
+        <ListSkeleton rows={3} label="Loading teams…" />
+      ) : viewMode === "map" ? (
         <TeamsMapView orgs={list.map((x) => x.o)} kind="team" />
       ) : (
         <div
@@ -332,8 +334,34 @@ function TeamsPage() {
             <EmptyState
               className="sm:col-span-2"
               icon={<Shield className="h-6 w-6" aria-hidden />}
-              title="No teams match your filters"
-              description="Try a wider distance or a different sport — new teams are added all the time."
+              title={
+                q || sports.length > 0 || avail !== "any"
+                  ? "No teams match your filters"
+                  : "No teams yet"
+              }
+              description={
+                q || sports.length > 0 || avail !== "any"
+                  ? "Try a different sport or search — new teams are added all the time."
+                  : "Be the first to put your team on the map."
+              }
+              action={
+                q || sports.length > 0 || avail !== "any" ? (
+                  <button
+                    type="button"
+                    onClick={() => updateSearch({ q: "", sport: "", avail: "any" })}
+                    className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <Link
+                    to="/teams/create"
+                    className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Create a team
+                  </Link>
+                )
+              }
             />
           )}
         </div>

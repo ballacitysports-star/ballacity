@@ -137,23 +137,27 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
   if (!u.user) return [];
   const me = u.user.id;
 
-  const { data: myParts } = await supabase
+  const { data: myParts, error: partsError } = await supabase
     .from("conversation_participants" as any)
     .select("conversation_id")
     .eq("user_id", me);
+  // An error is not "no conversations": say so, so the inbox can offer a retry.
+  if (partsError) throw partsError;
   const ids = ((myParts ?? []) as any[]).map((r) => r.conversation_id);
   if (ids.length === 0) return [];
 
-  const { data: convs } = await supabase
+  const { data: convs, error: convsError } = await supabase
     .from("conversations" as any)
     .select("*")
     .in("id", ids)
     .order("last_message_at", { ascending: false });
+  if (convsError) throw convsError;
 
-  const { data: allParts } = await supabase
+  const { data: allParts, error: allPartsError } = await supabase
     .from("conversation_participants" as any)
     .select("conversation_id, user_id")
     .in("conversation_id", ids);
+  if (allPartsError) throw allPartsError;
 
   const otherIds = Array.from(
     new Set(((allParts ?? []) as any[]).filter((p) => p.user_id !== me).map((p) => p.user_id)),
@@ -195,6 +199,17 @@ export type ConversationListInput = {
 };
 
 /**
+ * The line shown under a name in the inbox. A message with no text (a photo or
+ * file, or one that was unsent) still means the thread has history, so it says
+ * so instead of inviting the member to "say hi".
+ */
+export function previewOf(last: { body?: string | null } | undefined): string | null {
+  if (!last) return null;
+  const text = last.body?.trim();
+  return text ? last.body! : "Sent a message";
+}
+
+/**
  * Assemble the inbox rows. Pure, so the parts that have actually gone wrong —
  * whether a thread counts as a request, and what a thread with a missing
  * counterpart renders as — can be tested without a database.
@@ -217,7 +232,7 @@ export function buildConversationList(input: ConversationListInput): Conversatio
       other_initials:
         prof?.avatar_initials ?? prof?.display_name?.slice(0, 2).toUpperCase() ?? "PL",
       other_avatar_url: prof?.avatar_url ?? null,
-      last_message: lastByConv[c.id]?.body ?? null,
+      last_message: previewOf(lastByConv[c.id]),
       unread: unreadByConv[c.id] ?? 0,
       accepted_by: accepted,
       is_request: !accepted.includes(me),
