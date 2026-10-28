@@ -144,12 +144,7 @@ import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { useHasActiveGuardian } from "@/lib/use-has-guardian";
 import { hostTeamLink, useGameHost } from "@/lib/game-host-team";
 import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
-import {
-  HOST_APPROVE_NOTE,
-  hostBadge,
-  joinWait,
-  playerWaitCopy,
-} from "@/lib/join-guardian-status";
+import { HOST_APPROVE_NOTE, hostBadge, joinWait, playerWaitCopy } from "@/lib/join-guardian-status";
 import { refundTermsDisplay } from "@/lib/refund-policy";
 import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import {
@@ -2773,11 +2768,14 @@ function GameDetail() {
                 value={String(game.signupCutoffMin ?? 0)}
                 onChange={(e) => {
                   const v = Number(e.target.value) || 0;
-                  void updateHostedGame(game.id, { signupCutoffMin: v } as never).catch(() => {});
-                  toast.success(
-                    v > 0
-                      ? `Signups will close ${cutoffAmountLabel(v)} before start.`
-                      : "Signup cutoff turned off.",
+                  void updateHostedGame(game.id, { signupCutoffMin: v } as never).then(
+                    () =>
+                      toast.success(
+                        v > 0
+                          ? `Signups will close ${cutoffAmountLabel(v)} before start.`
+                          : "Signup cutoff turned off.",
+                      ),
+                    () => toast.error("Couldn't save the signup cutoff. Try again."),
                   );
                 }}
                 disabled={gate.joinState === "completed"}
@@ -2896,7 +2894,16 @@ function GameDetail() {
               <div className="mt-2">
                 <ListingVisibilityToggle kind="game" id={game.id} />
               </div>
-            ) : null}
+            ) : (
+              <p className="mt-2 rounded-xl border border-border bg-background px-3 py-2 text-[11px] text-muted-foreground">
+                Private game: only people you invite can see it. Invite players from their
+                availability card on the{" "}
+                <Link to="/players" className="font-semibold underline">
+                  Players tab
+                </Link>
+                .
+              </p>
+            )}
             {!game.cancelledAt && game.status !== "cancelled" ? (
               <button
                 type="button"
@@ -2907,22 +2914,47 @@ function GameDetail() {
                 <Ban className="h-4 w-4" /> Cancel game
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!window.confirm("Delete this game? This can't be undone.")) return;
-                try {
-                  await deleteHostedGame(game.id);
-                  toast.success("Game deleted.");
-                  nav({ to: "/" });
-                } catch {
-                  toast.error("Couldn't delete this game.");
-                }
-              }}
-              className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold"
-            >
-              <Trash2 className="h-4 w-4" /> Delete game
-            </button>
+            {(() => {
+              // Deleting removes the game without telling anyone; once players are in,
+              // Cancel is the one that notifies them (and handles refunds).
+              const hasPlayers =
+                liveRoster.length > 0 ||
+                (liveParticipantCount ?? 0) > 0 ||
+                (game.joined ?? 0) > 0 ||
+                hostRequests.some((r) => r.status === "approved");
+              return (
+                <>
+                  <button
+                    type="button"
+                    disabled={hasPlayers}
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          "Delete this game for good? Nobody has joined yet. This can't be undone.",
+                        )
+                      )
+                        return;
+                      try {
+                        await deleteHostedGame(game.id);
+                        toast.success("Game deleted.");
+                        nav({ to: "/feed", replace: true });
+                      } catch {
+                        toast.error("Couldn't delete this game.");
+                      }
+                    }}
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete game
+                  </button>
+                  {hasPlayers ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Players are signed up, so this game can only be cancelled. Cancelling tells
+                      everyone on the roster.
+                    </p>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
 
           {hostRequests.length > 0 ? (
@@ -5151,19 +5183,36 @@ function HostRequestRow({
   }, [req.player_id]);
   const ageLabel = requesterAgeLabel(age, ageReq);
 
-  const act = async (status: "approved" | "rejected", reason?: string | null) => {
+  /** Resolves true only when the review itself was saved. */
+  const act = async (status: "approved" | "rejected", reason?: string | null): Promise<boolean> => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
-      toast.success(status === "approved" ? "Approved" : "Declined");
     } catch (e: any) {
       rollback();
       toast.error(e.message);
-    } finally {
       setBusy(false);
+      return false;
     }
+    // The decision is saved; a failed heads-up to the player must not undo it on screen.
+    const heardBack = await notifyJoinReview(
+      req.player_id,
+      req.game_id,
+      gameTitle,
+      status,
+      reason,
+    ).then(
+      () => true,
+      () => false,
+    );
+    toast.success(status === "approved" ? "Approved" : "Declined", {
+      description: heardBack
+        ? undefined
+        : "We couldn't notify the player. They'll see it in the game.",
+    });
+    setBusy(false);
+    return true;
   };
 
   const promptRejection = (defaultReason?: string): string | null => {
@@ -5217,18 +5266,20 @@ function HostRequestRow({
           )}
         </div>
         {req.status === "pending" ? (
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <button
               disabled={busy}
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected", "Blocked by host");
+                // Only block once the decline actually went through.
+                if (!(await act("rejected", "Blocked by host"))) return;
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
-              className="grid h-9 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
+              className="grid h-10 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
               title="Block from your games"
+              aria-label={`Block ${name} from your games`}
             >
               Block
             </button>
@@ -5239,17 +5290,21 @@ function HostRequestRow({
                 if (reason === null) return;
                 void act("rejected", reason || null);
               }}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"
+              aria-label={`Decline ${name}`}
+              title="Decline"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"
             >
-              <XIcon className="h-4 w-4" />
+              <XIcon className="h-4 w-4" aria-hidden />
             </button>
 
             <button
               disabled={busy}
-              onClick={() => act("approved")}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-lime-gradient text-primary-foreground disabled:opacity-50"
+              onClick={() => void act("approved")}
+              aria-label={`Approve ${name}`}
+              title="Approve"
+              className="grid h-10 w-10 place-items-center rounded-xl bg-lime-gradient text-primary-foreground disabled:opacity-50"
             >
-              <Check className="h-4 w-4" />
+              <Check className="h-4 w-4" aria-hidden />
             </button>
           </div>
         ) : (
@@ -5295,20 +5350,37 @@ function HostPendingChip({
     })();
   }, [req.player_id]);
 
-  const act = async (status: "approved" | "rejected", reason?: string | null) => {
+  /** Resolves true only when the review itself was saved. */
+  const act = async (status: "approved" | "rejected", reason?: string | null): Promise<boolean> => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     setOpen(false);
     try {
       await reviewJoinRequest(req.id, status, reason ?? undefined);
-      await notifyJoinReview(req.player_id, req.game_id, gameTitle, status, reason);
-      toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
     } catch (e: any) {
       rollback();
       toast.error(e.message);
-    } finally {
       setBusy(false);
+      return false;
     }
+    // The decision is saved; a failed heads-up to the player must not undo it on screen.
+    const heardBack = await notifyJoinReview(
+      req.player_id,
+      req.game_id,
+      gameTitle,
+      status,
+      reason,
+    ).then(
+      () => true,
+      () => false,
+    );
+    toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`, {
+      description: heardBack
+        ? undefined
+        : "We couldn't notify the player. They'll see it in the game.",
+    });
+    setBusy(false);
+    return true;
   };
 
   const promptRejection = (): string | null => {
@@ -5384,7 +5456,7 @@ function HostPendingChip({
 
               <button
                 disabled={busy}
-                onClick={() => act("approved")}
+                onClick={() => void act("approved")}
                 className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
               >
                 <Check className="h-3.5 w-3.5" /> Approve
@@ -5395,7 +5467,8 @@ function HostPendingChip({
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected", "Blocked by host");
+                // Only block once the decline actually went through.
+                if (!(await act("rejected", "Blocked by host"))) return;
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
