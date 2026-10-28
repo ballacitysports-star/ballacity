@@ -32,23 +32,29 @@ statements, grants and revokes, data changes, and function bodies not named in N
 | **MISSING**   | 1     |
 | not checkable | 3     |
 
-## Finding: `20261023130000_follow_approval.sql` is not applied
+## Finding: `20261023130000_follow_approval.sql` was not applied, and now is
 
-The app code that shipped with it is live, so production's client and database disagree:
+When checked on 2026-10-28, nothing this migration creates existed in production, although the app code
+for it was already live. Following called `request_follow` and related functions that did not exist, and
+privacy saves upserted a `require_follow_approval` column that did not exist (inferred from the code and
+catalog; not run against production). The minor-safety rule was not in force: `authenticated` could still
+insert into `follows`.
 
-- `src/lib/follows.ts` calls `request_follow`, `cancel_follow_request`, `respond_follow_request` and
-  `remove_follower`, and reads `follow_requests`. None of these exist in production, so following fails.
-- `src/lib/privacy.ts` saves every privacy change as an upsert of the full preferences object, which now includes
-  `require_follow_approval`. That column does not exist in production, so privacy saves are expected to
-  fail. (Not run against production; inferred from the code and the catalog.)
-- The minor-safety rule in the migration is not in force: `authenticated` still has INSERT and UPDATE on
-  `follows`, and `enforce_minor_privacy_floor` does not set `require_follow_approval`. A minor can be
-  followed without a guardian's approval.
-- At the time of the check there were 0 follows of minors in production, so the migration would have no
-  existing followers to move back to pending.
+It was applied to production later the same day, on the owner's explicit approval, exactly as in the repo
+file. Read back afterwards:
 
-The migration has a passing SQL test (`supabase/tests/110_follow_approval.test.sql`) on the scratch database.
-It has not been applied. Applying it needs the owner's explicit approval.
+- `follow_requests` exists with row-level security on and one SELECT policy. `authenticated` can only
+  SELECT it; `anon` has no access.
+- `authenticated` can no longer INSERT or UPDATE `follows` (SELECT and DELETE remain).
+- The 2 existing minors' privacy rows have `require_follow_approval` set; none are left off.
+- Production had 0 follows and 0 follow requests, so nothing was moved to pending.
+- The bodies of all 8 functions match the repo file by MD5 of `prosrc`. `request_follow`,
+  `respond_follow_request`, `remove_follower` and `cancel_follow_request` are executable by
+  `authenticated` and not by `anon`; the other four are not executable by either.
+- Trigger `trg_accept_pending_when_public` is enabled.
+
+Not done: the follow flow and privacy save were not exercised in a browser against production, and the
+production history still has no row for this migration.
 
 ## Per-file results
 
