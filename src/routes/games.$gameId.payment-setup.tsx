@@ -34,9 +34,10 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
     gameId: params.gameId,
     game: GAMES.find((g) => g.id === params.gameId) ?? null,
   }),
-  errorComponent: ({ reset }) => (
+  errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't open payment setup"
+      error={error}
       onRetry={reset}
       action={
         <Link to="/feed" className={FALLBACK_ACTION_CLASS}>

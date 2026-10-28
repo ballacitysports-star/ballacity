@@ -78,3 +78,56 @@ describe("RouteFallback", () => {
     }
   });
 });
+
+describe("RouteFallback with the error that caused it", () => {
+  it("offers Reload, not Try again, when the page was open across an update", () => {
+    const reload = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, reload },
+    });
+    const onRetry = vi.fn();
+    render(
+      <RouteFallback
+        title="Something went wrong"
+        message="This game couldn't be loaded."
+        error={new Error("Importing a module script failed.")}
+        onRetry={onRetry}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "BallaCity was updated" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("shows what actually failed, small, and keeps Try again for other errors", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onRetry = vi.fn();
+    render(
+      <RouteFallback
+        title="Something went wrong"
+        message="This game couldn't be loaded."
+        error={new Error("Cannot read properties of undefined (reading 'map')")}
+        onRetry={onRetry}
+      />,
+    );
+    expect(screen.getByText(/Details: Cannot read properties of undefined/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("does not repeat a message the page already shows", () => {
+    render(
+      <RouteFallback
+        title="Couldn't load this gym"
+        message="Gym is hidden"
+        error={new Error("Gym is hidden")}
+      />,
+    );
+    expect(screen.queryByText(/Details:/)).toBeNull();
+  });
+});
