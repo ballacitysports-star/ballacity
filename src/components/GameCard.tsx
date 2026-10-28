@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
-import { hostTeamLink, useGameHostTeam } from "@/lib/game-host-team";
+import { hostTeamLink, useGameHost } from "@/lib/game-host-team";
 import { SpotsPill } from "@/components/SpotsPill";
 import { spotsOpenLabel } from "@/lib/spots-urgency";
 import type { Game } from "@/lib/sample-data";
@@ -55,8 +55,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const fit = myRange ? levelFit(game.sport, game.skill, myRange) : "open";
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
-  // A game hosted as a team is hosted by that team; its organizer stays the contact.
-  const hostTeam = useGameHostTeam(game.teamId).data ?? null;
+  // A game hosted as a team or an official gym event is hosted by that profile; its organizer stays the contact.
+  const hostTeam = useGameHost(game);
   const liveStatus = useLiveStatus(game);
   const gate = useJoinGate(game, { spotsLeft });
   const { status: flowStatus } = useMyFlowStatus(user && isGameId(game.id) ? game.id : undefined);
