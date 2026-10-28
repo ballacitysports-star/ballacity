@@ -3,7 +3,8 @@ import { BackButton } from "@/components/layout/BackButton";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Building2,
@@ -122,6 +123,9 @@ function OrgPage() {
   const { orgId } = Route.useParams();
   const auth = useAuth();
   const qc = useQueryClient();
+  useEffect(() => {
+    trackEvent("view_listing", { kind: "facility" });
+  }, [orgId]);
 
   const { data } = useQuery({
     queryKey: ["trainer-org", orgId],

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, MapPin } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
@@ -399,6 +400,7 @@ export function CreateTrainerWizard() {
       await setActiveProfileByRef("trainer", saved.id).catch(() => {});
       await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id), refetchType: "all" });
       clearDraft();
+      trackEvent("create_listing", { kind: "trainer" });
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
     } catch (e) {

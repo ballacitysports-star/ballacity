@@ -2,6 +2,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { toast } from "sonner";
 import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
 import { useQueryClient } from "@tanstack/react-query";
@@ -87,6 +88,7 @@ function CreateOrg() {
       // active profile up on their next mount instead of the pre-create one.
       await qc.invalidateQueries({ queryKey: myProfilesKey(userId), refetchType: "all" });
       clearDraft();
+      trackEvent("create_listing", { kind: "facility" });
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
     } catch (e) {

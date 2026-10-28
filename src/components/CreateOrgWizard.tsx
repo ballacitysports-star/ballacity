@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus } from "lucide-react";
 import {
@@ -303,6 +304,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       const saved = await addOrg(org);
       await setActiveProfileByRef(isCoach ? "trainer" : "team", saved.id).catch(() => {});
       await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id), refetchType: "all" });
+      trackEvent("create_listing", { kind: isCoach ? "trainer" : "team" });
       if (isCoach) {
         // Best-effort org linkage — failures don't roll back the profile.
         try {

@@ -8,6 +8,7 @@ import type { PublicTrainer } from "@/lib/city-seo";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
@@ -146,6 +147,9 @@ function TrainerRoute() {
   const { trainerId } = Route.useParams();
   const { org } = Route.useLoaderData() as TrainerLoaderData;
   const { pathname, searchStr } = useLocation();
+  useEffect(() => {
+    trackEvent("view_listing", { kind: "trainer" });
+  }, [trainerId]);
   if (loading) return <AuthRedirectSkeleton label="Loading trainer…" />;
   if (!user) return <PublicTrainerPreview trainerId={trainerId} next={`${pathname}${searchStr}`} />;
   return <SignedInTrainer trainerId={trainerId} loaded={org} />;

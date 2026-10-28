@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -519,6 +520,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
 
     if (isLast) {
+      trackEvent("onboarding_complete", { account_type: type });
       // Under-13 members finish in the parental-consent flow, not the feed.
       if (birthdayRequiresParentalConsent(basics.birthday)) {
         nav({ to: "/onboarding/child" });

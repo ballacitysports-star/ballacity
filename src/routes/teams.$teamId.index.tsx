@@ -6,6 +6,7 @@ import { PublicTeamPreview } from "@/components/teams/PublicTeamPreview";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
@@ -174,6 +175,9 @@ function TeamRoute() {
   const { teamId } = Route.useParams();
   const { org } = Route.useLoaderData() as TeamLoaderData;
   const { pathname, searchStr } = useLocation();
+  useEffect(() => {
+    trackEvent("view_listing", { kind: "team" });
+  }, [teamId]);
   if (loading) return <AuthRedirectSkeleton label="Loading team…" />;
   if (!user) return <PublicTeamPreview teamId={teamId} next={`${pathname}${searchStr}`} />;
   return <SignedInTeam teamId={teamId} loaded={org} />;

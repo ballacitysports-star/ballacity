@@ -13,7 +13,7 @@ import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { getPublicGameSeo } from "@/lib/city-pages.functions";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
@@ -717,10 +717,12 @@ function GameDetail() {
         cancellationReason: cancelReason.trim() || null,
         joinsClosed: true,
       });
+      trackEvent("cancel_game");
       toast.success("Game cancelled. Everyone on the roster was notified.");
       setCancelOpen(false);
       setCancelReason("");
     } catch (err) {
+      trackTaskError("cancel_game");
       toast.error((err as { message?: string })?.message ?? "Couldn't cancel this game.");
     } finally {
       setCancelling(false);
@@ -1069,6 +1071,7 @@ function GameDetail() {
               () => undefined,
             );
         }
+        trackEvent("leave_game");
         toast("You left the game.");
         // Notify host in real time that a player left. A late leave gets its
         // own "cancelled late" notice from the database instead.
@@ -1206,6 +1209,7 @@ function GameDetail() {
         );
       } catch (e: any) {
         setMyReq(prevReq);
+        trackTaskError("request_to_join");
         toast.error(
           String(e?.message ?? "").includes("BLOCKED_BY_HOST")
             ? "You can't request to join this game."
