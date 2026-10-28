@@ -102,20 +102,10 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Start dev server
-        run: |
-          bun run dev > dev-server.log 2>&1 &
-          echo $! > dev-server.pid
-          for i in $(seq 1 60); do
-            if curl -sfo /dev/null http://localhost:8080; then
-              echo "Dev server ready after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Dev server failed to start"
-          cat dev-server.log
-          exit 1
+      # Playwright starts the dev server itself (playwright.config.ts `webServer`),
+      # from the verified Supabase environment, and refuses to adopt one that is
+      # already running. Starting it here would make the run fail closed on a busy
+      # port. Why: e2e/safety/dev-server.ts.
 
       - name: Run Playwright tests
         run: bunx playwright test
@@ -154,13 +144,6 @@ jobs:
               files.map((f) => `- ${f}\n` + failed.filter((x) => x.file === f)
                 .map((t) => `  - ${t.title} — \`${clean(t.err) || "no message"}\``).join("\n")).join("\n") + "\n");
           '
-
-      - name: Stop dev server
-        if: always()
-        run: |
-          if [ -f dev-server.pid ]; then
-            kill "$(cat dev-server.pid)" 2>/dev/null || true
-          fi
 
       - name: Upload Playwright report
         if: always()

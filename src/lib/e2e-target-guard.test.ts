@@ -12,6 +12,7 @@ import {
   resolveE2eTarget,
   verifyServedAppTarget,
 } from "../../e2e/safety/target-guard";
+import { devServerWebServer } from "../../e2e/safety/dev-server";
 
 const PROD = PRODUCTION_PROJECT_REFS[0];
 const SANDBOX = NON_PRODUCTION_E2E_PROJECT_REFS[0];
@@ -357,15 +358,36 @@ describe("enforcement runs before any side effect", () => {
   });
 
   it("global setup stops, with no client created, when the running app cannot be confirmed", async () => {
+    const env = {
+      ...sandboxEnv(),
+      SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
+      VITE_SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
+      SUPABASE_SERVICE_ROLE_KEY: key({ ref: SANDBOX, role: "service_role" }),
+    } as Record<string, string>;
+    setEnv(env);
+    fetchSpy.mockRejectedValue(new Error("ECONNREFUSED"));
+    const { default: globalSetup } = await import("../../e2e/global-setup");
+    const webServer = devServerWebServer(env, { kind: "sandbox", ref: SANDBOX });
+    await expect(globalSetup({ webServer })).rejects.toMatchObject({ name: "E2eTargetError" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("global setup stops, with no client and no fetch, when the config did not launch the dev server", async () => {
     setEnv({
       ...sandboxEnv(),
       SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
-      SUPABASE_SERVICE_ROLE_KEY: key({ ref: SANDBOX, role: "service_role" }),
+      VITE_SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
     } as Record<string, string>);
-    fetchSpy.mockRejectedValue(new Error("ECONNREFUSED"));
     const { default: globalSetup } = await import("../../e2e/global-setup");
-    await expect(globalSetup()).rejects.toMatchObject({ name: "E2eTargetError" });
+    for (const config of [
+      undefined,
+      { webServer: null },
+      { webServer: { command: "bun run dev", reuseExistingServer: true } },
+    ]) {
+      await expect(globalSetup(config as never)).rejects.toMatchObject({ name: "E2eTargetError" });
+    }
     expect(createClient).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("the Playwright config refuses to load for production and for an empty environment", async () => {
@@ -384,7 +406,11 @@ describe("enforcement runs before any side effect", () => {
   });
 
   it("the Playwright config loads for a verified sandbox and for a local backend", async () => {
-    setEnv({ ...sandboxEnv() } as Record<string, string>);
+    setEnv({
+      ...sandboxEnv(),
+      SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
+      VITE_SUPABASE_PUBLISHABLE_KEY: key({ ref: SANDBOX }),
+    } as Record<string, string>);
     await expect(import("../../playwright.config")).resolves.toBeDefined();
     vi.resetModules();
     vi.unstubAllEnvs();

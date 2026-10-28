@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { devServerWebServer } from "./e2e/safety/dev-server";
 import { assertSafeE2eTarget, documentedProductionRefs } from "./e2e/safety/target-guard";
 
 /**
@@ -8,7 +9,7 @@ import { assertSafeE2eTarget, documentedProductionRefs } from "./e2e/safety/targ
  * first enforcement point; e2e/global-setup.ts checks again before its first
  * side effect. See e2e/safety/target-guard.ts for the rules.
  */
-assertSafeE2eTarget(
+const e2eTarget = assertSafeE2eTarget(
   process.env,
   documentedProductionRefs((path) => {
     try {
@@ -72,6 +73,10 @@ export default defineConfig({
   reporter: process.env.CI
     ? ([["list"], ["json", { outputFile: "playwright-report/results.json" }]] as const)
     : [["list"]],
+  // Playwright starts the dev server itself, from a verified environment, so the
+  // server functions' SUPABASE_* variables are known rather than guessed. It never
+  // adopts a server that was already running. See e2e/safety/dev-server.ts.
+  webServer: devServerWebServer(process.env, e2eTarget),
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     viewport: { width: 1280, height: 1800 },

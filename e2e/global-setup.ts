@@ -18,8 +18,10 @@
  * Missing env → warn + return; the specs auto-skip as before.
  */
 import { readFileSync } from "node:fs";
+import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
   assertSafeE2eTarget,
   documentedProductionRefs,
@@ -32,7 +34,7 @@ const SUPABASE_PUBLISHABLE_KEY =
 const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export default async function globalSetup() {
+export default async function globalSetup(config?: Pick<FullConfig, "webServer">) {
   // First statement, before the pass-through below, any client, any write.
   // playwright.config.ts has already run the environment check; this repeats it
   // (a setup file must not rely on its caller) and adds the one check only a
@@ -47,6 +49,11 @@ export default async function globalSetup() {
       }
     }),
   );
+  // The dev server must be the one playwright.config.ts launched from the verified
+  // environment. A config that drops the webServer, reuses a running server or
+  // starts anything else is refused: nothing then proves what the server's own
+  // SUPABASE_* variables are.
+  assertLaunchedDevServer(config?.webServer);
   await verifyServedAppTarget(
     process.env.E2E_BASE_URL ?? "http://localhost:8080",
     target,

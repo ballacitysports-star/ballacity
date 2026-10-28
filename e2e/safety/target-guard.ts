@@ -57,7 +57,8 @@ export class E2eTargetError extends Error {
         "     (and, to seed fixtures, the service-role key) for that project, and serve the",
         "     app with the same values. Its reference must be listed in",
         "     NON_PRODUCTION_E2E_PROJECT_REFS in e2e/safety/target-guard.ts.",
-        "Also serve the app from localhost (E2E_BASE_URL).",
+        "Also serve the app from localhost (E2E_BASE_URL). Playwright starts the dev server itself,",
+        "from exactly this environment, and refuses to use one that is already running: stop any dev server on that port first.",
         "There is deliberately no override flag. If a variable is unset, vite.config.ts",
         "falls back to the PRODUCTION backend, so an empty environment is refused too.",
       ].join("\n"),
@@ -362,9 +363,10 @@ type FetchLike = (url: string) => Promise<{ ok: boolean; text(): Promise<string>
  * What this CANNOT see: the dev server's own process environment. Server functions
  * read SUPABASE_URL there (client.server.ts, auth-middleware.ts and the other
  * `process.env.SUPABASE_URL` readers), and no served file or endpoint reports it.
- * See the note on resolveE2eTarget: that half is only covered by requiring this
- * process's environment to be complete, which is the same environment the dev
- * server must be started from.
+ * It is therefore not inferred from this check. playwright.config.ts starts the dev
+ * server itself, with an exact environment, and global setup refuses to run unless
+ * the config did so (e2e/safety/dev-server.ts). This check is the cross-check that
+ * the server it started is serving that environment to the browser.
  */
 export async function verifyServedAppTarget(
   baseUrl: string,
