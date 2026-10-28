@@ -1,5 +1,23 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { assertSafeE2eTarget, documentedProductionRefs } from "./e2e/safety/target-guard";
+
+/**
+ * Fail closed before anything else loads. Every way of running the suite
+ * (`bun run test:e2e`, `bunx playwright test`, CI) reads this file, so this is the
+ * first enforcement point; e2e/global-setup.ts checks again before its first
+ * side effect. See e2e/safety/target-guard.ts for the rules.
+ */
+assertSafeE2eTarget(
+  process.env,
+  documentedProductionRefs((path) => {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      return null;
+    }
+  }),
+);
 
 /**
  * Resolve a browser that actually exists on this machine.
@@ -22,7 +40,6 @@ function resolveChromium(): string | undefined {
   ];
   return candidates.find((p) => existsSync(p));
 }
-
 
 /**
  * Playwright config for E2E tests against the local dev server.
@@ -63,7 +80,6 @@ export default defineConfig({
     launchOptions: {
       executablePath: resolveChromium(),
     },
-
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
