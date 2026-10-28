@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The formatting check below compares with the base branch.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -67,3 +70,12 @@ jobs:
             echo "A hook is called conditionally; see the lines above."
             exit 1
           fi
+
+      # Blocking, and only for what this pull request touches. 240 older files are
+      # not Prettier-formatted, and reformatting them all at once would bury real
+      # changes; so edited and new files must be clean and the backlog only shrinks.
+      - name: Format (files changed in this pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          FORMAT_BASE: origin/${{ github.base_ref }}
+        run: bun run format:check:changed
