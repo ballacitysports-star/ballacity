@@ -420,6 +420,7 @@ export function CreateTrainerWizard() {
       <div className="flex items-center gap-3 mb-4">
         <Link
           to="/trainers"
+          aria-label="Back to trainers"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />

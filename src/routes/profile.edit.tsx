@@ -320,6 +320,7 @@ function EditProfile() {
       <div className="flex items-center justify-between gap-2 mb-5">
         <Link
           to="/profile"
+          aria-label="Back to profile"
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-4 w-4" />

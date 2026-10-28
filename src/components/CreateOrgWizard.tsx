@@ -399,6 +399,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       <div className="flex items-center gap-3 mb-4">
         <Link
           to={backHref}
+          aria-label={isCoach ? "Back to trainers" : "Back to teams"}
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />
