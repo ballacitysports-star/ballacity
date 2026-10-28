@@ -5996,6 +5996,10 @@ export type Database = {
         }[]
       }
       tier_for_price_id: { Args: { _price_id: string }; Returns: string }
+      trainer_profile_owned_by: {
+        Args: { _trainer: string; _user: string }
+        Returns: boolean
+      }
       transfer_team_ownership: {
         Args: { _team: string; _to: string }
         Returns: undefined
