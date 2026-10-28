@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useGameHost } from "@/lib/game-host-team";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -56,6 +57,8 @@ function EventRow({
   const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
   const gate = useJoinGate(game, { spotsLeft });
   const kind = classifyFacilityEvent(game);
+  // An official event of the gym (or a team's event) is hosted by that profile; a community run by its organizer.
+  const hostProfile = useGameHost(game);
 
   const cta = joinedByMe
     ? "Joined"
@@ -111,7 +114,7 @@ function EventRow({
               {spotsLeft > 0 ? `${spotsLeft} of ${game.maxPlayers} spots left` : "Full"}
             </span>
             <span>{game.skill}</span>
-            <span className="truncate">Hosted by {game.host.name}</span>
+            <span className="truncate">Hosted by {hostProfile?.name ?? game.host.name}</span>
           </div>
         </Link>
         <Link

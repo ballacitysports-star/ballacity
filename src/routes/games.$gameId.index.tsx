@@ -142,7 +142,7 @@ import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { useHasActiveGuardian } from "@/lib/use-has-guardian";
-import { hostTeamLink, useGameHostTeam } from "@/lib/game-host-team";
+import { hostTeamLink, useGameHost } from "@/lib/game-host-team";
 import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
 import {
   HOST_APPROVE_NOTE,
@@ -584,7 +584,7 @@ function GameDetail() {
 
   // A game made on behalf of a team is hosted by that team; the person who set it
   // up is its organizer.
-  const hostTeam = useGameHostTeam(game?.teamId).data ?? null;
+  const hostTeam = useGameHost(game);
   const hostAttendance = useHostAttendanceStats(game?.hostUserId ?? settings?.host_id ?? undefined);
 
   const hostTrust = useMemo<HostTrust>(() => {
