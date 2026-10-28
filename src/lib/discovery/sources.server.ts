@@ -24,7 +24,18 @@ import {
 } from "@/lib/discovery/urls";
 
 const FIRECRAWL_URL = "https://api.firecrawl.dev/v2";
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+/**
+ * Public Overpass servers, tried in order. They are volunteer-run and go down or
+ * fill up often (the first live run failed with HTTP 521 and 522 from the only
+ * server it knew), so a lookup moves on to the next one instead of giving up.
+ */
+export const OVERPASS_ENDPOINTS: readonly string[] = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+/** Three attempts must fit well inside a request's lifetime, so each is short. */
+const OVERPASS_ATTEMPT_MS = 25_000;
 
 const PAGE_TIMEOUT_MS = 10_000;
 const ROBOTS_TIMEOUT_MS = 6_000;
@@ -208,17 +219,61 @@ export async function searchWeb(query: string, limit = 10): Promise<SearchHit[]>
     }));
 }
 
+/** Busy, down or timed out (including Cloudflare's 52x errors): another server may answer. */
+const worthAnotherServer = (status: number) => status === 408 || status === 429 || status >= 500;
+
+/**
+ * Runs an Overpass query against the first server that answers. A server that
+ * is busy, down or too slow is skipped; an answer that says the query itself is
+ * wrong (any other error) stops at once, because every server would agree.
+ */
+export async function fetchOverpass(
+  query: string,
+  opts: { endpoints?: readonly string[]; fetchFn?: typeof fetch; timeoutMs?: number } = {},
+): Promise<unknown> {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const override = process.env["OVERPASS_URL"];
+  const endpoints = opts.endpoints ?? [
+    ...(override ? [override] : []),
+    ...OVERPASS_ENDPOINTS.filter((u) => u !== override),
+  ];
+  const failures: string[] = [];
+
+  for (const url of endpoints) {
+    const host = new URL(url).hostname;
+    let res: Response;
+    try {
+      res = await fetchFn(url, {
+        method: "POST",
+        signal: AbortSignal.timeout(opts.timeoutMs ?? OVERPASS_ATTEMPT_MS),
+        headers: {
+          "User-Agent": BOT_USER_AGENT,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+    } catch (e) {
+      failures.push(
+        `${host}: ${e instanceof Error && e.name === "TimeoutError" ? "too slow" : "unreachable"}`,
+      );
+      continue;
+    }
+    if (res.ok) {
+      const json = (await res.json().catch(() => null)) as { elements?: unknown } | null;
+      if (json && Array.isArray(json.elements)) return json;
+      failures.push(`${host}: unreadable answer`);
+      continue;
+    }
+    await res.body?.cancel().catch(() => {});
+    if (!worthAnotherServer(res.status)) {
+      throw new Error(`OpenStreetMap lookup failed (HTTP ${res.status}).`);
+    }
+    failures.push(`${host}: HTTP ${res.status}`);
+  }
+  throw new Error(`The OpenStreetMap servers are busy or down (${failures.join("; ")}).`);
+}
+
 /** Mapped places in the area that list a website, from OpenStreetMap. */
 export async function osmLeads(area: DiscoveryArea, type: DiscoveryType): Promise<OsmLead[]> {
-  const res = await fetch(process.env["OVERPASS_URL"] ?? OVERPASS_URL, {
-    method: "POST",
-    signal: AbortSignal.timeout(50_000),
-    headers: {
-      "User-Agent": BOT_USER_AGENT,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: `data=${encodeURIComponent(overpassQuery(area, type))}`,
-  });
-  if (!res.ok) throw new Error(`OpenStreetMap lookup failed (HTTP ${res.status}).`);
-  return parseOverpass(await res.json());
+  return parseOverpass(await fetchOverpass(overpassQuery(area, type)));
 }

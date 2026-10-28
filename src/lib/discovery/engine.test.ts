@@ -130,7 +130,7 @@ describe("startRun", () => {
 });
 
 describe("stepRun: lookups", () => {
-  it("turns search and map results into a de-duplicated queue of sites to read", async () => {
+  it("turns map and search results into a de-duplicated queue of sites to read", async () => {
     const db = new FakeDb({
       listing_discovery_pages: [
         {
@@ -163,16 +163,23 @@ describe("stepRun: lookups", () => {
       ]),
     });
 
-    const after = await stepRun(db, deps, { runId: run.id, userId: USER });
+    // The map lookup can try several servers, so it has a step to itself.
+    const first = await stepRun(db, deps, { runId: run.id, userId: USER });
     expect(deps.osmLeads).toHaveBeenCalledTimes(1);
-    expect(deps.searchWeb).toHaveBeenCalledTimes(TASKS_PER_STEP - 1);
-    const queued = (
-      db.rows("listing_discovery_runs")[0].pages as { url: string; hint?: unknown }[]
-    ).map((p) => p.url);
+    expect(deps.searchWeb).not.toHaveBeenCalled();
+    expect(first.tasksLeft).toBe(run.tasksLeft - 1);
+    expect(first.pagesLeft).toBe(1);
+
+    const second = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(deps.searchWeb).toHaveBeenCalledTimes(TASKS_PER_STEP);
+    expect(deps.osmLeads).toHaveBeenCalledTimes(1);
+    const queued = (db.rows("listing_discovery_runs")[0].pages as { url: string }[]).map(
+      (p) => p.url,
+    );
     expect(queued).toEqual(["https://a.com/", "https://err.com/x", "https://b.com/"]);
-    expect(after.pagesLeft).toBe(3);
-    expect(after.tasksLeft).toBe(run.tasksLeft - TASKS_PER_STEP);
-    expect(after.status).toBe("running");
+    expect(second.pagesLeft).toBe(3);
+    expect(second.tasksLeft).toBe(run.tasksLeft - 1 - TASKS_PER_STEP);
+    expect(second.status).toBe("running");
     expect(db.rows("listing_discovery_runs")[0].lock_until).toBeNull();
   });
 
@@ -181,14 +188,96 @@ describe("stepRun: lookups", () => {
     const run = await startRun(db, makeDeps(), { userId: USER, areaId: "atlanta", types: ["gym"] });
     const deps = makeDeps({
       osmLeads: vi.fn(async () => {
-        throw new Error("OpenStreetMap lookup failed (HTTP 429).");
+        throw new Error("The OpenStreetMap servers are busy or down (overpass-api.de: HTTP 522).");
       }),
       searchWeb: vi.fn(async () => [{ url: "https://c.com" }]),
     });
-    const after = await stepRun(db, deps, { runId: run.id, userId: USER });
-    expect(after.stats.errors).toBe(1);
-    expect(after.log.join(" ")).toMatch(/Map lookup failed: OpenStreetMap lookup failed/);
-    expect(after.pagesLeft).toBe(1);
+    const first = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(first.stats.errors).toBe(1);
+    expect(first.log.join(" ")).toMatch(
+      /Map lookup failed: The OpenStreetMap servers are busy or down/,
+    );
+    expect(first.status).toBe("running");
+
+    const second = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(second.pagesLeft).toBe(1);
+    expect(second.status).toBe("running");
+  });
+});
+
+describe("stepRun: a run that found nothing", () => {
+  it("ends as failed, with a plain reason, when every lookup failed", async () => {
+    const db = new FakeDb();
+    const noSearch = makeDeps({ searchEnabled: false });
+    const run = await startRun(db, noSearch, {
+      userId: USER,
+      areaId: "atlanta",
+      types: ["gym", "team"],
+    });
+    const deps = makeDeps({
+      searchEnabled: false,
+      osmLeads: vi.fn(async () => {
+        throw new Error("The OpenStreetMap servers are busy or down.");
+      }),
+    });
+    const first = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(first.status).toBe("running");
+    const last = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(last.status).toBe("failed");
+    expect(last.error).toMatch(/map servers could not be reached and web search is off/);
+    expect(last.error).toMatch(/FIRECRAWL_API_KEY/);
+    expect(last.finishedAt).not.toBeNull();
+    expect(last.stats).toMatchObject({ errors: 2, leads: 0, pagesRead: 0 });
+  });
+
+  it("gives a different reason when web search was on", async () => {
+    const db = new FakeDb();
+    const run = await startRun(db, makeDeps(), { userId: USER, areaId: "atlanta", types: ["gym"] });
+    db.rows("listing_discovery_runs")[0].tasks = [
+      { kind: "search", type: "gym", q: "gym Atlanta GA" },
+    ];
+    const deps = makeDeps({
+      searchWeb: vi.fn(async () => {
+        throw new Error("Web search failed (HTTP 401).");
+      }),
+    });
+    const out = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(out.status).toBe("failed");
+    expect(out.error).toBe(
+      "Every lookup failed, so there was nothing to read. Try again in a few minutes.",
+    );
+  });
+
+  it("is simply done, with a note, when the lookups worked but found no sites", async () => {
+    const db = new FakeDb();
+    const run = await startRun(db, makeDeps(), { userId: USER, areaId: "atlanta", types: ["gym"] });
+    db.rows("listing_discovery_runs")[0].tasks = [
+      { kind: "search", type: "gym", q: "gym Atlanta GA" },
+    ];
+    const out = await stepRun(db, makeDeps(), { runId: run.id, userId: USER });
+    expect(out.status).toBe("done");
+    expect(out.error).toBeNull();
+    expect(out.log.join(" ")).toMatch(/No sites to read/);
+  });
+
+  it("is not failed when some lookups failed but others found sites", async () => {
+    const db = new FakeDb();
+    const run = await startRun(db, makeDeps(), { userId: USER, areaId: "atlanta", types: ["gym"] });
+    db.rows("listing_discovery_runs")[0].tasks = [
+      { kind: "osm", type: "gym" },
+      { kind: "search", type: "gym", q: "gym Atlanta GA" },
+    ];
+    const deps = makeDeps({
+      osmLeads: vi.fn(async () => {
+        throw new Error("down");
+      }),
+      searchWeb: vi.fn(async () => [{ url: "https://a.com" }]),
+    });
+    await stepRun(db, deps, { runId: run.id, userId: USER });
+    const out = await stepRun(db, deps, { runId: run.id, userId: USER });
+    expect(out.status).toBe("running");
+    expect(out.pagesLeft).toBe(1);
+    expect(out.error).toBeNull();
   });
 });
 
