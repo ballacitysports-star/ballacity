@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { CircleHelp } from "lucide-react";
 import {
@@ -24,7 +24,12 @@ import {
   setSupportOwner,
   useSupportState,
 } from "@/lib/support/support-store";
-import { SupportPanel } from "./SupportPanel";
+
+// The panel and its knowledge base are only needed once someone opens Help, so
+// they stay out of the entry chunk every page downloads.
+const SupportPanel = lazy(() =>
+  import("./SupportPanel").then((m) => ({ default: m.SupportPanel })),
+);
 
 const TITLE = "BallaCity Help";
 const DESCRIPTION = "Quick answers and an AI assistant for using BallaCity.";
@@ -46,7 +51,9 @@ export function SupportAssistantHost() {
   }, [userId]);
 
   const panel = (
-    <SupportPanel signedIn={!!user} email={user?.email ?? null} onNavigate={closeSupport} />
+    <Suspense fallback={<p className="px-4 py-6 text-sm text-muted-foreground">Loading help…</p>}>
+      <SupportPanel signedIn={!!user} email={user?.email ?? null} onNavigate={closeSupport} />
+    </Suspense>
   );
 
   return (
