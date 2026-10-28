@@ -2,6 +2,7 @@ import { VenueHostedAt } from "@/components/venue/VenueBadge";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
+import type { ComponentProps } from "react";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicGamePreview } from "@/components/games/PublicGamePreview";
 import { emailLocalPart } from "@/lib/managed-children";
@@ -141,6 +142,7 @@ import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { useHasActiveGuardian } from "@/lib/use-has-guardian";
+import { hostTeamLink, useGameHostTeam } from "@/lib/game-host-team";
 import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
 import {
   HOST_APPROVE_NOTE,
@@ -580,6 +582,9 @@ function GameDetail() {
     };
   }, [game?.teamId]);
 
+  // A game made on behalf of a team is hosted by that team; the person who set it
+  // up is its organizer.
+  const hostTeam = useGameHostTeam(game?.teamId).data ?? null;
   const hostAttendance = useHostAttendanceStats(game?.hostUserId ?? settings?.host_id ?? undefined);
 
   const hostTrust = useMemo<HostTrust>(() => {
@@ -2081,6 +2086,38 @@ function GameDetail() {
                 rounded="square"
               />
             );
+            if (hostTeam) {
+              const link = hostTeamLink(hostTeam) as unknown as ComponentProps<typeof Link>;
+              return (
+                <>
+                  <Link {...link} aria-label={`View ${hostTeam.name}`}>
+                    <UserAvatar
+                      avatarUrl={hostTeam.avatarUrl}
+                      initials={hostTeam.initials}
+                      name={hostTeam.name}
+                      size="lg"
+                      rounded="logo"
+                    />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Hosted by
+                    </div>
+                    <div className="font-semibold truncate">
+                      <Link {...link} className="hover:text-lime hover:underline">
+                        {hostTeam.name}
+                      </Link>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Organized by <NameTag {...nameProps}>{game.host.name}</NameTag>
+                      {game.host.rating ? (
+                        <span className="text-lime font-semibold"> · ★ {game.host.rating}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </>
+              );
+            }
             return (
               <>
                 {hostId ? (

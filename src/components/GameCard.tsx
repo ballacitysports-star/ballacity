@@ -4,7 +4,8 @@ import { describeMessagingError } from "@/lib/minor-messaging";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
-import { UserAvatarById } from "@/components/UserAvatar";
+import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
+import { hostTeamLink, useGameHostTeam } from "@/lib/game-host-team";
 import { SpotsPill } from "@/components/SpotsPill";
 import { spotsOpenLabel } from "@/lib/spots-urgency";
 import type { Game } from "@/lib/sample-data";
@@ -54,6 +55,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const fit = myRange ? levelFit(game.sport, game.skill, myRange) : "open";
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
+  // A game hosted as a team is hosted by that team; its organizer stays the contact.
+  const hostTeam = useGameHostTeam(game.teamId).data ?? null;
   const liveStatus = useLiveStatus(game);
   const gate = useJoinGate(game, { spotsLeft });
   const { status: flowStatus } = useMyFlowStatus(user && isGameId(game.id) ? game.id : undefined);
@@ -62,6 +65,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     e.preventDefault();
     e.stopPropagation();
     navigate({ to: "/players/$userId", params: { userId: hostUserId } });
+  };
+  const goToHostTeam = (e: React.MouseEvent) => {
+    if (!hostTeam) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const link = hostTeamLink(hostTeam);
+    navigate(link as never);
   };
   const messageHost = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -227,7 +237,31 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           {/* Wraps when the host's skill/age text is long, instead of running under the message button and spots count. */}
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
             <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-              {hostUserId ? (
+              {hostTeam ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={goToHostTeam}
+                    className="shrink-0 hover:ring-2 hover:ring-lime rounded-2xl"
+                    aria-label={`View ${hostTeam.name}`}
+                  >
+                    <UserAvatar
+                      avatarUrl={hostTeam.avatarUrl}
+                      initials={hostTeam.initials}
+                      name={hostTeam.name}
+                      size="xs"
+                      rounded="logo"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goToHostTeam}
+                    className="truncate font-semibold text-foreground hover:text-lime hover:underline"
+                  >
+                    {hostTeam.name}
+                  </button>
+                </>
+              ) : hostUserId ? (
                 <button
                   type="button"
                   onClick={goToHost}
@@ -250,7 +284,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 />
               )}
 
-              {hostUserId ? (
+              {hostTeam ? null : hostUserId ? (
                 <button
                   type="button"
                   onClick={goToHost}
