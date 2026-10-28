@@ -114,6 +114,9 @@ describe("joinGateErrorMessage", () => {
     expect(joinGateErrorMessage({ message: "GAME_JOINS_CLOSED: ..." })).toMatch(/closed joining/i);
     expect(joinGateErrorMessage({ message: "GAME_SIGNUP_CLOSED: ..." })).toMatch(/closed/i);
     expect(joinGateErrorMessage({ message: "GAME_FULL: ..." })).toMatch(/waitlist/i);
+    expect(joinGateErrorMessage({ message: "BLOCKED_BY_HOST: ..." })).toBe(
+      "You can't join this game.",
+    );
     expect(joinGateErrorMessage({ message: "boom" })).toMatch(/Couldn't join/i);
   });
 

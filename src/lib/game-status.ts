@@ -171,6 +171,7 @@ export function joinGateErrorMessage(err: unknown): string {
     return "A parent or guardian has to approve this request before you can join.";
   if (raw.includes("AGE_VERIFICATION_REQUIRED"))
     return "Add your date of birth in your profile before joining games.";
+  if (raw.includes("BLOCKED_BY_HOST")) return "You can't join this game.";
   if (raw.includes("CHILD_GAME_PARTICIPATION_BLOCKED"))
     return "A parent or guardian must approve game participation for this account.";
   if (raw.includes("age requirement"))

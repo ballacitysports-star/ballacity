@@ -204,7 +204,7 @@ import { buildMediaRef } from "@/lib/media-refs";
 import { isAllowedImageMime, MAX_IMAGE_BYTES } from "@/lib/image-validation";
 import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { useCanReview } from "@/lib/transactions";
-import { blockUser, unblockUser, isUserBlocked, useBlockedUsers } from "@/lib/blocked-users-store";
+import { blockUser as blockAccount, useBlockedUsersList } from "@/lib/moderation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1008,20 +1008,7 @@ function GameDetail() {
       nav({ to: "/discover" });
       return;
     }
-    // Host has blocked this user from their games.
     const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
-    if (
-      !isHost &&
-      user &&
-      gameHostId &&
-      !isConfirmed &&
-      !joined &&
-      !isPending &&
-      isUserBlocked(gameHostId, user.id)
-    ) {
-      toast.error("The host has blocked you from joining their games.");
-      return;
-    }
     // The host said yes but a guardian has not: nothing to join or pay yet.
     if (myWait?.onParent && !myWait.onHost) {
       toast.info("Waiting for your parent to approve. They can do it in their Parent Center.");
@@ -1218,7 +1205,11 @@ function GameDetail() {
         );
       } catch (e: any) {
         setMyReq(prevReq);
-        toast.error(e.message ?? "Could not send request.");
+        toast.error(
+          String(e?.message ?? "").includes("BLOCKED_BY_HOST")
+            ? "You can't request to join this game."
+            : (e.message ?? "Could not send request."),
+        );
       } finally {
         setRequesting(false);
       }
@@ -4469,47 +4460,35 @@ function Meta({
 }
 
 function BlockedUsersSection({ hostId }: { hostId: string }) {
-  const blocked = useBlockedUsers(hostId);
-  const [names, setNames] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (blocked.length === 0) return;
-    const missing = blocked.filter((id) => !(id in names));
-    if (missing.length === 0) return;
-    let cancel = false;
-    (async () => {
-      const { data } = await supabase.from("profiles").select("id, display_name").in("id", missing);
-      if (cancel || !data) return;
-      const next: Record<string, string> = {};
-      (data as { id: string; display_name: string | null }[]).forEach((r) => {
-        next[r.id] = r.display_name ?? "Player";
-      });
-      setNames((n) => ({ ...n, ...next }));
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [blocked, names]);
+  const { users, loading, unblock, unblocking } = useBlockedUsersList();
 
   if (!hostId) return null;
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="micro-label text-muted-foreground mb-2">Blocked on this device</div>
-      {blocked.length === 0 ? (
+      <div className="micro-label text-muted-foreground mb-2">Blocked accounts</div>
+      {loading ? (
+        <div className="text-xs text-muted-foreground">Loading…</div>
+      ) : users.length === 0 ? (
         <div className="text-xs text-muted-foreground">
-          You haven't blocked anyone here. Players you block from a request or roster row are kept
-          on this device only. It's a reminder for you, not a ban.
+          You haven&apos;t blocked anyone. Blocked accounts can&apos;t ask to join your games,
+          message you or follow you.
         </div>
       ) : (
         <ul className="space-y-1.5">
-          {blocked.map((id) => (
-            <li key={id} className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold truncate">{names[id] ?? "Player"}</span>
+          {users.map((u) => (
+            <li key={u.id} className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold truncate">{u.displayName}</span>
               <button
                 type="button"
-                onClick={() => unblockUser(hostId, id)}
-                className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold hover:bg-secondary"
+                disabled={unblocking}
+                onClick={() =>
+                  void unblock(u.id).then(
+                    () => toast.success(`${u.displayName} unblocked.`),
+                    () => toast.error("Couldn't unblock. Try again."),
+                  )
+                }
+                className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold hover:bg-secondary disabled:opacity-60"
               >
                 Unblock
               </button>
@@ -4840,7 +4819,7 @@ function RosterPlayerRow({
   const removeAndBlock = async () => {
     if (
       !confirm(
-        `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
+        `Remove ${name} from this game and block them? From now on they can't ask to join your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`,
       )
     )
       return;
@@ -4854,7 +4833,6 @@ function RosterPlayerRow({
         .eq("game_id", req.game_id)
         .eq("user_id", req.player_id);
       if (delErr) throw delErr;
-      blockUser(req.host_id, req.player_id);
       await createNotification({
         user_id: req.player_id,
         type: "join_declined",
@@ -4862,7 +4840,7 @@ function RosterPlayerRow({
         body: "The host removed you from this game.",
         link: `/games/${req.game_id}`,
       });
-      toast.success(`${name} blocked.`);
+      await blockPlayer(req.player_id, name);
     } catch (e: any) {
       rollback();
       toast.error(e.message ?? "Could not block.");
@@ -5157,6 +5135,23 @@ function RosterPlayerRow({
   );
 }
 
+/** What Block means for a host: the account-level block, which the database enforces. */
+function blockConfirmText(name: string) {
+  return `Block ${name}? This request is declined, and from now on they can't ask to join your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`;
+}
+
+/** Records the block on the server. The decline has already been saved by then. */
+async function blockPlayer(playerId: string, name: string) {
+  try {
+    await blockAccount(playerId);
+    toast.success(`${name} blocked.`);
+  } catch (e) {
+    toast.error(
+      `Declined, but couldn't block ${name}${e instanceof Error && e.message ? ` (${e.message})` : ""}. Try again from their profile.`,
+    );
+  }
+}
+
 function HostRequestRow({
   req,
   gameTitle,
@@ -5275,19 +5270,13 @@ function HostRequestRow({
             <button
               disabled={busy}
               onClick={async () => {
-                if (
-                  !confirm(
-                    `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
-                  )
-                )
-                  return;
+                if (!confirm(blockConfirmText(name))) return;
                 // Only block once the decline actually went through.
                 if (!(await act("rejected", "Blocked by host"))) return;
-                blockUser(req.host_id, req.player_id);
-                toast.success(`${name} blocked.`);
+                await blockPlayer(req.player_id, name);
               }}
               className="grid h-10 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
-              title="Decline and add to this device's block list"
+              title="Decline and block this player"
               aria-label={`Block ${name} from your games`}
             >
               Block
@@ -5474,16 +5463,10 @@ function HostPendingChip({
             <button
               disabled={busy}
               onClick={async () => {
-                if (
-                  !confirm(
-                    `Decline ${name} and add them to your block list? The list lives on this device only: it is a reminder for you, not a ban. It doesn't stop them requesting from elsewhere or messaging you.`,
-                  )
-                )
-                  return;
+                if (!confirm(blockConfirmText(name))) return;
                 // Only block once the decline actually went through.
                 if (!(await act("rejected", "Blocked by host"))) return;
-                blockUser(req.host_id, req.player_id);
-                toast.success(`${name} blocked.`);
+                await blockPlayer(req.player_id, name);
               }}
               className="inline-flex items-center justify-center gap-1 rounded-xl border border-coral/60 bg-coral/10 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
             >
