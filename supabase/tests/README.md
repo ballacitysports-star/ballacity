@@ -43,6 +43,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `210_message_attachment_checks.test.sql`| An attachment is accepted only after the server checked that file for this sender and conversation; the stored type is the checked one |
 | `220_bucket_mime_types.test.sql`        | The public image buckets allow only JPG, PNG and WEBP; other buckets are untouched |
 | `230_cancel_own_requests.test.sql`      | A player can take back their own pending request and payment proof on a paid game, and no one else's |
+| `240_minor_pay_after_parent.test.sql`   | A 16-17 year old with a guardian cannot send a payment proof before the guardian approves the request; adults unaffected |
 | `140_game_join_gate.test.sql`              | A player cannot skip host approval or the entry fee, join an ended game or a full one; a guardian's "Can join games" switch and withdrawn consent hold for every minor |
 | `150_guardian_join_request_order.test.sql` | A minor's game request needs the host's answer and the guardian's, in either order; a guardian can answer until the child is on the roster                             |
 | `160_team_members_direct_add.test.sql`     | A coach cannot put a minor on a roster by writing the row; the invite their guardian approves is the way in                                                            |
