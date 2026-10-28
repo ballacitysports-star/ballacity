@@ -183,6 +183,13 @@
       "when": 1793147962776,
       "tag": "0025_guardian_join_request_either_order",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793147972480,
+      "tag": "0026_team_members_no_direct_minor_add",
+      "breakpoints": true
     }
   ]
 }
