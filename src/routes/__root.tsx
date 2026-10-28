@@ -46,6 +46,7 @@ import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoun
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { AnalyticsHost } from "@/components/AnalyticsHost";
+import { isChatThreadPath } from "@/lib/chat-layout";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
@@ -885,7 +886,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, loading, skipTypeCheck, skipAgeCheck, ageStatus, router, retryTick]);
 
   useEffect(() => {
-    if (user && !isTab) {
+    // A conversation has no tab bar below it, so it needs no room reserved for one.
+    if (user && !isTab && !isChatThreadPath(pathname)) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
     } else {
       document.body.style.paddingBottom = "";
@@ -893,7 +895,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       document.body.style.paddingBottom = "";
     };
-  }, [user, isPublic, isTab]);
+  }, [user, isPublic, isTab, pathname]);
 
   // Public routes skip the sign-in/age/account-type gates below so an
   // anonymous visitor (e.g. a shared link) can view them. A signed-in viewer

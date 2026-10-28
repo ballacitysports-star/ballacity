@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
 import { pageHead } from "@/lib/seo";
 import { describeMessagingError } from "@/lib/minor-messaging";
@@ -321,6 +322,13 @@ function Thread() {
     typingTimer.current = setTimeout(() => setTypingState(false), 2500);
   };
 
+  const viewport = useVisualViewport();
+  // Opening the keyboard shortens the screen; keep the latest message in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && viewport?.keyboardOpen) el.scrollTo({ top: el.scrollHeight });
+  }, [viewport?.keyboardOpen, viewport?.height]);
+
   const lastSeenId = useMemo(() => {
     if (!user) return null;
     const mine = msgs.filter((m) => m.sender_id === user.id && m.read_at);
@@ -458,8 +466,12 @@ function Thread() {
   };
 
   return (
-    <div className="flex h-dvh flex-col bg-background pb-[calc(env(safe-area-inset-bottom)+6rem)]">
-      <header className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-border bg-background shrink-0">
+    <div
+      className="fixed inset-x-0 top-0 flex h-dvh flex-col bg-background"
+      // Sized to what the keyboard leaves visible, so the message box sits on it.
+      style={viewport ? { height: viewport.height, transform: `translateY(${viewport.offsetTop}px)` } : undefined}
+    >
+      <header className="flex items-center gap-3 border-b border-border bg-background px-3 pb-2 pt-[max(env(safe-area-inset-top),0.5rem)] shrink-0">
         <Link
           to="/messages"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
@@ -771,7 +783,12 @@ function Thread() {
 
       <form
         onSubmit={submit}
-        className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
+        className="shrink-0 border-t border-border bg-background px-3 pt-2 z-20"
+        style={{
+          paddingBottom: viewport?.keyboardOpen
+            ? "0.5rem"
+            : "max(env(safe-area-inset-bottom), 0.5rem)",
+        }}
       >
         {/* The restriction itself is decided elsewhere and untouched here; this
             only states it in the composer instead of leaving a greyed-out box
