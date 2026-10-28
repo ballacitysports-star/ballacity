@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
-import { addHostedGame } from "@/lib/hosted-games-store";
+import { addHostedGame, fetchHostedGame } from "@/lib/hosted-games-store";
+import { hostAgainPrefill, planHostAgain, type HostAgainPrefill } from "@/lib/host-again";
 import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
   ANY_SKILL,
@@ -95,18 +96,21 @@ export const Route = createFileRoute("/_tabs/create")({
     }),
   // `orgId` / `kind` come from a facility page's "Host a run here" action.
   // The org is looked up server-side before anything is pre-filled.
+  // `again` is a finished game's id from its "Host this again" action.
   validateSearch: (
     search: Record<string, unknown>,
-  ): { orgId?: string; kind?: FacilityEventKind } => ({
-    orgId:
-      typeof search.orgId === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.orgId)
-        ? search.orgId
-        : undefined,
+  ): { orgId?: string; kind?: FacilityEventKind; again?: string } => ({
+    orgId: uuidParam(search.orgId),
     kind: isFacilityEventKind(search.kind) ? search.kind : undefined,
+    again: uuidParam(search.again),
   }),
   component: CreateGate,
 });
+
+const uuidParam = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    ? v
+    : undefined;
 
 /** A signed-out visitor gets a blurred sample preview; the real page mounts only for a member. */
 function CreateGate() {
@@ -119,7 +123,7 @@ function CreateGate() {
 
 function Create() {
   const nav = useNavigate();
-  const { orgId: orgIdParam, kind: requestedKind = "run" } = Route.useSearch();
+  const { orgId: orgIdParam, kind: requestedKind = "run", again: againId } = Route.useSearch();
   // The facility this run is hosted at: from the facility page link, or picked
   // in the "Host at a facility" selector.
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
@@ -371,6 +375,72 @@ function Create() {
     }
     setDraftChecked(true);
   }, [user]);
+  // "Host this again": copy a finished game of the host's own into the form.
+  // Applied once, then the id is dropped from the address so a refresh keeps
+  // whatever the host has edited since. If the form already holds unfinished
+  // work, the copy waits for the host's say-so instead of replacing it.
+  const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [pendingCopy, setPendingCopy] = useState<{
+    title: string;
+    prefill: HostAgainPrefill;
+  } | null>(null);
+  const againAppliedRef = useRef<string | null>(null);
+  // Dropping the id from the address re-runs the effect below, so it cannot own the cancel.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const applyCopy = (c: HostAgainPrefill, fromTitle: string) => {
+    if (c.sport && SPORTS.some((x) => x.name === c.sport)) {
+      sportTouchedRef.current = true;
+      setSport(c.sport as Sport);
+    }
+    setTitle(c.title ?? "");
+    setDescription(c.description ?? "");
+    setSkill(c.skill ?? ANY_SKILL);
+    setPaid(!!c.paid);
+    if (c.feeText) setFeeText(c.feeText);
+    setIndoor(!!c.indoor);
+    setPriv(!!c.priv);
+    // Approval stays on (the safe default) whatever the form held before.
+    setRequiresApproval(c.requiresApproval ?? true);
+    setMinAge(c.minAge ?? null);
+    setMaxAge(c.maxAge ?? null);
+    setSignupCutoffMin(c.signupCutoffMin ?? 0);
+    const n = c.maxPlayers;
+    if (n) setPolicy((p) => ({ ...p, maxPlayers: n }));
+    setDraftRestored(false);
+    setPendingCopy(null);
+    setCopiedFrom(fromTitle);
+  };
+  // The effect below runs once per link; it reads the latest form and applier through these.
+  const applyCopyRef = useRef(applyCopy);
+  applyCopyRef.current = applyCopy;
+  const formPlanRef = useRef<"apply" | "confirm">("apply");
+  formPlanRef.current = planHostAgain({ title, description });
+  useEffect(() => {
+    if (!user || !draftChecked || !againId || againAppliedRef.current === againId) return;
+    againAppliedRef.current = againId;
+    void fetchHostedGame(againId)
+      .then((g) => {
+        if (!mountedRef.current) return;
+        const c = g ? hostAgainPrefill(g, user.id) : null;
+        if (!g || !c) {
+          setCopyError("Couldn't copy that game. You can only copy a game you host.");
+          return;
+        }
+        if (formPlanRef.current === "confirm") setPendingCopy({ title: g.title, prefill: c });
+        else applyCopyRef.current(c, g.title);
+      })
+      .catch(() => {
+        if (mountedRef.current) setCopyError("Couldn't copy that game. Try again.");
+      });
+    void nav({ to: "/create", search: (prev) => ({ ...prev, again: undefined }), replace: true });
+  }, [user, draftChecked, againId, nav]);
   const publishedRef = useRef(false);
   useEffect(() => {
     if (!user || !draftChecked) return;
@@ -617,6 +687,52 @@ function Create() {
 
       {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
         <AvailabilityPromptBanner className="mb-4" />
+      )}
+
+      {copyError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs font-semibold text-destructive"
+        >
+          {copyError}
+        </div>
+      )}
+
+      {pendingCopy && (
+        <div
+          role="alert"
+          className="mb-4 space-y-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+        >
+          <p className="text-muted-foreground">
+            You have an unfinished game here. Replace it with a copy of “{pendingCopy.title}”?
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => applyCopy(pendingCopy.prefill, pendingCopy.title)}
+              className="rounded-full bg-background px-3 py-1.5 font-bold"
+            >
+              Replace it
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingCopy(null)}
+              className="rounded-full border border-border px-3 py-1.5 font-semibold"
+            >
+              Keep mine
+            </button>
+          </div>
+        </div>
+      )}
+
+      {copiedFrom && (
+        <div
+          role="status"
+          className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
+        >
+          Copied from “{copiedFrom}”. Pick the date and venue, check the rest, then publish. Players
+          still need your approval to join unless you change that below.
+        </div>
       )}
 
       {draftRestored && (

@@ -1474,6 +1474,22 @@ function GameDetail() {
             <div>
               <div className="text-sm font-bold">{resolved.label}</div>
               <p className="mt-0.5 font-medium opacity-90">{resolved.detail}</p>
+              {isHost ? (
+                <Link
+                  to="/create"
+                  search={{ again: game.id }}
+                  className="mt-2 inline-flex rounded-full bg-background px-3 py-1.5 text-xs font-bold text-foreground"
+                >
+                  Host this again
+                </Link>
+              ) : (
+                <Link
+                  to="/feed"
+                  className="mt-2 inline-flex rounded-full bg-background px-3 py-1.5 text-xs font-bold text-foreground"
+                >
+                  Find another game
+                </Link>
+              )}
             </div>
           </div>
         );
