@@ -17,7 +17,7 @@ import {
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import { addHostedGame, fetchHostedGame } from "@/lib/hosted-games-store";
-import { hostAgainPrefill } from "@/lib/host-again";
+import { hostAgainPrefill, planHostAgain, type HostAgainPrefill } from "@/lib/host-again";
 import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
   ANY_SKILL,
@@ -377,9 +377,14 @@ function Create() {
   }, [user]);
   // "Host this again": copy a finished game of the host's own into the form.
   // Applied once, then the id is dropped from the address so a refresh keeps
-  // whatever the host has edited since.
+  // whatever the host has edited since. If the form already holds unfinished
+  // work, the copy waits for the host's say-so instead of replacing it.
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [pendingCopy, setPendingCopy] = useState<{
+    title: string;
+    prefill: HostAgainPrefill;
+  } | null>(null);
   const againAppliedRef = useRef<string | null>(null);
   // Dropping the id from the address re-runs the effect below, so it cannot own the cancel.
   const mountedRef = useRef(true);
@@ -389,6 +394,34 @@ function Create() {
       mountedRef.current = false;
     };
   }, []);
+  const applyCopy = (c: HostAgainPrefill, fromTitle: string) => {
+    if (c.sport && SPORTS.some((x) => x.name === c.sport)) {
+      sportTouchedRef.current = true;
+      setSport(c.sport as Sport);
+    }
+    setTitle(c.title ?? "");
+    setDescription(c.description ?? "");
+    setSkill(c.skill ?? ANY_SKILL);
+    setPaid(!!c.paid);
+    if (c.feeText) setFeeText(c.feeText);
+    setIndoor(!!c.indoor);
+    setPriv(!!c.priv);
+    // Approval stays on (the safe default) whatever the form held before.
+    setRequiresApproval(c.requiresApproval ?? true);
+    setMinAge(c.minAge ?? null);
+    setMaxAge(c.maxAge ?? null);
+    setSignupCutoffMin(c.signupCutoffMin ?? 0);
+    const n = c.maxPlayers;
+    if (n) setPolicy((p) => ({ ...p, maxPlayers: n }));
+    setDraftRestored(false);
+    setPendingCopy(null);
+    setCopiedFrom(fromTitle);
+  };
+  // The effect below runs once per link; it reads the latest form and applier through these.
+  const applyCopyRef = useRef(applyCopy);
+  applyCopyRef.current = applyCopy;
+  const formPlanRef = useRef<"apply" | "confirm">("apply");
+  formPlanRef.current = planHostAgain({ title, description });
   useEffect(() => {
     if (!user || !draftChecked || !againId || againAppliedRef.current === againId) return;
     againAppliedRef.current = againId;
@@ -400,24 +433,8 @@ function Create() {
           setCopyError("Couldn't copy that game. You can only copy a game you host.");
           return;
         }
-        if (c.sport && SPORTS.some((x) => x.name === c.sport)) {
-          sportTouchedRef.current = true;
-          setSport(c.sport as Sport);
-        }
-        setTitle(c.title ?? "");
-        setDescription(c.description ?? "");
-        setSkill(c.skill ?? ANY_SKILL);
-        setPaid(!!c.paid);
-        if (c.feeText) setFeeText(c.feeText);
-        setIndoor(!!c.indoor);
-        setPriv(!!c.priv);
-        setMinAge(c.minAge ?? null);
-        setMaxAge(c.maxAge ?? null);
-        setSignupCutoffMin(c.signupCutoffMin ?? 0);
-        const n = c.maxPlayers;
-        if (n) setPolicy((p) => ({ ...p, maxPlayers: n }));
-        setDraftRestored(false);
-        setCopiedFrom(g.title);
+        if (formPlanRef.current === "confirm") setPendingCopy({ title: g.title, prefill: c });
+        else applyCopyRef.current(c, g.title);
       })
       .catch(() => {
         if (mountedRef.current) setCopyError("Couldn't copy that game. Try again.");
@@ -681,12 +698,40 @@ function Create() {
         </div>
       )}
 
+      {pendingCopy && (
+        <div
+          role="alert"
+          className="mb-4 space-y-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+        >
+          <p className="text-muted-foreground">
+            You have an unfinished game here. Replace it with a copy of “{pendingCopy.title}”?
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => applyCopy(pendingCopy.prefill, pendingCopy.title)}
+              className="rounded-full bg-background px-3 py-1.5 font-bold"
+            >
+              Replace it
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingCopy(null)}
+              className="rounded-full border border-border px-3 py-1.5 font-semibold"
+            >
+              Keep mine
+            </button>
+          </div>
+        </div>
+      )}
+
       {copiedFrom && (
         <div
           role="status"
           className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
         >
-          Copied from “{copiedFrom}”. Pick the date and venue, check the rest, then publish.
+          Copied from “{copiedFrom}”. Pick the date and venue, check the rest, then publish. Players
+          still need your approval to join unless you change that below.
         </div>
       )}
 
