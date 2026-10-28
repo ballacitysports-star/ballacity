@@ -85,6 +85,7 @@ function HostDashboard() {
       <div className="mb-5 flex items-center gap-3">
         <Link
           to="/profile"
+          aria-label="Back to profile"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />

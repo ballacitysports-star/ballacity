@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect, useLocation } from "@tanstack/react-router";
+import { BackButton } from "@/components/layout/BackButton";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicTeamPreview } from "@/components/teams/PublicTeamPreview";
@@ -8,7 +9,6 @@ import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
-  ArrowLeft,
   ShieldCheck,
   MapPin,
   Users,
@@ -280,12 +280,11 @@ function TeamPage({ org }: { org: Org }) {
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
-        <Link
-          to="/teams"
-          className="absolute top-4 left-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+        <BackButton
+          fallbackTo="/teams"
+          variant="overlay"
+          className="absolute top-4 left-4"
+        />
         <button
           type="button"
           onClick={() => setShareOpen(true)}

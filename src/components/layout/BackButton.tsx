@@ -20,11 +20,14 @@ export function BackButton({
   fallbackTo,
   className,
   label = "Back",
+  variant = "plain",
 }: {
   /** Where to go when there is no history to pop. */
   fallbackTo?: string;
   className?: string;
   label?: string;
+  /** "overlay": a bordered circle for sitting on a cover photo. */
+  variant?: "plain" | "overlay";
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -51,7 +54,10 @@ export function BackButton({
       className={cn(
         // 40px is the smallest square that still clears the 44px tap target
         // once the header's own padding is counted.
-        "grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors hover:bg-surface active:scale-95",
+        "grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors active:scale-95",
+        variant === "overlay"
+          ? "border border-border bg-background/70 backdrop-blur"
+          : "hover:bg-surface",
         className,
       )}
     >

@@ -1,11 +1,11 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { BackButton } from "@/components/layout/BackButton";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  ArrowLeft,
   Building2,
   MapPin,
   Users,
@@ -187,13 +187,7 @@ function OrgPage() {
 
   return (
     <div className="page-shell-content pt-4 pb-40 space-y-6">
-      <Link
-        to="/orgs"
-        aria-label="Back to venues"
-        className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-      >
-        <ArrowLeft className="h-4 w-4" />
-      </Link>
+      <BackButton fallbackTo="/orgs" variant="overlay" />
       <OrgListingHeader
         org={(orgWithContact ?? org) as unknown as OrgListingRow}
         memberCount={members.length}

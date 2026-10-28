@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { BackButton } from "@/components/layout/BackButton";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -339,13 +340,7 @@ function PlayerProfilePage() {
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
         bannerOverlay={
-          <Link
-            to="/players"
-            className="grid h-9 w-9 place-items-center rounded-full bg-background/70 backdrop-blur"
-            aria-label="Back to players"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <BackButton fallbackTo="/players" variant="overlay" />
         }
         avatarUrl={avatarUrl}
         avatarFallback={initials}

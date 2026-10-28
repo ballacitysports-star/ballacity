@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { BackButton } from "@/components/layout/BackButton";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -18,7 +19,6 @@ import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   Share2,
   MapPin,
   Clock,
@@ -1493,13 +1493,7 @@ function GameDetail() {
         <MediaImage src={game.image} alt={game.title} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/40" />
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-          <Link
-            to="/feed"
-            aria-label="Back to feed"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
+          <BackButton fallbackTo="/feed" variant="overlay" label="Back" />
           <div className="flex gap-2">
             {/* A private game is invite-only, so its link would lead nowhere for anyone else. */}
             {!game.isPrivate && (

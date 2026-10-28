@@ -697,7 +697,7 @@ function Create() {
               nav({ to: "/feed" });
             } else {
               toast.success("Game published");
-              nav({ to: "/games/$gameId", params: { gameId: firstGameId! } });
+              nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
             }
           } finally {
             setPublishing(false);
