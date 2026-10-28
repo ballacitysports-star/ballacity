@@ -1,7 +1,15 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarSearch, List, Map as MapIcon, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarSearch,
+  List,
+  Map as MapIcon,
+  RefreshCw,
+  Search,
+  WifiOff,
+} from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Bell, MessageCircle, MapPin } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
@@ -16,7 +24,8 @@ import { FilterBar } from "@/components/FilterBar";
 import { FeedPreferencesBody, FeedViewsRow } from "@/components/feed/FeedPreferencesSheet";
 import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
-import { useHostedGames } from "@/lib/hosted-games-store";
+import { retryHostedGames, useHostedGames, useHostedGamesStatus } from "@/lib/hosted-games-store";
+import { feedEmptyKind } from "@/lib/feed-empty";
 import { useJoinedGameIds } from "@/lib/games-store";
 import {
   useFeedPrefs,
@@ -113,6 +122,7 @@ function Feed() {
     Array.from({ length: count }, (_, i) => <GameCardSkeleton key={`sk-${i}`} />);
   const [positionFilter, setPositionFilter] = useState<string | null>(search.pos || null);
   const hosted = useHostedGames();
+  const loadStatus = useHostedGamesStatus();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
   const { user: authUser } = useAuth();
@@ -410,6 +420,14 @@ function Feed() {
     return () => io.disconnect();
   }, [hasMore, filtered.length]);
   const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const emptyKind = feedEmptyKind({
+    loading: loadStatus === "loading",
+    failed: loadStatus === "error",
+    totalGames: hosted.length,
+    query: q,
+    filtersActive: activeFilterCount + (positionFilter ? 1 : 0) > 0,
+  });
 
   // Persist + restore scroll position and pagination depth across refresh /
   // back-forward so the user lands right back where they left off.
@@ -664,35 +682,92 @@ function Feed() {
               {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
             </h2>
           )}
+          {loadStatus === "error" && hosted.length > 0 && (
+            <div
+              role="status"
+              className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
+            >
+              <span>
+                {offline
+                  ? "You're offline. Showing the games saved on this device."
+                  : "Couldn't refresh games. Showing what's saved."}
+              </span>
+              <button
+                type="button"
+                onClick={() => retryHostedGames()}
+                className="shrink-0 font-semibold text-foreground underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
           <div className={listContainerClass}>
             {refreshing && filtered.length === 0
               ? renderSkeletons(3)
               : visible.map((g, i) => renderGame(g, i))}
             {hasMore && !refreshing && renderSkeletons(3)}
-            {!refreshing && filtered.length === 0 && (
+            {!refreshing && filtered.length === 0 && emptyKind === "loading" && renderSkeletons(3)}
+            {!refreshing && filtered.length === 0 && emptyKind !== "loading" && (
               <EmptyState
                 className={emptyColSpan}
                 icon={
-                  q ? (
+                  emptyKind === "error" ? (
+                    <WifiOff className="h-6 w-6" aria-hidden />
+                  ) : emptyKind === "search" ? (
                     <Search className="h-6 w-6" aria-hidden />
                   ) : (
                     <CalendarSearch className="h-6 w-6" aria-hidden />
                   )
                 }
                 title={
-                  q
-                    ? `No games match "${q}"`
-                    : tab === "archive"
-                      ? "No finished games match your filters"
-                      : "No games match your filters"
+                  emptyKind === "error"
+                    ? offline
+                      ? "You're offline"
+                      : "Couldn't load games"
+                    : emptyKind === "search"
+                      ? `No games match "${q}"`
+                      : emptyKind === "none-yet"
+                        ? tab === "archive"
+                          ? "No finished games yet"
+                          : "No games listed yet"
+                        : tab === "archive"
+                          ? "No finished games match your filters"
+                          : "No games match your filters"
                 }
                 description={
-                  q
-                    ? "Try a shorter search, or a different sport or city name."
-                    : "Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                  emptyKind === "error"
+                    ? offline
+                      ? "Reconnect and your games will load."
+                      : "Check your connection and try again."
+                    : emptyKind === "search"
+                      ? "Try a shorter search, or a different sport or city name."
+                      : emptyKind === "none-yet"
+                        ? "Be the first to host one in your area."
+                        : "Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
                 }
                 action={
-                  q ? undefined : (
+                  emptyKind === "error" ? (
+                    <button
+                      onClick={() => retryHostedGames()}
+                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                    >
+                      Try again
+                    </button>
+                  ) : emptyKind === "search" ? (
+                    <button
+                      onClick={() => setQ("")}
+                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                    >
+                      Clear search
+                    </button>
+                  ) : emptyKind === "none-yet" ? (
+                    <Link
+                      to="/create"
+                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                    >
+                      Host a game
+                    </Link>
+                  ) : (
                     <button
                       onClick={() => {
                         setPositionFilter(null);
