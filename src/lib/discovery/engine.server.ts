@@ -390,6 +390,8 @@ export async function stepRun(
             `${task.kind === "osm" ? "Map lookup" : `Search "${task.q}"`} failed: ${e instanceof Error ? e.message : "error"}`,
           );
         }
+        // A map lookup can try several servers, so it gets the whole step.
+        if (task.kind === "osm") break;
       }
     } else if (pages.length && pagesDone < run.max_pages) {
       // Phase 2: read pages and turn what they say into candidates.
@@ -545,6 +547,18 @@ export async function stepRun(
         if (pages.length) note("Stopped at the page limit.");
         pages = [];
         status = "done";
+        if (stats.pagesRead === 0 && stats.leads === 0) {
+          if (stats.errors > 0) {
+            // Nothing was found because the lookups themselves failed: say so
+            // rather than reporting a finished run with no results.
+            status = "failed";
+            error = deps.searchEnabled
+              ? "Every lookup failed, so there was nothing to read. Try again in a few minutes."
+              : "The map servers could not be reached and web search is off, so there was nothing to read. Try again in a few minutes, or add FIRECRAWL_API_KEY to turn on web search.";
+          } else {
+            note("No sites to read.");
+          }
+        }
       }
     }
   } catch (e) {

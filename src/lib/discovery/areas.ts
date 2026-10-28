@@ -116,7 +116,7 @@ export function overpassQuery(area: DiscoveryArea, type: DiscoveryType): string 
     `  nwr${f}["website"]${box};`,
     `  nwr${f}["contact:website"]${box};`,
   ]);
-  return `[out:json][timeout:40];\n(\n${lines.join("\n")}\n);\nout tags center 300;`;
+  return `[out:json][timeout:20];\n(\n${lines.join("\n")}\n);\nout tags center 300;`;
 }
 
 export type OsmLead = {
