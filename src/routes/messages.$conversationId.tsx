@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
 import { pageHead } from "@/lib/seo";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -886,6 +887,7 @@ function Thread() {
           <input
             ref={fileInputRef}
             type="file"
+            accept={ATTACHMENT_ACCEPT}
             className="hidden"
             onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
           />
