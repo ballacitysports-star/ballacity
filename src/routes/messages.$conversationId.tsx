@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
 import { pageHead } from "@/lib/seo";
@@ -102,7 +103,7 @@ function Thread() {
   const uploaderRef = useRef<AttachmentUploader | null>(null);
   const sendingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { ref: scrollRef, pinNow } = useStickToBottom();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
@@ -291,10 +292,12 @@ function Thread() {
     };
   }, [conversationId, user?.id, loading]);
 
+  // The list stays pinned to the newest message on its own (useStickToBottom);
+  // a new message of mine always brings it to the bottom.
+  const lastMine = msgs.length > 0 && msgs[msgs.length - 1]?.sender_id === user?.id;
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs.length, otherTyping]);
+    if (lastMine) pinNow();
+  }, [msgs.length, lastMine, pinNow]);
 
   const setTypingState = (typing: boolean) => {
     if (isTypingRef.current === typing) return;
@@ -323,12 +326,6 @@ function Thread() {
   };
 
   const viewport = useVisualViewport();
-  // Opening the keyboard shortens the screen; keep the latest message in view.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && viewport?.keyboardOpen) el.scrollTo({ top: el.scrollHeight });
-  }, [viewport?.keyboardOpen, viewport?.height]);
-
   const lastSeenId = useMemo(() => {
     if (!user) return null;
     const mine = msgs.filter((m) => m.sender_id === user.id && m.read_at);
@@ -562,7 +559,7 @@ function Thread() {
         />
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {msgs.length === 0 ? (
           <p className="mt-10 text-center text-sm text-muted-foreground">
             No messages yet — say hi 👋
