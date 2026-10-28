@@ -45,6 +45,7 @@ import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
+import { AnalyticsHost } from "@/components/AnalyticsHost";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
@@ -167,11 +168,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) ?? "";
-const GA_INIT_SCRIPT = GA_ID
-  ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',${JSON.stringify(GA_ID)});`
-  : "";
-
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
@@ -293,15 +289,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        {GA_ID ? (
-          <>
-            <script
-              async
-              src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`}
-            />
-            <script dangerouslySetInnerHTML={{ __html: GA_INIT_SCRIPT }} />
-          </>
-        ) : null}
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script
@@ -1141,6 +1128,7 @@ function RootComponent() {
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <SessionHeartbeat />
+        <AnalyticsHost />
         <SupportAssistantHost />
         <DebugModeToggle />
       </ClientOnly>

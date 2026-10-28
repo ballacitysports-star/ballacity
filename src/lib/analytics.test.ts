@@ -1,0 +1,98 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ANALYTICS_EVENTS,
+  loadAnalyticsTag,
+  sanitizeParams,
+  setAnalyticsAudience,
+  trackEvent,
+} from "./analytics";
+
+type W = Window & {
+  gtag?: (...a: unknown[]) => void;
+  __bcGaLoaded?: boolean;
+  dataLayer?: unknown[];
+};
+let gtag: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  gtag = vi.fn();
+  (window as W).gtag = gtag as unknown as W["gtag"];
+  setAnalyticsAudience(false);
+});
+afterEach(() => {
+  delete (window as W).gtag;
+});
+
+describe("trackEvent", () => {
+  it("sends nothing until the member is confirmed an adult", () => {
+    trackEvent("view_game", { game_id: "g1" });
+    expect(gtag).not.toHaveBeenCalled();
+  });
+
+  it("sends held events once an adult is confirmed", () => {
+    trackEvent("view_game", { game_id: "g1" });
+    setAnalyticsAudience(true);
+    expect(gtag).toHaveBeenCalledWith("event", "view_game", { game_id: "g1" });
+    trackEvent("join_game", { kind: "instant" });
+    expect(gtag).toHaveBeenCalledWith("event", "join_game", { kind: "instant" });
+  });
+
+  it("drops held events when the member turns out not to be an adult", () => {
+    trackEvent("create_game", { count: 1 });
+    setAnalyticsAudience(false); // age answered: not an adult
+    setAnalyticsAudience(true); // a different member signs in as an adult
+    expect(gtag).not.toHaveBeenCalled();
+  });
+
+  it("ignores events that are not in the funnel list", () => {
+    setAnalyticsAudience(true);
+    trackEvent("page_scroll" as never);
+    expect(gtag).not.toHaveBeenCalled();
+    expect(ANALYTICS_EVENTS).toContain("join_game");
+  });
+
+  it("does not throw when the tag does", () => {
+    setAnalyticsAudience(true);
+    gtag.mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(() => trackEvent("create_game")).not.toThrow();
+  });
+});
+
+describe("sanitizeParams", () => {
+  it("keeps plain facts and drops anything personal", () => {
+    expect(
+      sanitizeParams({
+        game_id: "g1",
+        count: 2,
+        free: true,
+        email: "a@b.co",
+        display_name: "Sam",
+        note: "reach me at sam@example.com",
+        lat: 33.9,
+        user_id: "u1",
+        nested: { a: 1 },
+        long: "x".repeat(101),
+      }),
+    ).toEqual({ game_id: "g1", count: 2, free: true });
+  });
+});
+
+describe("loadAnalyticsTag", () => {
+  it("does nothing without a measurement id", () => {
+    loadAnalyticsTag("");
+    expect(document.querySelector('script[src*="googletagmanager"]')).toBeNull();
+  });
+
+  it("adds the tag once, with ad features off", () => {
+    loadAnalyticsTag("G-TEST123");
+    loadAnalyticsTag("G-TEST123");
+    expect(document.querySelectorAll('script[src*="googletagmanager"]').length).toBe(1);
+    const flat = JSON.stringify(
+      Array.from((window as W).dataLayer ?? []).map((a) => Array.from(a as ArrayLike<unknown>)),
+    );
+    expect(flat).toContain("allow_google_signals");
+  });
+});

@@ -76,6 +76,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { trackEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -690,6 +691,7 @@ function Create() {
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
+            trackEvent("create_game", { count: plans.length });
             if (plans.length > 1) {
               toast.success(`Created ${plans.length} games`);
               nav({ to: "/feed" });
