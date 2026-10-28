@@ -48,6 +48,17 @@ describe("useJoinGate / useLiveStatus stability", () => {
     expect(result.current.locked).toBe(true);
   });
 
+  it("holds a locked gate with no game, then resolves once one arrives", () => {
+    const { result, rerender } = renderHook(
+      ({ game }: { game: Game | undefined }) => useJoinGate(game),
+      { initialProps: { game: undefined as Game | undefined } },
+    );
+    expect(result.current.locked).toBe(true);
+    rerender({ game: makeGame() });
+    expect(result.current.joinState).toBe("open");
+    expect(result.current.locked).toBe(false);
+  });
+
   it("keeps live status stable across re-renders with a new game object", () => {
     const { result, rerender } = renderHook(() => useLiveStatus(makeGame()));
     expect(result.current).toBe("scheduled");

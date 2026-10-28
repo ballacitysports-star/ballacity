@@ -153,22 +153,6 @@ function EditProfile() {
     };
   }, [loading, profileUser, nav]);
 
-  if (loading) return null;
-  if (!profileUser) {
-    return (
-      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
-        <h1 className="page-title">Sign in to edit your profile</h1>
-        <p className="mt-2 page-subtitle">Profile changes are saved to your account.</p>
-        <Link
-          to="/auth"
-          className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
-        >
-          Sign in
-        </Link>
-      </div>
-    );
-  }
-
   const linkErrors = links.map((l) => validateProfileUrl(l.url));
 
   const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
@@ -303,6 +287,23 @@ function EditProfile() {
     validate,
     save: persist,
   });
+
+  // After every hook: returning earlier would change how many hooks run between renders.
+  if (loading) return null;
+  if (!profileUser) {
+    return (
+      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
+        <h1 className="page-title">Sign in to edit your profile</h1>
+        <p className="mt-2 page-subtitle">Profile changes are saved to your account.</p>
+        <Link
+          to="/auth"
+          className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
+        >
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   const done = async () => {
     await autosave.flush();

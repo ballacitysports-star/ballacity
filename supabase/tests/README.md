@@ -36,11 +36,13 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `60_content_studio.test.sql`               | Only a superadmin approves or publishes; an approval is bound to the exact text and Page; editing withdraws it; one post per approval; Page tokens unreadable          |
 | `70_listing_claim_review.test.sql`         | Nobody reviews their own listing claim; claims state a relationship and an attestation; the needs-info round trip; a claim grants nothing until approved               |
 | `110_follow_approval.test.sql`             | Private accounts: following waits for approval; every minor always needs it; under 16 only a guardian can answer; no direct writes to follows / requests               |
-| `120_game_join_gate.test.sql`              | A player cannot skip host approval or the entry fee, join an ended game or a full one; a guardian's "Can join games" switch and withdrawn consent hold for every minor |
-| `130_guardian_join_request_order.test.sql` | A minor's game request needs the host's answer and the guardian's, in either order; a guardian can answer until the child is on the roster                             |
-| `140_team_members_direct_add.test.sql`     | A coach cannot put a minor on a roster by writing the row; the invite their guardian approves is the way in                                                            |
-| `150_waitlist_notified_on_leave.test.sql`  | When a seat opens the player who has waited longest is told once; no one is told about a closed or started game                                                        |
-| `160_trainer_org_affiliation.test.sql`     | Only a trainer can put their profile on a facility: no direct add, no forged invite, no repointing a member row                                                        |
+| `120_minor_messaging.test.sql`             | Who may start a conversation with a minor: age rules, guardian controls, a guardian reaches only their own children, no client path around the function                |
+| `130_storage_policies.test.sql`            | Payment proofs, message attachments and highlight videos stay with their owners and participants; nobody writes into another folder; a quarantined clip is unreadable  |
+| `140_game_join_gate.test.sql`              | A player cannot skip host approval or the entry fee, join an ended game or a full one; a guardian's "Can join games" switch and withdrawn consent hold for every minor |
+| `150_guardian_join_request_order.test.sql` | A minor's game request needs the host's answer and the guardian's, in either order; a guardian can answer until the child is on the roster                             |
+| `160_team_members_direct_add.test.sql`     | A coach cannot put a minor on a roster by writing the row; the invite their guardian approves is the way in                                                            |
+| `170_waitlist_notified_on_leave.test.sql`  | When a seat opens the player who has waited longest is told once; no one is told about a closed or started game                                                        |
+| `180_trainer_org_affiliation.test.sql`     | Only a trainer can put their profile on a facility: no direct add, no forged invite, no repointing a member row                                                        |
 
 ## Races
 
