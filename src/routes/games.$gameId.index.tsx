@@ -1167,6 +1167,7 @@ function GameDetail() {
           link: `/games/${game.id}`,
         }).catch(() => {});
         void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
+        trackEvent("join_game", { game_id: game.id, kind: "request" });
         toast.success(
           isResubmit
             ? "Request resubmitted. The host will review it."
@@ -1200,6 +1201,7 @@ function GameDetail() {
     const joinedOk = await joinGame(game.id, preselectedPosition);
     if (!joinedOk) return;
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
+    trackEvent("join_game", { game_id: game.id, kind: "instant" });
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
     if (gameHostId && user && gameHostId !== user.id) {

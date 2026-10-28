@@ -63,7 +63,7 @@ jobs:
       # The backlog for this rule is zero, so any new hit is a regression.
       - name: Lint (rules of hooks must pass)
         run: |
-          if bunx eslint src --quiet --format unix | grep "react-hooks/rules-of-hooks"; then
+          if bunx eslint src --quiet | grep "react-hooks/rules-of-hooks"; then
             echo "A hook is called conditionally; see the lines above."
             exit 1
           fi
