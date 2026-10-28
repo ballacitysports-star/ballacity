@@ -39,6 +39,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `120_minor_messaging.test.sql`             | Who may start a conversation with a minor: age rules, guardian controls, a guardian reaches only their own children, no client path around the function                |
 | `130_storage_policies.test.sql`            | Payment proofs, message attachments and highlight videos stay with their owners and participants; nobody writes into another folder; a quarantined clip is unreadable  |
 | `140_report_integrity.test.sql`         | A report starts as new whatever its author sends; reviewer fields are a moderator's alone; the author cannot edit it afterwards |
+| `150_message_guards.test.sql`           | Messages are checked on send: a guardian turning messaging off or a block stops an existing thread; a sent message cannot be rewritten |
 | `140_game_join_gate.test.sql`              | A player cannot skip host approval or the entry fee, join an ended game or a full one; a guardian's "Can join games" switch and withdrawn consent hold for every minor |
 | `150_guardian_join_request_order.test.sql` | A minor's game request needs the host's answer and the guardian's, in either order; a guardian can answer until the child is on the roster                             |
 | `160_team_members_direct_add.test.sql`     | A coach cannot put a minor on a roster by writing the row; the invite their guardian approves is the way in                                                            |
