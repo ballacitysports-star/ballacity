@@ -100,6 +100,7 @@ export type DiscoveryDeps = {
   osmLeads: (area: DiscoveryArea, type: DiscoveryType) => Promise<OsmLead[]>;
   fetchPage: (
     url: string,
+    opts?: { allowRender?: boolean },
   ) => Promise<{ ok: true; url: string; page: PageText } | { ok: false; reason: string }>;
   extract: (input: {
     area: DiscoveryArea;
@@ -115,6 +116,8 @@ export type DiscoveryDeps = {
 export const TASKS_PER_STEP = 3;
 export const PAGES_PER_STEP = 2;
 export const STEP_BUDGET_MS = 25_000;
+/** Time that must be left in a step before a page may be rendered through Firecrawl. */
+export const RENDER_NEEDS_MS = 20_000;
 const LOCK_MS = 90_000;
 const STALE_RUN_MS = 60 * 60 * 1000;
 const MAX_QUEUE = 400;
@@ -417,7 +420,11 @@ export async function stepRun(
             { onConflict: "url" },
           );
 
-        const got = await deps.fetchPage(lead.url);
+        // Rendering a script-only page through Firecrawl can take 20s; only start
+        // one while the step has time to spare.
+        const got = await deps.fetchPage(lead.url, {
+          allowRender: STEP_BUDGET_MS - (deps.now() - started) > RENDER_NEEDS_MS,
+        });
         if (!got.ok) {
           stats.pagesSkipped++;
           note(`${host}: skipped (${got.reason})`);

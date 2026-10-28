@@ -41,6 +41,14 @@ export const OVERPASS_ENDPOINTS: readonly string[] = [
 /** Three attempts must fit well inside a request's lifetime, so each is short. */
 const OVERPASS_ATTEMPT_MS = 25_000;
 
+/**
+ * Firecrawl calls are kept short: a discovery step is one server request, and a
+ * request that outlives the server's limit comes back to the browser as a dropped
+ * connection ("Load failed"), not as an error message.
+ */
+export const FIRECRAWL_SCRAPE_MS = 20_000;
+export const FIRECRAWL_SEARCH_MS = 20_000;
+
 const PAGE_TIMEOUT_MS = 10_000;
 const ROBOTS_TIMEOUT_MS = 6_000;
 const MAX_PAGE_BYTES = 800_000;
@@ -169,7 +177,7 @@ async function firecrawlScrape(url: string): Promise<PageText | null> {
     const res = await firecrawlRequest(
       "/scrape",
       { url, formats: ["markdown"], onlyMainContent: true },
-      45_000,
+      FIRECRAWL_SCRAPE_MS,
     );
     if (!res.ok) return null;
     const json = (await res.json()) as {
@@ -188,8 +196,17 @@ async function firecrawlScrape(url: string): Promise<PageText | null> {
   }
 }
 
-/** Reads one public page, or says why not. Never throws. */
-export async function fetchPage(rawUrl: string): Promise<FetchResult> {
+/**
+ * Reads one public page, or says why not. Never throws.
+ *
+ * `allowRender: false` skips the Firecrawl fallback for a page that needs script
+ * to show its text. The caller sets it when the step has little time left, so one
+ * slow page cannot run a step past what the server allows.
+ */
+export async function fetchPage(
+  rawUrl: string,
+  opts: { allowRender?: boolean } = {},
+): Promise<FetchResult> {
   const url = normalizeWebUrl(rawUrl);
   if (!url) return { ok: false, reason: "not a fetchable address" };
   try {
@@ -210,7 +227,7 @@ export async function fetchPage(rawUrl: string): Promise<FetchResult> {
     const page = htmlToPageText(await readCapped(res, MAX_PAGE_BYTES));
     if (!isThinPage(page)) return { ok: true, url: finalUrl, page, via: "direct" };
 
-    const rendered = await firecrawlScrape(finalUrl);
+    const rendered = opts.allowRender === false ? null : await firecrawlScrape(finalUrl);
     if (rendered && !isThinPage(rendered)) {
       return { ok: true, url: finalUrl, page: rendered, via: "firecrawl" };
     }
@@ -229,7 +246,7 @@ export async function searchWeb(query: string, limit = 10): Promise<SearchHit[]>
   const res = await firecrawlRequest(
     "/search",
     { query, limit, sources: ["web"], country: "US" },
-    40_000,
+    FIRECRAWL_SEARCH_MS,
   );
   if (!res.ok) throw new Error(`Web search failed (HTTP ${res.status}).`);
   const json = (await res.json()) as { data?: unknown };
