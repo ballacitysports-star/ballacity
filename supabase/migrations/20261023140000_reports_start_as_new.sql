@@ -7,7 +7,7 @@
 -- with notes in their voice. The moderation queue and the compliance counters
 -- both filter on status, so such a report never shows as open, and the
 -- record looks as if a moderator had handled it. Found by the SQL test
--- 140_report_integrity.
+-- 190_report_integrity.
 --
 -- This BEFORE INSERT trigger resets those four columns for anyone who is not
 -- a moderator or server code (auth.uid() IS NULL). The app already sends
