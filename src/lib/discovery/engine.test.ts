@@ -541,3 +541,21 @@ describe("stepRun: locking and stopping", () => {
     ).rejects.toThrow(/no longer exists/);
   });
 });
+
+describe("rendering through Firecrawl is only allowed while a step has time", () => {
+  it("allows it for the first page of a step and refuses it once the step is running long", async () => {
+    const db = new FakeDb();
+    const id = await runWithPages(db, ["https://one.com/", "https://two.com/"]);
+    const calls: boolean[] = [];
+    let t = T0;
+    const fetchPage = vi.fn(async (url: string, opts?: { allowRender?: boolean }) => {
+      calls.push(opts?.allowRender !== false);
+      t += 10_000; // each page takes ten seconds
+      return { ok: true as const, url, page };
+    });
+    const deps = makeDeps({ now: () => t, fetchPage: fetchPage as never });
+    await stepRun(db, deps, { runId: id, userId: USER });
+    // 25s budget: the first page starts with 25s left (renders), the second with 15s (does not).
+    expect(calls).toEqual([true, false]);
+  });
+});

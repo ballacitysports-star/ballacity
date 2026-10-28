@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { MAX_DROPPED_STEPS, isNetworkDrop } from "@/lib/discovery/network-drop";
 import { useServerFn } from "@tanstack/react-start";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -85,6 +86,8 @@ export function DiscoveryTab() {
   const [run, setRun] = useState<Run | null>(null);
   const [driving, setDriving] = useState(false);
   const seeded = useRef(false);
+  // Steps in a row whose connection dropped; reset by any step that gets an answer.
+  const dropped = useRef(0);
 
   // The area defaults to the first one; no need to wait for an effect to fill it in.
   const areaId = pickedArea || overview.data?.areas[0]?.id || "";
@@ -114,6 +117,7 @@ export function DiscoveryTab() {
   const step = useMutation({
     mutationFn: (runId: string) => stepFn({ data: { runId } }),
     onSuccess: (r) => {
+      dropped.current = 0;
       setRun(r);
       refreshCandidates();
       if (r.status !== "running") {
@@ -124,8 +128,21 @@ export function DiscoveryTab() {
       }
     },
     onError: (e: unknown) => {
+      const message = asMessage(e, "A step failed. Resume to try again.");
+      // A step that outlived the server drops the connection; the run is saved
+      // after every step, so carry on a few times before giving up.
+      if (isNetworkDrop(message) && dropped.current < MAX_DROPPED_STEPS) {
+        dropped.current += 1;
+        toast.message("A step took too long and the connection dropped. Retrying…");
+        return;
+      }
+      dropped.current = 0;
       setDriving(false);
-      toast.error(asMessage(e, "A step failed. Resume to try again."));
+      toast.error(
+        isNetworkDrop(message)
+          ? "Steps keep taking too long and dropping the connection. Press Resume to try again."
+          : message,
+      );
     },
   });
 
