@@ -5333,6 +5333,7 @@ export type Database = {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
       }
+      game_duration_minutes: { Args: { _duration: string }; Returns: number }
       game_payments_allowed: { Args: { _user: string }; Returns: boolean }
       get_account_type: { Args: { _user_id: string }; Returns: string }
       get_game_host_payment_methods: {
@@ -5995,6 +5996,10 @@ export type Database = {
         }[]
       }
       tier_for_price_id: { Args: { _price_id: string }; Returns: string }
+      trainer_profile_owned_by: {
+        Args: { _trainer: string; _user: string }
+        Returns: boolean
+      }
       transfer_team_ownership: {
         Args: { _team: string; _to: string }
         Returns: undefined
