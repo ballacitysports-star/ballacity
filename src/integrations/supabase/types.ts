@@ -2079,11 +2079,15 @@ export type Database = {
       }
       listing_claims: {
         Row: {
+          attested_at: string | null
           created_at: string
           denial_reason: string | null
           evidence_url: string | null
           id: string
+          info_request: string | null
+          info_requested_at: string | null
           message: string | null
+          relationship: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
@@ -2093,11 +2097,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attested_at?: string | null
           created_at?: string
           denial_reason?: string | null
           evidence_url?: string | null
           id?: string
+          info_request?: string | null
+          info_requested_at?: string | null
           message?: string | null
+          relationship?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -2107,11 +2115,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attested_at?: string | null
           created_at?: string
           denial_reason?: string | null
           evidence_url?: string | null
           id?: string
+          info_request?: string | null
+          info_requested_at?: string | null
           message?: string | null
+          relationship?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -5811,6 +5823,10 @@ export type Database = {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
       }
+      request_listing_claim_info: {
+        Args: { _claim: string; _note: string }
+        Returns: undefined
+      }
       request_parental_consent: {
         Args: {
           _jurisdiction: string
@@ -5834,6 +5850,10 @@ export type Database = {
           title: string
           video_path: string
         }[]
+      }
+      respond_listing_claim: {
+        Args: { _claim: string; _evidence?: string; _message: string }
+        Returns: undefined
       }
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
@@ -5947,6 +5967,17 @@ export type Database = {
           _evidence?: string
           _id: string
           _message?: string
+          _type: string
+        }
+        Returns: string
+      }
+      submit_listing_claim_details: {
+        Args: {
+          _attest: boolean
+          _evidence?: string
+          _id: string
+          _message?: string
+          _relationship: string
           _type: string
         }
         Returns: string
