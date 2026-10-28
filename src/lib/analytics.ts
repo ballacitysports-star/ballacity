@@ -15,8 +15,18 @@ export const ANALYTICS_EVENTS = [
   "view_game",
   "join_game", // a join that went through (instant join or request sent)
   "create_game",
+  "onboarding_complete", // the profile setup was finished, not skipped
+  "view_listing", // a team, trainer or facility page was opened (kind only)
+  "create_listing", // a team, trainer or facility was published (kind only)
+  "cancel_game", // a host cancelled their game
+  "leave_game", // a player took themselves off a game
+  "task_error", // an important task failed (task name only, never the message)
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
+
+/** The tasks a `task_error` can name. Anything else is dropped, so no free text leaves. */
+export const ANALYTICS_TASKS = ["publish_game", "request_to_join", "cancel_game"] as const;
+export type AnalyticsTask = (typeof ANALYTICS_TASKS)[number];
 
 const PII_KEY = /mail|name|phone|address|birth|user|token|password|lat|lng|lon/i;
 const MAX_QUEUED = 20;
@@ -62,6 +72,12 @@ export function trackEvent(name: AnalyticsEvent, params: Record<string, unknown>
   // Not yet known to be an adult: hold a few events for the moment that is
   // confirmed, and drop them if it never is.
   if (queue.length < MAX_QUEUED) queue.push({ name, params: clean });
+}
+
+/** A failed important task, by name only: no error text, no ids. */
+export function trackTaskError(task: AnalyticsTask) {
+  if (!(ANALYTICS_TASKS as readonly string[]).includes(task)) return;
+  trackEvent("task_error", { task });
 }
 
 /** Called once the member's age is known. Anything but `true` also discards held events. */

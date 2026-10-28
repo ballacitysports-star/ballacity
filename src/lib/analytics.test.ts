@@ -2,10 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ANALYTICS_EVENTS,
+  ANALYTICS_TASKS,
   loadAnalyticsTag,
   sanitizeParams,
   setAnalyticsAudience,
   trackEvent,
+  trackTaskError,
 } from "./analytics";
 
 type W = Window & {
@@ -94,5 +96,62 @@ describe("loadAnalyticsTag", () => {
       Array.from((window as W).dataLayer ?? []).map((a) => Array.from(a as ArrayLike<unknown>)),
     );
     expect(flat).toContain("allow_google_signals");
+  });
+});
+
+describe("the wider funnel", () => {
+  it("lists the new events, so a typo at a call site cannot send an unknown one", () => {
+    for (const e of [
+      "onboarding_complete",
+      "view_listing",
+      "create_listing",
+      "cancel_game",
+      "leave_game",
+      "task_error",
+    ]) {
+      expect(ANALYTICS_EVENTS).toContain(e);
+    }
+  });
+
+  it("sends the new events for adults only, and holds then drops them otherwise", () => {
+    trackEvent("view_listing", { kind: "team" });
+    trackEvent("onboarding_complete", { account_type: "player" });
+    expect(gtag).not.toHaveBeenCalled();
+    setAnalyticsAudience(false); // turns out not to be an adult
+    setAnalyticsAudience(true);
+    expect(gtag).not.toHaveBeenCalled();
+
+    trackEvent("create_listing", { kind: "facility" });
+    expect(gtag).toHaveBeenCalledWith("event", "create_listing", { kind: "facility" });
+  });
+
+  it("sends only a kind or a task name, nothing that identifies a person or a place", () => {
+    setAnalyticsAudience(true);
+    trackEvent("view_listing", {
+      kind: "trainer",
+      user_id: "u1",
+      email: "a@b.co",
+      lat: 33.7,
+      lng: -84.3,
+      name: "Sam",
+    });
+    expect(gtag).toHaveBeenCalledWith("event", "view_listing", { kind: "trainer" });
+  });
+
+  it("names a failed task but never the error text", () => {
+    setAnalyticsAudience(true);
+    trackTaskError("publish_game");
+    expect(gtag).toHaveBeenCalledWith("event", "task_error", { task: "publish_game" });
+    gtag.mockClear();
+    trackTaskError("something else" as never);
+    expect(gtag).not.toHaveBeenCalled();
+    expect(ANALYTICS_TASKS).toEqual(["publish_game", "request_to_join", "cancel_game"]);
+  });
+
+  it("sends nothing for a minor's task errors either", () => {
+    setAnalyticsAudience(false);
+    trackTaskError("request_to_join");
+    trackEvent("leave_game");
+    expect(gtag).not.toHaveBeenCalled();
   });
 });

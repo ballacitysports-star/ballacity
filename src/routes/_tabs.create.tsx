@@ -76,7 +76,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 import { PreviewGate } from "@/components/public/PreviewGate";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { BackButton } from "@/components/layout/BackButton";
 import {
   clearCreateDraft,
@@ -831,6 +831,7 @@ function Create() {
               );
               nav({ to: "/games/$gameId", params: { gameId: firstGameId } });
             } else {
+              trackTaskError("publish_game");
               toast.error(`Couldn't publish your game. ${reason}`);
             }
           } finally {
