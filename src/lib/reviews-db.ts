@@ -10,13 +10,7 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  demoReviewees,
-  demoReviewsFor,
-  type Review,
-  type ReviewerKind,
-  type RevieweeKind,
-} from "@/lib/reviews";
+import type { Review, ReviewerKind, RevieweeKind } from "@/lib/reviews";
 import type { Database } from "@/integrations/supabase/types";
 import { analyzeSubmittedReview, submitReview } from "@/lib/reviews.functions";
 
@@ -101,8 +95,8 @@ async function fetchReviewsFor(revieweeId: string): Promise<Review[]> {
 }
 
 /**
- * Reviews about an entity. "me" resolves to the signed-in user. Sample-data
- * entities (ids that never exist in the database) still show their demo seed.
+ * Reviews about an entity. "me" resolves to the signed-in user. Every review is
+ * a real one from the database; nothing is made up to fill an empty list.
  */
 export function useReviewsFor(revieweeId: string): Review[] {
   const { user } = useAuth();
@@ -113,11 +107,7 @@ export function useReviewsFor(revieweeId: string): Review[] {
     enabled: id !== "me" && id.length > 0,
     staleTime: 30_000,
   });
-  return useMemo(() => {
-    const demo = demoReviewsFor(revieweeId);
-    if (!q.data?.length) return demo.length ? demo : NO_REVIEWS;
-    return demo.length ? [...q.data, ...demo] : q.data;
-  }, [q.data, revieweeId]);
+  return q.data?.length ? q.data : NO_REVIEWS;
 }
 
 export type ReviewBoardEntry = {
@@ -156,11 +146,6 @@ export function useReviewBoard(): ReviewBoardEntry[] {
       };
       e.reviews.push(r);
       map.set(r.revieweeId, e);
-    }
-    for (const d of demoReviewees()) {
-      if (!map.has(d.revieweeId)) {
-        map.set(d.revieweeId, { ...d, reviews: demoReviewsFor(d.revieweeId) });
-      }
     }
     return Array.from(map.values());
   }, [q.data]);

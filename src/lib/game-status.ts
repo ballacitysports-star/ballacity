@@ -163,6 +163,14 @@ export function joinGateErrorMessage(err: unknown): string {
   if (raw.includes("GAME_JOINS_CLOSED")) return "The host closed joining for this game.";
   if (raw.includes("GAME_SIGNUP_CLOSED")) return "Signups for this game are closed.";
   if (raw.includes("GAME_FULL")) return "The roster filled up — try the waitlist.";
+  if (raw.includes("GAME_APPROVAL_REQUIRED"))
+    return "The host has to approve your request before you can join.";
+  if (raw.includes("GAME_PAYMENT_REQUIRED"))
+    return "Your entry fee has to be confirmed by the host before you take a spot.";
+  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
+    return "A parent or guardian has to approve this request before you can join.";
+  if (raw.includes("AGE_VERIFICATION_REQUIRED"))
+    return "Add your date of birth in your profile before joining games.";
   if (raw.includes("CHILD_GAME_PARTICIPATION_BLOCKED"))
     return "A parent or guardian must approve game participation for this account.";
   if (raw.includes("age requirement"))

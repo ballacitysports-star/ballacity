@@ -1,17 +1,29 @@
 // Server-only: once a paid game's fee is verified, place the player on the
 // roster so they don't depend on their own client running refreshStatus().
 // Callers must have already verified the payment (host review or PayPal capture).
-export async function addPaidPlayerToRoster(gameId: string, playerId: string, position?: string | null) {
+export async function addPaidPlayerToRoster(
+  gameId: string,
+  playerId: string,
+  position?: string | null,
+) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: game } = await supabaseAdmin
-    .from("hosted_games")
-    .select("id, requires_approval, cancelled_at")
-    .eq("id", gameId)
-    .maybeSingle();
-  if (!game || (game as any).cancelled_at) return { added: false };
+  const [{ data: game }, { data: settings }] = await Promise.all([
+    supabaseAdmin.from("hosted_games").select("id, cancelled_at").eq("id", gameId).maybeSingle(),
+    // requires_approval lives with the payment settings, not on the game.
+    supabaseAdmin
+      .from("game_payment_settings")
+      .select("requires_approval")
+      .eq("game_id", gameId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (!game || game.cancelled_at) return { added: false };
 
-  // Approval-required games still need an approved request before rostering.
-  if ((game as any).requires_approval) {
+  // Approval-required games still need an approved request before rostering. A
+  // game with no settings row is request-to-join, as the game page treats it.
+  const requiresApproval = settings ? !!settings.requires_approval : true;
+  if (requiresApproval) {
     const { data: req } = await supabaseAdmin
       .from("join_requests")
       .select("id")

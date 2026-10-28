@@ -30,12 +30,16 @@ export type GuardianJoinRequest = {
   gameDate: string | null;
   message: string | null;
   createdAt: string;
+  /** The host already said yes; the child is waiting only on the guardian. */
+  hostApproved: boolean;
 };
 
 const ERRORS: Record<string, string> = {
   NOT_GUARDIAN: "You're not linked as this child's guardian.",
   INVITE_NOT_PENDING: "This invite was already answered.",
   REQUEST_NOT_PENDING: "This request was already answered.",
+  ALREADY_ON_ROSTER:
+    "They're already in this game. Open the game to cancel their spot instead.",
   INVITE_NOT_FOUND: "That invite no longer exists.",
   REQUEST_NOT_FOUND: "That request no longer exists.",
   WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
@@ -71,9 +75,10 @@ export function useGuardianApprovals() {
           .order("created_at", { ascending: false }),
         supabase
           .from("join_requests")
-          .select("id, game_id, player_id, message, created_at")
+          .select("id, game_id, player_id, message, created_at, status")
           .in("player_id", ids)
-          .eq("status", "pending")
+          // A host who answers first must not hide the request from the guardian.
+          .in("status", ["pending", "approved"])
           .is("guardian_approved_at", null)
           .order("created_at", { ascending: false }),
       ]);
@@ -113,6 +118,7 @@ export function useGuardianApprovals() {
         gameDate: game.get(r.game_id)?.date ?? null,
         message: r.message ?? null,
         createdAt: r.created_at,
+        hostApproved: r.status === "approved",
       }));
       return { invites, requests };
     },

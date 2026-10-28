@@ -217,6 +217,22 @@ describe("feature permission matrix", () => {
     expect(can("game_participation", { ...base, controls: on }).allowed).toBe(true);
   });
 
+  it("honours a guardian turning joining off for a teen, as the database does", () => {
+    const off = parseChildControls({ game_participation: false });
+    const on = parseChildControls({ game_participation: true });
+    for (const cohort of ["teen_13_15", "teen_16_17"] as const) {
+      const base = { cohort: cohort as AgeCohort, consent: consent("approved") };
+      const blocked = can("game_participation", { ...base, controls: off });
+      expect(blocked.allowed, cohort).toBe(false);
+      expect(blocked.reason).toMatch(/parent or guardian/i);
+      expect(can("game_participation", { ...base, controls: on }).allowed, cohort).toBe(true);
+      // No controls row means no guardian has set anything.
+      expect(can("game_participation", base).allowed, cohort).toBe(true);
+      // The switch is for joining only.
+      expect(can("game_discovery", { ...base, controls: off }).allowed, cohort).toBe(true);
+    }
+  });
+
   it("never lets a child host a game or hold a public profile", () => {
     const base = { cohort: "child_under_13" as AgeCohort, consent: consent("approved") };
     expect(can("game_hosting", base).allowed).toBe(false);

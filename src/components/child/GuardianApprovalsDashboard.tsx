@@ -147,6 +147,7 @@ export function GuardianApprovalsDashboard() {
                     title={`${r.childName} wants to join ${r.gameTitle}`}
                     lines={[
                       r.gameDate ? new Date(r.gameDate).toLocaleDateString() : null,
+                      r.hostApproved ? "The host already said yes. It's up to you." : null,
                       r.message ? `“${r.message}”` : null,
                     ]}
                     busy={busyId === r.id}
