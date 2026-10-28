@@ -50,6 +50,8 @@ export type JoinRequest = {
   reviewed_at: string | null;
   attempt_count?: number;
   last_rejected_at?: string | null;
+  /** Set when a guardian has approved this request for a minor. */
+  guardian_approved_at?: string | null;
 };
 
 export const JOIN_RESUBMIT_COOLDOWN_MS = 15 * 60 * 1000;
