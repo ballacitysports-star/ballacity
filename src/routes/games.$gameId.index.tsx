@@ -507,6 +507,15 @@ function GameDetail() {
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
   const hasGuardian = useHasActiveGuardian();
+  // A minor's request needs the host and a guardian; say who is still to answer.
+  const myWait =
+    !isHost && myReq
+      ? joinWait({
+          hostStatus: myReq.status,
+          needsGuardian: hasGuardian,
+          guardianApproved: !!myReq.guardian_approved_at,
+        })
+      : null;
   // Host only: which requests come from a minor with a guardian, and whether the
   // guardian has approved. Refetched when a request changes.
   const guardianNeedsQuery = useQuery({
@@ -614,7 +623,8 @@ function GameDetail() {
       // Join CTA would flip to "leave" and hide the Pay flow after approval.
       const feeOwed = Number(s?.entry_fee ?? game.price ?? 0) > 0;
       const paidOk = subs[0]?.status === "verified";
-      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) {
+      const guardianOk = !hasGuardian || !!req?.guardian_approved_at;
+      if (req?.status === "approved" && !joined && guardianOk && (!feeOwed || paidOk)) {
         const attempt = `${req.id}:${subs[0]?.id ?? ""}:${subs[0]?.status ?? ""}`;
         if (autoJoinTriedRef.current !== attempt) {
           autoJoinTriedRef.current = attempt;
@@ -953,8 +963,12 @@ function GameDetail() {
   // becomes actionable only after the host approves the request.
   const approvalCleared = !requiresApproval || isApproved;
   const paymentCleared = !isPaid || isPaymentVerified;
+  // A minor whose guardian has not approved is not confirmed, whatever the host said.
   const isConfirmed =
-    approvalCleared && paymentCleared && (requiresApproval || isPaid ? true : false);
+    approvalCleared &&
+    paymentCleared &&
+    (requiresApproval || isPaid ? true : false) &&
+    !myWait?.onParent;
   // Only surface "payment pending" once approval is cleared, so players
   // don't see a payment-pending state before they've been approved.
   const isPending = isRequestPending || (approvalCleared && isPaymentPending);
@@ -964,15 +978,6 @@ function GameDetail() {
   //  - either there's no approval gate and they've joined locally, OR
   //    the host has confirmed/approved them (paid-verified or approved request).
   const viewerCountsAsJoined = !isHost && (isConfirmed || (joined && !requiresApproval && !isPaid));
-  // A minor's request needs the host and a guardian; say who is still to answer.
-  const myWait =
-    !isHost && myReq
-      ? joinWait({
-          hostStatus: myReq.status,
-          needsGuardian: hasGuardian,
-          guardianApproved: !!myReq.guardian_approved_at,
-        })
-      : null;
   // Prefer the live participant count from `game_participants` (updates in
   // real time when anyone joins/leaves on any device) and fall back to the
   // cached `game.joined` counter until hydration completes. When we already
@@ -1015,6 +1020,11 @@ function GameDetail() {
       isUserBlocked(gameHostId, user.id)
     ) {
       toast.error("The host has blocked you from joining their games.");
+      return;
+    }
+    // The host said yes but a guardian has not: nothing to join or pay yet.
+    if (myWait?.onParent && !myWait.onHost) {
+      toast.info("Waiting for your parent to approve. They can do it in their Parent Center.");
       return;
     }
     // Approved-but-unpaid on a paid game → route to pay page/status (don't
@@ -3242,6 +3252,23 @@ function GameDetail() {
                     <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
                   </span>
                 );
+                if (myWait?.onParent && !myWait.onHost) {
+                  return (
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/40 bg-surface py-3.5 font-bold text-coral opacity-80"
+                      >
+                        <Clock className="h-4 w-4" /> Waiting for your parent
+                      </button>
+                      <div className="mt-1.5 text-center">
+                        <LeaveFlowButton gameId={game.id} gameTitle={game.title} variant="link" />
+                      </div>
+                    </div>
+                  );
+                }
                 if (paymentAction) {
                   return (
                     <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
