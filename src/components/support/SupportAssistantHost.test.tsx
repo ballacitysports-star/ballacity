@@ -67,7 +67,7 @@ describe("floating Help button", () => {
 });
 
 describe("the drawer", () => {
-  it("opens as a side panel on desktop, with a title and description", () => {
+  it("opens as a side panel on desktop, with a title and description", async () => {
     signedIn();
     render(<SupportAssistantHost />);
     fireEvent.click(screen.getByRole("button", { name: "Help and support" }));
@@ -75,16 +75,16 @@ describe("the drawer", () => {
     expect(dialog.textContent).toContain("BallaCity Help");
     expect(dialog.textContent).toContain("Quick answers and an AI assistant");
     expect(screen.queryByTestId("mobile-drawer")).toBeNull();
-    expect(screen.getByLabelText(/ask ballacity help/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/ask ballacity help/i)).toBeTruthy();
   });
 
-  it("opens as a bottom drawer on mobile", () => {
+  it("opens as a bottom drawer on mobile", async () => {
     signedIn();
     state.mobile = true;
     render(<SupportAssistantHost />);
     fireEvent.click(screen.getByRole("button", { name: "Help and support" }));
     expect(screen.getByTestId("mobile-drawer")).toBeTruthy();
-    expect(screen.getByLabelText(/ask ballacity help/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/ask ballacity help/i)).toBeTruthy();
   });
 
   it("hides the button while the drawer is open", () => {
@@ -94,12 +94,12 @@ describe("the drawer", () => {
     expect(screen.queryByRole("button", { name: "Help and support" })).toBeNull();
   });
 
-  it("can be opened from anywhere, and shows only written answers when signed out", () => {
+  it("can be opened from anywhere, and shows only written answers when signed out", async () => {
     render(<SupportAssistantHost />);
     act(() => openSupport());
     expect(screen.getByRole("dialog").textContent).toContain("BallaCity Help");
+    expect(await screen.findByRole("button", { name: "Paying for games" })).toBeTruthy();
     expect(screen.queryByLabelText(/ask ballacity help/i)).toBeNull();
-    expect(screen.getByRole("button", { name: "Paying for games" })).toBeTruthy();
   });
 
   it("closes and forgets the chat when a different member signs in", () => {
