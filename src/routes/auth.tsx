@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -13,6 +13,7 @@ import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
 import { RolePicker } from "@/components/RolePicker";
+import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
 import {
   EMPTY_DOB,
   MONTHS,
@@ -87,6 +88,14 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  // Set once sign-up has created the account but the email still needs confirming:
+  // the form gives way to a panel that stays put, with a way to send it again.
+  const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+  // Set when a sign-in was refused only because the email is unconfirmed.
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const emailRef = useRef<HTMLInputElement | null>(null);
   // Never pre-checked: the user must tick each document themselves.
   const [consent, setConsent] = useState(emptyConsentValue);
   const consentOk = allAccepted(consent);
@@ -232,10 +241,14 @@ function AuthPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const cleanEmail = email.trim();
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
     setErrors({ type: null, dob: null, consent: null, form: null });
+    setUnconfirmed(false);
+    setNotice(null);
     setBusy(true);
     try {
       if (mode === "signup") {
@@ -279,12 +292,12 @@ function AuthPage() {
         stashPendingDob(dobCheck.iso);
 
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
           options: {
             emailRedirectTo: window.location.origin,
             data: {
-              display_name: displayName || email.split("@")[0],
+              display_name: displayName.trim() || cleanEmail.split("@")[0],
               account_type: accountType,
               // Survives email confirmation on another device; read once by the
               // landing routes, which send them to it and then clear it. Not for
@@ -309,10 +322,10 @@ function AuthPage() {
         if (data.session) {
           toast.success("Account created!");
         } else {
-          toast.success("Check your email to confirm your account.");
+          setConfirmEmail(cleanEmail);
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) {
           const msg = error.message?.toLowerCase() ?? "";
           if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
@@ -322,7 +335,7 @@ function AuthPage() {
                 "If you signed up with Google, continue with Google and set a password under Profile → Security, or use Forgot password to set one now.",
               action: {
                 label: "Forgot password",
-                onClick: () => void sendReset(email),
+                onClick: () => void sendReset(),
               },
               duration: 8000,
             });
@@ -330,7 +343,7 @@ function AuthPage() {
           }
           if (msg.includes("email not confirmed")) {
             setErrors((p) => ({ ...p, form: "Confirm your email first, then sign in." }));
-            toast.error("Confirm your email first, then sign in.");
+            setUnconfirmed(true);
             return;
           }
           throw error;
@@ -345,20 +358,44 @@ function AuthPage() {
     }
   };
 
-  const sendReset = async (addr: string) => {
-    if (!addr) {
-      toast.error("Enter your email above first.");
+  const sendReset = async () => {
+    if (!cleanEmail) {
+      // The error summary takes focus, so the message is announced.
+      setErrors((p) => ({ ...p, form: "Enter your email above, then tap Forgot password." }));
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(addr, {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
-      toast.success("Check your email for a reset link.");
+      setErrors((p) => ({ ...p, form: null }));
+      setNotice(`If ${cleanEmail} has an account, a reset link is on its way.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send reset email");
+      setNotice(null);
+      setErrors((p) => ({
+        ...p,
+        form: err instanceof Error ? err.message : "Could not send reset email",
+      }));
     }
+  };
+
+  /** Sends the sign-up confirmation again; resolves to an error message, or null. */
+  const resendConfirmation = async (addr: string): Promise<string | null> => {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: addr,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    return error ? error.message || "Could not send the email. Try again shortly." : null;
+  };
+
+  const switchMode = (nextMode: "signin" | "signup") => {
+    setMode(nextMode);
+    setErrors({ type: null, dob: null, consent: null, form: null });
+    setUnconfirmed(false);
+    setNotice(null);
+    if (nextMode === "signup") setSignupStep("type");
   };
 
   // Move focus to the error summary so it is announced immediately.
@@ -560,14 +597,27 @@ function AuthPage() {
   return (
     <div className="page-shell-narrow min-h-dvh flex flex-col pb-12">
       <header className="flex items-center gap-2 px-4 py-3">
-        <Link
-          to="/"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <h1 className="bar-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
+        {mode === "signup" && signupStep === "form" && !confirmEmail && !isGuardianEntry ? (
+          <button
+            type="button"
+            onClick={() => setSignupStep("type")}
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+            aria-label="Back to role"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        ) : (
+          <Link
+            to="/"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+            aria-label="Back to home"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        )}
+        <h1 className="bar-title">
+          {confirmEmail ? "Confirm your email" : mode === "signin" ? "Sign in" : "Create account"}
+        </h1>
       </header>
 
       <div className="px-4 mt-6 space-y-5">
@@ -578,7 +628,17 @@ function AuthPage() {
           </p>
         </div>
 
-        {mode === "signup" && signupStep === "type" ? (
+        {confirmEmail ? (
+          <ConfirmEmailPanel
+            email={confirmEmail}
+            onResend={() => resendConfirmation(confirmEmail)}
+            onChangeEmail={() => {
+              setConfirmEmail(null);
+              setPassword("");
+              window.setTimeout(() => emailRef.current?.focus(), 0);
+            }}
+          />
+        ) : mode === "signup" && signupStep === "type" ? (
           <>
             <RolePicker value={setup} onChange={setSetup} />
             <p className="text-center text-xs text-muted-foreground">
@@ -606,7 +666,7 @@ function AuthPage() {
               Continue
             </button>
             <button
-              onClick={() => setMode("signin")}
+              onClick={() => switchMode("signin")}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               Already have an account? Sign in
@@ -701,7 +761,34 @@ function AuthPage() {
                 className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
               >
                 {errors.form}
+                {unconfirmed && cleanEmail ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const err = await resendConfirmation(cleanEmail);
+                      if (err) setErrors((p) => ({ ...p, form: err }));
+                      else {
+                        setUnconfirmed(false);
+                        setErrors((p) => ({ ...p, form: null }));
+                        setConfirmEmail(cleanEmail);
+                      }
+                    }}
+                    className="mt-2 block font-semibold underline"
+                  >
+                    Send the confirmation email again
+                  </button>
+                ) : null}
               </div>
+            ) : null}
+
+            {notice ? (
+              <p
+                role="status"
+                aria-live="polite"
+                className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
+              >
+                {notice}
+              </p>
             ) : null}
 
             <form onSubmit={submit} noValidate className="space-y-3">
@@ -806,7 +893,12 @@ function AuthPage() {
                 </label>
                 <input
                   id="auth-email"
+                  ref={emailRef}
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email"
@@ -822,18 +914,33 @@ function AuthPage() {
                 >
                   Password
                 </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  required
-                  minLength={6}
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  aria-describedby={mode === "signup" ? "password-hint" : undefined}
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-                />
+                <div className="relative">
+                  <input
+                    id="auth-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                    minLength={6}
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    aria-describedby={mode === "signup" ? "password-hint" : undefined}
+                    className="w-full rounded-2xl border border-border bg-surface py-3 pl-4 pr-12 text-sm outline-none focus:border-lime"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-muted-foreground"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden />
+                    )}
+                  </button>
+                </div>
                 {mode === "signup" ? (
                   <p id="password-hint" className="mt-1 text-[11px] text-muted-foreground">
                     At least 6 characters.
@@ -863,7 +970,7 @@ function AuthPage() {
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await sendReset(email);
+                    await sendReset();
                   } finally {
                     setBusy(false);
                   }
@@ -876,11 +983,7 @@ function AuthPage() {
             )}
 
             <button
-              onClick={() => {
-                const nextMode = mode === "signin" ? "signup" : "signin";
-                setMode(nextMode);
-                if (nextMode === "signup") setSignupStep("type");
-              }}
+              onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               {mode === "signin"

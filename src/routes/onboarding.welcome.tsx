@@ -34,6 +34,7 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { LoadingState } from "@/components/ui/loading-state";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
@@ -116,13 +117,13 @@ function OnboardingWelcomePage() {
   const nav = useNavigate();
   const { type: typeFromSearch } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
-  const { accountType, loading: typeLoading } = useAccountType();
+  const { accountType, loading: typeLoading, refetch: refetchType } = useAccountType();
   const guardian = useIsGuardianAccount();
   const type: AccountType | null = typeFromSearch ?? accountType;
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) nav({ to: "/auth" });
+    if (!user) nav({ to: "/auth", search: { next: "/onboarding/welcome" } });
   }, [user, authLoading, nav]);
 
   // Parents never see the athlete setup — send them to add their child.
@@ -133,7 +134,36 @@ function OnboardingWelcomePage() {
     }
   }, [sendGuardianAway, nav]);
 
-  if (authLoading || typeLoading || guardian.loading || sendGuardianAway || !type) return null;
+  if (authLoading || typeLoading || guardian.loading || sendGuardianAway) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background">
+        <LoadingState label="Loading your account…" />
+      </div>
+    );
+  }
+  // The lookup finished without an answer (offline, or the request failed): say
+  // so and offer a way on, instead of leaving a blank page.
+  if (!type) {
+    return (
+      <OnboardingShell
+        title="We couldn't load your account"
+        description="Check your connection and try again. Nothing you entered has been lost."
+      >
+        <div className="space-y-2">
+          <PrimaryCTA type="button" onClick={refetchType}>
+            Try again
+          </PrimaryCTA>
+          <button
+            type="button"
+            onClick={() => nav({ to: "/feed" })}
+            className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold"
+          >
+            Skip to the feed
+          </button>
+        </div>
+      </OnboardingShell>
+    );
+  }
 
   return <OnboardingWizard type={type} />;
 }
@@ -168,6 +198,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
   const [birthdayError, setBirthdayError] = useState<string | null>(null);
+  // Links sit behind a disclosure on the Basics step; a bad one must open it.
+  const [linksOpen, setLinksOpen] = useState(false);
 
   const [basics, setBasics] = useState<ProfileBasicsValue>({
     name: "",
@@ -213,6 +245,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     });
     setSports((profile.sports ?? []) as SportEntry[]);
     setLinks(profile.links ?? []);
+    if ((profile.links ?? []).length > 0) setLinksOpen(true);
     // Saved profile radius wins over the local default from a previous device.
     if (profile.searchRadiusMi != null) {
       setRadius(miToKm(profile.searchRadiusMi));
@@ -337,7 +370,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
     if (links.some((l) => validateProfileUrl(l.url) !== null)) {
       toast.error("Fix your profile links");
-      setStep(2);
+      setLinksOpen(true);
+      setStep(0);
       return false;
     }
     const cleanedLinks = cleanProfileLinks(links);
@@ -504,7 +538,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       step={step + 1}
       steps={stepLabels.length}
       title="Set up your profile"
-      description="Same details as Edit profile — you can change any of it later."
+      description="Add the basics so people can find and trust you. You can change any of it later."
       footer={
         <button
           type="button"
@@ -534,7 +568,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
                 if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
               }}
             />
-            <details className="mt-4 rounded-2xl border border-border bg-surface p-3">
+            <details
+              open={linksOpen}
+              onToggle={(e) => setLinksOpen(e.currentTarget.open)}
+              className="mt-4 rounded-2xl border border-border bg-surface p-3"
+            >
               <summary className="cursor-pointer text-sm font-semibold">
                 Add links (optional)
               </summary>

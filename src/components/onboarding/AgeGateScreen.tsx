@@ -106,18 +106,22 @@ export function AgeGateScreen({ onResolved }: { onResolved?: (cohort: string) =>
     void save(check.iso);
   };
 
-  if (loading || !user) {
+  // A date typed on the signup form is being applied for them: an empty form
+  // flashing up first would look like they are being asked twice.
+  const applyingPending = !error && (busy || !pendingTried) && !!readPendingDob();
+
+  if (loading || !user || applyingPending) {
     return (
       <div className="grid min-h-dvh place-items-center bg-background">
-        <LoadingState label="Loading your account…" />
+        <LoadingState
+          label={applyingPending ? "Setting up your account…" : "Loading your account…"}
+        />
       </div>
     );
   }
 
   return (
     <OnboardingShell
-      step={1}
-      steps={2}
       title="Your date of birth"
       description="Your age helps us provide the right safety, privacy and account experience. Everyone is welcome on BallaCity — we just set things up differently depending on your age."
     >
