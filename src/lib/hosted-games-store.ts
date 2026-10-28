@@ -11,6 +11,19 @@ let cache: Game[] = [];
 let loaded = false;
 let dbHydrated = false;
 let dbHydratePromise: Promise<void> | null = null;
+
+/** Where the first load from the database stands, so a screen can say so. */
+export type HostedGamesLoad = "loading" | "ready" | "error";
+let loadStatus: HostedGamesLoad = "loading";
+// After a failure the next attempt waits: every read of the store would otherwise
+// start another fetch, and reporting the failure re-reads the store.
+const RETRY_BACKOFF_MS = 15_000;
+let retryNotBefore = 0;
+function setLoadStatus(next: HostedGamesLoad) {
+  if (loadStatus === next) return;
+  loadStatus = next;
+  listeners.forEach((l) => l());
+}
 let realtimeAttached = false;
 const EMPTY = "[]";
 let snapshotCache = EMPTY;
@@ -251,14 +264,27 @@ async function fetchAll(): Promise<void> {
 function ensureDbHydrated() {
   if (dbHydrated || typeof window === "undefined") return;
   if (dbHydratePromise) return;
+  if (Date.now() < retryNotBefore) return;
   dbHydratePromise = fetchAll()
     .then(() => {
       dbHydrated = true;
+      setLoadStatus("ready");
     })
     .catch(() => {
-      // Silent — keep local cache; next call retries.
+      // Keep the local cache, say the load failed, and try again after a pause.
       dbHydratePromise = null;
+      retryNotBefore = Date.now() + RETRY_BACKOFF_MS;
+      setLoadStatus("error");
     });
+}
+
+/** Try the first load again now (a Retry button). */
+export function retryHostedGames() {
+  if (dbHydrated) return;
+  retryNotBefore = 0;
+  dbHydratePromise = null;
+  setLoadStatus("loading");
+  ensureDbHydrated();
 }
 
 function ensureRealtime() {
@@ -645,6 +671,14 @@ export function claimHostedGame(gameId: string, userId: string): void {
     .then(() => {
       /* noop */
     });
+}
+
+export function useHostedGamesStatus(): HostedGamesLoad {
+  return useSyncExternalStore(
+    subscribe,
+    () => loadStatus,
+    () => "loading",
+  );
 }
 
 export function useHostedGames(): Game[] {
