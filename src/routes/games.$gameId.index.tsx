@@ -313,10 +313,11 @@ export const Route = createFileRoute("/games/$gameId/")({
       </div>
     </div>
   ),
-  errorComponent: ({ reset }) => (
+  errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Something went wrong"
       message="This game couldn't be loaded."
+      error={error}
       onRetry={reset}
       action={
         <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
