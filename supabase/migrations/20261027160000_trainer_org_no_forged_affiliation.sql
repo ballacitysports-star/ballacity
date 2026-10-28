@@ -34,6 +34,7 @@ GRANT EXECUTE ON FUNCTION public.trainer_profile_owned_by(text, uuid) TO authent
 
 -- 1. An admin may add their own trainer profile, not anyone else's.
 DROP POLICY IF EXISTS "owner/admin can add members directly" ON public.trainer_org_members;
+DROP POLICY IF EXISTS "admin can add their own trainer profile" ON public.trainer_org_members;
 CREATE POLICY "admin can add their own trainer profile"
 ON public.trainer_org_members
 FOR INSERT
