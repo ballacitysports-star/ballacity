@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildConversationList,
   previewOf,
+  countInboxMessages,
   upsertMessages,
   type ConversationListInput,
   type Message,
@@ -204,5 +205,69 @@ describe("previewOf", () => {
 
   it("is null only when the thread has no messages at all", () => {
     expect(previewOf(undefined)).toBeNull();
+  });
+});
+
+describe("countInboxMessages", () => {
+  const me = "me";
+  const row = (
+    id: string,
+    over: Partial<{
+      unread: number;
+      last_created_at: string | null;
+      last_sender_id: string | null;
+    }> = {},
+  ) => ({
+    conversation_id: id,
+    unread: 0,
+    last_created_at: "2026-10-28T10:00:00Z",
+    last_sender_id: "them",
+    ...over,
+  });
+
+  it("counts unread messages only in threads the member has accepted", () => {
+    const out = countInboxMessages({
+      me,
+      summaries: [row("a", { unread: 2 }), row("b", { unread: 1 })],
+      acceptedBy: { a: [me, "them"], b: ["them"] },
+    });
+    expect(out.unread).toBe(2);
+  });
+
+  it("counts a request once the other person has actually written", () => {
+    const out = countInboxMessages({
+      me,
+      summaries: [row("r", { unread: 3 })],
+      acceptedBy: { r: ["them"] },
+    });
+    expect(out).toEqual({ unread: 0, requests: 1 });
+  });
+
+  it("ignores a thread nobody has written in", () => {
+    const out = countInboxMessages({
+      me,
+      summaries: [row("empty", { last_created_at: null, last_sender_id: null })],
+      acceptedBy: { empty: [] },
+    });
+    expect(out).toEqual({ unread: 0, requests: 0 });
+  });
+
+  it("does not call a thread whose last message is the member's own a request", () => {
+    const out = countInboxMessages({
+      me,
+      summaries: [row("mine", { last_sender_id: me })],
+      acceptedBy: { mine: [] },
+    });
+    expect(out.requests).toBe(0);
+  });
+
+  it("treats a missing accepted_by as not accepted and never goes negative", () => {
+    const out = countInboxMessages({
+      me,
+      summaries: [row("x", { unread: -4 }), row("y", { unread: 2 })],
+      acceptedBy: { y: [me] },
+    });
+    expect(out.unread).toBe(2);
+    expect(out.requests).toBe(1);
   });
 });

@@ -198,6 +198,64 @@ export type ConversationListInput = {
   unreadByConv: Record<string, number>;
 };
 
+export type InboxMessageCounts = { unread: number; requests: number };
+
+/**
+ * What the Inbox tab's badge counts from conversations: unread messages in
+ * threads the member has accepted, plus requests where someone else has actually
+ * written. A thread nobody has written in (many are created by tapping "message"
+ * and never sent) is a request on paper but nothing for the member to act on.
+ * Pure, so the rule can be tested.
+ */
+export function countInboxMessages(input: {
+  me: string;
+  summaries: readonly {
+    conversation_id: string;
+    unread?: number | null;
+    last_created_at?: string | null;
+    last_sender_id?: string | null;
+  }[];
+  acceptedBy: Readonly<Record<string, readonly string[] | null | undefined>>;
+}): InboxMessageCounts {
+  let unread = 0;
+  let requests = 0;
+  for (const s of input.summaries) {
+    const accepted = (input.acceptedBy[s.conversation_id] ?? []).includes(input.me);
+    if (accepted) {
+      unread += Math.max(0, s.unread ?? 0);
+    } else if (s.last_created_at && s.last_sender_id && s.last_sender_id !== input.me) {
+      requests += 1;
+    }
+  }
+  return { unread, requests };
+}
+
+/** Two small queries; the badge asks for this often, so it must stay cheap. */
+export async function fetchInboxMessageCounts(me: string): Promise<InboxMessageCounts> {
+  const { data, error } = await supabase.rpc("list_conversation_summaries" as any);
+  if (error || !Array.isArray(data) || data.length === 0) return { unread: 0, requests: 0 };
+  const summaries = data as {
+    conversation_id: string;
+    unread: number | null;
+    last_created_at: string | null;
+    last_sender_id: string | null;
+  }[];
+  const { data: convs } = await supabase
+    .from("conversations" as any)
+    .select("id, accepted_by")
+    .in(
+      "id",
+      summaries.map((s) => s.conversation_id),
+    );
+  const acceptedBy = Object.fromEntries(
+    ((convs ?? []) as unknown as { id: string; accepted_by: string[] | null }[]).map((c) => [
+      c.id,
+      c.accepted_by,
+    ]),
+  );
+  return countInboxMessages({ me, summaries, acceptedBy });
+}
+
 /**
  * The line shown under a name in the inbox. A message with no text (a photo or
  * file, or one that was unsent) still means the thread has history, so it says
@@ -533,6 +591,19 @@ export async function markConversationRead(convId: string): Promise<boolean> {
     console.error("[messages] markConversationRead failed", { convId, error });
     return false;
   }
+  // The "new message" notifications for this thread were left unread, so the
+  // Alerts list kept them (and the Inbox badge counted them) after the thread was
+  // read. Best effort: a failure here must not look like the thread failing to open.
+  void supabase
+    .from("notifications" as any)
+    .update({ read_at: new Date().toISOString() } as any)
+    .eq("user_id", u.user.id)
+    .eq("type", "message")
+    .like("link", `/messages/${convId}%`)
+    .is("read_at", null)
+    .then(({ error: nErr }) => {
+      if (nErr) console.warn("[messages] clearing message notifications failed", nErr);
+    });
   return true;
 }
 

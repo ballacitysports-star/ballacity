@@ -87,7 +87,7 @@ export function useNeedsAction(): { items: NeedsActionItem[]; isLoading: boolean
       const list = await listMyConversations();
       return {
         unread: list.filter((c) => !c.is_request).reduce((n, c) => n + c.unread, 0),
-        requests: list.filter((c) => c.is_request).length,
+        requests: list.filter((c) => c.is_request && c.last_message !== null).length,
       };
     },
   });

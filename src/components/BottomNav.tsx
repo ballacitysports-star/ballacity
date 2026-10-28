@@ -5,7 +5,7 @@ import { MyAvatar } from "@/components/UserAvatar";
 import { tabsForMode } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadNotificationCount } from "@/lib/notifications";
+import { useInboxBadgeCount } from "@/lib/use-inbox-badge";
 import { useFamilyPending } from "@/lib/use-family-pending";
 
 type NavItem = {
@@ -42,8 +42,8 @@ export function BottomNav() {
   const { pathname } = useLocation();
   const { isParentMode } = useParentMode();
   const { user } = useAuth();
-  // Alerts and message notifications are the same table, so one count covers the whole Inbox.
-  const inboxUnread = useUnreadNotificationCount("nav-");
+  // Unread messages, real message requests and alerts: what is waiting in the Inbox.
+  const inboxUnread = useInboxBadgeCount();
   const items: NavItem[] = tabsForMode(isParentMode).map((tab) => ({
     to: tab.to,
     label: tab.label,

@@ -93,7 +93,8 @@ export async function markAllNotificationsRead() {
  * `scope` keeps each caller's realtime channel separate: two components asking
  * for the same channel name at once would subscribe to it twice.
  */
-export function useUnreadNotificationCount(scope = "") {
+export function useUnreadNotificationCount(scope = "", opts: { excludeType?: string } = {}) {
+  const excludeType = opts.excludeType;
   const { user } = useAuth();
   const [count, setCount] = useState(0);
 
@@ -104,11 +105,13 @@ export function useUnreadNotificationCount(scope = "") {
     }
     let cancelled = false;
     const fetchCount = async () => {
-      const { count: c } = await supabase
+      let q = supabase
         .from("notifications" as any)
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .is("read_at", null);
+      if (excludeType) q = q.neq("type", excludeType);
+      const { count: c } = await q;
       if (!cancelled) setCount(c ?? 0);
     };
     fetchCount();
@@ -125,7 +128,7 @@ export function useUnreadNotificationCount(scope = "") {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, excludeType]);
 
   return count;
 }
