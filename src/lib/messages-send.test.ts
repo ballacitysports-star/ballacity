@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The send path: who is signed in, what is read after the insert, and who is
@@ -112,11 +112,18 @@ const h = vi.hoisted(() => {
     },
   };
 
-  return { state, supabase, createNotification, getUser, gate };
+  const finalize = vi.fn(async (_a: { data: { path: string } }) => ({
+    ok: true as const,
+    kind: "image" as const,
+    mime: "image/jpeg",
+    bytes: 10,
+  }));
+  return { state, supabase, createNotification, getUser, gate, finalize };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: h.supabase }));
 vi.mock("@/lib/notifications", () => ({ createNotification: h.createNotification }));
+vi.mock("@/lib/message-attachments.functions", () => ({ finalizeMessageAttachment: h.finalize }));
 
 import { discardMessageAttachment, sendMessage, uploadMessageAttachment } from "./messages";
 
@@ -309,6 +316,51 @@ describe("uploadMessageAttachment", () => {
     const big = new File([new Uint8Array(1)], "big.bin");
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     await expect(uploadMessageAttachment("c1", big)).rejects.toThrow("too large");
+  });
+});
+
+describe("uploadMessageAttachment: server check", () => {
+  const photo = () => new File([new Uint8Array(10)], "a.jpg", { type: "image/jpeg" });
+  class OkXhr {
+    status = 200;
+    upload = {} as { onprogress?: unknown };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    open() {}
+    setRequestHeader() {}
+    send() {
+      queueMicrotask(() => this.onload?.());
+    }
+    abort() {}
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("XMLHttpRequest", OkXhr);
+    h.finalize.mockClear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses a file type the server would refuse, before uploading", async () => {
+    const zip = new File([new Uint8Array(10)], "a.zip", { type: "application/zip" });
+    await expect(uploadMessageAttachment("c1", zip)).rejects.toThrow("not allowed");
+    expect(h.finalize).not.toHaveBeenCalled();
+  });
+
+  it("hands back the type and size the server checked, not the browser's", async () => {
+    h.finalize.mockResolvedValueOnce({ ok: true, kind: "image", mime: "image/png", bytes: 99 });
+    const a = await uploadMessageAttachment("c1", photo());
+    expect(h.finalize).toHaveBeenCalledWith({
+      data: { path: expect.stringMatching(/^c1\/me-id\//) },
+    });
+    expect(a).toMatchObject({ type: "image/png", size: 99, name: "a.jpg" });
+  });
+
+  it("rejects, and cleans up, when the server refuses the file", async () => {
+    h.finalize.mockRejectedValueOnce(new Error("That file type is not allowed."));
+    await expect(uploadMessageAttachment("c1", photo())).rejects.toThrow("not allowed");
   });
 });
 

@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
+import { finalizeMessageAttachment } from "@/lib/message-attachments.functions";
 import { createNotification } from "@/lib/notifications";
 
 export type Conversation = {
@@ -318,6 +320,12 @@ export async function uploadMessageAttachment(
   if (!uid) throw new Error("Sign in to send attachments.");
   const MAX = 20 * 1024 * 1024;
   if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
+  // Early, friendly refusal. The server decides from the file's real bytes.
+  if (!ATTACHMENT_ACCEPT.split(",").includes(file.type)) {
+    throw new Error(
+      "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.",
+    );
+  }
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   const path = `${convId}/${uid}/${Date.now()}-${safeName}`;
   const contentType = file.type || "application/octet-stream";
@@ -355,7 +363,15 @@ export async function uploadMessageAttachment(
     xhr.send(file);
   });
 
-  return { path, type: contentType, name: file.name, size: file.size };
+  // The server reads the stored file and decides what it is. A refused file is
+  // deleted there; the message is only accepted for a file that passed.
+  try {
+    const checked = await finalizeMessageAttachment({ data: { path } });
+    return { path, type: checked.mime, name: file.name, size: checked.bytes };
+  } catch (e) {
+    void discardMessageAttachment(path);
+    throw e instanceof Error ? e : new Error("Could not check the attachment.");
+  }
 }
 
 export async function getAttachmentUrl(path: string): Promise<string | null> {
