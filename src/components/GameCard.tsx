@@ -21,6 +21,7 @@ import { useMyFlowStatus, isGameId } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { GamePlaceDistance } from "@/components/GameDistance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
+import { GameCardCue } from "@/components/games/GameCardCue";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMySkillRange } from "@/lib/skill-db";
@@ -222,13 +223,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 .map(([name, count]) => (
                   <span
                     key={name}
-                    className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime"
+                    className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[10px] font-semibold text-lime"
                   >
                     {name} <span className="tabular-nums opacity-80">×{count}</span>
                   </span>
                 ))}
               {Object.keys(game.positionsNeeded).length > 3 && (
-                <span className="text-[9px] font-semibold text-muted-foreground">
+                <span className="text-[10px] font-semibold text-muted-foreground">
                   +{Object.keys(game.positionsNeeded).length - 3} more
                 </span>
               )}
@@ -298,7 +299,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <span className="min-w-0 text-foreground">· {game.skill}</span>
               {fit !== "open" && (
                 <span
-                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                     fit === "fit" ? "bg-lime/15 text-lime" : "bg-secondary text-muted-foreground"
                   }`}
                   title="Based on your skill rating"
@@ -323,7 +324,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                   onClick={messageHost}
                   disabled={opening}
                   aria-label={`Message ${game.host.name}`}
-                  className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
+                  className="relative grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:border-lime/40 hover:text-lime disabled:opacity-50"
                 >
                   <MessageCircle className="h-3.5 w-3.5" />
                 </button>
@@ -367,7 +368,20 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Users className="h-3.5 w-3.5" /> Join Waitlist
             </button>
           )}
-          <div className="mt-auto h-1 overflow-hidden rounded-full bg-secondary">
+          <GameCardCue
+            inFlow={joinedByMe || flowStatus !== "none"}
+            locked={gate.locked}
+            parentMode={isParentMode}
+          />
+          <div
+            role="progressbar"
+            aria-label="Spots filled"
+            aria-valuemin={0}
+            aria-valuemax={game.maxPlayers}
+            aria-valuenow={joinedCount}
+            aria-valuetext={`${joinedCount} of ${game.maxPlayers} joined`}
+            className="mt-auto h-1 overflow-hidden rounded-full bg-secondary"
+          >
             <div
               className={`grow-x h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
               style={

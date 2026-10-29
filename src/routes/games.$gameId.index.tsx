@@ -44,6 +44,7 @@ import {
   UserCheck,
   UserX,
   BellRing,
+  Loader2,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
@@ -191,6 +192,8 @@ import {
 } from "@/lib/live-status";
 import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
+import { ParticipationBlockedNote } from "@/components/games/ParticipationBlockedNote";
+import { joinBusyLabel } from "@/lib/game-cta-copy";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useParentMode } from "@/hooks/use-parent-mode";
@@ -3213,6 +3216,14 @@ function GameDetail() {
           {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
           )}
+          {!isParentMode &&
+            !isHost &&
+            !joined &&
+            !isPending &&
+            !isConfirmed &&
+            !participationDecision.allowed && (
+              <ParticipationBlockedNote reason={participationDecision.reason} className="mb-2" />
+            )}
           {ageNotice && !isConfirmed && !isApproved && (
             <p className="mb-2 text-[11px] font-medium text-muted-foreground" role="status">
               🎂 {ageNotice}
@@ -3399,6 +3410,7 @@ function GameDetail() {
                     }}
                     disabled={buttonDisabled}
                     aria-live="polite"
+                    aria-busy={requesting || processing}
                     aria-disabled={buttonDisabled}
                     className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                       isConfirmed
@@ -3412,7 +3424,20 @@ function GameDetail() {
                               : "bg-lime-gradient text-primary-foreground glow-lime"
                     }`}
                   >
-                    {isConfirmed ? (
+                    {requesting || processing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />{" "}
+                        {joinBusyLabel({
+                          isConfirmed,
+                          joined,
+                          isPaid,
+                          isPending,
+                          requiresApproval,
+                          isApproved,
+                          payingPending: latestSub?.status === "pending",
+                        })}
+                      </>
+                    ) : isConfirmed ? (
                       <>
                         <Check className="h-4 w-4" /> Confirmed · Tap to leave
                       </>
