@@ -160,6 +160,13 @@ async function fetchFlowInputs(gameId: string, userId: string) {
   return { settings, joinRequest, submissions, isJoined };
 }
 
+// The realtime client hands back the existing channel when a topic is already in use, and adding
+// postgres_changes listeners to a channel that has been subscribed throws ("cannot add
+// `postgres_changes` callbacks ... after `subscribe()`"), which breaks the whole page. Several
+// components on one game page use this hook, and a re-run can start before the previous channel
+// has finished closing, so every subscription gets its own topic.
+let flowChannelSeq = 0;
+
 /**
  * Live-derived join → payment flow status for the signed-in viewer.
  * Refetches whenever a relevant realtime event fires on join_requests,
@@ -208,7 +215,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
     void reload();
 
     const chan = supabase
-      .channel(`flow-status:${gameId}:${userId}`)
+      .channel(`flow-status:${gameId}:${userId}:${++flowChannelSeq}`)
       .on(
         "postgres_changes",
         {
