@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock } from "lucide-react";
 import {
   AGE_MAX,
@@ -8,6 +8,7 @@ import {
   clampAge,
   matchAgePreset,
 } from "@/lib/game-age";
+import { publicDiscoveryNote } from "@/lib/game-age-visibility";
 
 /**
  * Host-facing age requirement editor. Presets cover the common cases in one
@@ -30,6 +31,8 @@ export function AgeRequirementFields({
   const [minText, setMinText] = useState(minAge == null ? "" : String(minAge));
   const [maxText, setMaxText] = useState(maxAge == null ? "" : String(maxAge));
   const label = ageRequirementLabel({ minAge, maxAge });
+  const note = publicDiscoveryNote({ minAge, maxAge });
+  const firstPreset = useRef<HTMLButtonElement>(null);
 
   // Keep the raw text in sync when values change from outside (presets, load).
   useEffect(() => {
@@ -76,11 +79,12 @@ export function AgeRequirementFields({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        {AGE_PRESETS.map((p) => {
+        {AGE_PRESETS.map((p, i) => {
           const active = !custom && preset === p.id;
           return (
             <button
               key={p.id}
+              ref={i === 0 ? firstPreset : undefined}
               type="button"
               aria-pressed={active}
               onClick={() => {
@@ -162,6 +166,27 @@ export function AgeRequirementFields({
           : custom
             ? `Leave a field blank to keep that side open. Ages ${AGE_MIN}–${AGE_MAX}.`
             : "Pick a preset, or set your own range. Players outside it must request your approval."}
+      </p>
+
+      <p
+        role="status"
+        data-testid="age-public-discovery-note"
+        data-kind={note.kind}
+        className="mt-2 text-[11px] text-muted-foreground"
+      >
+        {note.text}
+        {note.kind === "unset" && (
+          <>
+            {" "}
+            <button
+              type="button"
+              onClick={() => firstPreset.current?.focus()}
+              className="font-semibold text-lime underline underline-offset-2"
+            >
+              Review age range
+            </button>
+          </>
+        )}
       </p>
     </div>
   );
