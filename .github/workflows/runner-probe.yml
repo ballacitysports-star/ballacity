@@ -21,6 +21,9 @@ name: Runner probe
 on:
   workflow_dispatch:
 
+# It only prints a line, so it needs no token permissions at all.
+permissions: {}
+
 jobs:
   probe:
     name: Probe

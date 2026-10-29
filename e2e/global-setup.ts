@@ -17,17 +17,56 @@
  *
  * Missing env → warn + return; the specs auto-skip as before.
  */
+import { readFileSync } from "node:fs";
+import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { assertLaunchedDevServer } from "./safety/dev-server";
+import {
+  assertSafeE2eTarget,
+  documentedProductionRefs,
+  verifyServedAppTarget,
+} from "./safety/target-guard";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const SUPABASE_PROJECT_ID =
-  process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
 
-export default async function globalSetup() {
+export default async function globalSetup(config?: Pick<FullConfig, "webServer">) {
+  // First statement, before the pass-through below, any client, any write.
+  // playwright.config.ts has already run the environment check; this repeats it
+  // (a setup file must not rely on its caller) and adds the one check only a
+  // running process can make: which backend the served app itself will use.
+  const target = assertSafeE2eTarget(
+    process.env,
+    documentedProductionRefs((path) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
+    }),
+  );
+  // The dev server must be the one playwright.config.ts launched from the verified
+  // environment. A config that drops the webServer, reuses a running server or
+  // starts anything else is refused: nothing then proves what the server's own
+  // SUPABASE_* variables are.
+  assertLaunchedDevServer(config?.webServer);
+  await verifyServedAppTarget(
+    process.env.E2E_BASE_URL ?? "http://localhost:8080",
+    target,
+    (url) => fetch(url),
+    { publishableKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+  );
+
+  // The service role key is read once, here, AFTER the guard above has validated it, and
+  // removed from the environment so the spec workers Playwright starts next, and
+  // their children, never inherit it. The web server (already started by now) received
+  // it through the launcher's inherited environment, not through the serialized config.
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
   if (
     process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON &&
     process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY
@@ -223,8 +262,30 @@ export default async function globalSetup() {
             host_snapshot: { name: "Ana García", username: "@anagk", avatar: "AG", rating: 4.8 },
           },
         ];
-        const { error } = await admin.from("hosted_games").upsert(rows, { onConflict: "id" });
-        if (error) throw new Error(error.message);
+        // Never overwrite a game this suite did not create. The ids are fixed and
+        // short, so a project that already has a real "g1" must keep it: only
+        // rows that are absent, or already owned by the fixture host, are written.
+        const { data: existing, error: readErr } = await admin
+          .from("hosted_games")
+          .select("id, host_id")
+          .in(
+            "id",
+            rows.map((r) => r.id),
+          );
+        if (readErr) throw new Error(readErr.message);
+        const foreign = new Set(
+          (existing ?? []).filter((r) => r.host_id !== gamesHostId).map((r) => r.id as string),
+        );
+        for (const id of foreign) {
+          console.warn(
+            `[e2e global-setup] A game with id ${id} exists and is not owned by the fixture host; leaving it untouched.`,
+          );
+        }
+        const writable = rows.filter((r) => !foreign.has(r.id));
+        if (writable.length > 0) {
+          const { error } = await admin.from("hosted_games").upsert(writable, { onConflict: "id" });
+          if (error) throw new Error(error.message);
+        }
       } catch (err) {
         console.warn(
           `[e2e global-setup] Could not seed fixture games g1/g2: ${
