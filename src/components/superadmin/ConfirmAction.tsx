@@ -62,7 +62,7 @@ export function ConfirmAction({
           {requireReason ? (
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">
-                Reason (recorded in audit log)
+                Reason (required, at least 3 characters; recorded in audit log)
               </label>
               <Textarea
                 value={reason}
@@ -81,6 +81,14 @@ export function ConfirmAction({
             </div>
           ) : null}
         </div>
+        {!ready && !pending ? (
+          <p className="text-xs text-muted-foreground" role="status" data-testid="confirm-hint">
+            {requireReason && reason.trim().length < 3 ? "Enter a reason to continue. " : ""}
+            {confirmWord && typed.trim().toUpperCase() !== confirmWord.toUpperCase()
+              ? `Type ${confirmWord} to continue.`
+              : ""}
+          </p>
+        ) : null}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel

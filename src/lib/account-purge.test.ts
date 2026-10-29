@@ -15,6 +15,8 @@ const log = vi.hoisted(() => [] as string[]);
 
 vi.mock("@/integrations/supabase/client.server", () => {
   const table = (name: string) => ({
+    // The up-front "does this account manage a child?" check reads counts; none here.
+    select: () => ({ eq: async () => ({ count: 0, error: null }) }),
     update: () => ({
       eq: async () => {
         log.push(`update ${name}`);
