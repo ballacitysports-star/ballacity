@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 import { SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDE_SLUGS } from "@/lib/sports-guide";
+import { SPORT_HUB_SLUGS } from "@/lib/sport-hubs";
 import { facilitySitemapEntries } from "@/lib/org-seo";
 
 interface SitemapEntry {
@@ -22,6 +23,9 @@ const ENTRIES: SitemapEntry[] = [
   { path: "/orgs", changefreq: "daily", priority: "0.8" },
   { path: "/plans", changefreq: "monthly", priority: "0.7" },
   { path: "/shop", changefreq: "weekly", priority: "0.6" },
+  ...SPORT_HUB_SLUGS.map(
+    (slug): SitemapEntry => ({ path: `/${slug}`, changefreq: "daily", priority: "0.9" }),
+  ),
   { path: "/guide", changefreq: "monthly", priority: "0.8" },
   ...SPORT_GUIDE_SLUGS.map(
     (slug): SitemapEntry => ({

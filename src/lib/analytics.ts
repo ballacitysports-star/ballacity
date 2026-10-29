@@ -21,6 +21,8 @@ export const ANALYTICS_EVENTS = [
   "cancel_game", // a host cancelled their game
   "leave_game", // a player took themselves off a game
   "task_error", // an important task failed (task name only, never the message)
+  "view_sport_hub", // a public sport hub was opened (sport only)
+  "select_primary_sport", // a member chose which sport comes first (sport only)
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 

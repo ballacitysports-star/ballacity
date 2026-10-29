@@ -2,6 +2,8 @@ import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { levelTiers, scaleForSport, toggleSportTier, type SportLevel } from "@/lib/sport-levels";
 import { TierChips } from "@/components/sports/TierChips";
+import { makePrimarySport } from "@/lib/sport-hubs";
+import { trackEvent } from "@/lib/analytics";
 
 export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel | null };
 
@@ -45,7 +47,25 @@ export function ProfileSportsFields({
         {sports.map((s) => (
           <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{s.name}</span>
+              <span className="flex items-center gap-2 font-semibold">
+                {s.name}
+                {sports[0]?.name === s.name ? (
+                  <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                    Primary
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(makePrimarySport(sports, s.name));
+                      trackEvent("select_primary_sport", { sport: s.name });
+                    }}
+                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:border-lime/40"
+                  >
+                    Make primary
+                  </button>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={() => removeSport(s.name)}
