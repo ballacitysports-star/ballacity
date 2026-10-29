@@ -10,7 +10,9 @@ import { openSpotCount } from "@/lib/team-recruiting";
  * engine, because a crawler is an anonymous audience:
  *  - private, hidden, cancelled and past games are never exposed, and
  *  - anything aimed at under-18s (youth games, youth/teen trainers) is kept
- *    out of search indexes and out of the city pages entirely.
+ *    out of search indexes and out of the city pages entirely. A game is only
+ *    public when its age range is provably adult-only (see gameAgeRangeIsAdultOnly);
+ *    the database applies the same rule to anonymous reads.
  */
 
 /** A city or city×sport page with fewer listings than this is thin: noindex. */
@@ -57,9 +59,23 @@ export type CityGymRow = {
   updated_at?: string | null;
 };
 
-/** True when the game could be open to someone under 18. */
+/**
+ * True only for an age range that is adult-only: a minimum of 18 or more, and a
+ * maximum that is either absent (the open-ended "18+" / "21+" presets) or not
+ * below the minimum. Mirrors public.game_age_range_is_adult_only in
+ * supabase/migrations/20261029150000_hosted_games_anon_minors_guard.sql, which is
+ * what anonymous visitors are actually held to; keep the two in step. A missing
+ * minimum ("any age"), a youth or mixed range such as 16-30, a maximum-only range
+ * and an inverted range are all not adult-only.
+ */
+export function gameAgeRangeIsAdultOnly(g: Pick<CityGameRow, "min_age" | "max_age">): boolean {
+  if (g.min_age === null || g.min_age < 18) return false;
+  return g.max_age === null || g.max_age >= g.min_age;
+}
+
+/** True when the game could be open to someone under 18, or its audience is unknown. */
 export function gameTouchesMinors(g: Pick<CityGameRow, "min_age" | "max_age">): boolean {
-  return g.max_age !== null && g.max_age < 18;
+  return !gameAgeRangeIsAdultOnly(g);
 }
 
 /** Whether a game may be shown to anonymous visitors and crawlers. */

@@ -68,6 +68,9 @@ export const getCityListings = createServerFn({ method: "GET" })
         .is("hidden_at", null)
         .is("org_hidden_at", null)
         .is("cancelled_at", null)
+        // Adult-only games only (the database also enforces this for anon); the full
+        // range rule is applied again by bucketByCity.
+        .gte("min_age", 18)
         .gte("date", new Date().toISOString())
         .gte("lat", b.minLat)
         .lte("lat", b.maxLat)

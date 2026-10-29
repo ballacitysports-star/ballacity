@@ -5,6 +5,8 @@ import {
   citySitemapEntries,
   entitySitemapEntries,
   filterBySport,
+  gameAgeRangeIsAdultOnly,
+  gameTouchesMinors,
   isPublicUpcomingGame,
   type CityGameRow,
   type CityOrgRow,
@@ -25,8 +27,8 @@ const game = (over: Partial<CityGameRow> = {}): CityGameRow => ({
   skill: "All",
   lat: AUSTIN.lat,
   lng: AUSTIN.lng,
-  min_age: null,
-  max_age: null,
+  min_age: 21,
+  max_age: 40,
   is_private: false,
   hidden_at: null,
   org_hidden_at: null,
@@ -73,6 +75,74 @@ describe("public rules", () => {
     expect(isPublicUpcomingGame(game({ date: "2026-10-01T00:00:00Z" }), NOW)).toBe(false);
     expect(isPublicUpcomingGame(game({ max_age: 14 }), NOW)).toBe(false);
     expect(isPublicUpcomingGame(game({ min_age: 18, max_age: null }), NOW)).toBe(true);
+  });
+
+  // The same table as supabase/tests/290_hosted_games_anon_minors.test.sql: the database is
+  // the enforcement layer and this helper must agree with it on every case.
+  it.each([
+    [21, 40, true],
+    [18, 18, true],
+    [18, 99, true],
+    [18, null, true],
+    [21, null, true],
+    [null, null, false],
+    [null, 40, false],
+    [null, 18, false],
+    [17, null, false],
+    [17, 40, false],
+    [16, 30, false],
+    [14, null, false],
+    [8, 12, false],
+    [40, 30, false],
+    [30, 12, false],
+    [0, null, false],
+  ] as const)("age range %s-%s adult-only: %s", (min_age, max_age, adult) => {
+    expect(gameAgeRangeIsAdultOnly({ min_age, max_age })).toBe(adult);
+    expect(gameTouchesMinors({ min_age, max_age })).toBe(!adult);
+    expect(isPublicUpcomingGame(game({ min_age, max_age }), NOW)).toBe(adult);
+  });
+
+  it("does not list a game with no age limit, a maximum alone or a mixed range", () => {
+    for (const ages of [
+      { min_age: null, max_age: null },
+      { min_age: null, max_age: 40 },
+      { min_age: 16, max_age: 30 },
+      { min_age: 13, max_age: null },
+    ]) {
+      expect(isPublicUpcomingGame(game(ages), NOW)).toBe(false);
+    }
+  });
+
+  it("keeps open-ended 18+ and 21+ games in city buckets, counts and the sitemap", () => {
+    const rows = {
+      games: [
+        game({ id: "open18", min_age: 18, max_age: null }),
+        game({ id: "open21", min_age: 21, max_age: null }),
+        game({ id: "bounded", min_age: 21, max_age: 40 }),
+        game({ id: "anyage", min_age: null, max_age: null }),
+        game({ id: "mixed", min_age: 16, max_age: 30 }),
+        game({ id: "teen13", min_age: 13, max_age: null }),
+        game({ id: "inverted", min_age: 40, max_age: 30 }),
+        game({ id: "private", is_private: true }),
+        game({ id: "hidden", hidden_at: "x" }),
+        game({ id: "orghidden", org_hidden_at: "x" }),
+        game({ id: "cancelled", cancelled_at: "x" }),
+      ],
+      orgs: [],
+      gyms: [],
+    };
+    const austin = bucketByCity(rows, NOW).get("austin-tx")!;
+    expect(austin.games.map((g) => g.id)).toEqual(["open18", "open21", "bounded"]);
+    expect(entitySitemapEntries(rows, NOW).map((e) => e.path)).toEqual([
+      "/games/open18",
+      "/games/open21",
+      "/games/bounded",
+    ]);
+    // Three eligible games reach the indexing threshold; the eight ineligible ones do not count.
+    expect(citySitemapEntries(LAUNCH_CITIES, bucketByCity(rows, NOW)).map((e) => e.path)).toEqual([
+      "/cities/austin-tx",
+      "/cities/austin-tx/basketball",
+    ]);
   });
 
   it("keeps youth/teen trainers and teams out of buckets and sitemaps", () => {

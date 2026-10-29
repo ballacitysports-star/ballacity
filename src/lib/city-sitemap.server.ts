@@ -25,6 +25,9 @@ export async function loadCitySitemapEntries() {
       .is("hidden_at", null)
       .is("org_hidden_at", null)
       .is("cancelled_at", null)
+      // Service role bypasses RLS, so ask for adult-only games here (it also stops
+      // ineligible rows using up the limit); the full range rule is re-applied in city-seo.
+      .gte("min_age", 18)
       .gte("date", nowIso)
       .order("date", { ascending: true })
       .limit(5000),
