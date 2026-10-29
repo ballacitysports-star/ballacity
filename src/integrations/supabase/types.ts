@@ -5879,6 +5879,10 @@ export type Database = {
         Args: { _follower: string; _target: string }
         Returns: boolean
       }
+      remove_unclaimed_listing: {
+        Args: { _id: string; _type: string }
+        Returns: undefined
+      }
       report_review: { Args: { _review_id: string }; Returns: undefined }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
