@@ -10,7 +10,9 @@ import { openSpotCount } from "@/lib/team-recruiting";
  * engine, because a crawler is an anonymous audience:
  *  - private, hidden, cancelled and past games are never exposed, and
  *  - anything aimed at under-18s (youth games, youth/teen trainers) is kept
- *    out of search indexes and out of the city pages entirely.
+ *    out of search indexes and out of the city pages entirely. A game is only
+ *    public when its age range is provably adult-only (see gameAgeRangeIsAdultOnly);
+ *    the database applies the same rule to anonymous reads.
  */
 
 /** A city or city×sport page with fewer listings than this is thin: noindex. */
@@ -57,17 +59,88 @@ export type CityGymRow = {
   updated_at?: string | null;
 };
 
-/** True when the game could be open to someone under 18. */
+/**
+ * True only for an age range that is adult-only: a minimum of 18 or more, and a
+ * maximum that is either absent (the open-ended "18+" / "21+" presets) or not
+ * below the minimum. Mirrors public.game_age_range_is_adult_only in
+ * supabase/migrations/20261029150000_hosted_games_anon_minors_guard.sql, which is
+ * what anonymous visitors are actually held to; keep the two in step. A missing
+ * minimum ("any age"), a youth or mixed range such as 16-30, a maximum-only range
+ * and an inverted range are all not adult-only.
+ */
+export function gameAgeRangeIsAdultOnly(g: Pick<CityGameRow, "min_age" | "max_age">): boolean {
+  if (g.min_age === null || g.min_age < 18) return false;
+  return g.max_age === null || g.max_age >= g.min_age;
+}
+
+/** True when the game could be open to someone under 18, or its audience is unknown. */
 export function gameTouchesMinors(g: Pick<CityGameRow, "min_age" | "max_age">): boolean {
-  return g.max_age !== null && g.max_age < 18;
+  return !gameAgeRangeIsAdultOnly(g);
+}
+
+/**
+ * Whether a game is public to everyone whenever it happens: not private, hidden, cancelled or
+ * hidden by its organization, and an adult-only age range. This is the database rule for
+ * anonymous reads, which has no time condition; use it where a past game still counts, such as
+ * a highlight reel of a game that has been played.
+ */
+export function isPublicGame(
+  g: Pick<
+    CityGameRow,
+    "is_private" | "hidden_at" | "org_hidden_at" | "cancelled_at" | "min_age" | "max_age"
+  >,
+): boolean {
+  if (g.is_private || g.hidden_at || g.org_hidden_at || g.cancelled_at) return false;
+  return !gameTouchesMinors(g);
 }
 
 /** Whether a game may be shown to anonymous visitors and crawlers. */
 export function isPublicUpcomingGame(g: CityGameRow, now: Date = new Date()): boolean {
-  if (g.is_private || g.hidden_at || g.org_hidden_at || g.cancelled_at) return false;
-  if (gameTouchesMinors(g)) return false;
+  if (!isPublicGame(g)) return false;
   const t = Date.parse(g.date);
   return Number.isFinite(t) && t >= now.getTime();
+}
+
+/** Minimal public facts about an eligible game, for its page title and structured data. */
+export type PublicGameSeo = {
+  id: string;
+  title: string;
+  sport: string;
+  date: string;
+  location: string;
+  neighborhood: string;
+  price: number;
+  description: string;
+  /** All-day games show a date, never a clock time. */
+  allDay: boolean;
+  /** Always true for a returned value; a game that is not public is null, never a stripped copy. */
+  indexable: boolean;
+};
+
+/**
+ * What a signed-out visitor or crawler may learn of a game, or null. Null covers a game that
+ * is private, hidden, cancelled, organization-hidden, past, not adult-only (youth, mixed-age,
+ * unknown minimum, inverted range) and a game that does not exist, so the response is the same
+ * for all of them and carries nothing about a restricted game: not its sport, date, price or
+ * place, and not that it exists.
+ */
+export function toPublicGameSeo(
+  g: CityGameRow & { description: string; all_day: boolean | null },
+  now: Date = new Date(),
+): PublicGameSeo | null {
+  if (!isPublicUpcomingGame(g, now)) return null;
+  return {
+    id: g.id,
+    title: g.title,
+    sport: g.sport,
+    date: g.date,
+    location: g.location,
+    neighborhood: g.neighborhood,
+    price: g.price,
+    description: g.description,
+    allDay: !!g.all_day,
+    indexable: true,
+  };
 }
 
 /** Teams and trainers that say they work with kids/teens stay off public pages. */

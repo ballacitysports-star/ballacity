@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { loadReelGameAccess, publicReelText } from "@/lib/reel-game-privacy";
 
 /**
  * Public highlight feed: every athlete's visible, finished reels in one
@@ -72,7 +73,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(
-        "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,created_at,game_id,game_title",
+        "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,created_at,game_id",
       )
       .in("id", ids)
       .order("created_at", { ascending: false });
@@ -87,23 +88,20 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
       new Set(page.map((r) => r.game_id as string | null).filter((id): id is string => !!id)),
     );
 
-    const [{ data: profiles }, { data: avatars }, { data: games }] = await Promise.all([
+    const [{ data: profiles }, { data: avatars }, access] = await Promise.all([
       supabaseAdmin
         .from("profiles")
         .select("id,display_name,username,avatar_initials")
         .in("id", userIds),
       supabaseAdmin.rpc("visible_avatars" as never, { _ids: userIds } as never),
-      gameIds.length > 0
-        ? supabaseAdmin
-            .from("hosted_games")
-            .select("id,title,sport,date,location")
-            .in("id", gameIds)
-        : Promise.resolve({ data: [] as any[] }),
+      // Linked-game details and host-written reel text are shown only for a game that is public
+      // (the shared rule). A failed lookup shows neither.
+      loadReelGameAccess(supabaseAdmin, gameIds, viewerId),
     ]);
 
     const profileById = new Map(((profiles ?? []) as any[]).map((p) => [p.id as string, p]));
     const avatarById = new Map(((avatars ?? []) as any[]).map((a) => [a.id as string, a]));
-    const gameById = new Map(((games ?? []) as any[]).map((g) => [g.id as string, g]));
+    const gameById = access.publicGames;
 
     const quarantined = await quarantinedMediaPaths(
       supabaseAdmin,
@@ -137,13 +135,21 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
         ]);
         const profile = profileById.get(r.user_id as string);
         const avatar = avatarById.get(r.user_id as string);
-        const game = r.game_id ? gameById.get(r.game_id as string) : null;
+        const game = r.game_id ? (gameById.get(r.game_id as string) ?? null) : null;
         return {
           id: r.id as string,
-          title: (r.ai_title as string) || (r.title as string) || "Highlight",
-          caption: (r.ai_caption as string) ?? null,
-          hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
-          sport: (r.ai_sport as string) ?? (game?.sport as string) ?? null,
+          ...publicReelText({
+            gameId: r.game_id as string | null,
+            ownerId: r.user_id as string,
+            viewerId,
+            access,
+            text: {
+              title: (r.ai_title as string) || (r.title as string) || "Highlight",
+              caption: (r.ai_caption as string) ?? null,
+              hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
+            },
+          }),
+          sport: (r.ai_sport as string) ?? game?.sport ?? null,
           videoUrl: video.data?.signedUrl ?? null,
           fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,
           thumbnailUrl: (thumb as any)?.data?.signedUrl ?? null,
@@ -157,23 +163,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
             initials:
               (avatar?.avatar_initials as string) ?? (profile?.avatar_initials as string) ?? null,
           },
-          game: game
-            ? {
-                id: game.id as string,
-                title: (game.title as string) ?? (r.game_title as string) ?? "Game",
-                sport: (game.sport as string) ?? null,
-                date: (game.date as string) ?? null,
-                location: (game.location as string) ?? null,
-              }
-            : r.game_id
-              ? {
-                  id: r.game_id as string,
-                  title: (r.game_title as string) ?? "Game",
-                  sport: null,
-                  date: null,
-                  location: null,
-                }
-              : null,
+          game,
         };
       }),
     );

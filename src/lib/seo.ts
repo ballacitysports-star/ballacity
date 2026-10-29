@@ -14,7 +14,6 @@ export const SITE_TITLE = "BallaCity | Find Games, Join Teams — Your City's Sp
 export const SITE_DESCRIPTION =
   "Find pickup games, team tryouts and camps, trainers and gyms near you. Post your availability so coaches can find you — basketball, soccer, baseball, pickleball and more.";
 
-
 type MetaTag = Record<string, string>;
 
 export type PageHeadInput = {
@@ -85,6 +84,14 @@ export function pageHead(input: PageHeadInput) {
 }
 
 /**
+ * Share cards for games carry a version in their URL. The card renderer is stateless and the URL
+ * is the cache key, so cards cached before game pages stopped putting restricted-game details in
+ * their URLs cannot be corrected by changing the response alone. The renderer shows a generic
+ * card for a game URL that does not carry this version; bump it only together with the renderer.
+ */
+export const OG_GAME_CARD_VERSION = "2";
+
+/**
  * Build an absolute URL for the dynamically rendered share card
  * (`/api/public/og`). Used by games, profiles, teams, trainers, and venues so
  * every link preview shares one visual template.
@@ -114,6 +121,7 @@ export function ogImageUrl(input: {
   const meta = (input.meta ?? []).filter((m): m is string => Boolean(m && m.trim())).slice(0, 3);
   if (meta.length) params.set("meta", meta.join("|"));
   params.set("size", input.size ?? "og");
+  if (input.kind === "game") params.set("v", OG_GAME_CARD_VERSION);
   return `${SITE_URL}/api/public/og?${params.toString()}`;
 }
 

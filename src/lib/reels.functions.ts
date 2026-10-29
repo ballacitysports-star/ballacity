@@ -93,12 +93,10 @@ export const askReelCoach = createServerFn({ method: "POST" })
       return {
         reelId: input.reelId,
         question: question.slice(0, 1000),
-        history: (Array.isArray(input.history) ? input.history : [])
-          .slice(-8)
-          .map((h) => ({
-            role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-            content: String(h?.content ?? "").slice(0, 2000),
-          })),
+        history: (Array.isArray(input.history) ? input.history : []).slice(-8).map((h) => ({
+          role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+          content: String(h?.content ?? "").slice(0, 2000),
+        })),
       };
     },
   )
@@ -773,6 +771,17 @@ export const listPublicReels = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
+
+    // A reel's game name, and the host-written text that can name the game, are shown only for a
+    // game that is public to everyone (the shared rule), plus the reel's owner and the game's own
+    // host and players. A missing, restricted or unverifiable game, or a failed lookup, shows none.
+    const { loadReelGameAccess, publicReelText } = await import("@/lib/reel-game-privacy");
+    const access = await loadReelGameAccess(
+      supabaseAdmin,
+      reels.map((r) => r.game_id as string | null).filter((id): id is string => !!id),
+      viewerId,
+    );
+
     const quarantined = await quarantinedMediaPaths(
       supabaseAdmin,
       reels.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
@@ -802,15 +811,23 @@ export const listPublicReels = createServerFn({ method: "GET" })
         ]);
         return {
           id: r.id as string,
-          title: (r.ai_title as string) || (r.title as string),
+          ...publicReelText({
+            gameId: r.game_id as string | null,
+            ownerId: r.user_id as string | null,
+            viewerId,
+            access,
+            text: {
+              title: (r.ai_title as string) || (r.title as string),
+              caption: (r.ai_caption as string) ?? null,
+              hashtags: (r.ai_hashtags as string[]) ?? [],
+            },
+          }),
           videoUrl: video.data?.signedUrl ?? null,
           /** Original upload, tried automatically if the primary copy won't decode. */
           fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,
           thumbnailUrl: (thumb as any).data?.signedUrl ?? null,
           sport: (r.ai_sport as string) ?? null,
-          caption: (r.ai_caption as string) ?? null,
-          hashtags: (r.ai_hashtags as string[]) ?? [],
-          gameTitle: (r.game_title as string) ?? null,
+          gameTitle: (r.game_id && access.publicGames.get(r.game_id as string)?.title) || null,
           createdAt: r.created_at as string,
         };
       }),

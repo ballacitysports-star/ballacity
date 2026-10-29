@@ -10,8 +10,8 @@ SELECT t.person('host', 33), t.person('player', 29), t.person('stranger', 31),
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator');
 
 -- ---- games -----------------------------------------------------------------
-INSERT INTO public.hosted_games (id, host_id, sport, title, date)
-VALUES ('hide-g1', t.id('host'), 'basketball', 'Sunday run', now() + interval '3 days');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age)
+VALUES ('hide-g1', t.id('host'), 'basketball', 'Sunday run', now() + interval '3 days', 21, 40);
 INSERT INTO public.game_participants (game_id, user_id) VALUES ('hide-g1', t.id('player'));
 
 SELECT t.as_anon();

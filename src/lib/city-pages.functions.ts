@@ -6,12 +6,13 @@ import {
   bucketByCity,
   emptyListings,
   filterBySport,
-  isPublicUpcomingGame,
   sportForGuideSlug,
+  toPublicGameSeo,
   toPublicTeam,
   toPublicTrainer,
   type CityGameRow,
   type CityListings,
+  type PublicGameSeo,
   type PublicTeam,
   type PublicTrainer,
   type PublicTeamRow,
@@ -68,6 +69,9 @@ export const getCityListings = createServerFn({ method: "GET" })
         .is("hidden_at", null)
         .is("org_hidden_at", null)
         .is("cancelled_at", null)
+        // Adult-only games only (the database also enforces this for anon); the full
+        // range rule is applied again by bucketByCity.
+        .gte("min_age", 18)
         .gte("date", new Date().toISOString())
         .gte("lat", b.minLat)
         .lte("lat", b.maxLat)
@@ -101,21 +105,7 @@ export const getCityListings = createServerFn({ method: "GET" })
     return { listings: sport ? filterBySport(listings, sport) : listings };
   });
 
-/** Minimal public facts about a game, for its page title and structured data. */
-export type PublicGameSeo = {
-  id: string;
-  title: string;
-  sport: string;
-  date: string;
-  location: string;
-  neighborhood: string;
-  price: number;
-  description: string;
-  /** All-day games show a date, never a clock time. */
-  allDay: boolean;
-  /** False for private, hidden, cancelled, past, or youth games: noindex. */
-  indexable: boolean;
-};
+export type { PublicGameSeo };
 
 export const PUBLIC_TEAM_COLUMNS = `${CITY_ORG_COLUMNS},handle,bio,verified,founded,positions_needed`;
 
@@ -153,6 +143,11 @@ export const getPublicTrainer = createServerFn({ method: "GET" })
     return toPublicTrainer(row as unknown as PublicTeamRow);
   });
 
+/**
+ * Public facts for a game page's title, link preview and structured data. Null unless the
+ * game is public to everyone (see toPublicGameSeo), so a restricted game and a missing one
+ * look the same to the caller.
+ */
 export const getPublicGameSeo = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1).max(64) }).parse(d))
   .handler(async ({ data }): Promise<PublicGameSeo | null> => {
@@ -162,19 +157,7 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
       .eq("id", data.id)
       .maybeSingle();
     if (error || !row) return null;
-    const g = row as unknown as CityGameRow & { description: string; all_day: boolean };
-    // Never describe a youth or private game to a crawler.
-    const indexable = isPublicUpcomingGame(g);
-    return {
-      id: g.id,
-      title: indexable ? g.title : "Pickup game",
-      sport: g.sport,
-      date: g.date,
-      location: indexable ? g.location : "",
-      neighborhood: indexable ? g.neighborhood : "",
-      price: g.price,
-      description: indexable ? g.description : "",
-      allDay: !!g.all_day,
-      indexable,
-    };
+    return toPublicGameSeo(
+      row as unknown as CityGameRow & { description: string; all_day: boolean | null },
+    );
   });
