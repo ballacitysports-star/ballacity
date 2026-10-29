@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { isMissingRelationError, managedChildErrorMessage } from "@/lib/managed-children";
 
 // Every bucket that stores user-uploaded media under a `<user id>/` prefix.
 const MEDIA_BUCKETS = [
@@ -14,6 +15,43 @@ const MEDIA_BUCKETS = [
   "org-avatars",
   "trainer-avatars",
 ];
+
+/**
+ * Refuse, before anything is erased, when the database will refuse the final delete.
+ *
+ * managed_accounts.managed_by and managed_device_pairings.created_by are ON DELETE RESTRICT, so an
+ * account that still manages a child profile cannot be deleted. Steps 1 and 2 below are
+ * irreversible, so finding that out only at step 3 would leave the account anonymised ("Deleted
+ * user"), stripped of its media and still there. Every caller gets this check, so a superadmin
+ * deleting a guardian is refused the same way a guardian deleting their own account is.
+ */
+async function assertNoManagedChildren(userId: string): Promise<void> {
+  const [accounts, pairings] = await Promise.all([
+    supabaseAdmin
+      .from("managed_accounts")
+      .select("child_user_id", { count: "exact", head: true })
+      .eq("managed_by", userId),
+    supabaseAdmin
+      .from("managed_device_pairings")
+      .select("child_user_id", { count: "exact", head: true })
+      .eq("created_by", userId),
+  ]);
+  // Before the managed-children migration is applied there is no such table and nobody manages a
+  // child. Any other failure is not "no children": this function erases before it deletes.
+  for (const r of [accounts, pairings]) {
+    if (r.error && !isMissingRelationError(r.error)) {
+      throw new Error(managedChildErrorMessage("MANAGES_CHECK_FAILED"));
+    }
+  }
+  const children = accounts.count ?? 0;
+  if (children > 0 || (pairings.count ?? 0) > 0) {
+    throw new Error(
+      `${managedChildErrorMessage("MANAGES_CHILDREN")} This account manages ${children} child ${
+        children === 1 ? "profile" : "profiles"
+      }: delete ${children === 1 ? "it" : "them"} first (Parent Center, or from the child's own entry), then delete this account.`,
+    );
+  }
+}
 
 /**
  * Permanently delete one account and everything it owns.
@@ -36,6 +74,9 @@ const MEDIA_BUCKETS = [
  * they no longer carry any profile details. Retention periods require legal review.
  */
 export async function purgeUserAccount(userId: string): Promise<void> {
+  // 0. Nothing below can be undone, so rule out a refused delete first.
+  await assertNoManagedChildren(userId);
+
   // 1. Anonymize profile PII before removal.
   await supabaseAdmin
     .from("profiles")
