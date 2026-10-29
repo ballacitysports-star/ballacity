@@ -62,8 +62,7 @@ function SportHubPage() {
   const { slug, listings } = Route.useLoaderData();
   const hub = hubBySlug(slug)!;
   const { user } = useAuth();
-  const empty =
-    listings.games.length + listings.teams.length + listings.trainers.length === 0;
+  const empty = listings.games.length + listings.teams.length + listings.trainers.length === 0;
 
   useEffect(() => {
     trackEvent("view_sport_hub", { sport: hub.sport });
