@@ -15,6 +15,7 @@ import {
 import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploadDialog";
 import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/guardian")({
   head: () => ({
@@ -175,9 +176,28 @@ function GuardianDashboard() {
       <GuardianVideoUploadDialog className="mt-3" />
 
       {q.isLoading ? (
-        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+        <div className="mt-6 space-y-3" role="status" aria-label="Loading activity">
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
       ) : q.error ? (
-        <p className="mt-6 text-sm text-destructive">Couldn't load activity. Try again shortly.</p>
+        <div
+          className="mt-6 rounded-2xl border border-destructive/40 bg-surface p-4 text-sm"
+          role="alert"
+        >
+          <p className="font-semibold text-destructive">Couldn't load activity.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Check your connection, then try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => void q.refetch()}
+            disabled={q.isFetching}
+            className="mt-3 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+          >
+            {q.isFetching ? "Retrying…" : "Try again"}
+          </button>
+        </div>
       ) : kids.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm">
           <p className="font-semibold">No linked children yet</p>
