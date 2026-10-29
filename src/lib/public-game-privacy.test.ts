@@ -31,13 +31,18 @@ const db = {
   gamesError: null as { message: string } | null,
   reels: [] as Record<string, unknown>[],
   gameSelect: "",
+  ilikePattern: "",
 };
 
 const chain = (call: Call, result: (c: Call) => Result) => {
   const c: Record<string, unknown> = {};
-  for (const m of ["select", "in", "order", "limit", "is", "ilike", "neq", "gte", "lte"]) {
+  for (const m of ["select", "in", "order", "limit", "is", "neq", "gte", "lte"]) {
     c[m] = () => c;
   }
+  c.ilike = (_col: string, pattern: string) => {
+    db.ilikePattern = pattern;
+    return c;
+  };
   c.eq = (k: string, v: unknown) => {
     call.eq[k] = v;
     return c;
@@ -130,7 +135,7 @@ const game = (over: Record<string, unknown> = {}) => ({
   cancelled_at: null,
   min_age: 21,
   max_age: 40,
-  image: "game-covers/u1/cover-secret.jpg",
+  image: "storage://game-covers/u1/cover-secret.jpg",
   ...over,
 });
 
@@ -155,6 +160,7 @@ beforeEach(() => {
   db.gamesError = null;
   db.reels = [];
   db.gameSelect = "";
+  db.ilikePattern = "";
 });
 
 describe("getPlayerCard", () => {
@@ -299,6 +305,39 @@ describe("signPublicGameCover", () => {
     db.joinedGames = [game()];
     db.gamesError = { message: "boom" };
     expect((await sign()).url).toBeNull();
+  });
+
+  it("signs only a game's own cover: a different image that merely matched the search is refused", async () => {
+    db.joinedGames = [game({ image: "storage://game-covers/u1/other-cover.jpg" })];
+    expect((await sign()).url).toBeNull();
+    db.joinedGames = [game({ image: "storage://game-covers/u2/cover-secret.jpg" })];
+    expect((await sign()).url).toBeNull();
+    db.joinedGames = [game({ image: null })];
+    expect((await sign()).url).toBeNull();
+  });
+
+  it("still matches a legacy signed-url reference to the same cover", async () => {
+    db.joinedGames = [
+      game({
+        image:
+          "https://x.supabase.co/storage/v1/object/sign/game-covers/u1/cover-secret.jpg?token=abc",
+      }),
+    ];
+    expect((await sign()).url).toBe("https://signed");
+  });
+
+  it("an eligible game cannot unlock a restricted game's cover that shares a pattern", async () => {
+    db.joinedGames = [
+      game({ id: "pub", image: "storage://game-covers/u1/cover-secret2.jpg" }),
+      game({ id: "youth", min_age: 10, max_age: 14 }),
+    ];
+    expect((await sign()).url).toBeNull();
+  });
+
+  it("treats the path as data: LIKE wildcards in it are escaped", async () => {
+    db.joinedGames = [game()];
+    await signPublicGameCover({ data: { ref: "storage://game-covers/u1/c_ver-secret.jpg" } });
+    expect(db.ilikePattern).toBe("%u1/c\\_ver-secret.jpg%");
   });
 
   it("asks for every column the shared rule needs", async () => {

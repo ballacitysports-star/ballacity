@@ -8,6 +8,11 @@ import {
   parseStorageMediaUrl,
 } from "@/lib/media-refs";
 
+function isSameMedia(stored: string | null, wanted: { bucket: string; path: string }): boolean {
+  const ref = parseMediaRef(stored) ?? parseStorageMediaUrl(stored);
+  return !!ref && ref.bucket === wanted.bucket && ref.path === wanted.path;
+}
+
 /**
  * Public fallback signer for game covers.
  *
@@ -36,13 +41,17 @@ export const signPublicGameCover = createServerFn({ method: "GET" })
     const { data: games, error: gamesError } = await supabaseAdmin
       .from("hosted_games")
       .select("id,image,is_private,hidden_at,org_hidden_at,cancelled_at,min_age,max_age")
-      .ilike("image", `%${parsed.path}%`)
-      .limit(2);
+      // The path is data, not a pattern: escape LIKE wildcards so it can only match itself.
+      .ilike("image", `%${parsed.path.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`)
+      .limit(10);
 
     const usable =
       !gamesError &&
       (games ?? []).some(
         (g) =>
+          // The cover must be this game's own cover: the stored reference or legacy signed URL
+          // has to resolve to exactly the requested bucket and path, not merely contain it.
+          isSameMedia(g.image, parsed) &&
           typeof g.is_private === "boolean" &&
           isPublicGame({
             is_private: g.is_private,
