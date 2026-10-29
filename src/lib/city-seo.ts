@@ -86,6 +86,48 @@ export function isPublicUpcomingGame(g: CityGameRow, now: Date = new Date()): bo
   return Number.isFinite(t) && t >= now.getTime();
 }
 
+/** Minimal public facts about an eligible game, for its page title and structured data. */
+export type PublicGameSeo = {
+  id: string;
+  title: string;
+  sport: string;
+  date: string;
+  location: string;
+  neighborhood: string;
+  price: number;
+  description: string;
+  /** All-day games show a date, never a clock time. */
+  allDay: boolean;
+  /** Always true for a returned value; a game that is not public is null, never a stripped copy. */
+  indexable: boolean;
+};
+
+/**
+ * What a signed-out visitor or crawler may learn of a game, or null. Null covers a game that
+ * is private, hidden, cancelled, organization-hidden, past, not adult-only (youth, mixed-age,
+ * unknown minimum, inverted range) and a game that does not exist, so the response is the same
+ * for all of them and carries nothing about a restricted game: not its sport, date, price or
+ * place, and not that it exists.
+ */
+export function toPublicGameSeo(
+  g: CityGameRow & { description: string; all_day: boolean | null },
+  now: Date = new Date(),
+): PublicGameSeo | null {
+  if (!isPublicUpcomingGame(g, now)) return null;
+  return {
+    id: g.id,
+    title: g.title,
+    sport: g.sport,
+    date: g.date,
+    location: g.location,
+    neighborhood: g.neighborhood,
+    price: g.price,
+    description: g.description,
+    allDay: !!g.all_day,
+    indexable: true,
+  };
+}
+
 /** Teams and trainers that say they work with kids/teens stay off public pages. */
 export function orgTouchesMinors(o: Pick<CityOrgRow, "age_groups">): boolean {
   return (o.age_groups ?? []).some((a) => a === "youth" || a === "teen");

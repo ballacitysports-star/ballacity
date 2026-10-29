@@ -8,6 +8,7 @@ import {
   gameAgeRangeIsAdultOnly,
   gameTouchesMinors,
   isPublicUpcomingGame,
+  toPublicGameSeo,
   type CityGameRow,
   type CityOrgRow,
 } from "@/lib/city-seo";
@@ -190,5 +191,34 @@ describe("sitemap entries", () => {
     const f = filterBySport(l, "basketball");
     expect(f.games).toHaveLength(1);
     expect(f.teams).toHaveLength(1);
+  });
+});
+
+describe("toPublicGameSeo", () => {
+  const full = (over: Partial<CityGameRow> = {}) => ({
+    ...game(over),
+    description: "Bring water",
+    all_day: false,
+  });
+
+  it("returns the public facts for an eligible game and null for everything else", () => {
+    expect(toPublicGameSeo(full(), NOW)).toMatchObject({
+      id: "g1",
+      sport: "Basketball",
+      indexable: true,
+    });
+    for (const over of [
+      { is_private: true },
+      { hidden_at: "x" },
+      { org_hidden_at: "x" },
+      { cancelled_at: "x" },
+      { date: "2026-10-01T00:00:00Z" },
+      { min_age: null, max_age: null },
+      { min_age: 16, max_age: 30 },
+      { min_age: 40, max_age: 30 },
+      { min_age: null, max_age: 17 },
+    ]) {
+      expect(toPublicGameSeo(full(over), NOW)).toBeNull();
+    }
   });
 });

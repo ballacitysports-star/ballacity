@@ -12,9 +12,9 @@ import { OpenInMaps } from "@/components/OpenInMaps";
 import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
-import { pageHead, ogImageUrl } from "@/lib/seo";
 import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { getPublicGameSeo } from "@/lib/city-pages.functions";
+import { gamePageHead } from "@/lib/game-head";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -264,41 +264,7 @@ export const Route = createFileRoute("/games/$gameId/")({
     const seo = await getPublicGameSeo({ data: { id: params.gameId } }).catch(() => null);
     return { gameId: params.gameId, seo };
   },
-  head: ({ loaderData, params }) => {
-    const seo = loaderData?.seo ?? null;
-    const name = seo?.title ?? "Pickup game";
-    return pageHead({
-      path: `/games/${params.gameId}`,
-      title: `${name} — BallaCity`,
-      description: (
-        seo?.description || "See the details for this pickup game and request to join on BallaCity."
-      ).slice(0, 155),
-      ogType: "article",
-      // Private, cancelled, past and youth games are never indexed.
-      noindex: !seo?.indexable,
-      image: ogImageUrl({
-        kind: "game",
-        title: name,
-        subtitle: seo
-          ? [seo.sport, seo.neighborhood || seo.location].filter(Boolean).join(" • ")
-          : "Pickup game on BallaCity",
-        meta: seo
-          ? [formatGameWhen({ date: seo.date }), seo.location, seo.price ? `$${seo.price}` : "Free"]
-          : [],
-      }),
-      jsonLd: seo?.indexable
-        ? {
-            "@context": "https://schema.org",
-            "@type": "SportsEvent",
-            name: seo.title,
-            startDate: seo.date,
-            location: { "@type": "Place", name: seo.location, address: seo.neighborhood },
-            sport: seo.sport,
-            url: `https://ballacity.com/games/${params.gameId}`,
-          }
-        : undefined,
-    });
-  },
+  head: ({ loaderData, params }) => gamePageHead(params.gameId, loaderData?.seo ?? null),
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
       <div>
