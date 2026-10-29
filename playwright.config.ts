@@ -1,5 +1,24 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { devServerWebServer } from "./e2e/safety/dev-server";
+import { assertSafeE2eTarget, documentedProductionRefs } from "./e2e/safety/target-guard";
+
+/**
+ * Fail closed before anything else loads. Every way of running the suite
+ * (`bun run test:e2e`, `bunx playwright test`, CI) reads this file, so this is the
+ * first enforcement point; e2e/global-setup.ts checks again before its first
+ * side effect. See e2e/safety/target-guard.ts for the rules.
+ */
+const e2eTarget = assertSafeE2eTarget(
+  process.env,
+  documentedProductionRefs((path) => {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      return null;
+    }
+  }),
+);
 
 /**
  * Resolve a browser that actually exists on this machine.
@@ -22,7 +41,6 @@ function resolveChromium(): string | undefined {
   ];
   return candidates.find((p) => existsSync(p));
 }
-
 
 /**
  * Playwright config for E2E tests against the local dev server.
@@ -55,6 +73,10 @@ export default defineConfig({
   reporter: process.env.CI
     ? ([["list"], ["json", { outputFile: "playwright-report/results.json" }]] as const)
     : [["list"]],
+  // Playwright starts the dev server itself, from a verified environment, so the
+  // server functions' SUPABASE_* variables are known rather than guessed. It never
+  // adopts a server that was already running. See e2e/safety/dev-server.ts.
+  webServer: devServerWebServer(process.env, e2eTarget),
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     viewport: { width: 1280, height: 1800 },
@@ -63,7 +85,6 @@ export default defineConfig({
     launchOptions: {
       executablePath: resolveChromium(),
     },
-
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

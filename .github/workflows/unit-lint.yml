@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# Least privilege: this workflow only checks out, builds and tests. It never
+# writes to the repository, so its token is read-only.
+permissions:
+  contents: read
+
 # A new push to the same ref supersedes the run it replaced.
 concurrency:
   group: unit-lint-${{ github.ref }}
@@ -22,6 +27,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -41,6 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           # The formatting check below compares with the base branch.
           fetch-depth: 0
 
