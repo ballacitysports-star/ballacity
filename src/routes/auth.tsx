@@ -418,6 +418,9 @@ function AuthPage() {
     // anything meaningful runs before the helper consumes the tap gesture.
     const promise = lovable.auth.signInWithOAuth(provider, {
       redirect_uri: window.location.origin,
+      // Without this Google silently reuses the last account in the browser, so
+      // after signing out there is no way to pick a different one.
+      ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
 
     if (mode === "signup") stashPendingConsent(currentAcceptances(publishedLegal));

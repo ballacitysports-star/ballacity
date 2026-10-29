@@ -1077,6 +1077,24 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_requests: {
+        Row: {
+          created_at: string
+          requester_id: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string
+          requester_id: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string
+          requester_id?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -2328,6 +2346,36 @@ export type Database = {
         }
         Relationships: []
       }
+      message_attachment_checks: {
+        Row: {
+          bytes: number
+          checked_at: string
+          conversation_id: string
+          kind: string
+          mime: string
+          path: string
+          user_id: string
+        }
+        Insert: {
+          bytes: number
+          checked_at?: string
+          conversation_id: string
+          kind: string
+          mime: string
+          path: string
+          user_id: string
+        }
+        Update: {
+          bytes?: number
+          checked_at?: string
+          conversation_id?: string
+          kind?: string
+          mime?: string
+          path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string
@@ -3279,6 +3327,7 @@ export type Database = {
           location_precision: string
           marketing_emails: boolean
           profile_visibility: string
+          require_follow_approval: boolean
           show_games_played: boolean
           show_online_status: boolean
           show_sports: boolean
@@ -3295,6 +3344,7 @@ export type Database = {
           location_precision?: string
           marketing_emails?: boolean
           profile_visibility?: string
+          require_follow_approval?: boolean
           show_games_played?: boolean
           show_online_status?: boolean
           show_sports?: boolean
@@ -3311,6 +3361,7 @@ export type Database = {
           location_precision?: string
           marketing_emails?: boolean
           profile_visibility?: string
+          require_follow_approval?: boolean
           show_games_played?: boolean
           show_online_status?: boolean
           show_sports?: boolean
@@ -5186,10 +5237,15 @@ export type Database = {
         Returns: boolean
       }
       calculate_age: { Args: { _dob: string; _now?: string }; Returns: number }
+      can_manage_followers: {
+        Args: { _actor: string; _target: string }
+        Returns: boolean
+      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
+      cancel_follow_request: { Args: { _target: string }; Returns: boolean }
       cancel_tryout_rsvp: {
         Args: { _on_behalf_of?: string; _post_id: string }
         Returns: undefined
@@ -5341,6 +5397,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      follow_approval_required: { Args: { _user: string }; Returns: boolean }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
@@ -5818,11 +5875,20 @@ export type Database = {
         Args: { _game_id?: string }
         Returns: number
       }
+      remove_follower: {
+        Args: { _follower: string; _target: string }
+        Returns: boolean
+      }
+      remove_unclaimed_listing: {
+        Args: { _id: string; _type: string }
+        Returns: undefined
+      }
       report_review: { Args: { _review_id: string }; Returns: undefined }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
       }
+      request_follow: { Args: { _target: string }; Returns: string }
       request_listing_claim_info: {
         Args: { _claim: string; _note: string }
         Returns: undefined
@@ -5850,6 +5916,10 @@ export type Database = {
           title: string
           video_path: string
         }[]
+      }
+      respond_follow_request: {
+        Args: { _approve: boolean; _requester: string; _target: string }
+        Returns: string
       }
       respond_listing_claim: {
         Args: { _claim: string; _evidence?: string; _message: string }
