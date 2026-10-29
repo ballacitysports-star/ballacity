@@ -11,7 +11,10 @@ import {
   KNOWN_SUPABASE_VARS,
   LOCAL_PLACEHOLDER_KEY,
   MUST_BE_SET_VARS,
+  LIVE_PAYMENTS_KEY,
   PASS_THROUGH_VARS,
+  PAYMENTS_PLACEHOLDER,
+  PAYMENTS_VAR,
 } from "../../e2e/safety/dev-server";
 import {
   E2eTargetError,
@@ -197,15 +200,25 @@ describe("nothing leaks in from the parent shell", () => {
     for (const name of Object.keys(env)) expect(allowed.has(name)).toBe(true);
   });
 
-  it("passes the service-role key only when the verified environment has one", () => {
-    expect(buildDevServerSpec(parent, SB_TARGET).env).not.toHaveProperty(
-      "SUPABASE_SERVICE_ROLE_KEY",
-    );
+  it("never puts the service-role key in the spec, only whether the launcher should inherit one", () => {
+    const without = buildDevServerSpec(parent, SB_TARGET);
+    expect(without.inheritServiceKey).toBe(false);
+    expect(without.env).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
     const withKey = buildDevServerSpec(
-      { ...parent, SUPABASE_SERVICE_ROLE_KEY: "svc-key" },
+      { ...parent, SUPABASE_SERVICE_ROLE_KEY: "SYNTH-OPAQUE-SERVICE-VALUE" },
       SB_TARGET,
     );
-    expect(withKey.env.SUPABASE_SERVICE_ROLE_KEY).toBe("svc-key");
+    expect(withKey.inheritServiceKey).toBe(true);
+    expect(withKey.env).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
+    expect(JSON.stringify(withKey)).not.toContain("SYNTH-OPAQUE-SERVICE-VALUE");
+    expect(
+      JSON.stringify(
+        devServerWebServer(
+          { ...parent, SUPABASE_SERVICE_ROLE_KEY: "SYNTH-OPAQUE-SERVICE-VALUE" },
+          SB_TARGET,
+        ),
+      ),
+    ).not.toContain("SYNTH-OPAQUE-SERVICE-VALUE");
   });
 
   it("a production value in the parent shell cannot reach the child under any name it reads", () => {
@@ -401,5 +414,183 @@ describe("the Playwright config", () => {
     });
     vi.resetModules();
     await expect(load({})).rejects.toMatchObject({ name: "E2eTargetError" });
+  });
+});
+
+describe("the payments token cannot fall back to .env.production (Blocker A)", () => {
+  const live = "pk_live_SYNTHETICvalue123456";
+
+  it("always gives the child the fixed E2E placeholder, for sandbox and local targets", () => {
+    for (const [env, target] of [
+      [sandboxEnv(), SB_TARGET],
+      [localEnv(), LOCAL_TARGET],
+    ] as const) {
+      const spec = buildDevServerSpec(env, target);
+      expect(spec.env[PAYMENTS_VAR]).toBe(PAYMENTS_PLACEHOLDER);
+      expect(spec.env[PAYMENTS_VAR]).toBe("e2e-payments-disabled");
+      expect(spec.mustBeSet).toContain(PAYMENTS_VAR);
+    }
+  });
+
+  it("accepts the placeholder from the parent, and ignores nothing else about it", () => {
+    const spec = buildDevServerSpec(
+      sandboxEnv({ [PAYMENTS_VAR]: "  e2e-payments-disabled " }),
+      SB_TARGET,
+    );
+    expect(spec.env[PAYMENTS_VAR]).toBe(PAYMENTS_PLACEHOLDER);
+  });
+
+  it.each([
+    ["a live key", live],
+    ["an uppercase live key", "PK_LIVE_SYNTHETICvalue123456"],
+    ["a live key embedded in text", `config=${live};`],
+    ["a test key", "pk_test_SYNTHETICvalue123456"],
+    ["an altered placeholder", "e2e-payments-enabled"],
+  ])("refuses a parent value that is %s, without printing it", (_label, value) => {
+    const text = problemsOf(() =>
+      buildDevServerSpec(sandboxEnv({ [PAYMENTS_VAR]: value }), SB_TARGET),
+    );
+    expect(text).toContain(PAYMENTS_VAR);
+    expect(text).not.toContain("SYNTHETICvalue");
+  });
+
+  it("an empty parent value is replaced by the placeholder, never passed through", () => {
+    expect(
+      buildDevServerSpec(sandboxEnv({ [PAYMENTS_VAR]: "" }), SB_TARGET).env[PAYMENTS_VAR],
+    ).toBe(PAYMENTS_PLACEHOLDER);
+  });
+
+  it("no child value holds a live payments key, whatever the parent has", () => {
+    const { env } = buildDevServerSpec(
+      sandboxEnv({
+        STRIPE_LIVE_API_KEY: live,
+        STRIPE_SECRET_KEY: live,
+        NODE_OPTIONS: "--max-old-space-size=4096",
+      }),
+      SB_TARGET,
+    );
+    for (const v of Object.values(env)) expect(LIVE_PAYMENTS_KEY.test(v)).toBe(false);
+  });
+
+  it("every variable .env.production would seed is set explicitly in the child", () => {
+    const names = readFileSync(".env.production", "utf8")
+      .split("\n")
+      .map((l) => /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(l)?.[1])
+      .filter((n): n is string => !!n);
+    expect(names).toContain(PAYMENTS_VAR);
+    for (const target of [SB_TARGET, LOCAL_TARGET]) {
+      const { env } = buildDevServerSpec(
+        target.kind === "local" ? localEnv() : sandboxEnv(),
+        target,
+      );
+      for (const n of names) expect(env[n]?.trim(), n).toBeTruthy();
+    }
+  });
+
+  it("the child never receives the value written in .env.production", () => {
+    const file = readFileSync(".env.production", "utf8");
+    const value = new RegExp(`^\\s*${PAYMENTS_VAR}\\s*=\\s*(.*)$`, "m")
+      .exec(file)?.[1]
+      ?.trim()
+      .replace(/^(['"])(.*)\1$/, "$2");
+    expect(value).toBeTruthy();
+    const { env } = buildDevServerSpec(sandboxEnv(), SB_TARGET);
+    expect(JSON.stringify(env)).not.toContain(value!);
+  });
+
+  it("the global-setup check refuses a spec without the placeholder or with a live key", () => {
+    const good = devServerWebServer(sandboxEnv(), SB_TARGET);
+    expect(() => assertLaunchedDevServer(good)).not.toThrow();
+    const tamper = (mutate: (e: Record<string, string>) => void) => {
+      const spec = JSON.parse(good.env[DEV_SERVER_SPEC_VAR]);
+      mutate(spec.env);
+      return { ...good, env: { [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) } };
+    };
+    expect(() => assertLaunchedDevServer(tamper((e) => delete e[PAYMENTS_VAR]))).toThrow(
+      /placeholder|required variable/,
+    );
+    expect(() => assertLaunchedDevServer(tamper((e) => (e[PAYMENTS_VAR] = live)))).toThrow(
+      /placeholder/,
+    );
+    expect(() => assertLaunchedDevServer(tamper((e) => (e.OTHER = live)))).toThrow(
+      /live payments key/,
+    );
+  });
+
+  it("the plain-JavaScript launcher refuses a missing, altered or live payments value, and prints nothing from the spec", () => {
+    const base = buildDevServerSpec(sandboxEnv(), SB_TARGET);
+    const launch = (mutate: (e: Record<string, string>) => void) => {
+      const spec = JSON.parse(JSON.stringify(base));
+      mutate(spec.env);
+      return spawnSync(process.execPath, ["e2e/safety/start-dev-server.mjs"], {
+        env: { PATH: process.env.PATH ?? "", [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) },
+        encoding: "utf8",
+        timeout: 20_000,
+      });
+    };
+    for (const mutate of [
+      (e: Record<string, string>) => delete e[PAYMENTS_VAR],
+      (e: Record<string, string>) => (e[PAYMENTS_VAR] = ""),
+      (e: Record<string, string>) => (e[PAYMENTS_VAR] = live),
+      (e: Record<string, string>) => (e[PAYMENTS_VAR] = "e2e-payments-disabled-x"),
+      (e: Record<string, string>) => (e.OTHER = live),
+    ]) {
+      const r = launch(mutate);
+      expect(r.status).toBe(2);
+      expect(`${r.stdout}${r.stderr}`).toContain("refusing to start");
+      expect(`${r.stdout}${r.stderr}`).not.toContain("SYNTHETICvalue");
+    }
+  });
+
+  it("the launcher's constants equal the module's", () => {
+    const src = readFileSync("e2e/safety/start-dev-server.mjs", "utf8");
+    expect(src).toContain(`const PAYMENTS_VAR = "${PAYMENTS_VAR}";`);
+    expect(src).toContain(`const PAYMENTS_PLACEHOLDER = "${PAYMENTS_PLACEHOLDER}";`);
+    expect(src).toContain(`const LIVE_PAYMENTS_KEY = ${LIVE_PAYMENTS_KEY.toString()};`);
+  });
+
+  it("does not change production files or payment behavior", () => {
+    const stripe = readFileSync("src/lib/stripe.ts", "utf8");
+    expect(stripe).toContain('token?.startsWith("pk_live_")');
+    const vite = readFileSync("vite.config.ts", "utf8");
+    expect(vite).toContain("if (process.env[key]) continue;");
+  });
+});
+
+describe("the service-role key is not serialized (Blocker B)", () => {
+  it("the launcher refuses a spec that carries it", () => {
+    const base = buildDevServerSpec(sandboxEnv(), SB_TARGET);
+    const spec = JSON.parse(JSON.stringify(base));
+    spec.env.SUPABASE_SERVICE_ROLE_KEY = "SYNTH-OPAQUE-SERVICE-VALUE";
+    const r = spawnSync(process.execPath, ["e2e/safety/start-dev-server.mjs"], {
+      env: { PATH: process.env.PATH ?? "", [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) },
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    expect(r.status).toBe(2);
+    expect(`${r.stdout}${r.stderr}`).not.toContain("SYNTH-OPAQUE-SERVICE-VALUE");
+  });
+
+  it("the global-setup check refuses a config whose spec carries it", () => {
+    const good = devServerWebServer(sandboxEnv(), SB_TARGET);
+    const spec = JSON.parse(good.env[DEV_SERVER_SPEC_VAR]);
+    spec.env.SUPABASE_SERVICE_ROLE_KEY = "SYNTH-OPAQUE-SERVICE-VALUE";
+    expect(() =>
+      assertLaunchedDevServer({ ...good, env: { [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) } }),
+    ).toThrow(/service role key/);
+  });
+
+  it("global-setup reads the key only after the guard and removes it from the environment", () => {
+    const gs = readFileSync("e2e/global-setup.ts", "utf8");
+    const guard = gs.indexOf("assertLaunchedDevServer(config?.webServer)");
+    const read = gs.indexOf(
+      "const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;",
+    );
+    const del = gs.indexOf("delete process.env.SUPABASE_SERVICE_ROLE_KEY;");
+    expect(guard).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(guard);
+    expect(del).toBeGreaterThan(read);
+    // No module-level read left to run before the guard.
+    expect(gs.match(/process\.env\.SUPABASE_SERVICE_ROLE_KEY/g)?.length).toBe(2);
   });
 });

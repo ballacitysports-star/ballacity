@@ -49,6 +49,18 @@ export const BROWSER_ID_VAR = "VITE_SUPABASE_PROJECT_ID";
 export const SERVER_KEY_VAR = "SUPABASE_PUBLISHABLE_KEY";
 export const BROWSER_KEY_VAR = "VITE_SUPABASE_PUBLISHABLE_KEY";
 export const SERVICE_ROLE_VAR = "SUPABASE_SERVICE_ROLE_KEY";
+/**
+ * vite.config.ts fills this from .env.production, which holds a LIVE Stripe publishable
+ * key, whenever it is unset or empty. The E2E server therefore always gets this fixed
+ * placeholder. It is not a `pk_test_`/`pk_live_` key, so src/lib/stripe.ts reads it as
+ * "payments not configured": Stripe is never loaded and billing stays in the sandbox
+ * partition. e2e/safety/start-dev-server.mjs repeats these two constants (it is plain
+ * JavaScript); a test keeps them equal.
+ */
+export const PAYMENTS_VAR = "VITE_PAYMENTS_CLIENT_TOKEN";
+export const PAYMENTS_PLACEHOLDER = "e2e-payments-disabled";
+/** A live Stripe-style key anywhere in a value. Stricter than the app, which only reads an exact lowercase prefix. */
+export const LIVE_PAYMENTS_KEY = /(?:^|[^a-z0-9])(?:pk|sk|rk)_live_/i;
 /** Read as a fallback by one server function; never inherited, never set. */
 export const NEVER_SET_VARS = ["SUPABASE_ANON_KEY"] as const;
 
@@ -60,6 +72,7 @@ export const MUST_BE_SET_VARS = [
   BROWSER_ID_VAR,
   SERVER_KEY_VAR,
   BROWSER_KEY_VAR,
+  PAYMENTS_VAR,
 ] as const;
 
 export const KNOWN_SUPABASE_VARS: readonly string[] = [
@@ -112,6 +125,15 @@ export type DevServerSpec = {
   env: Record<string, string>;
   /** Variables the launcher must find non-empty in `env` before it starts anything. */
   mustBeSet: string[];
+  /**
+   * True when the verified environment had a service role key. The key itself is NEVER in
+   * the spec: the spec is serialized into Playwright's config, and Playwright's JSON
+   * report writes `webServer.env` verbatim into results.json. The launcher instead takes
+   * the key from its own inherited environment (Playwright starts it with
+   * `{ ...process.env, ...env }`), which the guard has already validated, and only when
+   * this flag is true.
+   */
+  inheritServiceKey: boolean;
 };
 
 function present(v: string | undefined): v is string {
@@ -209,6 +231,15 @@ export function buildDevServerSpec(env: Env, target: E2eTarget): DevServerSpec {
     problems.push(`Both ${SERVER_KEY_VAR} and ${BROWSER_KEY_VAR} must be set for a remote target.`);
   }
 
+  // --- Payments: a fixed placeholder, never the parent's value, never .env.production's -----
+  if (present(env[PAYMENTS_VAR]) && env[PAYMENTS_VAR]!.trim() !== PAYMENTS_PLACEHOLDER) {
+    problems.push(
+      LIVE_PAYMENTS_KEY.test(env[PAYMENTS_VAR]!)
+        ? `${PAYMENTS_VAR} holds a live payments key. The E2E server must never receive one.`
+        : `${PAYMENTS_VAR} is set to something other than the E2E placeholder. Unset it or use the placeholder.`,
+    );
+  }
+
   // --- Base URL / port for Vite -------------------------------------------------------
   let host = "localhost";
   let port = "8080";
@@ -234,12 +265,18 @@ export function buildDevServerSpec(env: Env, target: E2eTarget): DevServerSpec {
   child[BROWSER_ID_VAR] = browserId!;
   child[SERVER_KEY_VAR] = key!;
   child[BROWSER_KEY_VAR] = key!;
-  if (present(env[SERVICE_ROLE_VAR])) child[SERVICE_ROLE_VAR] = env[SERVICE_ROLE_VAR]!.trim();
+  child[PAYMENTS_VAR] = PAYMENTS_PLACEHOLDER;
+  for (const [name, value] of Object.entries(child)) {
+    if (LIVE_PAYMENTS_KEY.test(value))
+      problems.push(`${name} holds a live payments key. The E2E server must never receive one.`);
+  }
+  if (problems.length > 0) throw new E2eTargetError(problems);
 
   return {
     args: ["dev", "--host", host, "--port", port, "--strictPort"],
     env: child,
     mustBeSet: [...MUST_BE_SET_VARS],
+    inheritServiceKey: present(env[SERVICE_ROLE_VAR]),
   };
 }
 
@@ -295,7 +332,15 @@ export function assertLaunchedDevServer(webServer: unknown): void {
         !!env &&
         MUST_BE_SET_VARS.every((n) => typeof env[n] === "string" && env[n].trim() !== "") &&
         spec.mustBeSet?.length === MUST_BE_SET_VARS.length;
-      if (!ok) problems.push("The launcher spec does not set every Supabase variable explicitly.");
+      if (!ok) problems.push("The launcher spec does not set every required variable explicitly.");
+      if (env && env[PAYMENTS_VAR] !== PAYMENTS_PLACEHOLDER)
+        problems.push("The launcher spec does not carry the E2E payments placeholder.");
+      if (env && Object.values(env).some((v) => LIVE_PAYMENTS_KEY.test(String(v))))
+        problems.push("The launcher spec carries a live payments key.");
+      if (env && SERVICE_ROLE_VAR in env)
+        problems.push(
+          "The launcher spec carries the service role key, which Playwright would write into its report.",
+        );
     } catch {
       problems.push("The launcher spec is unreadable.");
     }

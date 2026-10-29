@@ -32,7 +32,6 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function globalSetup(config?: Pick<FullConfig, "webServer">) {
   // First statement, before the pass-through below, any client, any write.
@@ -60,6 +59,13 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     (url) => fetch(url),
     { publishableKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY },
   );
+
+  // The service role key is read once, here, AFTER the guard above has validated it, and
+  // removed from the environment so the spec workers Playwright starts next, and
+  // their children, never inherit it. The web server (already started by now) received
+  // it through the launcher's inherited environment, not through the serialized config.
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (
     process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON &&

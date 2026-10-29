@@ -162,4 +162,65 @@ describe("the launched dev server's server functions use the verified environmen
     },
     240_000,
   );
+
+  it.skipIf(!linux)(
+    "gives the server the inherited service key without serializing it, and the payments placeholder instead of .env.production's live token",
+    async () => {
+      const OPAQUE = "SYNTH-OPAQUE-SERVICE-VALUE-0123456789";
+      const devPort = await freePort();
+      const base = `http://127.0.0.1:${devPort}`;
+      const supabaseUrl = "http://127.0.0.1:1";
+      const verified = {
+        E2E_BASE_URL: base,
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_URL: supabaseUrl,
+        SUPABASE_PUBLISHABLE_KEY: FAKE_KEY,
+        VITE_SUPABASE_PUBLISHABLE_KEY: FAKE_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: OPAQUE,
+      };
+      const spec = buildDevServerSpec(verified, { kind: "local" });
+      // The serialized spec, which Playwright would write into its report, has no key.
+      expect(JSON.stringify(spec)).not.toContain(OPAQUE);
+      expect(spec.inheritServiceKey).toBe(true);
+
+      launcher = spawn(process.execPath, ["e2e/safety/start-dev-server.mjs"], {
+        // What Playwright does: the runner's environment (here carrying the key) plus the spec.
+        env: {
+          ...process.env,
+          SUPABASE_SERVICE_ROLE_KEY: OPAQUE,
+          [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec),
+        },
+        stdio: "ignore",
+      });
+      let ready = false;
+      for (let i = 0; i < 100 && !ready; i++) {
+        try {
+          ready = (await fetch(`${base}/`)).ok;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+      expect(ready).toBe(true);
+
+      const [viteProcess] = childrenOf(launcher.pid!);
+      const env = initialEnv(viteProcess);
+      // The server needs the key (its server functions build an admin client from it) ...
+      expect(env.SUPABASE_SERVICE_ROLE_KEY).toBe(OPAQUE);
+      // ... and gets the placeholder, never the live token from .env.production.
+      const fromFile = /^\s*VITE_PAYMENTS_CLIENT_TOKEN\s*=\s*(.*)$/m
+        .exec(readFileSync(".env.production", "utf8"))?.[1]
+        ?.trim()
+        .replace(/^(['"])(.*)\1$/, "$2");
+      expect(fromFile).toBeTruthy();
+      expect(env.VITE_PAYMENTS_CLIENT_TOKEN).toBe("e2e-payments-disabled");
+      expect(JSON.stringify(env)).not.toContain(fromFile!);
+      // What the browser would be served: the placeholder is inlined, the live token is not.
+      const served = await (await fetch(`${base}/src/lib/stripe.ts`)).text();
+      expect(served).toContain("e2e-payments-disabled");
+      expect(served).not.toContain(fromFile!);
+    },
+    240_000,
+  );
 });
