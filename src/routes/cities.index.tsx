@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Navigation } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Calendar, MapPin, Navigation } from "lucide-react";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
-import { PublicGameRow, publicCardClass } from "@/components/public/PublicGameRow";
-import { PublicGamesEmpty } from "@/components/public/PublicGamesEmpty";
 import { getCityListings } from "@/lib/city-pages.functions";
-import { filterBySport } from "@/lib/city-seo";
+import { filterBySport, type CityGameRow } from "@/lib/city-seo";
+import { formatWhen } from "@/lib/format";
 import { LAUNCH_CITIES, cityBySlug, cityLabel, distanceKm } from "@/lib/launch-cities";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
@@ -16,6 +15,8 @@ const DEFAULT_CITY = LAUNCH_CITIES[0];
 
 type Search = { city?: string; sport?: string };
 
+const card =
+  "block rounded-2xl border border-border bg-surface p-4 transition-colors hover:border-lime/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const chip =
   "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition-colors";
 
@@ -54,12 +55,49 @@ export const Route = createFileRoute("/cities/")({
   component: PublicFeed,
 });
 
+function emojiFor(sport: string) {
+  return SPORT_GUIDES.find((g) => g.sport.toLowerCase() === sport.toLowerCase())?.emoji ?? "🏅";
+}
+
+function GameRow({ g }: { g: CityGameRow }) {
+  return (
+    <Link to="/games/$gameId" params={{ gameId: g.id }} className={card}>
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-background text-2xl"
+        >
+          {emojiFor(g.sport)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-bold">{g.title}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" aria-hidden /> {formatWhen(g.date)}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">
+              {[g.location, g.neighborhood].filter(Boolean).join(" · ")}
+            </span>
+          </p>
+        </div>
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+        <span className="rounded-full bg-background px-2.5 py-1">{g.sport}</span>
+        {g.skill && <span className="rounded-full bg-background px-2.5 py-1">{g.skill}</span>}
+        <span className="rounded-full bg-background px-2.5 py-1 text-lime">
+          {g.price ? `$${g.price}` : "Free"}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 function PublicFeed() {
   const { citySlug, listings: all } = Route.useLoaderData();
   const { city: cityParam, sport } = Route.useSearch();
   const navigate = useNavigate({ from: "/cities/" });
-  // Where signing up should bring the visitor back to: this page, same city and sport.
-  const next = useLocation({ select: (l) => l.href });
   const city = cityBySlug(citySlug) ?? DEFAULT_CITY;
   const [locating, setLocating] = useState(false);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -206,18 +244,25 @@ function PublicFeed() {
                 Upcoming games
               </h2>
               {listings.games.length === 0 ? (
-                <PublicGamesEmpty
-                  cityName={city.name}
-                  sport={sport}
-                  next={next}
-                  onShowAllSports={() => setSport(undefined)}
-                  onPickCity={() => document.getElementById("city-select")?.focus()}
-                />
+                <div className="mt-3 rounded-2xl border border-border bg-surface p-6 text-center">
+                  <p className="font-semibold">
+                    No public {sport ? sport.toLowerCase() : ""} games listed yet.
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Be the first to host one in {city.name}. It takes about a minute.
+                  </p>
+                  <Link
+                    to="/create"
+                    className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-lime-gradient px-5 text-sm font-bold text-primary-foreground"
+                  >
+                    Host a game <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </div>
               ) : (
                 <ul className="mt-3 grid gap-3">
                   {listings.games.map((g) => (
                     <li key={g.id}>
-                      <PublicGameRow g={g} />
+                      <GameRow g={g} />
                     </li>
                   ))}
                 </ul>
@@ -232,11 +277,7 @@ function PublicFeed() {
                 <ul className="mt-3 grid gap-3">
                   {listings.teams.map((t) => (
                     <li key={t.id}>
-                      <Link
-                        to="/teams/$teamId"
-                        params={{ teamId: t.id }}
-                        className={publicCardClass}
-                      >
+                      <Link to="/teams/$teamId" params={{ teamId: t.id }} className={card}>
                         <span className="block text-base font-bold">{t.name}</span>
                         <span className="mt-1 block text-sm text-muted-foreground">
                           {t.tagline || (t.sports ?? []).join(", ")}
@@ -256,11 +297,7 @@ function PublicFeed() {
                 <ul className="mt-3 grid gap-3">
                   {listings.gyms.map((gym) => (
                     <li key={gym.id}>
-                      <Link
-                        to="/orgs/$orgId"
-                        params={{ orgId: gym.id }}
-                        className={publicCardClass}
-                      >
+                      <Link to="/orgs/$orgId" params={{ orgId: gym.id }} className={card}>
                         <span className="block text-base font-bold">{gym.name}</span>
                         {gym.category && (
                           <span className="mt-1 block text-sm text-muted-foreground">
@@ -284,7 +321,6 @@ function PublicFeed() {
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/auth"
-              search={{ next }}
               className="inline-flex min-h-11 items-center rounded-full bg-lime px-5 text-sm font-bold text-primary-foreground"
             >
               Sign up or sign in
