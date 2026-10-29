@@ -1,0 +1,20 @@
+# Code owners for the files that decide where tests run and what credentials they get.
+#
+# This file only names who GitHub asks to review. It does not require anything by
+# itself: "Require review from Code Owners" is a branch-protection setting an owner
+# turns on in GitHub (see docs/ci-security.md). Turn it on only when a second
+# reviewer exists, or a sole owner could never merge a change to these paths.
+#
+# @ballacitysports-star is the repository owner's GitHub login (verified against the
+# repository owner and the authenticated account that opened the existing PRs).
+
+/.github/workflows/        @ballacitysports-star
+/.github/e2e-preflight.mjs @ballacitysports-star
+/.github/e2e-preflight-lib.mjs @ballacitysports-star
+/.github/ci-redact.mjs @ballacitysports-star
+/.github/ci-redact-lib.mjs @ballacitysports-star
+/playwright.config.ts      @ballacitysports-star
+/e2e/global-setup.ts       @ballacitysports-star
+/e2e/safety/               @ballacitysports-star
+/supabase/config*.toml     @ballacitysports-star
+/.github/CODEOWNERS        @ballacitysports-star

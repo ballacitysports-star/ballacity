@@ -26,6 +26,9 @@ const SUPABASE_PUBLISHABLE_KEY =
 const SUPABASE_PROJECT_ID =
   process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Only this file seeds with the privileged key. Remove it from the environment now
+// so the spec workers Playwright spawns after global setup do not inherit it.
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function globalSetup() {
   if (

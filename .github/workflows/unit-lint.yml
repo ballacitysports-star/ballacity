@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# Least privilege: this workflow only checks out, builds and tests. It never
+# writes to the repository, so its token is read-only.
+permissions:
+  contents: read
+
 # A new push to the same ref supersedes the run it replaced.
 concurrency:
   group: unit-lint-${{ github.ref }}

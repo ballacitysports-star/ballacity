@@ -22,6 +22,11 @@ on:
       - ".github/workflows/db-tests.yml"
   workflow_dispatch:
 
+# Least privilege: this workflow only checks out, builds and tests. It never
+# writes to the repository, so its token is read-only.
+permissions:
+  contents: read
+
 concurrency:
   group: db-tests-${{ github.ref }}
   cancel-in-progress: true

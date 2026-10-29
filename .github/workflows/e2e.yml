@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# Least privilege: this workflow only checks out, builds and tests. It never
+# writes to the repository, so its token is read-only.
+permissions:
+  contents: read
+
 # Two levels, because they solve different problems.
 #
 # Workflow level, keyed on the ref: a new push to the same branch cancels the
@@ -16,6 +21,32 @@ concurrency:
 jobs:
   playwright:
     name: Playwright
+    # This is the only job in the repository that receives the E2E_* secrets.
+    #
+    # `environment: e2e-sandbox` scopes them to a protected GitHub Environment, so a
+    # pull request that edits this file to drop the line gets no environment secrets,
+    # and one that keeps it waits for the Environment's required reviewers. The
+    # Environment, its reviewers, its secrets and its E2E_SANDBOX_PROJECT_REF
+    # variable are configured in GitHub settings, not here: see docs/ci-security.md.
+    #
+    # Approval is not the safety control. The first step below refuses to continue
+    # unless the target is consistent, designated and not production, so an
+    # unconfigured or mis-configured run stops before anything is built or started.
+    # Without it, empty secrets would fall through vite.config.ts to the production
+    # backend.
+    environment: e2e-sandbox
+    # Fail closed on who may run it. Only pushes to main and pull requests from
+    # THIS repository by someone other than Dependabot qualify. Fork pull requests
+    # never receive secrets anyway (this workflow uses pull_request, never
+    # pull_request_target); the condition makes that explicit and also skips the job
+    # so it does not fail noisily. A SKIPPED job is not a passing remote E2E test:
+    # nothing was run.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.actor != 'dependabot[bot]')
     # Job level, keyed on nothing: only one E2E job in the repository executes
     # at a time, whatever ref it is on.
     #
@@ -57,25 +88,22 @@ jobs:
       # sandbox-only path baked into playwright.config.ts.
       PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ""
       E2E_BASE_URL: http://localhost:8080
-      # Vite reads these from the environment at build/dev time (no .env file
-      # is committed — see .env.example). Without them the Supabase client in
-      # src/integrations/supabase/client.ts throws on first use and the app
-      # never boots, let alone runs auth-dependent specs.
-      VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
-      VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
-      # Non-VITE-prefixed copies for Node-side scripts (e2e/global-setup.ts,
-      # SSR) that read process.env directly instead of import.meta.env.
-      SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
-      SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
-      # Optional: lets global-setup.ts idempotently create/reset the seeded
-      # e2e-*@lovable.test fixture accounts via the admin API. Without it,
-      # global-setup falls back to signing in — which only works if those
-      # accounts already exist in the Supabase project.
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      # No Supabase value lives at job level. Each step below that needs one declares
+      # exactly the ones it needs, and re-runs the preflight on those very values first,
+      # so what is validated is what the process receives. See docs/ci-security.md.
     steps:
       - uses: actions/checkout@v4
+
+      # First, before install, build, dev server, browser or any fixture write.
+      # Prints check names only, never a value. See .github/e2e-preflight.mjs.
+      - name: Verify E2E target (fail closed)
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_SANDBOX_PROJECT_REF: ${{ vars.E2E_SANDBOX_PROJECT_REF }}
+        run: node .github/e2e-preflight.mjs
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -97,13 +125,51 @@ jobs:
       # Reproduced locally by capping the heap at the same 2 GB, which fails
       # identically, and confirmed fixed at 4096. Runners have 16 GB, so this is
       # comfortable rather than generous.
+      # Browser-facing values only: no service role key reaches the build.
+      # VITE_PAYMENTS_CLIENT_TOKEN is set on purpose: vite.config.ts fills any unset or empty
+      # variable from .env.production, which holds a LIVE Stripe key. The placeholder is not
+      # a pk_* key, so the build reads as payments-not-configured and never loads Stripe.
       - name: Build (dev mode)
-        run: bun run build:dev
+        run: |
+          node .github/e2e-preflight.mjs --runtime
+          bun run build:dev
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          E2E_SANDBOX_PROJECT_REF: ${{ vars.E2E_SANDBOX_PROJECT_REF }}
+          VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          VITE_PAYMENTS_CLIENT_TOKEN: e2e-payments-disabled
+          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
 
+      # Holds the service role key, and that is a technical requirement rather than
+      # convenience: the app's server functions build an admin client from
+      # SUPABASE_SERVICE_ROLE_KEY (src/integrations/supabase/client.server.ts,
+      # src/routes/api/public/payments/webhook.ts), so the SSR process needs it to serve
+      # the specs that exercise them. Only first-party code runs in this process. The key
+      # is never a VITE_* variable, so it cannot enter the browser bundle.
       - name: Start dev server
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_SANDBOX_PROJECT_REF: ${{ vars.E2E_SANDBOX_PROJECT_REF }}
+          VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          VITE_PAYMENTS_CLIENT_TOKEN: e2e-payments-disabled
+          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
         run: |
+          node .github/e2e-preflight.mjs --service
           bun run dev > dev-server.log 2>&1 &
           echo $! > dev-server.pid
           for i in $(seq 1 60); do
@@ -113,12 +179,54 @@ jobs:
             fi
             sleep 1
           done
-          echo "Dev server failed to start"
-          cat dev-server.log
+          echo "Dev server failed to start; last lines of its log, redacted:"
+          node .github/ci-redact.mjs --tail 60 < dev-server.log
           exit 1
 
+      # Holds the service role key (with the dev server): e2e/global-setup.ts seeds the
+      # fixture accounts with it and then removes it from process.env, so the spec workers
+      # Playwright spawns afterwards do not inherit it.
+      #
+      # --trace=off: traces record network requests and DOM snapshots, and the fixture
+      # user's session is injected into the page, so a trace would carry that user's
+      # tokens into an artifact. Screenshots stay in the runner's workspace and are not
+      # uploaded (see the upload step).
       - name: Run Playwright tests
-        run: bunx playwright test
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_SANDBOX_PROJECT_REF: ${{ vars.E2E_SANDBOX_PROJECT_REF }}
+          VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          VITE_PAYMENTS_CLIENT_TOKEN: e2e-payments-disabled
+          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node .github/e2e-preflight.mjs --service
+          bunx playwright test --trace=off
+
+      # The JSON report holds error messages. It is sanitized into a DIFFERENT file; the
+      # raw report is never an upload candidate. The `sanitized` output is set only after
+      # the redactor exited 0 (bash -e stops the step on failure), and the upload below is
+      # gated on it, so a failure blocks the upload even if no file could be removed or
+      # overwritten. Failure output is one fixed line, never content.
+      - name: Redact report
+        id: redact
+        if: always()
+        run: |
+          rm -rf ci-sanitized
+          if [ ! -f playwright-report/results.json ]; then
+            echo "No report was produced; nothing to sanitize."
+            exit 0
+          fi
+          mkdir ci-sanitized
+          node .github/ci-redact.mjs --in playwright-report/results.json --out ci-sanitized/results.json
+          echo "sanitized=true" >> "$GITHUB_OUTPUT"
 
       # Runs even when the suite fails, which is the only time it matters.
       # Reads the JSON reporter's file rather than the job log, so the tally
@@ -126,10 +234,10 @@ jobs:
       - name: Summarise results
         if: always()
         run: |
-          f=playwright-report/results.json
-          if [ ! -f "$f" ]; then echo "no results.json - the run died before writing one"; exit 0; fi
+          f=ci-sanitized/results.json
+          if [ ! -f "$f" ]; then echo "no sanitized report available (none produced, or sanitizing failed)"; exit 0; fi
           node -e '
-            const r = require("./playwright-report/results.json");
+            const r = require("./ci-sanitized/results.json");
             const out = [];
             const walk = (s) => (s.suites ?? []).forEach(walk) ||
               (s.specs ?? []).forEach((sp) => sp.tests.forEach((t) =>
@@ -163,12 +271,13 @@ jobs:
           fi
 
       - name: Upload Playwright report
-        if: always()
+        # Only after the redactor succeeded. `always()` keeps it running after test failures.
+        if: always() && steps.redact.outputs.sanitized == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          # Exactly the sanitized file. Neither the raw report nor test-results/ (screenshots,
+          # per-test files) is a candidate: they can show or contain the fixture user's session.
+          path: ci-sanitized/results.json
+          retention-days: 3
+          if-no-files-found: error
