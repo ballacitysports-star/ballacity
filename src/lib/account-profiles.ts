@@ -54,8 +54,8 @@ export const myProfilesKey = (userId: string | null | undefined) => [
   userId ?? "anon",
 ];
 
-async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
-  const [{ data: rows }, { data: me }, { data: myTeams }, { data: myOrgs }] = await Promise.all([
+export async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
+  const [rowsRes, meRes, myTeamsRes, myOrgsRes] = await Promise.all([
     supabase
       .from("account_profiles")
       .select("id, kind, ref_id, created_at")
@@ -71,6 +71,14 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     supabase.from("teams").select("id, kind").eq("owner_id", userId),
     supabase.from("trainer_orgs").select("id").eq("owner_id", userId),
   ]);
+  const { data: rows } = rowsRes;
+  const { data: me } = meRes;
+  const { data: myTeams } = myTeamsRes;
+  const { data: myOrgs } = myOrgsRes;
+  // An empty answer from a read that failed is not "this profile is gone". Below, a profile that
+  // is missing from the result is repaired in the database (the active profile is reset to the
+  // player one), so a failed read must never reach that step.
+  let readFailed = !!(rowsRes.error || meRes.error || myTeamsRes.error || myOrgsRes.error);
 
   const list = (rows ?? []) as {
     id: string;
@@ -117,6 +125,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
           .in("id", orgRefs)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
+
+  if ((teamsRes as { error?: unknown }).error || (orgsRes as { error?: unknown }).error) {
+    readFailed = true;
+  }
 
   const teams = new Map(
     (
@@ -243,7 +255,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
 
   const staleDefault = !!profile?.default_profile_id && !defaultId;
   const staleActive = !!profile?.active_profile_id && profile.active_profile_id !== activeId;
-  if ((staleDefault || staleActive) && active) {
+  if ((staleDefault || staleActive) && active && !readFailed) {
     const patch: {
       default_profile_id?: string | null;
       active_profile_id?: string | null;
