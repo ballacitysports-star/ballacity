@@ -18,6 +18,7 @@ import { ExternalLink, Pencil } from "lucide-react";
 import {
   superadminDiscoveryBulk,
   superadminDiscoveryCancel,
+  superadminDiscoveryIds,
   superadminDiscoveryList,
   superadminDiscoveryOverview,
   superadminDiscoveryReview,
@@ -27,6 +28,7 @@ import {
 import { DISCOVERY_TYPES, DISCOVERY_TYPE_LABELS, type DiscoveryType } from "@/lib/discovery/areas";
 import { ORG_CATEGORIES } from "@/lib/org-listing";
 import { SPORTS } from "@/lib/sample-data";
+import { ConfirmAction } from "./ConfirmAction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +47,25 @@ type Candidate = Awaited<ReturnType<typeof superadminDiscoveryList>>["rows"][num
 type Status = "pending" | "approved" | "rejected";
 
 const PAGE = 25;
+/** Matches the server: finds this sure and with no possible repeat can be bulk-approved. */
 const BULK_MIN = 0.75;
+/** The server takes at most this many finds per bulk call; more are sent in turns. */
+const BULK_CHUNK = 50;
+
+type BulkAction = "approve" | "reject" | "remove";
+type BulkTotals = { done: number; skipped: number; failed: { name: string; error: string }[] };
+
+/** Where a listing created from a find lives, so it can be looked at before it is removed. */
+const listingHref = (c: Candidate) =>
+  c.created_listing_id
+    ? c.subject_type === "gym"
+      ? `/orgs/${c.created_listing_id}`
+      : `/teams/${c.created_listing_id}`
+    : null;
+
+/** A find can be picked while it awaits a decision, or while its listing exists. */
+const isSelectable = (c: Candidate) =>
+  c.status === "pending" || (c.status === "approved" && !!c.created_listing_id);
 
 const STATUS_LABEL: Record<Status, string> = {
   pending: "To review",
@@ -74,6 +94,7 @@ export function DiscoveryTab() {
   const listFn = useServerFn(superadminDiscoveryList);
   const reviewFn = useServerFn(superadminDiscoveryReview);
   const bulkFn = useServerFn(superadminDiscoveryBulk);
+  const idsFn = useServerFn(superadminDiscoveryIds);
 
   const overview = useQuery({
     queryKey: ["superadmin-discovery-overview"],
@@ -308,6 +329,7 @@ export function DiscoveryTab() {
         listFn={listFn}
         reviewFn={reviewFn}
         bulkFn={bulkFn}
+        idsFn={idsFn}
         onChanged={refreshCandidates}
       />
     </div>
@@ -318,11 +340,13 @@ function ReviewQueue({
   listFn,
   reviewFn,
   bulkFn,
+  idsFn,
   onChanged,
 }: {
   listFn: ReturnType<typeof useServerFn<typeof superadminDiscoveryList>>;
   reviewFn: ReturnType<typeof useServerFn<typeof superadminDiscoveryReview>>;
   bulkFn: ReturnType<typeof useServerFn<typeof superadminDiscoveryBulk>>;
+  idsFn: ReturnType<typeof useServerFn<typeof superadminDiscoveryIds>>;
   onChanged: () => void;
 }) {
   const [status, setStatus] = useState<Status>("pending");
@@ -332,11 +356,13 @@ function ReviewQueue({
   const [page, setPage] = useState(0);
   const [picked, setPicked] = useState<string[]>([]);
   const [editing, setEditing] = useState<Candidate | null>(null);
+  const [removing, setRemoving] = useState<string[] | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
       setQuery(search.trim());
       setPage(0);
+      setPicked([]);
     }, 300);
     return () => clearTimeout(t);
   }, [search]);
@@ -357,12 +383,18 @@ function ReviewQueue({
   const review = useMutation({
     mutationFn: (v: {
       id: string;
-      action: "approve" | "reject";
+      action: "approve" | "reject" | "remove";
       edits?: Record<string, unknown>;
       confirmDuplicate?: boolean;
     }) => reviewFn({ data: v as never }),
     onSuccess: (_r, v) => {
-      toast.success(v.action === "approve" ? "Listed as an unclaimed listing" : "Rejected");
+      toast.success(
+        v.action === "approve"
+          ? "Listed as an unclaimed listing"
+          : v.action === "remove"
+            ? "Listing removed"
+            : "Rejected",
+      );
       setPicked((p) => p.filter((x) => x !== v.id));
       onChanged();
     },
@@ -370,16 +402,44 @@ function ReviewQueue({
   });
 
   const bulk = useMutation({
-    mutationFn: (action: "approve" | "reject") => bulkFn({ data: { ids: picked, action } }),
-    onSuccess: (r, action) => {
+    mutationFn: async (v: { action: BulkAction; ids: string[] }) => {
+      const total: BulkTotals = { done: 0, skipped: 0, failed: [] };
+      for (let i = 0; i < v.ids.length; i += BULK_CHUNK) {
+        const r = await bulkFn({
+          data: { ids: v.ids.slice(i, i + BULK_CHUNK), action: v.action },
+        });
+        total.done += r.done;
+        total.skipped += r.skipped;
+        total.failed.push(...r.failed);
+      }
+      return total;
+    },
+    onSuccess: (r, v) => {
+      const verb = { approve: "approved", reject: "rejected", remove: "removed" }[v.action];
       toast.success(
-        `${r.done} ${action === "approve" ? "approved" : "rejected"}` +
-          (r.skipped ? `, ${r.skipped} need a closer look` : "") +
+        `${r.done} ${verb}` +
+          (r.skipped
+            ? v.action === "approve"
+              ? `, ${r.skipped} need a closer look`
+              : `, ${r.skipped} skipped`
+            : "") +
           (r.failed.length ? `, ${r.failed.length} failed` : ""),
       );
       if (r.failed[0]) toast.error(`${r.failed[0].name}: ${r.failed[0].error}`);
       setPicked([]);
       onChanged();
+    },
+    onError: (e: unknown) => toast.error(asMessage(e)),
+  });
+
+  // Every find matching the current filters, across pages (up to a server limit).
+  const selectAll = useMutation({
+    mutationFn: () => idsFn({ data: { status, type: type || undefined, search: query } }),
+    onSuccess: (r) => {
+      setPicked(r.ids);
+      if (r.total > r.ids.length) {
+        toast.message(`Selected the first ${r.ids.length} of ${r.total}.`);
+      }
     },
     onError: (e: unknown) => toast.error(asMessage(e)),
   });
@@ -394,9 +454,16 @@ function ReviewQueue({
     review.mutate({ id: c.id, action: "approve", edits, confirmDuplicate: !!c.duplicate_of });
   };
 
-  const pickedSure = rows.filter(
-    (r) => picked.includes(r.id) && r.confidence >= BULK_MIN && !r.duplicate_of,
-  ).length;
+  const total = list.data?.total ?? 0;
+  const selectableRows = rows.filter(isSelectable);
+  const allOnPage = selectableRows.length > 0 && selectableRows.every((r) => picked.includes(r.id));
+  const toggleAllOnPage = () =>
+    setPicked((p) =>
+      allOnPage
+        ? p.filter((id) => !selectableRows.some((r) => r.id === id))
+        : [...new Set([...p, ...selectableRows.map((r) => r.id)])],
+    );
+  const busy = bulk.isPending || review.isPending;
 
   return (
     <Card>
@@ -429,6 +496,7 @@ function ReviewQueue({
               onClick={() => {
                 setType("");
                 setPage(0);
+                setPicked([]);
               }}
             >
               All
@@ -441,6 +509,7 @@ function ReviewQueue({
                 onClick={() => {
                   setType(t);
                   setPage(0);
+                  setPicked([]);
                 }}
               >
                 {DISCOVERY_TYPE_LABELS[t]}
@@ -456,29 +525,69 @@ function ReviewQueue({
           />
         </div>
 
-        {status === "pending" && picked.length > 0 && (
+        {selectableRows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={allOnPage}
+                onChange={toggleAllOnPage}
+                aria-label="Select all on this page"
+              />
+              Select all on this page ({selectableRows.length})
+            </label>
+            {allOnPage && total > selectableRows.length && picked.length < total && (
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0 text-xs"
+                disabled={selectAll.isPending}
+                onClick={() => selectAll.mutate()}
+              >
+                {selectAll.isPending ? "Selecting…" : `Select all ${total} matching`}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {picked.length > 0 && status !== "rejected" && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2 text-xs">
             <span>{picked.length} selected</span>
-            <Button
-              size="sm"
-              disabled={bulk.isPending || pickedSure === 0}
-              onClick={() => bulk.mutate("approve")}
-            >
-              Approve high-confidence ({pickedSure})
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={bulk.isPending}
-              onClick={() => bulk.mutate("reject")}
-            >
-              Reject selected
-            </Button>
+            {status === "pending" ? (
+              <>
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => bulk.mutate({ action: "approve", ids: picked })}
+                >
+                  Approve high-confidence
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => bulk.mutate({ action: "reject", ids: picked })}
+                >
+                  Reject selected
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => setRemoving(picked)}
+              >
+                Remove selected listings
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => setPicked([])}>
               Clear
             </Button>
             <span className="text-muted-foreground">
-              Bulk approval skips low-confidence and possible repeats; review those one by one.
+              {status === "pending"
+                ? "Bulk approval skips low-confidence finds and possible repeats; review those one by one."
+                : "Listings an owner has claimed, or that people have started using, are skipped."}
             </span>
           </div>
         )}
@@ -495,12 +604,14 @@ function ReviewQueue({
               key={c.id}
               c={c}
               picked={picked.includes(c.id)}
+              selectable={isSelectable(c)}
               busy={review.isPending && review.variables?.id === c.id}
               onPick={() =>
                 setPicked((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]))
               }
               onApprove={() => approve(c)}
               onReject={() => review.mutate({ id: c.id, action: "reject" })}
+              onRemove={() => setRemoving([c.id])}
               onEdit={() => setEditing(c)}
             />
           ))}
@@ -538,6 +649,30 @@ function ReviewQueue({
         )}
       </CardContent>
 
+      <ConfirmAction
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        title={
+          removing && removing.length > 1
+            ? `Remove ${removing.length} listings`
+            : "Remove this listing"
+        }
+        description={
+          "This deletes the unclaimed listing from BallaCity. The find is filed as rejected, so discovery won't suggest it again. " +
+          "A listing an owner has claimed, or that people have started using, is left alone."
+        }
+        confirmWord={removing && removing.length > 1 ? "REMOVE" : undefined}
+        requireReason={false}
+        confirmLabel="Remove"
+        pending={busy}
+        onConfirm={() => {
+          const ids = removing ?? [];
+          setRemoving(null);
+          if (ids.length === 1) review.mutate({ id: ids[0], action: "remove" });
+          else if (ids.length > 1) bulk.mutate({ action: "remove", ids });
+        }}
+      />
+
       {editing && (
         <EditDialog
           key={editing.id}
@@ -556,27 +691,32 @@ function ReviewQueue({
 function CandidateCard({
   c,
   picked,
+  selectable,
   busy,
   onPick,
   onApprove,
   onReject,
+  onRemove,
   onEdit,
 }: {
   c: Candidate;
   picked: boolean;
+  selectable: boolean;
   busy: boolean;
   onPick: () => void;
   onApprove: () => void;
   onReject: () => void;
+  onRemove: () => void;
   onEdit: () => void;
 }) {
+  const href = c.status === "approved" ? listingHref(c) : null;
   const conf = confidenceLabel(c.confidence);
   const where = [c.address, c.city].filter(Boolean).join(", ");
   return (
     <li className="rounded-lg border bg-surface p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 gap-2">
-          {c.status === "pending" && (
+          {selectable && (
             <input
               type="checkbox"
               checked={picked}
@@ -626,6 +766,19 @@ function CandidateCard({
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={onReject}>
               Reject
+            </Button>
+          </div>
+        )}
+        {c.status === "approved" && href && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button size="sm" variant="ghost" asChild>
+              <a href={href} target="_blank" rel="noreferrer noopener">
+                <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                View listing
+              </a>
+            </Button>
+            <Button size="sm" variant="destructive" disabled={busy} onClick={onRemove}>
+              Remove listing
             </Button>
           </div>
         )}

@@ -16,6 +16,40 @@ import type { DiscoveryDeps } from "@/lib/discovery/engine.server";
 
 const RUN_ID = z.string().uuid();
 
+/**
+ * Removes the listing an approved find created, and writes the audit entry.
+ * Shared by the single and bulk paths so both record the same thing.
+ */
+async function removeApproved(
+  context: { supabase: unknown; userId: string },
+  admin: Awaited<ReturnType<typeof getAdmin>>,
+  id: string,
+  bulk: boolean,
+) {
+  const review = await import("@/lib/discovery/review.server");
+  const { removeUnclaimedListingRecord } = await import("@/lib/listings-create.server");
+  const done = await review.removeApprovedCandidate(
+    admin,
+    {
+      remove: (type, listingId) => removeUnclaimedListingRecord(context.supabase, type, listingId),
+    },
+    { id },
+  );
+  await writeAudit(admin, context.userId, {
+    action: "listing.delete_unclaimed",
+    targetType: done.subjectType === "team" ? "team" : "org",
+    targetId: done.listingId,
+    before: {
+      candidateId: done.candidate.id,
+      name: done.candidate.name,
+      type: done.candidate.subject_type,
+      sourceUrl: done.candidate.source_url,
+    },
+    metadata: { via: "discovery", bulk, alreadyGone: done.alreadyGone },
+  });
+  return done;
+}
+
 /** Real network, AI and clock; the engine takes these so tests can swap them. */
 async function realDeps(admin: unknown, userId: string): Promise<DiscoveryDeps> {
   const [sources, extract] = await Promise.all([
@@ -140,7 +174,7 @@ export const superadminDiscoveryReview = createServerFn({ method: "POST" })
   .inputValidator(
     (d: {
       id: string;
-      action: "approve" | "reject";
+      action: "approve" | "reject" | "remove";
       edits?: z.infer<typeof EDITS>;
       reason?: string;
       confirmDuplicate?: boolean;
@@ -148,7 +182,7 @@ export const superadminDiscoveryReview = createServerFn({ method: "POST" })
       z
         .object({
           id: z.string().uuid(),
-          action: z.enum(["approve", "reject"]),
+          action: z.enum(["approve", "reject", "remove"]),
           edits: EDITS.optional(),
           reason: z.string().max(200).optional(),
           confirmDuplicate: z.boolean().optional(),
@@ -160,6 +194,11 @@ export const superadminDiscoveryReview = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const review = await import("@/lib/discovery/review.server");
     const nowIso = new Date().toISOString();
+
+    if (data.action === "remove") {
+      await removeApproved(context, admin, data.id, false);
+      return { ok: true as const };
+    }
 
     if (data.action === "reject") {
       const c = await review.rejectCandidate(
@@ -203,11 +242,11 @@ export const superadminDiscoveryReview = createServerFn({ method: "POST" })
 
 export const superadminDiscoveryBulk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { ids: string[]; action: "approve" | "reject" }) =>
+  .inputValidator((d: { ids: string[]; action: "approve" | "reject" | "remove" }) =>
     z
       .object({
         ids: z.array(z.string().uuid()).min(1).max(50),
-        action: z.enum(["approve", "reject"]),
+        action: z.enum(["approve", "reject", "remove"]),
       })
       .parse(d),
   )
@@ -223,12 +262,20 @@ export const superadminDiscoveryBulk = createServerFn({ method: "POST" })
       let name = id;
       try {
         const row = await review.getCandidate(admin, id);
-        if (!row || row.status !== "pending") {
+        // Approving and rejecting act on finds still waiting; removing acts on
+        // approved ones that still have a listing.
+        const actable =
+          data.action === "remove"
+            ? row?.status === "approved" && !!row.created_listing_id
+            : row?.status === "pending";
+        if (!row || !actable) {
           result.skipped++;
           continue;
         }
         name = row.name;
-        if (data.action === "approve") {
+        if (data.action === "remove") {
+          await removeApproved(context, admin, id, true);
+        } else if (data.action === "approve") {
           // Only what the reader was sure of and that repeats nothing; the rest
           // needs a person to look at it.
           if (!review.bulkApprovable(row)) {
@@ -272,4 +319,28 @@ export const superadminDiscoveryBulk = createServerFn({ method: "POST" })
       }
     }
     return result;
+  });
+
+export const superadminDiscoveryIds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      status: "pending" | "approved" | "rejected";
+      type?: (typeof DISCOVERY_TYPES)[number];
+      search?: string;
+    }) =>
+      z
+        .object({
+          status: z.enum(["pending", "approved", "rejected"]),
+          type: z.enum(DISCOVERY_TYPES).optional(),
+          search: z.string().max(120).optional(),
+        })
+        .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    const admin = await getAdmin();
+    const { listCandidateIds, SELECT_ALL_MAX } = await import("@/lib/discovery/review.server");
+    const found = await listCandidateIds(admin, data);
+    return { ...found, max: SELECT_ALL_MAX };
   });

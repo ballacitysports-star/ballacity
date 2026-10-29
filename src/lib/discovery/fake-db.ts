@@ -112,6 +112,12 @@ class Query implements PromiseLike<{
     this.filters.push((r) => r[col] != null && String(r[col]) >= String(val));
     return this;
   }
+  not(col: string, op: string, val: unknown) {
+    if (op === "is" && val === null)
+      this.filters.push((r) => r[col] !== null && r[col] !== undefined);
+    else throw new Error(`fake-db: unsupported not(${col}, ${op})`);
+    return this;
+  }
   or(expr: string) {
     const terms = expr.split(",").map(orTerm);
     this.filters.push((r) => terms.some((t) => t(r)));

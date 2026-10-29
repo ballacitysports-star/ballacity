@@ -65,3 +65,19 @@ export async function createUnclaimedListingRecord(
   if (error) throw new Error(error.message);
   return { id: String(out), subjectType: "gym" };
 }
+
+/**
+ * Removes an unclaimed listing through the database function that decides
+ * whether that is safe (see remove_unclaimed_listing). Call with the
+ * moderator's own client, like creation. Throws the database's error code in
+ * the message: LISTING_IN_USE, ALREADY_CLAIMED, CLAIM_OPEN, LISTING_NOT_FOUND ...
+ */
+export async function removeUnclaimedListingRecord(
+  supabase: unknown,
+  type: "team" | "gym",
+  id: string,
+): Promise<void> {
+  const client = supabase as { rpc: Rpc };
+  const { error } = await client.rpc("remove_unclaimed_listing", { _type: type, _id: id });
+  if (error) throw new Error(error.message);
+}

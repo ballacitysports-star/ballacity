@@ -260,3 +260,108 @@ export function bulkApprovable(c: Pick<CandidateRow, "status" | "confidence" | "
 }
 
 export const DISCOVERY_TYPE_ENUM = z.enum(DISCOVERY_TYPES);
+
+/* ------------------------------ removal ------------------------------- */
+
+const REMOVAL_MESSAGES: [code: string, message: string][] = [
+  ["ALREADY_CLAIMED", "An owner has claimed this listing, so it can't be removed here."],
+  ["CLAIM_OPEN", "Someone has filed a claim on this listing. Review the claim first."],
+  [
+    "LISTING_IN_USE",
+    "People have started using this listing (members, posts or reviews), so it can't be removed. Hide it from the Content tab instead.",
+  ],
+  ["NOT_UNCLAIMED_LISTING", "This isn't an unclaimed listing, so it can't be removed here."],
+  ["NOT_MODERATOR", "Only moderators can do that."],
+];
+
+/** A database refusal as something a person can act on. */
+export function removalMessage(raw: string): string {
+  return REMOVAL_MESSAGES.find(([code]) => raw.includes(code))?.[1] ?? raw;
+}
+
+export const REMOVED_REASON = "Removed after approval";
+
+export type RemoveResult = {
+  candidate: CandidateRow;
+  listingId: string;
+  subjectType: "team" | "gym";
+  /** The listing had already been deleted, so only the find was updated. */
+  alreadyGone: boolean;
+};
+
+/**
+ * Takes down the listing an approved find created, and files the find as
+ * rejected so a later run does not suggest it again. The find is moved first
+ * (approved → rejected), so two removals cannot race; if the database refuses
+ * (claimed, in use, ...) it goes back to approved with the reason.
+ */
+export async function removeApprovedCandidate(
+  admin: Db,
+  deps: { remove: (type: "team" | "gym", id: string) => Promise<void> },
+  input: { id: string },
+): Promise<RemoveResult> {
+  const candidate = await loadCandidate(admin, input.id);
+  if (candidate.status !== "approved" || !candidate.created_listing_id) {
+    throw new Error("This find is not an approved listing.");
+  }
+  const listingId = candidate.created_listing_id;
+  const subjectType = candidate.subject_type === "gym" ? "gym" : "team";
+
+  const { data: moved, error: moveError } = await admin
+    .from("listing_candidates")
+    .update({ status: "rejected", reject_reason: REMOVED_REASON })
+    .eq("id", candidate.id)
+    .eq("status", "approved")
+    .select("id");
+  if (moveError) throw new Error(moveError.message);
+  if (!moved?.length) throw new Error("This find was already changed.");
+
+  let alreadyGone = false;
+  try {
+    await deps.remove(subjectType, listingId);
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "Could not remove the listing.";
+    if (raw.includes("LISTING_NOT_FOUND")) {
+      alreadyGone = true;
+    } else {
+      await admin
+        .from("listing_candidates")
+        .update({ status: "approved", reject_reason: null })
+        .eq("id", candidate.id);
+      throw new Error(removalMessage(raw));
+    }
+  }
+  await admin
+    .from("listing_candidates")
+    .update({ created_listing_id: null })
+    .eq("id", candidate.id);
+  return { candidate, listingId, subjectType, alreadyGone };
+}
+
+/** Most ids "select all" will return, so one click cannot queue unbounded work. */
+export const SELECT_ALL_MAX = 500;
+
+/**
+ * Every find matching a filter that could be acted on (pending ones to approve
+ * or reject, approved ones that still have a listing to remove), up to
+ * {@link SELECT_ALL_MAX}.
+ */
+export async function listCandidateIds(
+  admin: Db,
+  input: { status: CandidateStatus; type?: DiscoveryType; search?: string },
+): Promise<{ ids: string[]; total: number }> {
+  let q = admin
+    .from("listing_candidates")
+    .select("id", { count: "exact" })
+    .eq("status", input.status)
+    .order("confidence", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(0, SELECT_ALL_MAX - 1);
+  if (input.status === "approved") q = q.not("created_listing_id", "is", null);
+  if (input.type) q = q.eq("subject_type", input.type);
+  const term = (input.search ?? "").replace(/[%,()]/g, " ").trim();
+  if (term) q = q.or(`name.ilike.%${term}%,city.ilike.%${term}%`);
+  const { data, count, error } = await q;
+  if (error) throw new Error(error.message);
+  return { ids: ((data ?? []) as { id: string }[]).map((r) => r.id), total: count ?? 0 };
+}

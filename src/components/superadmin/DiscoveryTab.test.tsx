@@ -58,6 +58,7 @@ const cancel = vi.fn();
 const list = vi.fn();
 const review = vi.fn();
 const bulk = vi.fn();
+const ids = vi.fn();
 
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 vi.mock("@/lib/discovery.functions", () => ({
@@ -68,6 +69,7 @@ vi.mock("@/lib/discovery.functions", () => ({
   superadminDiscoveryList: (a: unknown) => list(a),
   superadminDiscoveryReview: (a: unknown) => review(a),
   superadminDiscoveryBulk: (a: unknown) => bulk(a),
+  superadminDiscoveryIds: (a: unknown) => ids(a),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
 
@@ -84,6 +86,7 @@ beforeEach(() => {
   list.mockResolvedValue({ rows: [], total: 0, counts });
   review.mockResolvedValue({ ok: true });
   bulk.mockResolvedValue({ done: 1, skipped: 0, failed: [] });
+  ids.mockResolvedValue({ ids: [], total: 0, max: 500 });
 });
 
 afterEach(() => {
@@ -253,7 +256,7 @@ describe("DiscoveryTab: reviewing finds", () => {
       fireEvent.click(screen.getByLabelText(`Select ${name}`));
     }
     expect(screen.getByText("3 selected")).toBeTruthy();
-    const approve = screen.getByRole("button", { name: "Approve high-confidence (1)" });
+    const approve = screen.getByRole("button", { name: "Approve high-confidence" });
     fireEvent.click(approve);
     await waitFor(() => expect(bulk).toHaveBeenCalledTimes(1));
     expect(bulk.mock.calls[0][0]).toEqual({ data: { ids: ["c1", "c2", "c3"], action: "approve" } });
@@ -278,5 +281,138 @@ describe("DiscoveryTab: reviewing finds", () => {
         data: expect.objectContaining({ status: "approved", type: "coach" }),
       }),
     );
+  });
+});
+
+describe("DiscoveryTab: select all and removing approved listings", () => {
+  const approved = (n: number, over: Record<string, unknown> = {}) =>
+    row({
+      id: `a${n}`,
+      name: `Approved Gym ${n}`,
+      status: "approved",
+      created_listing_id: `listing-${n}`,
+      ...over,
+    });
+  const approvedCounts = { pending: 0, approved: 3, rejected: 0 };
+
+  async function openApproved(rows: unknown[], total = rows.length) {
+    list.mockImplementation(async ({ data }: { data: { status: string } }) =>
+      data.status === "approved"
+        ? { rows, total, counts: approvedCounts }
+        : { rows: [], total: 0, counts: approvedCounts },
+    );
+    renderTab();
+    fireEvent.click(await screen.findByRole("button", { name: /Approved/ }));
+    await screen.findByText("Approved Gym 1");
+  }
+
+  it("selects every find on the page, and deselects them again", async () => {
+    await openApproved([approved(1), approved(2), approved(3)]);
+    const all = screen.getByLabelText("Select all on this page") as HTMLInputElement;
+    expect(all.checked).toBe(false);
+    fireEvent.click(all);
+    for (const n of [1, 2, 3]) {
+      expect((screen.getByLabelText(`Select Approved Gym ${n}`) as HTMLInputElement).checked).toBe(
+        true,
+      );
+    }
+    expect(screen.getByText("3 selected")).toBeTruthy();
+    expect(all.checked).toBe(true);
+    fireEvent.click(all);
+    expect(screen.queryByText(/selected$/)).toBeNull();
+  });
+
+  it("offers every match across pages, capped by the server", async () => {
+    await openApproved([approved(1), approved(2), approved(3)], 120);
+    ids.mockResolvedValue({
+      ids: Array.from({ length: 100 }, (_, i) => `x${i}`),
+      total: 120,
+      max: 100,
+    });
+    expect(screen.queryByRole("button", { name: /Select all 120 matching/ })).toBeNull();
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: "Select all 120 matching" }));
+    await waitFor(() => expect(screen.getByText("100 selected")).toBeTruthy());
+    expect(ids).toHaveBeenCalledWith({ data: { status: "approved", type: undefined, search: "" } });
+  });
+
+  it("only offers to select an approved find while its listing exists", async () => {
+    await openApproved([approved(1), approved(2, { created_listing_id: null })]);
+    expect(screen.getByLabelText("Select Approved Gym 1")).toBeTruthy();
+    expect(screen.queryByLabelText("Select Approved Gym 2")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Remove listing" })).toHaveLength(1);
+  });
+
+  it("removes one approved listing after confirming", async () => {
+    await openApproved([approved(1)]);
+    review.mockResolvedValue({ ok: true });
+    expect(screen.getByRole("link", { name: /View listing/ }).getAttribute("href")).toBe(
+      "/orgs/listing-1",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove listing" }));
+    expect(review).not.toHaveBeenCalled(); // asks first
+    expect(await screen.findByText("Remove this listing")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
+    expect(review.mock.calls[0][0]).toEqual({ data: { id: "a1", action: "remove" } });
+  });
+
+  it("links a team or trainer to its team page", async () => {
+    await openApproved([approved(1, { subject_type: "coach", created_listing_id: "coach-dre" })]);
+    expect(screen.getByRole("link", { name: /View listing/ }).getAttribute("href")).toBe(
+      "/teams/coach-dre",
+    );
+  });
+
+  it("removes selected listings only after typing REMOVE", async () => {
+    await openApproved([approved(1), approved(2), approved(3)]);
+    bulk.mockResolvedValue({
+      done: 2,
+      skipped: 0,
+      failed: [{ name: "Approved Gym 3", error: "People have started using this listing" }],
+    });
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove selected listings" }));
+    expect(await screen.findByText("Remove 3 listings")).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: "Remove" }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "remove" } });
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(bulk).toHaveBeenCalledTimes(1));
+    expect(bulk.mock.calls[0][0]).toEqual({ data: { ids: ["a1", "a2", "a3"], action: "remove" } });
+  });
+
+  it("sends a large selection in batches the server accepts", async () => {
+    await openApproved([approved(1)], 120);
+    const many = Array.from({ length: 120 }, (_, i) => `id-${i}`);
+    ids.mockResolvedValue({ ids: many, total: 120, max: 500 });
+    bulk.mockResolvedValue({ done: 50, skipped: 0, failed: [] });
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(await screen.findByRole("button", { name: "Select all 120 matching" }));
+    await waitFor(() => expect(screen.getByText("120 selected")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Remove selected listings" }));
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "REMOVE" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(bulk).toHaveBeenCalledTimes(3));
+    expect(
+      bulk.mock.calls.map(([a]) => (a as { data: { ids: string[] } }).data.ids.length),
+    ).toEqual([50, 50, 20]);
+  });
+
+  it("selects pending finds the same way, and clears the selection when the filter changes", async () => {
+    list.mockResolvedValue({
+      rows: [row({ id: "p1", name: "Pending One" }), row({ id: "p2", name: "Pending Two" })],
+      total: 2,
+      counts,
+    });
+    renderTab();
+    await screen.findByText("Pending One");
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    expect(screen.getByText("2 selected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve high-confidence" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove selected listings" })).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Trainers" }).at(-1)!);
+    await waitFor(() => expect(screen.queryByText("2 selected")).toBeNull());
   });
 });
