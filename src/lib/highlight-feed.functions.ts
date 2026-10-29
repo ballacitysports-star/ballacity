@@ -1,10 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import {
-  FEED_GAME_COLUMNS,
-  publicFeedGame,
-  type FeedGame,
-  type FeedGameRow,
-} from "@/lib/highlight-feed-game";
+import { loadReelGameAccess, publicReelText } from "@/lib/reel-game-privacy";
 
 /**
  * Public highlight feed: every athlete's visible, finished reels in one
@@ -93,29 +88,20 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
       new Set(page.map((r) => r.game_id as string | null).filter((id): id is string => !!id)),
     );
 
-    const [{ data: profiles }, { data: avatars }, { data: games, error: gamesError }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("profiles")
-          .select("id,display_name,username,avatar_initials")
-          .in("id", userIds),
-        supabaseAdmin.rpc("visible_avatars" as never, { _ids: userIds } as never),
-        gameIds.length > 0
-          ? supabaseAdmin.from("hosted_games").select(FEED_GAME_COLUMNS).in("id", gameIds)
-          : Promise.resolve({ data: [] as any[], error: null }),
-      ]);
+    const [{ data: profiles }, { data: avatars }, access] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id,display_name,username,avatar_initials")
+        .in("id", userIds),
+      supabaseAdmin.rpc("visible_avatars" as never, { _ids: userIds } as never),
+      // Linked-game details and host-written reel text are shown only for a game that is public
+      // (the shared rule). A failed lookup shows neither.
+      loadReelGameAccess(supabaseAdmin, gameIds, viewerId),
+    ]);
 
     const profileById = new Map(((profiles ?? []) as any[]).map((p) => [p.id as string, p]));
     const avatarById = new Map(((avatars ?? []) as any[]).map((a) => [a.id as string, a]));
-    // Linked-game details are shown only for a game that is public (publicFeedGame). If the
-    // lookup failed, no game is verified, so no game details are shown at all.
-    const gameById = new Map<string, FeedGame>();
-    if (!gamesError) {
-      for (const g of (games ?? []) as FeedGameRow[]) {
-        const visible = publicFeedGame(g);
-        if (visible) gameById.set(visible.id, visible);
-      }
-    }
+    const gameById = access.publicGames;
 
     const quarantined = await quarantinedMediaPaths(
       supabaseAdmin,
@@ -152,9 +138,17 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
         const game = r.game_id ? (gameById.get(r.game_id as string) ?? null) : null;
         return {
           id: r.id as string,
-          title: (r.ai_title as string) || (r.title as string) || "Highlight",
-          caption: (r.ai_caption as string) ?? null,
-          hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
+          ...publicReelText({
+            gameId: r.game_id as string | null,
+            ownerId: r.user_id as string,
+            viewerId,
+            access,
+            text: {
+              title: (r.ai_title as string) || (r.title as string) || "Highlight",
+              caption: (r.ai_caption as string) ?? null,
+              hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
+            },
+          }),
           sport: (r.ai_sport as string) ?? game?.sport ?? null,
           videoUrl: video.data?.signedUrl ?? null,
           fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,

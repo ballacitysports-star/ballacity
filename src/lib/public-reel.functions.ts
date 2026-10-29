@@ -31,8 +31,10 @@ export const getPublicReel = createServerFn({ method: "GET" })
     if (!data.id) return { found: false };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { quarantinedMediaPaths, signablePath } = await import("@/lib/reel-visibility.server");
+      const { optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
+        await import("@/lib/reel-visibility.server");
       const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
+      const { loadReelGameAccess, publicReelText } = await import("@/lib/reel-game-privacy");
 
       const { data: audience, error: audErr } = await supabaseAdmin.rpc(
         "reel_audience" as never,
@@ -43,12 +45,32 @@ export const getPublicReel = createServerFn({ method: "GET" })
       const { data: r, error } = await supabaseAdmin
         .from("highlight_reels")
         .select(
-          "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,subject_child_id",
+          "id,user_id,title,ai_title,ai_caption,ai_hashtags,ai_sport,video_path,playback_path,thumbnail_path,subject_child_id,game_id",
         )
         .eq("id", data.id)
         .maybeSingle();
       if (error || !r || r.subject_child_id) return { found: false };
       const row = r;
+
+      // Host-written text can name the game, so a reel of a game that is not public shows a
+      // generic title and no caption or hashtags, in the page and in its link preview.
+      const viewerId = await optionalSupabaseUserId();
+      const access = await loadReelGameAccess(
+        supabaseAdmin,
+        row.game_id ? [row.game_id as string] : [],
+        viewerId,
+      );
+      const text = publicReelText({
+        gameId: row.game_id as string | null,
+        ownerId: row.user_id as string,
+        viewerId,
+        access,
+        text: {
+          title: String(row.ai_title || row.title || "Highlight").slice(0, 120),
+          caption: row.ai_caption ? String(row.ai_caption).slice(0, 500) : null,
+          hashtags: ((row.ai_hashtags as string[]) ?? []).slice(0, 5),
+        },
+      });
 
       const owner = row.user_id as string;
       const quarantined = await quarantinedMediaPaths(supabaseAdmin, [
@@ -81,9 +103,9 @@ export const getPublicReel = createServerFn({ method: "GET" })
       return {
         found: true,
         id: row.id as string,
-        title: String(row.ai_title || row.title || "Highlight").slice(0, 120),
-        caption: row.ai_caption ? String(row.ai_caption).slice(0, 500) : null,
-        hashtags: ((row.ai_hashtags as string[]) ?? []).slice(0, 5),
+        title: text.title,
+        caption: text.caption,
+        hashtags: text.hashtags,
         sport: (row.ai_sport as string) ?? null,
         videoUrl,
         fallbackVideoUrl,
