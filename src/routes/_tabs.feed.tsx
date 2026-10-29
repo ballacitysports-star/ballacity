@@ -743,7 +743,7 @@ function Feed() {
                       ? "Try a shorter search, or a different sport or city name."
                       : emptyKind === "none-yet"
                         ? "Be the first to host one in your area."
-                        : "Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                        : "Your sport, distance, price, or hosting/joined filters are narrowing this down. Clearing them shows everything nearby."
                 }
                 action={
                   emptyKind === "error" ? (
