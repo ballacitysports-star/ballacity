@@ -213,7 +213,7 @@ function Landing() {
               className="enter-up mt-7 flex flex-wrap gap-3"
             >
               <Link
-                to="/feed"
+                to="/cities"
                 className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
               >
                 Find a game near me <ArrowRight className="h-4 w-4" />
@@ -256,9 +256,9 @@ function Landing() {
       {visible.pickupGames && (
         <section id="trending" className="page-shell py-16">
           <div className="flex items-end justify-between mb-6">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Upcoming public games</h2>
             <Link
-              to="/feed"
+              to="/cities"
               className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
             >
               See all <ArrowRight className="h-4 w-4" />
@@ -266,16 +266,24 @@ function Landing() {
           </div>
           {trending.length === 0 ? (
             <div className="rounded-2xl border border-border bg-surface p-8 text-center">
-              <p className="font-semibold">No games posted near you yet.</p>
+              <p className="font-semibold">No public games listed right now.</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Be the first to put one on the board — hosting takes about a minute.
+                Check a city page for what is coming up, or put one on the board yourself.
               </p>
-              <Link
-                to="/create"
-                className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
-              >
-                Host a game <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <Link
+                  to="/cities"
+                  className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+                >
+                  Browse games by city <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/create"
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-3 text-sm font-semibold"
+                >
+                  Host a game
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
