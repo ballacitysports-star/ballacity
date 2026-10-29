@@ -22,6 +22,11 @@ on:
       - ".github/workflows/db-tests.yml"
   workflow_dispatch:
 
+# Least privilege: this workflow only checks out, builds and tests. It never
+# writes to the repository, so its token is read-only.
+permissions:
+  contents: read
+
 concurrency:
   group: db-tests-${{ github.ref }}
   cancel-in-progress: true
@@ -51,6 +56,8 @@ jobs:
       PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Make sure psql is available
         run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
