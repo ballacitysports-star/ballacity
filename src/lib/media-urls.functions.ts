@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { isPublicGame } from "@/lib/city-seo";
 import {
   MEDIA_SIGNED_URL_TTL_SECONDS,
   isPrivateMediaBucket,
@@ -13,9 +14,10 @@ import {
  * Storage RLS lets hosts and participants sign a game cover themselves from the
  * browser, but a visitor browsing an open game has no session. This function
  * mints a short-lived URL *only* for covers attached to a game that is not
- * private — the same audience the public game listing already exposes. Anything
- * else (private games, other buckets) is refused and must be signed by a
- * permitted, signed-in caller.
+ * public to everyone (isPublicGame: not private, hidden, cancelled or
+ * organization-hidden, and an adult-only age range), the same audience the public
+ * game listing already exposes. Anything else (restricted games, other buckets)
+ * is refused and must be signed by a permitted, signed-in caller.
  */
 export const signPublicGameCover = createServerFn({ method: "GET" })
   .inputValidator((d: { ref: string }) => z.object({ ref: z.string().min(1).max(600) }).parse(d))
@@ -29,13 +31,28 @@ export const signPublicGameCover = createServerFn({ method: "GET" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: games } = await supabaseAdmin
+    // Only a cover of a game that is public to everyone (isPublicGame, the shared rule) is
+    // signed. A restricted game, a missing one and a failed lookup all give the same null.
+    const { data: games, error: gamesError } = await supabaseAdmin
       .from("hosted_games")
-      .select("id,is_private,image")
+      .select("id,image,is_private,hidden_at,org_hidden_at,cancelled_at,min_age,max_age")
       .ilike("image", `%${parsed.path}%`)
       .limit(2);
 
-    const usable = (games ?? []).some((g: any) => g.is_private !== true);
+    const usable =
+      !gamesError &&
+      (games ?? []).some(
+        (g) =>
+          typeof g.is_private === "boolean" &&
+          isPublicGame({
+            is_private: g.is_private,
+            hidden_at: g.hidden_at ?? null,
+            org_hidden_at: g.org_hidden_at ?? null,
+            cancelled_at: g.cancelled_at ?? null,
+            min_age: g.min_age ?? null,
+            max_age: g.max_age ?? null,
+          }),
+      );
     if (!usable) return { url: null as string | null };
 
     const { data: signed } = await supabaseAdmin.storage

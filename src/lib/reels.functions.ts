@@ -93,12 +93,10 @@ export const askReelCoach = createServerFn({ method: "POST" })
       return {
         reelId: input.reelId,
         question: question.slice(0, 1000),
-        history: (Array.isArray(input.history) ? input.history : [])
-          .slice(-8)
-          .map((h) => ({
-            role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-            content: String(h?.content ?? "").slice(0, 2000),
-          })),
+        history: (Array.isArray(input.history) ? input.history : []).slice(-8).map((h) => ({
+          role: (h?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+          content: String(h?.content ?? "").slice(0, 2000),
+        })),
       };
     },
   )
@@ -773,6 +771,28 @@ export const listPublicReels = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
+
+    // A reel's game name is shown only for a game that is public to everyone (publicFeedGame,
+    // the shared rule), and it is the game's current title, never the title stored on the reel.
+    // A missing, restricted or unverifiable game, or a failed lookup, shows no game name.
+    const { FEED_GAME_COLUMNS, publicFeedGame } = await import("@/lib/highlight-feed-game");
+    const linkedIds = Array.from(
+      new Set(reels.map((r) => r.game_id as string | null).filter((id): id is string => !!id)),
+    );
+    const publicGameTitles = new Map<string, string>();
+    if (linkedIds.length > 0) {
+      const { data: games, error: gamesError } = await supabaseAdmin
+        .from("hosted_games")
+        .select(FEED_GAME_COLUMNS)
+        .in("id", linkedIds);
+      if (!gamesError) {
+        for (const g of (games ?? []) as any[]) {
+          const visible = publicFeedGame(g);
+          if (visible) publicGameTitles.set(visible.id, visible.title);
+        }
+      }
+    }
+
     const quarantined = await quarantinedMediaPaths(
       supabaseAdmin,
       reels.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
@@ -810,7 +830,7 @@ export const listPublicReels = createServerFn({ method: "GET" })
           sport: (r.ai_sport as string) ?? null,
           caption: (r.ai_caption as string) ?? null,
           hashtags: (r.ai_hashtags as string[]) ?? [],
-          gameTitle: (r.game_title as string) ?? null,
+          gameTitle: (r.game_id && publicGameTitles.get(r.game_id as string)) || null,
           createdAt: r.created_at as string,
         };
       }),

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { PublicXp } from "@/lib/athlete-xp";
+import { FEED_GAME_COLUMNS, publicFeedGame, type FeedGameRow } from "@/lib/highlight-feed-game";
 
 export type PlayerCardGame = {
   id: string;
@@ -50,7 +51,8 @@ export const getPlayerCard = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<PlayerCardData> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cols = "id,title,sport,date,location,host_id,hidden_at,is_private";
+    // Everything isPublicGame needs, so a game is listed only if it is public to everyone.
+    const cols = `${FEED_GAME_COLUMNS},host_id`;
 
     const empty: PlayerCardData = {
       profile: null,
@@ -104,14 +106,24 @@ export const getPlayerCard = createServerFn({ method: "GET" })
     const prof = profRes.data as any | null;
     if (!prof || prof.suspended_at) return empty;
 
-    const { data: cohortRaw } = await supabaseAdmin.rpc("age_cohort_of" as never, { _user: data.userId } as never);
-    const isMinor = ["child_under_13", "teen_13_15", "teen_16_17"].includes(cohortRaw as unknown as string);
+    const { data: cohortRaw } = await supabaseAdmin.rpc(
+      "age_cohort_of" as never,
+      { _user: data.userId } as never,
+    );
+    const isMinor = ["child_under_13", "teen_13_15", "teen_16_17"].includes(
+      cohortRaw as unknown as string,
+    );
 
-    const hosted = showGames
-      ? ((hostedRes.data ?? []) as any[])
-          .filter((g) => g.is_private !== true)
-          .map((g) => ({ ...g, role: "host" as const }))
-      : [];
+    // Only games that pass the shared public-game rule are listed. A failed lookup lists none.
+    const publicGames = (rows: unknown, error: unknown, role: "host" | "player") =>
+      error
+        ? []
+        : ((rows ?? []) as FeedGameRow[]).flatMap((g) => {
+            const visible = publicFeedGame(g);
+            return visible ? [{ ...visible, role }] : [];
+          });
+
+    const hosted = showGames ? publicGames(hostedRes.data, hostedRes.error, "host") : [];
     const hostedIds = new Set(hosted.map((g) => g.id));
     const joinedIds = showGames
       ? ((joinsRes.data ?? []) as any[])
@@ -119,18 +131,16 @@ export const getPlayerCard = createServerFn({ method: "GET" })
           .filter((id) => id && !hostedIds.has(id))
       : [];
 
-    let joined: any[] = [];
+    let joined: ReturnType<typeof publicGames> = [];
     if (joinedIds.length > 0) {
-      const { data: rows } = await supabaseAdmin
+      const { data: rows, error: joinedError } = await supabaseAdmin
         .from("hosted_games")
         .select(cols)
         .in("id", joinedIds)
         .is("hidden_at", null)
         .order("date", { ascending: false })
         .limit(40);
-      joined = ((rows ?? []) as any[])
-        .filter((g) => g.is_private !== true)
-        .map((g) => ({ ...g, role: "player" as const }));
+      joined = publicGames(rows, joinedError, "player");
     }
 
     const now = Date.now();
@@ -160,9 +170,12 @@ export const getPlayerCard = createServerFn({ method: "GET" })
     let publicXp: PublicXp | null = null;
     if (isMinor) {
       try {
-        const { data: on } = await supabaseAdmin.rpc("public_xp_enabled" as never, {
-          _user: data.userId,
-        } as never);
+        const { data: on } = await supabaseAdmin.rpc(
+          "public_xp_enabled" as never,
+          {
+            _user: data.userId,
+          } as never,
+        );
         if (on === true) {
           const [{ loadAthleteProgress }, { toPublicXp }] = await Promise.all([
             import("@/lib/athlete-progress.server"),
