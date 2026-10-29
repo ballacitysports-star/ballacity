@@ -78,10 +78,25 @@ export function gameTouchesMinors(g: Pick<CityGameRow, "min_age" | "max_age">): 
   return !gameAgeRangeIsAdultOnly(g);
 }
 
+/**
+ * Whether a game is public to everyone whenever it happens: not private, hidden, cancelled or
+ * hidden by its organization, and an adult-only age range. This is the database rule for
+ * anonymous reads, which has no time condition; use it where a past game still counts, such as
+ * a highlight reel of a game that has been played.
+ */
+export function isPublicGame(
+  g: Pick<
+    CityGameRow,
+    "is_private" | "hidden_at" | "org_hidden_at" | "cancelled_at" | "min_age" | "max_age"
+  >,
+): boolean {
+  if (g.is_private || g.hidden_at || g.org_hidden_at || g.cancelled_at) return false;
+  return !gameTouchesMinors(g);
+}
+
 /** Whether a game may be shown to anonymous visitors and crawlers. */
 export function isPublicUpcomingGame(g: CityGameRow, now: Date = new Date()): boolean {
-  if (g.is_private || g.hidden_at || g.org_hidden_at || g.cancelled_at) return false;
-  if (gameTouchesMinors(g)) return false;
+  if (!isPublicGame(g)) return false;
   const t = Date.parse(g.date);
   return Number.isFinite(t) && t >= now.getTime();
 }

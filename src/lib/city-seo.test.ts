@@ -7,6 +7,7 @@ import {
   filterBySport,
   gameAgeRangeIsAdultOnly,
   gameTouchesMinors,
+  isPublicGame,
   isPublicUpcomingGame,
   toPublicGameSeo,
   type CityGameRow,
@@ -219,6 +220,25 @@ describe("toPublicGameSeo", () => {
       { min_age: null, max_age: 17 },
     ]) {
       expect(toPublicGameSeo(full(over), NOW)).toBeNull();
+    }
+  });
+});
+
+describe("isPublicGame", () => {
+  it("is the public-discovery rule without the clock", () => {
+    const past = { date: "2026-01-01T00:00:00Z" };
+    expect(isPublicGame(game(past))).toBe(true);
+    expect(isPublicUpcomingGame(game(past), NOW)).toBe(false);
+    for (const over of [
+      { is_private: true },
+      { hidden_at: "x" },
+      { org_hidden_at: "x" },
+      { cancelled_at: "x" },
+      { min_age: null, max_age: null },
+      { min_age: 16, max_age: 30 },
+      { min_age: 40, max_age: 30 },
+    ]) {
+      expect(isPublicGame(game(over))).toBe(false);
     }
   });
 });
