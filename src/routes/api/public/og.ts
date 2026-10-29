@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { OG_GAME_CARD_VERSION } from "@/lib/seo";
 
 /**
  * Dynamic OpenGraph / Twitter card renderer.
@@ -65,7 +66,7 @@ const CACHE_CONTROL =
   "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
 
 /** Bump when the card design changes so old ETags stop matching. */
-const OG_VERSION = "v1";
+const OG_VERSION = "v2";
 
 async function etagFor(parts: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts));
@@ -92,13 +93,24 @@ export const Route = createFileRoute("/api/public/og")({
         const url = new URL(request.url);
         const kindKey = (url.searchParams.get("kind") ?? "page").toLowerCase();
         const kind = KINDS[kindKey] ?? KINDS["page"]!;
-        const title = clamp(url.searchParams.get("title")?.trim() || "BallaCity", 90);
-        const subtitle = clamp(url.searchParams.get("subtitle")?.trim() || "", 120);
-        const meta = (url.searchParams.get("meta") ?? "")
-          .split("|")
-          .map((m) => clamp(m.trim(), 28))
-          .filter(Boolean)
-          .slice(0, 3);
+        // A game card whose URL predates the version (v) was built when game pages could put
+        // details of a restricted game in the URL. Those URLs may still be cached or shared, so the
+        // details in them are ignored and the card is the same generic one for every game.
+        const legacyGameCard =
+          kindKey === "game" && url.searchParams.get("v") !== OG_GAME_CARD_VERSION;
+        const title = legacyGameCard
+          ? "Pickup game"
+          : clamp(url.searchParams.get("title")?.trim() || "BallaCity", 90);
+        const subtitle = legacyGameCard
+          ? "Pickup game on BallaCity"
+          : clamp(url.searchParams.get("subtitle")?.trim() || "", 120);
+        const meta = legacyGameCard
+          ? []
+          : (url.searchParams.get("meta") ?? "")
+              .split("|")
+              .map((m) => clamp(m.trim(), 28))
+              .filter(Boolean)
+              .slice(0, 3);
 
         const sizeParam = (url.searchParams.get("size") ?? "og").toLowerCase();
         const sizeKey: SizeKey = sizeParam in OG_SIZES ? (sizeParam as SizeKey) : "og";

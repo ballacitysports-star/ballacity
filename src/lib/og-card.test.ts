@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Route } from "@/routes/api/public/og";
+import { OG_GAME_CARD_VERSION, ogImageUrl } from "@/lib/seo";
 
 type Handler = (ctx: { request: Request }) => Promise<Response>;
 const GET = (Route as unknown as { options: { server: { handlers: { GET: Handler } } } }).options
@@ -44,7 +45,51 @@ describe("/api/public/og", () => {
     const generic = await get(
       "kind=game&title=Pickup%20game&subtitle=Pickup%20game%20on%20BallaCity",
     );
-    const specific = await get("kind=game&title=Pickup%20game&subtitle=Lacrosse");
+    const specific = await get("kind=game&title=Pickup%20game&subtitle=Lacrosse&v=2");
     expect(specific.headers.get("etag")).not.toBe(generic.headers.get("etag"));
+  });
+
+  describe("legacy game cards", () => {
+    const LEGACY =
+      "kind=game&title=Zeppelin%20Heights%20Run&subtitle=Lacrosse%20%E2%80%A2%20Quillon%20Gym&meta=Oct%2012%7CQuillon%20Secret%20Gym%7C%2437.5&size=og";
+    const LEAKS = ["Zeppelin", "Lacrosse", "Quillon", "Oct 12", "37.5"];
+
+    it("a game url without the card version shows the generic card, not the details in the url", async () => {
+      const res = await get(LEGACY);
+      const body = await res.text();
+      for (const leak of LEAKS) expect(body).not.toContain(leak);
+      expect(body).toContain("Pickup game");
+    });
+
+    it("the generic card is the same for every legacy game url, so it says nothing about the game", async () => {
+      const a = await get(LEGACY);
+      const b = await get("kind=game&title=Other&subtitle=Soccer&meta=x&size=og&v=1");
+      expect(await b.text()).toBe(await a.text());
+      expect(b.headers.get("etag")).toBe(a.headers.get("etag"));
+    });
+
+    it("a versioned game url renders the text it was given", async () => {
+      const body = await (await get(`${LEGACY}&v=${OG_GAME_CARD_VERSION}`)).text();
+      expect(body).toContain("Zeppelin Heights Run");
+    });
+
+    it("other card kinds are unaffected by the game version", async () => {
+      const body = await (await get("kind=team&title=Hoops%20Club&size=og")).text();
+      expect(body).toContain("Hoops Club");
+    });
+
+    it("the etag version moved, so a revalidation of an old cached card no longer returns 304", async () => {
+      const res = await get(LEGACY);
+      expect(res.headers.get("etag")).toMatch(/^"v2-/);
+      const again = await get(LEGACY, { "if-none-match": '"v1-0123456789abcdef"' });
+      expect(again.status).toBe(200);
+    });
+
+    it("ogImageUrl puts the version in game card urls only", () => {
+      expect(new URL(ogImageUrl({ kind: "game", title: "x" })).searchParams.get("v")).toBe(
+        OG_GAME_CARD_VERSION,
+      );
+      expect(new URL(ogImageUrl({ kind: "team", title: "x" })).searchParams.get("v")).toBeNull();
+    });
   });
 });

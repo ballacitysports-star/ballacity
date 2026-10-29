@@ -99,7 +99,7 @@ describe("signed-out metadata for a game that is not public", () => {
     });
     expect(new Set(urls).size).toBe(1);
     const u = new URL(urls[0]!);
-    expect([...u.searchParams.keys()].sort()).toEqual(["kind", "size", "subtitle", "title"]);
+    expect([...u.searchParams.keys()].sort()).toEqual(["kind", "size", "subtitle", "title", "v"]);
     expect(u.searchParams.get("title")).toBe("Pickup game");
     expect(u.searchParams.get("meta")).toBeNull();
   });
