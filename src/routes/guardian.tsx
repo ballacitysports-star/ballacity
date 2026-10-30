@@ -21,9 +21,15 @@ export const Route = createFileRoute("/guardian")({
   head: () => ({
     meta: [
       { title: "Guardian Dashboard — BallaCity" },
-      { name: "description", content: "Your linked children's teams, upcoming games and recent activity." },
+      {
+        name: "description",
+        content: "Your linked children's teams, upcoming games and recent activity.",
+      },
       { property: "og:title", content: "Guardian Dashboard — BallaCity" },
-      { property: "og:description", content: "Your children's teams and game activity in one place." },
+      {
+        property: "og:description",
+        content: "Your children's teams and game activity in one place.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -33,7 +39,13 @@ export const Route = createFileRoute("/guardian")({
 });
 
 function fmt(d: string) {
-  return new Date(d).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(d).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function GameRow({
@@ -120,7 +132,9 @@ function GameRow({
             : `The request to join ${g.title} will be withdrawn.`
         }
         lateWarning={
-          holds && isLateCancel(g.date, g.cancelCutoffMin) ? lateCancelWarning(g.cancelCutoffMin) : null
+          holds && isLateCancel(g.date, g.cancelCutoffMin)
+            ? lateCancelWarning(g.cancelCutoffMin)
+            : null
         }
         busy={busy}
         onConfirm={() => void run()}
@@ -144,7 +158,10 @@ function GuardianDashboard() {
     return (
       <main className="page-shell-content pt-10 text-center">
         <p className="text-sm text-muted-foreground">Sign in to see your children's activity.</p>
-        <Link to="/auth" className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground">
+        <Link
+          to="/auth"
+          className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
+        >
           Sign in
         </Link>
       </main>
@@ -169,7 +186,9 @@ function GuardianDashboard() {
         <span className="section-eyebrow">Guardian Dashboard</span>
       </div>
       <h1 className="mt-2 page-title">Your kids' activity</h1>
-      <p className="mt-2 page-subtitle">Invites, waivers, team updates and games for the children linked to your account.</p>
+      <p className="mt-2 page-subtitle">
+        Invites, waivers, team updates and games for the children linked to your account.
+      </p>
       <Link to="/parent" className="mt-2 inline-block text-xs font-semibold text-primary underline">
         Settings, approvals and safety → Parent Center
       </Link>
@@ -201,7 +220,10 @@ function GuardianDashboard() {
       ) : kids.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm">
           <p className="font-semibold">No linked children yet</p>
-          <Link to="/parent" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+          <Link
+            to="/parent"
+            className="mt-2 inline-block text-xs font-semibold text-primary underline"
+          >
             Add or link a child in the Parent Center
           </Link>
         </div>
@@ -209,12 +231,17 @@ function GuardianDashboard() {
         <>
           {kids.length > 1 && (
             <div className="mt-5 flex gap-2 overflow-x-auto">
-              {[{ id: "all", name: "All" }, ...kids.map((k) => ({ id: k.childUserId, name: k.name }))].map((o) => (
+              {[
+                { id: "all", name: "All" },
+                ...kids.map((k) => ({ id: k.childUserId, name: k.name })),
+              ].map((o) => (
                 <button
                   key={o.id}
                   onClick={() => setSel(o.id)}
                   className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
-                    sel === o.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    sel === o.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {o.name}
@@ -281,7 +308,9 @@ function GuardianDashboard() {
               {recent.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No past games yet.</p>
               ) : (
-                recent.map(({ g, child }) => <GameRow key={child + g.gameId} g={g} child={multi ? child : undefined} />)
+                recent.map(({ g, child }) => (
+                  <GameRow key={child + g.gameId} g={g} child={multi ? child : undefined} />
+                ))
               )}
             </div>
           </section>
