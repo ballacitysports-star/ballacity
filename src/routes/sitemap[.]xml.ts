@@ -23,20 +23,17 @@ const ENTRIES: SitemapEntry[] = [
   { path: "/orgs", changefreq: "daily", priority: "0.8" },
   { path: "/plans", changefreq: "monthly", priority: "0.7" },
   { path: "/shop", changefreq: "weekly", priority: "0.6" },
-  ...SPORT_HUB_SLUGS.map(
-    (slug): SitemapEntry => ({ path: `/${slug}`, changefreq: "daily", priority: "0.9" }),
-  ),
+  ...SPORT_HUB_SLUGS.map((slug): SitemapEntry => ({
+    path: `/${slug}`,
+    changefreq: "daily",
+    priority: "0.9",
+  })),
   { path: "/guide", changefreq: "monthly", priority: "0.8" },
-  ...SPORT_GUIDE_SLUGS.map(
-    (slug): SitemapEntry => ({
-      path: `/guide/${slug}`,
-      changefreq: "monthly",
-      priority: "0.7",
-    }),
-  ),
-
-
-
+  ...SPORT_GUIDE_SLUGS.map((slug): SitemapEntry => ({
+    path: `/guide/${slug}`,
+    changefreq: "monthly",
+    priority: "0.7",
+  })),
 
   { path: "/blog/how-to-find-pickup-soccer-games", changefreq: "monthly", priority: "0.7" },
 
