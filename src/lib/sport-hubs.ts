@@ -60,6 +60,16 @@ export function hubBySlug(slug: string): SportHub | undefined {
   return guide ? SPORT_HUBS.find((h) => h.slug === guide.slug) : undefined;
 }
 
+/**
+ * True only for exactly `/<sport slug>` (an optional trailing slash). The hubs
+ * are public pages, so the app shell must not send a signed-out visitor to sign
+ * in. Nothing deeper and no other path is matched.
+ */
+export function isSportHubPath(pathname: string): boolean {
+  const m = /^\/([a-z]+)\/?$/.exec(pathname);
+  return m ? hubBySlug(m[1]) !== undefined : false;
+}
+
 export function hubForSport(sport: string): SportHub | undefined {
   return SPORT_HUBS.find((h) => h.sport.toLowerCase() === sport.toLowerCase());
 }

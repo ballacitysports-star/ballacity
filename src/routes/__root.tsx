@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
+import { isSportHubPath } from "@/lib/sport-hubs";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import {
@@ -585,6 +586,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // signed-in member still goes through the age and account-type steps below.
     (!user && isSignedOutPublicPath(pathname)) ||
     PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
+    // The public sport hubs: exactly /<sport>, nothing deeper.
+    isSportHubPath(pathname) ||
     // A shared reel page; an exact match, since a /reels prefix would open the studio tab.
     isPublicReelPath(pathname);
   const isTab = TAB_PATHS.includes(pathname);

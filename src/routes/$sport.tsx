@@ -215,7 +215,9 @@ function SportHubPage() {
           </ul>
         </nav>
 
-        <PolicyLinks />
+        <div className="mt-10">
+          <PolicyLinks />
+        </div>
       </main>
     </div>
   );

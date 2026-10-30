@@ -5,6 +5,7 @@ import {
   SPORT_HUBS,
   clearSportContext,
   hubBySlug,
+  isSportHubPath,
   makePrimarySport,
   orderSportsForViewer,
   parseSportContext,
@@ -95,5 +96,31 @@ describe("orderSportsForViewer", () => {
       "Tennis",
     ]);
     expect(orderSportsForViewer(all, [])).toEqual(all);
+  });
+});
+
+describe("isSportHubPath", () => {
+  it("is public only for exactly /<sport>", () => {
+    for (const p of ["/basketball", "/soccer/", "/pickleball", "/volleyball"]) {
+      expect(isSportHubPath(p)).toBe(true);
+    }
+  });
+
+  it("does not open anything else to signed-out visitors", () => {
+    for (const p of [
+      "/",
+      "/feed",
+      "/profile",
+      "/admin",
+      "/basketball/extra",
+      "/Basketball",
+      "/basketball.html",
+      "//basketball",
+      "/guide/basketball",
+      "/curling",
+      "",
+    ]) {
+      expect(isSportHubPath(p)).toBe(false);
+    }
   });
 });
