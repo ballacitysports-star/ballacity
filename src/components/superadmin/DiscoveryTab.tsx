@@ -28,6 +28,7 @@ import {
 import { DISCOVERY_TYPES, DISCOVERY_TYPE_LABELS, type DiscoveryType } from "@/lib/discovery/areas";
 import { ORG_CATEGORIES } from "@/lib/org-listing";
 import { SPORTS } from "@/lib/sample-data";
+import { SportHubsPanel } from "@/components/superadmin/SportHubsPanel";
 import { ConfirmAction } from "./ConfirmAction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,6 +192,7 @@ export function DiscoveryTab() {
 
   return (
     <div className="space-y-4">
+      <SportHubsPanel />
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Find teams, gyms and trainers</CardTitle>

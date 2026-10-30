@@ -1,10 +1,12 @@
 import { SPORTS } from "@/lib/sample-data";
+import { orderSportsForViewer } from "@/lib/sport-hubs";
 import { motion } from "framer-motion";
 
 export function SportChips({
   selected,
   onSelect,
   multi = false,
+  prioritize,
 }: {
   /** Single sport, list of sports (multi-select), or null/empty for "All". */
   selected?: string | string[] | null;
@@ -16,6 +18,8 @@ export function SportChips({
   onSelect?: (sport: string | null) => void;
   /** Chips toggle sports in and out of a multi-sport selection. */
   multi?: boolean;
+  /** The viewer's own sports; shown first. Every other sport stays in the list. */
+  prioritize?: string[];
 }) {
   const selectedList = Array.isArray(selected) ? selected : selected ? [selected] : [];
   const selectedSet = new Set(selectedList);
@@ -44,7 +48,7 @@ export function SportChips({
       >
         All sports
       </button>
-      {SPORTS.map((s, i) => {
+      {orderSportsForViewer(SPORTS, prioritize ?? []).map((s, i) => {
         const active = selectedSet.has(s.name);
         return (
           <motion.button

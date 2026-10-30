@@ -14,6 +14,8 @@ import {
   MONETIZATION_SETTING_KEY,
   invalidateMonetizationConfigCache,
 } from "@/lib/monetization/settings.server";
+import { SPORTS } from "@/lib/sample-data";
+import { maskSmallCount } from "@/lib/sport-activity";
 import { AI_SETTING_KEYS, invalidateAiConfigCache } from "@/lib/ai/settings.server";
 
 export const superadminCheck = createServerFn({ method: "GET" })
@@ -994,4 +996,35 @@ export const superadminReviewSignals = createServerFn({ method: "GET" })
     if (rings.error) throw new Error(rings.error.message);
     if (uniform.error) throw new Error(uniform.error.message);
     return { rings: rings.data ?? [], uniform: uniform.data ?? [] };
+  });
+
+/**
+ * Aggregate activity per sport for the Super admin sport panel: games created
+ * in the last 30 days, upcoming games, and teams. Counts only, no people and no
+ * age breakdown; any count under the privacy threshold is returned masked.
+ */
+export const superadminSportActivity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context);
+    const admin = await getAdmin();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    const rows = await Promise.all(
+      SPORTS.map(async ({ name }) => {
+        const [created, upcoming, teams] = await Promise.all([
+          countRows(admin, "hosted_games", (q) => q.eq("sport", name).gte("created_at", since)),
+          countRows(admin, "hosted_games", (q) => q.eq("sport", name).gte("date", nowIso)),
+          countRows(admin, "teams", (q) => q.contains("sports", [name])),
+        ]);
+        return {
+          sport: name,
+          gamesCreated30d: maskSmallCount(created),
+          upcomingGames: maskSmallCount(upcoming),
+          teams: maskSmallCount(teams),
+        };
+      }),
+    );
+    return { rows };
   });

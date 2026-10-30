@@ -33,6 +33,7 @@ import {
 } from "@/components/profile/ProfileLinksFields";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { clearSportContext, readSportContext } from "@/lib/sport-hubs";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -244,7 +245,15 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       birthday: profile.birthday ?? "",
       graduatingClass: profile.graduatingClass != null ? String(profile.graduatingClass) : "",
     });
-    setSports((profile.sports ?? []) as SportEntry[]);
+    // A new account that arrived through a sport hub starts with that sport;
+    // existing sports are never replaced.
+    const arrived = readSportContext();
+    setSports(
+      (profile.sports ?? []).length === 0 && arrived
+        ? [{ name: arrived }]
+        : ((profile.sports ?? []) as SportEntry[]),
+    );
+    clearSportContext();
     setLinks(profile.links ?? []);
     if ((profile.links ?? []).length > 0) setLinksOpen(true);
     // Saved profile radius wins over the local default from a previous device.

@@ -6,6 +6,8 @@ import {
   bucketByCity,
   emptyListings,
   filterBySport,
+  isPublicOrg,
+  isPublicUpcomingGame,
   sportForGuideSlug,
   toPublicGameSeo,
   toPublicTeam,
@@ -160,4 +162,63 @@ export const getPublicGameSeo = createServerFn({ method: "GET" })
     return toPublicGameSeo(
       row as unknown as CityGameRow & { description: string; all_day: boolean | null },
     );
+  });
+
+export const SPORT_HUBS_SETTING_KEY = "sport_hubs";
+const HUB_LIMIT = 12;
+
+export type SportHubListings = Pick<CityListings, "games" | "teams" | "trainers">;
+
+/**
+ * Public listings for one sport hub, filtered by sport in the database and
+ * capped. Same public columns and adult-only/hidden/private rules as the city
+ * pages; no gyms, because a gym row carries no verified sport. Returns null
+ * for an unknown sport slug, or when the `sport_hubs` switch in app_settings is
+ * set to {"enabled": false} (a missing row means on).
+ */
+export const getSportHubListings = createServerFn({ method: "GET" })
+  .inputValidator((d: { sport: string }) => z.object({ sport: z.string().max(40) }).parse(d))
+  .handler(async ({ data }): Promise<SportHubListings | null> => {
+    const sport = sportForGuideSlug(data.sport);
+    if (!sport) return null;
+
+    const sb = publicClient();
+    const flag = await sb
+      .from("app_settings")
+      .select("value")
+      .eq("key", SPORT_HUBS_SETTING_KEY)
+      .maybeSingle();
+    const enabled = (flag.data?.value as { enabled?: unknown } | null | undefined)?.enabled;
+    if (enabled === false) return null;
+
+    const now = new Date();
+    const [games, orgs] = await Promise.all([
+      sb
+        .from("hosted_games")
+        .select(CITY_GAME_COLUMNS)
+        .eq("sport", sport)
+        .eq("is_private", false)
+        .is("hidden_at", null)
+        .is("org_hidden_at", null)
+        .is("cancelled_at", null)
+        .gte("min_age", 18)
+        .gte("date", now.toISOString())
+        .order("date", { ascending: true })
+        .limit(HUB_LIMIT),
+      sb
+        .from("teams")
+        .select(CITY_ORG_COLUMNS)
+        .is("hidden_at", null)
+        .contains("sports", [sport])
+        .limit(HUB_LIMIT * 2),
+    ]);
+    if (games.error) throw new Error(games.error.message);
+    if (orgs.error) throw new Error(orgs.error.message);
+
+    const publicOrgs = (orgs.data ?? []).filter(isPublicOrg);
+    return {
+      games: (games.data ?? []).filter((g) => isPublicUpcomingGame(g, now)),
+      teams: publicOrgs.filter((o) => o.kind !== "coach").slice(0, HUB_LIMIT),
+      trainers: publicOrgs.filter((o) => o.kind === "coach").slice(0, HUB_LIMIT),
+    };
   });
