@@ -32,6 +32,7 @@ import {
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
+import { SportPicker } from "@/components/sports/SportPicker";
 import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import {
   ProfileLinksFields,
@@ -418,13 +419,24 @@ function EditProfile() {
       </Section>
 
       <Section title="Sports">
-        <ProfileSportsFields
+        <SportPicker
           sports={sports}
+          confirmRemoveWithDetails
           onChange={(next) => {
             markDirty();
             setSports(next);
           }}
         />
+        <div className="mt-5">
+          <ProfileSportsFields
+            sports={sports}
+            hideAdd
+            onChange={(next) => {
+              markDirty();
+              setSports(next);
+            }}
+          />
+        </div>
       </Section>
 
       <Section title="Profile links">

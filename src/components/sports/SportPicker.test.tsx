@@ -1,23 +1,32 @@
 // @vitest-environment jsdom
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { SportPicker } from "./SportPicker";
 
 type Entry = { name: Sport; level?: string };
 
-function Harness({ initial = [] as Entry[] }: { initial?: Entry[] }) {
+function Harness({
+  initial = [] as Entry[],
+  confirmRemove = false,
+}: {
+  initial?: Entry[];
+  confirmRemove?: boolean;
+}) {
   const [sports, setSports] = useState<Entry[]>(initial);
   return (
     <>
-      <SportPicker sports={sports} onChange={setSports} />
+      <SportPicker sports={sports} onChange={setSports} confirmRemoveWithDetails={confirmRemove} />
       <output data-testid="state">{JSON.stringify(sports)}</output>
     </>
   );
 }
 const state = () => JSON.parse(screen.getByTestId("state").textContent ?? "[]") as Entry[];
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("SportPicker", () => {
   it("asks the question and lists every canonical sport once, launch sports first", () => {
@@ -71,5 +80,35 @@ describe("SportPicker", () => {
   it("works with no selection at all (skipping stays valid)", () => {
     render(<Harness />);
     expect(state()).toEqual([]);
+  });
+
+  describe("confirmRemoveWithDetails (Edit profile)", () => {
+    const initial: Entry[] = [{ name: "Soccer", level: "Advanced" }, { name: "Tennis" }];
+
+    it("keeps the sport when the member declines to lose its level", () => {
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+      render(<Harness initial={initial} confirmRemove />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /Soccer/ }));
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(state().map((s) => s.name)).toEqual(["Soccer", "Tennis"]);
+    });
+
+    it("removes it when confirmed, and never asks for a sport with no details", () => {
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      render(<Harness initial={initial} confirmRemove />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /Tennis/ }));
+      expect(confirm).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("checkbox", { name: /Soccer/ }));
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(state()).toEqual([]);
+    });
+
+    it("does not ask in onboarding, where the prop is off", () => {
+      const confirm = vi.spyOn(window, "confirm");
+      render(<Harness initial={initial} />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /Soccer/ }));
+      expect(confirm).not.toHaveBeenCalled();
+      expect(state().map((s) => s.name)).toEqual(["Tennis"]);
+    });
   });
 });
