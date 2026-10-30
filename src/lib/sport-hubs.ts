@@ -134,3 +134,23 @@ export function orderSportsForViewer<T extends { name: string }>(all: T[], mine:
   const firstNames = new Set(first.map((s) => s.name));
   return [...first, ...all.filter((s) => !firstNames.has(s.name))];
 }
+
+/**
+ * Sports shown first in onboarding, in this order. "Flag Football" is the
+ * canonical Football sport (its formats include 5v5 Flag), so it is not a
+ * separate entry. Every other canonical sport follows in canonical order.
+ */
+export const SPORT_PRIORITY = [
+  "Basketball",
+  "Baseball",
+  "Soccer",
+  "Pickleball",
+  "Volleyball",
+  "Softball",
+  "Football",
+  "Tennis",
+] as const;
+
+export function orderSportsByPriority<T extends { name: string }>(all: T[]): T[] {
+  return orderSportsForViewer(all, [...SPORT_PRIORITY]);
+}

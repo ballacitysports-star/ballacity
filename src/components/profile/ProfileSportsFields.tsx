@@ -13,9 +13,12 @@ export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel
 export function ProfileSportsFields({
   sports,
   onChange,
+  hideAdd = false,
 }: {
   sports: SportEntry[];
   onChange: (next: SportEntry[]) => void;
+  /** Hide the "Add sport" chips when a picker above already chooses sports. */
+  hideAdd?: boolean;
 }) {
   const addSport = (s: Sport) => {
     if (sports.some((x) => x.name === s)) return;
@@ -125,22 +128,24 @@ export function ProfileSportsFields({
           </div>
         ))}
       </div>
-      <div className="mt-3">
-        <div className="text-xs text-muted-foreground mb-1.5">Add sport</div>
-        <div className="flex flex-wrap gap-2">
-          {SPORTS.filter((s) => !sports.some((x) => x.name === s.name)).map((s) => (
-            <button
-              key={s.name}
-              type="button"
-              onClick={() => addSport(s.name)}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
-            >
-              <span>{s.emoji}</span>
-              {s.name}
-            </button>
-          ))}
+      {!hideAdd && (
+        <div className="mt-3">
+          <div className="text-xs text-muted-foreground mb-1.5">Add sport</div>
+          <div className="flex flex-wrap gap-2">
+            {SPORTS.filter((s) => !sports.some((x) => x.name === s.name)).map((s) => (
+              <button
+                key={s.name}
+                type="button"
+                onClick={() => addSport(s.name)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
+              >
+                <span>{s.emoji}</span>
+                {s.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

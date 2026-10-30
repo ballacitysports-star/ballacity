@@ -26,6 +26,7 @@ import {
   type ProfileBasicsValue,
 } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields, type SportEntry } from "@/components/profile/ProfileSportsFields";
+import { SportPicker } from "@/components/sports/SportPicker";
 import {
   ProfileLinksFields,
   cleanProfileLinks,
@@ -596,7 +597,10 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
         {step === 1 && (
           <Section title="Sports">
-            <ProfileSportsFields sports={sports} onChange={setSports} />
+            <SportPicker sports={sports} onChange={setSports} />
+            <div className="mt-5">
+              <ProfileSportsFields sports={sports} onChange={setSports} hideAdd />
+            </div>
           </Section>
         )}
 
