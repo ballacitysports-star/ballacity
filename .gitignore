@@ -40,3 +40,6 @@ dist-ssr
 # Playwright
 test-results/
 playwright-report/
+
+# Personal Claude Code permission overrides (not shared)
+.claude/settings.local.json
