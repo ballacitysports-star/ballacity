@@ -10,10 +10,12 @@ Status: local only. Nothing here is deployed, pushed or applied to any database.
 - Analytics events `view_sport_hub` and `select_primary_sport` (sport name only, adult-gated like all events).
 
 ## Database
-No migrations. Nothing to apply or replay.
+One additive migration, `20261030120000_sport_hubs_setting.sql`: seeds `app_settings.sport_hubs` as `{"enabled": true}` with `is_public = true`, and never overwrites an existing row. It is not applied anywhere. The row must stay public: anonymous reads only see public rows, so a non-public row would leave the switch ineffective.
+
+Anonymous read paths were reviewed against the migrations (not run): `hosted_games` is limited to adult-only, uncancelled, unhidden games by the restrictive anon policy in `20261029150000`, and every `teams` column the hub selects is in the anon column grant from `20261021150000`.
 
 ## Kill switch
-Set `app_settings.sport_hubs` to `{"enabled": false}`. Hubs then 404. A missing row means enabled. This is a display switch only; it grants and removes no permissions. Removing the route file also restores prior behavior, with no data to clean up.
+Set `app_settings.sport_hubs` (keep `is_public = true`) to `{"enabled": false}`. Hubs then 404. A missing row means enabled. This is a display switch only; it grants and removes no permissions. Removing the route file also restores prior behavior, with no data to clean up.
 
 ## Before staging
 1. `bun install`, then `bun run dev` or `bun run build` to regenerate `src/routeTree.gen.ts` (tracked file; the `/$sport` route is not in it yet).
