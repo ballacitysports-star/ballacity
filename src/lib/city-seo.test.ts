@@ -8,6 +8,7 @@ import {
   gameAgeRangeIsAdultOnly,
   gameTouchesMinors,
   isPublicGame,
+  isPublicOrg,
   isPublicUpcomingGame,
   toPublicGameSeo,
   type CityGameRow,
@@ -240,5 +241,27 @@ describe("isPublicGame", () => {
     ]) {
       expect(isPublicGame(game(over))).toBe(false);
     }
+  });
+});
+
+describe("isPublicOrg", () => {
+  const org = {
+    id: "t",
+    name: "Team",
+    city: null,
+    sports: ["Basketball"],
+    kind: "team",
+    tagline: null,
+    updated_at: null,
+  };
+
+  it("keeps youth and teen teams and hidden teams off public pages", () => {
+    expect(isPublicOrg({ ...org, age_groups: ["adult"], hidden_at: null })).toBe(true);
+    expect(isPublicOrg({ ...org, age_groups: [], hidden_at: null })).toBe(true);
+    expect(isPublicOrg({ ...org, age_groups: ["youth"], hidden_at: null })).toBe(false);
+    expect(isPublicOrg({ ...org, age_groups: ["adult", "teen"], hidden_at: null })).toBe(false);
+    expect(isPublicOrg({ ...org, age_groups: ["adult"], hidden_at: "2026-10-01T00:00:00Z" })).toBe(
+      false,
+    );
   });
 });

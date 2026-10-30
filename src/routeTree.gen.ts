@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SportRouteImport } from './routes/$sport'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AiDisclosureRouteImport } from './routes/ai-disclosure'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -131,6 +132,11 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SportRoute = SportRouteImport.update({
+  id: '/$sport',
+  path: '/$sport',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TabsRoute = TabsRouteImport.update({
@@ -729,6 +735,7 @@ const LovableEmailTransactionalPreviewRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$sport': typeof SportRoute
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
@@ -848,6 +855,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$sport': typeof SportRoute
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
@@ -967,6 +975,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$sport': typeof SportRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
@@ -1089,6 +1098,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$sport'
     | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
@@ -1208,6 +1218,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$sport'
     | '/ai-disclosure'
     | '/auth'
     | '/community-guidelines'
@@ -1326,6 +1337,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/$sport'
     | '/_tabs'
     | '/ai-disclosure'
     | '/auth'
@@ -1447,6 +1459,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SportRoute: typeof SportRoute
   TabsRoute: typeof TabsRouteWithChildren
   AiDisclosureRoute: typeof AiDisclosureRoute
   AuthRoute: typeof AuthRoute
@@ -1560,6 +1573,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$sport': {
+      id: '/$sport'
+      path: '/$sport'
+      fullPath: '/$sport'
+      preLoaderRoute: typeof SportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_tabs': {
@@ -2430,6 +2450,7 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SportRoute: SportRoute,
   TabsRoute: TabsRouteWithChildren,
   AiDisclosureRoute: AiDisclosureRoute,
   AuthRoute: AuthRoute,
