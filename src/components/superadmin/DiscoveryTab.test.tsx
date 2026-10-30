@@ -71,6 +71,7 @@ vi.mock("@/lib/discovery.functions", () => ({
   superadminDiscoveryBulk: (a: unknown) => bulk(a),
   superadminDiscoveryIds: (a: unknown) => ids(a),
 }));
+vi.mock("@/components/superadmin/SportHubsPanel", () => ({ SportHubsPanel: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
 
 import { DiscoveryTab } from "./DiscoveryTab";
