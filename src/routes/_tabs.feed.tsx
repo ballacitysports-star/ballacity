@@ -35,7 +35,7 @@ import {
   useMyProfile,
   getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
-import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
+import { markSportChoice, useDefaultSports, useProfileSportDefault } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserLocation } from "@/lib/geo";
 import { gameDistanceMi } from "@/lib/game-distance";
@@ -200,6 +200,7 @@ function Feed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const { sports: mySports } = useDefaultSports();
   // First visit only: start the feed filtered to the viewer's profile sports.
   // Signed-out viewers are mid-redirect to /auth — writing prefs there would
   // trigger the URL sync below and fight that redirect.
@@ -659,7 +660,14 @@ function Feed() {
                 setPositionFilter(null);
                 setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
               }}
-              chips={<SportChips multi selected={chipSelected} onSelect={setChipSport} />}
+              chips={
+                <SportChips
+                  multi
+                  selected={chipSelected}
+                  onSelect={setChipSport}
+                  prioritize={mySports}
+                />
+              }
             />
             {q && suggestions.length > 0 && (
               <div className="absolute left-0 right-14 top-[2.9rem] z-20 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">

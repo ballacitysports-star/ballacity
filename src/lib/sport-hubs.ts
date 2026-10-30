@@ -110,3 +110,17 @@ export function makePrimarySport<T extends { name: string }>(sports: T[], name: 
   if (i <= 0) return sports;
   return [sports[i], ...sports.slice(0, i), ...sports.slice(i + 1)];
 }
+
+/**
+ * The canonical sports with the viewer's own first (in their order), then the
+ * rest in canonical order. Nothing is removed: every sport stays reachable.
+ */
+export function orderSportsForViewer<T extends { name: string }>(all: T[], mine: string[]): T[] {
+  const byName = new Map(all.map((s) => [s.name, s]));
+  const first = [...new Set(mine)].flatMap((n) => {
+    const s = byName.get(n);
+    return s ? [s] : [];
+  });
+  const firstNames = new Set(first.map((s) => s.name));
+  return [...first, ...all.filter((s) => !firstNames.has(s.name))];
+}

@@ -6,6 +6,7 @@ import {
   clearSportContext,
   hubBySlug,
   makePrimarySport,
+  orderSportsForViewer,
   parseSportContext,
   readSportContext,
   rememberSportContext,
@@ -70,5 +71,29 @@ describe("makePrimarySport", () => {
   it("is a no-op for the current primary or an unknown sport", () => {
     expect(makePrimarySport(list, "Soccer")).toBe(list);
     expect(makePrimarySport(list, "Curling")).toBe(list);
+  });
+});
+
+describe("orderSportsForViewer", () => {
+  const all = [
+    { name: "Baseball" },
+    { name: "Basketball" },
+    { name: "Soccer" },
+    { name: "Tennis" },
+  ];
+
+  it("puts the viewer's sports first in their order and keeps every sport", () => {
+    const out = orderSportsForViewer(all, ["Tennis", "Baseball"]).map((s) => s.name);
+    expect(out).toEqual(["Tennis", "Baseball", "Basketball", "Soccer"]);
+  });
+
+  it("ignores unknown or repeated names and is unchanged with none", () => {
+    expect(orderSportsForViewer(all, ["Curling", "Soccer", "Soccer"]).map((s) => s.name)).toEqual([
+      "Soccer",
+      "Baseball",
+      "Basketball",
+      "Tennis",
+    ]);
+    expect(orderSportsForViewer(all, [])).toEqual(all);
   });
 });
