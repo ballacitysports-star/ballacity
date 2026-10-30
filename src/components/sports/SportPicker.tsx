@@ -18,21 +18,37 @@ const CARDS = orderSportsByPriority(SPORTS);
  * positions on other sports are untouched. When more than one sport is
  * chosen, a second question picks the primary one (the first entry).
  */
-export function SportPicker<T extends { name: Sport }>({
+export function SportPicker<T extends { name: Sport; level?: unknown; positions?: string[] }>({
   sports,
   onChange,
+  confirmRemoveWithDetails = false,
 }: {
   sports: T[];
   onChange: (next: T[]) => void;
+  /**
+   * Ask before unticking a sport that already has a level or positions saved,
+   * since removing it discards them. Off in onboarding; on in Edit profile.
+   */
+  confirmRemoveWithDetails?: boolean;
 }) {
   const selected = new Set(sports.map((s) => s.name));
 
-  const toggle = (name: Sport) =>
-    onChange(
-      selected.has(name)
-        ? sports.filter((s) => s.name !== name)
-        : [...sports, { name } as unknown as T],
-    );
+  const toggle = (name: Sport) => {
+    if (!selected.has(name)) {
+      onChange([...sports, { name } as unknown as T]);
+      return;
+    }
+    const entry = sports.find((s) => s.name === name);
+    const hasDetails = !!entry && (!!entry.level || (entry.positions?.length ?? 0) > 0);
+    if (
+      confirmRemoveWithDetails &&
+      hasDetails &&
+      !window.confirm(`Remove ${name}? Its skill level and positions will be cleared.`)
+    ) {
+      return;
+    }
+    onChange(sports.filter((s) => s.name !== name));
+  };
 
   return (
     <div className="space-y-5">
