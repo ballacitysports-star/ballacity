@@ -18,7 +18,9 @@ Anonymous read paths were reviewed against the migrations (not run): `hosted_gam
 Set `app_settings.sport_hubs` (keep `is_public = true`) to `{"enabled": false}`. Hubs then 404. A missing row means enabled. This is a display switch only; it grants and removes no permissions. Removing the route file also restores prior behavior, with no data to clean up.
 
 ## Before staging
-1. `bun install`, then `bun run dev` or `bun run build` to regenerate `src/routeTree.gen.ts` (tracked file; the `/$sport` route is not in it yet).
-2. `bun run lint`, `bunx tsc --noEmit`, `bun run test`.
-3. Confirm anon RLS on `hosted_games` and `teams` for the new filtered queries (same columns as the city pages).
-4. Check `/basketball` etc. at phone width and signed-out.
+Done locally: route tree regenerated, `tsc --noEmit` clean, `vitest run` passing, `vite build` passing (needs `node --max-old-space-size=8192`; default memory aborted once).
+
+Still to do:
+1. `bun run test:db` on a machine with Postgres, to replay the new seed migration (not run yet).
+2. Against staging: confirm anon can read the `sport_hubs` row and the hub queries, and that setting it to `{"enabled": false}` makes the hubs 404.
+3. Check `/basketball` etc. at phone width, signed in and signed out.
