@@ -132,7 +132,7 @@ export function gameLocationView(
   return {
     kind: "approximate",
     note: signedIn
-      ? "The exact location is shared once you're confirmed for this game."
+      ? "The exact location is shared once you're confirmed for this game and any entry fee is paid."
       : "Sign in and join to see the exact location.",
   };
 }

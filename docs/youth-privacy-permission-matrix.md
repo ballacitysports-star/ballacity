@@ -12,8 +12,9 @@ payments, identity). Tests: `supabase/tests/320`, `330`, `335`; app tests under 
 | Viewer | Exact venue / coordinates | What they get instead |
 |---|---|---|
 | The host (adult, or an approved 16–17 host) | yes | – |
-| A person on the roster (any cohort allowed to take part) | yes | – |
-| A verified, active guardian of someone on the roster | yes | – |
+| A person on the roster (any cohort allowed to take part) whose entry fee is settled (a free game, or a verified payment) | yes | – |
+| A person on the roster of a paid game whose payment is not yet verified | no | same coarse form until the payment clears |
+| A verified, active guardian of someone on the roster whose fee is settled | yes | – |
 | Manager of the game's team; admin/owner of the game's organization | yes | – |
 | Guardian whose link is revoked or unverified | no | neighborhood label, coordinates to 2 decimals (~1 km) |
 | Pending requester; approved requester **not yet on the roster**; waitlisted player | no | same coarse form |
@@ -32,6 +33,9 @@ person is on the roster.
 
 Until the database switch (`app_settings.youth_location_privacy.coarsen`) is turned on and existing rows are
 coarsened, the public columns still carry the exact venue over the network; the app hides them, the database does not yet.
+The switch is guarded and one-way: it needs the adoption confirmation, a typed session confirmation and an exact private
+copy of every youth game; once on it cannot be turned off, and nothing ever restores exact values into public columns
+(recovery is by fixing forward). There is no per-player fee waiver in the data model yet.
 
 ## 2. Taking part (joining, requesting)
 
