@@ -87,3 +87,76 @@ jobs:
         env:
           FORMAT_BASE: origin/${{ github.base_ref }}
         run: bun run format:check:changed
+
+  # Two blocking checks that nothing else in CI makes: that the code type-checks, and
+  # that the production bundle builds. Unit tests run through Vitest, which strips
+  # types without checking them, and no other job builds the app, so a type error or a
+  # broken import could reach `main` with every check green.
+  #
+  # One job, not two: both need the same install, so a second job would repeat it.
+  # The build step still runs after a type error (`!cancelled()`), so a single run
+  # reports both results instead of costing a second round trip.
+  #
+  # No secrets, and nothing here can reach a backend. `vite.config.ts` fills any unset
+  # or EMPTY variable from `.env.production` (the real backend and a live Stripe
+  # publishable key) and falls back to literals for the three Supabase browser
+  # variables, so the build step sets every one of them to an inert placeholder. The
+  # last step then fails the job if the production project reference is still found in
+  # the output. The artifact is never uploaded or deployed.
+  #
+  # Its name, "Typecheck & build", is the status check to require on `main`; see
+  # docs/ci-security.md.
+  typecheck-build:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # `noEmit` in tsconfig.json, so this only checks. The local binary, not `bunx`,
+      # so nothing is fetched at run time.
+      - name: Typecheck
+        run: ./node_modules/.bin/tsc --noEmit
+
+      # The bundle outgrew Node's default heap on a runner (~2 GB): the build dies with
+      # "JavaScript heap out of memory" before it finishes. 4096 is what the E2E build
+      # uses; runners have 16 GB.
+      - name: Build
+        if: ${{ !cancelled() }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          # Every variable `.env.production` would seed, set to something else.
+          SUPABASE_URL: http://127.0.0.1:54321
+          SUPABASE_PUBLISHABLE_KEY: ci-build-placeholder
+          SUPABASE_PROJECT_ID: ci-build-placeholder
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-build-placeholder
+          VITE_SUPABASE_PROJECT_ID: ci-build-placeholder
+          # Not a pk_* key, so the build reads as payments-not-configured and never
+          # loads Stripe.
+          VITE_PAYMENTS_CLIENT_TOKEN: ci-build-payments-disabled
+          # Otherwise falls back to the real GA4 measurement ID.
+          GOOGLE_ANALYTICS_MEASUREMENT_ID: G-CIBUILD0000
+        run: bun run build
+
+      - name: Check the build carries no production backend
+        if: ${{ !cancelled() }}
+        run: |
+          if [ ! -d .output ]; then
+            echo "No build output to inspect (the build step failed or did not run)."
+            exit 1
+          fi
+          if grep -rIl "cpqihhcqeivbgxqbzatv" .output; then
+            echo "The production project reference is in the build output; see the files above."
+            exit 1
+          fi
