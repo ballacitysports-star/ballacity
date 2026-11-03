@@ -1,3 +1,4 @@
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -1124,9 +1125,11 @@ function RootComponent() {
         <GlobalErrorBoundary scope="root">
           <AuthGate>
             <StaffBar />
-            <SwipeNavigator>
-              <Outlet />
-            </SwipeNavigator>
+            <MaintenanceGate>
+              <SwipeNavigator>
+                <Outlet />
+              </SwipeNavigator>
+            </MaintenanceGate>
           </AuthGate>
         </GlobalErrorBoundary>
       </ClientOnly>
