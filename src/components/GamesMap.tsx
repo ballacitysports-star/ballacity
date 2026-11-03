@@ -58,7 +58,15 @@ export type MapPinItem = {
   lng: number;
   urgent?: boolean;
   real?: boolean;
+  /**
+   * The game is a youth-inclusive one the viewer is not entitled to the exact venue of: lat/lng are already the
+   * coarse (about 1 km) form and the map draws the area as a circle instead of implying a precise spot.
+   */
+  approximate?: boolean;
 };
+
+/** Radius of the circle drawn for an approximate location (metres), about the precision of the coarse form. */
+export const APPROXIMATE_AREA_RADIUS_M = 1000;
 
 export function GamesMap({
   pins,
@@ -81,6 +89,7 @@ export function GamesMap({
   const userCircleRef = useRef<any>(null);
   const searchMarkerRef = useRef<any>(null);
   const pinMarkersRef = useRef<Map<string, any>>(new Map());
+  const pinAreasRef = useRef<Map<string, any>>(new Map());
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const manualLocationRef = useRef(false);
@@ -388,9 +397,44 @@ export function GamesMap({
     const existing = pinMarkersRef.current;
     const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
 
+    const syncArea = (p: MapPinItem, position: { lat: number; lng: number }) => {
+      const area = pinAreasRef.current.get(p.id);
+      if (!p.approximate) {
+        // The exact venue was released to this viewer (or the game is adult-only): no circle any more.
+        area?.setMap(null);
+        pinAreasRef.current.delete(p.id);
+        return;
+      }
+      if (area) {
+        area.setCenter(position);
+        return;
+      }
+      // An area, not a spot: the exact venue is only shared with people on the game.
+      pinAreasRef.current.set(
+        p.id,
+        new window.google.maps.Circle({
+          center: position,
+          radius: APPROXIMATE_AREA_RADIUS_M,
+          map: mapRef.current,
+          strokeColor: "#a3e635",
+          strokeOpacity: 0.55,
+          strokeWeight: 1.5,
+          fillColor: "#a3e635",
+          fillOpacity: 0.12,
+          clickable: false,
+        }),
+      );
+    };
+
     pins.forEach((p) => {
-      if (existing.has(p.id)) return;
       const position = p.real ? { lat: p.lat, lng: p.lng } : toLatLng(p.lng, p.lat, center);
+      const known = existing.get(p.id);
+      if (known) {
+        // The same game can move from approximate to exact once the database releases its venue.
+        if (p.real) known.setPosition(position);
+        syncArea(p, p.real ? position : (known.getPosition()?.toJSON?.() ?? position));
+        return;
+      }
       const marker = new window.google.maps.Marker({
         position,
         map: mapRef.current,
@@ -398,6 +442,7 @@ export function GamesMap({
       });
       marker.addListener("click", () => onSelect(p.id));
       existing.set(p.id, marker);
+      syncArea(p, position);
     });
 
     // remove stale
@@ -405,6 +450,8 @@ export function GamesMap({
       if (!pins.find((p) => p.id === id)) {
         existing.get(id)?.setMap(null);
         existing.delete(id);
+        pinAreasRef.current.get(id)?.setMap(null);
+        pinAreasRef.current.delete(id);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

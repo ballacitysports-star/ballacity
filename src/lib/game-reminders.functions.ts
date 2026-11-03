@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatNotificationWhen } from "@/lib/format";
+import { notificationLocationText } from "@/lib/youth-game-location";
 
 /**
  * Delivers the caller's due game reminders as notification rows.
@@ -29,7 +30,7 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
     const gameIds = [...new Set(reminders.map((r) => r.game_id))];
     const { data: games } = await context.supabase
       .from("hosted_games")
-      .select("id, title, date, location, all_day")
+      .select("id, title, date, location, neighborhood, min_age, max_age, all_day")
       .in("id", gameIds);
     const byId = new Map(
       ((games ?? []) as any[]).map((g) => [String(g.id), g as Record<string, any>]),
@@ -67,7 +68,13 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
         body:
           [
             formatNotificationWhen({ date: String(game["date"]), allDay: !!game["all_day"] }),
-            game["location"] ? `Where: ${game["location"]}` : null,
+            // A youth-inclusive game never puts its venue in a notification or push payload.
+            notificationLocationText({
+              min_age: game["min_age"] as number | null,
+              max_age: game["max_age"] as number | null,
+              location: game["location"] as string | null,
+              neighborhood: game["neighborhood"] as string | null,
+            }),
           ]
             .filter(Boolean)
             .join(" · ") || null,

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeCutoff } from "@/lib/cancel-window";
+import { coarsenRow } from "@/lib/youth-game-location";
 
 export type ChildTeam = {
   teamId: string;
@@ -220,6 +221,9 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
           sport: string;
           date: string;
           location: string | null;
+          neighborhood?: string | null;
+          min_age?: number | null;
+          max_age?: number | null;
           cancelled_at: string | null;
           cancel_cutoff_min?: number | null;
         }[]
@@ -231,12 +235,15 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
       const mk = (gid: string, status: ChildGame["status"]): ChildGame | null => {
         const g = gameById.get(gid);
         if (!g || g.cancelled_at) return null;
+        // Only a child on the roster is entitled to the exact venue of a youth-inclusive game; a request
+        // (pending or approved but not yet on the roster) gets the coarse area.
+        const shown = status === "joined" ? g : coarsenRow(g);
         return {
           gameId: g.id,
           title: g.title,
           sport: g.sport,
           date: g.date,
-          location: g.location,
+          location: shown.location,
           status,
           cancelCutoffMin: normalizeCutoff(g.cancel_cutoff_min),
         };

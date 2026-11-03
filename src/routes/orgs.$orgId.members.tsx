@@ -1,3 +1,4 @@
+import { OrgYouthHostingApprovals } from "@/components/youth/OrgYouthHostingApprovals";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -254,9 +255,7 @@ function MembersPage() {
                       {p.display_name || "Unnamed"}
                     </div>
                     {already && (
-                      <div className="micro-label text-muted-foreground">
-                        Already a member
-                      </div>
+                      <div className="micro-label text-muted-foreground">Already a member</div>
                     )}
                   </div>
                   {!already && (
@@ -401,6 +400,15 @@ function MembersPage() {
           </ul>
         )}
       </section>
+
+      <OrgYouthHostingApprovals
+        orgId={orgId}
+        viewerId={userId}
+        members={(membersQ.data ?? []).map((m) => ({
+          user_id: m.user_id,
+          name: m.profile?.display_name || "Member",
+        }))}
+      />
     </div>
   );
 }

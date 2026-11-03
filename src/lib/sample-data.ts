@@ -58,6 +58,11 @@ export type Game = {
   title: string;
   host: { name: string; username: string; avatar: string; rating: number };
   hostUserId?: string; // auth user id of the host (locks ownership)
+  /**
+   * True when the host is not a confirmed adult: `host` then carries only the organizer's name (team or
+   * organization, else "Youth host"), with no username, photo or rating, and the UI shows no profile link.
+   */
+  hostNeutral?: boolean;
   date: string; // ISO
   duration: string; // "90 min"
   location: string;
@@ -67,6 +72,11 @@ export type Game = {
    * computed live from the viewer's location to the venue coordinates.
    */
   distanceMi?: number | null;
+  /**
+   * "approximate" when `location`, `lat` and `lng` are the coarse form of a youth-inclusive game (neighborhood
+   * label, coordinates to two decimals) because this viewer is not entitled to the exact venue.
+   */
+  locationPrecision?: "exact" | "approximate";
   /** Real venue latitude/longitude; null when the venue was never geocoded. */
   lat?: number | null;
   lng?: number | null;
