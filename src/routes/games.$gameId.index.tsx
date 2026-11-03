@@ -7,8 +7,6 @@ import type { ComponentProps } from "react";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicGamePreview } from "@/components/games/PublicGamePreview";
 import { emailLocalPart } from "@/lib/managed-children";
-import { Navigation } from "lucide-react";
-import { OpenInMaps } from "@/components/OpenInMaps";
 import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
@@ -158,6 +156,7 @@ import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
 import { GameDistance } from "@/components/GameDistance";
+import { GameLocationCard } from "@/components/games/GameLocationCard";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
 import { ShareSheet } from "@/components/ShareSheet";
@@ -1980,9 +1979,13 @@ function GameDetail() {
               timezone: game.timezone ?? null,
               location: [game.location, game.neighborhood].filter(Boolean).join(", "),
               description: game.description ?? undefined,
-              mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                [game.location, game.neighborhood].filter(Boolean).join(", "),
-              )}`,
+              // No map link for an approximate location: it would point at the coarse area, not the venue.
+              mapUrl:
+                game.locationPrecision === "approximate"
+                  ? undefined
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      [game.location, game.neighborhood].filter(Boolean).join(", "),
+                    )}`,
               url: typeof window !== "undefined" ? window.location.href : undefined,
               uid: `game-${game.id}@ballacity`,
             }}
@@ -1991,54 +1994,15 @@ function GameDetail() {
 
         {viewerCountsAsJoined && <GameReminderCard gameId={game.id} />}
 
-        {/* Location card */}
-        <div className="rounded-3xl border border-border bg-surface overflow-hidden">
-          <div
-            className="h-32 relative"
-            style={{
-              background:
-                "radial-gradient(50% 60% at 50% 50%, oklch(0.30 0.08 145 / 0.5), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
-            }}
-          >
-            <svg className="absolute inset-0 h-full w-full opacity-30" aria-hidden>
-              <defs>
-                <pattern id="g2" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path
-                    d="M 32 0 L 0 0 0 32"
-                    fill="none"
-                    stroke="oklch(1 0 0 / 0.1)"
-                    strokeWidth="1"
-                  />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#g2)" />
-            </svg>
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-lime text-primary-foreground glow-lime">
-              <MapPin className="h-5 w-5" />
-            </div>
-          </div>
-          <OpenInMaps address={[game.location, game.neighborhood].filter(Boolean).join(", ")}>
-            <div className="flex items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold underline-offset-2 hover:underline">
-                  {game.location}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}
-                </div>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-semibold text-lime">
-                <Navigation className="h-3.5 w-3.5" /> Directions
-              </span>
-            </div>
-          </OpenInMaps>
+        {/* Location card: exact only for people the database released it to */}
+        <GameLocationCard game={game} signedIn={!!user}>
           <VenueHostedAt orgId={game.orgId} />
-        </div>
+        </GameLocationCard>
 
         {/* Host */}
         <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
           {(() => {
-            const hostId = settings?.host_id ?? game.hostUserId;
+            const hostId = game.hostNeutral ? undefined : (settings?.host_id ?? game.hostUserId);
             const NameTag: any = hostId ? Link : "span";
             const nameProps = hostId
               ? {
@@ -2108,13 +2072,17 @@ function GameDetail() {
                   </div>
                   <div className="font-semibold">
                     <NameTag {...nameProps}>{game.host.name}</NameTag>{" "}
-                    <span className="text-muted-foreground font-normal text-sm">
-                      {game.host.username}
-                    </span>
+                    {game.host.username ? (
+                      <span className="text-muted-foreground font-normal text-sm">
+                        {game.host.username}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="text-xs text-lime font-semibold">
-                    ★ {game.host.rating} host rating
-                  </div>
+                  {game.host.rating ? (
+                    <div className="text-xs text-lime font-semibold">
+                      ★ {game.host.rating} host rating
+                    </div>
+                  ) : null}
                 </div>
               </>
             );

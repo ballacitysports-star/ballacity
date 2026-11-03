@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { computeAthleteProgress, type AthleteProgress } from "@/lib/athlete-xp";
 import { teamAvatarDisplay } from "@/lib/team-avatar";
+import { coarsenRow } from "@/lib/youth-game-location";
 
 export type PassportTeam = {
   id: string;
@@ -169,7 +170,7 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
     if (gameIds.length > 0) {
       const { data: games } = await supabaseAdmin
         .from("hosted_games")
-        .select("id, title, sport, date, location, org_id")
+        .select("id, title, sport, date, location, neighborhood, min_age, max_age, org_id")
         .in("id", gameIds)
         .eq("is_private", false)
         .is("hidden_at", null)
@@ -177,14 +178,19 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
         .gte("date", new Date().toISOString())
         .order("date", { ascending: true })
         .limit(5);
-      upcomingRuns = (games ?? []).map((g) => ({
-        id: g.id,
-        title: g.title,
-        sport: g.sport,
-        date: g.date,
-        location: g.location,
-        orgId: g.org_id,
-      }));
+      upcomingRuns = (games ?? []).map((raw) => {
+        // The player is on these rosters, so they may see their own venues; anyone else gets the coarse form
+        // for a game that may include children.
+        const g = context.userId === userId ? raw : coarsenRow(raw);
+        return {
+          id: g.id,
+          title: g.title,
+          sport: g.sport,
+          date: g.date,
+          location: g.location,
+          orgId: g.org_id,
+        };
+      });
     }
 
     let progress: AthleteProgress | null = null;

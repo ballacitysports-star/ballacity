@@ -85,6 +85,7 @@ describe("per-user client state", () => {
       expect.arrayContaining([
         "openrun.joinedGameIds.v1",
         "openrun.hostedGames.v1",
+        "openrun.hostedGames.v2",
         "openrun:pending-dob",
         "openrun:pending-legal-consent",
       ]),

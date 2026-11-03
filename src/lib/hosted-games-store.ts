@@ -4,8 +4,18 @@ import { normalizeCutoff } from "@/lib/cancel-window";
 import { imageFor, ME, resolveSportAsset, toStoredCover } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import {
+  coarsenGame,
+  redactForStorage,
+  withExactLocation,
+  type ExactLocation,
+  type ExactLocationStatus,
+} from "@/lib/youth-game-location";
 
-const STORAGE_KEY = "openrun.hostedGames.v1";
+// v2 holds only what is safe to keep on a device: a youth-inclusive game is stored in its coarse form, never its
+// exact venue or coordinates. v1 held exact coordinates of every game ever fetched and is deleted on first load.
+const STORAGE_KEY = "openrun.hostedGames.v2";
+const LEGACY_STORAGE_KEY = "openrun.hostedGames.v1";
 const listeners = new Set<() => void>();
 let cache: Game[] = [];
 let loaded = false;
@@ -36,9 +46,15 @@ function loadLocal() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(arr)) cache = arr;
+    // Re-coarsen on the way in as well: a stored copy is never trusted to be coarse.
+    if (Array.isArray(arr)) cache = arr.map((g) => redactForStorage(g as Game));
   } catch {
     cache = [];
   }
@@ -48,10 +64,131 @@ function loadLocal() {
 function saveLocal() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.map(redactForStorage)));
   } catch {
     /* ignore quota errors */
   }
+}
+
+// ---------- Exact locations of youth-inclusive games (in memory only) ----------
+//
+// The database releases the exact venue of a youth-inclusive game only to people entitled to it (host, roster,
+// their verified guardians, managers). Whatever it returns is overlaid here for this signed-in viewer, kept in
+// memory only, never written to storage, and dropped on sign-out, account switch or a guardian profile switch.
+const exactLocations = new Map<string, ExactLocation>();
+let exactStatus: ExactLocationStatus = "idle";
+let exactPromise: Promise<void> | null = null;
+const exactListeners = new Set<() => void>();
+
+function setExactStatus(next: ExactLocationStatus) {
+  if (exactStatus === next) return;
+  exactStatus = next;
+  exactListeners.forEach((l) => l());
+}
+
+type PrivateRow = {
+  game_id: string;
+  location: string | null;
+  lat: number | string | null;
+  lng: number | string | null;
+};
+
+function toExact(r: PrivateRow): ExactLocation {
+  return {
+    location: r.location ?? null,
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
+  };
+}
+
+function reapplyExact() {
+  cache = cache.map((g) => withExactLocation(coarsenGame(g), exactLocations.get(g.id)));
+  emit();
+}
+
+async function hydrateExact(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (exactPromise) return exactPromise;
+  setExactStatus("loading");
+  exactPromise = (async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      exactLocations.clear();
+      if (!sess.session) {
+        setExactStatus("ready"); // signed out: nothing is released, coarse is the answer
+        reapplyExact();
+        return;
+      }
+      const { data, error } = await supabase
+        .from("hosted_game_private" as never)
+        .select("game_id, location, lat, lng")
+        .limit(2000);
+      if (error) throw error;
+      for (const r of (data ?? []) as unknown as PrivateRow[])
+        exactLocations.set(r.game_id, toExact(r));
+      setExactStatus("ready");
+      reapplyExact();
+    } catch {
+      setExactStatus("error");
+    } finally {
+      exactPromise = null;
+    }
+  })();
+  return exactPromise;
+}
+
+/** Re-read one game's exact location (after the game changed, or a roster change may have removed access). */
+export async function refreshExactLocation(gameId: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session) {
+      exactLocations.delete(gameId);
+    } else {
+      const { data, error } = await supabase
+        .from("hosted_game_private" as never)
+        .select("game_id, location, lat, lng")
+        .eq("game_id", gameId)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) exactLocations.set(gameId, toExact(data as unknown as PrivateRow));
+      else exactLocations.delete(gameId);
+    }
+    reapplyExact();
+  } catch {
+    /* keep what we have; the next full hydrate reports an error */
+  }
+}
+
+/** Retry button for the "couldn't check your access" state. */
+export function retryExactLocations() {
+  exactPromise = null;
+  void hydrateExact();
+}
+
+/** Forget everything that belongs to the signed-in viewer (sign-out, account or profile switch). */
+export function resetHostedGamesClientState() {
+  exactLocations.clear();
+  exactPromise = null;
+  exactStatus = "idle";
+  cache = [];
+  loaded = false;
+  dbHydrated = false;
+  dbHydratePromise = null;
+  recomputeSnapshot();
+  listeners.forEach((l) => l());
+  exactListeners.forEach((l) => l());
+}
+
+export function useExactLocationStatus(): ExactLocationStatus {
+  return useSyncExternalStore(
+    (cb) => {
+      exactListeners.add(cb);
+      return () => exactListeners.delete(cb);
+    },
+    () => exactStatus,
+    () => "idle",
+  );
 }
 
 function emit() {
@@ -111,7 +248,13 @@ type DbRow = {
   cancel_cutoff_min?: number | null;
   min_age?: number | null;
   max_age?: number | null;
-  host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
+  host_snapshot: {
+    name?: string;
+    username?: string;
+    avatar?: string;
+    rating?: number;
+    neutral?: boolean;
+  } | null;
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
   org_id?: string | null;
@@ -139,18 +282,25 @@ function publicHostSnapshot(host: unknown) {
   return snap;
 }
 
-function rowToGame(r: DbRow): Game {
+function rowToGameRaw(r: DbRow): Game {
   const snap = r.host_snapshot ?? {};
+  // A host who is not a confirmed adult is shown only as the organizer the database recorded: no username,
+  // photo, rating or profile link, and no invented defaults that look like an identity.
+  const neutral = snap.neutral === true;
+  const organizer = (snap.name ?? "").trim() || "Youth host";
   return {
     id: r.id,
     sport: r.sport as Sport,
     title: r.title,
-    host: {
-      name: snap.name ?? "Host",
-      username: snap.username ?? "@host",
-      avatar: snap.avatar ?? "H",
-      rating: snap.rating ?? 5,
-    },
+    host: neutral
+      ? { name: organizer, username: "", avatar: organizer.slice(0, 1).toUpperCase(), rating: 0 }
+      : {
+          name: snap.name ?? "Host",
+          username: snap.username ?? "@host",
+          avatar: snap.avatar ?? "H",
+          rating: snap.rating ?? 5,
+        },
+    hostNeutral: neutral || undefined,
     hostUserId: r.host_id,
     date: r.date,
     duration: r.duration,
@@ -194,6 +344,11 @@ function rowToGame(r: DbRow): Game {
     cancellationNotes: r.cancellation_notes ?? null,
     gameRules: r.game_rules ?? null,
   } as Game;
+}
+
+/** A game as this viewer may see it: coarse for a youth-inclusive game unless the database released the exact venue. */
+function rowToGame(r: DbRow): Game {
+  return withExactLocation(coarsenGame(rowToGameRaw(r)), exactLocations.get(r.id));
 }
 
 function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
@@ -259,6 +414,8 @@ async function fetchAll(): Promise<void> {
   const pending = cache.filter((g) => !dbIds.has(g.id) && !g.hostUserId);
   cache = [...games, ...pending];
   emit();
+  // Ask the database which exact locations this viewer is entitled to (a failure leaves the coarse form).
+  void hydrateExact();
 }
 
 function ensureDbHydrated() {
@@ -312,6 +469,8 @@ function ensureRealtime() {
         if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
         else cache = [g, ...cache];
         emit();
+        // The venue, the roster or the age range may have changed what this viewer may see: re-check it.
+        void refreshExactLocation(g.id);
       }
     })
     .subscribe();
@@ -330,7 +489,17 @@ function ensureRealtime() {
 // Re-hydrate when auth state changes so newly signed-in users pull DB rows.
 if (typeof window !== "undefined") {
   supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") {
+      // Nothing the previous viewer was entitled to may linger for the next one.
+      exactLocations.clear();
+      exactPromise = null;
+      setExactStatus("idle");
+    }
     if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+      if (event === "SIGNED_IN") {
+        exactLocations.clear();
+        exactPromise = null;
+      }
       dbHydrated = false;
       dbHydratePromise = null;
       ensureDbHydrated();
@@ -379,6 +548,8 @@ export type HostedGameInput = {
   /** Minutes before start that cancelling counts as late / the refund rule changes. */
   cancelCutoffMin?: number;
   gameRules?: string | null;
+  /** A 16-17 year old's hosting approval (from a guardian or an organization administrator). */
+  hostingApprovalId?: string | null;
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -432,17 +603,25 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     gameRules: input.gameRules ?? null,
   };
 
+  // The host always knows their own venue: keep it for this session (in memory only).
+  exactLocations.set(id, { location: game.location, lat: game.lat ?? null, lng: game.lng ?? null });
+
   // Optimistic local insert.
-  cache = [game, ...cache];
+  cache = [withExactLocation(coarsenGame(game), exactLocations.get(id)), ...cache];
   emit();
 
   // Persist to DB when signed in.
   if (input.hostUserId) {
     try {
-      const { error } = await supabase.from("hosted_games").insert(gameToInsertRow(game));
+      const row = gameToInsertRow(game) as Record<string, unknown>;
+      if (input.hostingApprovalId) row.hosting_approval_id = input.hostingApprovalId;
+      const { error } = await supabase
+        .from("hosted_games")
+        .insert(row as TablesInsert<"hosted_games">);
       if (error) throw error;
     } catch (err) {
       // Roll back local insert on failure so UI reflects reality.
+      exactLocations.delete(id);
       cache = cache.filter((g) => g.id !== id);
       emit();
       throw err;
@@ -525,7 +704,8 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   const exists = cache.some((g) => g.id === game.id);
   cache = exists ? cache.map((g) => (g.id === game.id ? game : g)) : [game, ...cache];
   emit();
-  return game;
+  await refreshExactLocation(game.id);
+  return cache.find((g) => g.id === game.id) ?? game;
 }
 
 /** Patch a hosted game locally, and mirror the change to the DB. */
@@ -541,6 +721,17 @@ export async function updateHostedGame(
     return updated;
   });
   if (!updated) return undefined;
+  if (patch.location !== undefined || patch.lat !== undefined || patch.lng !== undefined) {
+    // Only the host can edit a venue, and the host is entitled to it: keep the new exact value in memory.
+    const next = updated as Game;
+    exactLocations.set(id, {
+      location: next.location,
+      lat: next.lat ?? null,
+      lng: next.lng ?? null,
+    });
+    updated = withExactLocation(coarsenGame(next), exactLocations.get(id));
+    cache = cache.map((g) => (g.id === id ? (updated as Game) : g));
+  }
   emit();
 
   // Best-effort DB mirror; RLS restricts to the host.

@@ -15,6 +15,7 @@
 export const PER_USER_STORAGE_KEYS = [
   "openrun.joinedGameIds.v1",
   "openrun.hostedGames.v1",
+  "openrun.hostedGames.v2",
   "openrun:pending-dob",
   "openrun:pending-legal-consent",
 ] as const;
@@ -27,6 +28,13 @@ export async function resetPerUserClientState(): Promise<void> {
     } catch {
       /* storage unavailable */
     }
+  }
+  // Exact youth-game locations the previous viewer was entitled to live in memory only: drop them with the keys.
+  try {
+    const { resetHostedGamesClientState } = await import("@/lib/hosted-games-store");
+    resetHostedGamesClientState();
+  } catch {
+    /* ignore */
   }
   // Signed media URLs are per-viewer credentials.
   try {
