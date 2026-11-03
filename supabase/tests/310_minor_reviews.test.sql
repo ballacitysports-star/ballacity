@@ -207,9 +207,9 @@ SELECT t.as_anon();
 SELECT t.throws(format('SELECT * FROM public.player_activity_stats(%L)', t.id('adultsubj')), 'permission denied', 'anonymous visitors still cannot call the statistics');
 SELECT t.throws(format('SELECT * FROM public.player_trait_counts(%L)', t.id('adultsubj')), 'permission denied', 'nor the trait counts');
 SELECT t.reset();
-SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('teen14'))), 1,
-  'the server (no user) still sees the preserved data: the historical public review is counted (the private one never is)');
-SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('teen14'))), 1, 'and the preserved trait counts');
+SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('teen14'))), 0,
+  'even the server''s statistics do not count the preserved historical review about a minor (protected content feeds no aggregate)');
+SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('teen14'))), 0, 'nor its trait counts');
 
 -- ---- 7. who is offered to review ---------------------------------------------------------------
 SELECT t.as_user(t.id('adultrev'));
@@ -350,4 +350,90 @@ SELECT t.throws(format('SELECT * FROM public.host_attendance_stats(%L)', t.id('a
 SELECT t.reset();
 
 
+
+-- ==== 9. PERMANENT protection: content from the time someone was a minor never becomes public ====
+-- "grad" is 18 now and was 17 two months ago; "fraud" is 17 and will have a birthday "correction"; "noage" has no birthday.
+SELECT t.person('grad', 18), t.person('fraud', 17), t.person('peer30', 30), t.person('peer31', 31);
+INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data) VALUES (t.id('noage'), 'noage@example.test', now(), '{"display_name":"Noage","account_type":"player"}');
+-- written while "grad" was a minor: by them, and about them (inserted by the server, as legacy rows would be)
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, created_at) VALUES
+  (t.id('h-by-grad'),   t.id('grad'),   'player', 'player', t.id('peer30')::text, 'Peer', 4, 'Written by someone who was 17 then.', now() - interval '2 months'),
+  (t.id('h-about-grad'), t.id('peer30'), 'player', 'player', t.id('grad')::text,   'Grad', 4, 'Written about someone who was 17 then.', now() - interval '2 months'),
+  (t.id('h-by-noage'),  t.id('noage'),  'player', 'player', t.id('peer30')::text, 'Peer', 4, 'Written by someone of unknown age.', now() - interval '2 months'),
+  (t.id('h-adult-old'), t.id('peer31'), 'player', 'player', t.id('peer30')::text, 'Peer', 5, 'Adult to adult, long ago, stays public.', now() - interval '2 months'),
+  (t.id('h-adult-new'), t.id('grad'),   'player', 'player', t.id('peer30')::text, 'Peer', 5, 'Written after turning 18, public.', now());
+SELECT t.ok((SELECT minor_protected FROM public.reviews WHERE id = t.id('h-by-grad')), 'written by someone who was a minor then: flagged');
+SELECT t.ok((SELECT minor_protected FROM public.reviews WHERE id = t.id('h-about-grad')), 'written about someone who was a minor then: flagged');
+SELECT t.ok((SELECT minor_protected FROM public.reviews WHERE id = t.id('h-by-noage')), 'written by someone of unknown age: flagged (fail closed)');
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reviews WHERE id = t.id('h-adult-old')), 'adult to adult: not flagged');
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reviews WHERE id = t.id('h-adult-new')), 'written after turning 18: not flagged');
+SELECT t.eq(public.age_cohort_of(t.id('grad')), 'adult', 'fixture: grad is an adult today');
+-- nobody but the author sees the protected ones, whatever their age is today
+SELECT t.as_anon();
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id IN (%L, %L, %L)$q$, t.id('h-by-grad'), t.id('h-about-grad'), t.id('h-by-noage'))), 0, 'anonymous: none of the protected reviews');
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id IN (%L, %L)$q$, t.id('h-adult-old'), t.id('h-adult-new'))), 2, 'anonymous: the adult reviews are public');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id IN (%L, %L, %L)$q$, t.id('h-by-grad'), t.id('h-about-grad'), t.id('h-by-noage'))), 0, 'a signed-in stranger: none of the protected reviews');
+SELECT t.as_user(t.id('grad'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id = %L$q$, t.id('h-about-grad'))), 0, 'the person themself (now 18) does not see the review written about them as a minor');
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id = %L$q$, t.id('h-by-grad'))), 1, 'the author still reads their own text');
+SELECT t.reset();
+-- AI analysis follows review visibility
+INSERT INTO public.review_ai_analysis (review_id, traits, sentiment, mismatch, model) VALUES (t.id('h-about-grad'), ARRAY['respectful'], 0.5, false, 'm');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.review_ai_analysis WHERE review_id = %L$q$, t.id('h-about-grad'))), 0, 'the AI analysis of a protected review is not readable either');
+SELECT t.reset();
+-- aggregates and statistics count only what may be published
+SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('peer30'))), 2, 'a review count includes only the unprotected reviews about a person (2 of 4)');
+SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('grad'))), 0, 'and nothing protected is counted for the person it was about');
+-- a birthday "correction" later cannot publish the protected content, and the flag cannot be cleared
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (t.id('h-by-fraud'), t.id('fraud'), 'player', 'player', t.id('peer30')::text, 'Peer', 3, 'Written at 17, birthday corrected later.');
+SELECT t.ok((SELECT minor_protected FROM public.reviews WHERE id = t.id('h-by-fraud')), 'written by a 17-year-old today: flagged');
+SET LOCAL session_replication_role = replica;
+UPDATE public.profile_birthdays SET birthday = (current_date - interval '40 years')::date WHERE user_id = t.id('fraud');
+SET LOCAL session_replication_role = origin;
+UPDATE public.profiles SET age_cohort = 'adult', age_category = 'adult' WHERE id = t.id('fraud');
+SELECT t.eq(public.age_cohort_of(t.id('fraud')), 'adult', 'fixture: the corrected account now looks like an adult');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE id = %L$q$, t.id('h-by-fraud'))), 0, 'but its earlier review stays hidden (the flag, not the current age, decides)');
+SELECT t.reset();
+UPDATE public.reviews SET minor_protected = false WHERE id = t.id('h-by-fraud');
+SELECT t.ok((SELECT minor_protected FROM public.reviews WHERE id = t.id('h-by-fraud')), 'and the flag cannot be cleared by an update');
+-- summaries
+INSERT INTO public.reputation_insights (reviewee_id, reviewee_kind, summary, strengths, growth, review_count, model, generated_at) VALUES
+  (t.id('grad')::text, 'player', 'Generated while they were 17.', '{}', '{}', 1, 'm', now() - interval '2 months'),
+  (t.id('peer30')::text, 'player', 'Generated for an adult.', '{}', '{}', 2, 'm', now());
+SELECT t.ok((SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'a summary generated while its subject was a minor is flagged');
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('peer30')::text), 'an adult''s summary is not');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reputation_insights WHERE reviewee_id = %L$q$, t.id('grad')::text)), 0, 'the old summary of the new adult is not readable');
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reputation_insights WHERE reviewee_id = %L$q$, t.id('peer30')::text)), 1, 'an adult''s summary is');
+SELECT t.reset();
+-- merely editing other columns cannot clear a flag
+UPDATE public.reputation_insights SET minor_protected = false, summary = 'edited' WHERE reviewee_id = t.id('grad')::text;
+SELECT t.ok((SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'editing other columns cannot clear the summary flag');
+-- a summary regenerated after 18 (the server builds it from unprotected reviews only) is judged at its own time
+UPDATE public.reputation_insights SET summary = 'Regenerated from adult-era reviews.', generated_at = now() WHERE reviewee_id = t.id('grad')::text;
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'a regenerated summary is not flagged');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reputation_insights WHERE reviewee_id = %L$q$, t.id('grad')::text)), 1, 'and is readable');
+SELECT t.reset();
+-- helpers: no client can ask about ages or the protection of arbitrary subjects
+SELECT t.as_user(t.id('stranger'));
+SELECT t.throws(format($q$SELECT private_sec.was_minor_at(%L, now())$q$, t.id('grad')), 'permission denied', 'a signed-in user cannot ask whether someone was a minor at a time');
+SELECT t.throws($q$SELECT private_sec.review_subject_is_public('player', 'x')$q$, 'permission denied', 'nor use the old subject helper');
+SELECT t.throws(format($q$SELECT * FROM public.publishable_review_ids(ARRAY[%L]::uuid[])$q$, t.id('h-adult-old')), 'permission denied', 'nor the server-only filter');
+SELECT t.as_anon();
+SELECT t.throws(format($q$SELECT private_sec.review_author_is_adult(%L)$q$, t.id('grad')), 'permission denied', 'anonymous visitors cannot ask whether an account is an adult');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT t.eq((SELECT count(*)::int FROM public.publishable_review_ids(ARRAY[t.id('h-by-grad'), t.id('h-about-grad'), t.id('h-by-noage'), t.id('h-adult-old'), t.id('h-adult-new'), t.id('h-by-fraud')])), 2, 'the server filter keeps only the 2 unprotected reviews');
+SELECT t.reset();
+-- adult reviews keep working after all of this
+SELECT t.as_user(t.id('adultpeer'));
+SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
+  VALUES (%L, 'player', 'player', %L, 'Adult', 5, 'Great again, very reliable.', 'g-rv')$q$, t.id('adultpeer'), t.id('adultrev')::text), 'an adult can still review an adult');
+SELECT t.reset();
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reviews WHERE body = 'Great again, very reliable.'), 'and the new review is public');
 ROLLBACK;

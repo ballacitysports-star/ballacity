@@ -16,7 +16,7 @@
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { moderateAiFields } from "@/lib/ai/moderation.server";
 import { withAiSession } from "@/lib/ai/session.server";
-import { mayAnalyseSubject, onlyAdultAuthored } from "@/lib/review-age.server";
+import { mayAnalyseSubject, onlyPublishable } from "@/lib/review-age.server";
 
 /** Must match SportsmanshipTraitCounts keys in badges.ts. */
 export const REVIEW_TRAITS = [
@@ -38,15 +38,25 @@ const cap = (s: unknown, n: number) =>
 // Pure helpers (unit-tested)
 // ---------------------------------------------------------------------------
 
-export type ReviewAnalysis = { traits: ReviewTrait[]; sentiment: number; mismatch: boolean };
+export type ReviewAnalysis = {
+  traits: ReviewTrait[];
+  sentiment: number;
+  mismatch: boolean;
+};
 
 /** A rating that disagrees strongly with the words next to it. */
 export function isRatingMismatch(rating: number, sentiment: number): boolean {
-  return (rating >= 4 && sentiment <= -0.4) || (rating <= 2 && sentiment >= 0.4);
+  return (
+    (rating >= 4 && sentiment <= -0.4) || (rating <= 2 && sentiment >= 0.4)
+  );
 }
 
-export function normalizeAnalysis(raw: unknown, rating: number): ReviewAnalysis {
-  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+export function normalizeAnalysis(
+  raw: unknown,
+  rating: number,
+): ReviewAnalysis {
+  const src =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const traits = Array.isArray(src["traits"])
     ? Array.from(
         new Set(
@@ -57,14 +67,21 @@ export function normalizeAnalysis(raw: unknown, rating: number): ReviewAnalysis 
       )
     : [];
   const s = Number(src["sentiment"]);
-  const sentiment = Number.isFinite(s) ? Math.max(-1, Math.min(1, Math.round(s * 100) / 100)) : 0;
+  const sentiment = Number.isFinite(s)
+    ? Math.max(-1, Math.min(1, Math.round(s * 100) / 100))
+    : 0;
   return { traits, sentiment, mismatch: isRatingMismatch(rating, sentiment) };
 }
 
-export type InsightDraft = { summary: string; strengths: string[]; growth: string[] };
+export type InsightDraft = {
+  summary: string;
+  strengths: string[];
+  growth: string[];
+};
 
 export function normalizeInsight(raw: unknown): InsightDraft | null {
-  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const src =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const summary = cap(src["summary"], 400);
   if (!summary) return null;
   const list = (v: unknown) =>
@@ -74,10 +91,19 @@ export function normalizeInsight(raw: unknown): InsightDraft | null {
           .filter(Boolean)
           .slice(0, 4)
       : [];
-  return { summary, strengths: list(src["strengths"]), growth: list(src["growth"]) };
+  return {
+    summary,
+    strengths: list(src["strengths"]),
+    growth: list(src["growth"]),
+  };
 }
 
-const SUBJECT = { player: "player", trainer: "coach", team: "team", host: "game host" } as const;
+const SUBJECT = {
+  player: "player",
+  trainer: "coach",
+  team: "team",
+  host: "game host",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Moderation + analysis (run for the review's author, platform-level)
@@ -87,13 +113,19 @@ export type ReviewModeration = { verdict: "allow" | "review" | "block" };
 
 export async function moderateReviewText(
   admin: any,
-  input: { userId: string; reviewId?: string | null; title?: string; body: string },
+  input: {
+    userId: string;
+    reviewId?: string | null;
+    title?: string;
+    body: string;
+  },
 ): Promise<ReviewModeration> {
   const out = await moderateAiFields(admin, {
     userId: input.userId,
     table: "reviews",
     id: input.reviewId ?? null,
-    context: "A sports review written about another player, coach, team or game host.",
+    context:
+      "A sports review written about another player, coach, team or game host.",
     fields: { title: input.title ?? "", body: input.body },
   });
   if (out.blocked.length) return { verdict: "block" };
@@ -159,7 +191,10 @@ export async function analyzeReview(
 
 export const INSIGHT_REFRESH_EVERY = 3;
 
-export function shouldRefreshInsight(existing: { review_count: number } | null, count: number) {
+export function shouldRefreshInsight(
+  existing: { review_count: number } | null,
+  count: number,
+) {
   if (count === 0) return false;
   if (!existing) return true;
   return count - existing.review_count >= INSIGHT_REFRESH_EVERY;
@@ -167,7 +202,11 @@ export function shouldRefreshInsight(existing: { review_count: number } | null, 
 
 export async function refreshInsight(
   admin: any,
-  input: { revieweeUserId: string | null; revieweeId: string; revieweeKind: keyof typeof SUBJECT },
+  input: {
+    revieweeUserId: string | null;
+    revieweeId: string;
+    revieweeKind: keyof typeof SUBJECT;
+  },
   opts: { force?: boolean } = {},
 ): Promise<InsightDraft | null> {
   if (!input.revieweeUserId) return null;
@@ -183,15 +222,15 @@ export async function refreshInsight(
     .eq("is_private", false)
     .order("created_at", { ascending: false })
     .limit(30);
-  // Reviews written by a person under 18 are hidden from everyone else, so they do not feed a summary
-  // that others can read either.
+  // Reviews written by or about someone who was under 18 (or of unknown age) when they were written are nonpublic
+  // permanently, even after that person turns 18, so they do not feed a summary that others can read either.
   const reviews: Array<{
     id: string;
     reviewer_id: string;
     rating: number;
     title: string | null;
     body: string;
-  }> = await onlyAdultAuthored(admin, rows ?? []);
+  }> = await onlyPublishable(admin, rows ?? []);
   if (reviews.length === 0) return null;
 
   const { data: existing } = await admin
@@ -200,7 +239,8 @@ export async function refreshInsight(
     .eq("reviewee_id", input.revieweeId)
     .eq("reviewee_kind", input.revieweeKind)
     .maybeSingle();
-  if (!opts.force && !shouldRefreshInsight(existing, reviews.length)) return null;
+  if (!opts.force && !shouldRefreshInsight(existing, reviews.length))
+    return null;
 
   const { data: analyses } = await admin
     .from("review_ai_analysis")
@@ -210,7 +250,9 @@ export async function refreshInsight(
       reviews.map((r) => r.id),
     );
   const mismatched = new Set(
-    (analyses ?? []).filter((a: any) => a.mismatch).map((a: any) => a.review_id),
+    (analyses ?? [])
+      .filter((a: any) => a.mismatch)
+      .map((a: any) => a.review_id),
   );
   const usable = reviews.filter((r) => !mismatched.has(r.id));
   if (usable.length === 0) return null;
@@ -220,7 +262,10 @@ export async function refreshInsight(
       { admin, userId: input.revieweeUserId, feature: "review_insights" },
       async (session: AiSession) => {
         const quoted = usable
-          .map((r, i) => `<review n="${i + 1}" stars="${r.rating}">${cap(r.body, 400)}</review>`)
+          .map(
+            (r, i) =>
+              `<review n="${i + 1}" stars="${r.rating}">${cap(r.body, 400)}</review>`,
+          )
           .join("\n");
         const out = await runAiCall(session, (p) =>
           p.generateStructured<Record<string, unknown>>({
@@ -248,7 +293,8 @@ export async function refreshInsight(
             growth: draft.growth.join(", "),
           },
         });
-        if (safe.blocked.length || safe.review.length || safe.unavailable) return null;
+        if (safe.blocked.length || safe.review.length || safe.unavailable)
+          return null;
 
         await admin.from("reputation_insights").upsert({
           reviewee_id: input.revieweeId,
@@ -299,7 +345,8 @@ export async function suggestReviewDraft(
         }),
       );
       const draft = cap((out.data as Record<string, unknown>)?.["draft"], 600);
-      if (!draft) throw new Error("Couldn't draft that — try adding a few more points.");
+      if (!draft)
+        throw new Error("Couldn't draft that — try adding a few more points.");
       return draft;
     },
   );

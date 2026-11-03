@@ -275,6 +275,19 @@ AS $function$
     (SELECT COUNT(*) FROM public.hosted_games WHERE host_id = _host AND completed_at IS NOT NULL)
 $function$;
 
+-- Persistent-protection objects. The two minor_protected COLUMNS are deliberately KEPT: they record which content was
+-- written by or about a minor and must not be thrown away by a rollback. Nothing reads them once the policies above
+-- are restored, so keeping them is harmless; re-applying the migration reuses them.
+DROP TRIGGER IF EXISTS aa_review_minor_protected_trg ON public.reviews;
+DROP TRIGGER IF EXISTS aa_insight_minor_protected_trg ON public.reputation_insights;
+DROP FUNCTION IF EXISTS public.set_review_minor_protected();
+DROP FUNCTION IF EXISTS public.set_insight_minor_protected();
+DROP FUNCTION IF EXISTS public.publishable_review_ids(uuid[]);
+DROP FUNCTION IF EXISTS private_sec.insight_is_publishable(text, text);
+DROP FUNCTION IF EXISTS private_sec.review_is_publishable(uuid);
+DROP FUNCTION IF EXISTS private_sec.review_was_minor_involved(timestamptz, uuid, text, text);
+DROP FUNCTION IF EXISTS private_sec.subject_was_minor_at(text, text, timestamptz);
+DROP FUNCTION IF EXISTS private_sec.was_minor_at(uuid, timestamptz);
 DROP FUNCTION IF EXISTS private_sec.review_subject_is_public(text, text);
 DROP FUNCTION IF EXISTS private_sec.review_author_is_adult(uuid);
 

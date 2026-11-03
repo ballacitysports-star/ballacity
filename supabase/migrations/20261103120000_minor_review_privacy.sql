@@ -23,6 +23,14 @@
 --      guardian. "Confirmed adult" is profiles.age_cohort = 'adult' (the same value every other
 --      age rule uses); anything else, including unknown, fails closed.
 --
+--   5. PERMANENT PROTECTION (owner policy). A review written by or about a person who was under 18 (or whose age
+--      was unknown) when it was written is nonpublic by default FOREVER: turning 18, or a change of age
+--      cohort, never publishes it. Each review carries a sticky flag, reviews.minor_protected, set once by a
+--      trigger and never cleared, so even a later correction of a birthday cannot make old content public.
+--      The same flag on reputation_insights protects an AI summary generated while its subject was a minor; a
+--      summary regenerated after 18 is built only from unprotected reviews. Reviews written after both people
+--      are adults are unaffected. Nothing is deleted; the content is kept for a future, consented workflow.
+--
 -- Additive and reversible: new helper functions and one trigger, policies re-created in the same
 -- transaction (there is no moment without a policy), function bodies replaced in place.
 -- docs/rollbacks/20261103120000_minor_review_privacy.down.sql restores the previous definitions.
@@ -58,16 +66,135 @@ GRANT EXECUTE ON FUNCTION private_sec.review_subject_is_public(text, text) TO an
 GRANT EXECUTE ON FUNCTION private_sec.review_author_is_adult(uuid) TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
+-- Persistent protection of historical content.
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS minor_protected boolean NOT NULL DEFAULT false;
+ALTER TABLE public.reputation_insights ADD COLUMN IF NOT EXISTS minor_protected boolean NOT NULL DEFAULT false;
+
+-- Was this account under 18, or of unknown age, at that moment? Computed from the stored birthday; no birthday
+-- (or no such account) counts as yes. NOT callable by clients: with an arbitrary user and time it would reveal a
+-- birthday.
+CREATE OR REPLACE FUNCTION private_sec.was_minor_at(_user uuid, _at timestamptz)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT COALESCE(
+    (SELECT _at < ((b.birthday + interval '18 years')::date)::timestamptz
+       FROM public.profile_birthdays b WHERE b.user_id = _user),
+    true)
+$$;
+
+-- Was the person this review is about, if it is about a person, under 18 or of unknown age at that moment?
+-- player/host reviews are about a person; any other kind counts only when its id is an account.
+CREATE OR REPLACE FUNCTION private_sec.subject_was_minor_at(_kind text, _reviewee_id text, _at timestamptz)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT CASE
+    WHEN _kind IN ('player', 'host') THEN private_sec.was_minor_at(public.try_uuid(_reviewee_id), _at)
+    ELSE EXISTS (SELECT 1 FROM auth.users u WHERE u.id = public.try_uuid(_reviewee_id))
+         AND private_sec.was_minor_at(public.try_uuid(_reviewee_id), _at)
+  END
+$$;
+
+CREATE OR REPLACE FUNCTION private_sec.review_was_minor_involved(_created timestamptz, _reviewer uuid, _kind text, _reviewee_id text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT private_sec.was_minor_at(_reviewer, _created) OR private_sec.subject_was_minor_at(_kind, _reviewee_id, _created)
+$$;
+REVOKE ALL ON FUNCTION private_sec.was_minor_at(uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private_sec.subject_was_minor_at(text, text, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private_sec.review_was_minor_involved(timestamptz, uuid, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.was_minor_at(uuid, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION private_sec.subject_was_minor_at(text, text, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION private_sec.review_was_minor_involved(timestamptz, uuid, text, text) TO service_role;
+
+-- The one question the read policies ask: may this stored review be shown to people other than its author?
+-- It takes only a review id (a caller can learn only about a review it already knows the id of), so it is not a way
+-- to ask about anyone's age or birthday. The two earlier helpers are no longer exposed to clients for the same reason.
+CREATE OR REPLACE FUNCTION private_sec.review_is_publishable(_review_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT COALESCE((
+    SELECT NOT r.minor_protected
+       AND private_sec.review_author_is_adult(r.reviewer_id)
+       AND private_sec.review_subject_is_public(r.reviewee_kind, r.reviewee_id)
+       AND NOT private_sec.review_was_minor_involved(r.created_at, r.reviewer_id, r.reviewee_kind, r.reviewee_id)
+      FROM public.reviews r WHERE r.id = _review_id), false)
+$$;
+
+CREATE OR REPLACE FUNCTION private_sec.insight_is_publishable(_kind text, _reviewee_id text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT COALESCE((
+    SELECT NOT i.minor_protected AND private_sec.review_subject_is_public(i.reviewee_kind, i.reviewee_id)
+      FROM public.reputation_insights i WHERE i.reviewee_kind = _kind AND i.reviewee_id = _reviewee_id), false)
+$$;
+REVOKE ALL ON FUNCTION private_sec.review_is_publishable(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private_sec.insight_is_publishable(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.review_is_publishable(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private_sec.insight_is_publishable(text, text) TO anon, authenticated, service_role;
+-- review_subject_is_public / review_author_is_adult now serve only the functions above and the SECURITY DEFINER code
+-- below, so clients no longer need to call them.
+REVOKE EXECUTE ON FUNCTION private_sec.review_subject_is_public(text, text) FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION private_sec.review_author_is_adult(uuid) FROM anon, authenticated;
+
+-- Server code (service role) asks which of a set of reviews may feed a public summary or an aggregate.
+CREATE OR REPLACE FUNCTION public.publishable_review_ids(_ids uuid[])
+RETURNS SETOF uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT r.id FROM public.reviews r WHERE r.id = ANY (_ids) AND private_sec.review_is_publishable(r.id)
+$$;
+REVOKE ALL ON FUNCTION public.publishable_review_ids(uuid[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.publishable_review_ids(uuid[]) TO service_role;
+
+-- The flag is set when the row is written and never cleared. A client cannot write it to false.
+CREATE OR REPLACE FUNCTION public.set_review_minor_protected()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE _at timestamptz;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    NEW.minor_protected := OLD.minor_protected OR NEW.minor_protected;
+    RETURN NEW;
+  END IF;
+  -- Clients get the server's clock (the integrity trigger forces it too); the server may backdate.
+  _at := CASE WHEN auth.uid() IS NULL THEN COALESCE(NEW.created_at, now()) ELSE now() END;
+  NEW.minor_protected := NEW.minor_protected
+    OR private_sec.review_was_minor_involved(_at, NEW.reviewer_id, NEW.reviewee_kind, NEW.reviewee_id);
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.set_review_minor_protected() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.set_review_minor_protected() TO service_role;
+DROP TRIGGER IF EXISTS aa_review_minor_protected_trg ON public.reviews;
+CREATE TRIGGER aa_review_minor_protected_trg BEFORE INSERT OR UPDATE ON public.reviews
+  FOR EACH ROW EXECUTE FUNCTION public.set_review_minor_protected();
+
+-- A summary generated while its subject was a minor stays protected; one regenerated later (from unprotected
+-- reviews only, see review-ai.server.ts) is judged at its own generation time. Other writes cannot clear the flag.
+CREATE OR REPLACE FUNCTION public.set_insight_minor_protected()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.generated_at IS DISTINCT FROM OLD.generated_at THEN
+    NEW.minor_protected := private_sec.subject_was_minor_at(NEW.reviewee_kind, NEW.reviewee_id, COALESCE(NEW.generated_at, now()));
+  ELSE
+    NEW.minor_protected := OLD.minor_protected OR NEW.minor_protected;
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.set_insight_minor_protected() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.set_insight_minor_protected() TO service_role;
+DROP TRIGGER IF EXISTS aa_insight_minor_protected_trg ON public.reputation_insights;
+CREATE TRIGGER aa_insight_minor_protected_trg BEFORE INSERT OR UPDATE ON public.reputation_insights
+  FOR EACH ROW EXECUTE FUNCTION public.set_insight_minor_protected();
+
+-- Existing rows: mark the ones that were written by or about someone under 18 or of unknown age at the time. Only the
+-- new flag is set; no content is changed. (Production holds no reviews or summaries at the time of writing.)
+UPDATE public.reviews r SET minor_protected = true
+ WHERE NOT r.minor_protected
+   AND private_sec.review_was_minor_involved(r.created_at, r.reviewer_id, r.reviewee_kind, r.reviewee_id);
+UPDATE public.reputation_insights i SET minor_protected = true
+ WHERE NOT i.minor_protected
+   AND private_sec.subject_was_minor_at(i.reviewee_kind, i.reviewee_id, COALESCE(i.generated_at, now()));
+
+-- ---------------------------------------------------------------------------
 -- Read policies. Rows stay in place; they stop being readable.
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Public reviews are viewable by everyone" ON public.reviews;
 CREATE POLICY "Public reviews are viewable by everyone" ON public.reviews
   FOR SELECT TO public
-  USING (
-    is_private = false AND flagged = false
-    AND private_sec.review_subject_is_public(reviewee_kind, reviewee_id)
-    AND private_sec.review_author_is_adult(reviewer_id)
-  );
+  USING (is_private = false AND flagged = false AND private_sec.review_is_publishable(id));
 
 -- Private reviews are only ever about adults now; a historical private review about someone
 -- under 18 is not shown to them either, until a private-feedback workflow exists.
@@ -78,8 +205,7 @@ CREATE POLICY "Reviewees view their private reviews" ON public.reviews
     is_private = true
     AND reviewee_id = (auth.uid())::text
     AND reviewee_kind <> ALL (ARRAY['gym'::text, 'team'::text, 'org'::text, 'trainer_org'::text])
-    AND private_sec.review_subject_is_public(reviewee_kind, reviewee_id)
-    AND private_sec.review_author_is_adult(reviewer_id)
+    AND private_sec.review_is_publishable(id)
   );
 
 -- Gym admins read the reviews about their gym, but not ones written by a person under 18 (that would hand
@@ -90,8 +216,7 @@ CREATE POLICY "Gym admins view reviews about their gym" ON public.reviews
   USING (
     reviewee_kind = 'gym'
     AND public.is_gym_admin_text(reviewee_id, auth.uid())
-    AND private_sec.review_author_is_adult(reviewer_id)
-    AND private_sec.review_subject_is_public(reviewee_kind, reviewee_id)
+    AND private_sec.review_is_publishable(id)
   );
 
 -- review_ai_analysis ("Analysis follows review visibility") reads reviews as the caller, so it
@@ -100,7 +225,7 @@ CREATE POLICY "Gym admins view reviews about their gym" ON public.reviews
 DROP POLICY IF EXISTS "Insights are public" ON public.reputation_insights;
 CREATE POLICY "Insights are public" ON public.reputation_insights
   FOR SELECT TO public
-  USING (private_sec.review_subject_is_public(reviewee_kind, reviewee_id));
+  USING (private_sec.insight_is_publishable(reviewee_kind, reviewee_id));
 
 -- ---------------------------------------------------------------------------
 -- Age rules for EVERY review kind, gyms included. Named "aa_" so it fires before
@@ -118,6 +243,10 @@ BEGIN
     RAISE EXCEPTION 'Reviews are available to adults only for now.' USING ERRCODE = '42501';
   END IF;
   IF NOT private_sec.review_subject_is_public(NEW.reviewee_kind, NEW.reviewee_id) THEN
+    RAISE EXCEPTION 'Reviews are not available for this person.' USING ERRCODE = '42501';
+  END IF;
+  -- Whoever is involved must also be an adult by their birthday right now (a stale cohort cannot get around it).
+  IF private_sec.review_was_minor_involved(now(), NEW.reviewer_id, NEW.reviewee_kind, NEW.reviewee_id) THEN
     RAISE EXCEPTION 'Reviews are not available for this person.' USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
@@ -328,7 +457,7 @@ BEGIN
       SELECT rating, verified FROM public.reviews
       WHERE reviewee_kind = 'player' AND reviewee_id = _user::text
         AND NOT flagged AND NOT is_private
-        AND private_sec.review_author_is_adult(reviewer_id)
+        AND private_sec.review_is_publishable(id)
     )
     SELECT
       (SELECT count(*) FROM parts WHERE cancelled_at IS NULL)::int,
@@ -376,7 +505,7 @@ BEGIN
   JOIN public.review_ai_analysis a ON a.review_id = r.id
   WHERE r.reviewee_kind = 'player' AND r.reviewee_id = _user::text
     AND NOT r.flagged AND NOT r.is_private AND NOT a.mismatch
-    AND private_sec.review_author_is_adult(r.reviewer_id);
+    AND private_sec.review_is_publishable(r.id);
 END
 $fn$;
 

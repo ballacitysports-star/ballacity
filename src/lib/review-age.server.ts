@@ -8,8 +8,10 @@
  * lookup and an id that is not a user id all count as "not an adult".
  */
 
-export const REVIEW_AUTHOR_MESSAGE = "Reviews are available to adults only for now.";
-export const REVIEW_SUBJECT_MESSAGE = "Reviews are not available for this person.";
+export const REVIEW_AUTHOR_MESSAGE =
+  "Reviews are available to adults only for now.";
+export const REVIEW_SUBJECT_MESSAGE =
+  "Reviews are not available for this person.";
 
 /** Reviews about these kinds are about a person; the rest are about teams, trainers or places. */
 export function isPersonReview(revieweeKind: string): boolean {
@@ -18,7 +20,9 @@ export function isPersonReview(revieweeKind: string): boolean {
 
 // The service-role client is typed by the generated function list; this only needs `rpc`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Rpc = { rpc: (...args: any[]) => PromiseLike<{ data: unknown; error: unknown }> };
+type Rpc = {
+  rpc: (...args: any[]) => PromiseLike<{ data: unknown; error: unknown }>;
+};
 
 /** True only when `userId` is a confirmed adult (profiles.age_cohort = 'adult'). */
 export async function isConfirmedAdult(
@@ -39,8 +43,12 @@ export async function assertReviewAllowedByAge(
   admin: Rpc,
   input: { authorId: string; revieweeKind: string; revieweeId: string },
 ): Promise<void> {
-  if (!(await isConfirmedAdult(admin, input.authorId))) throw new Error(REVIEW_AUTHOR_MESSAGE);
-  if (isPersonReview(input.revieweeKind) && !(await isConfirmedAdult(admin, input.revieweeId))) {
+  if (!(await isConfirmedAdult(admin, input.authorId)))
+    throw new Error(REVIEW_AUTHOR_MESSAGE);
+  if (
+    isPersonReview(input.revieweeKind) &&
+    !(await isConfirmedAdult(admin, input.revieweeId))
+  ) {
     throw new Error(REVIEW_SUBJECT_MESSAGE);
   }
 }
@@ -58,20 +66,25 @@ export async function mayAnalyseSubject(
 }
 
 /**
- * Keeps only reviews written by a confirmed adult. A review written by a person under 18 is hidden from
- * everyone else, so it must not feed an AI summary that others can read either. Looks up each distinct
- * author once; a failed lookup drops that author's reviews (fail closed).
+ * Keeps only the reviews the database says may be published to people other than their author. That is every review
+ * written by AND about adults after they were adults: reviews written by or about someone who was under 18 (or of
+ * unknown age) when they were written stay nonpublic permanently, even once that person turns 18, so they must not
+ * feed an AI summary or an aggregate that others can read either. One call to `publishable_review_ids`
+ * (service role); a failed call drops everything (fail closed).
  */
-export async function onlyAdultAuthored<T extends { reviewer_id: string }>(
+export async function onlyPublishable<T extends { id: string }>(
   admin: Rpc,
   rows: T[],
 ): Promise<T[]> {
-  const ids = [...new Set(rows.map((r) => r.reviewer_id))];
-  const adult = new Set<string>();
-  await Promise.all(
-    ids.map(async (id) => {
-      if (await isConfirmedAdult(admin, id)) adult.add(id);
-    }),
-  );
-  return rows.filter((r) => adult.has(r.reviewer_id));
+  if (rows.length === 0) return [];
+  try {
+    const { data, error } = await admin.rpc("publishable_review_ids", {
+      _ids: rows.map((r) => r.id),
+    });
+    if (error || !Array.isArray(data)) return [];
+    const ok = new Set((data as unknown[]).map((v) => String(v)));
+    return rows.filter((r) => ok.has(String(r.id)));
+  } catch {
+    return [];
+  }
 }
