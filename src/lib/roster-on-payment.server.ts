@@ -7,6 +7,14 @@ export async function addPaidPlayerToRoster(
   position?: string | null,
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // The settings that count are the ones held by the game's payee (its host, or a minor host's payment manager).
+  // A row written by anyone else is ignored even if it is the newest.
+  const { data: payee } = await supabaseAdmin.rpc(
+    "game_payee_id" as never,
+    {
+      _game_id: gameId,
+    } as never,
+  );
   const [{ data: game }, { data: settings }] = await Promise.all([
     supabaseAdmin.from("hosted_games").select("id, cancelled_at").eq("id", gameId).maybeSingle(),
     // requires_approval lives with the payment settings, not on the game.
@@ -14,6 +22,7 @@ export async function addPaidPlayerToRoster(
       .from("game_payment_settings")
       .select("requires_approval")
       .eq("game_id", gameId)
+      .eq("host_id", (payee as unknown as string | null) ?? "00000000-0000-0000-0000-000000000000")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
