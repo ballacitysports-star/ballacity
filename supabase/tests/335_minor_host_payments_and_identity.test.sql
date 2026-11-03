@@ -121,6 +121,12 @@ SELECT t.throws(format($q$INSERT INTO public.hosted_games (id, host_id, sport, t
   'ADULT_HOST_REQUIRED', 'a payment-managing guardian still cannot make a minor the host of an 18+ game');
 SELECT t.reset();
 
+-- an organization administrator cannot use the approval call to learn anyone's age band
+SELECT t.as_user(t.id('orgadmin'));
+SELECT t.throws(format($q$SELECT public.grant_org_minor_hosting_approval(%L, %L)$q$, t.id('stranger'), t.id('org')), 'this member cannot be approved for hosting', 'an adult non-member gets the neutral refusal');
+SELECT t.throws(format($q$SELECT public.grant_org_minor_hosting_approval(%L, %L)$q$, t.id('teen16'), t.id('org')), 'this member cannot be approved for hosting', 'a 16-year-old non-member gets the same refusal as an adult one');
+SELECT t.reset();
+
 -- under-16 and unknown ages are unchanged: they cannot host at all
 SELECT t.as_user(t.id('kid14'));
 SELECT t.throws(format($q$INSERT INTO public.hosted_games (id, host_id, sport, title, date, price) VALUES ('k-paid', %L, 'basketball', 't', now()+interval '3 days', 5)$q$, t.id('kid14')),

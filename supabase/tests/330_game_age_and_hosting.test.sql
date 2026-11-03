@@ -98,7 +98,7 @@ SELECT t.throws(format($q$SELECT public.grant_minor_hosting_approval(%L)$q$, t.i
 SELECT t.throws(format($q$SELECT public.grant_minor_hosting_approval(%L)$q$, t.id('teen14')), 'NOT_ELIGIBLE', 'a guardian cannot approve hosting for a 14-year-old (under-16 rule stays)');
 SELECT t.reset();
 SELECT t.as_user(t.id('orgadmin'));
-SELECT t.throws(format($q$SELECT public.grant_org_minor_hosting_approval(%L, %L)$q$, t.id('teen17b'), t.id('org')), 'NOT_MEMBER', 'an org admin cannot approve a non-member');
+SELECT t.throws(format($q$SELECT public.grant_org_minor_hosting_approval(%L, %L)$q$, t.id('teen17b'), t.id('org')), 'NOT_ELIGIBLE', 'an org admin cannot approve a non-member (and is not told why)');
 SELECT t.throws(format($q$SELECT public.grant_org_minor_hosting_approval(%L, %L)$q$, t.id('teen14'), t.id('org')), 'NOT_ELIGIBLE', 'nor a 14-year-old');
 SELECT t.reset();
 

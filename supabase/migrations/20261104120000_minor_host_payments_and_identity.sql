@@ -48,12 +48,12 @@ BEGIN
   IF public.age_cohort_of(_uid) IS DISTINCT FROM 'adult' OR NOT public.is_trainer_org_admin(_org, _uid) THEN
     RAISE EXCEPTION 'NOT_ORG_ADMIN: only an adult administrator of this organization can approve hosting.' USING ERRCODE = '42501';
   END IF;
-  IF public.age_cohort_of(_minor) IS DISTINCT FROM 'teen_16_17' THEN
-    RAISE EXCEPTION 'NOT_ELIGIBLE: hosting can only be approved for a 16 or 17 year old.' USING ERRCODE = '42501';
-  END IF;
+  -- The administrator is not told why a member cannot be approved (age band, membership or an unknown id):
+  -- membership is checked first and every refusal is the same, so the call is not an age lookup.
   IF NOT (public.is_org_member(_org, _minor)
-          OR EXISTS (SELECT 1 FROM public.trainer_org_members m WHERE m.org_id = _org AND m.user_id = _minor)) THEN
-    RAISE EXCEPTION 'NOT_MEMBER: the player is not a member of this organization.' USING ERRCODE = '42501';
+          OR EXISTS (SELECT 1 FROM public.trainer_org_members m WHERE m.org_id = _org AND m.user_id = _minor))
+     OR public.age_cohort_of(_minor) IS DISTINCT FROM 'teen_16_17' THEN
+    RAISE EXCEPTION 'NOT_ELIGIBLE: this member cannot be approved for hosting.' USING ERRCODE = '42501';
   END IF;
   IF _valid_hours IS NULL OR _valid_hours < 1 OR _valid_hours > 720 THEN
     RAISE EXCEPTION 'INVALID_DURATION' USING ERRCODE = '22023';
