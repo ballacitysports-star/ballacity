@@ -18,10 +18,20 @@ function columnsOf(table: string): string[] {
 }
 
 type Rows = Record<string, any>;
-const db: { rows: Rows; inserts: { table: string; row: any }[]; insertError: any } = {
+const db: {
+  rows: Rows;
+  inserts: { table: string; row: any }[];
+  insertError: any;
+  /** The game's payee, as `game_payee_id` answers it; null means nobody. */
+  payee: string | null;
+  /** Every .eq() the code made, so a test can see which settings row it asked for. */
+  eqs: { table: string; col: string; val: unknown }[];
+} = {
   rows: {},
   inserts: [],
   insertError: null,
+  payee: "host-1",
+  eqs: [],
 };
 
 function from(table: string) {
@@ -36,7 +46,10 @@ function from(table: string) {
       }
       return chain;
     },
-    eq: () => chain,
+    eq: (col: string, val: unknown) => {
+      db.eqs.push({ table, col, val });
+      return chain;
+    },
     order: () => chain,
     limit: () => chain,
     maybeSingle: async () =>
@@ -51,7 +64,9 @@ function from(table: string) {
   return chain;
 }
 
-vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from } }));
+const rpc = async (fn: string) => ({ data: fn === "game_payee_id" ? db.payee : null, error: null });
+
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from, rpc } }));
 
 const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
 
@@ -61,6 +76,8 @@ beforeEach(() => {
   db.rows = { hosted_games: { id: "g1", cancelled_at: null } };
   db.inserts = [];
   db.insertError = null;
+  db.payee = "host-1";
+  db.eqs = [];
 });
 
 describe("addPaidPlayerToRoster", () => {
@@ -129,5 +146,21 @@ describe("addPaidPlayerToRoster", () => {
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+
+  it("only believes the settings row held by the game's payee, never just the newest one", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    await addPaidPlayerToRoster("g1", "p1");
+    expect(
+      db.eqs.filter((e) => e.table === "game_payment_settings" && e.col === "host_id"),
+    ).toEqual([{ table: "game_payment_settings", col: "host_id", val: "host-1" }]);
+  });
+
+  it("with no payee it asks for no real settings row, so the game is request-to-join", async () => {
+    db.payee = null;
+    db.rows.game_payment_settings = null;
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    const asked = db.eqs.find((e) => e.table === "game_payment_settings" && e.col === "host_id");
+    expect(asked?.val).toBe("00000000-0000-0000-0000-000000000000");
   });
 });

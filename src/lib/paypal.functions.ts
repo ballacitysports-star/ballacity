@@ -12,25 +12,32 @@ type AdminClient = (typeof import("@/integrations/supabase/client.server"))["sup
  * connected merchant id. Null when the game doesn't exist.
  */
 async function quoteGamePayPalFee(admin: AdminClient, gameId: string) {
+  // Money goes to the game's payee (its host, or a minor host's payment manager), and only the payee's settings count.
+  const { data: payeeRaw } = await admin.rpc(
+    "game_payee_id" as never,
+    { _game_id: gameId } as never,
+  );
+  const payee = (payeeRaw as unknown as string | null) ?? null;
   const [{ data: game }, { data: settings }] = await Promise.all([
     admin.from("hosted_games").select("title, price, host_id").eq("id", gameId).maybeSingle(),
     admin
       .from("game_payment_settings")
       .select("entry_fee")
       .eq("game_id", gameId)
+      .eq("host_id", payee ?? "00000000-0000-0000-0000-000000000000")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
-  if (!game) return null;
+  if (!game || !payee) return null;
   const fee = Number(settings?.entry_fee ?? game.price ?? 0);
   const { data: pp } = await admin
     .from("host_paypal_accounts")
     .select("merchant_id")
-    .eq("host_id", game.host_id)
+    .eq("host_id", payee)
     .maybeSingle();
   return {
-    hostId: game.host_id as string,
+    hostId: payee,
     title: game.title as string | null,
     amountCents: Number.isFinite(fee) && fee > 0 ? Math.round(fee * 100) : 0,
     merchantId: pp?.merchant_id ?? null,
@@ -52,7 +59,9 @@ export const getPayPalCheckoutConfig = createServerFn({ method: "GET" })
       process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY!,
       { auth: { persistSession: false } },
     );
-    const { data: rows } = await pub.rpc("get_game_host_paypal", { _game_id: data.gameId });
+    const { data: rows } = await pub.rpc("get_game_host_paypal", {
+      _game_id: data.gameId,
+    });
     const merchantId = (rows as { merchant_id: string }[] | null)?.[0]?.merchant_id ?? null;
     return { clientId, merchantId };
   });
@@ -114,9 +123,7 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
  */
 export const captureGamePayPalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({ orderId: z.string().min(3).max(64) }).parse(i),
-  )
+  .inputValidator((i) => z.object({ orderId: z.string().min(3).max(64) }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: order } = await context.supabase
       .from("paypal_orders")
