@@ -16,6 +16,7 @@
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { moderateAiFields } from "@/lib/ai/moderation.server";
 import { withAiSession } from "@/lib/ai/session.server";
+import { mayAnalyseSubject } from "@/lib/review-age.server";
 
 /** Must match SportsmanshipTraitCounts keys in badges.ts. */
 export const REVIEW_TRAITS = [
@@ -117,6 +118,8 @@ export async function analyzeReview(
   },
 ): Promise<ReviewAnalysis | null> {
   if (!input.revieweeUserId) return null;
+  // Nothing about a person who is not a confirmed adult is sent to an AI service.
+  if (!(await mayAnalyseSubject(admin, input))) return null;
   try {
     return await withAiSession(
       { admin, userId: input.revieweeUserId, feature: "review_insights" },
@@ -168,6 +171,8 @@ export async function refreshInsight(
   opts: { force?: boolean } = {},
 ): Promise<InsightDraft | null> {
   if (!input.revieweeUserId) return null;
+  // No AI reputation summary is made about a person who is not a confirmed adult.
+  if (!(await mayAnalyseSubject(admin, input))) return null;
 
   const { data: rows } = await admin
     .from("reviews")
