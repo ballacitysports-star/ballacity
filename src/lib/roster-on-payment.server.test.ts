@@ -44,10 +44,8 @@ vi.mock("@/integrations/supabase/client.server", () => {
       rpc: () => Promise.resolve({ data: h.payee }),
       from: (t: string) => {
         if (t === "game_payment_settings") return settingsQuery();
-        if (t === "hosted_games")
-          return simple({ id: "g", cancelled_at: null });
-        if (t === "join_requests")
-          return simple(h.approvedRequest ? { id: "r" } : null);
+        if (t === "hosted_games") return simple({ id: "g", cancelled_at: null });
+        if (t === "join_requests") return simple(h.approvedRequest ? { id: "r" } : null);
         return {
           insert: (row: unknown) => {
             h.inserted.push(row);
