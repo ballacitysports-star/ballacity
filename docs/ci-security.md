@@ -64,6 +64,31 @@ A skipped E2E job is **not** a passing remote test. Nothing ran.
    deploys migrations on merge. A per-pull-request preview check has been seen
    reporting that preview branching is disabled.
 
+## Required status checks on `main`
+
+Which checks should block a merge. The workflow files cannot enforce this: only a branch
+protection rule or ruleset the owner creates in GitHub (Settings, Branches or Rules) does.
+Nothing here has been configured or verified; the repository's current protection settings
+were not readable from where this was written.
+
+| Check (job name)                      | Workflow       | Fails the check when                                                                                                                                    | Require it?                                                                                                                                              |
+| ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Unit tests`                          | Unit & Lint    | any Vitest test fails                                                                                                                                   | Yes                                                                                                                                                      |
+| `Lint`                                | Unit & Lint    | a `react-hooks/rules-of-hooks` hit, or (pull requests) a changed `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`, `.json` or `.css` file is not Prettier-formatted | Yes. The full `eslint .` step is informational (`continue-on-error`) and does not fail the check.                                                        |
+| `Typecheck & build`                   | Unit & Lint    | `tsc --noEmit` reports an error, `vite build` fails, or the production project reference is found in the build output                                   | Yes                                                                                                                                                      |
+| `Replay migrations and run SQL tests` | Database tests | a migration does not replay or a SQL test fails                                                                                                         | No, not as it is. The workflow only runs when migration or test paths change; a required check that never runs stays "Expected" and blocks the merge.    |
+| `Playwright`                          | E2E            | the target preflight, then any test, fails                                                                                                              | No, not yet. It currently stops at the preflight until the owner designates a verified sandbox (`E2E_SANDBOX_PROJECT_REF`). A skipped run is not a pass. |
+
+Order matters. A required check that has never reported waits as "Expected" and blocks every
+merge, so merge the change that adds `Typecheck & build` first, let it run once on `main`,
+and only then add it to the rule. The three required jobs have no path filters, so they report
+on every pull request, documentation-only ones included.
+
+`Typecheck & build` runs without secrets and sets every variable that `.env.production` would
+seed to an inert placeholder, so the build neither contains nor contacts the real backend.
+Its last step fails the job if the production project reference is still in the output.
+The artifact is not uploaded or deployed.
+
 ## What approval does to checks
 
 With required reviewers on `e2e-sandbox`, the E2E job pauses in "waiting" on every
