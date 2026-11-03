@@ -1,0 +1,104 @@
+# Branch protection for `main`: steps for the repository administrator
+
+Nothing in this file is applied by the repository. It is done in the GitHub web interface by someone with admin rights.
+Before changing anything, read what already exists in Settings > Rules and Settings > Branches and write it down.
+
+## 1. The four required checks
+
+| Required check (exact job name)       | Workflow       | Source         |
+| ------------------------------------- | -------------- | -------------- |
+| `Unit tests`                          | Unit & Lint    | GitHub Actions |
+| `Lint`                                | Unit & Lint    | GitHub Actions |
+| `Typecheck & build`                   | Unit & Lint    | GitHub Actions |
+| `Replay migrations and run SQL tests` | Database tests | GitHub Actions |
+
+`Playwright` (workflow E2E) is **not** required. It stops at its target preflight until the owner designates a verified
+Supabase sandbox (`E2E_SANDBOX_PROJECT_REF`), and a skipped or failing run is not a pass. Make it required only after the
+sandbox is verified, the preflight passes, the run is stable across several pull requests, and the `e2e-sandbox`
+Environment has required reviewers (an approval pause would otherwise stall every merge).
+
+### Gate before requiring them: each check must have reported success on `main`
+
+Checked on 2026-11-03 at `main` = `890082cb` (merge of #250): `Unit & Lint` (jobs `Unit tests`, `Lint`,
+`Typecheck & build`) and `Database tests` (job `Replay migrations and run SQL tests`) each completed with conclusion
+`success` on the push to `main`.
+
+One more condition for the fourth check: until the workflow change in "Run the migration check on every pull request"
+is merged, `Replay migrations and run SQL tests` reports only on pull requests that touch migration, test or script
+paths. Merge that change first, wait for the push run on `main`, then add the check. GitHub only offers a check for
+selection after it has reported on the repository within the last seven days.
+
+## 2. Lovable and direct pushes to `main`: assessment
+
+What the history shows. `main` receives direct commits written by Lovable (author `gpt-engineer-app[bot]`, for example
+"Added app-only maintenance mode", 2026-11-03). In the Actions history those pushes are attributed to the owner's own
+GitHub account as the pushing actor (`ballacitysports-star`), not to a separate app. **Confirm which it is** in Settings >
+Integrations (a GitHub App installation, or an OAuth authorization of the owner's account). The answer decides what a
+bypass means:
+
+- If Lovable pushes as the owner's account, you cannot give Lovable a bypass without giving the owner's account the same
+  bypass, and "admin may bypass" and "Lovable may bypass" are the same switch.
+- If Lovable pushes as its own GitHub App, a bypass can be limited to that app.
+
+What an unrestricted direct push to `main` can do, and why it matters for the privacy release:
+
+| Path in a direct push                                | Effect                                                                                                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase/migrations/**`, `drizzle/migrations/**`    | Lovable's agent applies migrations to the production database itself (commits such as "Applied remove_unclaimed_listing"). Branch rules cannot stop that; they can only make the file reviewable first. |
+| `.github/workflows/**`, `.github/e2e-preflight*.mjs` | Changes what CI checks, what has secrets, and the sandbox guard.                                                                                                                                        |
+| `supabase/config*.toml`                              | Changes which project tooling points at.                                                                                                                                                                |
+| Application code                                     | Reaches production only when someone publishes (publishing is separate), but a bad merge here is what the checks exist to catch.                                                                        |
+
+Merging to `main` does not apply SQL or publish (F7 and the payment-settings fix are merged and absent from production).
+So a branch rule protects review and CI, not the database; the database is protected by approvals for each production
+action described in the release runbook.
+
+Recommendation, in order of preference:
+
+1. **During the privacy release (from the first merge until activation and coarsening are complete): no standing bypass.**
+   Pull requests only, all four checks required. Lovable work continues on a branch and reaches `main` through a pull
+   request (verify that your Lovable plan supports working on a non-default branch; test with a trivial edit outside the
+   release window). Lovable edits made while the rule is active and not supported on a branch will be rejected; that is
+   the intended friction, not a fault.
+2. **If Lovable cannot work any other way, a time-boxed bypass held by the owner**, switched on for the minimum time and
+   off again, with every bypassed commit reviewed afterwards. Never a permanent entry for an actor that can write
+   migrations, workflows and configuration unreviewed.
+3. **After the release**, re-assess with real data: how often Lovable pushes, whether it supports branches and pull
+   requests, and whether a path-restricted rule is available on your plan (rulesets can restrict file paths on some
+   plans, which would let application files through while still requiring review for the three sensitive path groups
+   above).
+
+A detective control that needs no special plan: a small workflow on `push` to `main` that fails visibly if a commit by the
+bot touched the sensitive path groups. Not added here; ask if you want it.
+
+## 3. The ruleset (Settings > Rules > Rulesets > New branch ruleset)
+
+- Name `main protection`. Enforcement: Active (use Evaluate first if your plan offers it, to see what would be blocked).
+- Target: the default branch (`main`).
+- Rules:
+  - Restrict deletions. Block force pushes.
+  - Require a pull request before merging. Required approvals: 0 while there is a single account (GitHub does not count an
+    author's own approval, so 1 would block everything). Do not require Code Owners review until a second reviewer exists.
+    Dismiss stale approvals; require conversation resolution.
+  - Require status checks to pass: the four in section 1, source GitHub Actions. Require branches to be up to date before
+    merging: the migration pull requests must be tested against the final merged result.
+  - Allowed merge methods: merge commit only while the stacked privacy branches exist (squash or rebase rewrites the
+    branches a later pull request is based on).
+- Bypass list: empty during the privacy release (see section 2). Do not add a "Lovable" entry on the assumption that it is
+  separate from the owner; check first.
+- Settings > General > Automatically delete head branches: off until the privacy stack is merged (deleting a branch that an
+  open pull request uses as its base closes that pull request).
+
+## 4. Verify it works
+
+1. Open a documentation-only pull request. All four checks appear and report (none stays "Expected").
+2. Push a commit directly to `main`: rejected.
+3. A pull request with a deliberately failing SQL assertion or broken migration cannot be merged.
+4. Make a trivial Lovable edit and see what happens; this tells you whether section 2, option 1 is workable.
+5. Settings > Rules > Insights shows the rule evaluated.
+
+## 5. Do not
+
+- Require `Playwright` or any check that needs a secret or an approval.
+- Set `E2E_SANDBOX_PROJECT_REF` as part of this.
+- Weaken or bypass the rules to get a release step through; fix the failing check.
