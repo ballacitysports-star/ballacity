@@ -13,10 +13,7 @@ const ADULT = "11111111-1111-4111-8111-111111111111";
 const TEEN = "22222222-2222-4222-8222-222222222222";
 
 /** A stand-in for the service-role client: answers age_cohort_of from a table of cohorts. */
-function admin(
-  cohorts: Record<string, string>,
-  opts: { fail?: boolean; throws?: boolean } = {},
-) {
+function admin(cohorts: Record<string, string>, opts: { fail?: boolean; throws?: boolean } = {}) {
   const calls: string[] = [];
   return {
     calls,
@@ -45,24 +42,15 @@ describe("isConfirmedAdult", () => {
   it("fails closed: no id, a failed lookup, a thrown error", async () => {
     expect(await isConfirmedAdult(admin({}), null)).toBe(false);
     expect(await isConfirmedAdult(admin({}), undefined)).toBe(false);
-    expect(
-      await isConfirmedAdult(
-        admin({ [ADULT]: "adult" }, { fail: true }),
-        ADULT,
-      ),
-    ).toBe(false);
-    expect(
-      await isConfirmedAdult(
-        admin({ [ADULT]: "adult" }, { throws: true }),
-        ADULT,
-      ),
-    ).toBe(false);
+    expect(await isConfirmedAdult(admin({ [ADULT]: "adult" }, { fail: true }), ADULT)).toBe(false);
+    expect(await isConfirmedAdult(admin({ [ADULT]: "adult" }, { throws: true }), ADULT)).toBe(
+      false,
+    );
   });
 });
 
 describe("assertReviewAllowedByAge", () => {
-  const a = () =>
-    admin({ [ADULT]: "adult", other: "adult", [TEEN]: "teen_16_17" });
+  const a = () => admin({ [ADULT]: "adult", other: "adult", [TEEN]: "teen_16_17" });
 
   it("lets an adult review an adult", async () => {
     await expect(
@@ -159,17 +147,18 @@ describe("mayAnalyseSubject", () => {
 
 describe("isPersonReview", () => {
   it("is true for players and hosts only", () => {
-    expect(
-      ["player", "host", "team", "trainer", "gym"].map(isPersonReview),
-    ).toEqual([true, true, false, false, false]);
+    expect(["player", "host", "team", "trainer", "gym"].map(isPersonReview)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
   });
 });
 
 describe("onlyPublishable", () => {
-  function filterAdmin(
-    publishable: string[],
-    opts: { fail?: boolean; throws?: boolean } = {},
-  ) {
+  function filterAdmin(publishable: string[], opts: { fail?: boolean; throws?: boolean } = {}) {
     const calls: unknown[] = [];
     return {
       calls,
@@ -178,9 +167,7 @@ describe("onlyPublishable", () => {
         if (opts.throws) throw new Error("network");
         if (opts.fail) return { data: null, error: { message: "boom" } };
         return {
-          data: (args["_ids"] as string[]).filter((i) =>
-            publishable.includes(i),
-          ),
+          data: (args["_ids"] as string[]).filter((i) => publishable.includes(i)),
           error: null,
         };
       },
@@ -191,31 +178,15 @@ describe("onlyPublishable", () => {
     // 2 and 4 stand for reviews written by or about someone who was a minor when they were written, even if they
     // are adults today.
     const a = filterAdmin(["1", "3", "5"]);
-    const rows = [
-      { id: "1" },
-      { id: "2" },
-      { id: "3" },
-      { id: "4" },
-      { id: "5" },
-    ];
-    expect((await onlyPublishable(a, rows)).map((r) => r.id)).toEqual([
-      "1",
-      "3",
-      "5",
-    ]);
+    const rows = [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }, { id: "5" }];
+    expect((await onlyPublishable(a, rows)).map((r) => r.id)).toEqual(["1", "3", "5"]);
     expect(a.calls).toHaveLength(1);
     expect((a.calls[0] as [string, unknown])[0]).toBe("publishable_review_ids");
   });
 
   it("drops everything when the call fails or throws (fail closed)", async () => {
-    expect(
-      await onlyPublishable(filterAdmin(["1"], { fail: true }), [{ id: "1" }]),
-    ).toEqual([]);
-    expect(
-      await onlyPublishable(filterAdmin(["1"], { throws: true }), [
-        { id: "1" },
-      ]),
-    ).toEqual([]);
+    expect(await onlyPublishable(filterAdmin(["1"], { fail: true }), [{ id: "1" }])).toEqual([]);
+    expect(await onlyPublishable(filterAdmin(["1"], { throws: true }), [{ id: "1" }])).toEqual([]);
   });
 
   it("makes no call for nothing", async () => {

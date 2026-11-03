@@ -46,17 +46,11 @@ export type ReviewAnalysis = {
 
 /** A rating that disagrees strongly with the words next to it. */
 export function isRatingMismatch(rating: number, sentiment: number): boolean {
-  return (
-    (rating >= 4 && sentiment <= -0.4) || (rating <= 2 && sentiment >= 0.4)
-  );
+  return (rating >= 4 && sentiment <= -0.4) || (rating <= 2 && sentiment >= 0.4);
 }
 
-export function normalizeAnalysis(
-  raw: unknown,
-  rating: number,
-): ReviewAnalysis {
-  const src =
-    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+export function normalizeAnalysis(raw: unknown, rating: number): ReviewAnalysis {
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const traits = Array.isArray(src["traits"])
     ? Array.from(
         new Set(
@@ -67,9 +61,7 @@ export function normalizeAnalysis(
       )
     : [];
   const s = Number(src["sentiment"]);
-  const sentiment = Number.isFinite(s)
-    ? Math.max(-1, Math.min(1, Math.round(s * 100) / 100))
-    : 0;
+  const sentiment = Number.isFinite(s) ? Math.max(-1, Math.min(1, Math.round(s * 100) / 100)) : 0;
   return { traits, sentiment, mismatch: isRatingMismatch(rating, sentiment) };
 }
 
@@ -80,8 +72,7 @@ export type InsightDraft = {
 };
 
 export function normalizeInsight(raw: unknown): InsightDraft | null {
-  const src =
-    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const summary = cap(src["summary"], 400);
   if (!summary) return null;
   const list = (v: unknown) =>
@@ -124,8 +115,7 @@ export async function moderateReviewText(
     userId: input.userId,
     table: "reviews",
     id: input.reviewId ?? null,
-    context:
-      "A sports review written about another player, coach, team or game host.",
+    context: "A sports review written about another player, coach, team or game host.",
     fields: { title: input.title ?? "", body: input.body },
   });
   if (out.blocked.length) return { verdict: "block" };
@@ -191,10 +181,7 @@ export async function analyzeReview(
 
 export const INSIGHT_REFRESH_EVERY = 3;
 
-export function shouldRefreshInsight(
-  existing: { review_count: number } | null,
-  count: number,
-) {
+export function shouldRefreshInsight(existing: { review_count: number } | null, count: number) {
   if (count === 0) return false;
   if (!existing) return true;
   return count - existing.review_count >= INSIGHT_REFRESH_EVERY;
@@ -239,8 +226,7 @@ export async function refreshInsight(
     .eq("reviewee_id", input.revieweeId)
     .eq("reviewee_kind", input.revieweeKind)
     .maybeSingle();
-  if (!opts.force && !shouldRefreshInsight(existing, reviews.length))
-    return null;
+  if (!opts.force && !shouldRefreshInsight(existing, reviews.length)) return null;
 
   const { data: analyses } = await admin
     .from("review_ai_analysis")
@@ -250,9 +236,7 @@ export async function refreshInsight(
       reviews.map((r) => r.id),
     );
   const mismatched = new Set(
-    (analyses ?? [])
-      .filter((a: any) => a.mismatch)
-      .map((a: any) => a.review_id),
+    (analyses ?? []).filter((a: any) => a.mismatch).map((a: any) => a.review_id),
   );
   const usable = reviews.filter((r) => !mismatched.has(r.id));
   if (usable.length === 0) return null;
@@ -262,10 +246,7 @@ export async function refreshInsight(
       { admin, userId: input.revieweeUserId, feature: "review_insights" },
       async (session: AiSession) => {
         const quoted = usable
-          .map(
-            (r, i) =>
-              `<review n="${i + 1}" stars="${r.rating}">${cap(r.body, 400)}</review>`,
-          )
+          .map((r, i) => `<review n="${i + 1}" stars="${r.rating}">${cap(r.body, 400)}</review>`)
           .join("\n");
         const out = await runAiCall(session, (p) =>
           p.generateStructured<Record<string, unknown>>({
@@ -293,8 +274,7 @@ export async function refreshInsight(
             growth: draft.growth.join(", "),
           },
         });
-        if (safe.blocked.length || safe.review.length || safe.unavailable)
-          return null;
+        if (safe.blocked.length || safe.review.length || safe.unavailable) return null;
 
         await admin.from("reputation_insights").upsert({
           reviewee_id: input.revieweeId,
@@ -345,8 +325,7 @@ export async function suggestReviewDraft(
         }),
       );
       const draft = cap((out.data as Record<string, unknown>)?.["draft"], 600);
-      if (!draft)
-        throw new Error("Couldn't draft that — try adding a few more points.");
+      if (!draft) throw new Error("Couldn't draft that — try adding a few more points.");
       return draft;
     },
   );

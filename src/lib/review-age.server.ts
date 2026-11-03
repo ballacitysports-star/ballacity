@@ -8,10 +8,8 @@
  * lookup and an id that is not a user id all count as "not an adult".
  */
 
-export const REVIEW_AUTHOR_MESSAGE =
-  "Reviews are available to adults only for now.";
-export const REVIEW_SUBJECT_MESSAGE =
-  "Reviews are not available for this person.";
+export const REVIEW_AUTHOR_MESSAGE = "Reviews are available to adults only for now.";
+export const REVIEW_SUBJECT_MESSAGE = "Reviews are not available for this person.";
 
 /** Reviews about these kinds are about a person; the rest are about teams, trainers or places. */
 export function isPersonReview(revieweeKind: string): boolean {
@@ -43,12 +41,8 @@ export async function assertReviewAllowedByAge(
   admin: Rpc,
   input: { authorId: string; revieweeKind: string; revieweeId: string },
 ): Promise<void> {
-  if (!(await isConfirmedAdult(admin, input.authorId)))
-    throw new Error(REVIEW_AUTHOR_MESSAGE);
-  if (
-    isPersonReview(input.revieweeKind) &&
-    !(await isConfirmedAdult(admin, input.revieweeId))
-  ) {
+  if (!(await isConfirmedAdult(admin, input.authorId))) throw new Error(REVIEW_AUTHOR_MESSAGE);
+  if (isPersonReview(input.revieweeKind) && !(await isConfirmedAdult(admin, input.revieweeId))) {
     throw new Error(REVIEW_SUBJECT_MESSAGE);
   }
 }
