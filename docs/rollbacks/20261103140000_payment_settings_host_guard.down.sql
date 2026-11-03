@@ -15,5 +15,5 @@ CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_p
 DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
 CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
   FOR UPDATE TO authenticated USING (host_id = auth.uid()) WITH CHECK (host_id = auth.uid());
-DROP FUNCTION IF EXISTS private_sec.is_game_host(text, uuid);
+DROP FUNCTION IF EXISTS private_sec.is_game_host(text);
 COMMIT;

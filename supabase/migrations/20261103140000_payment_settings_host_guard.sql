@@ -9,20 +9,21 @@
 -- Additive: two policies are replaced and one helper added. No row is changed. Rows that were already written
 -- for a game by someone other than its host (if any) are not touched here; the read-only query in the PR lists them
 -- for the owner to review.
-CREATE OR REPLACE FUNCTION private_sec.is_game_host(_game_id text, _user uuid)
+-- Reads the caller from auth.uid(); no user argument, so it is not a lookup of who hosts what for third parties.
+CREATE OR REPLACE FUNCTION private_sec.is_game_host(_game_id text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = _user)
+  SELECT EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = auth.uid())
 $$;
-REVOKE ALL ON FUNCTION private_sec.is_game_host(text, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private_sec.is_game_host(text, uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION private_sec.is_game_host(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.is_game_host(text) TO authenticated, service_role;
 
 DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
 CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
   FOR INSERT TO authenticated
-  WITH CHECK (host_id = auth.uid() AND private_sec.is_game_host(game_id, auth.uid()));
+  WITH CHECK (host_id = auth.uid() AND private_sec.is_game_host(game_id));
 
 DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
 CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
   FOR UPDATE TO authenticated
   USING (host_id = auth.uid())
-  WITH CHECK (host_id = auth.uid() AND private_sec.is_game_host(game_id, auth.uid()));
+  WITH CHECK (host_id = auth.uid() AND private_sec.is_game_host(game_id));
