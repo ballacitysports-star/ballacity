@@ -53,7 +53,10 @@ function notify() {
  * TTL_MS so photo/privacy changes are picked up on a later visit.
  * ------------------------------------------------------------------ */
 
-const STORE_KEY = "ballacity.avatarCache.v1";
+// v2: names of accounts that are not adults were once returned to anyone who asked; a v1 snapshot may still hold
+// such names, so it is deleted and never read.
+const STORE_KEY = "ballacity.avatarCache.v2";
+const LEGACY_STORE_KEY = "ballacity.avatarCache.v1";
 const TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const MAX_ENTRIES = 400;
 
@@ -121,6 +124,11 @@ function clearStore() {
 function hydrate() {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
+  try {
+    window.localStorage.removeItem(LEGACY_STORE_KEY);
+  } catch {
+    /* ignore */
+  }
 
   const stored = readStore();
   if (stored) {
