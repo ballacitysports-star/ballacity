@@ -139,24 +139,25 @@ CREATE TRIGGER y_minor_payment_settings_trg BEFORE INSERT OR UPDATE ON public.ga
 -- The INSERT/UPDATE policies only checked host_id = auth.uid(), so any signed-in account could add a settings row to
 -- someone else's game, and the payment flow treats the latest row for a game as the host's (so players could be
 -- directed to pay that account). Closed here for both cases.
-CREATE OR REPLACE FUNCTION private_sec.can_manage_game_payment_settings(_game_id text, _user uuid)
+-- Reads the caller from auth.uid(); it takes no user argument, so it cannot be used to ask who manages a game.
+CREATE OR REPLACE FUNCTION private_sec.can_manage_game_payment_settings(_game_id text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT _user IS NOT NULL AND (
-    EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = _user)
-    OR private_sec.minor_game_payment_manager(_game_id) = _user)
+  SELECT auth.uid() IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = auth.uid())
+    OR private_sec.minor_game_payment_manager(_game_id) = auth.uid())
 $$;
-REVOKE ALL ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION private_sec.can_manage_game_payment_settings(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.can_manage_game_payment_settings(text) TO authenticated, service_role;
 
 DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
 CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
   FOR INSERT TO authenticated
-  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
+  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id));
 DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
 CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
   FOR UPDATE TO authenticated
   USING (host_id = auth.uid())
-  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
+  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id));
 
 -- A new payment submission can only name an adult payee, and for a minor-hosted game only its payment manager.
 -- (Existing submissions keep moving through their states: the rule is on INSERT.)
