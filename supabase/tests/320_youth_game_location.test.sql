@@ -5,7 +5,7 @@
 -- minor), a guardian of a pending child, a waitlisted player and a guardian whose link was revoked read nothing. The
 -- private table is not in realtime and cannot be written by a client. With the switch on, new youth-inclusive games are
 -- stored coarse publicly and exact privately; an edit that round-trips the coarse values cannot destroy the exact copy;
--- the one-time batch functions coarsen and restore existing rows exactly.
+-- the one-time batch function coarsens existing rows (the exact copy stays private; there is no inverse).
 
 BEGIN;
 SELECT t.person('host', 35), t.person('stranger', 28), t.person('teenstranger', 16), t.person('player', 30),
@@ -81,7 +81,8 @@ SELECT t.eq((SELECT count(*)::int FROM pg_publication_tables WHERE pubname = 'su
 SELECT t.eq((SELECT count(*)::int FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'hosted_games'), 1, 'hosted_games still is (so its columns must be coarse before it is safe)');
 
 -- turn coarsening ON (the later step)
-UPDATE public.app_settings SET value = '{"coarsen": true}' WHERE key = 'youth_location_privacy';
+SELECT set_config('app.confirm_activate_youth_coarsening', 'yes', true);
+UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy';
 
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, lat, lng) VALUES
  ('n-youth', t.id('host'), 'basketball', 'new youth',  now()+interval '3 days', 10, 14, 'Oak Elementary, 3 Oak St', 'Decatur', 33.12345, -84.54321),
@@ -138,7 +139,8 @@ INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_a
  ('l-youth2', t.id('host'), 'basketball', 'open', now()+interval '2 days', NULL, NULL, 'Park Court, 5 Elm St', '', 33.70011, -84.30011),
  ('l-adult',  t.id('host'), 'basketball', '21+',  now()+interval '2 days', 21, NULL, 'Rec Center, 1 Main St', 'Westside', 33.80055, -84.40044);
 ALTER TABLE public.hosted_games ENABLE TRIGGER validate_hosted_game_age_range;
-UPDATE public.app_settings SET value = '{"coarsen": true}' WHERE key = 'youth_location_privacy';   -- flag already on in this scenario
+SELECT set_config('app.confirm_activate_youth_coarsening', 'yes', true);
+UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy';   -- flag already on in this scenario
 SELECT t.eq((SELECT count(*)::int FROM public.hosted_game_private WHERE game_id LIKE 'l-%'), 2, 'legacy youth games were copied by the 2A backfill/sync');
 SELECT t.eq((SELECT public.coarsen_existing_youth_games(1)), 1, 'batch of 1 coarsens one game');
 SELECT t.eq((SELECT public.coarsen_existing_youth_games(200)), 1, 'the next call coarsens the remaining one');
@@ -157,11 +159,10 @@ SELECT t.reset();
 -- an old client edits the title and sends back what it was given
 UPDATE public.hosted_games SET title = 'renamed', location = 'Midtown', lat = 33.78, lng = -84.39 WHERE id = 'l-youth1';
 SELECT t.eq((SELECT location FROM public.hosted_game_private WHERE game_id = 'l-youth1'), 'Lincoln Elementary Gym, 12 Oak St', 'a round-tripped coarse edit does not clobber the exact copy');
--- reversal
-SELECT t.eq((SELECT public.restore_exact_youth_games(200)), 2, 'restore puts back both games');
-SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'l-youth1'), 'Lincoln Elementary Gym, 12 Oak St', 'exact value restored');
-SELECT t.eq((SELECT lat FROM public.hosted_games WHERE id = 'l-youth1'), 33.77712::numeric, 'with exact coordinates');
-SELECT t.eq((SELECT public.restore_exact_youth_games(200)), 0, 'restore is idempotent');
+-- there is no way back into the public columns
+SELECT t.eq((SELECT count(*)::int FROM pg_proc WHERE proname = 'restore_exact_youth_games'), 0, 'no function puts exact values back into the public columns');
+SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'l-youth1'), 'Midtown', 'the public row stays coarse');
+SELECT t.eq((SELECT location FROM public.hosted_game_private WHERE game_id = 'l-youth1'), 'Lincoln Elementary Gym, 12 Oak St', 'and the exact copy is still there');
 ROLLBACK;
 
 -- ===== Age-based viewers and game shapes (explicit cohorts) ===========================================
@@ -202,7 +203,8 @@ SELECT t.as_user(t.id('host'));           SELECT t.eq(t.vp('s-8-12') + t.vp('s-1
 SELECT t.as_anon();                        SELECT t.eq(t.count('SELECT 1 FROM public.hosted_game_private'), 0, 'anonymous: nothing');
 SELECT t.reset();
 -- switching the guard on does not change who can read, and strangers of every age see only the coarse form
-UPDATE public.app_settings SET value = '{"coarsen": true}' WHERE key = 'youth_location_privacy';
+SELECT set_config('app.confirm_activate_youth_coarsening', 'yes', true);
+UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy';
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, lat, lng) VALUES
   ('c-8-12', t.id('host'), 'basketball', 'new youth', now()+interval '3 days', 8, 12, 'Oak Elementary, 3 Oak St', 'Decatur', 33.12345, -84.54321);
 SELECT t.as_user(t.id('adultstranger'));
@@ -212,5 +214,67 @@ SELECT t.as_user(t.id('teen17'));
 SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'c-8-12'), 'Decatur', 'a 16-17 stranger: the same');
 SELECT t.as_user(t.id('child9'));
 SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'c-8-12'), 'Decatur', 'an under-13 with no relation to the game: the same');
+SELECT t.reset();
+ROLLBACK;
+
+-- ===== Coarsening cannot be started early and cannot be undone ==========================================
+BEGIN;
+SELECT t.person('host', 35);
+SELECT t.eq((SELECT value ->> 'coarsen' FROM public.app_settings WHERE key = 'youth_location_privacy'), 'false', 'the switch is seeded off');
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"coarsen": true}' WHERE key = 'youth_location_privacy'$q$, 'COARSENING_NOT_READY', 'cannot be turned on without the adoption confirmation');
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "yes"}' WHERE key = 'youth_location_privacy'$q$, 'COARSENING_NOT_READY', 'a wrong confirmation value does not count');
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy'$q$, 'COARSENING_NOT_CONFIRMED', 'nor without the typed session confirmation');
+SELECT t.throws($q$SELECT public.coarsen_existing_youth_games(10)$q$, 'COARSENING_NOT_ACTIVE', 'the batch function refuses while the switch is off');
+SELECT t.as_user(t.id('host'));
+SELECT t.eq(t.changed($q$UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy'$q$), 0, 'no client can touch the setting at all (row-level security hides the row)');
+SELECT t.reset();
+-- a youth game with no private copy (a copy was lost) blocks activation
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, lat, lng) VALUES
+  ('x-youth', t.id('host'), 'basketball', 'u12', now()+interval '2 days', 8, 12, 'Gym, 1 St', 'Midtown', 33.1, -84.1);
+DELETE FROM public.hosted_game_private WHERE game_id = 'x-youth';
+SELECT set_config('app.confirm_activate_youth_coarsening', 'yes', true);
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy'$q$, 'no exact private copy', 'cannot be turned on while a youth game has no exact private copy');
+INSERT INTO public.hosted_game_private (game_id, location, lat, lng) VALUES ('x-youth', 'Gym, 1 St', 33.1, -84.1);
+SELECT t.lives($q$UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "2c-verified"}' WHERE key = 'youth_location_privacy'$q$, 'with everything in place it can be turned on, on purpose');
+SELECT t.ok((SELECT value ? 'activated_at' FROM public.app_settings WHERE key = 'youth_location_privacy'), 'and records when');
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"coarsen": false}' WHERE key = 'youth_location_privacy'$q$, 'COARSENING_IRREVERSIBLE', 'once on it cannot be turned off');
+SELECT t.throws($q$DELETE FROM public.app_settings WHERE key = 'youth_location_privacy'$q$, 'COARSENING_IRREVERSIBLE', 'nor deleted');
+UPDATE public.app_settings SET value = '{"coarsen": true, "app_adoption_confirmed": "no"}' WHERE key = 'youth_location_privacy';
+SELECT t.eq((SELECT value ->> 'app_adoption_confirmed' FROM public.app_settings WHERE key = 'youth_location_privacy'), '2c-verified', 'and the active value cannot be edited into something else');
+SELECT t.lives($q$UPDATE public.app_settings SET value = '{"x": 1}' WHERE key = 'age_policy' AND false$q$, 'other settings are untouched by the guard');
+ROLLBACK;
+
+-- ===== A paid game: the exact venue needs a settled fee as well as a roster place =========================
+BEGIN;
+SELECT t.person('host', 35), t.person('paidplayer', 30), t.person('waitplayer', 31), t.person('freeplayer', 32), t.person('kid', 10), t.person('kidguardian', 41), t.person('stranger', 28);
+SELECT t.guardian('kidguardian', 'kid');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, lat, lng, price) VALUES
+  ('pay-y', t.id('host'), 'basketball', 'paid youth', now()+interval '3 days', 8, 12, 'Gym, 9 Pine St', 'Midtown', 33.1, -84.1, 10),
+  ('free-y', t.id('host'), 'basketball', 'free youth', now()+interval '3 days', 8, 12, 'Gym, 2 Pine St', 'Midtown', 33.2, -84.2, 0);
+INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee) VALUES ('pay-y', t.id('host'), 10);
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id) VALUES
+  ('pay-y', t.id('paidplayer')), ('pay-y', t.id('waitplayer')), ('pay-y', t.id('kid')), ('free-y', t.id('freeplayer')), ('free-y', t.id('kid'));
+INSERT INTO public.payment_submissions (player_id, game_id, host_id, status) VALUES
+  (t.id('paidplayer'), 'pay-y', t.id('host'), 'verified'),
+  (t.id('waitplayer'), 'pay-y', t.id('host'), 'pending');
+SET LOCAL session_replication_role = origin;
+CREATE FUNCTION t.vp2(g text) RETURNS int LANGUAGE sql AS $$ SELECT count(*)::int FROM public.hosted_game_private WHERE game_id = g $$;
+SELECT t.as_user(t.id('paidplayer'));  SELECT t.eq(t.vp2('pay-y'), 1, 'on the roster with a verified payment: exact');
+SELECT t.as_user(t.id('waitplayer'));  SELECT t.eq(t.vp2('pay-y'), 0, 'on the roster but payment only pending: not yet');
+SELECT t.as_user(t.id('kid'));         SELECT t.eq(t.vp2('pay-y'), 0, 'a child on the roster who has not paid: not yet');
+                                       SELECT t.eq(t.vp2('free-y'), 1, 'but the child in a free game: exact');
+SELECT t.as_user(t.id('kidguardian')); SELECT t.eq(t.vp2('pay-y'), 0, 'their guardian: not for the unpaid game');
+                                       SELECT t.eq(t.vp2('free-y'), 1, 'and exact for the free one');
+SELECT t.as_user(t.id('freeplayer'));  SELECT t.eq(t.vp2('free-y'), 1, 'a free game''s roster member: exact');
+SELECT t.as_user(t.id('stranger'));    SELECT t.eq(t.vp2('pay-y') + t.vp2('free-y'), 0, 'a stranger: neither');
+SELECT t.as_user(t.id('host'));        SELECT t.eq(t.vp2('pay-y') + t.vp2('free-y'), 2, 'the host: both');
+SELECT t.reset();
+-- the payment clears: the venue opens for the child's guardian too
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.payment_submissions (player_id, game_id, host_id, status) VALUES (t.id('kid'), 'pay-y', t.id('host'), 'verified');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('kid'));         SELECT t.eq(t.vp2('pay-y'), 1, 'once the payment is verified: exact');
+SELECT t.as_user(t.id('kidguardian')); SELECT t.eq(t.vp2('pay-y'), 1, 'and for their verified guardian');
 SELECT t.reset();
 ROLLBACK;

@@ -12,6 +12,16 @@
 --     account that is not a confirmed adult from viewers who have no relationship to it.
 -- Additive. Existing rows are untouched; every rule fires on new writes (INSERT, or UPDATE of the guarded columns).
 
+-- Depends on the payment-settings fix (20261103140000_payment_settings_host_guard): fail loudly rather than leave the
+-- payment-settings policies unprotected if migrations are applied out of order.
+DO $dep$
+BEGIN
+  IF to_regprocedure('private_sec.game_payee(text)') IS NULL THEN
+    RAISE EXCEPTION 'Apply 20261103140000_payment_settings_host_guard before this migration.';
+  END IF;
+END
+$dep$;
+
 -- ---------------------------------------------------------------------------------------------
 -- 1. Approvals can name a payment manager (the approver, an adult)
 -- ---------------------------------------------------------------------------------------------
@@ -135,28 +145,17 @@ DROP TRIGGER IF EXISTS y_minor_payment_settings_trg ON public.game_payment_setti
 CREATE TRIGGER y_minor_payment_settings_trg BEFORE INSERT OR UPDATE ON public.game_payment_settings
   FOR EACH ROW EXECUTE FUNCTION public.enforce_minor_payment_settings();
 
--- Who may write the payment settings of a game: its host, or, for a game hosted by a minor, its payment manager.
--- The INSERT/UPDATE policies only checked host_id = auth.uid(), so any signed-in account could add a settings row to
--- someone else's game, and the payment flow treats the latest row for a game as the host's (so players could be
--- directed to pay that account). Closed here for both cases.
-CREATE OR REPLACE FUNCTION private_sec.can_manage_game_payment_settings(_game_id text, _user uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT _user IS NOT NULL AND (
-    EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = _user)
-    OR private_sec.minor_game_payment_manager(_game_id) = _user)
+-- The payee of a game (20261103140000_payment_settings_host_guard): its host, except that a game hosted by someone who is
+-- not a confirmed adult is paid to, and its settings written by, that game's payment manager (or nobody, if none).
+-- The write policy, the read policy, the payment-destination trigger and every function that looked for "the latest
+-- settings row" already go through this function, so replacing it is all that is needed; the policies and triggers are
+-- owned by that earlier migration and are not re-created here.
+CREATE OR REPLACE FUNCTION private_sec.game_payee(_game_id text)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT CASE WHEN public.age_cohort_of(g.host_id) = 'adult' THEN g.host_id
+              ELSE private_sec.minor_game_payment_manager(g.id) END
+    FROM public.hosted_games g WHERE g.id = _game_id
 $$;
-REVOKE ALL ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) TO authenticated, service_role;
-
-DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
-CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
-  FOR INSERT TO authenticated
-  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
-DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
-CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
-  FOR UPDATE TO authenticated
-  USING (host_id = auth.uid())
-  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
 
 -- A new payment submission can only name an adult payee, and for a minor-hosted game only its payment manager.
 -- (Existing submissions keep moving through their states: the rule is on INSERT.)
@@ -216,6 +215,7 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RETURN; END IF;
   IF public.age_cohort_of(_host_id) IS DISTINCT FROM 'adult' THEN RETURN; END IF;
+  IF _host_id IS DISTINCT FROM private_sec.game_payee(_game_id) THEN RETURN; END IF;
 
   SELECT * INTO _settings FROM public.game_payment_settings gps
    WHERE gps.game_id = _game_id AND gps.host_id = _host_id

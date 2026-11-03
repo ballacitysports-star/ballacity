@@ -39,6 +39,7 @@ CREATE OR REPLACE FUNCTION public.get_game_host_payment_methods(_host_id uuid, _
 DECLARE _settings public.game_payment_settings%ROWTYPE;
 BEGIN
   IF auth.uid() IS NULL THEN RETURN; END IF;
+  IF _host_id IS DISTINCT FROM private_sec.game_payee(_game_id) THEN RETURN; END IF;
   SELECT * INTO _settings FROM public.game_payment_settings gps
    WHERE gps.game_id = _game_id AND gps.host_id = _host_id ORDER BY gps.created_at DESC LIMIT 1;
   IF _settings.id IS NULL THEN RETURN; END IF;
@@ -99,13 +100,11 @@ $function$;
 -- Approval functions without the payment-manager parameter (an approval that named a manager keeps it).
 DROP FUNCTION IF EXISTS public.grant_minor_hosting_approval(uuid, integer, boolean);
 DROP FUNCTION IF EXISTS public.grant_org_minor_hosting_approval(uuid, uuid, integer, boolean);
-DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
-CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
-  FOR INSERT TO authenticated WITH CHECK (host_id = auth.uid());
-DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
-CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
-  FOR UPDATE TO authenticated USING (host_id = auth.uid()) WITH CHECK (host_id = auth.uid());
-DROP FUNCTION IF EXISTS private_sec.can_manage_game_payment_settings(text, uuid);
+-- Back to the host-only payee of 20261103140000.
+CREATE OR REPLACE FUNCTION private_sec.game_payee(_game_id text)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT g.host_id FROM public.hosted_games g WHERE g.id = _game_id
+$$;
 DROP FUNCTION IF EXISTS private_sec.minor_game_payment_manager(text);
 DROP FUNCTION IF EXISTS private_sec.can_see_minor_name(uuid, uuid);
 

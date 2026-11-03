@@ -67,12 +67,19 @@ SELECT t.as_user(t.id('adult'));
 SELECT t.lives(format($q$INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee) VALUES ('legacy-free-adult', %L, 0)$q$, t.id('adult')), 'the adult host can write their own game''s settings');
 SELECT t.reset();
 
+-- a join request to the minor-hosted paid game still names the real host (the game's host, not the payment manager)
+SELECT t.as_user(t.id('teen16'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key) VALUES ('p-ok', %L, %L, 'kpay')$q$, t.id('teen16'), t.id('teenhost')), 'a player can ask to join a minor-hosted paid game');
+SELECT t.reset();
+SELECT t.eq(private_sec.game_payee('p-ok'), t.id('guardian'), 'the payee of that game is its payment manager');
+SELECT t.eq(private_sec.game_payee('legacy-free-adult'), t.id('adult'), 'and of an adult host''s game, the host');
+
 -- payers: only the manager can be named as payee
 SELECT t.as_user(t.id('payer'));
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('teenhost')),
-  'MINOR_CANNOT_COLLECT_PAYMENTS', 'a payment cannot be made out to the minor host');
+  'PAYMENT_DESTINATION_INVALID', 'a payment cannot be made out to the minor host');
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('stranger')),
-  'MINOR_HOST_PAYMENT_MANAGER_REQUIRED', 'nor to a different adult');
+  'PAYMENT_DESTINATION_INVALID', 'nor to a different adult');
 SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('guardian')),
   'but to the payment manager it can');
 SELECT t.reset();
@@ -118,7 +125,7 @@ INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, 
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('payer'));
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-org', %L)$q$, t.id('payer'), t.id('orgadmin')),
-  'MINOR_HOST_PAYMENT_MANAGER_REQUIRED', 'so new payments for it are refused');
+  'PAYMENT_DESTINATION_INVALID', 'so new payments for it are refused');
 SELECT t.reset();
 
 -- guardian approval does not override age eligibility (unchanged, re-checked with a payment manager attached)
