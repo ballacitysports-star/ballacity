@@ -5402,6 +5402,10 @@ export type Database = {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
       }
+      game_age_range_is_adult_only: {
+        Args: { _max_age: number; _min_age: number }
+        Returns: boolean
+      }
       game_duration_minutes: { Args: { _duration: string }; Returns: number }
       game_payments_allowed: { Args: { _user: string }; Returns: boolean }
       get_account_type: { Args: { _user_id: string }; Returns: string }
