@@ -99,6 +99,13 @@ $function$;
 -- Approval functions without the payment-manager parameter (an approval that named a manager keeps it).
 DROP FUNCTION IF EXISTS public.grant_minor_hosting_approval(uuid, integer, boolean);
 DROP FUNCTION IF EXISTS public.grant_org_minor_hosting_approval(uuid, uuid, integer, boolean);
+DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
+CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
+  FOR INSERT TO authenticated WITH CHECK (host_id = auth.uid());
+DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
+CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
+  FOR UPDATE TO authenticated USING (host_id = auth.uid()) WITH CHECK (host_id = auth.uid());
+DROP FUNCTION IF EXISTS private_sec.can_manage_game_payment_settings(text, uuid);
 DROP FUNCTION IF EXISTS private_sec.minor_game_payment_manager(text);
 DROP FUNCTION IF EXISTS private_sec.can_see_minor_name(uuid, uuid);
 

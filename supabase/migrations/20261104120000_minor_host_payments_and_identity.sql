@@ -135,6 +135,29 @@ DROP TRIGGER IF EXISTS y_minor_payment_settings_trg ON public.game_payment_setti
 CREATE TRIGGER y_minor_payment_settings_trg BEFORE INSERT OR UPDATE ON public.game_payment_settings
   FOR EACH ROW EXECUTE FUNCTION public.enforce_minor_payment_settings();
 
+-- Who may write the payment settings of a game: its host, or, for a game hosted by a minor, its payment manager.
+-- The INSERT/UPDATE policies only checked host_id = auth.uid(), so any signed-in account could add a settings row to
+-- someone else's game, and the payment flow treats the latest row for a game as the host's (so players could be
+-- directed to pay that account). Closed here for both cases.
+CREATE OR REPLACE FUNCTION private_sec.can_manage_game_payment_settings(_game_id text, _user uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT _user IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id AND g.host_id = _user)
+    OR private_sec.minor_game_payment_manager(_game_id) = _user)
+$$;
+REVOKE ALL ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.can_manage_game_payment_settings(text, uuid) TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "Hosts manage own game payment settings (insert)" ON public.game_payment_settings;
+CREATE POLICY "Hosts manage own game payment settings (insert)" ON public.game_payment_settings
+  FOR INSERT TO authenticated
+  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
+DROP POLICY IF EXISTS "Hosts manage own game payment settings (update)" ON public.game_payment_settings;
+CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_payment_settings
+  FOR UPDATE TO authenticated
+  USING (host_id = auth.uid())
+  WITH CHECK (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id, auth.uid()));
+
 -- A new payment submission can only name an adult payee, and for a minor-hosted game only its payment manager.
 -- (Existing submissions keep moving through their states: the rule is on INSERT.)
 CREATE OR REPLACE FUNCTION public.enforce_game_payment_cohort()

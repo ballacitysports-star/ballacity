@@ -58,6 +58,15 @@ SELECT t.lives(format($q$INSERT INTO public.game_payment_settings (game_id, host
 SELECT t.reset();
 SELECT t.eq(private_sec.minor_game_payment_manager('p-ok'), t.id('guardian'), 'and is recorded as the payment manager');
 
+INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES ('legacy-free-adult', t.id('adult'), 'basketball', 'adult run', now()+interval '5 days');
+-- payment settings cannot be written onto a game by someone who neither hosts it nor manages its payment
+SELECT t.as_user(t.id('stranger'));
+SELECT t.throws(format($q$INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee) VALUES ('legacy-free-adult', %L, 0)$q$, t.id('stranger')), 'row-level security', 'a stranger cannot add settings to an adult host''s game');
+SELECT t.reset();
+SELECT t.as_user(t.id('adult'));
+SELECT t.lives(format($q$INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee) VALUES ('legacy-free-adult', %L, 0)$q$, t.id('adult')), 'the adult host can write their own game''s settings');
+SELECT t.reset();
+
 -- payers: only the manager can be named as payee
 SELECT t.as_user(t.id('payer'));
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('teenhost')),
