@@ -136,3 +136,12 @@ export function gameLocationView(
       : "Sign in and join to see the exact location.",
   };
 }
+
+/**
+ * The location text that may go into an invitation, a share or a notification sent to someone who is not (yet) on the
+ * roster: the real one for an enforced adult-only game, otherwise the coarse area. The database enforces the same rule
+ * on invitations whatever a client sends (PRIV-2D); this keeps the screen and the text honest.
+ */
+export function invitationLocation(g: LocatedGame): string {
+  return isYouthInclusiveGame(g) ? coarseGameLabel(g.neighborhood) : g.location;
+}
