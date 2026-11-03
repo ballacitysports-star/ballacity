@@ -170,6 +170,18 @@ SELECT t.member('tmx', 'payer');
 SELECT t.as_user(t.id('payer'));
 SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('teenhost')])), 'a teammate sees it');
 SELECT t.reset();
+-- every non-adult cohort is hidden from a stranger, adults are not (the lookup is not specific to 16-17 hosts)
+SELECT t.person('c9', 9), t.person('c14', 14), t.person('c16', 16), t.person('c17', 17), t.person('c30', 30);
+INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data) VALUES (t.id('cnoage'), 'cnoage@example.test', now(), '{"display_name":"Cnoage","account_type":"player"}');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('c9')])), 'under-13: name hidden from a stranger');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('c14')])), '13-15: name hidden from a stranger');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('c16')])), '16: name hidden from a stranger');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('c17')])), '17: name hidden from a stranger');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('cnoage')])) OR NOT EXISTS (SELECT 1 FROM public.visible_avatars(ARRAY[t.id('cnoage')])), 'unknown age: name hidden from a stranger');
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('c30')])), 'adult: name returned');
+SELECT t.reset();
+
 -- the public game row carries no name
 SELECT t.as_user(t.id('stranger'));
 SELECT t.ok((SELECT NOT (host_snapshot ? 'name') OR host_snapshot ->> 'name' = 'Youth host' FROM public.hosted_games WHERE id = 'id-game'), 'the public game row carries a neutral organizer, not the minor''s name');
