@@ -2,8 +2,9 @@
  * Optional per-game age requirement.
  *
  * Hosts can set a minimum age, a maximum age, or both. Players inside the
- * range follow the normal join flow; players outside it — or who haven't
- * shared a birthday — must send a request the host approves or declines.
+ * range follow the normal join flow. Players outside it — or who haven't
+ * shared a birthday — cannot join or request a spot: a host cannot approve
+ * someone past the range (the database refuses it as well).
  */
 
 export type AgeRequirement = {
@@ -43,7 +44,7 @@ export function isAgeEligible(
   return true;
 }
 
-export type AgeGateState = "none" | "eligible" | "needs_approval" | "unknown_age";
+export type AgeGateState = "none" | "eligible" | "ineligible" | "unknown_age";
 
 export function ageGateState(input: {
   req: AgeRequirement | null | undefined;
@@ -52,21 +53,21 @@ export function ageGateState(input: {
   const { req, viewerAge } = input;
   if (!hasAgeRequirement(req)) return "none";
   if (viewerAge == null || !Number.isFinite(viewerAge)) return "unknown_age";
-  return isAgeEligible(viewerAge, req) ? "eligible" : "needs_approval";
+  return isAgeEligible(viewerAge, req) ? "eligible" : "ineligible";
 }
 
-/** Short player-facing explanation of why the host must review the request. */
+/** Short player-facing explanation of why the viewer cannot join. */
 export function ageGateMessage(
   state: AgeGateState,
   req: AgeRequirement | null | undefined,
 ): string | null {
   const label = ageRequirementLabel(req);
   if (!label) return null;
-  if (state === "needs_approval") {
-    return `This game is ${label} — the host reviews requests outside that range.`;
+  if (state === "ineligible") {
+    return `This game is ${label}. It isn't open to your age, and a host can't make an exception.`;
   }
   if (state === "unknown_age") {
-    return `This game is ${label}. Add your birthday to your profile, or request the host's approval.`;
+    return `This game is ${label}. Add your birthday to your profile to see whether you can join.`;
   }
   return null;
 }

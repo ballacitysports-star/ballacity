@@ -916,13 +916,13 @@ function GameDetail() {
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
   const hostRequiresApproval = settings ? !!settings.requires_approval : true;
-  // An age requirement forces the request-to-join flow for anyone outside the
-  // range (or who hasn't shared a birthday), even on instant-join games.
+  // An age requirement is strict: anyone outside the range (or who hasn't shared
+  // a birthday) cannot join or request a spot, and no host approval overrides it.
   const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
   const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
-  const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
-  const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
-  const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
+  const ageBlocked = !isHost && (ageGate === "ineligible" || ageGate === "unknown_age");
+  const requiresApproval = hostRequiresApproval;
+  const ageNotice = ageBlocked ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
@@ -1086,6 +1086,10 @@ function GameDetail() {
         setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
       }
+      return;
+    }
+    if (ageBlocked) {
+      toast.error(ageNotice ?? "This game isn't open to your age.");
       return;
     }
     // Signup window: started games, host-closed games and the host's blackout
@@ -3243,19 +3247,22 @@ function GameDetail() {
                 // join; leaving/withdrawing a join made before consent was
                 // revoked stays available.
                 const consentBlocksNewJoin = !alreadyInFlow && !participationDecision.allowed;
+                const ageBlocksNewJoin = !alreadyInFlow && ageBlocked;
                 const canJoinAction = alreadyInFlow || spotsLeft > 0;
                 const waitlistCta =
                   spotsLeft <= 0 &&
                   !alreadyInFlow &&
                   !lockedForNewJoin &&
                   !consentBlocksNewJoin &&
+                  !ageBlocksNewJoin &&
                   viewerGate.waitlistOpen;
                 const buttonDisabled =
                   requesting ||
                   processing ||
                   (!canJoinAction && !waitlistCta) ||
                   lockedForNewJoin ||
-                  consentBlocksNewJoin;
+                  consentBlocksNewJoin ||
+                  ageBlocksNewJoin;
                 const hasPaymentAttempt =
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
@@ -3339,6 +3346,10 @@ function GameDetail() {
                         );
                         return;
                       }
+                      if (ageBlocksNewJoin) {
+                        toast.error(ageNotice ?? "This game isn't open to your age.");
+                        return;
+                      }
                       if (waitlistCta) {
                         document
                           .getElementById("waitlist")
@@ -3373,7 +3384,10 @@ function GameDetail() {
                           ? "bg-surface border border-coral/40 text-coral"
                           : joined
                             ? "bg-surface border border-lime/40 text-lime"
-                            : lockedForNewJoin || spotsLeft <= 0 || consentBlocksNewJoin
+                            : lockedForNewJoin ||
+                                spotsLeft <= 0 ||
+                                consentBlocksNewJoin ||
+                                ageBlocksNewJoin
                               ? "bg-surface border border-border text-muted-foreground"
                               : "bg-lime-gradient text-primary-foreground glow-lime"
                     }`}
@@ -3396,6 +3410,10 @@ function GameDetail() {
                     ) : consentBlocksNewJoin ? (
                       <>
                         <Lock className="h-4 w-4" /> Parent approval needed
+                      </>
+                    ) : ageBlocksNewJoin ? (
+                      <>
+                        <Lock className="h-4 w-4" /> Not open to your age
                       </>
                     ) : lockedForNewJoin ? (
                       <>
