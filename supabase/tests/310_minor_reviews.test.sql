@@ -13,7 +13,8 @@ SELECT t.person('adultrev', 30), t.person('adultsubj', 31), t.person('adultpeer'
        t.person('stranger', 28), t.person('modone', 35),
        t.person('child8', 8), t.person('teen14', 14), t.person('teen17', 17), t.person('teen16', 16),
        t.person('nullcohort', 30),
-       t.person('guardian14', 40), t.person('guardian8', 41);
+       t.person('guardian14', 40), t.person('guardian8', 41),
+       t.person('revokedguard', 42), t.person('unverifiedguard', 43);
 SELECT t.guardian('guardian14', 'teen14');
 SELECT t.guardian('guardian8', 'child8');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'admin');
@@ -231,5 +232,122 @@ SELECT t.eq((SELECT is_private FROM public.reviews WHERE reviewer_id = t.id('adu
 SELECT t.as_anon();
 SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE reviewee_id = %L', t.id('adultpeer')::text)), 1,
   'and anonymous visitors can read it');
+
+-- ---- 9. guardian access is decided by the link, on the server --------------------------------
+-- A revoked link and an unverified link give a "guardian" nothing; only a verified, active link does.
+SELECT t.reset();
+INSERT INTO public.guardian_links (parent_user_id, child_user_id, relationship, status, verified_at) VALUES
+  (t.id('revokedguard'), t.id('teen14'), 'parent', 'revoked', now()),
+  (t.id('unverifiedguard'), t.id('teen14'), 'parent', 'active', NULL);
+SELECT t.as_user(t.id('revokedguard'));
+SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('teen14'))), 0, 'a guardian whose link was revoked gets no attendance counts');
+SELECT t.as_user(t.id('unverifiedguard'));
+SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('teen14'))), 0, 'an active but unverified link gets none');
+SELECT t.as_user(t.id('guardian14'));
+SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('teen14'))), 1, 'the verified, active guardian does (control)');
+SELECT t.reset();
+
+-- ---- 10. adult review features still work -------------------------------------------------------
+SELECT t.member('tm', 'adultpeer');
+SELECT t.as_user(t.id('adultpeer'));
+SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (%L, 'player', 'team', 'tm', 'Team', 5, 'A well run team with good vibes.')$q$, t.id('adultpeer')),
+  'an adult team member can review the team');
+SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
+  VALUES (%L, 'player', 'host', %L, 'Host', 4, 'Well organised and started on time.', 'g-rv')$q$, t.id('adultpeer'), t.id('adultrev')::text),
+  'an adult who played in a game can review its adult host');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives(format('SELECT public.report_review(%L)', t.id('r-adult-pub')), 'any adult member can still report a public review');
+SELECT t.as_anon();
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reviews WHERE reviewee_id = %L AND reviewee_kind = 'host'$q$, t.id('adultrev')::text)), 1,
+  'the host review about an adult is public');
+SELECT t.reset();
+
+
+-- ---- 11. a team or gym keyed to a minor's account id cannot carry public text about them -------------
+-- teams.id and trainer_orgs.id are chosen by whoever creates them, so the id of a "team" can be a child's user id.
+SELECT t.reset();
+SELECT t.person('gymowner', 45);
+SELECT t.as_user(t.id('adultrev'));
+INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES (t.id('teen14')::text, t.id('adultrev'), 'team', 'NotAKid', 'notakid');
+SELECT t.throws(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (%L, 'player', 'team', %L, 'x', 1, 'He is a terrible person, avoid him.')$q$, t.id('adultrev'), t.id('teen14')::text),
+  'not available for this person', 'a team whose id is a 14-year-old''s user id cannot be reviewed');
+SELECT t.reset();
+INSERT INTO public.trainer_orgs (id, owner_id, name, handle) VALUES (t.id('teen14'), t.id('gymowner'), 'Innocent Gym', 'innocentgym');
+SELECT t.as_user(t.id('adultpeer'));
+SELECT t.throws(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (%L, 'player', 'gym', %L, 'x', 1, 'He is a terrible person, avoid him.')$q$, t.id('adultpeer'), t.id('teen14')::text),
+  'not available for this person', 'nor a gym whose id is a 14-year-old''s user id');
+-- the same pair, written historically, is hidden from everyone, and so is a summary keyed the same way
+SELECT t.reset();
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, is_private, verified, flagged) VALUES
+  (t.id('r-team-keyed'), t.id('adultrev'),  'player', 'team', t.id('teen14')::text, 'x', 1, 'He is a terrible person, avoid him.', false, true, false),
+  (t.id('r-gym-keyed'),  t.id('adultpeer'), 'player', 'gym',  t.id('teen14')::text, 'x', 1, 'He is a terrible person, avoid him.', false, true, false),
+  (t.id('r-team-adultkeyed'), t.id('adultrev'), 'player', 'team', t.id('adultsubj')::text, 'x', 5, 'A well run team with good vibes.', false, true, false);
+INSERT INTO public.reputation_insights (reviewee_id, reviewee_kind, summary, strengths, growth, review_count, model) VALUES
+  (t.id('teen14')::text, 'team', 'Keyed to a minor.', ARRAY['x'], ARRAY['y'], 1, 'fixture'),
+  (t.id('adultsubj')::text, 'team', 'Keyed to an adult.', ARRAY['x'], ARRAY['y'], 1, 'fixture');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_anon();
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE reviewee_id = %L', t.id('teen14')::text)), 0, 'anonymous: nothing keyed to the 14-year-old''s id, whatever the kind');
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reputation_insights WHERE reviewee_id = %L AND reviewee_kind = 'team'$q$, t.id('teen14')::text)), 0, 'anonymous: no team-kind summary keyed to the 14-year-old');
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE id = %L', t.id('r-team-adultkeyed'))), 1, 'a team keyed to an ADULT''s id stays visible (control)');
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.reputation_insights WHERE reviewee_id = %L AND reviewee_kind = 'team'$q$, t.id('adultsubj')::text)), 1, 'and so does its summary');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE reviewee_id = %L', t.id('teen14')::text)), 0, 'a member: the same');
+-- the offer list does not name the child through such a team, nor offer it
+SELECT t.as_user(t.id('adultrev'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.my_reviewable(NULL, %L)', t.id('teen14')::text)), 0, 'my_reviewable does not offer a team keyed to a minor''s id');
+SELECT t.reset();
+
+-- ---- 12. a private review written by a minor is not readable by its adult subject --------------------
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, is_private, verified, flagged) VALUES
+  (t.id('r-priv-by-teen'),  t.id('teen17'),   'player', 'player', t.id('adultsubj')::text, 'Adult', 3, 'Kept to themselves a lot today.', true, true, false),
+  (t.id('r-priv-by-adult'), t.id('adultrev'), 'player', 'player', t.id('adultsubj')::text, 'Adult', 3, 'Kept to themselves a lot today.', true, true, false);
+INSERT INTO public.review_ai_analysis (review_id, traits, sentiment, mismatch, model) VALUES
+  (t.id('r-priv-by-teen'), ARRAY['positive'], 0.1, false, 'fixture'), (t.id('r-priv-by-adult'), ARRAY['positive'], 0.1, false, 'fixture');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('adultsubj'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE id = %L', t.id('r-priv-by-teen'))), 0, 'the adult subject cannot read a private review written by a minor (or learn the minor''s id)');
+SELECT t.eq(t.count(format('SELECT 1 FROM public.review_ai_analysis WHERE review_id = %L', t.id('r-priv-by-teen'))), 0, 'nor its analysis');
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE id = %L', t.id('r-priv-by-adult'))), 1, 'a private review written by an adult is still readable by its subject (control)');
+SELECT t.reset();
+
+-- ---- 13. gym admins do not read gym reviews written by a minor --------------------------------------
+INSERT INTO public.trainer_orgs (id, owner_id, name, handle) VALUES (t.id('gym1'), t.id('gymowner'), 'Gym One', 'gymone');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, is_private, verified, flagged) VALUES
+  (t.id('r-gym1-by-teen'),  t.id('teen17'),   'player', 'gym', t.id('gym1')::text, 'Gym One', 4, 'Clean courts and friendly staff.', false, true, false),
+  (t.id('r-gym1-by-adult'), t.id('adultrev'), 'player', 'gym', t.id('gym1')::text, 'Gym One', 4, 'Clean courts and friendly staff.', false, true, false);
+INSERT INTO public.review_ai_analysis (review_id, traits, sentiment, mismatch, model) VALUES (t.id('r-gym1-by-teen'), ARRAY['positive'], 0.5, false, 'fixture');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('gymowner'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE reviewee_id = %L', t.id('gym1')::text)), 1, 'the gym owner reads the adult-authored review only');
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE id = %L', t.id('r-gym1-by-teen'))), 0, 'not the one written by a minor (no minor id, no analysis)');
+SELECT t.eq(t.count(format('SELECT 1 FROM public.review_ai_analysis WHERE review_id = %L', t.id('r-gym1-by-teen'))), 0, 'and no analysis of it');
+SELECT t.as_anon();
+SELECT t.eq(t.count(format('SELECT 1 FROM public.reviews WHERE reviewee_id = %L', t.id('gym1')::text)), 1, 'anonymous: the same one');
+SELECT t.reset();
+
+-- ---- 14. host attendance statistics follow the same rule ------------------------------------------
+ALTER TABLE public.hosted_games DISABLE TRIGGER validate_hosted_game_age_range;
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, status, completed_at)
+VALUES ('g-teenhost', t.id('teen17'), 'basketball', 'teen host game', now() - interval '3 days', 13, 17, 'completed', now() - interval '3 days');
+ALTER TABLE public.hosted_games ENABLE TRIGGER validate_hosted_game_age_range;
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id, attended) VALUES ('g-teenhost', t.id('teen16'), true);
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq((SELECT marked + attended + completed_games FROM public.host_attendance_stats(t.id('teen17'))), 0, 'host stats about a 16-17 host, asked by a member: zeros');
+SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 1, 'an adult host''s stats are unchanged for a member (control)');
+SELECT t.as_user(t.id('teen17'));
+SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('teen17'))), 1, 'the 16-17 host sees their own');
+SELECT t.as_anon();
+SELECT t.throws(format('SELECT * FROM public.host_attendance_stats(%L)', t.id('adultrev')), 'permission denied', 'anonymous visitors still cannot call it');
+SELECT t.reset();
+
 
 ROLLBACK;

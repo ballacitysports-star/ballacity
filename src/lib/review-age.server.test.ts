@@ -6,6 +6,7 @@ import {
   isConfirmedAdult,
   isPersonReview,
   mayAnalyseSubject,
+  onlyAdultAuthored,
 } from "@/lib/review-age.server";
 
 const ADULT = "11111111-1111-4111-8111-111111111111";
@@ -127,5 +128,26 @@ describe("isPersonReview", () => {
       false,
       false,
     ]);
+  });
+});
+
+describe("onlyAdultAuthored", () => {
+  it("drops reviews written by anyone who is not a confirmed adult, and looks each author up once", async () => {
+    const a = admin({ [ADULT]: "adult", [TEEN]: "teen_16_17", other: "adult" });
+    const rows = [
+      { id: "1", reviewer_id: ADULT },
+      { id: "2", reviewer_id: TEEN },
+      { id: "3", reviewer_id: ADULT },
+      { id: "4", reviewer_id: "ghost" },
+      { id: "5", reviewer_id: "other" },
+    ];
+    const kept = await onlyAdultAuthored(a, rows);
+    expect(kept.map((r) => r.id)).toEqual(["1", "3", "5"]);
+    expect(a.calls.length).toBe(4);
+  });
+
+  it("drops everything when the lookup fails", async () => {
+    const a = admin({ [ADULT]: "adult" }, { fail: true });
+    expect(await onlyAdultAuthored(a, [{ id: "1", reviewer_id: ADULT }])).toEqual([]);
   });
 });

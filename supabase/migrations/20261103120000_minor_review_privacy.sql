@@ -7,7 +7,10 @@
 -- signed-in account. Reviews written by a minor also published that minor's name.
 --
 -- Rules after this migration (enforced here, in the database, not only in the app):
---   1. Nobody can write a review whose subject (player or host) is under 18 or of unconfirmed age.
+--   1. Nobody can write a review whose subject is a person under 18 or of unconfirmed age: a player or
+--      host, AND any review (team, trainer, gym...) whose reviewee_id is the id of an account that is not
+--      a confirmed adult. teams.id and trainer_orgs.id are chosen by whoever creates them, so a "team"
+--      or "gym" keyed to a minor's user id would otherwise carry public text about that minor.
 --   2. Nobody under 18 (or of unconfirmed age) can write a review of anyone or anything for now.
 --      Minor-authored feedback needs a workflow with anonymity, moderation and authorization; until
 --      that exists it is off rather than half-protected.
@@ -15,7 +18,7 @@
 --      readable by others when its subject or its author is not a confirmed adult, and an AI
 --      summary is not readable when its subject is not a confirmed adult. The author still reads
 --      their own text. Service-role code (moderation, retention review) still reads everything.
---   4. Review-derived statistics about a person under 18 are not returned to anyone but the
+--   4. Review-derived statistics (and host attendance statistics) about a person under 18 are not returned to anyone but the
 --      server; attendance-based counts are returned only to that person and their verified
 --      guardian. "Confirmed adult" is profiles.age_cohort = 'adult' (the same value every other
 --      age rule uses); anything else, including unknown, fails closed.
@@ -29,12 +32,18 @@
 -- Policy helpers. Called from row-level security policies, so anon and authenticated need EXECUTE,
 -- as with the other private_sec helpers. Fail closed: an unknown cohort is not an adult.
 -- ---------------------------------------------------------------------------
+-- A review's subject may be shown or written only if it is not a person who is not a confirmed adult.
+--  * player / host reviews are about a person: that person must be a confirmed adult.
+--  * any other kind (team, trainer, gym...) is about a thing, EXCEPT that its id is free text chosen by
+--    its creator and can equal an account's id. If the id is an account, that account must be a
+--    confirmed adult. An id that is not an account (a normal team or place id) is fine.
 CREATE OR REPLACE FUNCTION private_sec.review_subject_is_public(_kind text, _reviewee_id text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT CASE
     WHEN _kind IN ('player', 'host')
       THEN COALESCE(public.age_cohort_of(public.try_uuid(_reviewee_id)) = 'adult', false)
-    ELSE true  -- teams, trainers, gyms and organizations are not people under 18
+    ELSE NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = public.try_uuid(_reviewee_id))
+         OR COALESCE(public.age_cohort_of(public.try_uuid(_reviewee_id)) = 'adult', false)
   END;
 $$;
 
@@ -70,6 +79,19 @@ CREATE POLICY "Reviewees view their private reviews" ON public.reviews
     AND reviewee_id = (auth.uid())::text
     AND reviewee_kind <> ALL (ARRAY['gym'::text, 'team'::text, 'org'::text, 'trainer_org'::text])
     AND private_sec.review_subject_is_public(reviewee_kind, reviewee_id)
+    AND private_sec.review_author_is_adult(reviewer_id)
+  );
+
+-- Gym admins read the reviews about their gym, but not ones written by a person under 18 (that would hand
+-- them the minor's id and, through review_ai_analysis, the analysis).
+DROP POLICY IF EXISTS "Gym admins view reviews about their gym" ON public.reviews;
+CREATE POLICY "Gym admins view reviews about their gym" ON public.reviews
+  FOR SELECT TO authenticated
+  USING (
+    reviewee_kind = 'gym'
+    AND public.is_gym_admin_text(reviewee_id, auth.uid())
+    AND private_sec.review_author_is_adult(reviewer_id)
+    AND private_sec.review_subject_is_public(reviewee_kind, reviewee_id)
   );
 
 -- review_ai_analysis ("Analysis follows review visibility") reads reviews as the caller, so it
@@ -81,28 +103,33 @@ CREATE POLICY "Insights are public" ON public.reputation_insights
   USING (private_sec.review_subject_is_public(reviewee_kind, reviewee_id));
 
 -- ---------------------------------------------------------------------------
--- Authors: nobody under 18 (or of unconfirmed age) writes a review for now, of any kind,
--- gyms included. Named "aa_" so it fires before enforce_gym_review_trg and
--- enforce_review_integrity_trg and its message is the one a minor sees. The service role
--- (auth.uid() IS NULL) is not affected.
+-- Age rules for EVERY review kind, gyms included. Named "aa_" so it fires before
+-- enforce_gym_review_trg and enforce_review_integrity_trg and its message is the one a person sees.
+--   * Authors: nobody under 18 (or of unconfirmed age) writes a review for now.
+--   * Subjects: no review whose subject is a person under 18 or of unconfirmed age, including a
+--     team or gym whose id is such an account's id (see review_subject_is_public).
+-- The service role (auth.uid() IS NULL) is not affected.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.enforce_adult_review_author()
+CREATE OR REPLACE FUNCTION public.enforce_review_age_rules()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF auth.uid() IS NULL THEN RETURN NEW; END IF;
   IF public.age_cohort_of(NEW.reviewer_id) IS DISTINCT FROM 'adult' THEN
     RAISE EXCEPTION 'Reviews are available to adults only for now.' USING ERRCODE = '42501';
   END IF;
+  IF NOT private_sec.review_subject_is_public(NEW.reviewee_kind, NEW.reviewee_id) THEN
+    RAISE EXCEPTION 'Reviews are not available for this person.' USING ERRCODE = '42501';
+  END IF;
   RETURN NEW;
 END $$;
 
-REVOKE ALL ON FUNCTION public.enforce_adult_review_author() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.enforce_adult_review_author() TO service_role;
+REVOKE ALL ON FUNCTION public.enforce_review_age_rules() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.enforce_review_age_rules() TO service_role;
 
-DROP TRIGGER IF EXISTS aa_enforce_adult_review_author_trg ON public.reviews;
-CREATE TRIGGER aa_enforce_adult_review_author_trg
+DROP TRIGGER IF EXISTS aa_enforce_review_age_rules_trg ON public.reviews;
+CREATE TRIGGER aa_enforce_review_age_rules_trg
 BEFORE INSERT ON public.reviews
-FOR EACH ROW EXECUTE FUNCTION public.enforce_adult_review_author();
+FOR EACH ROW EXECUTE FUNCTION public.enforce_review_age_rules();
 
 -- ---------------------------------------------------------------------------
 -- Subject: the integrity trigger no longer coerces teen reviews to public and refuses any
@@ -143,7 +170,7 @@ BEGIN
     END IF;
 
     -- PRIV-1: a person under 18, or whose age is not confirmed, is never the subject of a
-    -- review, public or private. (Authors under 18 are refused by enforce_adult_review_author.)
+    -- review, public or private. (Authors under 18, and subjects keyed by an account id, are refused by enforce_review_age_rules.)
     IF NEW.reviewee_kind IN ('player', 'host')
        AND public.age_cohort_of(public.try_uuid(NEW.reviewee_id)) IS DISTINCT FROM 'adult' THEN
       RAISE EXCEPTION 'Reviews are not available for this person.' USING ERRCODE = '42501';
@@ -238,7 +265,7 @@ BEGIN
   )
   SELECT e.k, e.rid,
          COALESCE(
-           (SELECT pr.display_name FROM public.profiles pr WHERE pr.id = public.try_uuid(e.rid)),
+           (SELECT pr.display_name FROM public.profiles pr WHERE e.k IN ('player', 'host') AND pr.id = public.try_uuid(e.rid)),
            (SELECT t.name FROM public.teams t WHERE t.id = e.rid), 'Unknown'),
          e.game_id, e.context, e.sport, e.happened_at,
          CASE WHEN e.game_id IS NOT NULL THEN e.happened_at + interval '14 days' END
@@ -250,6 +277,8 @@ BEGIN
           AND r.game_id IS NOT DISTINCT FROM e.game_id)
      -- Nobody under 18, or of unconfirmed age, is offered as a person to review.
      AND (e.k NOT IN ('player', 'host') OR public.age_cohort_of(public.try_uuid(e.rid)) = 'adult')
+     -- ...nor a team, trainer or gym whose id is such an account's id.
+     AND private_sec.review_subject_is_public(e.k, e.rid)
    ORDER BY e.happened_at DESC NULLS LAST
    LIMIT 200;
 END $$;
@@ -261,8 +290,7 @@ END $$;
 --     server (auth.uid() IS NULL);
 --   * attendance-derived counts are returned only to that person and a verified guardian
 --     (public.is_self_or_guardian), zero for everyone else.
--- The row keeps its shape so callers do not break. host_attendance_stats is unchanged: it holds no
--- review data and the host trust panel depends on it (minor hosts are handled in PRIV-2).
+-- The row keeps its shape so callers do not break.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.player_activity_stats(_user uuid)
  RETURNS TABLE(games_joined integer, games_attended integer, no_shows integer, games_completed integer, hosted_total integer, hosted_completed integer, hosted_cancelled integer, teams_count integer, review_count integer, review_avg numeric, verified_review_count integer, first_activity_at timestamp with time zone)
@@ -349,5 +377,35 @@ BEGIN
   WHERE r.reviewee_kind = 'player' AND r.reviewee_id = _user::text
     AND NOT r.flagged AND NOT r.is_private AND NOT a.mismatch
     AND private_sec.review_author_is_adult(r.reviewer_id);
+END
+$fn$;
+
+-- host_attendance_stats holds no review data but is attendance-derived reputation about a host, who may be
+-- 16-17. Same rule as player_activity_stats: for a host who is not a confirmed adult it is returned to that
+-- person and a verified guardian (and the server); everyone else gets zeros. Same row shape.
+CREATE OR REPLACE FUNCTION public.host_attendance_stats(_host uuid)
+ RETURNS TABLE(marked bigint, attended bigint, cancelled_games bigint, completed_games bigint)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $fn$
+BEGIN
+  IF NOT (auth.uid() IS NULL
+          OR COALESCE(public.age_cohort_of(_host) = 'adult', false)
+          OR public.is_self_or_guardian(_host)) THEN
+    RETURN QUERY SELECT 0::bigint, 0::bigint, 0::bigint, 0::bigint;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    (SELECT COUNT(*) FROM public.game_participants gp
+       JOIN public.hosted_games g ON g.id = gp.game_id
+      WHERE g.host_id = _host AND gp.attended IS NOT NULL),
+    (SELECT COUNT(*) FROM public.game_participants gp
+       JOIN public.hosted_games g ON g.id = gp.game_id
+      WHERE g.host_id = _host AND gp.attended IS TRUE),
+    (SELECT COUNT(*) FROM public.hosted_games WHERE host_id = _host AND cancelled_at IS NOT NULL),
+    (SELECT COUNT(*) FROM public.hosted_games WHERE host_id = _host AND completed_at IS NOT NULL);
 END
 $fn$;

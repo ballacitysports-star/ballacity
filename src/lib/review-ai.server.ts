@@ -16,7 +16,7 @@
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { moderateAiFields } from "@/lib/ai/moderation.server";
 import { withAiSession } from "@/lib/ai/session.server";
-import { mayAnalyseSubject } from "@/lib/review-age.server";
+import { mayAnalyseSubject, onlyAdultAuthored } from "@/lib/review-age.server";
 
 /** Must match SportsmanshipTraitCounts keys in badges.ts. */
 export const REVIEW_TRAITS = [
@@ -176,15 +176,22 @@ export async function refreshInsight(
 
   const { data: rows } = await admin
     .from("reviews")
-    .select("id, rating, title, body, created_at")
+    .select("id, reviewer_id, rating, title, body, created_at")
     .eq("reviewee_id", input.revieweeId)
     .eq("reviewee_kind", input.revieweeKind)
     .eq("flagged", false)
     .eq("is_private", false)
     .order("created_at", { ascending: false })
     .limit(30);
-  const reviews: Array<{ id: string; rating: number; title: string | null; body: string }> =
-    rows ?? [];
+  // Reviews written by a person under 18 are hidden from everyone else, so they do not feed a summary
+  // that others can read either.
+  const reviews: Array<{
+    id: string;
+    reviewer_id: string;
+    rating: number;
+    title: string | null;
+    body: string;
+  }> = await onlyAdultAuthored(admin, rows ?? []);
   if (reviews.length === 0) return null;
 
   const { data: existing } = await admin

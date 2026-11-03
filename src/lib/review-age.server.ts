@@ -56,3 +56,22 @@ export async function mayAnalyseSubject(
   if (!isPersonReview(input.revieweeKind)) return true;
   return isConfirmedAdult(admin, input.revieweeUserId);
 }
+
+/**
+ * Keeps only reviews written by a confirmed adult. A review written by a person under 18 is hidden from
+ * everyone else, so it must not feed an AI summary that others can read either. Looks up each distinct
+ * author once; a failed lookup drops that author's reviews (fail closed).
+ */
+export async function onlyAdultAuthored<T extends { reviewer_id: string }>(
+  admin: Rpc,
+  rows: T[],
+): Promise<T[]> {
+  const ids = [...new Set(rows.map((r) => r.reviewer_id))];
+  const adult = new Set<string>();
+  await Promise.all(
+    ids.map(async (id) => {
+      if (await isConfirmedAdult(admin, id)) adult.add(id);
+    }),
+  );
+  return rows.filter((r) => adult.has(r.reviewer_id));
+}

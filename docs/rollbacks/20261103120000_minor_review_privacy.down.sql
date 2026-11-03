@@ -1,17 +1,37 @@
 -- ROLLBACK for supabase/migrations/20261103120000_minor_review_privacy.sql
 --
--- NOT a migration: it lives outside supabase/migrations on purpose so the replay never runs it.
--- Run it only if PRIV-1 must be undone. It restores the exact definitions that existed before
--- PRIV-1 (captured from a replay of the migrations that precede it) and removes what PRIV-1 added.
--- No review, insight or analysis row is changed by PRIV-1 or by this script.
+-- NOT a migration: it lives outside supabase/migrations on purpose so no replay or migration tool runs it.
+-- It restores the exact definitions that existed before PRIV-1 (captured from a replay of the
+-- migrations that precede it) and removes what PRIV-1 added. No review, insight or analysis row is
+-- changed by PRIV-1 or by this script.
 --
--- WARNING: rolling back re-opens the exposure PRIV-1 closes (reviews and AI summaries about people
--- under 18 become publicly readable again, and minors may be reviewed again). Do it only with
--- the owner's approval.
+-- THIS RE-OPENS THE EXPOSURE PRIV-1 CLOSES: reviews and AI summaries about people under 18 become
+-- readable by anonymous visitors and by any signed-in account again, review statistics about them are
+-- returned again, and minors may write and be the subject of reviews again. It therefore refuses to
+-- run unless the session says, on purpose, that this is intended:
+--
+--     PGOPTIONS="-c app.confirm_reopen_minor_review_exposure=yes" psql ... -f <this file>
+--
+-- PREFER A FORWARD FIX. Narrow options that do NOT re-open any read access:
+--   * the app change can be reverted on its own (the app works with either database state);
+--   * if only the WRITE rules (no reviews by, or about, people under 18) must be relaxed, drop just that trigger:
+--         DROP TRIGGER IF EXISTS aa_enforce_review_age_rules_trg ON public.reviews;
+--     (the read policies and the statistics gates stay in force, so nothing becomes readable).
+--
+-- Do it only with the owner's explicit approval, record it, and add a ledger row.
+
 BEGIN;
 
-DROP TRIGGER IF EXISTS aa_enforce_adult_review_author_trg ON public.reviews;
-DROP FUNCTION IF EXISTS public.enforce_adult_review_author();
+DO $guard$
+BEGIN
+  IF current_setting('app.confirm_reopen_minor_review_exposure', true) IS DISTINCT FROM 'yes' THEN
+    RAISE EXCEPTION 'Refusing to run: this rollback re-opens public access to reviews and AI summaries about people under 18. Read the header of this file; to proceed deliberately set app.confirm_reopen_minor_review_exposure=yes for the session.';
+  END IF;
+END
+$guard$;
+
+DROP TRIGGER IF EXISTS aa_enforce_review_age_rules_trg ON public.reviews;
+DROP FUNCTION IF EXISTS public.enforce_review_age_rules();
 
 CREATE OR REPLACE FUNCTION public.enforce_review_integrity()
  RETURNS trigger
@@ -233,6 +253,27 @@ CREATE POLICY "Reviewees view their private reviews" ON public.reviews FOR SELEC
 DROP POLICY IF EXISTS "Insights are public" ON public.reputation_insights;
 CREATE POLICY "Insights are public" ON public.reputation_insights FOR SELECT TO public
   USING (true);
+
+DROP POLICY IF EXISTS "Gym admins view reviews about their gym" ON public.reviews;
+CREATE POLICY "Gym admins view reviews about their gym" ON public.reviews FOR SELECT TO authenticated
+  USING (((reviewee_kind = 'gym'::text) AND is_gym_admin_text(reviewee_id, auth.uid())));
+
+CREATE OR REPLACE FUNCTION public.host_attendance_stats(_host uuid)
+ RETURNS TABLE(marked bigint, attended bigint, cancelled_games bigint, completed_games bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT
+    (SELECT COUNT(*) FROM public.game_participants gp
+       JOIN public.hosted_games g ON g.id = gp.game_id
+      WHERE g.host_id = _host AND gp.attended IS NOT NULL),
+    (SELECT COUNT(*) FROM public.game_participants gp
+       JOIN public.hosted_games g ON g.id = gp.game_id
+      WHERE g.host_id = _host AND gp.attended IS TRUE),
+    (SELECT COUNT(*) FROM public.hosted_games WHERE host_id = _host AND cancelled_at IS NOT NULL),
+    (SELECT COUNT(*) FROM public.hosted_games WHERE host_id = _host AND completed_at IS NOT NULL)
+$function$;
 
 DROP FUNCTION IF EXISTS private_sec.review_subject_is_public(text, text);
 DROP FUNCTION IF EXISTS private_sec.review_author_is_adult(uuid);
