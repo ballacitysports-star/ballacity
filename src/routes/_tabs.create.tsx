@@ -75,6 +75,12 @@ import { defaultGamePolicy, validateGamePolicy, type GamePolicy } from "@/lib/ga
 import { recordSafetyAck } from "@/lib/safety-acks";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
+import { YouthHostApprovalPicker } from "@/components/youth/YouthHostApprovalPicker";
+import {
+  approvalBlocksGame,
+  hostingErrorMessage,
+  type HostingApproval,
+} from "@/lib/youth-hosting-approvals";
 import { ShieldAlert } from "lucide-react";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { trackEvent, trackTaskError } from "@/lib/analytics";
@@ -129,7 +135,10 @@ function Create() {
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const { can: canFeature } = useMyChildStatus();
+  const { can: canFeature, status: childStatus } = useMyChildStatus();
+  // A 16-17 year old hosts only with a guardian's or a club administrator's approval (checked again by the database).
+  const isTeenHost = childStatus?.cohort === "teen_16_17";
+  const [hostApproval, setHostApproval] = useState<HostingApproval | null>(null);
   const hostingDecision = canFeature("game_hosting");
   const fetchMyTeams = useServerFn(listMyTeams);
   const myTeamsQuery = useQuery({
@@ -234,6 +243,16 @@ function Create() {
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
   const [multiDay, setMultiDay] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
+  const approvalProblem = isTeenHost
+    ? approvalBlocksGame({
+        approval: hostApproval,
+        price,
+        minAge,
+        maxAge,
+        isPrivate: priv,
+        sessions: multiDay ? Math.max(1, schedule.length) : 1,
+      })
+    : null;
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -778,6 +797,10 @@ function Create() {
             policyRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             return;
           }
+          if (isTeenHost && approvalProblem) {
+            toast.error(approvalProblem);
+            return;
+          }
           if (!hostAck) {
             toast.error("Acknowledge your host responsibilities to publish");
             hostAckRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -882,7 +905,13 @@ function Create() {
                 maxAge,
                 teamId: selectedAffiliation?.id,
                 // Only public runs can be listed at someone else's facility.
-                orgId: postingOrg && (postingOfficial || !priv) ? postingOrg.id : undefined,
+                orgId:
+                  isTeenHost && hostApproval?.org_id
+                    ? hostApproval.org_id
+                    : postingOrg && (postingOfficial || !priv)
+                      ? postingOrg.id
+                      : undefined,
+                hostingApprovalId: isTeenHost ? hostApproval?.id : undefined,
                 seriesId,
                 endsAt: plan.endIso,
                 allDay: plan.allDay,
@@ -906,6 +935,14 @@ function Create() {
               );
 
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
+              // A paid game hosted by a minor has its payment settings created by the adult who manages payment.
+              if (isTeenHost && price > 0) {
+                toast.message("Payment setup", {
+                  description:
+                    "The adult managing payment for this game will finish setting it up from their dashboard.",
+                });
+                continue;
+              }
               try {
                 await upsertGamePaymentSettings({
                   game_id: game.id,
@@ -939,7 +976,8 @@ function Create() {
             nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
           } catch (err) {
             const reason =
-              err instanceof Error && err.message ? err.message : "Please check your connection.";
+              hostingErrorMessage(err) ??
+              (err instanceof Error && err.message ? err.message : "Please check your connection.");
             if (createdCount > 0 && firstGameId) {
               // Some dates are already live; trying again would duplicate them.
               toast.error(
@@ -956,6 +994,15 @@ function Create() {
         }}
         className="space-y-5"
       >
+        {isTeenHost && user && (
+          <YouthHostApprovalPicker
+            minorId={user.id}
+            value={hostApproval}
+            onChange={setHostApproval}
+            problem={hostApproval ? approvalProblem : null}
+          />
+        )}
+
         {/* Host as (team/club) */}
         <div
           ref={hostAsRef}
