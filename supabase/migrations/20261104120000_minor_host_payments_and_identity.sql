@@ -233,9 +233,38 @@ $function$;
 -- 3. Name lookups: a non-adult account's name and initials are shown only to people connected to them
 -- ---------------------------------------------------------------------------------------------
 -- visible_avatars(ids) returned display_name and initials for any id to any caller, so a 16-17 year old host's id
--- (which is part of the public game row) could be turned into a name.  Adults are unchanged.  For an account that is
--- not a confirmed adult, name and initials are returned only to: the account itself, a verified guardian, someone who
--- shares a game, chat or team with it, anyone its profile visibility already shows the profile to, and admins.
+-- (which is part of the public game row) could be turned into a name. Adults are unchanged. For an account that is
+-- not a confirmed adult, name and initials are returned only to a person who has a real reason to know them:
+-- see private_sec.can_see_minor_name. Anyone else gets NULL (the app shows a neutral placeholder), so a relationship
+-- this list misses fails safe (a placeholder) rather than leaking a name.
+CREATE OR REPLACE FUNCTION private_sec.can_see_minor_name(_viewer uuid, _subject uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT _viewer IS NOT NULL AND (
+       _viewer = _subject
+    OR public.is_guardian_of(_viewer, _subject)
+    OR public.shares_game_or_chat(_viewer, _subject)
+    OR public.shares_team(_viewer, _subject)
+    OR public.has_role(_viewer, 'admin') OR public.has_role(_viewer, 'superadmin') OR public.has_role(_viewer, 'moderator')
+    -- the host (or payment manager) dealing with this person's request, waitlist place or payment
+    OR EXISTS (SELECT 1 FROM public.join_requests jr WHERE jr.player_id = _subject AND jr.host_id = _viewer)
+    OR EXISTS (SELECT 1 FROM public.game_position_waitlist w JOIN public.hosted_games g ON g.id = w.game_id
+                WHERE w.user_id = _subject AND g.host_id = _viewer)
+    OR EXISTS (SELECT 1 FROM public.payment_submissions ps WHERE ps.player_id = _subject AND ps.host_id = _viewer)
+    -- a team's staff dealing with an invitation or tryout sign-up
+    OR EXISTS (SELECT 1 FROM public.team_invites i WHERE i.invitee_id = _subject
+                AND (i.invited_by = _viewer OR public.is_team_manager(i.team_id, _viewer)))
+    OR EXISTS (SELECT 1 FROM public.tryout_rsvps r WHERE r.user_id = _subject AND public.is_team_manager(r.team_id, _viewer))
+    -- an organization's administrators dealing with a member or a request to join
+    OR EXISTS (SELECT 1 FROM public.org_members m WHERE m.user_id = _subject AND public.is_trainer_org_admin(m.org_id, _viewer))
+    OR EXISTS (SELECT 1 FROM public.org_member_requests q WHERE q.user_id = _subject AND public.is_trainer_org_admin(q.org_id, _viewer))
+    OR EXISTS (SELECT 1 FROM public.trainer_org_members m WHERE m.user_id = _subject AND public.is_trainer_org_admin(m.org_id, _viewer))
+    -- someone the person has accepted as a follower
+    OR EXISTS (SELECT 1 FROM public.follows f WHERE f.follower_id = _viewer AND f.followee_id = _subject)
+  )
+$$;
+REVOKE ALL ON FUNCTION private_sec.can_see_minor_name(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.can_see_minor_name(uuid, uuid) TO service_role;  -- called only from visible_avatars (definer); not an oracle for third parties
+
 CREATE OR REPLACE FUNCTION private_sec.visible_avatars(_ids uuid[])
  RETURNS TABLE(id uuid, display_name text, avatar_initials text, avatar_url text, avatar_visibility text, avatar_hidden boolean)
  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $function$
@@ -243,13 +272,8 @@ CREATE OR REPLACE FUNCTION private_sec.visible_avatars(_ids uuid[])
     SELECT p.*,
            (public.age_cohort_of(p.id) = 'adult'
             OR p.id = auth.uid()
-            OR (auth.uid() IS NOT NULL AND (
-                  public.is_guardian_of(auth.uid(), p.id)
-               OR public.shares_game_or_chat(auth.uid(), p.id)
-               OR public.shares_team(auth.uid(), p.id)
-               OR public.has_role(auth.uid(), 'admin')
-               OR public.has_role(auth.uid(), 'superadmin')
-               OR private_sec.profile_visibility_of(p.id) IN ('public', 'members')))
+            OR private_sec.can_see_minor_name(auth.uid(), p.id)
+            OR (auth.uid() IS NOT NULL AND private_sec.profile_visibility_of(p.id) IN ('public', 'members'))
             OR private_sec.profile_visibility_of(p.id) = 'public') AS name_ok
       FROM public.profiles p
      WHERE p.id = ANY(_ids)

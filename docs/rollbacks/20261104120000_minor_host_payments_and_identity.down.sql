@@ -100,6 +100,7 @@ $function$;
 DROP FUNCTION IF EXISTS public.grant_minor_hosting_approval(uuid, integer, boolean);
 DROP FUNCTION IF EXISTS public.grant_org_minor_hosting_approval(uuid, uuid, integer, boolean);
 DROP FUNCTION IF EXISTS private_sec.minor_game_payment_manager(text);
+DROP FUNCTION IF EXISTS private_sec.can_see_minor_name(uuid, uuid);
 
 -- The two-argument approval functions of 20261104110000.
 CREATE OR REPLACE FUNCTION public.grant_minor_hosting_approval(_minor uuid, _valid_hours integer DEFAULT 168)

@@ -182,6 +182,53 @@ SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id(
 SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('c30')])), 'adult: name returned');
 SELECT t.reset();
 
+-- ---- legitimate relationships keep working (a name a person needs to do their job is not hidden from them)
+SELECT t.person('m_req', 17), t.person('m_wait', 16), t.person('m_inv', 15), t.person('m_rsvp', 16), t.person('m_orgmem', 17),
+       t.person('m_follow', 17), t.person('m_payer', 17), t.person('m_orgreq', 16), t.person('coach', 35), t.person('outsider', 36);
+SELECT t.team('tmy', 'coach');
+SELECT t.guardian('guardian', 'm_req');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('id-game', t.id('m_req'), t.id('teenhost'), 'kreq', 'pending');
+INSERT INTO public.game_position_waitlist (game_id, position, user_id) VALUES ('id-game', 'guard', t.id('m_wait'));
+INSERT INTO public.team_invites (team_id, invitee_id, invited_by, role) VALUES ('tmy', t.id('m_inv'), t.id('coach'), 'player');
+INSERT INTO public.org_members (org_id, user_id, role) VALUES (t.id('org'), t.id('m_orgmem'), 'member');
+INSERT INTO public.org_member_requests (org_id, user_id, message) VALUES (t.id('org'), t.id('m_orgreq'), 'hi');
+INSERT INTO public.follows (follower_id, followee_id) VALUES (t.id('outsider'), t.id('m_follow'));
+SET LOCAL session_replication_role = origin;
+
+-- the host sees a pending requester and a waitlisted player; a stranger sees neither
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_req')])), 'a host sees the name of someone who asked to join');
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_wait')])), 'and of a waitlisted player');
+SELECT t.reset();
+SELECT t.as_user(t.id('coach'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_inv')])), 'a coach sees someone they invited');
+SELECT t.reset();
+SELECT t.as_user(t.id('orgadmin'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_orgmem')])), 'an organization admin sees a member');
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_orgreq')])), 'and someone who asked to join');
+SELECT t.reset();
+SELECT t.as_user(t.id('outsider'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_follow')])), 'an accepted follower sees the name');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('m_req')])), 'but not someone they have no relationship with');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('m_wait')])), 'nor a waitlisted player of a game that is not theirs');
+SELECT t.ok((SELECT display_name IS NULL FROM public.visible_avatars(ARRAY[t.id('m_orgmem')])), 'nor an organization member');
+SELECT t.reset();
+-- a guardian sees their child; payment manager sees the payer
+SELECT t.as_user(t.id('guardian'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_req')])), 'a verified guardian sees their child');
+SELECT t.reset();
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (t.id('m_payer'), 'p-ok', t.id('guardian'));
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('guardian'));
+SELECT t.ok((SELECT display_name IS NOT NULL FROM public.visible_avatars(ARRAY[t.id('m_payer')])), 'a payment manager sees the person paying them');
+SELECT t.reset();
+-- the helper is not a way to ask about other people's relationships
+SELECT t.as_user(t.id('outsider'));
+SELECT t.throws(format($q$SELECT private_sec.can_see_minor_name(%L, %L)$q$, t.id('guardian'), t.id('m_req')), 'permission denied', 'the relationship helper cannot be called by users');
+SELECT t.reset();
+
 -- the public game row carries no name
 SELECT t.as_user(t.id('stranger'));
 SELECT t.ok((SELECT NOT (host_snapshot ? 'name') OR host_snapshot ->> 'name' = 'Youth host' FROM public.hosted_games WHERE id = 'id-game'), 'the public game row carries a neutral organizer, not the minor''s name');
