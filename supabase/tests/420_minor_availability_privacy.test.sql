@@ -89,7 +89,7 @@ SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id
 SELECT t.as_user(t.id('teen15'));
 SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teen15'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'MINOR_MESSAGING_BLOCKED', 'a 15-year-old cannot contact an adult stranger (existing shared-context rule now applies to requests)');
 SELECT t.as_user(t.id('mate'));
-SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('mate'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'practice?')$q$, 'guardian_only', 'a teammate is still stopped by the guardian''s "guardian only" control');
+SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('mate'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'practice?')$q$, 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'a teammate is still stopped by the guardian''s "guardian only" control');
 SELECT t.reset();
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('teen17');
 SELECT t.as_user(t.id('mate'));

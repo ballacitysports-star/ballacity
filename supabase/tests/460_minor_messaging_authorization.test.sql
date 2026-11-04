@@ -62,7 +62,7 @@ SELECT t.eq(t.dm('t14', 't17u'), 'needs_guardian_link:other', 'a linked minor an
 
 -- ================= 4. conversations, messages, revocation, history
 SELECT t.as_user(t.id('stranger'));
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('t16')), 'MINOR_MESSAGING_BLOCKED:needs_connection', 'creation is refused');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('t16')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'creation is refused');
 SELECT t.as_user(t.id('coach'));
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('t16')), 'a coach can open a conversation with a player of their team');
 SELECT t.reset();
@@ -85,11 +85,11 @@ CREATE FUNCTION t.req(who text, avail text, other text) RETURNS void LANGUAGE sq
 GRANT EXECUTE ON FUNCTION t.req(text, text, text) TO anon, authenticated;
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t16');
 SELECT t.as_user(t.id('stranger'));
-SELECT t.throws($q$SELECT t.req('stranger', 'b2', 't16')$q$, 'MINOR_MESSAGING_BLOCKED:needs_connection', 'an adult stranger cannot ask a minor');
+SELECT t.throws($q$SELECT t.req('stranger', 'b2', 't16')$q$, 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'an adult stranger cannot ask a minor');
 SELECT t.as_user(t.id('t17u'));
 SELECT t.throws($q$SELECT t.req('t17u', 'b1', 'adultpost')$q$, 'MINOR_MESSAGING_BLOCKED:needs_guardian_link:self', 'an unlinked 16-17 cannot ask an adult: link a guardian first');
 SELECT t.as_user(t.id('t16'));
-SELECT t.throws($q$SELECT t.req('t16', 'b3', 't15b')$q$, 'MINOR_MESSAGING_BLOCKED:needs_connection', 'a minor cannot ask an unrelated minor');
+SELECT t.throws($q$SELECT t.req('t16', 'b3', 't15b')$q$, 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'a minor cannot ask an unrelated minor');
 SELECT t.lives($q$SELECT t.req('t16', 'b1', 'adultpost')$q$, 'a linked minor can ask an adult; the request waits for a guardian');
 SELECT t.eq((SELECT status FROM public.availability_contact_requests WHERE from_user_id = t.id('t16')), 'awaiting_guardian', 'its status is awaiting_guardian whatever the client sent');
 SELECT t.eq(t.changed($$UPDATE public.availability_contact_requests SET status = 'accepted', guardian_approved_at = now() WHERE from_user_id = auth.uid()$$), 0, 'the minor cannot approve their own request');
@@ -252,7 +252,7 @@ SELECT t.as_user(t.id('t14'));
 SELECT t.lives($q$SELECT t.req('t14', 'b3', 't15b')$q$, 'a 13-15 can ask another 13-15 whose guardian allows peers');
 SELECT t.eq((SELECT status FROM public.availability_contact_requests WHERE from_user_id = t.id('t14') AND to_user_id = t.id('t15b')), 'awaiting_guardian', 'it waits for the sender''s guardian');
 SELECT t.as_user(t.id('t16'));
-SELECT t.throws($q$SELECT t.req('t16', 'b3', 't15b')$q$, 'needs_connection', 'not across age bands');
+SELECT t.throws($q$SELECT t.req('t16', 'b3', 't15b')$q$, 'not_permitted:other', 'not across age bands');
 SELECT t.as_user(t.id('gmom'));
 SELECT t.eq(public.guardian_decide_contact_request((SELECT id FROM public.availability_contact_requests WHERE from_user_id = t.id('t14') AND to_user_id = t.id('t15b')), true), 'approved', 'the sender''s guardian approves');
 SELECT t.as_user(t.id('t15b'));
@@ -419,4 +419,30 @@ SELECT t.reset();
 SELECT t.ok(public.is_guardian_of(t.id('stranger'), t.id('t17u')), 'the first guardian is active');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE title = 'Approve a new guardian'), 2, 'and no one new is asked to approve (only the two earlier requests)');
 SELECT t.eq(has_function_privilege('anon', 'public.guardian_decide_link_request(uuid, boolean)', 'EXECUTE'), false, 'anonymous cannot decide link requests');
+
+-- ---- final review N1: opening a conversation never tells the caller why the OTHER person can't be messaged
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kid')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'N1: an under-13 target gives the caller one fixed code');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('t16u')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'N1: so does an unlinked teen (no guardian-link status leaks)');
+SELECT t.as_user(t.id('kid'));
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('adultpost')), ':self', 'N1: a reason about the caller''s own account is still explained');
+SELECT t.reset();
+-- the specific rule is still decided and asserted where it is not exposed to the caller (superuser = the decision itself)
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('kid')), 'child_needs_guardian:other', 'N1: the decision still names the under-13 rule');
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t16u')), 'needs_guardian_link:other', 'N1: and the unlinked-teen rule');
+UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('t14');
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t14')), 'messaging_off:other', 'N1: and the guardian''s messaging-off control');
+UPDATE public.child_controls SET messaging = 'guardian_only' WHERE child_user_id = t.id('t14');
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t14')), 'guardian_only:other', 'N1: and guardian-only');
+
+-- ---- final review N2: a host's cancellation text reaches only confirmed adults
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, location, max_players) VALUES ('n2game', t.id('host'), 'basketball', 'N2 run', now() + interval '2 days', 'Gym', 10);
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('n2game', t.id('t14')), ('n2game', t.id('coach'));
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('host'));
+SELECT t.lives($q$SELECT public.host_cancel_game('n2game', 'cancelled - dm me on snap @creep123')$q$, 'setup: the host cancels with a free-text reason');
+SELECT t.reset();
+SELECT t.eq((SELECT body FROM public.notifications WHERE user_id = t.id('t14') AND type = 'game_cancelled' AND link = '/games/n2game'), 'The host cancelled this game.', 'N2: a minor participant gets the fixed wording');
+SELECT t.eq((SELECT body FROM public.notifications WHERE user_id = t.id('coach') AND type = 'game_cancelled' AND link = '/games/n2game'), 'cancelled - dm me on snap @creep123', 'N2: an adult participant still gets the host''s reason');
 ROLLBACK;
