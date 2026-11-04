@@ -105,8 +105,8 @@ SELECT t.eq((SELECT location FROM public.hosted_game_private WHERE game_id = 'n-
 SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'n-youth'), 'Decatur', 'and the public row stays coarse');
 -- age range changes
 UPDATE public.hosted_games SET min_age = 21, max_age = NULL WHERE id = 'n-youth';
-SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'n-youth'), 'New Gym, 8 Cedar St', 'becoming adult-only restores the exact location');
-SELECT t.eq(t.vis_private('n-youth'), 0, 'and removes the private row');
+SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'n-youth'), 'Decatur', 'becoming adult-only after activation never publishes the exact location (SEC-1)');
+SELECT t.eq(t.vis_private('n-youth'), 1, 'and keeps the private row');
 UPDATE public.hosted_games SET min_age = 8, max_age = 12 WHERE id = 'n-youth';
 SELECT t.eq((SELECT location FROM public.hosted_games WHERE id = 'n-youth'), 'Decatur', 'becoming youth-inclusive again coarsens it');
 SELECT t.eq((SELECT location FROM public.hosted_game_private WHERE game_id = 'n-youth'), 'New Gym, 8 Cedar St', 'and keeps the exact one privately');
