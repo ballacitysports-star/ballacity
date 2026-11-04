@@ -17,6 +17,8 @@
     "test:db": "node scripts/db-test.mjs",
     "preflight": "node scripts/release-preflight.mjs",
     "preflight:test": "node --test --test-concurrency=1 scripts/release-preflight.test.mjs",
+    "rehearsal:guard": "node scripts/rehearsal-guard.mjs",
+    "rehearsal:guard:test": "node --test scripts/rehearsal-guard.test.mjs",
     "postinstall": "node scripts/patch-tanstack-client-abort.mjs"
   },
   "dependencies": {
