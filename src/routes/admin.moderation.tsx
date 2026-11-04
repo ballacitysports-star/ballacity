@@ -18,6 +18,9 @@ import {
   setReportStatus,
   applyModerationAction,
   listModerationAudit,
+  decideContentReport,
+  listContentAppeals,
+  reviewContentAppeal,
   type ModerationReport,
 } from "@/lib/moderation.functions";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
@@ -42,7 +45,7 @@ const STATUS_FILTERS = [
   "resolved",
   "dismissed",
 ] as const;
-const SUBJECT_FILTERS = ["all", "user", "game", "message", "reel"] as const;
+const SUBJECT_FILTERS = ["all", "user", "game", "message", "reel", "team_post", "comment"] as const;
 
 function statusTone(status: string) {
   const s = reportStatusLabel(status);
@@ -103,10 +106,14 @@ function ModerationPage() {
         <Tabs defaultValue="reports">
           <TabsList>
             <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="appeals">Appeals</TabsTrigger>
             <TabsTrigger value="audit">Audit log</TabsTrigger>
           </TabsList>
           <TabsContent value="reports" className="pt-3">
             <ReportsTab />
+          </TabsContent>
+          <TabsContent value="appeals" className="pt-3">
+            <AppealsTab />
           </TabsContent>
           <TabsContent value="audit" className="pt-3">
             <AuditTab />
@@ -204,7 +211,18 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
     onError: (e: any) => toast.error(e?.message ?? "Couldn't apply action"),
   });
 
-  const busy = statusMutation.isPending || actionMutation.isPending;
+  const decideFn = useServerFn(decideContentReport);
+  const decideMutation = useMutation({
+    mutationFn: (decision: "dismiss" | "hide" | "remove_media" | "restore") =>
+      decideFn({ data: { reportId: report.id, decision, notes } }),
+    onSuccess: () => {
+      toast.success("Decision recorded");
+      onDone();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Couldn't record that decision"),
+  });
+  const isContent = report.subjectType === "team_post" || report.subjectType === "comment";
+  const busy = statusMutation.isPending || actionMutation.isPending || decideMutation.isPending;
 
   return (
     <Card>
@@ -279,6 +297,20 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
               </dd>
             </div>
           ) : null}
+          {isContent ? (
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">
+                {report.subjectType === "team_post" ? "Reported post" : "Reported comment"}
+                {report.contentState && report.contentState !== "visible"
+                  ? ` (${report.contentState})`
+                  : ""}
+                {report.hasImage ? " · has an image" : ""}
+              </dt>
+              <dd className="rounded-lg border border-border bg-surface p-2 whitespace-pre-wrap">
+                {report.contentText ?? "(no longer available)"}
+              </dd>
+            </div>
+          ) : null}
           {report.details ? (
             <div className="sm:col-span-2">
               <dt className="text-muted-foreground">Reporter description</dt>
@@ -300,82 +332,237 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
           placeholder="Moderator note / reason (recorded in the audit log)"
         />
 
-        <div className="flex flex-wrap gap-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => statusMutation.mutate("investigating")}
-          >
-            Investigating
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => actionMutation.mutate("warn")}
-          >
-            Warn
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || report.subjectType === "user"}
-            onClick={() => actionMutation.mutate("remove_content")}
-          >
-            Remove content
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={busy}
-            onClick={() => actionMutation.mutate("suspend")}
-          >
-            Suspend
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={busy}
-            onClick={() => actionMutation.mutate("ban")}
-          >
-            Ban
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => actionMutation.mutate("restore")}
-          >
-            Restore
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => statusMutation.mutate("escalated")}
-          >
-            Escalate
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => statusMutation.mutate("resolved")}
-          >
-            Resolve
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            onClick={() => statusMutation.mutate("dismissed")}
-          >
-            Dismiss
-          </Button>
-        </div>
+        {isContent ? (
+          <div className="space-y-2">
+            {report.status === "escalated" ? (
+              <p className="text-xs text-muted-foreground">
+                Escalated: only an administrator can dismiss or resolve it, with a written note.
+                Hiding the content is always allowed.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => statusMutation.mutate("investigating")}
+              >
+                Investigating
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => decideMutation.mutate("hide")}
+              >
+                Hide
+              </Button>
+              {report.subjectType === "team_post" && report.hasImage ? (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => decideMutation.mutate("remove_media")}
+                >
+                  Remove image and hide
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => decideMutation.mutate("restore")}
+              >
+                Restore
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => statusMutation.mutate("escalated")}
+              >
+                Escalate
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => decideMutation.mutate("dismiss")}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => statusMutation.mutate("investigating")}
+            >
+              Investigating
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => actionMutation.mutate("warn")}
+            >
+              Warn
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || report.subjectType === "user"}
+              onClick={() => actionMutation.mutate("remove_content")}
+            >
+              Remove content
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={busy}
+              onClick={() => actionMutation.mutate("suspend")}
+            >
+              Suspend
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={busy}
+              onClick={() => actionMutation.mutate("ban")}
+            >
+              Ban
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => actionMutation.mutate("restore")}
+            >
+              Restore
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => statusMutation.mutate("escalated")}
+            >
+              Escalate
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => statusMutation.mutate("resolved")}
+            >
+              Resolve
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => statusMutation.mutate("dismissed")}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function AppealsTab() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listContentAppeals);
+  const reviewFn = useServerFn(reviewContentAppeal);
+  const { data, isLoading } = useQuery({
+    queryKey: ["moderation-appeals"],
+    queryFn: () => listFn(),
+  });
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const review = useMutation({
+    mutationFn: (v: { id: string; reverse: boolean }) =>
+      reviewFn({ data: { appealId: v.id, reverse: v.reverse, notes: notes[v.id] } }),
+    onSuccess: () => {
+      toast.success("Appeal reviewed");
+      void qc.invalidateQueries({ queryKey: ["moderation-appeals"] });
+      void qc.invalidateQueries({ queryKey: ["moderation-reports"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Couldn't review that appeal"),
+  });
+
+  if (isLoading)
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading appeals…
+      </div>
+    );
+  if ((data?.length ?? 0) === 0)
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No open appeals.
+        </CardContent>
+      </Card>
+    );
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        A different moderator than the one who made the decision must review it (administrators can
+        review any).
+      </p>
+      {data!.map((a) => (
+        <Card key={a.id}>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="capitalize">
+                {a.contentType.replace("_", " ")}
+              </Badge>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {new Date(a.createdAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">Content</p>
+              <p className="whitespace-pre-wrap rounded-lg border border-border bg-surface p-2">
+                {a.contentText ?? "(no longer available)"}
+              </p>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">Author's note</p>
+              <p className="whitespace-pre-wrap">{a.note}</p>
+            </div>
+            <Textarea
+              rows={2}
+              value={notes[a.id] ?? ""}
+              onChange={(e) => setNotes((n) => ({ ...n, [a.id]: e.target.value.slice(0, 1000) }))}
+              placeholder="Review note (recorded in the audit log)"
+            />
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={review.isPending}
+                onClick={() => review.mutate({ id: a.id, reverse: true })}
+              >
+                Restore the content
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={review.isPending}
+                onClick={() => review.mutate({ id: a.id, reverse: false })}
+              >
+                Keep the decision
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
 

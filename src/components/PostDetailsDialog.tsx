@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import { ShareSheet } from "@/components/ShareSheet";
 import { PostEngagement } from "@/components/PostEngagement";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
+import { ReportContentButton } from "@/components/moderation/ReportContentButton";
 
 export type PostDetailsTeam = {
   id: string;
@@ -176,6 +177,13 @@ export function PostDetailsDialog({
               >
                 <Share2 className="h-4 w-4" /> Share
               </button>
+              <ReportContentButton
+                kind="team_post"
+                contentId={post.id}
+                authorId={post.authorId}
+                label={post.title}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted-foreground"
+              />
             </div>
 
             <PostEngagement subjectType="team_post" subjectId={post.id} />

@@ -25,7 +25,8 @@ export type ReportReason =
   | "unsafe_conditions"
   | "injury_risk";
 
-export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
+export type ReportSubjectType =
+  "user" | "game" | "message" | "reel" | "payment" | "team_post" | "comment";
 
 type ReasonOption = { value: ReportReason; label: string };
 
@@ -77,6 +78,22 @@ export const PAYMENT_REPORT_REASONS: ReasonOption[] = [
   { value: "other", label: "Other" },
 ];
 
+/** Team posts, their comments and the image attached to a post. */
+export const TEAM_CONTENT_REPORT_REASONS: ReasonOption[] = [
+  { value: "inappropriate", label: "Inappropriate content" },
+  { value: "harassment", label: "Harassment" },
+  { value: "threats", label: "Threatening behavior" },
+  { value: "minor_safety", label: "Unsafe for or about a minor" },
+  {
+    value: "location_disclosed",
+    label: "Reveals a private location (address, map link or landmark)",
+  },
+  { value: "scam", label: "Scam or fraud" },
+  { value: "illegal", label: "Illegal activity" },
+  { value: "spam", label: "Spam" },
+  { value: "other", label: "Other" },
+];
+
 /** Back-compat alias used by older call sites. */
 export const REPORT_REASONS = USER_REPORT_REASONS;
 
@@ -84,6 +101,7 @@ export function reasonsFor(subject: ReportSubjectType): ReasonOption[] {
   if (subject === "game") return GAME_REPORT_REASONS;
   if (subject === "message") return MESSAGE_REPORT_REASONS;
   if (subject === "payment") return PAYMENT_REPORT_REASONS;
+  if (subject === "team_post" || subject === "comment") return TEAM_CONTENT_REPORT_REASONS;
   return USER_REPORT_REASONS;
 }
 
@@ -92,6 +110,7 @@ const ALL_REASONS: ReasonOption[] = [
   ...GAME_REPORT_REASONS,
   ...MESSAGE_REPORT_REASONS,
   ...PAYMENT_REPORT_REASONS,
+  ...TEAM_CONTENT_REPORT_REASONS,
 ];
 
 export function reportReasonLabel(reason: string): string {
@@ -198,6 +217,10 @@ export type SubmitReportInput = {
   conversationId?: string | null;
   messageId?: string | null;
   reelId?: string | null;
+  /** For subjectType "team_post". The database takes the reported account from the post, not from `reportedId`. */
+  teamPostId?: string | null;
+  /** For subjectType "comment". */
+  commentId?: string | null;
 };
 
 /**
@@ -218,9 +241,42 @@ export async function submitReport(input: SubmitReportInput) {
     conversation_id: input.conversationId ?? null,
     message_id: input.messageId ?? null,
     reel_id: input.reelId ?? null,
+    team_post_id: input.teamPostId ?? null,
+    comment_id: input.commentId ?? null,
     status: "new",
+  } as never);
+  if (error) throw new Error(describeReportError(error));
+}
+
+/** A reporter-facing message for the refusals the database can raise when reporting team content. */
+export function describeReportError(error: { message?: string } | null | undefined): string {
+  const m = error?.message ?? "";
+  if (/duplicate key|user_reports_open_/i.test(m))
+    return "You have already reported this. A moderator will review it.";
+  if (/REPORT_RATE_LIMIT/.test(m))
+    return "You have sent a lot of reports today. A moderator will review them.";
+  if (/CONTENT_NOT_FOUND/.test(m)) return "This item is no longer available to report.";
+  return m || "Couldn't send your report";
+}
+
+/** Ask for a second look at a moderator's decision on your own team post or comment. */
+export async function appealContentDecision(
+  type: "team_post" | "comment",
+  id: string,
+  note: string,
+) {
+  const { error } = await (supabase.rpc as any)("appeal_content_decision", {
+    _type: type,
+    _id: id,
+    _note: note.trim().slice(0, 500),
   });
-  if (error) throw error;
+  if (error) {
+    if (/duplicate key/i.test(error.message))
+      throw new Error("You already asked for a review of this.");
+    if (/CONTENT_NOT_FOUND/.test(error.message))
+      throw new Error("There is nothing to appeal here.");
+    throw new Error(error.message);
+  }
 }
 
 export async function reportUser(reportedId: string, reason: ReportReason, details?: string) {

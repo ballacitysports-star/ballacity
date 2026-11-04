@@ -17,6 +17,7 @@ import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
+import { ContentUnderReview } from "@/components/moderation/ContentUnderReview";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
@@ -212,6 +213,7 @@ function MessagesInbox() {
         <>
           {/* Invitations need an answer, so they sit above the passive feed. */}
           <TeamInvitesInbox className="mb-5" />
+          {user ? <ContentUnderReview scope="mine" viewerId={user.id} /> : null}
           <NotificationsPanel />
         </>
       ) : (

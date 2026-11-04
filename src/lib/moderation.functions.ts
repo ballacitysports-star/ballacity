@@ -74,6 +74,12 @@ export type ModerationReport = {
   reelId: string | null;
   reelTitle: string | null;
   reelHidden: boolean;
+  /** Team post or comment reports: what was reported and whether it is held or hidden right now. */
+  teamPostId: string | null;
+  commentId: string | null;
+  contentText: string | null;
+  contentState: "visible" | "held" | "hidden" | null;
+  hasImage: boolean;
 };
 
 export const listReports = createServerFn({ method: "GET" })
@@ -83,7 +89,10 @@ export const listReports = createServerFn({ method: "GET" })
       .object({
         status: z.union([STATUS, z.literal("all")]).default("all"),
         subjectType: z
-          .union([z.enum(["user", "game", "message", "reel"]), z.literal("all")])
+          .union([
+            z.enum(["user", "game", "message", "reel", "team_post", "comment"]),
+            z.literal("all"),
+          ])
           .default("all"),
       })
       .parse(d ?? {}),
@@ -95,7 +104,7 @@ export const listReports = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("user_reports")
       .select(
-        "id, subject_type, reason, details, status, created_at, reviewed_at, resolution_notes, reporter_id, reported_id, game_id, conversation_id, message_id, reel_id",
+        "id, subject_type, reason, details, status, created_at, reviewed_at, resolution_notes, reporter_id, reported_id, game_id, conversation_id, message_id, reel_id, team_post_id, comment_id",
       )
       .order("created_at", { ascending: false })
       .limit(300);
@@ -123,6 +132,29 @@ export const listReports = createServerFn({ method: "GET" })
       new Set(list.map((r) => r.message_id).filter(Boolean)),
     ) as string[];
     const reelIds = Array.from(new Set(list.map((r) => r.reel_id).filter(Boolean))) as string[];
+
+    const postIds = Array.from(
+      new Set(list.map((r) => r.team_post_id).filter(Boolean)),
+    ) as string[];
+    const commentIds = Array.from(
+      new Set(list.map((r) => r.comment_id).filter(Boolean)),
+    ) as string[];
+    const [posts, comments] = await Promise.all([
+      postIds.length
+        ? supabaseAdmin
+            .from("team_posts")
+            .select("id, title, body, image_url, hidden_at, moderation_status")
+            .in("id", postIds)
+        : Promise.resolve({ data: [] as any[] }),
+      commentIds.length
+        ? supabaseAdmin
+            .from("post_comments")
+            .select("id, body, hidden_at, moderation_status")
+            .in("id", commentIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const postMap = new Map((posts.data ?? []).map((p: any) => [p.id, p]));
+    const commentMap = new Map((comments.data ?? []).map((c: any) => [c.id, c]));
 
     const [profiles, games, messages, reels] = await Promise.all([
       userIds.length
@@ -183,6 +215,25 @@ export const listReports = createServerFn({ method: "GET" })
         reelId: r.reel_id,
         reelTitle: reel?.title ?? null,
         reelHidden: !!reel?.hidden_at,
+        teamPostId: r.team_post_id ?? null,
+        commentId: r.comment_id ?? null,
+        contentText: (() => {
+          const p = r.team_post_id ? postMap.get(r.team_post_id) : null;
+          const c = r.comment_id ? commentMap.get(r.comment_id) : null;
+          if (p) return `${p.title}${p.body ? `\n${p.body}` : ""}`.slice(0, 600);
+          return c ? String(c.body ?? "").slice(0, 600) : null;
+        })(),
+        contentState: (() => {
+          const row: any = r.team_post_id
+            ? postMap.get(r.team_post_id)
+            : r.comment_id
+              ? commentMap.get(r.comment_id)
+              : null;
+          if (!row) return null;
+          if (row.hidden_at) return "hidden" as const;
+          return row.moderation_status === "held" ? ("held" as const) : ("visible" as const);
+        })(),
+        hasImage: !!(r.team_post_id && postMap.get(r.team_post_id)?.image_url),
       };
     });
 
@@ -393,4 +444,96 @@ export const listModerationAudit = createServerFn({ method: "GET" })
         createdAt: r.created_at,
       })),
     };
+  });
+
+const CONTENT_DECISION = z.enum(["dismiss", "hide", "remove_media", "restore"]);
+
+/** Decide a team-post or comment report. Runs as the signed-in moderator so the database checks the role, the audit actor and the escalation rules. */
+export const decideContentReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { reportId: string; decision: string; notes?: string }) =>
+    z
+      .object({
+        reportId: z.string().uuid(),
+        decision: CONTENT_DECISION,
+        notes: z.string().max(1000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertModerator(context);
+    const { error } = await (context.supabase.rpc as any)("moderator_decide_content_report", {
+      _report: data.reportId,
+      _decision: data.decision,
+      _notes: data.notes?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export type ContentAppeal = {
+  id: string;
+  contentType: string;
+  contentId: string;
+  note: string;
+  createdAt: string;
+  contentText: string | null;
+};
+
+export const listContentAppeals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ContentAppeal[]> => {
+    await assertModerator(context);
+    const { data, error } = await (context.supabase as any)
+      .from("moderation_appeals")
+      .select("id, content_type, content_id, note, created_at")
+      .eq("status", "open")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as any[];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const posts = rows.filter((r) => r.content_type === "team_post").map((r) => r.content_id);
+    const comments = rows.filter((r) => r.content_type === "comment").map((r) => r.content_id);
+    const [p, c] = await Promise.all([
+      posts.length
+        ? supabaseAdmin.from("team_posts").select("id, title, body").in("id", posts)
+        : Promise.resolve({ data: [] as any[] }),
+      comments.length
+        ? supabaseAdmin.from("post_comments").select("id, body").in("id", comments)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const text = new Map<string, string>();
+    for (const x of (p.data ?? []) as any[])
+      text.set(x.id, `${x.title}${x.body ? `\n${x.body}` : ""}`.slice(0, 600));
+    for (const x of (c.data ?? []) as any[]) text.set(x.id, String(x.body ?? "").slice(0, 600));
+    return rows.map((r) => ({
+      id: r.id,
+      contentType: r.content_type,
+      contentId: r.content_id,
+      note: r.note,
+      createdAt: r.created_at,
+      contentText: text.get(r.content_id) ?? null,
+    }));
+  });
+
+export const reviewContentAppeal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { appealId: string; reverse: boolean; notes?: string }) =>
+    z
+      .object({
+        appealId: z.string().uuid(),
+        reverse: z.boolean(),
+        notes: z.string().max(1000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertModerator(context);
+    const { error } = await (context.supabase.rpc as any)("moderator_review_appeal", {
+      _appeal: data.appealId,
+      _reverse: data.reverse,
+      _notes: data.notes?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
