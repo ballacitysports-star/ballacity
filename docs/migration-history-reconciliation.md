@@ -93,18 +93,18 @@ platform-owned triggers in `storage`. Everything not listed above matched.
 
 ### Drift register (production differs from what main rebuilds)
 
-| #   | Object                                                              | Production                                                                              | Source on main                                                         | Handling                                                                                          |
-| --- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 1   | `reviews.recommend`, `.answers`, `.tags`, `reviews_recommend_check` | present                                                                                 | absent                                                                 | captured by `20261103110000_capture_structured_reviews.sql` (#245)                                |
-| 2   | functions `review_question_keys`, `review_tag_keys`                 | present                                                                                 | absent                                                                 | captured by #245                                                                                  |
-| 3   | `enforce_review_integrity`, `player_trait_counts` definitions       | production versions                                                                     | older                                                                  | captured by #245                                                                                  |
-| 4   | `enforce_review_integrity` EXECUTE                                  | `service_role` only                                                                     | PUBLIC/anon/authenticated                                              | #245 does not revoke it either (checked); captured by `20261103104000` in #253 (open, not merged) |
-| 5   | trigger `review_helpfuls.bump_helpful_count_trg`                    | absent                                                                                  | present (second trigger, double-counts votes)                          | fixed by `20261103100000_single_review_helpfuls_trigger.sql` (#251)                               |
-| 6   | `enforce_gym_review` definition                                     | has a bypass for system updates (`pg_trigger_depth() > 1` or `app.review_system = '1'`) | no bypass                                                              | captured by `20261103101000` in #253 (open, not merged)                                           |
-| 7   | `review_ring_suspects` definition                                   | alias `mean_rating`                                                                     | alias `avg_rating`, which collides with the `avg_rating` output column | captured by `20261103102000` in #253 (open, not merged)                                           |
-| 8   | `enforce_skill_vote` EXECUTE                                        | `service_role` only                                                                     | PUBLIC/anon/authenticated                                              | captured by `20261103103000` in #253 (open, not merged); low risk (trigger function)              |
+| #   | Object                                                              | Production                                                                              | Source on main                                                         | Handling                                                                                |
+| --- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | `reviews.recommend`, `.answers`, `.tags`, `reviews_recommend_check` | present                                                                                 | absent                                                                 | captured by `20261103110000_capture_structured_reviews.sql` (#245)                      |
+| 2   | functions `review_question_keys`, `review_tag_keys`                 | present                                                                                 | absent                                                                 | captured by #245                                                                        |
+| 3   | `enforce_review_integrity`, `player_trait_counts` definitions       | production versions                                                                     | older                                                                  | captured by #245                                                                        |
+| 4   | `enforce_review_integrity` EXECUTE                                  | `service_role` only                                                                     | PUBLIC/anon/authenticated                                              | #245 does not revoke it either (checked); captured by `20261103104000` in #253 (merged) |
+| 5   | trigger `review_helpfuls.bump_helpful_count_trg`                    | absent                                                                                  | present (second trigger, double-counts votes)                          | fixed by `20261103100000_single_review_helpfuls_trigger.sql` (#251)                     |
+| 6   | `enforce_gym_review` definition                                     | has a bypass for system updates (`pg_trigger_depth() > 1` or `app.review_system = '1'`) | no bypass                                                              | captured by `20261103101000` in #253 (merged)                                           |
+| 7   | `review_ring_suspects` definition                                   | alias `mean_rating`                                                                     | alias `avg_rating`, which collides with the `avg_rating` output column | captured by `20261103102000` in #253 (merged)                                           |
+| 8   | `enforce_skill_vote` EXECUTE                                        | `service_role` only                                                                     | PUBLIC/anon/authenticated                                              | captured by `20261103103000` in #253 (merged); low risk (trigger function)              |
 
-Items 4 and 6 to 8 are captured by #253, which is open and has not been merged or applied anywhere; until it is, they remain differences. Items 6 to 8 are new in this report. None is caused by the privacy release, and production is the safer side in each.
+Items 4 and 6 to 8 are captured by #253, which is merged into `main` (2026-11-04) but has not been applied to production; until it is applied there, production and a rebuild still differ only in that the rebuild now matches production's hand fixes. Items 6 to 8 are new in this report. None is caused by the privacy release, and production is the safer side in each.
 The risk is a rebuild or a later `CREATE OR REPLACE` from source silently reverting a hand fix.
 
 ## 5. Per-file evidence for the 71 files without ledger rows
@@ -234,3 +234,33 @@ migration decision. Summary:
 ## See also
 
 PR #229 (`docs/migration-ledger.md`, opened 2026-10-28, not merged) is an earlier, separate record of what production contained for the 65 files then newer than the last ledger row, including that `20261023130000_follow_approval` was applied to production on 2026-10-28 on the owner's approval. It uses a different method (object presence by name) and covers a different set; the two do not conflict, and neither inserts a ledger row.
+
+## 8. Proposed dispositions (documentation only; nothing is inserted)
+
+`docs/migration-evidence/ledger-evidence.csv` now has three more columns per entry: `proposed_disposition`, `disposition_basis`
+and `supporting_evidence_summary`. They are proposals for the owner; no production migration-history write is approved.
+
+| Disposition                    | Entries | Meaning                                                                                                                                                                                  |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INSERT-PROTECTIVE (priority)   | 1       | Re-running the file would change data (`20261023100000_owner_hide_listings` would relabel owner-hidden listings as moderator-hidden). A row stops a version-matching tool from doing it. |
+| INSERT-PROTECTIVE              | 27      | Later files redefine or drop objects this file creates; re-running it would silently regress them. A row records "applied, then superseded".                                             |
+| INSERT-AFTER-OWNER-REVIEW      | 6       | Effects proven by outcome (data, bucket or small-table checks); the owner reads the postconditions first.                                                                                |
+| INSERT-OPTIONAL (history only) | 32      | Effects present with identical fingerprints; nothing depends on a re-run. A row only completes the ledger.                                                                               |
+| HOLD-DRIFT                     | 4       | Production differs in a definition or grant. No row until the drift capture (#253, merged; and #245 for `player_trait_counts`, open) is applied to production and re-verified.           |
+| HOLD-OWNER                     | 1       | `20261030120000_sport_hubs_setting`: the setting exists but an operator set it to `{"enabled": false}`; confirm that is intended.                                                        |
+
+Guardrails that apply to every disposition:
+
+- No historical migration is replayed. No source file is fabricated or reconstructed. No obsolete column is restored (the
+  archived `20260708185348` original would re-create a dropped column and must never run).
+- The two recovered originals stay under `docs/migration-evidence/original-sources/` as evidence, outside any executable folder.
+- A ledger row records that a file was applied; it never applies it. If rows are approved, each is a single `INSERT` into
+  `supabase_migrations.schema_migrations` made in its own transaction with the owner's written approval, with `version` = the
+  file's timestamp and `name` = the file name without `.sql`. Whether `statements` holds the file's text or stays empty is the owner's
+  decision (the text is faithful to what was applied by hand; an empty array claims nothing). Template, **not executed**:
+
+```sql
+-- one approved entry per transaction; verify the file's SHA-256 against the CSV first
+insert into supabase_migrations.schema_migrations (version, name, statements)
+values ('<version_if_inserted>', '<source_file without .sql>', array[]::text[]);
+```
