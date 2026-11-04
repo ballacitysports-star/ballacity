@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the database client is faked structurally in tests */
 /**
  * One server call at a time per image path (SEC-6, R5 independent review 39ae9545, finding 1). See
- * supabase/migrations/20261108130000_image_processing_claim.sql: claim_image_processing atomically marks a path 'processing' under a
+ * supabase/migrations/20261108150000_image_processing_claim.sql: claim_image_processing atomically marks a path 'processing' under a
  * fresh token (refused while another call holds a live claim, and always for a quarantined or removed path); every non-flag outcome
  * is then written with finish_image_processing, which only succeeds while that same claim still stands. A flag is written
  * unconditionally and so always wins over a concurrent "safe" verdict. A claim older than 10 minutes can be taken over.

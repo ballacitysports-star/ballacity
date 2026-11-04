@@ -65,7 +65,7 @@ function world(
   const upserts: any[] = [];
   const items: any[] = [];
   const log: string[] = [];
-  // The database clock, for the claim's 10-minute expiry (supabase/migrations/20261108130000).
+  // The database clock, for the claim's 10-minute expiry (supabase/migrations/20261108150000).
   const clock = { now: Date.now() };
   const admin = {
     // claim_image_processing / finish_image_processing, with the migration's semantics (each call is atomic, as in Postgres).
