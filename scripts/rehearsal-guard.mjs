@@ -94,15 +94,23 @@ function urlRef(value) {
 const POOLER_HOST = /^[a-z0-9-]+\.pooler\.supabase\.com$/;
 const isDbUrl = (v) => /^\s*postgres(?:ql)?:\/\//i.test(v);
 /** libpq keyword/value conninfo ("host=... user=..."), recognized when it names a host, hostaddr or service. */
+const LIBPQ_TARGET_KEYS = ["host", "hostaddr", "port", "user", "dbname", "service", "options"];
+
 function conninfoParams(v) {
   const s = String(v).trim();
   if (!/^(?:[a-z_]+\s*=\s*(?:'(?:[^'\\]|\\.)*'|\S+)\s*)+$/i.test(s)) return null;
   const params = {};
-  for (const m of s.matchAll(/([a-z_]+)\s*=\s*('(?:[^'\\]|\\.)*'|\S+)/gi))
+  for (const m of s.matchAll(/([a-z_]+)\s*=\s*('(?:[^'\\]|\\.)*'|\S+)/gi)) {
+    // libpq uses the LAST of a repeated key; any repetition is refused so no check reads a different value
+    if (m[1].toLowerCase() in params && LIBPQ_TARGET_KEYS.includes(m[1].toLowerCase()))
+      params.__repeated = true;
     params[m[1].toLowerCase()] = m[2].startsWith("'")
       ? m[2].slice(1, -1).replace(/\\(.)/g, "$1")
       : m[2];
-  return "host" in params || "hostaddr" in params || "service" in params ? params : null;
+  }
+  return "host" in params || params.__repeated || "hostaddr" in params || "service" in params
+    ? params
+    : null;
 }
 
 /**
@@ -154,17 +162,29 @@ export function dbUrlFailures(name, value, r) {
   } catch {
     return [`environment variable ${name} is a database URL that cannot be parsed; refused`];
   }
+  // libpq applies the LAST of a repeated query parameter, percent-decoded. Refuse any repetition of a key that
+  // chooses the target, and decode the authority the way libpq does, so every check sees what libpq would use.
+  const repeated = LIBPQ_TARGET_KEYS.filter((k) => url.searchParams.getAll(k).length > 1);
+  if (repeated.length)
+    return [
+      `environment variable ${name} repeats the database URL parameter(s) ${repeated.join(", ")}; refused`,
+    ];
   const q = (k) => url.searchParams.get(k);
-  let user = "";
-  try {
-    user = decodeURIComponent(url.username);
-  } catch {
-    user = url.username;
-  }
+  const dec = (v) => {
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      return null;
+    }
+  };
+  const user = dec(url.username);
+  const hostname = dec(url.hostname);
+  if (user === null || hostname === null)
+    return [`environment variable ${name} has a malformed percent-encoding; refused`];
   return targetFailures(
     `environment variable ${name}`,
     {
-      host: q("host") ?? url.hostname,
+      host: q("host") ?? hostname,
       hostaddr: q("hostaddr"),
       user: q("user") ?? user,
       service: q("service"),
@@ -246,12 +266,22 @@ export function checkSandbox({ ref, allowList, env = {}, production }) {
   for (const [name, value] of Object.entries(env)) {
     if (typeof value !== "string" || value === "" || name === "SANDBOX_PROJECT_REF") continue;
     const v = norm(value);
-    if ([...prod].some((p) => v.includes(p)))
+    let decoded = v;
+    try {
+      decoded = norm(decodeURIComponent(value));
+    } catch {
+      /* a malformed encoding is refused by the URL check */
+    }
+    if ([...prod].some((p) => v.includes(p) || decoded.includes(p)))
       failures.push(`environment variable ${name} contains a production identifier`);
     if (isDbUrl(value)) failures.push(...dbUrlFailures(name, value, r));
     else {
       const ci = conninfoParams(value);
-      if (ci)
+      if (ci?.__repeated)
+        failures.push(
+          `environment variable ${name} repeats a connection parameter that chooses the target; refused`,
+        );
+      else if (ci)
         failures.push(
           ...targetFailures(
             `environment variable ${name}`,

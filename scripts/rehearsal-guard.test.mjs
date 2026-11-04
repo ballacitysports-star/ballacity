@@ -282,3 +282,36 @@ test("the guard imports nothing that can reach the network or a database", () =>
   assert.deepEqual(imports.sort(), ["node:fs", "node:path", "node:url"]);
   assert.doesNotMatch(src, /\bfetch\(|child_process|node:net|node:http|psql|createClient/);
 });
+
+test("R5 review F1: repeated or percent-encoded libpq parameters cannot redirect a sandbox URL", () => {
+  const [prod] = PRODUCTION_IDENTIFIERS;
+  const enc = (id) => `%${id.charCodeAt(0).toString(16)}${id.slice(1)}`;
+  const urls = [
+    `postgresql://postgres:pw@db.${SANDBOX}.supabase.co/postgres?host=db.${SANDBOX}.supabase.co&host=db.${enc(prod)}.supabase.co`,
+    `postgresql://postgres:pw@db.${SANDBOX}.supabase.co/postgres?host=db.${SANDBOX}.supabase.co&host=db.zyxwvutsrqponmlkjihg.supabase.co`,
+    `postgresql://postgres.${SANDBOX}:pw@aws-0-eu-west-1.pooler.supabase.com/postgres?user=postgres.${SANDBOX}&user=postgres.${enc(prod)}`,
+    `postgresql://postgres:pw@db.${enc(prod)}.supabase.co/postgres`,
+    `postgresql://postgres.${enc(prod)}:pw@aws-0-eu-west-1.pooler.supabase.com/postgres`,
+  ];
+  for (const url of urls) {
+    const res = checkSandbox({ ref: SANDBOX, allowList: [entry()], env: { DATABASE_URL: url } });
+    assert.equal(res.ok, false, url);
+  }
+  const ci = checkSandbox({
+    ref: SANDBOX,
+    allowList: [entry()],
+    env: {
+      DB: `host=db.${SANDBOX}.supabase.co host=db.zyxwvutsrqponmlkjihg.supabase.co user=postgres`,
+    },
+  });
+  assert.equal(ci.ok, false);
+  // the plain sandbox URL still passes
+  const ok = checkSandbox({
+    ref: SANDBOX,
+    allowList: [entry()],
+    env: {
+      DATABASE_URL: `postgresql://postgres:pw@db.${SANDBOX}.supabase.co/postgres?sslmode=require`,
+    },
+  });
+  assert.deepEqual(ok.failures, []);
+});

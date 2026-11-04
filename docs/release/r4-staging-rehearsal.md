@@ -133,8 +133,12 @@ and the preflight accepts exactly that difference and no other.
 Do **not** use `supabase db push`. It would also try the historical files, which are ledgered differently (runbook
 section 1).
 
-**Dependency guards.** Each file starts with a guard block (`to_regprocedure` / `to_regclass` checks) that raises
-and aborts if a prerequisite is missing. The "Dependency guard" column lists everything the manifest records the file
+**Dependency guards.** Most files start with a guard block (`to_regprocedure` / `to_regclass` checks) that raises
+and aborts if a prerequisite is missing. **Not all do** (R5 review F4): `20261103120000` (needs `20261103110000`),
+`20261104140000` and `20261104150000` (need `20261104100000` and `20261104130000`) and `20261105100000` (needs
+`20261104130000`) apply without their dependency and leave triggers calling missing objects; `20261104120000` refuses
+through a missing relation, not its guard. Apply strictly in the order below and run the read-only preflight, whose
+dependency rule catches an omission; never apply a subset. The "Dependency guard" column lists everything the manifest records the file
 needs: the guard literals plus the runbook's "Needs" (functions, tables, schemas, earlier migrations). A file that
 stops on its guard leaves nothing applied. Stop and record it; do not edit the file.
 
@@ -229,6 +233,19 @@ Auth signup path (so the `profiles` insert trigger runs) plus service-role inser
 Record fixture ids in the rehearsal record (synthetic ids only). Delete the fixtures at the end, or reset the sandbox.
 
 ## 6. Verifications that need a real Supabase project
+
+**Legacy-data stop conditions (R5 review F2, F3).** Before applying the release, run these read-only counts on the
+target. If either is non-zero, stop: the named file would abort (it rolls back cleanly) and needs a reviewed forward fix.
+Production on 2026-11-04 (read-only, aggregate): both 0 (no reviews, no contact requests).
+
+```sql
+-- 20261103120000 aborts with "Unknown gym." on a gym review whose organisation was deleted
+SELECT count(*) FROM public.reviews r
+ WHERE r.reviewee_kind IN ('gym', 'org', 'trainer_org')
+   AND NOT EXISTS (SELECT 1 FROM public.trainer_orgs o WHERE o.id::text = r.reviewee_id::text);
+-- 20261104150000 aborts with LOCATION_IN_PUBLIC_TEXT on a game invitation whose message names a place
+SELECT count(*) FROM public.availability_contact_requests WHERE game_id IS NOT NULL;
+```
 
 Run each with the synthetic accounts above, through the real API (publishable key + user JWTs), not `SET ROLE`. Record
 pass or fail with evidence (request, response code, row counts, screenshots). Any fail stops the rehearsal.
