@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
 import { assertModerator } from "@/lib/moderation.server";
+import { blockedByLocationHold, LOCATION_HOLD_MESSAGE, locationHoldRpc } from "@/lib/location-hold";
 
 /** Canonical audit action for each moderation outcome. */
 const MODERATION_AUDIT_ACTION = {
@@ -67,6 +68,8 @@ export type ModerationReport = {
   } | null;
   gameId: string | null;
   gameTitle: string | null;
+  /** The game's text is held after location-disclosure reports; only Restore text / Confirm removal close it. */
+  locationHold: boolean;
   conversationId: string | null;
   messageId: string | null;
   messageBody: string | null;
@@ -156,7 +159,7 @@ export const listReports = createServerFn({ method: "GET" })
     const postMap = new Map((posts.data ?? []).map((p: any) => [p.id, p]));
     const commentMap = new Map((comments.data ?? []).map((c: any) => [c.id, c]));
 
-    const [profiles, games, messages, reels] = await Promise.all([
+    const [profiles, games, messages, reels, holds] = await Promise.all([
       userIds.length
         ? supabaseAdmin
             .from("profiles")
@@ -175,7 +178,15 @@ export const listReports = createServerFn({ method: "GET" })
       reelIds.length
         ? supabaseAdmin.from("highlight_reels").select("id, title, hidden_at").in("id", reelIds)
         : Promise.resolve({ data: [] as any[] }),
+      gameIds.length
+        ? (supabaseAdmin as any)
+            .from("location_report_evidence")
+            .select("game_id")
+            .in("game_id", gameIds)
+            .is("released_at", null)
+        : Promise.resolve({ data: [] as any[] }),
     ]);
+    const heldGames = new Set(((holds as any).data ?? []).map((h: any) => h.game_id as string));
 
     const pMap = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
     const gMap = new Map((games.data ?? []).map((g: any) => [g.id, g]));
@@ -208,6 +219,7 @@ export const listReports = createServerFn({ method: "GET" })
           : null,
         gameId: r.game_id,
         gameTitle: game?.title ?? null,
+        locationHold: !!r.game_id && r.reason === "location_disclosed" && heldGames.has(r.game_id),
         conversationId: r.conversation_id ?? msg?.conversation_id ?? null,
         messageId: r.message_id,
         messageBody: msg?.body ?? null,
@@ -242,6 +254,26 @@ export const listReports = createServerFn({ method: "GET" })
     return { reports, counts };
   });
 
+/** Refuse a generic close of a report whose game text is held (the database refuses it too: LOCATION_HOLD_OPEN). */
+async function assertNoOpenHold(
+  admin: any,
+  report: { reason: string | null; game_id: string | null } | null,
+  action: { status?: string; action?: string },
+) {
+  if (!report?.game_id || report.reason !== "location_disclosed") return;
+  const { data } = await admin
+    .from("location_report_evidence")
+    .select("id")
+    .eq("game_id", report.game_id)
+    .is("released_at", null)
+    .limit(1);
+  const locationHold = (data ?? []).length > 0;
+  if (
+    blockedByLocationHold({ reason: report.reason, gameId: report.game_id, locationHold }, action)
+  )
+    throw new Error(LOCATION_HOLD_MESSAGE);
+}
+
 export const setReportStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { reportId: string; status: string; notes?: string }) =>
@@ -258,9 +290,10 @@ export const setReportStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin
       .from("user_reports")
-      .select("id, status, resolution_notes")
+      .select("id, status, resolution_notes, reason, game_id")
       .eq("id", data.reportId)
       .maybeSingle();
+    await assertNoOpenHold(supabaseAdmin, before as any, { status: data.status });
     const { error } = await supabaseAdmin
       .from("user_reports")
       .update({
@@ -307,6 +340,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!report) throw new Error("Report not found");
+    await assertNoOpenHold(supabaseAdmin, report as any, { action: data.action });
 
     const reason = data.reason?.trim() || null;
     const now = new Date().toISOString();
@@ -383,7 +417,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       summary = "Access and content restored";
     }
 
-    await supabaseAdmin
+    const { error: closeErr } = await supabaseAdmin
       .from("user_reports")
       .update({
         status: data.action === "restore" ? "dismissed" : "resolved",
@@ -392,6 +426,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
         resolution_notes: [summary, reason].filter(Boolean).join(" — "),
       })
       .eq("id", data.reportId);
+    if (closeErr) throw new Error(closeErr.message);
 
     await audit(supabaseAdmin, context.userId, {
       action: MODERATION_AUDIT_ACTION[data.action],
@@ -444,6 +479,40 @@ export const listModerationAudit = createServerFn({ method: "GET" })
         createdAt: r.created_at,
       })),
     };
+  });
+
+/**
+ * Decide a held location-disclosure report: restore the listing text or confirm its removal. Runs as the signed-in moderator, so the database
+ * checks the role, records the moderator and closes every report on that game.
+ */
+export const decideLocationHold = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { reportId: string; decision: string; notes?: string }) =>
+    z
+      .object({
+        reportId: z.string().uuid(),
+        decision: z.enum(["restore", "confirm"]),
+        notes: z.string().max(1000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertModerator(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: report, error: rErr } = await supabaseAdmin
+      .from("user_reports")
+      .select("id, reason, game_id")
+      .eq("id", data.reportId)
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!report?.game_id || report.reason !== "location_disclosed")
+      throw new Error("This report is not about a held listing");
+    const { error } = await (context.supabase.rpc as any)(locationHoldRpc(data.decision), {
+      _game: report.game_id,
+      _reason: data.notes?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 const CONTENT_DECISION = z.enum(["dismiss", "hide", "remove_media", "restore"]);

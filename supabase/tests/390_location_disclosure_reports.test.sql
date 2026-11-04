@@ -6,6 +6,8 @@ SELECT t.person('host', 35), t.person('rep1', 30), t.person('rep2', 31), t.perso
 SELECT t.guardian('kidguardian', 'kidrep');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator'), (t.id('adminone'), 'admin');
 ALTER TABLE public.hosted_games DISABLE TRIGGER validate_hosted_game_age_range;
+-- reporters must be established accounts to count toward the automatic hold (SEC-1)
+UPDATE auth.users SET created_at = now() - interval '30 days' WHERE id IN (t.id('rep1'), t.id('rep2'), t.id('teenrep'), t.id('kidrep'));
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, description, game_rules) VALUES
   ('yg', t.id('host'), 'basketball', 'U12 run behind the green gate', now()+interval '3 days', 8, 12, 'Old Mill Gym, 4 Dam Rd', 'by the creek', 'Park in the lot across from the green gate.', 'Bring a ball'),
   ('yg2', t.id('host'), 'basketball', 'U12 other', now()+interval '3 days', 8, 12, 'Gym, 1 A St', 'North', 'Directions in a paraphrase', NULL),
@@ -34,16 +36,18 @@ SELECT t.eq((SELECT title FROM public.hosted_games WHERE id = 'yg'), 'U12 run be
 SELECT t.as_user(t.id('teenrep'));
 SELECT t.eq(t.rep('yg', 'teenrep'), 'ok', 'a teen can report');
 SELECT t.reset();
-SELECT t.eq((SELECT title FROM public.hosted_games WHERE id = 'yg'), 'Basketball game', 'a second independent reporter removes the listing text');
+SELECT t.eq((SELECT title FROM public.hosted_games WHERE id = 'yg'), 'Basketball game', 'a second established reporter holds the listing text (removed from public view, kept as evidence)');
 SELECT t.ok((SELECT description = '' AND neighborhood = '' AND game_rules IS NULL AND equipment = '{}' FROM public.hosted_games WHERE id = 'yg'), 'description, neighborhood, rules and equipment are cleared');
 SELECT t.ok((SELECT host_id = t.id('host') AND sport = 'basketball' AND min_age = 8 AND max_age = 12 AND cancelled_at IS NULL FROM public.hosted_games WHERE id = 'yg'), 'the game itself (host, sport, ages, not cancelled) is untouched');
-SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE game_id = 'yg' AND status = 'actioned'), 3, 'all open reports are marked actioned');
+SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE game_id = 'yg' AND status = 'investigating'), 3, 'all open reports stay open for a moderator (investigating)');
+SELECT t.eq((SELECT count(*)::int FROM public.location_report_evidence WHERE game_id = 'yg' AND released_at IS NULL AND title = 'U12 run behind the green gate'), 1, 'the original text is kept as evidence');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('host') AND type = 'moderation_notice' AND link = '/games/yg'), 1, 'the host is told, without the reporters'' names');
 SELECT t.ok((SELECT NOT (title || coalesce(body, '')) ILIKE '%creek%' FROM public.notifications WHERE user_id = t.id('host') AND type = 'moderation_notice'), 'and without repeating the text');
-SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE action = 'location_disclosure_autoscrub' AND target_id = 'yg'), 1, 'the automatic removal is audited');
-SELECT t.ok((SELECT NOT (coalesce(reason, '') || metadata::text || coalesce(before::text, '') || coalesce(after::text, '')) ILIKE '%creek%' FROM public.admin_audit_log WHERE action = 'location_disclosure_autoscrub' AND target_id = 'yg'), 'and the audit row holds no copy of the removed text');
+SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE action = 'location_disclosure_auto_hold' AND target_id = 'yg'), 1, 'the automatic hold is audited');
+SELECT t.ok((SELECT NOT (coalesce(reason, '') || metadata::text || coalesce(before::text, '') || coalesce(after::text, '')) ILIKE '%creek%' FROM public.admin_audit_log WHERE action = 'location_disclosure_auto_hold' AND target_id = 'yg'), 'and the audit row holds no copy of the removed text');
 SELECT t.as_user(t.id('host'));
 SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), 0, 'the host cannot read the reports (nor who made them)');
+SELECT t.eq(t.count('SELECT 1 FROM public.location_report_evidence'), 0, 'nor the held evidence');
 SELECT t.throws($q$UPDATE public.hosted_games SET description = 'Meet at 4 Dam Rd' WHERE id = 'yg'$q$, 'LOCATION_IN_PUBLIC_TEXT', 'the host rewriting it with the address is refused by the PRIV-2D guard');
 SELECT t.lives($q$UPDATE public.hosted_games SET description = 'Come early to warm up.', neighborhood = 'Riverside' WHERE id = 'yg'$q$, 'but can describe the area again');
 SELECT t.reset();
