@@ -24,6 +24,14 @@ export const PER_USER_STORAGE_KEYS = [
 
 export async function resetPerUserClientState(): Promise<void> {
   if (typeof window === "undefined") return;
+  // Every per-user store, every legacy key and the original-photo database, in both local and session storage (the manifest
+  // lists them; PER_USER_STORAGE_KEYS above is kept for callers and tests that name the original set).
+  try {
+    const { purgeClientState } = await import("@/lib/client-storage-manifest");
+    await purgeClientState("identity-change");
+  } catch {
+    /* ignore */
+  }
   for (const key of PER_USER_STORAGE_KEYS) {
     try {
       window.localStorage.removeItem(key);
