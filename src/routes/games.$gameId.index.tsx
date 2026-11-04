@@ -4657,42 +4657,6 @@ function RosterPlayerRow({
     }
   };
 
-  const markPaidNoSubmission = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await reviewPaymentAction({
-        data: {
-          gameId: req.game_id,
-          playerId: req.player_id,
-          next: "verified",
-          expectedFrom: "none",
-        },
-      });
-      setLatestSub({
-        id: res.submission.id,
-        status: res.submission.status,
-        screenshot_path: res.submission.screenshot_path,
-      });
-      if (!res.changed) {
-        toast.info("Already marked as paid.");
-        return;
-      }
-      await createNotification({
-        user_id: req.player_id,
-        type: "payment_verified",
-        title: `Payment recorded for ${gameTitle}`,
-        body: "The host marked your payment as received.",
-        link: `/games/${req.game_id}`,
-      });
-      toast.success("Marked as paid.");
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not mark as paid.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const viewProof = async () => {
     if (!latestSub?.screenshot_path) return;
     const url = await getSignedProofUrl(latestSub.screenshot_path);
@@ -5028,16 +4992,6 @@ function RosterPlayerRow({
               className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary disabled:opacity-50"
             >
               Mark unpaid
-            </button>
-          )}
-          {paymentStatus === "none" && (
-            <button
-              type="button"
-              onClick={markPaidNoSubmission}
-              disabled={busy}
-              className="inline-flex items-center gap-1 rounded-full border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime disabled:opacity-50"
-            >
-              <Check className="h-3 w-3" /> Mark as paid
             </button>
           )}
           <button

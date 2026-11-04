@@ -12,6 +12,10 @@ SELECT t.as_user(t.id('teenhost'));
 SELECT t.lives(format($q$INSERT INTO public.hosted_games (id, host_id, sport, title, date, price, min_age, max_age, hosting_approval_id) VALUES ('p-ok', %L, 'basketball', 'paid youth run', now()+interval '3 days', 10, 13, 17, %L)$q$, t.id('teenhost'), current_setting('t.pay')::uuid), 'setup: a paid minor-hosted game with a guardian payment manager');
 SELECT t.reset();
 SELECT t.eq(private_sec.game_payee('p-ok'), t.id('guardian'), 'the payee is the guardian');
+-- SEC-8: only a payment made after an approved request (or a verified one) is a payment relation.
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status, reviewed_at) VALUES ('p-ok', t.id('payer'), t.id('teenhost'), 'kpayer', 'approved', now() - interval '1 minute');
+SET LOCAL session_replication_role = origin;
 INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (t.id('payer'), 'p-ok', t.id('guardian'));
 
 -- 1. a payer can notify the adult who holds their payment; the relation is one-way and needs an actual payment

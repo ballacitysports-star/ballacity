@@ -202,13 +202,15 @@ export async function listMyPaymentMethods(): Promise<PaymentMethod[]> {
   return (data ?? []) as PaymentMethod[];
 }
 
+/** The payee's handles for one game; the database decides whether the caller may see them. */
 export async function listPaymentMethodsForHost(
   hostId: string,
-  gameId?: string,
+  gameId: string,
 ): Promise<PaymentMethod[]> {
-  const { data, error } = gameId
-    ? await supabase.rpc("get_game_host_payment_methods", { _host_id: hostId, _game_id: gameId })
-    : await supabase.rpc("get_host_payment_methods", { _host_id: hostId });
+  const { data, error } = await supabase.rpc("get_game_host_payment_methods", {
+    _host_id: hostId,
+    _game_id: gameId,
+  });
   if (error) throw error;
   return (data ?? []) as PaymentMethod[];
 }
@@ -546,7 +548,9 @@ export async function createJoinRequest(input: {
 
   const { data, error } = await attemptInsert();
   if (!error && data) {
-    void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", (data as JoinRequest).id));
+    void import("@/lib/guardian-push.functions").then((m) =>
+      m.pingGuardians("join_request", (data as JoinRequest).id),
+    );
     return data as JoinRequest;
   }
 
@@ -597,7 +601,9 @@ export async function createJoinRequest(input: {
           // Trigger raises P0001 with a human-readable message for cap/cooldown.
           throw new Error(retryErr.message);
         }
-        void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", prev.id));
+        void import("@/lib/guardian-push.functions").then((m) =>
+          m.pingGuardians("join_request", prev.id),
+        );
         return retryData as JoinRequest;
       }
       return prev;
