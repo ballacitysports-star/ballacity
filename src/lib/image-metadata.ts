@@ -113,6 +113,10 @@ function concat(parts: Uint8Array[]): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------------------------- JPEG
+/** Segments needed to decode: SOFn (C0-CF except C4 DHT, C8 reserved, CC DAC — those two tables are kept too), DQT, DNL, DRI. */
+const JPEG_KEEP = (m: number) =>
+  (m >= 0xc0 && m <= 0xcf && m !== 0xc8) || m === 0xdb || m === 0xdc || m === 0xdd;
+
 function stripJpeg(b: Uint8Array): StripResult {
   const report: MetadataReport = { ...EMPTY, format: "jpeg" };
   if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) throw new Error("Not a JPEG");
@@ -169,7 +173,30 @@ function stripJpeg(b: Uint8Array): StripResult {
     const seg = b.subarray(i, i + 2 + len);
     const payload = b.subarray(i + 4, i + 2 + len);
     let drop = false;
-    if (m === 0xe1) {
+    let replacement: Uint8Array | null = null;
+    if (m === 0xe0) {
+      // APP0: keep only the 14-byte JFIF header with its thumbnail size set to 0 x 0; JFIF thumbnails and JFXX/other APP0
+      // extensions are dropped (a thumbnail can show the original, uncropped picture).
+      if (len >= 16 && ascii(payload, 0, 5) === "JFIF\0") {
+        const jfif = payload.slice(0, 14);
+        jfif[12] = 0;
+        jfif[13] = 0;
+        replacement = concat([Uint8Array.from([0xff, 0xe0, 0x00, 0x10]), jfif]);
+        if (len !== 16 || payload[12] !== 0 || payload[13] !== 0) report.hasOther = true;
+      } else {
+        drop = true;
+        report.hasOther = true;
+      }
+    } else if (m === 0xee) {
+      // APP14: keep only the 12-byte Adobe colour-transform header; anything after it, or a non-Adobe APP14, is dropped.
+      if (len >= 14 && ascii(payload, 0, 5) === "Adobe") {
+        replacement = concat([Uint8Array.from([0xff, 0xee, 0x00, 0x0e]), payload.slice(0, 12)]);
+        if (len !== 14) report.hasOther = true;
+      } else {
+        drop = true;
+        report.hasOther = true;
+      }
+    } else if (m === 0xe1) {
       drop = true;
       if (ascii(payload, 0, 6) === "Exif\0\0") {
         report.hasExif = true;
@@ -182,12 +209,21 @@ function stripJpeg(b: Uint8Array): StripResult {
     } else if (m === 0xed || m === 0xfe || (m >= 0xe3 && m <= 0xef && m !== 0xee)) {
       drop = true;
       report.hasOther = true; // Photoshop/IPTC, comments, vendor blocks (APP14 Adobe is kept: it sets the colour transform)
-    } else if (m === 0xe2 && ascii(payload, 0, 12) !== "ICC_PROFILE\0") {
+    } else if (m === 0xe2) {
+      if (ascii(payload, 0, 12) !== "ICC_PROFILE\0") {
+        drop = true;
+        report.hasOther = true; // FlashPix and other APP2 data; the ICC profile is kept
+      }
+    } else if (!JPEG_KEEP(m)) {
+      // allow-list: anything that is not a frame, table or restart definition (JPGn extensions, reserved markers) is dropped
       drop = true;
-      report.hasOther = true; // FlashPix and other APP2 data; the ICC profile is kept
+      report.hasOther = true;
     }
     if (drop) changed = true;
-    else out.push(seg);
+    else if (replacement) {
+      out.push(replacement);
+      if (!same(replacement, seg)) changed = true;
+    } else out.push(seg);
     i += 2 + len;
   }
   if (!sawEoi) throw new Error("Truncated JPEG (no end of image)");
@@ -270,10 +306,13 @@ function stripPng(b: Uint8Array): StripResult {
   let changed = false;
   let orientation: number | null = null;
   let ihdrEnd = -1;
+  let sawIend = false;
   while (i + 12 <= b.length) {
     const len = u32(b, i, false);
     const type = ascii(b, i + 4, 4);
     if (i + 12 + len > b.length) throw new Error("Malformed PNG chunk");
+    if ((i === 8) !== (type === "IHDR"))
+      throw new Error("Malformed PNG (IHDR must come first, once)");
     const chunk = b.subarray(i, i + 12 + len);
     if (type === "eXIf") {
       report.hasExif = true;
@@ -291,13 +330,21 @@ function stripPng(b: Uint8Array): StripResult {
       if (type.charCodeAt(0) >= 0x61) {
         report.hasOther = true;
         changed = true;
-      } else out.push(chunk);
+      } else throw new Error(`Unsupported critical PNG chunk ${JSON.stringify(type)}`); // cannot be dropped, so cannot be published
     } else {
       out.push(chunk);
       if (type === "IHDR") ihdrEnd = out.length;
     }
     i += 12 + len;
-    if (type === "IEND") break;
+    if (type === "IEND") {
+      sawIend = true;
+      break;
+    }
+  }
+  if (!sawIend) throw new Error("Truncated PNG (no IEND)");
+  if (i < b.length) {
+    report.hasOther = true; // data appended after IEND is dropped
+    changed = true;
   }
   report.orientation = orientation;
   if (orientation && orientation !== 1 && ihdrEnd > 0) {
@@ -312,6 +359,34 @@ function stripPng(b: Uint8Array): StripResult {
 }
 
 // ----------------------------------------------------------------------------------------------- WEBP
+const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ANIM", "ANMF", "ICCP"]);
+const ANMF_KEEP = new Set(["VP8 ", "VP8L", "ALPH"]);
+
+/** Keep only image sub-chunks inside an animation frame (16-byte frame header, then sub-chunks). */
+function filterAnmf(chunk: Uint8Array, size: number): Uint8Array {
+  if (size < 16) throw new Error("Malformed WEBP frame");
+  const body = chunk.subarray(8, 8 + size);
+  const keep: Uint8Array[] = [body.subarray(0, 16)];
+  let j = 16;
+  let dropped = false;
+  while (j + 8 <= body.length) {
+    const t = ascii(body, j, 4);
+    const sz = u32(body, j + 4, true);
+    const end = j + 8 + sz + (sz & 1);
+    if (end > body.length + 1) throw new Error("Malformed WEBP frame chunk");
+    if (ANMF_KEEP.has(t)) keep.push(body.subarray(j, Math.min(end, body.length)));
+    else dropped = true;
+    j = end;
+  }
+  if (j < body.length) throw new Error("Truncated WEBP frame");
+  if (!dropped) return chunk;
+  const inner = concat(keep);
+  const hdr = new Uint8Array(8);
+  hdr.set(new TextEncoder().encode("ANMF"), 0);
+  new DataView(hdr.buffer).setUint32(4, inner.length, true);
+  return concat(inner.length & 1 ? [hdr, inner, new Uint8Array(1)] : [hdr, inner]);
+}
+
 function stripWebp(b: Uint8Array): StripResult {
   const report: MetadataReport = { ...EMPTY, format: "webp" };
   if (b.length < 12 || ascii(b, 0, 4) !== "RIFF" || ascii(b, 8, 4) !== "WEBP")
@@ -321,13 +396,18 @@ function stripWebp(b: Uint8Array): StripResult {
   let changed = false;
   let orientation: number | null = null;
   let vp8xAt = -1;
-  while (i + 8 <= b.length) {
+  const riffEnd = Math.min(8 + u32(b, 4, true), b.length);
+  if (riffEnd < b.length) {
+    report.hasOther = true; // data appended after the RIFF container is dropped
+    changed = true;
+  }
+  while (i + 8 <= riffEnd) {
     const type = ascii(b, i, 4);
     const size = u32(b, i + 4, true);
     const padded = size + (size & 1);
-    if (i + 8 + padded > b.length + 1) throw new Error("Malformed WEBP chunk");
-    const end = Math.min(i + 8 + padded, b.length);
-    const chunk = b.subarray(i, end);
+    if (i + 8 + padded > riffEnd + 1) throw new Error("Malformed WEBP chunk");
+    const end = Math.min(i + 8 + padded, riffEnd);
+    let chunk = b.subarray(i, end);
     if (type === "EXIF") {
       report.hasExif = true;
       let tiff = b.subarray(i + 8, i + 8 + size);
@@ -339,12 +419,24 @@ function stripWebp(b: Uint8Array): StripResult {
     } else if (type === "XMP ") {
       report.hasXmp = true;
       changed = true;
+    } else if (!WEBP_KEEP.has(type)) {
+      report.hasOther = true; // allow-list: unknown chunks are dropped
+      changed = true;
     } else {
       if (type === "VP8X") vp8xAt = parts.length;
+      if (type === "ANMF") {
+        const frame = filterAnmf(chunk, size);
+        if (frame !== chunk) {
+          report.hasOther = true;
+          changed = true;
+          chunk = frame;
+        }
+      }
       parts.push(chunk);
     }
     i = end;
   }
+  if (i < riffEnd) throw new Error("Truncated WEBP chunk");
   report.orientation = orientation;
   const keepExif = !!orientation && orientation !== 1 && vp8xAt >= 0;
   if (keepExif) {
