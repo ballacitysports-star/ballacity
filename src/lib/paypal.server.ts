@@ -126,10 +126,13 @@ export type CaptureResult = {
 
 export async function captureOrder(orderId: string): Promise<CaptureResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
+  const res = await fetch(
+    `${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    },
+  );
   const json = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) throw new Error(json?.message || `PayPal capture failed (${res.status}).`);
   const unit = json?.purchase_units?.[0];
@@ -141,4 +144,24 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     currency: capture?.amount?.currency_code ?? null,
     payeeMerchantId: unit?.payee?.merchant_id ?? null,
   };
+}
+
+/**
+ * Refunds a capture in full. Used when a captured payment could not be
+ * recorded (the database refused the payment row), so the player is never
+ * charged for a payment the app does not know about.
+ */
+export async function refundCapture(captureId: string): Promise<{ refundId: string | null }> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${baseUrl()}/v2/payments/captures/${encodeURIComponent(captureId)}/refund`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: "{}",
+    },
+  );
+  const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+  if (!res.ok) throw new Error(json?.message || `PayPal refund failed (${res.status}).`);
+  return { refundId: json.id ?? null };
 }

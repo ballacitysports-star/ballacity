@@ -45,9 +45,8 @@ SELECT t.eq(
       'private_sec.minor_host_hidden(_user uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
-      -- Public by design: the checkout page needs the host's PayPal merchant id and a
-      -- game's refund terms before the visitor signs in.
-      'public.get_game_host_paypal(_game_id text)',
+      -- Public by design: the checkout page needs a game's refund terms before the visitor
+      -- signs in. (The PayPal merchant id is no longer public: SEC-8.)
       'public.get_game_refund_terms(_game_id text)')),
   '', 'no unlisted SECURITY DEFINER function is callable by anonymous visitors');
 

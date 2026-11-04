@@ -22,15 +22,18 @@ export type ReviewPaymentResult = {
  * Idempotent host action on a player's payment for a game.
  *
  * Guarantees enforced server-side (not just the RLS/insert grants):
- * - Only the host of the submission may act; caller must be signed in.
+ * - Only the game's payee (`game_payee_id`: its adult host, or a minor
+ *   host's payment manager) may act; caller must be signed in. Hosting a
+ *   game whose money goes to someone else is not enough.
  * - If the latest submission already matches `next`, this is a no-op
  *   (`changed: false`) — repeated taps or duplicate tabs cannot log
  *   duplicate transitions or fire duplicate notifications.
  * - Optional `expectedFrom` gives optimistic concurrency: if the row
  *   changed under the caller since they loaded it, we return a 409-ish
  *   error instead of blindly overwriting.
- * - `mark-paid` (no prior submission + next="verified") inserts once;
- *   a concurrent second call sees the row and returns `changed: false`.
+ * - It only reviews a payment the player submitted. There is no host
+ *   "mark paid" insert: a payment row is always written by its player (or
+ *   by PayPal checkout on the server), and the database refuses any other.
  *
  * The DB trigger `log_payment_verification_event` already skips writing
  * a history row when status is unchanged, so idempotency here also
@@ -66,20 +69,11 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
     // game's host or payment manager AND the player is already linked to the game, so this function cannot be used to
     // probe an arbitrary account's age cohort.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: game, error: gameErr } = await supabaseAdmin
-      .from("hosted_games")
-      .select("host_id")
-      .eq("id", gameId)
-      .maybeSingle();
-    if (gameErr) throw new Error(gameErr.message);
-    let managesPayments = !!game && game.host_id === userId;
-    if (game && !managesPayments) {
-      // In the privacy release a minor-hosted game's payee is the guardian payment manager (absent on older schemas).
-      const { data: payee, error: payeeErr } = await (supabaseAdmin.rpc as any)("game_payee_id", {
-        _game_id: gameId,
-      });
-      managesPayments = !payeeErr && payee === userId;
-    }
+    // The payee alone manages a game's payments: a minor host is never its payee, and an adult host is.
+    const { data: payee, error: payeeErr } = await (supabaseAdmin.rpc as any)("game_payee_id", {
+      _game_id: gameId,
+    });
+    const managesPayments = !payeeErr && !!payee && payee === userId;
     if (!managesPayments) throw new Error("Only this game's host can review its payments.");
     const linked = await Promise.all([
       supabaseAdmin
@@ -135,60 +129,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       .maybeSingle();
     if (readErr) throw new Error(readErr.message);
 
-    // No submission yet: only "verified" is meaningful (host marks as paid).
+    // Nothing to review. A host cannot create a payment for a player: the database accepts a payment row only from
+    // the player it is for (SEC-8), so there is no "mark paid" without a submission.
     if (!existing) {
-      if (next !== "verified") {
-        throw new Error("No payment submission to update.");
-      }
-      if (expectedFrom && expectedFrom !== "none") {
-        throw new Error("Payment status changed since you loaded the page. Please refresh.");
-      }
-      const nowIso = new Date().toISOString();
-      const { data: inserted, error: insErr } = await supabase
-        .from("payment_submissions")
-        .insert({
-          player_id: playerId,
-          game_id: gameId,
-          host_id: userId,
-          payment_method_id: null,
-          payment_type: null,
-          screenshot_path: null,
-          notes: "Marked paid by host",
-          paid_at: nowIso,
-          status: "verified",
-          reviewed_at: nowIso,
-        } as never)
-        .select("id, status, screenshot_path, game_id, player_id, host_id")
-        .single();
-      if (insErr) {
-        // Race: another tab inserted first. Re-read and treat as no-op.
-        const { data: after } = await supabase
-          .from("payment_submissions")
-          .select("id, status, screenshot_path, game_id, player_id, host_id")
-          .eq("game_id", gameId)
-          .eq("player_id", playerId)
-          .eq("host_id", userId)
-          .order("submitted_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (after) {
-          return {
-            ok: true,
-            changed: false,
-            submission: after as ReviewPaymentResult["submission"],
-          };
-        }
-        throw new Error(insErr.message);
-      }
-      {
-        const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-        await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
-      }
-      return {
-        ok: true,
-        changed: true,
-        submission: inserted as ReviewPaymentResult["submission"],
-      };
+      throw new Error("No payment submission to update.");
     }
 
     // Idempotent no-op: latest submission already in the requested state.

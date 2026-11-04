@@ -45,21 +45,51 @@ async function quoteGamePayPalFee(admin: AdminClient, gameId: string) {
 }
 
 /**
- * Public config for rendering the PayPal button on a game's pay screen.
- * The client id and merchant id are publishable identifiers, not secrets.
+ * Messages for the codes `payment_precondition_error` returns. The same rules
+ * as the payment_submissions triggers, checked before any money moves.
+ */
+const PRECONDITION_MESSAGES: Record<string, string> = {
+  GAME_NOT_FOUND: "Game not found.",
+  PAYMENTS_NOT_AVAILABLE: "Payment coordination isn't available for this account yet.",
+  PAYMENT_DESTINATION_INVALID: "This game can't take payments right now.",
+  HOST_APPROVAL_REQUIRED: "The host has to approve your request before you can pay.",
+  GUARDIAN_APPROVAL_REQUIRED:
+    "A parent or guardian has to approve this game before a payment can be sent.",
+};
+
+/**
+ * Null when `playerId` may pay for `gameId` now (approved request when one is
+ * required, the guardian's approval when the player has a guardian, an adult
+ * payee), else the message to show. Fails closed when the check itself fails.
+ */
+export async function paymentPreconditionError(
+  admin: AdminClient,
+  gameId: string,
+  playerId: string,
+): Promise<string | null> {
+  const { data, error } = await admin.rpc(
+    "payment_precondition_error" as never,
+    { _game_id: gameId, _player: playerId } as never,
+  );
+  if (error) return "Payment checks are unavailable right now. Please try again.";
+  const code = (data as unknown as string | null) ?? null;
+  if (!code) return null;
+  return PRECONDITION_MESSAGES[code] ?? "You can't pay for this game right now.";
+}
+
+/**
+ * Config for rendering the PayPal button on a game's pay screen. The client id
+ * is publishable. The merchant id is the game's payee's, and the database
+ * returns it only to a signed-in caller who can see the listing or is involved
+ * with the game, and only when the payee is a confirmed adult.
  */
 export const getPayPalCheckoutConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => gameIdSchema.parse(i))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const clientId = process.env.PAYPAL_CLIENT_ID ?? null;
     if (!clientId) return { clientId: null, merchantId: null };
-    const { createClient } = await import("@supabase/supabase-js");
-    const pub = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } },
-    );
-    const { data: rows } = await pub.rpc("get_game_host_paypal", {
+    const { data: rows } = await context.supabase.rpc("get_game_host_paypal", {
       _game_id: data.gameId,
     });
     const merchantId = (rows as { merchant_id: string }[] | null)?.[0]?.merchant_id ?? null;
@@ -94,6 +124,9 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
     if (quote.hostId === context.userId) throw new Error("You host this game.");
     if (quote.amountCents <= 0) throw new Error("This game is free — no payment needed.");
     if (!quote.merchantId) throw new Error("This host hasn't connected PayPal checkout.");
+    // The approval and guardian rules the database applies to the payment row, checked before an order exists.
+    const blocked = await paymentPreconditionError(supabaseAdmin, data.gameId, context.userId);
+    if (blocked) throw new Error(blocked);
 
     const { createOrder } = await import("@/lib/paypal.server");
     const { orderId } = await createOrder({
@@ -132,12 +165,16 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!order || order.player_id !== context.userId) throw new Error("Order not found.");
     if (order.status === "captured") return { ok: true as const, already: true as const };
+    if (order.status !== "created" && order.status !== "approved") {
+      throw new Error("This PayPal order can't be completed. Please start again.");
+    }
 
     // Re-price from the game rather than trusting the stored order row.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const quote = await quoteGamePayPalFee(supabaseAdmin, order.game_id);
 
-    const { captureOrder, getOrder, paypalPaymentMatches } = await import("@/lib/paypal.server");
+    const { captureOrder, getOrder, paypalPaymentMatches, refundCapture } =
+      await import("@/lib/paypal.server");
     const expected = {
       amountCents: order.amount_cents,
       currency: "USD",
@@ -162,6 +199,17 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       );
     }
 
+    // Re-check approval and guardian consent for this player now: either may have been withdrawn since the
+    // order was created, and once captured the money has moved.
+    const blocked = await paymentPreconditionError(supabaseAdmin, order.game_id, order.player_id);
+    if (blocked) {
+      await supabaseAdmin
+        .from("paypal_orders")
+        .update({ status: "failed" })
+        .eq("order_id", data.orderId);
+      throw new Error(`${blocked} You weren't charged.`);
+    }
+
     const result = await captureOrder(data.orderId);
 
     if (!paypalPaymentMatches(result, { ...expected, status: "COMPLETED" })) {
@@ -172,18 +220,11 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       throw new Error("PayPal payment could not be verified. No charge was recorded by us.");
     }
 
-    await supabaseAdmin
-      .from("paypal_orders")
-      .update({
-        status: "captured",
-        capture_id: result.captureId,
-        captured_at: new Date().toISOString(),
-      })
-      .eq("order_id", data.orderId);
-
     // Verified payment submission — the game page's realtime listener adds
-    // the player to the roster, same as a host-verified proof.
-    await supabaseAdmin.from("payment_submissions").insert({
+    // the player to the roster, same as a host-verified proof. The database
+    // re-applies the approval and guardian rules to this row; if it refuses,
+    // the money goes back and the player is not told it worked.
+    const { error: insertError } = await supabaseAdmin.from("payment_submissions").insert({
       game_id: order.game_id,
       host_id: order.host_id,
       player_id: order.player_id,
@@ -197,6 +238,40 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       status: "verified",
       reviewed_at: new Date().toISOString(),
     });
+    if (insertError) {
+      console.error("[paypal] captured payment could not be recorded", insertError.message);
+      let refunded = false;
+      if (result.captureId) {
+        refunded = await refundCapture(result.captureId)
+          .then(() => true)
+          .catch((e) => {
+            console.error("[paypal] refund after unrecorded capture failed", e);
+            return false;
+          });
+      }
+      await supabaseAdmin
+        .from("paypal_orders")
+        .update({
+          status: refunded ? "refunded" : "unrecorded",
+          capture_id: result.captureId,
+          captured_at: new Date().toISOString(),
+        } as never)
+        .eq("order_id", data.orderId);
+      throw new Error(
+        refunded
+          ? "Your payment couldn't be recorded, so PayPal is refunding it."
+          : "Your payment couldn't be recorded. Please contact support so we can refund it.",
+      );
+    }
+
+    await supabaseAdmin
+      .from("paypal_orders")
+      .update({
+        status: "captured",
+        capture_id: result.captureId,
+        captured_at: new Date().toISOString(),
+      })
+      .eq("order_id", data.orderId);
 
     {
       const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");

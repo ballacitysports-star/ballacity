@@ -80,13 +80,16 @@ SET LOCAL session_replication_role = replica;
 INSERT INTO public.join_requests (game_id, player_id, host_id, status, idempotency_key) VALUES ('p-ok', t.id('payer'), t.id('teenhost'), 'approved', 'kpayer');
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('payer'));
-SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('teenhost')),
-  'PAYMENT_DESTINATION_INVALID', 'a payment cannot be made out to the minor host');
-SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('stranger')),
-  'PAYMENT_DESTINATION_INVALID', 'nor to a different adult');
-SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('guardian')),
-  'but to the payment manager it can');
+-- SEC-8: the database names the payee; the host_id the client sends is ignored.
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'p-ok', %L)$q$, t.id('ps-t'), t.id('payer'), t.id('teenhost')),
+  'a payment naming the minor host is accepted');
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'p-ok', %L)$q$, t.id('ps-s'), t.id('payer'), t.id('stranger')),
+  'as is one naming a different adult');
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'p-ok', %L)$q$, t.id('ps-g'), t.id('payer'), t.id('guardian')),
+  'and one naming the payment manager');
 SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.payment_submissions WHERE id IN (t.id('ps-t'), t.id('ps-s'), t.id('ps-g')) AND host_id = t.id('guardian')), 3,
+  'but every one is made out to the payment manager, never to the minor host or another adult');
 
 -- existing minor-hosted paid game cannot raise its price or change host without an approval
 SET LOCAL session_replication_role = replica;

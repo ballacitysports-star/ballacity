@@ -4,6 +4,8 @@ BEGIN;
 SELECT t.person('host', 35), t.person('payer', 30);
 INSERT INTO public.hosted_games (id, host_id, sport, title, date)
 VALUES ('pay-g1', t.id('host'), 'basketball', 'Paid run', now() + interval '2 days');
+-- SEC-8: a game with no payment settings needs approval before payment; this host has opted out of approval.
+INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval) VALUES ('pay-g1', t.id('host'), 10, false);
 
 -- A claim as the player makes it: pending, with its evidence.
 SELECT t.as_user(t.id('payer'));
