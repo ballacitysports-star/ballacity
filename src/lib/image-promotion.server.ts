@@ -36,6 +36,8 @@ export type PromotionResult = {
 };
 
 const INLINE_SCAN_LIMIT = 4 * 1024 * 1024;
+export const ANIMATED_REFUSAL =
+  "Animated images can't be used here. Please choose a still JPG, PNG or WEBP picture.";
 
 async function removeStaged(
   admin: any,
@@ -162,6 +164,35 @@ export async function promoteStagedImage(
     throw new Error("This image could not be processed. Please try a different photo.");
   }
 
+  // The safety scanner looks at one frame. An animated PNG/WEBP could show a different picture in a later frame, so every
+  // bucket promoted here (avatars, covers, team/org/trainer images, game covers) takes still images only.
+  if (report.animated) {
+    await removeStaged(admin, userId, stagingPath, ANIMATED_REFUSAL, "validation", {
+      failure: "animated",
+    });
+    throw new Error(ANIMATED_REFUSAL);
+  }
+
+  // Validate what will actually be published (the clean bytes), not only the original: same type, readable, within limits,
+  // and the same picture size.
+  const cleanDims = readImageDimensions(clean);
+  const cleanFailure =
+    (sniffImageMime(clean) !== mime ? "The cleaned image is not the same type" : null) ??
+    validateImageMeta({ mime, bytes: clean.byteLength, dimensions: cleanDims }) ??
+    (cleanDims &&
+    dimensions &&
+    cleanDims.width === dimensions.width &&
+    cleanDims.height === dimensions.height
+      ? null
+      : "The cleaned image is not readable");
+  if (cleanFailure) {
+    await removeStaged(admin, userId, stagingPath, cleanFailure, "validation", {
+      failure: cleanFailure,
+      cleaned: true,
+    });
+    throw new Error("This image could not be processed. Please try a different photo.");
+  }
+
   // The scanner must see exactly the bytes that will be published. Up to 4 MB they travel inline. Above that, the CLEAN bytes are written to a
   // server-only scratch name (users can only write `{their own id}/...`, never `_scan/...`) and the scanner fetches that copy, which is then
   // deleted. The staged object itself is never re-fetched by the scanner, so a swap of it cannot change what is scanned.
@@ -209,8 +240,8 @@ export async function promoteStagedImage(
     owner_id: userId,
     mime,
     bytes: clean.byteLength,
-    width: dimensions?.width ?? null,
-    height: dimensions?.height ?? null,
+    width: cleanDims?.width ?? null,
+    height: cleanDims?.height ?? null,
   };
 
   if (!verdict) {
@@ -315,6 +346,8 @@ export type StagingSweepResult = {
   removed: number;
   kept: number;
   keptFlagged: number;
+  /** Sub-folders inside a user folder. The upload policy allows only `{uid}/{file}`, so none should exist; they are reported, never removed. */
+  skippedNested: number;
 };
 
 /**
@@ -329,7 +362,13 @@ export async function sweepImageStaging(
 ): Promise<StagingSweepResult> {
   const now = opts.now ?? Date.now();
   const page = opts.pageSize ?? 1000;
-  const result: StagingSweepResult = { examined: 0, removed: 0, kept: 0, keptFlagged: 0 };
+  const result: StagingSweepResult = {
+    examined: 0,
+    removed: 0,
+    kept: 0,
+    keptFlagged: 0,
+    skippedNested: 0,
+  };
   const bucket = admin.storage.from(IMAGE_STAGING_BUCKET);
 
   const listAll = async (prefix: string) => {
@@ -348,6 +387,11 @@ export async function sweepImageStaging(
     const files = await listAll(folder.name);
     const stale: string[] = [];
     for (const f of files) {
+      if (!f.id) {
+        // a sub-folder (Storage lists folders with no id): never passed to remove(), which takes object names only
+        result.skippedNested += 1;
+        continue;
+      }
       result.examined += 1;
       const created = f.created_at ? Date.parse(f.created_at) : NaN;
       if (Number.isFinite(created) && now - created > opts.olderThanMs)

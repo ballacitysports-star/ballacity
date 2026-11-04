@@ -2353,6 +2353,7 @@ export type Database = {
           conversation_id: string
           kind: string
           mime: string
+          object_id: string | null
           path: string
           user_id: string
         }
@@ -2362,6 +2363,7 @@ export type Database = {
           conversation_id: string
           kind: string
           mime: string
+          object_id?: string | null
           path: string
           user_id: string
         }
@@ -2371,6 +2373,7 @@ export type Database = {
           conversation_id?: string
           kind?: string
           mime?: string
+          object_id?: string | null
           path?: string
           user_id?: string
         }

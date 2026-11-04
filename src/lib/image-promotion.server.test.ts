@@ -1,6 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
 import { describe, expect, it, vi } from "vitest";
+import type { StripResult } from "./image-metadata";
+
+// Pass-through by default; a test can replace the stripper's output to prove the clean bytes are validated again.
+const stripOverride = vi.hoisted(() => ({ fn: null as null | ((b: Uint8Array) => StripResult) }));
+vi.mock("@/lib/image-metadata", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./image-metadata")>();
+  return {
+    ...real,
+    stripImageMetadata: (b: Uint8Array) =>
+      stripOverride.fn ? stripOverride.fn(b) : real.stripImageMetadata(b),
+  };
+});
 import {
+  ANIMATED_REFUSAL,
   promoteStagedImage,
   sweepImageStaging,
   type PromotionDeps,
@@ -289,10 +302,132 @@ describe("promoteStagedImage", () => {
   });
 });
 
+// ---- animated and cleaned-output checks (review round 4)
+const be32 = (n: number) => Uint8Array.from([n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255]);
+const le32 = (n: number) => Uint8Array.from([n & 255, (n >> 8) & 255, (n >> 16) & 255, n >>> 24]);
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc = (b: Uint8Array) => {
+  let c = 0xffffffff;
+  for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+const pchunk = (type: string, data: Uint8Array) => {
+  const body = cat(enc.encode(type), data);
+  return cat(be32(data.length), body, be32(crc(body)));
+};
+const apng = () =>
+  cat(
+    Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pchunk("IHDR", Uint8Array.from([0, 0, 0, 100, 0, 0, 0, 80, 8, 2, 0, 0, 0])),
+    pchunk("acTL", Uint8Array.from([0, 0, 0, 2, 0, 0, 0, 0])),
+    pchunk("fcTL", new Uint8Array(26)),
+    pchunk("IDAT", Uint8Array.from([1, 2, 3])),
+    pchunk("fcTL", new Uint8Array(26)),
+    pchunk("fdAT", new Uint8Array(8)),
+    pchunk("IEND", new Uint8Array(0)),
+  );
+const wchunk = (type: string, data: Uint8Array) =>
+  cat(
+    enc.encode(type),
+    le32(data.length),
+    data,
+    data.length & 1 ? new Uint8Array(1) : new Uint8Array(0),
+  );
+const animatedWebp = () => {
+  const vp8l = wchunk("VP8L", Uint8Array.from([0x2f, 99, 0xc0, 0x13, 0, 7, 16, 17, 17]));
+  const body = cat(
+    wchunk("VP8X", Uint8Array.from([0x02, 0, 0, 0, 99, 0, 0, 79, 0, 0])),
+    wchunk("ANIM", new Uint8Array(6)),
+    wchunk("ANMF", cat(new Uint8Array(16), vp8l)),
+    wchunk("ANMF", cat(new Uint8Array(16), vp8l)),
+  );
+  return cat(enc.encode("RIFF"), le32(4 + body.length), enc.encode("WEBP"), body);
+};
+
+describe("promoteStagedImage: still images only, and the cleaned bytes are validated", () => {
+  it.each([
+    ["an animated PNG (APNG)", "png", apng],
+    ["an animated WEBP", "webp", animatedWebp],
+  ])("refuses %s with a clear error, removes it and publishes nothing", async (_n, ext, make) => {
+    const stage = `${USER}/anim.${ext}`;
+    const target = `${USER}/anim-final.${ext}`;
+    for (const bucket of ["avatars", "covers", "team-avatars", "org-covers", "trainer-avatars"]) {
+      const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: make() });
+      const d = deps(w);
+      await expect(
+        promoteStagedImage(d, { userId: USER, bucket, stagingPath: stage, targetPath: target }),
+      ).rejects.toThrow(ANIMATED_REFUSAL);
+      expect(d.scan).not.toHaveBeenCalled();
+      expect(w.files.has(`${bucket}|${target}`)).toBe(false);
+      expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${stage}`)).toBe(false);
+      expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${stage}`).status).toBe("removed");
+    }
+  });
+
+  it("refuses a WEBP with no image data (canvas header only) before any scan", async () => {
+    const body = wchunk("VP8X", Uint8Array.from([0, 0, 0, 0, 99, 0, 0, 79, 0, 0]));
+    const w = world({
+      [`${IMAGE_STAGING_BUCKET}|${USER}/e.webp`]: cat(
+        enc.encode("RIFF"),
+        le32(4 + body.length),
+        enc.encode("WEBP"),
+        body,
+      ),
+    });
+    const d = deps(w);
+    await expect(
+      promoteStagedImage(d, {
+        ...input,
+        stagingPath: `${USER}/e.webp`,
+        targetPath: `${USER}/f.webp`,
+      }),
+    ).rejects.toThrow(/could not be processed/);
+    expect(d.scan).not.toHaveBeenCalled();
+    expect(w.files.size).toBe(0);
+  });
+
+  it("re-validates the cleaned bytes: a cleaned result of another size, type or none at all is never published", async () => {
+    const outputs: Uint8Array[] = [
+      jpeg().map((x, i) => (i === 10 ? 0 : x)), // height 80 -> 0: not the same picture, and too small
+      enc.encode("not an image"),
+      new Uint8Array(0),
+    ];
+    try {
+      for (const bytes of outputs) {
+        stripOverride.fn = () => ({
+          bytes,
+          changed: true,
+          report: {
+            format: "jpeg",
+            hasExif: false,
+            hasGps: false,
+            hasXmp: false,
+            hasOther: false,
+            orientation: null,
+            animated: false,
+          },
+        });
+        const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
+        const d = deps(w);
+        await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
+        expect(d.scan).not.toHaveBeenCalled();
+        expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+        expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("removed");
+      }
+    } finally {
+      stripOverride.fn = null;
+    }
+  });
+});
+
 describe("sweepImageStaging", () => {
   const NOW = Date.parse("2026-11-05T12:00:00Z");
   const listing = (
-    items: Record<string, { name: string; created_at: string }[]>,
+    items: Record<string, { name: string; id: string | null; created_at: string | null }[]>,
     flaggedPaths: string[] = [],
   ) => {
     const removed: string[] = [];
@@ -336,8 +471,8 @@ describe("sweepImageStaging", () => {
     };
     return { admin, removed, deletedRows };
   };
-  const old = { name: "a.jpg", created_at: "2026-11-03T00:00:00Z" };
-  const fresh = { name: "b.jpg", created_at: "2026-11-05T11:00:00Z" };
+  const old = { name: "a.jpg", id: "o-a", created_at: "2026-11-03T00:00:00Z" };
+  const fresh = { name: "b.jpg", id: "o-b", created_at: "2026-11-05T11:00:00Z" };
 
   it("removes only files older than the window, and their moderation rows", async () => {
     const { admin, removed, deletedRows } = listing({ u1: [old, fresh] });
@@ -345,6 +480,14 @@ describe("sweepImageStaging", () => {
     expect(removed).toEqual(["u1/a.jpg"]);
     expect(deletedRows).toEqual(["u1/a.jpg"]);
     expect(r).toMatchObject({ examined: 2, removed: 1, kept: 1, keptFlagged: 0 });
+  });
+  it("skips a nested folder instead of passing a folder name to remove()", async () => {
+    const { admin, removed } = listing({
+      u1: [old, { name: "nested", id: null, created_at: null }],
+    });
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
+    expect(removed).toEqual(["u1/a.jpg"]);
+    expect(r).toMatchObject({ examined: 1, removed: 1, skippedNested: 1 });
   });
   it("never removes a quarantined file (possible child-safety evidence)", async () => {
     const { admin, removed } = listing({ u1: [old] }, ["u1/a.jpg"]);
@@ -360,13 +503,14 @@ describe("sweepImageStaging", () => {
     expect(r.removed).toBe(1);
   });
   it("keeps files with an unknown age", async () => {
-    const { admin, removed } = listing({ u1: [{ name: "c.jpg", created_at: "" }] });
+    const { admin, removed } = listing({ u1: [{ name: "c.jpg", id: "o-c", created_at: "" }] });
     await sweepImageStaging(admin, { olderThanMs: 1, now: NOW });
     expect(removed).toEqual([]);
   });
   it("pages through folders and files beyond one page", async () => {
     const many = Array.from({ length: 5 }, (_, i) => ({
       name: `f${i}.jpg`,
+      id: `o-${i}`,
       created_at: "2026-11-01T00:00:00Z",
     }));
     const { admin, removed } = listing({ u1: many });
