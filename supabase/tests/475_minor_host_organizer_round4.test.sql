@@ -89,7 +89,7 @@ SELECT set_config('t.run', public.neutralize_existing_minor_host_snapshots(1, fa
 SELECT set_config('request.jwt.claim.sub', '', true);
 SELECT t.eq((current_setting('t.run')::jsonb ->> 'updated')::int, 1, 'a superadmin runs it in batches (one row here)');
 SELECT t.ok((current_setting('t.run')::jsonb ->> 'next_after_id') IS NOT NULL, 'final review #3: the batch returns a cursor for the next call');
-SELECT set_config('t.cur', public.neutralize_existing_minor_host_snapshots(1000, false, true, '~~~~')::text, true);
+SELECT set_config('t.cur', public.neutralize_existing_minor_host_snapshots(1000, false, true, (SELECT max(id) FROM public.hosted_games))::text, true);
 SELECT t.eq((current_setting('t.cur')::jsonb ->> 'updated')::int, 0, 'final review #3: a cursor past every id processes nothing (failed rows can never block later batches)');
 SELECT set_config('t.run', public.neutralize_existing_minor_host_snapshots(1000, false)::text, true);
 SELECT t.eq((current_setting('t.run')::jsonb ->> 'failed')::int, 0, 'the service role runs the rest without failures');
