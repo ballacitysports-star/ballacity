@@ -19,8 +19,8 @@ Status: **implemented locally, open in a pull request (stacked on #258). Not mer
 
 - Migration `20261106120000_private_image_staging.sql`: a private bucket `image-staging` (8 MB, image types only). A signed-in user may insert only into their own folder; there is no SELECT, UPDATE or DELETE policy, so nobody can read, replace or delete a staged file through the API. Only the service role can.
 - `promoteStagedImage` (server): download the staged file, validate type, size and dimensions, strip metadata, scan the **clean** bytes, and only if everything passes write them to the destination bucket, record the outcome, and remove the staged copy. Unsafe files stay in the private bucket (quarantined, escalated if child-safety); invalid files are removed. A failed publish keeps the staged file so a retry works; a retry or concurrent second call after success returns the recorded outcome.
-- Client (`uploadDataUrlToBucket`): stage, then promote. It falls back to the old direct flow only when the staging bucket does not exist (database not migrated yet) or the destination folder is not the caller's own, so every existing flow keeps working during rollout.
-- The old direct path is **not** closed here. After the new build has been live for a full adoption window, a separately approved migration should drop the direct INSERT/UPDATE policies on the public image buckets (avatars/covers: "Users write own avatar"; "Users write entity images in own folder"; org and team owner policies). Until then a direct client can still bypass staging; a read-only sweep (below) detects that.
+- Client (`uploadDataUrlToBucket`): stage, then promote. **There is no fallback to a direct public upload.** If the staging bucket is missing, staging errors, the folder is not the caller's own, or the user is signed out, the upload fails with a clear message. Deploy order is therefore: migration first, then the app.
+- The old direct path is **not** closed here (see the transition plan). After the new build has been live for a full adoption window, a separately approved migration should drop the direct INSERT/UPDATE policies on the public image buckets (avatars/covers: "Users write own avatar"; "Users write entity images in own folder"; org and team owner policies). Until then a direct client can still bypass staging; a read-only sweep (below) detects that.
 
 ## Tests
 
@@ -51,3 +51,60 @@ Sandbox remediation plan (no production bulk rewrite):
 ## Recovery
 
 Forward only. If promotion fails in the field, the client falls back only for a missing bucket; other errors surface to the user and the staged file stays private. Disabling staging means shipping a client that uploads directly again, which restores the old window; it is not recommended.
+
+## Hardening review of #258 and #268 together (second pass)
+
+Reviewed together at the final heads: the boundary is (1) Storage policies, (2) the browser, (3) the promotion function, (4) the scanner.
+
+| Requirement                            | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Private upload staging                 | `image-staging` is private; owners can insert only in their own folder and cannot read, replace or delete (no SELECT/UPDATE/DELETE policy; test 440).                                                                                                                                                                                                                                                                                                                                                                                             |
+| Server-side metadata removal           | `stripImageMetadata` runs on the staged bytes before anything is scanned or published; unreadable files are removed and refused.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Scan before public promotion           | The clean bytes are scanned first; the destination is written only after a verdict.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Fail closed                            | **Changed in this pass.** If the scanner is off, errors, or yields no verdict, nothing is published: the file waits in private staging as `pending`, the client says "we couldn't check this image right now", and a retry promotes it. Previously an unscanned upload was let through to the review queue. Production check (read-only): all 37 existing moderation records were produced by a working scan, so this does not change today's behaviour, but any future scanner outage now blocks uploads instead of publishing unchecked images. |
+| No fallback to an unsafe public upload | **Changed in this pass.** The browser never writes to a destination bucket. Missing staging bucket, staging error, foreign folder and signed-out all fail (unit tests, 8 cases).                                                                                                                                                                                                                                                                                                                                                                  |
+| Cleanup of failed uploads              | Invalid and unreadable files are removed immediately and recorded; unsafe files stay private and quarantined; abandoned, held or failed-publish files are removed by `superadminSweepImageStaging` (superadmin only, dry run by default, 24 h window, audited, **not scheduled**).                                                                                                                                                                                                                                                                |
+| Authorization failures                 | Staging and target paths must be the caller's own folder, plain file names only, known bucket; wrong type/name refused. A second concurrent call after success returns the recorded outcome.                                                                                                                                                                                                                                                                                                                                                      |
+| Retries                                | Publish failure keeps the staged file; a held scan can be retried; the destination write is an upsert in the caller's own folder.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Large images                           | 8 MB cap; scans over 4 MB use a short-lived signed URL of the private copy (unit test); worker memory and time limits remain a sandbox check (ST-8.4).                                                                                                                                                                                                                                                                                                                                                                                            |
+
+Findings that remain, by design, until phase 2:
+
+1. **Direct legacy uploads and in-place overwrite.** The existing public-bucket policies let an owner insert and update objects in their own folder. An older client, or a user calling the Storage API directly, can still put an unprocessed original in a public bucket, or overwrite a finalized image with one. The sweep below finds unfinalized objects; it cannot find an overwrite. Phase 2 removes the write policies.
+2. **No per-user staging quota.** A user can fill their own private staging folder up to the platform limits; the sweeper bounds the retention, not the rate.
+3. **CDN behaviour** after replacement or deletion is only verifiable in the sandbox (ST-8.5).
+
+## Legacy-client compatibility and transition plan
+
+| Phase | What                                                                                                                                                                                                                                                                        | Gate                                                           |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 0     | Apply the staging migration (additive), then publish the new app. Old clients keep uploading directly.                                                                                                                                                                      | owner approvals as per the runbook                             |
+| 1     | Adoption window (at least the cache lifetime of the old build plus one week). Run the read-only sweep weekly: public-bucket objects with no moderation record, and objects whose moderation row says `pending` for more than a day. Watch the audit log for staging sweeps. | counts trend to zero                                           |
+| 2     | **Separately approved migration** closing the direct paths (draft below, not in `supabase/migrations`). After it, only the service role writes to public image buckets; owners can still delete. Old clients get a Storage permission error and must update.                | owner approval after phase 1 is clean; sandbox rehearsal first |
+| 3     | Historical media: assessment, sandbox rewrite, then a separately approved production rewrite (see the plan above).                                                                                                                                                          | owner approval                                                 |
+
+Phase 2 draft (reviewed against the policies present in the replayed schema; names must be re-read from production before use):
+
+```sql
+-- NOT APPLIED. Phase 2: no browser writes into public image buckets; deletes stay with the owner.
+DROP POLICY IF EXISTS "Users write own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Users write entity images in own folder (insert)" ON storage.objects;
+DROP POLICY IF EXISTS "Users write entity images in own folder (update)" ON storage.objects;
+DROP POLICY IF EXISTS "Team owners write team images" ON storage.objects;
+DROP POLICY IF EXISTS "Org admins write org images" ON storage.objects;
+-- keep owners able to remove their own files
+CREATE POLICY "owners delete own public images" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id IN ('avatars','covers','org-avatars','org-covers','team-avatars','team-covers','trainer-avatars')
+         AND (storage.foldername(name))[1] = (auth.uid())::text);
+```
+
+Read-only sweep (run in the SQL console, aggregates only):
+
+```sql
+select o.bucket_id, count(*) as without_moderation_record
+  from storage.objects o left join public.image_moderation m on m.bucket = o.bucket_id and m.path = o.name
+ where o.bucket_id in ('avatars','covers','org-avatars','org-covers','team-avatars','team-covers','trainer-avatars') and m.id is null
+ group by 1;
+```
+
+Review requested from an independent reviewer before any merge: the storage policy set, `promoteStagedImage`, and the client. See `docs/release/independent-review-briefs.md`.

@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
 import { describe, expect, it, vi } from "vitest";
-import { promoteStagedImage, type PromotionDeps } from "./image-promotion.server";
+import {
+  promoteStagedImage,
+  sweepImageStaging,
+  type PromotionDeps,
+} from "./image-promotion.server";
 import { IMAGE_STAGING_BUCKET, isOwnFilePath } from "./image-staging";
 
 const enc = new TextEncoder();
@@ -192,5 +196,89 @@ describe("promoteStagedImage", () => {
     expect(isOwnFilePath(USER, `${USER}/sub/a.jpg`)).toBe(false);
     expect(isOwnFilePath(USER, `${USER}/../a.jpg`)).toBe(false);
     expect(isOwnFilePath(USER, `other/a.jpg`)).toBe(false);
+  });
+
+  it("fails closed when the safety scan cannot run: nothing is published and the file stays private", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
+    const d = deps(w, { ...safe, scanned: false, label: "unscanned" });
+    const out = await promoteStagedImage(d, input);
+    expect(out.held).toBe(true);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(true);
+    expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("pending");
+  });
+
+  it("fails closed when the scanner throws", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const d = deps(w);
+    d.scan.mockRejectedValue(new Error("gateway down"));
+    const out = await promoteStagedImage(d, input);
+    expect(out.held).toBe(true);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+  });
+
+  it("publishes after a held attempt is retried and the scan works", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
+    const first = await promoteStagedImage(deps(w, { ...safe, scanned: false }), input);
+    expect(first.held).toBe(true);
+    const second = await promoteStagedImage(deps(w), input);
+    expect(second.held).toBeUndefined();
+    expect(hasText(w.files.get(`avatars|${TARGET}`)!, "GPS")).toBe(false);
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(false);
+  });
+
+  it("never publishes an original even when the stored name pretends to be another type", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${USER}/x.png`]: jpeg({ gps: true }) });
+    await expect(
+      promoteStagedImage(deps(w), {
+        ...input,
+        stagingPath: `${USER}/x.png`,
+        targetPath: `${USER}/y.png`,
+      }),
+    ).rejects.toThrow(/does not match/);
+    expect(w.files.has(`avatars|${USER}/y.png`)).toBe(false);
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${USER}/x.png`)).toBe(false);
+  });
+});
+
+describe("sweepImageStaging", () => {
+  const NOW = Date.parse("2026-11-05T12:00:00Z");
+  const listing = (items: Record<string, { name: string; created_at: string }[]>) => {
+    const removed: string[] = [];
+    const admin = {
+      storage: {
+        from: () => ({
+          list: async (prefix: string) =>
+            prefix === ""
+              ? { data: Object.keys(items).map((name) => ({ name, id: null })) }
+              : { data: items[prefix] ?? [] },
+          remove: async (paths: string[]) => {
+            removed.push(...paths);
+            return { error: null };
+          },
+        }),
+      },
+    };
+    return { admin, removed };
+  };
+  const old = { name: "a.jpg", created_at: "2026-11-03T00:00:00Z" };
+  const fresh = { name: "b.jpg", created_at: "2026-11-05T11:00:00Z" };
+
+  it("removes only files older than the window", async () => {
+    const { admin, removed } = listing({ u1: [old, fresh] });
+    const r = await sweepImageStaging(admin, { olderThanMs: 24 * 3600 * 1000, now: NOW });
+    expect(removed).toEqual(["u1/a.jpg"]);
+    expect(r).toEqual({ examined: 2, removed: 1, kept: 1 });
+  });
+  it("a dry run changes nothing", async () => {
+    const { admin, removed } = listing({ u1: [old] });
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW, dryRun: true });
+    expect(removed).toEqual([]);
+    expect(r.removed).toBe(1);
+  });
+  it("keeps files with an unknown age", async () => {
+    const { admin, removed } = listing({ u1: [{ name: "c.jpg", created_at: "" }] });
+    await sweepImageStaging(admin, { olderThanMs: 1, now: NOW });
+    expect(removed).toEqual([]);
   });
 });
