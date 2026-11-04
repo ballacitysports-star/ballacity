@@ -498,6 +498,10 @@ BEGIN
   IF NOT FOUND OR public.game_age_range_is_adult_only(_g.min_age, _g.max_age) THEN RETURN NEW; END IF;
   IF EXISTS (SELECT 1 FROM public.location_report_evidence e
               WHERE e.game_id = NEW.game_id AND e.released_at IS NULL AND e.captured_by IS NULL) THEN RETURN NEW; END IF;  -- already held
+  -- final review #1: a moderator's restore is durable. For 30 days after it, new reports wait for a moderator (status 'new') instead of
+  -- re-hiding the text automatically, so the same accounts cannot keep a listing blanked by re-reporting.
+  IF EXISTS (SELECT 1 FROM public.location_report_evidence e
+              WHERE e.game_id = NEW.game_id AND e.decision = 'restored' AND e.released_at > now() - interval '30 days') THEN RETURN NEW; END IF;
   -- established reporters: the auth account (not the client-writable profile row) is at least 7 days old and confirmed, and a birthday was declared
   SELECT count(DISTINCT r.reporter_id) INTO _reporters FROM public.user_reports r JOIN auth.users u ON u.id = r.reporter_id
    WHERE r.game_id = NEW.game_id AND r.reason = 'location_disclosed' AND r.created_at > now() - interval '30 days'
@@ -785,9 +789,9 @@ CREATE TRIGGER zzz_minor_host_org_owner_trg BEFORE INSERT OR UPDATE ON public.tr
 
 -- D-3. Neutralizing a host's snapshots, row by row (one row that a later guard refuses must not stop the rest; it is counted and named).
 -- _detach: also remove a team or organization display that is not authorized (above) from the game; the game itself is untouched.
-CREATE OR REPLACE FUNCTION private_sec.neutralize_minor_host_games(_host uuid, _limit integer, _detach boolean)
+CREATE OR REPLACE FUNCTION private_sec.neutralize_minor_host_games(_host uuid, _limit integer, _detach boolean, _after_id text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
-DECLARE _g record; _team text; _org uuid; _done integer := 0; _failed integer := 0; _failed_ids text[] := '{}';
+DECLARE _g record; _team text; _org uuid; _done integer := 0; _failed integer := 0; _failed_ids text[] := '{}'; _last text;
 BEGIN
   FOR _g IN
     SELECT g.id, g.host_id, g.team_id, g.org_id, g.hosting_approval_id, g.host_snapshot,
@@ -795,6 +799,7 @@ BEGIN
            (g.org_id IS NOT NULL AND NOT private_sec.minor_org_display_ok(g.id, g.host_id, g.org_id, g.hosting_approval_id, false)) AS bad_org
       FROM public.hosted_games g
      WHERE (_host IS NULL OR g.host_id = _host)
+       AND (_after_id IS NULL OR g.id > _after_id)        -- final review #3: keyset cursor, so failed rows never block later batches
        AND COALESCE(public.age_cohort_of(g.host_id), 'unknown') <> 'adult'
        AND (g.host_snapshot IS DISTINCT FROM private_sec.minor_host_public_snapshot(g.id, g.host_id, g.team_id, g.org_id, g.hosting_approval_id)
             OR (_detach AND g.team_id IS NOT NULL AND NOT private_sec.minor_team_display_ok(g.host_id, g.team_id))
@@ -802,32 +807,42 @@ BEGIN
      ORDER BY g.id
      LIMIT _limit
   LOOP
+    _last := _g.id;
     BEGIN
       _team := CASE WHEN _detach AND _g.bad_team THEN NULL ELSE _g.team_id END;
       _org  := CASE WHEN _detach AND _g.bad_org  THEN NULL ELSE _g.org_id END;
+      -- final review #3: the personal snapshot is neutralized on its own first, so a guard on the display detach can never keep it
       UPDATE public.hosted_games g
-         SET team_id = _team, org_id = _org,
-             org_official = CASE WHEN _org IS NULL THEN false ELSE g.org_official END,
-             host_snapshot = private_sec.minor_host_public_snapshot(g.id, g.host_id, _team, _org, g.hosting_approval_id)
+         SET host_snapshot = private_sec.minor_host_public_snapshot(g.id, g.host_id, _team, _org, g.hosting_approval_id)
        WHERE g.id = _g.id;
+      IF _team IS DISTINCT FROM _g.team_id OR _org IS DISTINCT FROM _g.org_id THEN
+        PERFORM set_config('app.org_moderation', 'on', true);   -- the detach is a moderation action (the facility-hidden guard allows it)
+        UPDATE public.hosted_games g
+           SET team_id = _team, org_id = _org, org_official = CASE WHEN _org IS NULL THEN false ELSE g.org_official END
+         WHERE g.id = _g.id;
+        PERFORM set_config('app.org_moderation', 'off', true);
+      END IF;
       _done := _done + 1;
     EXCEPTION WHEN OTHERS THEN
+      PERFORM set_config('app.org_moderation', 'off', true);
       _failed := _failed + 1;
       IF cardinality(_failed_ids) < 50 THEN _failed_ids := _failed_ids || _g.id; END IF;
     END;
   END LOOP;
-  RETURN jsonb_build_object('updated', _done, 'failed', _failed, 'failed_ids', to_jsonb(_failed_ids));
+  RETURN jsonb_build_object('updated', _done, 'failed', _failed, 'failed_ids', to_jsonb(_failed_ids), 'next_after_id', _last);
 END $$;
-REVOKE ALL ON FUNCTION private_sec.neutralize_minor_host_games(uuid, integer, boolean) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION private_sec.neutralize_minor_host_games(uuid, integer, boolean) TO service_role;
+REVOKE ALL ON FUNCTION private_sec.neutralize_minor_host_games(uuid, integer, boolean, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private_sec.neutralize_minor_host_games(uuid, integer, boolean, text) TO service_role;
 
 -- D-3. GUARDED HISTORICAL BATCH. NOT executed by this migration (nothing here rewrites an existing row when the file is applied). Running it on
 -- production needs the owner's separate approval (docs/privacy/sec1-stack-hardening.md, "Review round 4"). Service role, or a superadmin.
 -- Neutralizes host_snapshot of every game whose host is not currently a confirmed adult (including past and cancelled games), and with
 -- _detach_unauthorized_display also removes a team or organization display that is not authorized under the rules above.
--- _dry_run (the default) only counts. Batched: call repeatedly until 'remaining' is 0.
+-- _dry_run (the default) only counts. Batched: call repeatedly, passing the returned 'next_after_id' as _after_id, until it is null;
+-- then run once more from the start and expect 'snapshots_pending' 0 (rows named in 'failed_ids' need a look).
 CREATE OR REPLACE FUNCTION public.neutralize_existing_minor_host_snapshots(_limit integer DEFAULT 200, _dry_run boolean DEFAULT true,
-                                                                         _detach_unauthorized_display boolean DEFAULT true)
+                                                                         _detach_unauthorized_display boolean DEFAULT true,
+                                                                         _after_id text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 DECLARE _r jsonb; _counts jsonb;
 BEGIN
@@ -836,7 +851,7 @@ BEGIN
   END IF;
   IF _limit IS NULL OR _limit < 1 OR _limit > 5000 THEN RAISE EXCEPTION 'INVALID_LIMIT' USING ERRCODE = '22023'; END IF;
   IF NOT COALESCE(_dry_run, true) THEN
-    _r := private_sec.neutralize_minor_host_games(NULL, _limit, COALESCE(_detach_unauthorized_display, false));
+    _r := private_sec.neutralize_minor_host_games(NULL, _limit, COALESCE(_detach_unauthorized_display, false), _after_id);
   END IF;
   SELECT jsonb_build_object(
            'snapshots_pending', count(*) FILTER (WHERE g.host_snapshot IS DISTINCT FROM
@@ -849,8 +864,8 @@ BEGIN
    WHERE COALESCE(public.age_cohort_of(g.host_id), 'unknown') <> 'adult';
   RETURN jsonb_build_object('dry_run', COALESCE(_dry_run, true)) || _counts || COALESCE(_r, '{}'::jsonb);
 END $$;
-REVOKE ALL ON FUNCTION public.neutralize_existing_minor_host_snapshots(integer, boolean, boolean) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.neutralize_existing_minor_host_snapshots(integer, boolean, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.neutralize_existing_minor_host_snapshots(integer, boolean, boolean, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.neutralize_existing_minor_host_snapshots(integer, boolean, boolean, text) TO service_role;
 
 -- D-3, going forward: when a person stops being a confirmed adult (a corrected birthday, an age review), every game they host gets the neutral
 -- snapshot at once (past games included). Only a future cohort change runs this; applying the migration rewrites nothing. Same body as
@@ -868,7 +883,7 @@ BEGIN
        SET updated_at = now()
      WHERE user_id = NEW.id;
     IF COALESCE(NEW.age_cohort, 'unknown') <> 'adult' THEN
-      PERFORM private_sec.neutralize_minor_host_games(NEW.id, 100000, false);
+      PERFORM private_sec.neutralize_minor_host_games(NEW.id, 100000, false, NULL);
     END IF;
   END IF;
   RETURN NEW;

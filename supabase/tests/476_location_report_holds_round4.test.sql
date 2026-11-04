@@ -58,6 +58,13 @@ SELECT t.reset();
 SELECT t.eq((SELECT title || '|' || description || '|' || neighborhood FROM public.hosted_games WHERE id = 'fg'), 'U12 by the river|Bring water.|Riverside',
   'F2-4: held fields come back, the host''s new description is kept');
 SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE game_id = 'fg' AND status = 'dismissed'), 5, 'and the decision closes the reports');
+-- final review #1: a restore is durable; the same reporters re-reporting at once go to a moderator, not straight back into a hold
+SELECT t.as_user(t.id('vetx')); SELECT t.lrep4('vetx', 'fg');
+SELECT t.as_user(t.id('vety')); SELECT t.lrep4('vety', 'fg');
+SELECT t.reset();
+SELECT t.eq((SELECT title FROM public.hosted_games WHERE id = 'fg'), 'U12 by the river', 'final #1: re-reports right after a restore do not re-hide the text');
+SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE game_id = 'fg' AND status = 'new'), 2, 'final #1: they wait for a moderator instead');
+UPDATE public.location_report_evidence SET released_at = now() - interval '31 days' WHERE game_id = 'fg' AND decision = 'restored';
 
 -- F2-3: a moderator's own removal does not switch off later automatic holds
 SELECT t.as_user(t.id('modfour'));
