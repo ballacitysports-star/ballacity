@@ -76,10 +76,14 @@ SELECT t.reset();
 SELECT t.team('kids', 'adultmgr'); SELECT t.team('grown', 'adultmgr');
 UPDATE public.teams SET age_groups = ARRAY['youth'] WHERE id = 'kids';
 UPDATE public.teams SET age_groups = ARRAY['adult'] WHERE id = 'grown';
+-- Legacy rows: posts written before any title guard existed. Triggers are bypassed on purpose so this test
+-- also passes when a later title guard (G1) is present; the scan and scrub must handle exactly such rows.
+SET LOCAL session_replication_role = replica;
 INSERT INTO public.team_posts (id, team_id, author_id, kind, title, body) VALUES
   (t.id('tp1'), 'kids', t.id('adultmgr'), 'announcement', 'Practice at 12 Oak St', 'See you there'),
   (t.id('tp2'), 'kids', t.id('adultmgr'), 'announcement', 'Great week', 'Thanks everyone'),
   (t.id('tp3'), 'grown', t.id('adultmgr'), 'announcement', 'Meet at 1 Main St', 'adult team');
+SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('modone'));
 SELECT t.ok((SELECT count(*) FROM public.list_team_posts_with_location_text() WHERE post_id = t.id('tp1') AND field = 'title' AND reason = 'street_address') = 1, 'a moderator sees the youth team post that gives an address');
 SELECT t.ok((SELECT count(*) FROM public.list_team_posts_with_location_text() WHERE post_id IN (t.id('tp2'), t.id('tp3'))) = 0, 'and not a clean post or an adult team''s');
