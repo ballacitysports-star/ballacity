@@ -10,6 +10,7 @@ import {
 } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
+import { clearedFacilityFields, facilityMap, withExactFacility } from "./team-facility";
 import { normalizeCutoff } from "@/lib/cancel-window";
 
 type TeamRow = {
@@ -244,6 +245,27 @@ async function refreshCurrentUser() {
 // an empty list means "not here yet", not "there are none".
 let settled = false;
 
+/**
+ * A youth team's practice venue is empty in public rows; the database releases the real values to its managers, members and
+ * verified guardians through team_facility_private. Read them with the viewer's own session and fill them in.
+ */
+async function withFacilityDetails<T extends { id: string; kind?: string | null }>(
+  rows: T[],
+): Promise<T[]> {
+  const ids = rows.filter((r) => r.kind === "team").map((r) => r.id);
+  if (ids.length === 0) return rows;
+  try {
+    const { data } = await supabase
+      .from("team_facility_private" as never)
+      .select("team_id,home_court,venues,venue_addresses,primary_venue,venue_geo")
+      .in("team_id", ids);
+    const exact = facilityMap(data as never);
+    return rows.map((r) => withExactFacility(r as never, exact) as T);
+  } catch {
+    return rows; // the table may not exist yet, or the viewer may not be entitled: keep the public values
+  }
+}
+
 export async function hydrateOrgs(): Promise<void> {
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
@@ -256,7 +278,7 @@ export async function hydrateOrgs(): Promise<void> {
         hydratePromise = null;
         return;
       }
-      const rows = (await listTeams()) as TeamRow[];
+      const rows = await withFacilityDetails((await listTeams()) as TeamRow[]);
       for (const row of rows) mergeRow(row);
       settled = true;
       emit();
@@ -427,7 +449,16 @@ export async function updateOrg(
   if (patch.lateRefundPct !== undefined) mapped.late_refund_pct = patch.lateRefundPct;
 
   try {
-    const row = (await updateTeam({ data: mapped as never })) as TeamRow;
+    const cleared = prev?.kind === "team" ? clearedFacilityFields(patch) : [];
+    const saved = (await updateTeam({ data: mapped as never })) as TeamRow;
+    if (cleared.length > 0) {
+      // Emptying a detail is explicit: a plain empty write is indistinguishable from a client sending back the empty public value.
+      await supabase.rpc(
+        "clear_team_facility_details" as never,
+        { _team: id, _fields: cleared } as never,
+      );
+    }
+    const [row] = await withFacilityDetails([saved]);
     mergeRow(row);
     emit();
   } catch (e) {
