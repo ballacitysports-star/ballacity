@@ -54,7 +54,10 @@ function builder(table: string) {
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (t: string) => builder(t) },
+  supabase: {
+    from: (t: string) => builder(t),
+    rpc: (fn: string) => builder(fn === "team_invites_inbox" ? "team_invites" : fn),
+  },
 }));
 vi.mock("@/lib/child-safety", () => ({
   useMyChildren: () => ({

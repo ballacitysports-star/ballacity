@@ -2,8 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
-import { assertModerator } from "@/lib/moderation.server";
-import { blockedByLocationHold, LOCATION_HOLD_MESSAGE, locationHoldRpc } from "@/lib/location-hold";
+import { assertModerator, loadHeldEvidence } from "@/lib/moderation.server";
+import {
+  blockedByLocationHold,
+  LOCATION_HOLD_MESSAGE,
+  locationHoldRpc,
+  type HeldEvidence,
+} from "@/lib/location-hold";
 
 /** Canonical audit action for each moderation outcome. */
 const MODERATION_AUDIT_ACTION = {
@@ -70,6 +75,8 @@ export type ModerationReport = {
   gameTitle: string | null;
   /** The game's text is held after location-disclosure reports; only Restore text / Confirm removal close it. */
   locationHold: boolean;
+  /** Moderators only: the held listing text (the latest open hold's evidence), so Restore text / Confirm removal is decided with it in view. */
+  heldEvidence: HeldEvidence | null;
   conversationId: string | null;
   messageId: string | null;
   messageBody: string | null;
@@ -187,6 +194,15 @@ export const listReports = createServerFn({ method: "GET" })
         : Promise.resolve({ data: [] as any[] }),
     ]);
     const heldGames = new Set(((holds as any).data ?? []).map((h: any) => h.game_id as string));
+    // The held text itself, for the held location reports on this page only, read with the moderator's own session (row security).
+    const heldReportGames = Array.from(
+      new Set(
+        list
+          .filter((r) => r.reason === "location_disclosed" && r.game_id && heldGames.has(r.game_id))
+          .map((r) => r.game_id as string),
+      ),
+    );
+    const evidence = await loadHeldEvidence(context, heldReportGames);
 
     const pMap = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
     const gMap = new Map((games.data ?? []).map((g: any) => [g.id, g]));
@@ -220,6 +236,8 @@ export const listReports = createServerFn({ method: "GET" })
         gameId: r.game_id,
         gameTitle: game?.title ?? null,
         locationHold: !!r.game_id && r.reason === "location_disclosed" && heldGames.has(r.game_id),
+        heldEvidence:
+          r.game_id && r.reason === "location_disclosed" ? (evidence.get(r.game_id) ?? null) : null,
         conversationId: r.conversation_id ?? msg?.conversation_id ?? null,
         messageId: r.message_id,
         messageBody: msg?.body ?? null,

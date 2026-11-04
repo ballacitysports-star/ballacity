@@ -42,3 +42,77 @@ export const LOCATION_HOLD_MESSAGE =
 export function locationHoldRpc(decision: LocationHoldDecision) {
   return decision === "restore" ? "moderator_restore_game_text" : "moderator_confirm_location_hold";
 }
+
+/**
+ * The original listing text an open hold keeps as evidence (`location_report_evidence`), shown to the moderator so Restore text or
+ * Confirm removal is decided with the text in view (SEC-7). Moderators only: the table's row security admits moderators and
+ * administrators, and the server reads it with the moderator's own session after checking the role. It is never part of anything a
+ * host or a reporter receives.
+ */
+export type HeldEvidence = {
+  capturedAt: string;
+  title: string | null;
+  description: string | null;
+  neighborhood: string | null;
+  gameRules: string | null;
+  equipment: string[];
+  cancellationNotes: string | null;
+  cancellationReason: string | null;
+};
+
+export type EvidenceRow = {
+  game_id: string | null;
+  captured_at: string;
+  captured_by: string | null;
+  released_at: string | null;
+  title: string | null;
+  description: string | null;
+  neighborhood: string | null;
+  game_rules: string | null;
+  equipment: string[] | null;
+  cancellation_notes: string | null;
+  cancellation_reason: string | null;
+};
+
+/** The columns the report detail needs; nothing else is read. */
+export const EVIDENCE_COLUMNS =
+  "game_id, captured_at, captured_by, released_at, title, description, neighborhood, game_rules, equipment, cancellation_notes, cancellation_reason";
+
+/** The latest OPEN automatic hold per game (released_at and captured_by empty), the one Restore text would bring back. */
+export function latestOpenEvidenceByGame(rows: EvidenceRow[]): Map<string, HeldEvidence> {
+  const out = new Map<string, HeldEvidence & { _t: number }>();
+  for (const r of rows) {
+    if (!r.game_id || r.released_at || r.captured_by) continue;
+    const t = Date.parse(r.captured_at);
+    const prev = out.get(r.game_id);
+    if (prev && prev._t >= t) continue;
+    out.set(r.game_id, {
+      _t: t,
+      capturedAt: r.captured_at,
+      title: r.title,
+      description: r.description,
+      neighborhood: r.neighborhood,
+      gameRules: r.game_rules,
+      equipment: r.equipment ?? [],
+      cancellationNotes: r.cancellation_notes,
+      cancellationReason: r.cancellation_reason,
+    });
+  }
+  return new Map(Array.from(out, ([k, { _t, ...v }]) => [k, v]));
+}
+
+/** The non-empty evidence fields, labelled, in the order the moderator reads them. */
+export function evidenceFields(e: HeldEvidence): { label: string; value: string }[] {
+  const fields: [string, string | null][] = [
+    ["Title", e.title],
+    ["Description", e.description],
+    ["Neighborhood", e.neighborhood],
+    ["Game rules", e.gameRules],
+    ["Equipment", e.equipment.length ? e.equipment.join(", ") : null],
+    ["Cancellation notes", e.cancellationNotes],
+    ["Cancellation reason", e.cancellationReason],
+  ];
+  return fields
+    .filter((f): f is [string, string] => !!f[1] && f[1].trim() !== "")
+    .map(([label, value]) => ({ label, value }));
+}

@@ -251,8 +251,10 @@ export function useMyTeamInvites() {
   return useQuery({
     queryKey: ["team-invites", "mine", user?.id],
     queryFn: async (): Promise<TeamInvite[]> => {
+      // Invitees read through team_invites_inbox(): it leaves out invitations they must not know
+      // about and never returns a manager's free text to someone who is not a confirmed adult.
       const { data, error } = await supabase
-        .from("team_invites")
+        .rpc("team_invites_inbox")
         .select(
           "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at, guardian_approved_at",
         )
@@ -320,7 +322,9 @@ export function useTeamRosterActions(teamId: string) {
       }),
     onSuccess: (inviteId) => {
       invalidate();
-      void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("team_invite", inviteId));
+      void import("@/lib/guardian-push.functions").then((m) =>
+        m.pingGuardians("team_invite", inviteId),
+      );
     },
   });
 

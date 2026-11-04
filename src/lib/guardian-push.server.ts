@@ -89,6 +89,16 @@ export async function planGuardianApprovalPush(
     });
     if (!inv || inv.invited_by !== input.callerId) return NOTHING;
     if (inv.status !== "pending" || inv.guardian_approved_at) return NOTHING;
+    // A suppressed invitation (a block between the manager and the player) reaches nobody (SEC-7).
+    const suppressed = await one<{ invite_id: string }>(
+      admin,
+      "team_invite_suppressions",
+      "invite_id",
+      {
+        invite_id: input.id,
+      },
+    );
+    if (suppressed) return NOTHING;
     const team = await one<{ name: string | null }>(admin, "teams", "name", { id: inv.team_id });
     childId = inv.invitee_id;
     what = `was invited to join ${team?.name?.trim() || "a team"}`;

@@ -167,6 +167,8 @@ import {
   fetchHostedGame,
   updateHostedGame,
   deleteHostedGame,
+  clearHostedGameLocation,
+  REMOVED_GAME_LOCATION,
 } from "@/lib/hosted-games-store";
 import {
   ANY_SKILL,
@@ -3704,6 +3706,8 @@ function EditGameModal({
           : null;
       // Re-resolve venue coordinates whenever the host edits the address so
       // viewer-relative distance stays accurate.
+      // An emptied address removes the venue, explicitly (SEC-7): an empty write alone would be ignored for a youth-inclusive game.
+      const removeLocation = !location.trim() && game.location.trim() !== REMOVED_GAME_LOCATION;
       const nextLocation = location.trim() || game.location;
       let venue: { lat: number; lng: number } | null = null;
       let venueChanged = false;
@@ -3724,7 +3728,7 @@ function EditGameModal({
         skill,
         minAge,
         maxAge,
-        location: nextLocation,
+        ...(removeLocation ? {} : { location: nextLocation }),
         neighborhood: neighborhood.trim(),
         ...(venueChanged ? { lat: venue?.lat ?? null, lng: venue?.lng ?? null } : {}),
         date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
@@ -3756,6 +3760,13 @@ function EditGameModal({
       });
       if (!updated) {
         return;
+      }
+      if (removeLocation) {
+        try {
+          await clearHostedGameLocation(game.id);
+        } catch (err: any) {
+          toast.error(err?.message ?? "Saved game, but couldn't remove its location.");
+        }
       }
 
       try {

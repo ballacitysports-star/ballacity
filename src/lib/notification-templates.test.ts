@@ -26,12 +26,13 @@ const state = {
   cohorts: {} as Record<string, string>,
   inserted: [] as Record<string, unknown>[],
   pushed: [] as Record<string, unknown>[],
+  canNotify: true,
 };
 
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
-    rpc: async (_fn: string, args: { _user: string }) => ({
-      data: state.cohorts[args._user] ?? "unknown",
+    rpc: async (fn: string, args: { _user: string }) => ({
+      data: fn === "can_notify" ? state.canNotify : (state.cohorts[args._user] ?? "unknown"),
       error: null,
     }),
     from: () => ({
@@ -75,6 +76,7 @@ beforeEach(() => {
   state.cohorts = { [CALLER]: "adult", [ADULT]: "adult", [MINOR]: "teen_13_15" };
   state.inserted = [];
   state.pushed = [];
+  state.canNotify = true;
 });
 
 describe("minorSafeNotification", () => {
@@ -175,5 +177,48 @@ describe("sendPushToUser", () => {
       title: "New notification",
       url: "https://app.test/notifications",
     });
+  });
+});
+
+// SEC-7 final review (7): the service-role can_notify answer is never passed back to the caller.
+describe("a refused notification looks the same to the caller", () => {
+  it("createNotificationForUser answers the same and stores nothing when refused", async () => {
+    const allowed = await createNotificationForUser({
+      data: { user_id: MINOR, ...hostile },
+      context,
+    } as any);
+    expect(state.inserted).toHaveLength(1);
+    state.inserted = [];
+    state.canNotify = false;
+    const refused = await createNotificationForUser({
+      data: { user_id: MINOR, ...hostile },
+      context,
+    } as any);
+    expect(refused).toEqual(allowed);
+    expect(state.inserted).toHaveLength(0);
+  });
+
+  it("sendPushToUser answers the same and pushes nothing when refused", async () => {
+    const push = {
+      userId: ADULT,
+      title: hostile.title,
+      body: hostile.body,
+      url: null,
+      type: "message",
+    };
+    const allowed = await sendPushToUser({ data: push, context } as any);
+    expect(state.pushed).toHaveLength(1);
+    state.pushed = [];
+    state.canNotify = false;
+    const refused = await sendPushToUser({ data: push, context } as any);
+    expect(refused).toEqual(allowed);
+    expect(state.pushed).toHaveLength(0);
+  });
+
+  it("sendPushToUser gives the same answer for a minor and an adult recipient", async () => {
+    const push = { title: "t", body: "b", url: null, type: "message" };
+    const adult = await sendPushToUser({ data: { ...push, userId: ADULT }, context } as any);
+    const minor = await sendPushToUser({ data: { ...push, userId: MINOR }, context } as any);
+    expect(minor).toEqual(adult);
   });
 });

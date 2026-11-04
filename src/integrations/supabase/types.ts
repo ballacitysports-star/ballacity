@@ -4172,8 +4172,31 @@ export type Database = {
             referencedRelation: "teams";
             referencedColumns: ["id"];
           },
-        ];
-      };
+        ]
+      }
+      team_invite_suppressions: {
+        Row: {
+          created_at: string
+          invite_id: string
+        }
+        Insert: {
+          created_at?: string
+          invite_id: string
+        }
+        Update: {
+          created_at?: string
+          invite_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invite_suppressions_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: true
+            referencedRelation: "team_invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string;
@@ -6183,9 +6206,27 @@ export type Database = {
       };
       team_owner_of: { Args: { _team: string }; Returns: string };
       team_remove_member: {
-        Args: { _team: string; _user: string };
-        Returns: undefined;
-      };
+        Args: { _team: string; _user: string }
+        Returns: undefined
+      }
+      team_invites_inbox: {
+        Args: never
+        Returns: {
+          created_at: string
+          expires_at: string
+          guardian_approved_at: string | null
+          guardian_approved_by: string | null
+          id: string
+          invited_by: string
+          invitee_id: string
+          message: string | null
+          responded_at: string | null
+          role: Database["public"]["Enums"]["team_role"]
+          status: string
+          team_id: string
+          updated_at: string
+        }[]
+      }
       team_respond_invite: {
         Args: { _accept: boolean; _invite: string };
         Returns: string;
