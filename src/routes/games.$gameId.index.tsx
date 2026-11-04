@@ -200,9 +200,8 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { MediaImage } from "@/components/MediaImage";
-import { buildMediaRef } from "@/lib/media-refs";
 import { isAllowedImageMime, MAX_IMAGE_BYTES } from "@/lib/image-validation";
-import { finalizeImageUpload } from "@/lib/image-uploads.functions";
+import { uploadDataUrlToBucket } from "@/lib/image-upload";
 import { useCanReview } from "@/lib/transactions";
 import { blockUser as blockAccount, useBlockedUsersList } from "@/lib/moderation";
 import {
@@ -4001,24 +4000,16 @@ function EditGameModal({
                   }
                   setCoverUploading(true);
                   try {
-                    const path = `${user.id}/${Date.now()}-${Math.random()
-                      .toString(36)
-                      .slice(2, 8)}.${ext}`;
-                    const { error: upErr } = await supabase.storage
-                      .from("game-covers")
-                      .upload(path, file, { cacheControl: "3600", upsert: false });
-                    if (upErr) throw upErr;
-                    // Server re-validates the stored bytes and safety-scans them.
-                    const check = await finalizeImageUpload({
-                      data: { bucket: "game-covers", path },
+                    // Stage privately; the server cleans, scans and publishes. The browser never writes the destination bucket.
+                    const dataUrl = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(String(reader.result));
+                      reader.onerror = () =>
+                        reject(reader.error ?? new Error("Couldn't read that file"));
+                      reader.readAsDataURL(file);
                     });
-                    if (check?.quarantined) {
-                      throw new Error(
-                        "This image was flagged by our automated safety check and is pending review.",
-                      );
-                    }
-                    // Persist a reference, not a long-lived signed URL.
-                    setImage(buildMediaRef("game-covers", path));
+                    // Persists a bucket+path reference, not a long-lived signed URL.
+                    setImage(await uploadDataUrlToBucket("game-covers", user.id, dataUrl));
                   } catch (err: any) {
                     toast.error(err?.message ?? "Upload failed");
                   } finally {

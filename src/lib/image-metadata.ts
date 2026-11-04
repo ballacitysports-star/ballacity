@@ -120,19 +120,43 @@ function stripJpeg(b: Uint8Array): StripResult {
   let i = 2;
   let changed = false;
   let keepOrientation: number | null = null;
+  let sawEoi = false;
   while (i < b.length) {
     if (b[i] !== 0xff) throw new Error("Malformed JPEG");
     let m = b[i + 1];
     while (m === 0xff) m = b[++i + 1]; // fill bytes
     if (m === 0xd9) {
       out.push(b.subarray(i, i + 2)); // EOI
+      if (i + 2 < b.length) changed = true; // anything after EOI (secondary images, motion-photo video, appended data) is dropped
+      sawEoi = true;
       i = b.length;
       break;
     }
     if (m === 0xda) {
-      out.push(b.subarray(i)); // SOS: entropy-coded data to the end
-      i = b.length;
-      break;
+      // SOS: keep the scan header, then walk the entropy-coded data to the next real marker, so metadata placed between scans
+      // (progressive files) and everything after EOI are handled by the same rules as the header segments.
+      if (i + 4 > b.length) throw new Error("Truncated JPEG");
+      const slen = (b[i + 2] << 8) | b[i + 3];
+      if (slen < 2 || i + 2 + slen > b.length) throw new Error("Malformed JPEG segment");
+      let j = i + 2 + slen;
+      while (j < b.length) {
+        if (b[j] === 0xff) {
+          const n = b[j + 1];
+          if (n === 0x00 || (n >= 0xd0 && n <= 0xd7)) {
+            j += 2;
+            continue;
+          }
+          if (n === 0xff) {
+            j += 1;
+            continue;
+          }
+          break; // a real marker
+        }
+        j += 1;
+      }
+      out.push(b.subarray(i, j));
+      i = j;
+      continue;
     }
     if (m === 0x01 || (m >= 0xd0 && m <= 0xd8)) {
       out.push(b.subarray(i, i + 2));
@@ -166,6 +190,7 @@ function stripJpeg(b: Uint8Array): StripResult {
     else out.push(seg);
     i += 2 + len;
   }
+  if (!sawEoi) throw new Error("Truncated JPEG (no end of image)");
   report.orientation = keepOrientation;
   if (keepOrientation && keepOrientation !== 1) {
     const tiff = orientationTiff(keepOrientation);

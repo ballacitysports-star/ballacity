@@ -85,7 +85,14 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       }
       const verdict = target
         ? await scanImageForSafety(target, { userId: context.userId })
-        : { safe: true, csam: false, categories: [] as string[] };
+        : { safe: true, csam: false, categories: [] as string[], scanned: false };
+      // Fail closed: an attachment whose safety scan could not run is not accepted (the sender can retry).
+      if (verdict.safe && "scanned" in verdict && verdict.scanned === false) {
+        await remove();
+        throw new Error(
+          "We couldn't check this image right now. Please try again in a few minutes.",
+        );
+      }
       if (!verdict.safe) {
         await remove();
         if (verdict.csam) {

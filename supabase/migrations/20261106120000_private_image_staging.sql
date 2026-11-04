@@ -19,5 +19,13 @@ DROP POLICY IF EXISTS "image_staging_insert_own_folder" ON storage.objects;
 CREATE POLICY "image_staging_insert_own_folder" ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'image-staging' AND (auth.uid())::text = (storage.foldername(name))[1]);
 
--- Deliberately no SELECT, UPDATE or DELETE policy: staged files are never readable, replaceable or deletable through the API (a DELETE with a
--- WHERE clause needs SELECT visibility anyway). The server promotes or removes them with the service role.
+-- Own-folder SELECT and DELETE are required, not optional: Storage inserts with INSERT ... RETURNING, and Postgres checks a new row against the
+-- SELECT policy on its way back out (see 20261020130000), so a bucket with no SELECT policy rejects every upload. They expose nothing new: the
+-- bucket is private, the folder is the caller's own, and the files are the caller's own unprocessed uploads. Nobody else can read, replace or
+-- delete a staged file through the API; there is no UPDATE policy; promotion and cleanup use the service role.
+DROP POLICY IF EXISTS "image_staging_select_own_folder" ON storage.objects;
+CREATE POLICY "image_staging_select_own_folder" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'image-staging' AND (auth.uid())::text = (storage.foldername(name))[1]);
+DROP POLICY IF EXISTS "image_staging_delete_own_folder" ON storage.objects;
+CREATE POLICY "image_staging_delete_own_folder" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'image-staging' AND (auth.uid())::text = (storage.foldername(name))[1]);

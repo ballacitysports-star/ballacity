@@ -164,15 +164,63 @@ describe("promoteStagedImage", () => {
     await expect(promoteStagedImage(deps(world()), input)).rejects.toThrow(/could not be read/);
   });
 
-  it("scans a large image through a short-lived signed URL of the private copy", async () => {
+  it("scans a large image through a server-only scratch copy of the CLEAN bytes, then deletes it", async () => {
     const w = world({
       [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true, pad: 4.5 * 1024 * 1024 }),
     });
     const d = deps(w);
+    let scannedBytes: Uint8Array | null = null;
+    d.scan.mockImplementation(async (url: string) => {
+      const m = url.match(/^https:\/\/signed\/image-staging\/(_scan\/.+)$/);
+      expect(m).not.toBeNull();
+      scannedBytes = w.files.get(`${IMAGE_STAGING_BUCKET}|${m![1]}`) ?? null;
+      return safe;
+    });
     const out = await promoteStagedImage(d, input);
     expect(out.quarantined).toBe(false);
-    expect(d.scan.mock.calls[0][0]).toBe(`https://signed/${IMAGE_STAGING_BUCKET}/${STAGE}`);
-    expect(hasText(w.files.get(`avatars|${TARGET}`)!, "GPS")).toBe(false);
+    expect(scannedBytes).not.toBeNull();
+    expect(hasText(scannedBytes!, "GPS")).toBe(false);
+    // what was scanned is exactly what was published
+    expect(w.files.get(`avatars|${TARGET}`)).toBe(scannedBytes);
+    // the scratch copy is gone
+    expect([...w.files.keys()].some((k) => k.includes("_scan/"))).toBe(false);
+  });
+
+  it("a flagged file is never re-scanned or promoted", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const d = deps(w, { ...safe, safe: false, label: "x", reason: "flagged" });
+    await promoteStagedImage(d, input);
+    const again = deps(w); // a lenient scan the second time
+    await expect(promoteStagedImage(again, input)).rejects.toThrow(/flagged/);
+    expect(again.scan).not.toHaveBeenCalled();
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+  });
+
+  it("does not overwrite a target a moderator already quarantined", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    w.moderation.set(`avatars|${TARGET}`, {
+      bucket: "avatars",
+      path: TARGET,
+      status: "quarantined",
+    });
+    await expect(promoteStagedImage(deps(w), input)).rejects.toThrow(/flagged/);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+  });
+
+  it("a storage error (not a missing file) is not treated as a finished promotion", async () => {
+    const w = world();
+    w.moderation.set(`avatars|${TARGET}`, { bucket: "avatars", path: TARGET, status: "pending" });
+    const failing = {
+      ...w.admin,
+      storage: {
+        from: () => ({
+          download: async () => ({ data: null, error: { message: "upstream timeout" } }),
+        }),
+      },
+    };
+    await expect(promoteStagedImage({ ...deps(w), admin: failing }, input)).rejects.toThrow(
+      /could not be read/,
+    );
   });
 
   it("only works inside the caller's own folder and for known buckets", async () => {
@@ -243,42 +291,87 @@ describe("promoteStagedImage", () => {
 
 describe("sweepImageStaging", () => {
   const NOW = Date.parse("2026-11-05T12:00:00Z");
-  const listing = (items: Record<string, { name: string; created_at: string }[]>) => {
+  const listing = (
+    items: Record<string, { name: string; created_at: string }[]>,
+    flaggedPaths: string[] = [],
+  ) => {
     const removed: string[] = [];
+    const deletedRows: string[] = [];
     const admin = {
       storage: {
         from: () => ({
-          list: async (prefix: string) =>
-            prefix === ""
-              ? { data: Object.keys(items).map((name) => ({ name, id: null })) }
-              : { data: items[prefix] ?? [] },
+          list: async (prefix: string, o?: { limit?: number; offset?: number }) => {
+            const rows =
+              prefix === ""
+                ? Object.keys(items).map((name) => ({ name, id: null }))
+                : (items[prefix] ?? []);
+            const off = o?.offset ?? 0;
+            return { data: rows.slice(off, off + (o?.limit ?? 1000)) };
+          },
           remove: async (paths: string[]) => {
             removed.push(...paths);
             return { error: null };
           },
         }),
       },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            in: async (_c: string, paths: string[]) => ({
+              data: paths
+                .filter((p) => flaggedPaths.includes(p))
+                .map((path) => ({ path, status: "quarantined" })),
+            }),
+          }),
+        }),
+        delete: () => ({
+          eq: () => ({
+            in: async (_c: string, paths: string[]) => {
+              deletedRows.push(...paths);
+              return {};
+            },
+          }),
+        }),
+      }),
     };
-    return { admin, removed };
+    return { admin, removed, deletedRows };
   };
   const old = { name: "a.jpg", created_at: "2026-11-03T00:00:00Z" };
   const fresh = { name: "b.jpg", created_at: "2026-11-05T11:00:00Z" };
 
-  it("removes only files older than the window", async () => {
-    const { admin, removed } = listing({ u1: [old, fresh] });
+  it("removes only files older than the window, and their moderation rows", async () => {
+    const { admin, removed, deletedRows } = listing({ u1: [old, fresh] });
     const r = await sweepImageStaging(admin, { olderThanMs: 24 * 3600 * 1000, now: NOW });
     expect(removed).toEqual(["u1/a.jpg"]);
-    expect(r).toEqual({ examined: 2, removed: 1, kept: 1 });
+    expect(deletedRows).toEqual(["u1/a.jpg"]);
+    expect(r).toMatchObject({ examined: 2, removed: 1, kept: 1, keptFlagged: 0 });
+  });
+  it("never removes a quarantined file (possible child-safety evidence)", async () => {
+    const { admin, removed } = listing({ u1: [old] }, ["u1/a.jpg"]);
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
+    expect(removed).toEqual([]);
+    expect(r.keptFlagged).toBe(1);
   });
   it("a dry run changes nothing", async () => {
-    const { admin, removed } = listing({ u1: [old] });
+    const { admin, removed, deletedRows } = listing({ u1: [old] });
     const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW, dryRun: true });
     expect(removed).toEqual([]);
+    expect(deletedRows).toEqual([]);
     expect(r.removed).toBe(1);
   });
   it("keeps files with an unknown age", async () => {
     const { admin, removed } = listing({ u1: [{ name: "c.jpg", created_at: "" }] });
     await sweepImageStaging(admin, { olderThanMs: 1, now: NOW });
     expect(removed).toEqual([]);
+  });
+  it("pages through folders and files beyond one page", async () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      name: `f${i}.jpg`,
+      created_at: "2026-11-01T00:00:00Z",
+    }));
+    const { admin, removed } = listing({ u1: many });
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW, pageSize: 2 });
+    expect(removed.length).toBe(5);
+    expect(r.examined).toBe(5);
   });
 });
