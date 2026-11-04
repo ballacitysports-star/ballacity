@@ -1335,8 +1335,6 @@ function GameDetail() {
     })),
   ];
 
-  const reportedHostId = settings?.host_id ?? game.hostUserId ?? null;
-
   return (
     <div className="pb-32">
       <RiskAcknowledgmentDialog
@@ -1362,16 +1360,15 @@ function GameDetail() {
         />
       )}
 
-      {reportedHostId && (
-        <ReportDialog
-          open={reportGameOpen}
-          onOpenChange={setReportGameOpen}
-          subjectType="game"
-          reportedId={reportedHostId}
-          subjectLabel={game.title}
-          gameId={game.id}
-        />
-      )}
+      {/* A game report is filed against the game; the database names its host (SEC-5), so anyone
+          who can see the game can report it, even when the host is not shown to them. */}
+      <ReportDialog
+        open={reportGameOpen}
+        onOpenChange={setReportGameOpen}
+        subjectType="game"
+        subjectLabel={game.title}
+        gameId={game.id}
+      />
       {/* Cancel game dialog (host) */}
       <Dialog
         open={cancelOpen}
@@ -1474,7 +1471,7 @@ function GameDetail() {
                 <Share2 className="h-4 w-4" />
               </button>
             )}
-            {!isHost && reportedHostId && (
+            {!isHost && (
               <button
                 onClick={() => setReportGameOpen(true)}
                 aria-label="Report game"
@@ -2154,7 +2151,7 @@ function GameDetail() {
               >
                 Safety Center
               </Link>
-              {!isHost && reportedHostId && (
+              {!isHost && (
                 <button
                   type="button"
                   onClick={() => setReportGameOpen(true)}

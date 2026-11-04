@@ -5131,7 +5131,29 @@ export type Database = {
       };
     };
     Views: {
-      /** SEC-5: the client read path for games; host_id and image are masked for unrelated viewers of a minor host. */
+      /** SEC-5: the client read path for payment settings; host_id (the holder) is masked like the game's host. */
+      game_payment_settings_visible: {
+        Row: {
+          accepted_method_ids: string[];
+          created_at: string;
+          entry_fee: number;
+          game_id: string;
+          host_id: string | null;
+          id: string;
+          late_refund_pct: number;
+          payment_deadline: string | null;
+          payment_hold_minutes: number | null;
+          payment_instructions: string | null;
+          payment_mode: string;
+          refund_policy: string | null;
+          refund_rule: string;
+          requires_approval: boolean;
+          updated_at: string;
+          viewer_is_holder: boolean;
+        };
+        Relationships: [];
+      };
+      /** SEC-5: the client read path for games; host_id and image are masked (and host_snapshot neutral) for unrelated viewers of a minor host. */
       hosted_games_public: {
         Row: {
           all_day: boolean;

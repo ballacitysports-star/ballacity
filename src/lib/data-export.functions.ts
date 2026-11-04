@@ -104,8 +104,9 @@ const CATEGORY_QUERIES: Record<
     },
     {
       key: "game_payment_settings",
-      table: "game_payment_settings",
-      column: "host_id",
+      table: "game_payment_settings_visible",
+      column: "viewer_is_holder",
+      value: true,
       columns:
         "game_id, entry_fee, accepted_method_ids, payment_deadline, refund_policy, requires_approval, created_at",
     },

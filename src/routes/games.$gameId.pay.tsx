@@ -304,7 +304,9 @@ function PayPage() {
         const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
         setSettings(s);
-        if (s) {
+        // host_id is masked (null) only when the holder is not a confirmed adult, i.e. a free
+        // game's minor host: there is no payee and so no payment method to list (SEC-5).
+        if (s?.host_id) {
           const all = await withTimeout(
             listPaymentMethodsForHost(s.host_id, gameId),
             "listPaymentMethodsForHost",
@@ -766,7 +768,7 @@ function PayPage() {
           game_id={game.id}
           game_title={game.title}
           fee={settings?.entry_fee ?? game.price}
-          host_id={settings!.host_id}
+          host_id={settings!.host_id ?? ""}
           method={picked}
           extraInstructions={settings?.payment_instructions ?? null}
           refundTerms={refundDisclaimer(

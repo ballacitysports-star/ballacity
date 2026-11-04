@@ -23,8 +23,8 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   subjectType: ReportSubjectType;
-  /** User the report is about (game host, message sender, reel owner). */
-  reportedId: string;
+  /** User the report is about (message sender, reel owner). Omitted for a game: the database names its host. */
+  reportedId?: string | null;
   /** Shown in the dialog title, e.g. a display name or game title. */
   subjectLabel: string;
   gameId?: string | null;

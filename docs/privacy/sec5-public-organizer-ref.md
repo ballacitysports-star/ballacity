@@ -2,9 +2,10 @@
 
 Migration `supabase/migrations/20261108110000_public_organizer_ref.sql` (phase 1). Prepared phase 2:
 `supabase/phase2/sec5_phase2_close_host_id_columns.sql` (not a migration, not applied). Tests:
-`supabase/tests/510_public_organizer_ref.test.sql` (69 assertions, phase 2 applied inside the rolled-back
-transaction), plus `src/lib/organizer-access.test.ts`, `src/lib/hosted-games-store.organizer.test.tsx` and
-`src/lib/payments.join-request.test.ts`.
+`supabase/tests/510_public_organizer_ref.test.sql` (113 assertions, phase 2 applied inside the rolled-back
+transaction), plus `src/lib/organizer-access.test.ts`, `src/lib/hosted-games-store.organizer.test.tsx`,
+`src/lib/payments.join-request.test.ts` and `src/lib/organizer-review-fixes.test.ts`. See "Final review (780eaf8f)
+corrections" at the end for what the independent review changed.
 
 ## Problem
 
@@ -88,13 +89,15 @@ visitor's list is unchanged and has no hit).
 | `join_requests.host_id`                                                                 | the requester, their guardians, the host          | masked in `join_requests_visible`, revoked in phase 2                                        |
 | join-request insert (`validate_join_request` mismatch error)                            | any signed-in account                             | closed in phase 1 (fill trigger)                                                             |
 | realtime `hosted_games`, `join_requests`                                                | subscribers passing row security                  | client uses events as signals only; phase 2 strips the columns                               |
-| `game_payment_settings.host_id`                                                         | host, approved requesters, payers, participants   | holder is the payee (adult) or, for a free game, the host; open item 2                       |
+| `game_payment_settings.host_id`                                                         | host, approved requesters, payers, participants   | masked in `game_payment_settings_visible`, revoked in phase 2 (review F4)                    |
 | `payment_submissions`, `paypal_orders`, `payment_verification_events` `.host_id`        | payer and payee                                   | always the payee (`enforce_payment_destination`), an adult; never the minor                  |
-| `game_participants`, `game_position_waitlist`                                           | the person, the host, the roster                  | related only (roster = shares a game)                                                        |
+| `game_participants`                                                                     | the person, the host, the roster                  | related only (roster = shares a game)                                                        |
+| `game_position_waitlist.reviewed_by`                                                    | the waitlisted person (and realtime)              | written by the database, closed to clients in phase 1 (review F1)                            |
+| `hosted_games.host_snapshot` (legacy personal snapshots)                                | anyone who can read the game                      | neutral in the view when hidden, revoked in phase 2 (review F2)                              |
 | `conversations` / `conversation_participants`                                           | participants                                      | related only (shares a chat)                                                                 |
 | `notifications`                                                                         | the recipient                                     | game links only; no host id in player-facing content                                         |
 | `reviews`                                                                               | public                                            | minors are never reviewable (`my_reviewable`, PRIV-1)                                        |
-| `user_reports.reported_id`                                                              | the reporter                                      | client-supplied; the report-host button needs a known host, so it is not offered when masked |
+| `user_reports.reported_id`                                                              | the reporter                                      | game reports: filled from the game; closed to clients in phase 1 (review F3)                 |
 | `minor_hosting_approvals`                                                               | the minor, approver, guardians                    | related only                                                                                 |
 | `skill_ratings`, `team_members`, `team_posts`, `post_comments`, `post_reactions`, reels | R1                                                | already hidden for minor hosts (sweep confirms)                                              |
 | RPC `get_game_organizer`                                                                | signed-in                                         | neutral for strangers (G4)                                                                   |
@@ -158,7 +161,7 @@ with the service role and applies the same `can_notify` check and minor-safe wor
 **Phase 1 (this PR).** Additive. Old clients keep working unchanged (the table still answers them). New clients read
 only the views for anything that touches the organizer. Visible changes, all for a host who is not a confirmed
 adult seen by an unrelated viewer: the custom cover shows the sport artwork; the profile link, message-host and
-report-host buttons are not offered (they were already hidden for neutral hosts on cards); "games hosted" counts on
+host buttons are not offered (they were already hidden for neutral hosts on cards; Report game stays, see review F3); "games hosted" counts on
 the game page do not group their games. A join request naming the wrong host is now corrected instead of refused
 (test 340 updated accordingly).
 
@@ -185,9 +188,7 @@ each `select`).
 
 1. Phase 2 is not applied; until it is, the base columns, realtime payloads and the Storage listing still carry the
    id for anyone who queries them by hand (the 510 "BEFORE phase 2" assertions pin exactly that).
-2. `game_payment_settings.host_id` is readable by approved requesters who are not yet on the roster; for a free
-   minor-hosted game it is the host. That is the host's own approval decision, but `can_see_minor_name` does not
-   include them. Decide whether to mask it too (a third view) or add approved requesters to the relation.
+2. ~~`game_payment_settings.host_id` readable by approved requesters~~: masked and closed in phase 2 (review F4).
 3. `enforce_payment_destination` runs before the approval check, so any signed-in account can test whether an
    account is the payee of a game (for a minor host, the adult payment manager, usually a guardian). Fix the same way
    as join requests: fill the payee from the game.
@@ -203,3 +204,46 @@ each `select`).
    phase 2 the database refuses it).
 9. Unknown-age hosts are treated as not adult (masked), the same as the neutral snapshot rule.
 10. No helper wrapped by SEC-2 is redefined, so `private_sec.wrap_oracle_helpers()` was not re-run.
+
+## Final review (780eaf8f) corrections
+
+The independent review of the combined build 780eaf8f demonstrated five findings as the API roles. All five are fixed
+in place in the unapplied migration, the phase 2 script and test 510 (now 113 assertions; each finding's assertions
+are prefixed `F1`–`F5`). The payment-insert payee oracle and `get_game_host_paypal` are being fixed separately on
+another branch and are not touched here.
+
+| #   | Severity | Finding                                                                                                                                                                                                                                | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Tests (510)                                                                                                                                                                                                                                                                       |
+| --- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1  | High     | The host wrote `game_position_waitlist.reviewed_by = uid`; the waitlisted person reads their own row and gets it in realtime payloads, so a stranger who only asked for a place learned a minor host's account id, before and after phase 2. | `a00_fill_waitlist_reviewer_trg` writes `reviewed_by` itself (the caller on a status/reviewed_at change, kept otherwise, NULL on insert; the service role keeps what it writes). The client no longer sends it. The column is closed to `anon`/`authenticated` **in phase 1**: no client reads it (`waitlist-store.ts` lists its columns, the data export too), and realtime drops columns the subscriber cannot SELECT. No view is needed because no client needs the value.                                                                                                       | A waitlist row reviewed by the minor host is in the sweep fixture; the reviewer named by the client is ignored; the waitlisted stranger finds 0 rows with `reviewed_by` = the host (and selecting it is refused) before phase 2; the stranger's sweep is `{}` after phase 2. |
+| F2  | Medium   | `hosted_games_public` passed a stored personal `host_snapshot` through (legacy rows; the SEC-1 neutralizing batch is never run by a migration).                                                                                         | `private_sec.game_organizer_for_caller` also returns `host_snapshot`: `minor_host_public_snapshot(...)` when the organizer is hidden, the stored value otherwise. It runs inside that definer function, so `minor_host_public_snapshot` stays service-role-only and the view keeps working after phase 2. Phase 2 also closes `hosted_games.host_snapshot` (no client reads it from the table; inserts and updates need only INSERT/UPDATE).                                                                                                                                         | A legacy row written in replica mode with `{"username":"teenhandle"}`: a stranger gets `{"name":"Youth host","neutral":true}`, the host their own; sweep for `teenhandle` is `{public.hosted_games}` before phase 2 and `{}` after.                                       |
+| F3  | Medium   | Report game was only offered when a host id was known (a moderation regression for minor-hosted games), and `reported_id` was the client's choice.                                                                                    | `a00_fill_game_report_subject_trg` (BEFORE INSERT, runs first) sets `reported_id` from `hosted_games.host_id` for `subject_type = 'game'` and ignores the client value; an unknown game with no `reported_id` is refused with `CONTENT_NOT_FOUND`; an id that is not a hosted game (legacy local game) keeps the client's value. `user_reports.reported_id` is closed to `authenticated` in phase 1 (the reporter's read policy would otherwise hand them the host). The client always offers Report game and never sends `reported_id` for a game. | A stranger's report without `reported_id` lives; a forged one is overwritten; both are stored against the real host; the reporter cannot select or filter by `reported_id` but still reads their reports; a missing game is refused; every other column stays readable. |
+| F4  | Low      | `game_payment_settings.host_id` named the minor host of a free game to an approved requester not on the roster.                                                                                                                         | Safer option chosen (mask, not widen `organizer_hidden_for`): `public.game_payment_settings_visible` (security_invoker) with `host_id` masked by the game's rule and `viewer_is_holder`; the definer helper answers only for a row the caller's read policy admits. The client reads settings through the view, saves by id instead of `upsert(onConflict: game_id,host_id)` (an upsert needs SELECT on `host_id`), and the data export filters on `viewer_is_holder`. Phase 2 closes the base column.                                                                         | The approved requester gets the row with `host_id` NULL; the holder and an adult payee's payer see the id; the requester's sweep lists `game_payment_settings` before phase 2 and is `{}` after; after phase 2 the host saves by id and an upsert on `(game_id, host_id)` is refused. |
+| F5  | Low      | The dependency guard missed PAY-1's `private_sec.is_game_host(text)` and SEC-2's `private_sec.is_game_participant(text,uuid)`.                                                                                                       | Both added (plus `can_read_game_payment_settings`, `game_position_waitlist`, `user_reports` and `game_payment_settings`, which the corrections use).                                                                                                                                                                                                                                                                                                                                                                                          | 510 extracts the guard block from the migration file (psql backtick + `sed`), runs it as written, then renames each helper inside the rolled-back transaction: the guard stops with the release message each time and passes with both present.                          |
+
+**Compatibility-plan changes.**
+
+- Phase 1 now closes two columns to `anon`/`authenticated` itself: `user_reports.reported_id` and
+  `game_position_waitlist.reviewed_by` (catalog-driven: the table-level SELECT is replaced by a grant on every other
+  column, and the migration fails if either is still readable). Nothing in the current or older clients reads them;
+  moderators read reports with the service role. A column added to either table later must be granted to
+  `authenticated` explicitly (510 checks `user_reports`). A moderator querying `user_reports.reported_id` directly
+  as `authenticated` is refused; moderation tools already use the service role.
+- Phase 2 additionally closes `hosted_games.host_snapshot` and `game_payment_settings.host_id`, and its verify step
+  checks all seven closed columns. Add to the pre-phase-2 staging checks: (d) the settings screen saves (update by
+  id / insert) with the new build, and no client upserts `game_payment_settings`; (e) an old cached bundle doing
+  `select("*")` on `game_payment_settings` will get `permission denied` after phase 2, like `hosted_games`.
+- New client read path: `game_payment_settings_visible` (Lovable must keep using it and `viewer_is_holder`; a new
+  `game_payment_settings` column must be added to the view too, 510 checks). `src/integrations/supabase/types.ts`
+  gains it by hand.
+- Report game is offered to every viewer who is not the host, whether or not the host is shown.
+
+**Open items from this round.**
+
+- `private_sec.game_organizer_for_caller(game)` answers for any game id, including one the caller's row security
+  would not return (it returns the adult host id of such a game). It is not reachable through the API (private_sec
+  is not exposed), and the new payment-settings helper checks the read policy; consider the same check there.
+- A game report against an id that is not a hosted game still takes `reported_id` from the client (legacy local
+  games); it is a report like any user report and moderators see it as such.
+- Realtime payloads of `game_payment_settings`, `hosted_games` and `join_requests` still carry the closed columns
+  until phase 2 (the app treats them as signals only).
+

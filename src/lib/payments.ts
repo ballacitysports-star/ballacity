@@ -23,7 +23,14 @@ export type PaymentMethod = {
 export type GamePaymentSettings = {
   id: string;
   game_id: string;
-  host_id: string;
+  /**
+   * The settings holder (the payee for a paid game, the host for a free one). Read through
+   * game_payment_settings_visible (SEC-5), so it is null when the holder is not a confirmed
+   * adult and the viewer is unrelated to them.
+   */
+  host_id: string | null;
+  /** True when the signed-in viewer holds these settings ("my settings"; never compare host_id). */
+  viewer_is_holder?: boolean;
   entry_fee: number;
   accepted_method_ids: string[];
   payment_deadline: string | null;
@@ -288,8 +295,9 @@ export async function disconnectMyPayPalAccount() {
 
 // ----- Game settings -----
 export async function getGamePaymentSettings(gameId: string): Promise<GamePaymentSettings | null> {
+  // SEC-5: the view masks the holder for unrelated viewers; phase 2 closes the base column.
   const { data, error } = await supabase
-    .from("game_payment_settings")
+    .from("game_payment_settings_visible")
     .select("*")
     .eq("game_id", gameId)
     .order("created_at", { ascending: false })
@@ -319,10 +327,10 @@ export async function getMyGamePaymentSettings(
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data, error } = await supabase
-    .from("game_payment_settings")
+    .from("game_payment_settings_visible")
     .select("*")
     .eq("game_id", gameId)
-    .eq("host_id", u.user.id)
+    .eq("viewer_is_holder", true)
     .maybeSingle();
   if (error) throw error;
   return (data as GamePaymentSettings) ?? null;
@@ -352,9 +360,30 @@ export async function upsertGamePaymentSettings(input: {
   if (payment_mode !== "direct_host") {
     throw new Error("BallaCity does not process game payments yet — hosts collect directly.");
   }
+  // Update my row by id, else insert one. Not an upsert: ON CONFLICT (game_id, host_id) needs SELECT on
+  // host_id, which SEC-5 phase 2 closes to clients.
+  const updateMine = async (): Promise<boolean> => {
+    const { data: mine, error: readError } = await supabase
+      .from("game_payment_settings_visible")
+      .select("id")
+      .eq("game_id", input.game_id)
+      .eq("viewer_is_holder", true)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!mine?.id) return false;
+    const { error } = await supabase
+      .from("game_payment_settings")
+      .update({ ...input, payment_mode })
+      .eq("id", mine.id);
+    if (error) throw error;
+    return true;
+  };
+  if (await updateMine()) return;
   const { error } = await supabase
     .from("game_payment_settings")
-    .upsert({ ...input, payment_mode, host_id: u.user.id }, { onConflict: "game_id,host_id" });
+    .insert({ ...input, payment_mode, host_id: u.user.id });
+  // A concurrent save created it first: update that row instead.
+  if (error?.code === "23505" && (await updateMine())) return;
   if (error) throw error;
 }
 
