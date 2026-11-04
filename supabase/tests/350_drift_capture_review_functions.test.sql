@@ -60,15 +60,26 @@ SELECT t.lives(format($q$INSERT INTO public.review_helpfuls (review_id, user_id)
 SELECT t.as_user(t.id('rev3'));
 SELECT t.lives(format($q$INSERT INTO public.review_helpfuls (review_id, user_id) VALUES (%L, %L)$q$, t.id('gymrev'), t.id('rev3')), 'and a third');
 SELECT t.reset();
--- (>= 2, not = 2: until 20261103100000 lands, a rebuilt database has two helpful-count triggers and counts every vote twice.
--- What matters here is that the counter moves at all: before this migration the lock rolled it back to 0.)
-CREATE TEMP TABLE _hc AS SELECT helpful_count AS after_two FROM public.reviews WHERE id = t.id('gymrev');
-SELECT t.ok((SELECT after_two >= 2 FROM _hc),
+SELECT t.eq((SELECT helpful_count FROM public.reviews WHERE id = t.id('gymrev')), 2,
   'the vote counter, an update issued from a trigger, is not undone by the author-edit lock (this is what production does and a rebuild from source did not)');
 SELECT t.as_user(t.id('rev2'));
 SELECT t.lives(format($q$DELETE FROM public.review_helpfuls WHERE review_id = %L AND user_id = %L$q$, t.id('gymrev'), t.id('rev2')), 'a vote can be withdrawn');
 SELECT t.reset();
-SELECT t.ok((SELECT helpful_count < (SELECT after_two FROM _hc) AND helpful_count >= 1 FROM public.reviews WHERE id = t.id('gymrev')), 'and the count follows it down');
+SELECT t.eq((SELECT helpful_count FROM public.reviews WHERE id = t.id('gymrev')), 1, 'and the count follows it down');
+
+-- the other system-write path: report_review flags a row while app.review_system = '1' (the only place in the code that sets it).
+-- Without it the author's own flag is reverted; with it the update passes the lock. The setting cannot be chosen through the API:
+-- no exposed function takes it from the caller (checked in review of this change).
+SELECT t.as_user(t.id('rev1'));
+SELECT t.eq(t.changed(format($q$UPDATE public.reviews SET flagged = true WHERE id = %L$q$, t.id('gymrev'))), 1, 'the author''s update of their own review is accepted');
+SELECT t.reset();
+SELECT t.eq((SELECT flagged FROM public.reviews WHERE id = t.id('gymrev')), false, 'but the author cannot flag it themselves: the lock reverts the flag');
+SELECT t.as_user(t.id('rev1'));
+SELECT set_config('app.review_system', '1', true);
+SELECT t.eq(t.changed(format($q$UPDATE public.reviews SET flagged = true WHERE id = %L$q$, t.id('gymrev'))), 1, 'under app.review_system = 1 the same update is accepted');
+SELECT set_config('app.review_system', '', true);
+SELECT t.reset();
+SELECT t.eq((SELECT flagged FROM public.reviews WHERE id = t.id('gymrev')), true, 'and this time it sticks: this is the path report_review uses, which the lock must let through');
 
 -- ---- review_ring_suspects: runs (no ambiguous column), moderators only
 SELECT t.person('ringa', 30), t.person('ringb', 31);

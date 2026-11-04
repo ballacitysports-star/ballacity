@@ -3,7 +3,8 @@
 -- DRIFT. Production's version lets system updates through the author-edit lock; the version in this repository
 -- (20260730162842) does not. A database rebuilt from source therefore silently ignores a helpful vote on a gym review
 -- (the vote counter is an UPDATE issued from inside a trigger, and the lock rolls helpful_count back to its old value)
--- and cannot flag a review through report_review. Production was fixed by hand; the fix was never written down.
+-- and a flag raised through report_review is undone whenever the reporter is the review's author. Production was fixed by hand;
+-- the fix was never written down.
 --
 -- WHAT THIS DOES. Replaces the function with production's exact text (verified 2026-11-03: pg_get_functiondef md5
 -- 1c776a864a0f9e4aac3d17d45cf31c9f, owner postgres, SECURITY DEFINER, search_path = public, trigger function, no
