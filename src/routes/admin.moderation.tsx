@@ -21,8 +21,10 @@ import {
   decideContentReport,
   listContentAppeals,
   reviewContentAppeal,
+  decideLocationHold,
   type ModerationReport,
 } from "@/lib/moderation.functions";
+import { blockedByLocationHold, hasOpenLocationHold } from "@/lib/location-hold";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
 
 export const Route = createFileRoute("/admin/moderation")({
@@ -221,8 +223,24 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
     },
     onError: (e: any) => toast.error(e?.message ?? "Couldn't record that decision"),
   });
+  const holdFn = useServerFn(decideLocationHold);
+  const holdMutation = useMutation({
+    mutationFn: (decision: "restore" | "confirm") =>
+      holdFn({ data: { reportId: report.id, decision, notes } }),
+    onSuccess: (_res, decision) => {
+      toast.success(decision === "restore" ? "Listing text restored" : "Removal confirmed");
+      onDone();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Couldn't record that decision"),
+  });
   const isContent = report.subjectType === "team_post" || report.subjectType === "comment";
-  const busy = statusMutation.isPending || actionMutation.isPending || decideMutation.isPending;
+  const held = hasOpenLocationHold(report);
+  const busy =
+    statusMutation.isPending ||
+    actionMutation.isPending ||
+    decideMutation.isPending ||
+    holdMutation.isPending;
+  const holdBlocks = (a: { status?: string; action?: string }) => blockedByLocationHold(report, a);
 
   return (
     <Card>
@@ -394,79 +412,110 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => statusMutation.mutate("investigating")}
-            >
-              Investigating
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => actionMutation.mutate("warn")}
-            >
-              Warn
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy || report.subjectType === "user"}
-              onClick={() => actionMutation.mutate("remove_content")}
-            >
-              Remove content
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={busy}
-              onClick={() => actionMutation.mutate("suspend")}
-            >
-              Suspend
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={busy}
-              onClick={() => actionMutation.mutate("ban")}
-            >
-              Ban
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => actionMutation.mutate("restore")}
-            >
-              Restore
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => statusMutation.mutate("escalated")}
-            >
-              Escalate
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => statusMutation.mutate("resolved")}
-            >
-              Resolve
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => statusMutation.mutate("dismissed")}
-            >
-              Dismiss
-            </Button>
+          <div className="space-y-2">
+            {held ? (
+              <div className="space-y-2 rounded-lg border border-border bg-surface p-2">
+                <p className="text-xs text-muted-foreground">
+                  The listing&apos;s text is held after location reports: it is hidden from the
+                  public and kept as evidence. Restore it if it reveals no private location, or
+                  confirm the removal. Either decision closes every report on this game.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => holdMutation.mutate("restore")}
+                  >
+                    Restore text
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={() => holdMutation.mutate("confirm")}
+                  >
+                    Confirm removal
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => statusMutation.mutate("investigating")}
+              >
+                Investigating
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy || holdBlocks({ action: "warn" })}
+                onClick={() => actionMutation.mutate("warn")}
+              >
+                Warn
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  busy || report.subjectType === "user" || holdBlocks({ action: "remove_content" })
+                }
+                onClick={() => actionMutation.mutate("remove_content")}
+              >
+                Remove content
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy || holdBlocks({ action: "suspend" })}
+                onClick={() => actionMutation.mutate("suspend")}
+              >
+                Suspend
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy || holdBlocks({ action: "ban" })}
+                onClick={() => actionMutation.mutate("ban")}
+              >
+                Ban
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy || holdBlocks({ action: "restore" })}
+                onClick={() => actionMutation.mutate("restore")}
+              >
+                Restore
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => statusMutation.mutate("escalated")}
+              >
+                Escalate
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy || holdBlocks({ status: "resolved" })}
+                onClick={() => statusMutation.mutate("resolved")}
+              >
+                Resolve
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy || holdBlocks({ status: "dismissed" })}
+                onClick={() => statusMutation.mutate("dismissed")}
+              >
+                Dismiss
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

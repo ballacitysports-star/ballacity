@@ -7,7 +7,7 @@ SELECT t.guardian('kidguardian', 'kidrep');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator'), (t.id('adminone'), 'admin');
 ALTER TABLE public.hosted_games DISABLE TRIGGER validate_hosted_game_age_range;
 -- reporters must be established accounts to count toward the automatic hold (SEC-1)
-UPDATE public.profiles SET created_at = now() - interval '30 days' WHERE id IN (t.id('rep1'), t.id('rep2'), t.id('teenrep'), t.id('kidrep'));
+UPDATE auth.users SET created_at = now() - interval '30 days' WHERE id IN (t.id('rep1'), t.id('rep2'), t.id('teenrep'), t.id('kidrep'));
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, description, game_rules) VALUES
   ('yg', t.id('host'), 'basketball', 'U12 run behind the green gate', now()+interval '3 days', 8, 12, 'Old Mill Gym, 4 Dam Rd', 'by the creek', 'Park in the lot across from the green gate.', 'Bring a ball'),
   ('yg2', t.id('host'), 'basketball', 'U12 other', now()+interval '3 days', 8, 12, 'Gym, 1 A St', 'North', 'Directions in a paraphrase', NULL),
