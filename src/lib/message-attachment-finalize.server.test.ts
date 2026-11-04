@@ -34,30 +34,41 @@ const CONV = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "11111111-1111-4111-8111-111111111111";
 const PATH = `${CONV}/${USER}/photo.jpg`;
 
-/** Storage with object ids: every write makes a new object id, as a delete + re-upload does. */
-function world(initial: Record<string, Uint8Array>) {
+/**
+ * Storage with object ids and versions, as Supabase Storage keeps them: a new upload (or a delete + re-upload) makes a new id;
+ * an upsert over an existing object (the server's clean rewrite, or a sender's signed upload URL minted with upsert) keeps the
+ * id and makes a new version.
+ */
+function world(initial: Record<string, Uint8Array>, opts: { noVersion?: boolean } = {}) {
   let seq = 0;
-  const files = new Map<string, { bytes: Uint8Array; id: string }>();
-  for (const [p, b] of Object.entries(initial)) files.set(p, { bytes: b, id: `obj-${++seq}` });
+  const files = new Map<string, { bytes: Uint8Array; id: string; version: string }>();
+  for (const [p, b] of Object.entries(initial))
+    files.set(p, { bytes: b, id: `obj-${++seq}`, version: `v-${++seq}` });
   const checks: any[] = [];
   let checkError: ((row: any) => string | null) | null = null;
+  let afterDownload: (() => void) | null = null;
   const bucket = {
     info: async (p: string) => {
       const f = files.get(p);
       return f
-        ? { data: { id: f.id }, error: null }
+        ? { data: opts.noVersion ? { id: f.id } : { id: f.id, version: f.version }, error: null }
         : { data: null, error: { message: "not found" } };
     },
     download: async (p: string) => {
       const f = files.get(p);
-      return f
+      const out = f
         ? { data: new Blob([f.bytes as BlobPart]), error: null }
         : { data: null, error: { message: "not found" } };
+      const hook = afterDownload;
+      afterDownload = null;
+      hook?.();
+      return out;
     },
     upload: async (p: string, bytes: Uint8Array) => {
-      const id = `obj-${++seq}`;
-      files.set(p, { bytes, id });
-      return { data: { id, path: p }, error: null };
+      const prior = files.get(p);
+      const id = prior?.id ?? `obj-${++seq}`;
+      files.set(p, { bytes, id, version: `v-${++seq}` });
+      return { data: { id, path: p }, error: null }; // Storage's upload answer carries no version
     },
     remove: async (paths: string[]) => {
       for (const p of paths) files.delete(p);
@@ -77,12 +88,19 @@ function world(initial: Record<string, Uint8Array>) {
     }),
   };
   /** The sender deletes their file and uploads another at the same path (msg_attach_delete_sender + insert). */
-  const swap = (bytes: Uint8Array) => files.set(PATH, { bytes, id: `obj-${++seq}` });
+  const swap = (bytes: Uint8Array) =>
+    files.set(PATH, { bytes, id: `obj-${++seq}`, version: `v-${++seq}` });
+  /** H1: Storage writes the PUT of the sender's signed upload URL with upsert: same id, new version, new bytes. */
+  const overwrite = (bytes: Uint8Array) =>
+    files.set(PATH, { bytes, id: files.get(PATH)!.id, version: `v-${++seq}` });
   return {
     files,
     checks,
     admin,
     swap,
+    overwrite,
+    /** Run once, right after the next download returns (between the download and the following info()). */
+    onNextDownload: (f: () => void) => (afterDownload = f),
     failChecks: (f: (row: any) => string | null) => (checkError = f),
   };
 }
@@ -95,20 +113,88 @@ const deps = (w: ReturnType<typeof world>) => ({
 const input = { userId: USER, conversationId: CONV, path: PATH };
 
 describe("finalizeAttachment: the check is bound to the object that was checked", () => {
-  it("records the id of the checked object", async () => {
+  it("records the id and version of the checked object", async () => {
     const w = world({ [PATH]: jpeg() });
     const out = await finalizeAttachment(deps(w), input);
     expect(out.objectId).toBe(w.files.get(PATH)!.id);
-    expect(w.checks).toEqual([expect.objectContaining({ path: PATH, object_id: out.objectId })]);
+    expect(out.objectVersion).toBe(w.files.get(PATH)!.version);
+    expect(w.checks).toEqual([
+      expect.objectContaining({
+        path: PATH,
+        object_id: out.objectId,
+        object_version: out.objectVersion,
+      }),
+    ]);
   });
 
-  it("records the id of the server's clean rewrite when metadata was removed", async () => {
+  it("records the version of the server's clean rewrite when metadata was removed", async () => {
     const w = world({ [PATH]: jpeg({ gps: true }) });
-    const before = w.files.get(PATH)!.id;
+    const before = { ...w.files.get(PATH)! };
     const out = await finalizeAttachment(deps(w), input);
-    expect(out.objectId).not.toBe(before);
-    expect(out.objectId).toBe(w.files.get(PATH)!.id);
+    expect(out.objectId).toBe(before.id); // Storage's upsert keeps the id
+    expect(out.objectVersion).not.toBe(before.version);
+    expect(out.objectVersion).toBe(w.files.get(PATH)!.version);
     expect(hasText(w.files.get(PATH)!.bytes, "GPS")).toBe(false);
+  });
+
+  it("H1: refuses when the sender overwrites the file in place (same id, new version) during the check", async () => {
+    const w = world({ [PATH]: jpeg() });
+    const d = deps(w);
+    d.scan.mockImplementation(async () => {
+      w.overwrite(enc.encode("%PDF-1.7 never checked"));
+      return safe;
+    });
+    await expect(finalizeAttachment(d, input)).rejects.toThrow(
+      /changed while it was being checked/,
+    );
+    expect(w.checks).toEqual([]);
+  });
+
+  it("H1: refuses an in-place overwrite that lands between the first info() and the download", async () => {
+    const w = world({ [PATH]: jpeg() });
+    let calls = 0;
+    const bucket = w.admin.storage.from();
+    const info = bucket.info;
+    bucket.info = async (p: string) => {
+      const r = await info(p);
+      if (++calls === 1) w.overwrite(jpeg({ pad: 7 })); // the download now reads bytes of a newer version
+      return r;
+    };
+    await expect(finalizeAttachment(deps(w), input)).rejects.toThrow(/changed/);
+    expect(w.checks).toEqual([]);
+  });
+
+  it("H1: refuses when the sender overwrites the server's clean rewrite before it is read back", async () => {
+    const w = world({ [PATH]: jpeg({ gps: true }) });
+    let n = 0;
+    const bucket = w.admin.storage.from();
+    const upload = bucket.upload;
+    bucket.upload = async (p: string, bytes: Uint8Array) => {
+      const r = await upload(p, bytes);
+      if (p === PATH && ++n === 1) w.overwrite(jpeg({ gps: true, pad: 11 })); // right after the rewrite
+      return r;
+    };
+    await expect(finalizeAttachment(deps(w), input)).rejects.toThrow(/changed/);
+    expect(w.checks).toEqual([]);
+  });
+
+  it("H1: refuses when the read-back of the clean rewrite is overwritten before the second info()", async () => {
+    const w = world({ [PATH]: jpeg({ gps: true }) });
+    const bucket = w.admin.storage.from();
+    const upload = bucket.upload;
+    bucket.upload = async (p: string, bytes: Uint8Array) => {
+      const r = await upload(p, bytes);
+      if (p === PATH) w.onNextDownload(() => w.overwrite(jpeg({ pad: 13 })));
+      return r;
+    };
+    await expect(finalizeAttachment(deps(w), input)).rejects.toThrow(/changed/);
+    expect(w.checks).toEqual([]);
+  });
+
+  it("fails closed when Storage does not report a version", async () => {
+    const w = world({ [PATH]: jpeg() }, { noVersion: true });
+    await expect(finalizeAttachment(deps(w), input)).rejects.toThrow(/could not be read/);
+    expect(w.checks).toEqual([]);
   });
 
   it("refuses, and records nothing, when the sender replaces the file while it is being checked", async () => {
@@ -180,15 +266,16 @@ describe("finalizeAttachment: the check is bound to the object that was checked"
     expect(w.checks).toEqual([]);
   });
 
-  it("still records the check on a database without the object_id column (app ships before the migration)", async () => {
+  it("still records the check on a database without the new columns (app ships before the migration)", async () => {
     const w = world({ [PATH]: jpeg() });
     w.failChecks((row) =>
-      "object_id" in row
-        ? "Could not find the 'object_id' column of 'message_attachment_checks'"
+      "object_version" in row
+        ? "Could not find the 'object_version' column of 'message_attachment_checks'"
         : null,
     );
     await finalizeAttachment(deps(w), input);
     expect(w.checks).toHaveLength(1);
     expect(w.checks[0]).not.toHaveProperty("object_id");
+    expect(w.checks[0]).not.toHaveProperty("object_version");
   });
 });
