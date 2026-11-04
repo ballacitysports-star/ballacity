@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import {
+  guardRequirements,
   DEFAULT_MANIFEST,
   LEDGER,
   ROOT,
@@ -393,4 +394,14 @@ describe("dependencies, ledger and protections against a target", () => {
     assert.equal(r.status, 2);
     assert.match(r.stderr, /local scratch database only/);
   });
+});
+
+test("guard requirements: only complete literal arguments count (dynamic names are not requirements)", () => {
+  const r = guardRequirements(`DO $g$ BEGIN
+    IF to_regprocedure('private_sec.game_payee(text)') IS NULL THEN RAISE EXCEPTION 'x'; END IF;
+    _pub := to_regprocedure('public.' || _sig);
+    IF to_regclass( 'public.teams' ) IS NULL THEN RAISE EXCEPTION 'y'; END IF;
+  END $g$;`);
+  assert.deepEqual(r.functions, ["private_sec.game_payee(text)"]);
+  assert.deepEqual(r.tables, ["public.teams"]);
 });

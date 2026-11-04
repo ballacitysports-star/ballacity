@@ -147,7 +147,7 @@ export function definitionsIn(text) {
 export function guardRequirements(text) {
   const body = stripComments(text);
   const out = { functions: [], tables: [], schemas: [] };
-  const re = /\bto_(regprocedure|regclass|regnamespace)\s*\(\s*'([^']+)'/gi;
+  const re = /\bto_(regprocedure|regclass|regnamespace)\s*\(\s*'([^']+)'\s*\)/gi; // a complete literal argument only (not 'public.' || _sig)
   for (const m of body.matchAll(re)) {
     const kind = { regprocedure: "functions", regclass: "tables", regnamespace: "schemas" }[
       m[1].toLowerCase()
