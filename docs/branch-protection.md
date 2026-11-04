@@ -3,6 +3,39 @@
 Nothing in this file is applied by the repository. It is done in the GitHub web interface by someone with admin rights.
 Before changing anything, read what already exists in Settings > Rules and Settings > Branches and write it down.
 
+## 0. Final administrator checklist (tick in order; do not skip the verification at the end)
+
+Preconditions (all true on 2026-11-04, `main` = `04e4b6cc` or later):
+
+- [ ] `Replay migrations and run SQL tests` has no path filter (merged in #254) and reported success on the push to `main`.
+- [ ] `Unit tests`, `Lint` and `Typecheck & build` reported success on the same push.
+- [ ] You have written down every rule and ruleset that already exists (Settings, Rules and Settings, Branches).
+- [ ] You know which identity Lovable pushes as (Settings, Integrations): a GitHub App installation, or an authorization of your own account.
+
+Create one ruleset on the default branch (Settings, Rules, Rulesets, New branch ruleset, name `main protection`; start in Evaluate mode if your plan offers it, then Active):
+
+- [ ] **Require a pull request before merging.**
+- [ ] **Required reviews:** while there is one account, 0 approvals but "Require conversation resolution" and "Dismiss stale approvals" on (GitHub does not count an author's own approval, so 1 would block every change). The day a second reviewer exists: 1 approval, "Require review from Code Owners", "Require approval of the most recent reviewable push".
+- [ ] **Require status checks to pass:** `Unit tests`, `Lint`, `Typecheck & build`, `Replay migrations and run SQL tests` (source: GitHub Actions). Require branches to be up to date before merging.
+- [ ] **Not required:** `Playwright`. It stays optional until the sandbox is verified, `E2E_SANDBOX_PROJECT_REF` is configured by you, and it has passed repeatedly; and the `e2e-sandbox` Environment has required reviewers.
+- [ ] Restrict deletions; block force pushes; merge commits only while the stacked privacy branches exist.
+- [ ] **Bypass list: empty.** No standing bypass for anyone, including you and Lovable (see section 2 for the operating procedure).
+- [ ] Settings, General, "Automatically delete head branches": off until the privacy stack is merged.
+
+Operating Lovable safely under the rule (details in section 2):
+
+- [ ] Before enabling the rule, tell your team that Lovable edits that land directly on `main` will be rejected once it is Active.
+- [ ] Test, outside any release window and with a trivial edit, whether Lovable can work on a non-default branch and open a pull request. If yes, that is the workflow from then on.
+- [ ] If it cannot: pause Lovable's GitHub sync (or stop making edits in Lovable) during the privacy release; use a time-boxed bypass held by you only if an urgent app change cannot wait, and review every bypassed commit afterwards.
+- [ ] Lovable applying a migration to the database is not governed by this rule at all. Treat "Applied <migration>" commits as a production change that needs its own approval.
+
+Verify (do not skip):
+
+- [ ] A documentation-only pull request shows all four required checks and none stays "Expected".
+- [ ] A direct push to `main` is rejected.
+- [ ] A pull request with a deliberately failing SQL assertion or broken migration cannot be merged.
+- [ ] Settings, Rules, Insights shows the rule evaluated.
+
 ## 1. The four required checks
 
 | Required check (exact job name)       | Workflow       | Source         |
@@ -19,14 +52,7 @@ Environment has required reviewers (an approval pause would otherwise stall ever
 
 ### Gate before requiring them: each check must have reported success on `main`
 
-Checked on 2026-11-03 at `main` = `890082cb` (merge of #250): `Unit & Lint` (jobs `Unit tests`, `Lint`,
-`Typecheck & build`) and `Database tests` (job `Replay migrations and run SQL tests`) each completed with conclusion
-`success` on the push to `main`.
-
-One more condition for the fourth check: until the workflow change in "Run the migration check on every pull request"
-is merged, `Replay migrations and run SQL tests` reports only on pull requests that touch migration, test or script
-paths. Merge that change first, wait for the push run on `main`, then add the check. GitHub only offers a check for
-selection after it has reported on the repository within the last seven days.
+Checked on 2026-11-04: after #254 merged (`05009c41`) and after #251 merged (`04e4b6cc`), `Unit & Lint` (jobs `Unit tests`, `Lint`, `Typecheck & build`) and `Database tests` (job `Replay migrations and run SQL tests`) each completed with conclusion `success` on the push to `main`. Earlier, at `890082cb`, the same three Unit & Lint jobs and Database tests had also succeeded. `Replay migrations and run SQL tests` now reports on every pull request, including documentation-only ones. A check can be selected as required once it has reported on the repository within the last seven days.
 
 ## 2. Lovable and direct pushes to `main`: assessment
 
