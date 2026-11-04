@@ -4,6 +4,19 @@ Scope: F7 (merged to `main`), #250 payment-settings fix, PRIV-1 reviews (#245), 
 PRIV-2B age/hosting/payments/identity (#248), PRIV-2C application (#249), PRIV-2D location-leak fixes (free text, invitations), the helpful-trigger fix and four drift captures. Nothing in this document has been run.
 **Every step that changes production needs its own explicit owner approval, in writing, at the time.**
 
+## Status vocabulary (used throughout this runbook)
+
+Four separate states. A later state is never implied by an earlier one, and none is claimed without the evidence named here.
+
+| State                   | Meaning                                                                                                                                     | Evidence                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Implemented**         | code, migration and tests exist on a branch or pull request and pass in a local or CI replay                                                | pull request number and final-head CI run               |
+| **Merged**              | the change is in `main`. Merging applies nothing: Lovable syncs code, migrations are applied by hand, publishing is separate                | merge commit on `main`                                  |
+| **Deployed**            | the migration has been applied to the production database (ledger row present) and the application build containing the change is published | ledger row and published build id, recorded at the time |
+| **Production-verified** | the read-only checks in sections 3, 7 and 12 have been run against production after deployment and matched                                  | dated query results, aggregates only                    |
+
+State on 2026-11-04: every privacy change is **Implemented** only (open pull requests). Documentation, tests and repository governance are **Merged**. Nothing in this runbook is **Deployed** or **Production-verified**. Production is NO-GO.
+
 ## 0. Principles
 
 1. Production is never a test environment. Everything is rehearsed first in a verified, isolated Supabase project.
@@ -377,3 +390,21 @@ G3 (#258) and G5 (#261) have no migration. `20261105120000` is unused on purpose
 **Compatibility.** Every migration here is additive except two replaced definitions (roster visibility, availability read policy), which only reduce what unrelated viewers can read. An older app keeps working and sees less. Text guards refuse new addresses in youth team posts and minors' availability notes with an explanation; cancellations and unrelated edits are not blocked.
 
 **Recovery.** No procedure restores exact data to a public column or re-opens a minor's post to strangers. A wrong private copy is corrected by the service role; a guard false positive is fixed forward by editing the detector only; an app rollback is allowed only to a build that keeps the v2 caches and the client-storage manifest (PRIV-2C or later) once activation has happened.
+
+## 17. Corrections from the independent review round (revision 7, 2026-11-05)
+
+**Two more migrations.** Step 18: `20261106140000_minor_messaging_authorization.sql` (R7, #270; needs 14; replaces `minor_messaging_block` and `can_notify`, adds the `awaiting_guardian` request status, the approval trigger, the reaction guard and the corrected `team_invite_player`; production fingerprints of the three replaced functions matched on 2026-11-05: md5 `52f406f8...`, `d0d2e465...`, `2712dcac...`). Step 19, applied last: `20261107100000_stack_hardening_from_review.sql` (SEC-1, #271; needs everything above; replaces `can_see_minor_name`, `sync_hosted_game_private` and `coarsen_existing_youth_games`, adds the switch tamper guard and the join-request approval guard). The step 17 dependency on step 12 is soft (the report reason list). Migrations 14 to 19 now begin with a dependency guard that fails before changing anything if a required earlier migration is missing.
+
+**Order and merge.** Add to section 16: #270 after #265; #271 last (retarget from `staging/priv-rehearsal` to `main`); #268 before the app is published (the app has no fallback to a direct upload); migration 16 (staging bucket) before the app.
+
+**Apply discipline (review findings).**
+
+- Start every file's session with `SET lock_timeout = '5s'` so a long-running transaction cannot queue all readers behind a DDL statement; retry later if it times out.
+- Never re-run a file. Re-running these silently reverts newer protection (demonstrated): 0f `20261103110000` (loses the PRIV-1 review rules), 4 `20261104100000` (reverts the switch guard to the version without the team-post check), 14 after 18 (reverts the contact-request guard), and the two already listed (3, 5). Re-runs of 14, 17 and 18 fail loudly on `CREATE POLICY`.
+- Skipping a file is not detected for the older migrations (4130000, 4140000, 4150000, 5100000, 5110000, 5130000 have no dependency guard; skipping the detector later fails every youth-game write at user time; skipping 4100000 leaves the activation guard uncreated). Apply in order, check with section 3 after each file, and add the guards in a follow-up before the production plan.
+- Recovery for steps 7 to 19 is forward-fix only. The older down scripts (`docs/rollbacks`) must not be applied to the full release: applying the PRIV-2D or PRIV-2A down script on the complete schema breaks youth game and team post writes. Section 10 covers steps 1 to 6 only.
+- Two moderator-only procedures deliberately copy an exact venue back to public columns for a verified public venue or facility (`verify_team_post_public_venue`, `verify_team_facility_public`); the owner must confirm this exception explicitly.
+
+**Behaviour changes to announce.** Unlinked 16-17 year olds lose adult messaging until a guardian is linked; organization membership is not a messaging context; a 16-17 year old who has hosted a youth game keeps a private profile and hidden team, rating, posts, comments and reel until 18 and cannot own a visible team; moderators who are not administrators cannot dismiss or resolve an escalated report; availability posts of minors are visible only to related people.
+
+**S0 to S11 changes.** S1 applies migrations 10 to 19 in order with a `lock_timeout`; S3 and S4 add the contact-request table, `player_availabilities`, `post_comments` and `post_reactions`; S5 runs the G3b upload steps with the staging bucket and the scanner both up and with the scanner forced down (the upload must be held, not published); S7 covers the report and appeal screens, the Guardian approvals card and the Appeals tab; S9 runs every batch to 0; S10 adds the legacy procedures P1 and P4 (`legacy-data-procedures.md`). Items ST-7.6 (organization context) is replaced by a negative: an organization admin adding a minor gives no access.
