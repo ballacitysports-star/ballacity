@@ -18,6 +18,14 @@
 -- (documented in src/lib/retention.ts; purge function provided, not scheduled); escalated items and open appeals are never purged.
 -- Depends on 20261105130000 (reason list) and the existing moderation states. No data is rewritten.
 
+-- Dependency guard: fail loudly, before changing anything, if a migration this one needs has not been applied (plpgsql bodies would otherwise fail only at user time).
+DO $guard$ BEGIN
+  IF to_regprocedure('public.is_moderator(uuid)') IS NULL OR to_regprocedure('public.age_cohort_of(uuid)') IS NULL OR to_regprocedure('private_sec.scrub_game_public_text(text)') IS NULL OR to_regclass('public.user_reports') IS NULL OR to_regclass('public.team_posts') IS NULL OR to_regclass('public.post_comments') IS NULL THEN
+    RAISE EXCEPTION 'MOD-1: a required earlier release migration has not been applied (see docs/release/youth-privacy-release-runbook.md, sections 2 and 16)';
+  END IF;
+END $guard$;
+
+
 ALTER TABLE public.user_reports ADD COLUMN IF NOT EXISTS team_post_id uuid;
 ALTER TABLE public.user_reports ADD COLUMN IF NOT EXISTS comment_id uuid;
 ALTER TABLE public.user_reports DROP CONSTRAINT IF EXISTS user_reports_subject_type_check;
