@@ -902,6 +902,19 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       const resolveFn = (name) => {
         const direct = readFn(prev, name);
         if (direct) return [direct];
+        if (name.includes("(")) {
+          // A guard may spell a type differently from the catalog (timestamptz vs "timestamp with time zone", int vs integer):
+          // let the server canonicalize it with the same empty search_path the snapshot uses.
+          const canonical = scratch
+            .sql(
+              db,
+              `SET search_path = '';\nSELECT coalesce(to_regprocedure(${lit(name)})::text, '');`,
+            )
+            .trim()
+            .split("\n")
+            .pop();
+          if (canonical && canonical in prev.functions) return [canonical];
+        }
         const overloads = Object.keys(prev.functions).filter((s) => fnName(s) === name);
         if (!overloads.length)
           throw new Error(`${m.path}: required function ${name} does not exist before it runs`);
