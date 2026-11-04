@@ -40,13 +40,17 @@ SELECT t.eq(t.dm('gdad', 'kid'), 'child_needs_guardian:other', 'another family''
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('t16');
 SELECT t.ok(t.dm('coach', 't16') IS NULL, 'a coach and a player of the same team');
 SELECT t.eq(t.dm('coach', 't15b'), 'needs_connection:other', 'but not a player of another team');
-SELECT t.ok(t.dm('host', 't14') IS NULL, 'a game''s host and a confirmed participant');
+SELECT t.eq(t.dm('host', 't14'), 'needs_connection:other', 'a game''s host and a self-joined minor participant: not a context (anyone can publish a public game)');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status, guardian_approved_at, guardian_approved_by) VALUES ('pub', t.id('t14'), t.id('host'), 'k-approved', 'approved', now(), t.id('gmom'));
+SET LOCAL session_replication_role = origin;
+SELECT t.ok(t.dm('host', 't14') IS NULL, 'an adult host and a participant whose guardian approved that participation: a context');
 SELECT t.eq(t.dm('stranger', 't14'), 'needs_connection:other', 'a co-participant adult is still a stranger');
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t16');
 
 -- ================= 3. minors with each other (E2)
-SELECT t.ok(t.dm('t14', 't15b') IS NULL, 'two 13-15 year olds whose guardians both chose peers and who share a confirmed game');
-SELECT t.eq(t.dm('t16', 't15b'), 'needs_connection:other', 'but not across age bands (a 16-17 and a 13-15), even with peers and a shared game');
+SELECT t.eq(t.dm('t14', 't15b'), 'needs_connection:other', 'two 13-15 year olds sharing a public game are not a context, even with peers on both sides (consent goes through a request)');
+SELECT t.eq(t.dm('t16', 't15b'), 'needs_connection:other', 'nor across age bands');
 SELECT t.eq(t.dm('kid', 't14'), 'needs_connection:other', 'and never an under-13');
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('t15b');
 SELECT t.eq(t.dm('t14', 't15b'), 'teammates_only:other', 'the other guardian''s stricter setting wins');
@@ -177,7 +181,8 @@ SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t17u')), 'and cannot n
 
 -- F3: a rejected or old join request is not a relationship; controls still apply to the connection branch
 SET LOCAL session_replication_role = replica;
-INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('pub', t.id('t14'), t.id('stranger'), 'k-rej', 'rejected');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, host_snapshot) VALUES ('pub2', t.id('stranger'), 'basketball', 'Open run 2', now() + interval '2 days', 12, 17, 'Gym', 'North', '{"name":"S"}'::jsonb);
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('pub2', t.id('t14'), t.id('stranger'), 'k-rej', 'rejected');
 SET LOCAL session_replication_role = origin;
 SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t14')), 'a rejected join request does not allow notifying the child');
 UPDATE public.join_requests SET status = 'pending' WHERE idempotency_key = 'k-rej';
@@ -195,7 +200,7 @@ SET LOCAL session_replication_role = origin;
 SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t16')), 'an adult with a join request to a minor host cannot notify that host');
 SELECT t.ok(public.can_notify(t.id('t16'), t.id('stranger')), 'but the host can notify the requester (host to player)');
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id IN (t.id('t14'), t.id('t15b'));
-SELECT t.ok(public.can_notify(t.id('t14'), t.id('t15b')), 'two peers with a shared game can notify each other (message notices keep working)');
+SELECT t.ok(NOT public.can_notify(t.id('t14'), t.id('t15b')), 'two teens who only share a game cannot notify each other');
 
 -- F4: approval re-checks blocks and privacy; the guardian sees who is being contacted (names come from visible_avatars in the app)
 SELECT t.as_user(t.id('t16'));
@@ -234,6 +239,22 @@ SELECT t.eq(public.minor_messaging_block(t.id('gmom'), t.id('t16')), 'needs_conn
 SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t17u')), 'needs_guardian_link:other', 'a party to the pair still gets the reason');
 SELECT t.ok(NOT public.can_notify(t.id('gmom'), t.id('t16')), 'can_notify says no to a third party');
 SELECT t.reset();
+
+-- ================= teen-to-teen consent: request, sender's guardian approves, recipient (whose guardian allows peers) accepts
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id IN (t.id('t14'), t.id('t15b'));
+SELECT t.as_user(t.id('t14'));
+SELECT t.lives($q$SELECT t.req('t14', 'b3', 't15b')$q$, 'a 13-15 can ask another 13-15 whose guardian allows peers');
+SELECT t.eq((SELECT status FROM public.availability_contact_requests WHERE from_user_id = t.id('t14') AND to_user_id = t.id('t15b')), 'awaiting_guardian', 'it waits for the sender''s guardian');
+SELECT t.as_user(t.id('t16'));
+SELECT t.throws($q$SELECT t.req('t16', 'b3', 't15b')$q$, 'needs_connection', 'not across age bands');
+SELECT t.as_user(t.id('gmom'));
+SELECT t.eq(public.guardian_decide_contact_request((SELECT id FROM public.availability_contact_requests WHERE from_user_id = t.id('t14') AND to_user_id = t.id('t15b')), true), 'approved', 'the sender''s guardian approves');
+SELECT t.as_user(t.id('t15b'));
+SELECT t.lives($q$UPDATE public.availability_contact_requests SET status = 'accepted' WHERE from_user_id = t.id('t14') AND to_user_id = t.id('t15b')$q$, 'the recipient accepts');
+SELECT t.reset();
+SELECT t.ok(t.dm('t14', 't15b') IS NULL, 'only now may they message (verified context, mutual consent, guardian permission on both sides)');
+UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('t15b');
+SELECT t.eq(t.dm('t14', 't15b'), 'teammates_only:other', 'and the recipient''s guardian can still narrow it later');
 
 -- ================= 7. bypass attempts
 SELECT set_config('t.conv', (SELECT conversation_id::text FROM public.conversation_participants WHERE user_id = t.id('t16') LIMIT 1), false);
