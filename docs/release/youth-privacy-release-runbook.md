@@ -4,6 +4,19 @@ Scope: F7 (merged to `main`), #250 payment-settings fix, PRIV-1 reviews (#245), 
 PRIV-2B age/hosting/payments/identity (#248), PRIV-2C application (#249), PRIV-2D location-leak fixes (free text, invitations), the helpful-trigger fix and four drift captures. Nothing in this document has been run.
 **Every step that changes production needs its own explicit owner approval, in writing, at the time.**
 
+## Status vocabulary (used throughout this runbook)
+
+Four separate states. A later state is never implied by an earlier one, and none is claimed without the evidence named here.
+
+| State                   | Meaning                                                                                                                                     | Evidence                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Implemented**         | code, migration and tests exist on a branch or pull request and pass in a local or CI replay                                                | pull request number and final-head CI run               |
+| **Merged**              | the change is in `main`. Merging applies nothing: Lovable syncs code, migrations are applied by hand, publishing is separate                | merge commit on `main`                                  |
+| **Deployed**            | the migration has been applied to the production database (ledger row present) and the application build containing the change is published | ledger row and published build id, recorded at the time |
+| **Production-verified** | the read-only checks in sections 3, 7 and 12 have been run against production after deployment and matched                                  | dated query results, aggregates only                    |
+
+State on 2026-11-04: every privacy change is **Implemented** only (open pull requests). Documentation, tests and repository governance are **Merged**. Nothing in this runbook is **Deployed** or **Production-verified**. Production is NO-GO.
+
 ## 0. Principles
 
 1. Production is never a test environment. Everything is rehearsed first in a verified, isolated Supabase project.
