@@ -1,6 +1,5 @@
--- R7 audit: stranger-to-minor direct messaging. Locks the verified protections and records, by name, the exceptions that exist today.
--- Assertions named "KNOWN EXCEPTION" describe current behaviour that is NOT the intended policy; they exist so that fixing one shows up as
--- a deliberate test change, not a silent drift. See docs/privacy/r7-messaging-audit.md.
+-- R7: stranger-to-minor direct messaging. Locks the protections that existed before and, since the R7 authorization migration, the
+-- refusals that close the former exceptions E1 to E4 (E5 is covered in 460). See docs/privacy/r7-messaging-audit.md.
 BEGIN;
 SELECT t.person('adult', 35), t.person('adulttwo', 36), t.person('parent', 41), t.person('kid', 10), t.person('teen14', 14),
        t.person('teen17', 17), t.person('selfteen', 17), t.person('selfteen14', 14), t.person('selfteenb', 16), t.person('shared', 30);
@@ -37,18 +36,18 @@ SELECT t.as_user(t.id('adult'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kid')), 'MINOR_MESSAGING_BLOCKED', 'adult stranger to an under-13: refused');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen14')), 'MINOR_MESSAGING_BLOCKED', 'adult stranger to a linked 13-15: refused');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:guardian_only', 'adult stranger to a linked 16-17: refused (guardian-only default)');
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen14')), 'MINOR_MESSAGING_BLOCKED:teen_needs_shared_game', 'adult stranger to an unlinked 13-15: refused without a shared game');
-SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'KNOWN EXCEPTION E1: adult stranger to an unlinked 16-17 is allowed (no guardian control row exists, no rule applies)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen14')), 'MINOR_MESSAGING_BLOCKED:needs_guardian_link:other', 'adult stranger to an unlinked 13-15: refused (the child needs a linked guardian first)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'MINOR_MESSAGING_BLOCKED:needs_guardian_link:other', 'E1 closed: adult stranger to an unlinked 16-17 is refused');
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('adulttwo')), 'adult to adult: allowed');
 SELECT t.reset();
 SELECT t.as_user(t.id('selfteenb'));
-SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'KNOWN EXCEPTION E2: two unrelated unlinked 16-17 year olds can open a conversation');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'MINOR_MESSAGING_BLOCKED', 'E2 closed: two unrelated unlinked 16-17 year olds cannot open a conversation');
 SELECT t.reset();
 
 -- ---- a guardian who opens messaging to peers lets an adult stranger reach a 16-17 (existing test 120 asserts this)
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('teen17');
 SELECT t.as_user(t.id('shared'));
-SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'KNOWN EXCEPTION E3: with "peers" chosen by the guardian an adult stranger can open a conversation with a 16-17');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:needs_connection:other', 'E3 closed: "peers" chosen by the guardian does not authorize an adult stranger');
 SELECT t.reset();
 
 -- ---- blocks

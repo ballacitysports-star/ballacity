@@ -28,7 +28,9 @@ export type MinorMessagingReason =
   | "teammates_only"
   | "child_needs_guardian"
   | "child_needs_shared_game"
-  | "teen_needs_shared_game";
+  | "teen_needs_shared_game"
+  | "needs_connection"
+  | "needs_guardian_link";
 
 /** Whose account the refusing rule applies to, from the sender's view. */
 export type MinorMessagingSide = "self" | "other";
@@ -53,6 +55,8 @@ const KNOWN: ReadonlySet<string> = new Set<MinorMessagingReason>([
   "child_needs_guardian",
   "child_needs_shared_game",
   "teen_needs_shared_game",
+  "needs_connection",
+  "needs_guardian_link",
 ]);
 
 const NOUN: Record<MessagingRecipient, string> = {
@@ -84,11 +88,30 @@ function sharedGameMessage(side: MinorMessagingSide | null, to: MessagingRecipie
   }
 }
 
+/** The backend's floor: nobody reaches a minor except a guardian or inside an authorized context. */
+function authorizationMessage(
+  reason: "needs_connection" | "needs_guardian_link",
+  side: MinorMessagingSide | null,
+  to: MessagingRecipient,
+): string {
+  if (reason === "needs_guardian_link") {
+    return side === "self"
+      ? "To message other people, ask a parent or guardian to link your account first (Settings, Family). Until then you can still join games and teams."
+      : `${capitalize(NOUN[to])} can't be messaged yet because their account is not linked to a parent or guardian.`;
+  }
+  return side === "self"
+    ? "You can message this person once you're on the same team, or a parent or guardian approves a request."
+    : `You can message ${NOUN[to]} once you're on the same team or their parent or guardian has approved a request.`;
+}
+
 function describe(
   reason: MinorMessagingReason,
   side: MinorMessagingSide | null,
   to: MessagingRecipient,
 ): string {
+  if (reason === "needs_connection" || reason === "needs_guardian_link") {
+    return authorizationMessage(reason, side, to);
+  }
   if (reason === "child_needs_shared_game" || reason === "teen_needs_shared_game") {
     return sharedGameMessage(side, to);
   }

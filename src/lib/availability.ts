@@ -15,7 +15,8 @@ export type PlaceGeo = {
 };
 
 export type AvailabilityStatus = "open" | "closed";
-export type ContactRequestStatus = "pending" | "accepted" | "declined" | "withdrawn";
+export type ContactRequestStatus =
+  "pending" | "accepted" | "declined" | "withdrawn" | "awaiting_guardian";
 
 export type PlayerAvailability = {
   id: string;

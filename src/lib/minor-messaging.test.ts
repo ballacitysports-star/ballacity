@@ -14,6 +14,8 @@ const ALL_CODES = [
   "child_needs_guardian",
   "child_needs_shared_game",
   "teen_needs_shared_game",
+  "needs_connection",
+  "needs_guardian_link",
 ] as const;
 const RECIPIENTS = ["player", "game_player", "host", "team_leader", "guardian", "chat"] as const;
 
@@ -218,5 +220,38 @@ describe("describeMessagingError", () => {
   it("uses the fallback when there is no message at all", () => {
     expect(describeMessagingError(undefined)).toBe("Couldn't open chat");
     expect(describeMessagingError(undefined, "Try again")).toBe("Try again");
+  });
+});
+
+describe("R7 authorization reasons", () => {
+  it("tells an unlinked minor how to fix it, without a raw code", () => {
+    const msg = minorMessagingMessage(
+      new Error("MINOR_MESSAGING_BLOCKED:needs_guardian_link:self"),
+      "player",
+    );
+    expect(msg).toMatch(/parent or guardian to link your account/i);
+    expect(msg).not.toMatch(/MINOR_MESSAGING/);
+  });
+  it("explains the other side without naming anyone", () => {
+    expect(
+      minorMessagingMessage(
+        new Error("MINOR_MESSAGING_BLOCKED:needs_guardian_link:other"),
+        "player",
+      ),
+    ).toMatch(/not linked to a parent or guardian/i);
+    expect(
+      minorMessagingMessage(new Error("MINOR_MESSAGING_BLOCKED:needs_connection:other"), "player"),
+    ).toMatch(/same team|approved a request/i);
+  });
+  it("never suggests that sharing a game is enough", () => {
+    for (const side of ["self", "other"]) {
+      for (const code of ["needs_connection", "needs_guardian_link"]) {
+        const msg = minorMessagingMessage(
+          new Error(`MINOR_MESSAGING_BLOCKED:${code}:${side}`),
+          "player",
+        );
+        expect(msg).not.toMatch(/same game/i);
+      }
+    }
   });
 });
