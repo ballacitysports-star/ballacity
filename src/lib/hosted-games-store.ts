@@ -11,11 +11,14 @@ import {
   type ExactLocation,
   type ExactLocationStatus,
 } from "@/lib/youth-game-location";
+import { GAMES_READ } from "@/lib/organizer-access";
 
-// v2 holds only what is safe to keep on a device: a youth-inclusive game is stored in its coarse form, never its
-// exact venue or coordinates. v1 held exact coordinates of every game ever fetched and is deleted on first load.
-const STORAGE_KEY = "openrun.hostedGames.v2";
-const LEGACY_STORAGE_KEY = "openrun.hostedGames.v1";
+// v3 holds only what is safe to keep on a device: a youth-inclusive game is stored in its coarse form, never its
+// exact venue or coordinates, and games come from hosted_games_public, so a minor host's account id (and cover path)
+// is only stored for a viewer entitled to it (SEC-5). v1 held exact coordinates and v2 held every host id read
+// straight from the table; both are deleted on first load.
+const STORAGE_KEY = "openrun.hostedGames.v3";
+const LEGACY_STORAGE_KEYS = ["openrun.hostedGames.v1", "openrun.hostedGames.v2"];
 const listeners = new Set<() => void>();
 let cache: Game[] = [];
 let loaded = false;
@@ -46,7 +49,7 @@ function loadLocal() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
-    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    for (const key of LEGACY_STORAGE_KEYS) window.localStorage.removeItem(key);
   } catch {
     /* storage unavailable */
   }
@@ -211,9 +214,12 @@ function getSnapshot() {
 
 // ---------- DB row <-> Game mapping ----------
 
-type DbRow = {
+/** A row of hosted_games_public (SEC-5): host_id is null when this viewer may not know the organizer. */
+export type DbRow = {
   id: string;
-  host_id: string;
+  host_id: string | null;
+  organizer_ref?: string | null;
+  viewer_is_host?: boolean | null;
   hidden_at?: string | null;
 
   sport: string;
@@ -282,7 +288,7 @@ function publicHostSnapshot(host: unknown) {
   return snap;
 }
 
-function rowToGameRaw(r: DbRow): Game {
+export function rowToGameRaw(r: DbRow): Game {
   const snap = r.host_snapshot ?? {};
   // A host who is not a confirmed adult is shown only as the organizer the database recorded: no username,
   // photo, rating or profile link, and no invented defaults that look like an identity.
@@ -301,7 +307,9 @@ function rowToGameRaw(r: DbRow): Game {
           rating: snap.rating ?? 5,
         },
     hostNeutral: neutral || undefined,
-    hostUserId: r.host_id,
+    hostUserId: r.host_id ?? undefined,
+    viewerIsHost: r.viewer_is_host === true,
+    organizerRef: r.organizer_ref ?? undefined,
     date: r.date,
     duration: r.duration,
     location: r.location,
@@ -402,7 +410,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
 
 async function fetchAll(): Promise<void> {
   const { data, error } = await supabase
-    .from("hosted_games")
+    .from(GAMES_READ)
     .select("*")
     // Moderator-hidden games must never surface in the feed or on the map.
     .is("hidden_at", null)
@@ -444,34 +452,75 @@ export function retryHostedGames() {
   ensureDbHydrated();
 }
 
+// Realtime reads the table, not the view: until phase 2 its payload still carries host_id and the cover path, and
+// after phase 2 it carries neither. So a change is only a signal: the changed rows are read again through
+// hosted_games_public (batched), and nothing from the payload except the id and hidden_at is used.
+const pendingRealtimeIds = new Set<string>();
+let realtimeFlush: ReturnType<typeof setTimeout> | null = null;
+const REALTIME_BATCH_MS = 250;
+
+async function refetchChangedGames(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { data, error } = await supabase.from(GAMES_READ).select("*").in("id", ids);
+  if (error) return;
+  const rows = (data as DbRow[] | null) ?? [];
+  const seen = new Set(rows.map((r) => r.id));
+  let next = cache.filter((g) => !ids.includes(g.id) || seen.has(g.id));
+  for (const r of rows) {
+    if (r.hidden_at) {
+      next = next.filter((g) => g.id !== r.id);
+      continue;
+    }
+    const g = rowToGame(r);
+    const idx = next.findIndex((x) => x.id === g.id);
+    next = idx >= 0 ? next.map((x) => (x.id === g.id ? g : x)) : [g, ...next];
+  }
+  cache = next;
+  emit();
+  // The venue, the roster or the age range may have changed what this viewer may see: re-check it.
+  for (const r of rows) void refreshExactLocation(r.id);
+}
+
+function queueRealtimeRefetch(id: string) {
+  pendingRealtimeIds.add(id);
+  if (realtimeFlush) return;
+  realtimeFlush = setTimeout(() => {
+    realtimeFlush = null;
+    const ids = [...pendingRealtimeIds];
+    pendingRealtimeIds.clear();
+    void refetchChangedGames(ids);
+  }, REALTIME_BATCH_MS);
+}
+
+/** What the store does with one realtime event (exported for tests). */
+export function realtimeAction(payload: {
+  eventType: string;
+  new?: { id?: string; hidden_at?: string | null } | null;
+  old?: { id?: string } | null;
+}): { kind: "remove"; id: string } | { kind: "refetch"; id: string } | null {
+  if (payload.eventType === "DELETE")
+    return payload.old?.id ? { kind: "remove", id: payload.old.id } : null;
+  const id = payload.new?.id;
+  if (!id) return null;
+  // Just hidden by a moderator: drop it from the live cache without a read.
+  if (payload.new?.hidden_at) return { kind: "remove", id };
+  return { kind: "refetch", id };
+}
+
 function ensureRealtime() {
   if (realtimeAttached || typeof window === "undefined") return;
   realtimeAttached = true;
   const channel = supabase
     .channel("hosted_games:all")
     .on("postgres_changes", { event: "*", schema: "public", table: "hosted_games" }, (payload) => {
-      const newRow = payload.new as DbRow | null;
-      const oldRow = payload.old as DbRow | null;
-      if (payload.eventType === "DELETE" && oldRow) {
-        cache = cache.filter((g) => g.id !== oldRow.id);
+      const action = realtimeAction(payload as unknown as Parameters<typeof realtimeAction>[0]);
+      if (!action) return;
+      if (action.kind === "remove") {
+        cache = cache.filter((g) => g.id !== action.id);
         emit();
         return;
       }
-      if (newRow?.hidden_at) {
-        // Just hidden by a moderator: drop it from the live cache.
-        cache = cache.filter((g) => g.id !== newRow.id);
-        emit();
-        return;
-      }
-      if (newRow) {
-        const g = rowToGame(newRow);
-        const idx = cache.findIndex((x) => x.id === g.id);
-        if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
-        else cache = [g, ...cache];
-        emit();
-        // The venue, the roster or the age range may have changed what this viewer may see: re-check it.
-        void refreshExactLocation(g.id);
-      }
+      queueRealtimeRefetch(action.id);
     })
     .subscribe();
 
@@ -638,7 +687,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
  */
 export async function fetchHostedGamesForOrg(orgId: string): Promise<Game[]> {
   const { data, error } = await supabase
-    .from("hosted_games")
+    .from(GAMES_READ)
     .select("*")
     .eq("org_id", orgId)
     .eq("is_private", false)
@@ -671,7 +720,7 @@ export async function hideGameFromOrg(gameId: string, hidden: boolean): Promise<
  */
 export async function fetchMyHiddenGames(): Promise<Game[]> {
   const { data, error } = await supabase
-    .from("hosted_games")
+    .from(GAMES_READ)
     .select("*")
     .not("hidden_at", "is", null)
     .order("date", { ascending: true })
@@ -691,7 +740,7 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   if (local) return local;
 
   const { data, error } = await supabase
-    .from("hosted_games")
+    .from(GAMES_READ)
     .select("*")
     .eq("id", id)
     // No `hidden_at` filter: the database already hides a hidden game from
@@ -855,10 +904,11 @@ export function claimHostedGame(gameId: string, userId: string): void {
   cache = cache.map((g) => (g.id === gameId ? updated : g));
   emit();
 
-  // Upsert into DB so it survives storage wipes.
+  // Save to the DB so it survives storage wipes. A plain insert: an upsert would name host_id in its ON CONFLICT update,
+  // which needs SELECT on host_id (closed to clients in SEC-5 phase 2). A row that already exists is left as it is.
   supabase
     .from("hosted_games")
-    .upsert(gameToInsertRow(updated), { onConflict: "id" })
+    .insert(gameToInsertRow(updated))
     .then(() => {
       /* noop */
     });

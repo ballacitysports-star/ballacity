@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { createNotification } from "@/lib/notifications";
+import { notifyGameHostOf } from "@/lib/notifications";
 import { isGameId } from "@/lib/game-flow-status";
 import { withdrawMyApprovedJoinRequest } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
 import { isLateCancel } from "@/lib/cancel-window";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 /** Drop the viewer's unreviewed payment proof for a game. Best effort. */
 export async function clearPendingSubmissions(gameId: string) {
@@ -32,7 +33,12 @@ export async function notifyHostOfLeave(gameId: string, fallbackTitle: string) {
     const uid = u.user?.id;
     if (!uid || !isGameId(gameId)) return;
     const [{ data: game }, { data: me }] = await Promise.all([
-      supabase.from("hosted_games").select("*").eq("id", gameId).maybeSingle(),
+      // SEC-5: through the view; host_id is null when this player may not know the organizer (then nobody is told here).
+      supabase
+        .from(GAMES_READ)
+        .select("host_id, title, date, cancel_cutoff_min")
+        .eq("id", gameId)
+        .maybeSingle(),
       supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle(),
     ]);
     const g = game as {
@@ -40,14 +46,14 @@ export async function notifyHostOfLeave(gameId: string, fallbackTitle: string) {
       date?: string;
       cancel_cutoff_min?: number | null;
     } | null;
-    const hostId = g?.host_id;
-    if (!hostId || hostId === uid) return;
+    const hostId = g?.host_id ?? null;
+    if (!g || hostId === uid) return;
     // Inside the cutoff the database sends its own "cancelled late" notice.
     if (isLateCancel(g?.date, g?.cancel_cutoff_min)) return;
     const title = (game as { title?: string } | null)?.title ?? fallbackTitle;
     const who = (me as { display_name?: string } | null)?.display_name || "A player";
-    await createNotification({
-      user_id: hostId,
+    // SEC-5: when this player may not know the host (host_id masked), the server names them.
+    await notifyGameHostOf(gameId, hostId, {
       type: "participant_left",
       title: `${who} left ${title}`,
       body: "Their spot is open again.",

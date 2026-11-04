@@ -9,6 +9,7 @@ import {
   fmtShortDate,
   type TimeSlot,
 } from "./availability-timeslots";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 /** A block of time the player is already committed to (or has marked off). */
 export type BusyBlock = {
@@ -85,9 +86,9 @@ export async function listMyBusyBlocks(
   const [{ data: parts }, { data: hosted }, { data: avails }] = await Promise.all([
     supabase.from("game_participants").select("game_id").eq("user_id", uid),
     supabase
-      .from("hosted_games")
+      .from(GAMES_READ)
       .select("id, title, date, duration")
-      .eq("host_id", uid)
+      .eq("viewer_is_host", true)
       .gte("date", fromIso),
     supabase
       .from("player_availabilities" as any)
@@ -98,12 +99,12 @@ export async function listMyBusyBlocks(
   const joinedIds = (parts ?? []).map((p) => p.game_id);
   if (joinedIds.length > 0) {
     const { data: joinedGames } = await supabase
-      .from("hosted_games")
-      .select("id, title, date, duration, host_id")
+      .from(GAMES_READ)
+      .select("id, title, date, duration, viewer_is_host")
       .in("id", joinedIds)
       .gte("date", fromIso);
     for (const g of joinedGames ?? []) {
-      const b = gameToBusyBlock(g, g.host_id === uid ? "hosting" : "joined");
+      const b = gameToBusyBlock(g, g.viewer_is_host ? "hosting" : "joined");
       if (b) out.push(b);
     }
   }

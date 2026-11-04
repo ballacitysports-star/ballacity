@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
 import { sanitizePostCopy } from "@/lib/reel-post";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 /**
  * AI/video processing is opt-out for adults (Settings → Privacy) and
@@ -646,9 +647,9 @@ export const listAttachableGames = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data: hosted } = await context.supabase
-      .from("hosted_games")
+      .from(GAMES_READ)
       .select("id,title,sport,date")
-      .eq("host_id", context.userId)
+      .eq("viewer_is_host", true)
       .order("date", { ascending: false })
       .limit(60);
 
@@ -893,9 +894,9 @@ export const suggestGameForReel = createServerFn({ method: "GET" })
 
     const [{ data: hosted }, { data: joins }] = await Promise.all([
       context.supabase
-        .from("hosted_games")
+        .from(GAMES_READ)
         .select("id,title,sport,date")
-        .eq("host_id", context.userId)
+        .eq("viewer_is_host", true)
         .order("date", { ascending: false })
         .limit(40),
       context.supabase

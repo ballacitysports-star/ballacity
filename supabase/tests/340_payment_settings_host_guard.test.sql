@@ -52,10 +52,13 @@ SELECT t.reset();
 SELECT t.as_user(t.id('accomplice'));
 SELECT t.throws(format($q$INSERT INTO public.game_participants (game_id, user_id) VALUES ('g-pay', %L)$q$, t.id('accomplice')),
   'GAME_APPROVAL_REQUIRED', 'the join gate still requires the host''s approval');
-SELECT t.throws(format($q$INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key) VALUES ('g-pay', %L, %L, 'k9')$q$, t.id('accomplice'), t.id('stranger')),
-  'does not match the game host', 'and a join request cannot name the stranger as the host');
-SELECT t.lives(format($q$INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key) VALUES ('g-pay', %L, %L, 'k8')$q$, t.id('accomplice'), t.id('host')), 'a request naming the real host is accepted');
+-- SEC-5 (20261108110000): the database names the host from the game, so a wrong host_id is corrected rather than refused (a refusal
+-- told the caller whether an account hosts the game).
+SELECT t.lives(format($q$INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key) VALUES ('g-pay', %L, %L, 'k9')$q$, t.id('accomplice'), t.id('stranger')),
+  'a join request naming the stranger as the host is accepted...');
 SELECT t.reset();
+SELECT t.eq((SELECT host_id FROM public.join_requests WHERE game_id = 'g-pay' AND player_id = t.id('accomplice')), t.id('host'),
+  '...but it is stored against the real host: a join request cannot name the stranger as the host');
 -- the stranger cannot touch the submission they were never the payee of
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq(t.count($q$SELECT 1 FROM public.payment_submissions$q$), 0, 'the stranger sees no submissions');

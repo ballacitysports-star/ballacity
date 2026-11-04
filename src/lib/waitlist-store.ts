@@ -152,7 +152,11 @@ export async function leaveWaitlist(gameId: string, position: string): Promise<v
     .eq("user_id", uid);
 }
 
-/** Host action: approve or decline a waitlist entry as slots free up. */
+/**
+ * Host action: approve or decline a waitlist entry as slots free up. The database records who
+ * reviewed it (reviewed_by) and keeps that column from clients: for a minor host it is their
+ * account id, and the waitlisted person reads their own row (SEC-5).
+ */
 export async function reviewWaitlistEntry(
   entryId: string,
   status: Exclude<WaitlistStatus, "waiting">,
@@ -162,7 +166,7 @@ export async function reviewWaitlistEntry(
   if (!uid) throw new Error("Sign in to review the waitlist.");
   const { error } = await supabase
     .from("game_position_waitlist")
-    .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: uid })
+    .update({ status, reviewed_at: new Date().toISOString() })
     .eq("id", entryId);
   if (error) throw error;
 }

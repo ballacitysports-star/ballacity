@@ -1,6 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, CalendarRange, MapPin, Users, Wallet, BellRing, Share2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  CalendarRange,
+  MapPin,
+  Users,
+  Wallet,
+  BellRing,
+  Share2,
+} from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { pageHead } from "@/lib/seo";
@@ -10,6 +19,7 @@ import { formatGameWhen } from "@/lib/format";
 import { ShareSheet } from "@/components/ShareSheet";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { HostGamesCalendar } from "@/components/games/HostGamesCalendar";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 export const Route = createFileRoute("/host")({
   head: () =>
@@ -19,9 +29,7 @@ export const Route = createFileRoute("/host")({
       description: "Manage your hosted games, unpaid players and payment reminders.",
       noindex: true,
     }),
-  validateSearch: zodValidator(
-    z.object({ tab: fallback(z.string(), "").default("") }),
-  ),
+  validateSearch: zodValidator(z.object({ tab: fallback(z.string(), "").default("") })),
   component: HostDashboard,
 });
 
@@ -41,7 +49,11 @@ function HostDashboard() {
   const tab: "games" | "calendar" | "payments" =
     search.tab === "payments" ? "payments" : search.tab === "calendar" ? "calendar" : "games";
   const setTab = (v: "games" | "calendar" | "payments") =>
-    nav({ to: "/host", search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }), replace: true });
+    nav({
+      to: "/host",
+      search: (p: any) => ({ ...p, tab: v === "games" ? "" : v }),
+      replace: true,
+    });
 
   const [games, setGames] = useState<HostedGame[] | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
@@ -60,9 +72,9 @@ function HostDashboard() {
     if (!user) return;
     let alive = true;
     supabase
-      .from("hosted_games")
+      .from(GAMES_READ)
       .select("id, title, date, price, location, cancelled_at")
-      .eq("host_id", user.id)
+      .eq("viewer_is_host", true)
       .order("date", { ascending: false })
       .limit(50)
       .then(({ data }) => {
@@ -155,11 +167,7 @@ function HostDashboard() {
           {games.map((g) => (
             <div key={g.id} className="rounded-2xl border border-border bg-surface p-3">
               <div className="flex items-start justify-between gap-2">
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: g.id }}
-                  className="min-w-0 flex-1"
-                >
+                <Link to="/games/$gameId" params={{ gameId: g.id }} className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{g.title}</div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
@@ -213,7 +221,8 @@ function HostDashboard() {
 
       {tab === "payments" && (
         <p className="mt-4 flex items-center justify-center gap-1 text-center text-[11px] text-muted-foreground">
-          <Users className="h-3 w-3" /> Reminders send each player an in-app alert with a link to pay you.
+          <Users className="h-3 w-3" /> Reminders send each player an in-app alert with a link to
+          pay you.
         </p>
       )}
     </div>

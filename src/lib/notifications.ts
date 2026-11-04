@@ -48,6 +48,35 @@ export async function createNotification(input: {
   }
 }
 
+/**
+ * Tell the host of a game something (a request, a player leaving) without knowing who the host is: the server looks
+ * the host up and applies the same checks as createNotification (SEC-5). Best effort, like createNotification.
+ */
+export async function notifyHostOfGame(input: {
+  game_id: string;
+  type: string;
+  title: string;
+  body?: string | null;
+  link?: string | null;
+}) {
+  try {
+    const { notifyGameHost } = await import("@/lib/notifications.functions");
+    await notifyGameHost({ data: input });
+  } catch (e: any) {
+    console.warn("host notification failed", e?.message ?? e);
+  }
+}
+
+/** Notify a game's host: directly when this viewer knows who it is, otherwise through the server (SEC-5). */
+export async function notifyGameHostOf(
+  gameId: string,
+  knownHostId: string | null | undefined,
+  note: { type: string; title: string; body?: string | null; link?: string | null },
+) {
+  if (knownHostId) return createNotification({ user_id: knownHostId, ...note });
+  return notifyHostOfGame({ game_id: gameId, ...note });
+}
+
 export async function listMyNotifications(): Promise<Notification[]> {
   const { data, error } = await supabase
     .from("notifications" as any)

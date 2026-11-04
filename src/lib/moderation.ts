@@ -209,8 +209,11 @@ export function useBlock(targetId: string) {
 
 export type SubmitReportInput = {
   subjectType: ReportSubjectType;
-  /** The user the report is about (game host / message sender / reel owner). */
-  reportedId: string;
+  /**
+   * The user the report is about (message sender / reel owner). Not used for a "game" report: the
+   * database names the game's host itself (SEC-5), so a viewer who may not know the host can report.
+   */
+  reportedId?: string | null;
   reason: ReportReason;
   details?: string;
   gameId?: string | null;
@@ -230,10 +233,13 @@ export type SubmitReportInput = {
 export async function submitReport(input: SubmitReportInput) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to report");
-  if (u.user.id === input.reportedId) throw new Error("You cannot report yourself");
+  const isGame = input.subjectType === "game";
+  if (!isGame && !input.reportedId) throw new Error("Couldn't send your report");
+  if (!isGame && u.user.id === input.reportedId) throw new Error("You cannot report yourself");
   const { error } = await supabase.from("user_reports").insert({
     reporter_id: u.user.id,
-    reported_id: input.reportedId,
+    // A game report never names the host: the database takes it from the game.
+    ...(isGame ? {} : { reported_id: input.reportedId }),
     subject_type: input.subjectType,
     reason: input.reason,
     details: input.details?.trim().slice(0, 1000) || null,

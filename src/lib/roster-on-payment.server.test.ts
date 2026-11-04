@@ -13,7 +13,8 @@ function columnsOf(table: string): string[] {
   const types = readFileSync(new URL("../integrations/supabase/types.ts", import.meta.url), "utf8");
   const start = types.indexOf(`      ${table}: {\n        Row: {`);
   if (start < 0) throw new Error(`no ${table} in types.ts`);
-  const body = types.slice(start).split("\n        }\n")[0]!;
+  // The Row block ends at the first 8-space closing brace (types.ts may or may not end it with ";").
+  const body = types.slice(start).split(/\n {8}\};?\n/)[0]!;
   return [...body.matchAll(/^ {10}(\w+)\??:/gm)].map((m) => m[1]!);
 }
 
