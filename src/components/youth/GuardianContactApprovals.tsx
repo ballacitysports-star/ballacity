@@ -59,6 +59,21 @@ export function GuardianContactApprovals({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't save that decision."),
   });
 
+  const ids = (q.data ?? []).map((r) => r.to_user_id);
+  const names = useQuery({
+    queryKey: ["guardian-contact-approvals-names", ids.join(",")],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("visible_avatars" as never, { _ids: ids } as never);
+      return Object.fromEntries(
+        ((data ?? []) as unknown as { id: string; display_name: string | null }[]).map((r) => [
+          r.id,
+          r.display_name,
+        ]),
+      ) as Record<string, string | null>;
+    },
+  });
+
   if (q.isLoading) return <Skeleton className="mt-6 h-16 w-full rounded-xl" />;
   const rows = q.data ?? [];
   if (q.error || rows.length === 0) return null;
@@ -80,7 +95,8 @@ export function GuardianContactApprovals({
           <div key={r.id} className="rounded-xl border border-border bg-surface p-3">
             <p className="text-sm font-semibold">
               {childNames[r.from_user_id] ?? "Your child"} wants to{" "}
-              {r.kind === "invite" ? "invite a player to a game" : "message a player"}
+              {r.kind === "invite" ? "invite" : "message"}{" "}
+              {names.data?.[r.to_user_id] ?? "a player"}
             </p>
             {r.message && <p className="mt-1 text-xs text-muted-foreground">“{r.message}”</p>}
             <div className="mt-2 flex gap-2">

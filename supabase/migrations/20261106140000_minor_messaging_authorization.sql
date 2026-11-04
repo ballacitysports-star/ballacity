@@ -32,6 +32,10 @@
 -- ---------------------------------------------------------------------------------------------------------------- columns
 ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS guardian_approved_by uuid;
 ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS guardian_approved_at timestamptz;
+ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS needs_guardian boolean NOT NULL DEFAULT false;
+-- Requests sent by a non-adult before this migration were never guardian-approved: they stay out of sight and can never become a context.
+UPDATE public.availability_contact_requests r SET needs_guardian = true
+ WHERE r.needs_guardian = false AND COALESCE(public.age_cohort_of(r.from_user_id), 'unknown') <> 'adult';
 
 -- ---------------------------------------------------------------------------------------------------------------- helpers
 CREATE OR REPLACE FUNCTION private_sec.has_guardian_link(_minor uuid)
@@ -50,23 +54,19 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
     OR public.shares_team(_a, _b)
     OR EXISTS (SELECT 1 FROM public.hosted_games g JOIN public.game_participants p ON p.game_id = g.id
                 WHERE (g.host_id = _a AND p.user_id = _b) OR (g.host_id = _b AND p.user_id = _a))
-    OR EXISTS (SELECT 1 FROM public.org_members m WHERE (m.user_id = _b AND public.is_trainer_org_admin(m.org_id, _a))
-                                                       OR (m.user_id = _a AND public.is_trainer_org_admin(m.org_id, _b)))
-    OR EXISTS (SELECT 1 FROM public.trainer_org_members m WHERE (m.user_id = _b AND public.is_trainer_org_admin(m.org_id, _a))
-                                                              OR (m.user_id = _a AND public.is_trainer_org_admin(m.org_id, _b)))
     OR EXISTS (SELECT 1 FROM public.availability_contact_requests r
-                WHERE r.status = 'accepted' AND r.guardian_approved_at IS NOT NULL
+                WHERE r.status = 'accepted' AND r.needs_guardian AND r.guardian_approved_at IS NOT NULL
                   AND ((r.from_user_id = _a AND r.to_user_id = _b) OR (r.from_user_id = _b AND r.to_user_id = _a))
-                  AND private_sec.has_guardian_link(r.from_user_id))
+                  AND public.is_guardian_of(r.guardian_approved_by, r.from_user_id))
   )
 $$;
 REVOKE ALL ON FUNCTION private_sec.messaging_connection(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private_sec.messaging_connection(uuid, uuid) TO service_role;
 
--- Two minors whose guardians both chose "peers" and who share a confirmed game. Never involves an adult.
+-- Two teens of the same age band whose guardians both chose "peers" and who share a confirmed game. Never involves an adult, an under-13 or an unknown age.
 CREATE OR REPLACE FUNCTION private_sec.peer_game_context(_a uuid, _b uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT COALESCE(public.age_cohort_of(_a), 'unknown') <> 'adult' AND COALESCE(public.age_cohort_of(_b), 'unknown') <> 'adult'
+  SELECT public.age_cohort_of(_a) IN ('teen_13_15', 'teen_16_17') AND public.age_cohort_of(_a) = public.age_cohort_of(_b)
      AND EXISTS (SELECT 1 FROM public.child_controls c WHERE c.child_user_id = _a AND c.messaging = 'peers')
      AND EXISTS (SELECT 1 FROM public.child_controls c WHERE c.child_user_id = _b AND c.messaging = 'peers')
      AND EXISTS (SELECT 1 FROM public.game_participants pa JOIN public.game_participants pb ON pb.game_id = pa.game_id
@@ -108,6 +108,10 @@ CREATE OR REPLACE FUNCTION public.minor_messaging_block(_a uuid, _b uuid)
 AS $function$
 DECLARE ca text; cb text; ctl text; minor_a boolean; minor_b boolean;
 BEGIN
+  -- Not an oracle: a signed-in caller who is neither party (and not a moderator) learns nothing about the pair.
+  IF auth.uid() IS NOT NULL AND auth.uid() NOT IN (_a, _b) AND NOT public.is_moderator(auth.uid()) THEN
+    RETURN 'needs_connection:other';
+  END IF;
   ca := COALESCE(public.age_cohort_of(_a), 'unknown');
   cb := COALESCE(public.age_cohort_of(_b), 'unknown');
   minor_a := ca <> 'adult';
@@ -149,13 +153,20 @@ AS $function$
     _caller IS NOT NULL AND _target IS NOT NULL AND (
       _caller = _target
       OR (
-        NOT public.blocks_exist_between(_caller, _target)
+        -- not an oracle: a signed-in caller who is neither party learns nothing about the pair (service role has no auth.uid())
+        (auth.uid() IS NULL OR auth.uid() IN (_caller, _target))
+        AND NOT public.blocks_exist_between(_caller, _target)
         AND CASE
-          -- someone who is not a confirmed adult is involved: only a guardian or an authorized context, or the host handling a request
+          -- a person who is not a confirmed adult is involved: an authorized context that the guardian's controls allow, or a host dealing
+          -- with a live join request (pending or approved, last 90 days); a rejected or old request is not a relationship
           WHEN COALESCE(public.age_cohort_of(_caller), 'unknown') <> 'adult' OR COALESCE(public.age_cohort_of(_target), 'unknown') <> 'adult' THEN
-            private_sec.messaging_connection(_caller, _target)
+            ((private_sec.messaging_connection(_caller, _target) OR private_sec.peer_game_context(_caller, _target))
+              AND private_sec.messaging_controls_block(_caller, _target) IS NULL)
+            -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed adult
             OR EXISTS (SELECT 1 FROM public.join_requests jr
-                        WHERE (jr.host_id = _caller AND jr.player_id = _target) OR (jr.host_id = _target AND jr.player_id = _caller))
+                        WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
+                          AND ((jr.host_id = _caller AND jr.player_id = _target)
+                               OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult')))
           ELSE
             EXISTS (SELECT 1 FROM public.conversation_participants a
                       JOIN public.conversation_participants b ON b.conversation_id = a.conversation_id
@@ -211,6 +222,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 BEGIN
   IF auth.uid() IS NOT NULL AND COALESCE(public.age_cohort_of(NEW.from_user_id), 'unknown') <> 'adult' THEN
     NEW.status := 'awaiting_guardian';
+    NEW.needs_guardian := true;
     NEW.guardian_approved_by := NULL;
     NEW.guardian_approved_at := NULL;
   END IF;
@@ -237,34 +249,143 @@ DROP TRIGGER IF EXISTS zz_notify_guardians_of_contact_request_trg ON public.avai
 CREATE TRIGGER zz_notify_guardians_of_contact_request_trg AFTER INSERT ON public.availability_contact_requests
   FOR EACH ROW EXECUTE FUNCTION public.notify_guardians_of_contact_request();
 
+DROP FUNCTION IF EXISTS public.guardian_decide_contact_request(uuid, boolean);
 CREATE OR REPLACE FUNCTION public.guardian_decide_contact_request(_request uuid, _approve boolean)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
-DECLARE _r record;
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE _r record; _mode text; _key text;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in required' USING ERRCODE = 'insufficient_privilege'; END IF;
   SELECT * INTO _r FROM public.availability_contact_requests WHERE id = _request AND status = 'awaiting_guardian';
   IF NOT FOUND OR NOT public.is_guardian_of(auth.uid(), _r.from_user_id) THEN
     RAISE EXCEPTION 'REQUEST_NOT_FOUND: nothing to decide.' USING ERRCODE = 'no_data_found';
   END IF;
-  IF _approve THEN
-    UPDATE public.availability_contact_requests
-       SET status = 'pending', guardian_approved_by = auth.uid(), guardian_approved_at = now() WHERE id = _request;
-    INSERT INTO public.notifications (user_id, type, title, body, link)
-    VALUES (_r.to_user_id, 'contact_request', 'You have a new request', 'A player sent you a request. Open your requests to answer it.', '/messages');
-  ELSE
+  PERFORM set_config('app.guardian_decide_request', 'on', true);
+  IF NOT _approve THEN
     UPDATE public.availability_contact_requests SET status = 'withdrawn' WHERE id = _request;
+    PERFORM set_config('app.guardian_decide_request', '', true);
+    RETURN 'declined';
   END IF;
+  -- the world may have changed since the child sent it: re-check blocks, the recipient's privacy settings and the controls
+  _key := CASE WHEN _r.kind = 'invite' THEN 'allow_invites' ELSE 'allow_messages' END;
+  _mode := COALESCE(public.privacy_text(_r.to_user_id, _key), 'everyone');
+  IF public.blocks_exist_between(_r.from_user_id, _r.to_user_id)
+     OR _mode = 'nobody'
+     OR (_mode = 'shared' AND NOT private_sec.messaging_connection(_r.from_user_id, _r.to_user_id))
+     OR private_sec.messaging_controls_block(_r.from_user_id, _r.to_user_id) IS NOT NULL THEN
+    UPDATE public.availability_contact_requests SET status = 'withdrawn' WHERE id = _request;
+    PERFORM set_config('app.guardian_decide_request', '', true);
+    RETURN 'blocked';
+  END IF;
+  UPDATE public.availability_contact_requests
+     SET status = 'pending', guardian_approved_by = auth.uid(), guardian_approved_at = now() WHERE id = _request;
+  INSERT INTO public.notifications (user_id, type, title, body, link)
+  VALUES (_r.to_user_id, 'contact_request', 'You have a new request', 'A player sent you a request. Open your requests to answer it.', '/messages');
+  PERFORM set_config('app.guardian_decide_request', '', true);
+  RETURN 'approved';
 END $$;
 REVOKE ALL ON FUNCTION public.guardian_decide_contact_request(uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.guardian_decide_contact_request(uuid, boolean) TO authenticated, service_role;
+
+-- A client can never write the approval, the gate flag or a status the flow does not allow: only guardian_decide_contact_request (which sets the
+-- transaction-local flag below) writes approval; a recipient may only move a visible, pending request to accepted or declined.
+CREATE OR REPLACE FUNCTION public.protect_contact_request_approval()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF auth.uid() IS NULL OR COALESCE(current_setting('app.guardian_decide_request', true), '') = 'on' THEN RETURN NEW; END IF;
+  NEW.guardian_approved_by := OLD.guardian_approved_by;
+  NEW.guardian_approved_at := OLD.guardian_approved_at;
+  NEW.needs_guardian := OLD.needs_guardian;
+  IF NEW.status IS DISTINCT FROM OLD.status
+     AND NOT (OLD.status = 'pending' AND NEW.status IN ('accepted', 'declined')) THEN
+    RAISE EXCEPTION 'This request cannot be changed that way.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.protect_contact_request_approval() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.protect_contact_request_approval() TO service_role;
+DROP TRIGGER IF EXISTS a2_protect_contact_request_approval_trg ON public.availability_contact_requests;
+CREATE TRIGGER a2_protect_contact_request_approval_trg BEFORE UPDATE ON public.availability_contact_requests
+  FOR EACH ROW EXECUTE FUNCTION public.protect_contact_request_approval();
 
 -- Recipients never see a request that is still waiting for a guardian; a guardian sees their child's requests.
 DROP POLICY IF EXISTS "Sender or recipient can read" ON public.availability_contact_requests;
 CREATE POLICY "Sender, released recipient or guardian can read" ON public.availability_contact_requests FOR SELECT TO authenticated
   USING (from_user_id = auth.uid()
-         OR (to_user_id = auth.uid() AND status <> 'awaiting_guardian')
+         OR (to_user_id = auth.uid() AND status <> 'awaiting_guardian' AND (NOT needs_guardian OR guardian_approved_at IS NOT NULL))
          OR public.is_guardian_of(auth.uid(), from_user_id));
 DROP POLICY IF EXISTS "Recipient updates status" ON public.availability_contact_requests;
 CREATE POLICY "Recipient updates status" ON public.availability_contact_requests FOR UPDATE TO authenticated
-  USING (to_user_id = auth.uid() AND status <> 'awaiting_guardian')
-  WITH CHECK (to_user_id = auth.uid() AND status <> 'awaiting_guardian');
+  USING (to_user_id = auth.uid() AND status <> 'awaiting_guardian' AND (NOT needs_guardian OR guardian_approved_at IS NOT NULL))
+  WITH CHECK (to_user_id = auth.uid() AND status <> 'awaiting_guardian' AND (NOT needs_guardian OR guardian_approved_at IS NOT NULL));
+
+-- ------------------------------------------------------------------------------------------------------------------ team invitations
+-- Found in review: team_invite_player let any team manager (any adult can create a team) place a free-text message and a direct notification in a minor's
+-- inbox. For a person who is not a confirmed adult the message is dropped and the guardians are told instead; the invitation itself still waits for
+-- the guardian's approval as before. Everything else is unchanged (production definition fingerprint-compared, md5 2712dcac...).
+CREATE OR REPLACE FUNCTION public.team_invite_player(_team text, _user uuid, _role team_role DEFAULT 'player'::team_role, _message text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _me uuid := auth.uid();
+  _id uuid;
+  _team_name text;
+  _minor boolean := COALESCE(public.age_cohort_of(_user), 'unknown') <> 'adult';
+BEGIN
+  IF _me IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  IF NOT public.is_team_manager(_team, _me) THEN RAISE EXCEPTION 'NOT_TEAM_MANAGER'; END IF;
+  IF _role = 'owner' THEN RAISE EXCEPTION 'OWNER_NOT_INVITABLE'; END IF;
+  IF _user = _me THEN RAISE EXCEPTION 'SELF_INVITE'; END IF;
+  IF public.is_team_member(_team, _user) THEN RAISE EXCEPTION 'ALREADY_MEMBER'; END IF;
+  IF public.blocks_exist_between(_me, _user) THEN RAISE EXCEPTION 'BLOCKED'; END IF;
+
+  SELECT name INTO _team_name FROM public.teams WHERE id = _team;
+
+  UPDATE public.team_invites SET status = 'expired', updated_at = now()
+  WHERE team_id = _team AND invitee_id = _user AND status = 'pending' AND expires_at <= now();
+
+  INSERT INTO public.team_invites (team_id, invitee_id, invited_by, role, message)
+  VALUES (_team, _user, _me, _role, CASE WHEN _minor THEN NULL ELSE nullif(btrim(coalesce(_message,'')), '') END)
+  RETURNING id INTO _id;
+
+  IF NOT _minor THEN
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (_user, 'team_invite', 'Team invitation',
+            coalesce(_team_name,'A team') || ' invited you to join as ' || _role::text,
+            '/teams/' || _team);
+  ELSE
+    PERFORM public.notify_guardians(_user, 'team_invite',
+      'Team invitation for your player',
+      coalesce(_team_name,'A team') || ' invited your player to join as ' || _role::text,
+      '/parent');
+  END IF;
+
+  RETURN _id;
+END $function$;
+
+-- ---------------------------------------------------------------------------------------------------------------------------- reactions
+-- Found in review: a participant whose authorization had lapsed could still react to messages. Reactions follow the same decision as messages.
+CREATE OR REPLACE FUNCTION public.enforce_minor_messaging_reaction()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE other uuid; block text;
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF;
+  FOR other IN
+    SELECT cp.user_id FROM public.messages m
+      JOIN public.conversation_participants cp ON cp.conversation_id = m.conversation_id
+     WHERE m.id = NEW.message_id AND cp.user_id <> NEW.user_id
+  LOOP
+    block := public.minor_messaging_block(NEW.user_id, other);
+    IF block IS NOT NULL THEN
+      RAISE EXCEPTION 'MINOR_MESSAGING_BLOCKED:%', block USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.enforce_minor_messaging_reaction() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.enforce_minor_messaging_reaction() TO service_role;
+DROP TRIGGER IF EXISTS trg_enforce_minor_messaging_reaction ON public.message_reactions;
+CREATE TRIGGER trg_enforce_minor_messaging_reaction BEFORE INSERT ON public.message_reactions
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_minor_messaging_reaction();
