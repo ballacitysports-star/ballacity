@@ -33,7 +33,11 @@ export const sendPushToUser = createServerFn({ method: "POST" })
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
     if (data.userId !== context.userId) {
-      const { data: allowed, error: relErr } = await context.supabase.rpc("can_notify" as any, {
+      // Asked with the service role: `_caller` is the verified session user, and
+      // the database gives a signed-in client a fixed answer for this two-party
+      // helper (SEC-2).
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: allowed, error: relErr } = await supabaseAdmin.rpc("can_notify" as any, {
         _caller: context.userId,
         _target: data.userId,
       });
