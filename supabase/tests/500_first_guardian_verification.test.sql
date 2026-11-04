@@ -35,10 +35,11 @@ SET LOCAL session_replication_role = origin;
 
 -- helpers: an invitation token hash for a label, and the pending claim for a child
 CREATE FUNCTION t.tok(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $f$ SELECT md5('sec4-invite-' || label) || md5(label) $f$;
-CREATE FUNCTION t.invite(who text, label text) RETURNS void LANGUAGE plpgsql AS $f$
+-- (childname: the first name the inviter types; it is compared with the redeemer's profile, and a mismatch needs two reviewers)
+CREATE FUNCTION t.invite(who text, label text, childname text DEFAULT 'Kiddo') RETURNS void LANGUAGE plpgsql AS $f$
 BEGIN
   PERFORM t.as_user(t.id(who));
-  PERFORM public.create_minor_invite('Kiddo', 'parent', t.tok(label), now() + interval '7 days');
+  PERFORM public.create_minor_invite(childname, 'parent', t.tok(label), now() + interval '7 days');
   PERFORM t.reset();
 END $f$;
 CREATE FUNCTION t.claim(child text, claimant text) RETURNS uuid LANGUAGE sql AS $f$
@@ -47,7 +48,16 @@ $f$;
 CREATE FUNCTION t.link(parent text, child text) RETURNS uuid LANGUAGE sql AS $f$
   SELECT id FROM public.guardian_links WHERE parent_user_id = t.id(parent) AND child_user_id = t.id(child)
 $f$;
-GRANT EXECUTE ON FUNCTION t.tok(text), t.claim(text, text), t.link(text, text) TO authenticated, anon;
+-- the result of a call as text, or 'ERROR: <message>' (in a savepoint, so a refused call changes nothing)
+CREATE FUNCTION t.res(stmt text) RETURNS text LANGUAGE plpgsql AS $f$
+DECLARE r text;
+BEGIN
+  EXECUTE stmt INTO r;
+  RETURN COALESCE(r, '<null>');
+EXCEPTION WHEN OTHERS THEN
+  RETURN 'ERROR: ' || SQLERRM;
+END $f$;
+GRANT EXECUTE ON FUNCTION t.tok(text), t.claim(text, text), t.link(text, text), t.res(text) TO authenticated, anon;
 -- A client write must change nothing: refused by a privilege, by row level security or by the SEC-4 trigger, or matching no row it may touch.
 CREATE FUNCTION t.refused(stmt text, name text) RETURNS void LANGUAGE plpgsql AS $f$
 DECLARE n int;
@@ -65,7 +75,7 @@ END $f$;
 GRANT EXECUTE ON FUNCTION t.refused(text, text) TO authenticated;
 
 -- ================= 1. legitimate onboarding: a real parent's invitation, then staff verification
-SELECT t.invite('realmom', 'mom');
+SELECT t.invite('realmom', 'mom', 'Kidu');
 SELECT t.as_user(t.id('kidu'));
 CREATE TEMP TABLE r1 AS SELECT * FROM public.redeem_minor_invite(t.tok('mom'));
 SELECT t.reset();
@@ -105,12 +115,12 @@ SELECT t.eq(public.minor_messaging_block(t.id('coachx'), t.id('teen')), 'needs_g
 
 -- ================= 3. staff verification activates, with the evidence and who verified
 SELECT t.as_user(t.id('realmom'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-1')$q$, t.claim('kidu', 'realmom')), 'NOT_AUTHORIZED', 'the inviter cannot verify');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0001')$q$, t.claim('kidu', 'realmom')), 'NOT_AUTHORIZED', 'the inviter cannot verify');
 SELECT t.as_user(t.id('kidu'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-1')$q$, t.claim('kidu', 'realmom')), 'NOT_AUTHORIZED', 'the child cannot verify');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0001')$q$, t.claim('kidu', 'realmom')), 'NOT_AUTHORIZED', 'the child cannot verify');
 SELECT t.as_user(t.id('modone'));
 SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', '  ')$q$, t.claim('kidu', 'realmom')), 'EVIDENCE_REQUIRED', 'staff must record the evidence');
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'looked fine', 'CASE-1')$q$, t.claim('kidu', 'realmom')), 'METHOD_INVALID', 'and a known method');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'looked fine', 'CASE-0001')$q$, t.claim('kidu', 'realmom')), 'METHOD_INVALID', 'and a known method');
 SELECT t.lives(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-1234')$q$, t.claim('kidu', 'realmom')), 'a moderator verifies the parent');
 SELECT t.reset();
 SELECT t.ok(public.is_guardian_of(t.id('realmom'), t.id('kidu')), 'verified: is_guardian_of is true');
@@ -133,7 +143,7 @@ SELECT t.invite('modtwo', 'modtwo');
 SELECT t.as_user(t.id('teend'));
 SELECT t.lives(format('SELECT * FROM public.redeem_minor_invite(%L)', t.tok('modtwo')), 'setup: a child redeems a staff member''s invitation');
 SELECT t.as_user(t.id('modtwo'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-2')$q$, t.claim('teend', 'modtwo')), 'CONFLICT_OF_INTEREST', 'staff cannot verify themselves');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0002')$q$, t.claim('teend', 'modtwo')), 'CONFLICT_OF_INTEREST', 'staff cannot verify themselves');
 SELECT t.reset();
 
 -- ================= 4. existing legitimate links are untouched
@@ -166,8 +176,8 @@ SELECT t.ok(NOT public.is_guardian_of(t.id('coachx'), t.id('teen')) AND NOT publ
             AND NOT public.is_guardian_of(t.id('contactx'), t.id('teenc')) AND NOT public.is_guardian_of(t.id('chatx'), t.id('teene')),
             'none of them is a guardian');
 SELECT t.as_user(t.id('modone'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-3')$q$, t.claim('teen', 'coachx')), 'SIGNALS_NOT_ACKNOWLEDGED', 'a flagged claim cannot be verified by default');
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-4')$q$, t.claim('teenb', 'hostx')), 'SIGNALS_NOT_ACKNOWLEDGED', 'nor the host''s');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0003')$q$, t.claim('teen', 'coachx')), 'SIGNALS_NOT_ACKNOWLEDGED', 'a flagged claim cannot be verified by default');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0004')$q$, t.claim('teenb', 'hostx')), 'SIGNALS_NOT_ACKNOWLEDGED', 'nor the host''s');
 SELECT t.lives(format($q$SELECT public.staff_decline_guardian_claim(%L, 'Not the parent: coach of the team')$q$, t.claim('teen', 'coachx')), 'staff decline the coach');
 SELECT t.throws(format($q$SELECT public.staff_decline_guardian_claim(%L, '')$q$, t.claim('teenb', 'hostx')), 'REASON_REQUIRED', 'a decline needs a reason');
 SELECT t.reset();
@@ -182,15 +192,20 @@ SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('modone'));
 SELECT t.eq((SELECT signals FROM public.staff_guardian_claims() WHERE request_id = t.claim('teenc', 'contactx')), ARRAY['contact_request', 'conversation']::text[],
             'a relationship built while the claim waits shows up in the staff queue');
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-9')$q$, t.claim('teenc', 'contactx')), 'conversation', 'and blocks verification without acknowledgement');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0009')$q$, t.claim('teenc', 'contactx')), 'conversation', 'and blocks verification without acknowledgement');
 SELECT t.reset();
 -- a parent who really coaches their child's team: flagged, then verified only with the reviewer's explicit acknowledgement
-SELECT t.invite('dadcoach', 'dad');
+SELECT t.invite('dadcoach', 'dad', 'Teenf');
 SELECT t.as_user(t.id('teenf'));
 SELECT t.lives(format('SELECT * FROM public.redeem_minor_invite(%L)', t.tok('dad')), 'setup: a coach''s own child redeems');
 SELECT t.as_user(t.id('modone'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'consent_document', 'CASE-5')$q$, t.claim('teenf', 'dadcoach')), 'SIGNALS_NOT_ACKNOWLEDGED', 'the parent-coach is flagged too');
-SELECT t.lives(format($q$SELECT public.staff_verify_guardian_claim(%L, 'consent_document', 'CASE-5', true)$q$, t.claim('teenf', 'dadcoach')), 'and verified once the reviewer acknowledges the signal');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'consent_document', 'CASE-0005')$q$, t.claim('teenf', 'dadcoach')), 'SIGNALS_NOT_ACKNOWLEDGED', 'the parent-coach is flagged too');
+SELECT t.eq(t.res(format($q$SELECT public.staff_verify_guardian_claim(%L, 'consent_document', 'CASE-0005', true)$q$, t.claim('teenf', 'dadcoach'))), 'second_review_required',
+            'once the reviewer acknowledges the signal it is a first review: a flagged claim needs a second reviewer');
+SELECT t.ok(NOT public.is_guardian_of(t.id('dadcoach'), t.id('teenf')), 'the first review alone activates nothing');
+SELECT t.as_user(t.id('modtwo'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_verify_guardian_claim(%L, 'video_call', 'CASE-0015', true)$q$, t.claim('teenf', 'dadcoach'))), 'activated',
+            'and a different staff member''s acknowledged second review verifies it');
 SELECT t.reset();
 SELECT t.ok(public.is_guardian_of(t.id('dadcoach'), t.id('teenf')), 'the parent-coach is now a guardian');
 SELECT t.eq((SELECT detail -> 'signals' FROM public.guardian_link_audit WHERE link_id = t.link('dadcoach', 'teenf') AND action = 'link_activated'), '["shared_team"]'::jsonb,
@@ -269,7 +284,7 @@ SELECT t.reset();
 SELECT t.eq((SELECT status FROM public.guardian_link_requests WHERE id = t.claim('wrongkid', 'realmom')), 'withdrawn', 'it is withdrawn');
 SELECT t.eq((SELECT actor_role FROM public.guardian_link_audit WHERE request_id = t.claim('wrongkid', 'realmom') AND action = 'claim_withdrawn'), 'child', 'audit: the child withdrew it');
 SELECT t.as_user(t.id('modone'));
-SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-6')$q$, t.claim('wrongkid', 'realmom')), 'REQUEST_NOT_FOUND', 'a withdrawn claim cannot be verified');
+SELECT t.throws(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'CASE-0006')$q$, t.claim('wrongkid', 'realmom')), 'REQUEST_NOT_FOUND', 'a withdrawn claim cannot be verified');
 SELECT t.reset();
 SELECT t.as_user(t.id('teenr'));
 SELECT t.throws(format('SELECT * FROM public.redeem_minor_invite(%L)', t.tok('leaked')), 'INVITE_USED', 'and the link stays used');
@@ -331,7 +346,7 @@ SELECT t.eq((SELECT status FROM public.parental_consents WHERE child_user_id = t
 SELECT t.ok((SELECT verification_token_hash IS NULL FROM public.parental_consents WHERE child_user_id = t.id('kidc')), 'and the link is used up');
 SELECT t.ok(public.child_features_locked(t.id('kidc')), 'the child stays locked');
 SELECT t.as_user(t.id('modone'));
-SELECT t.lives(format($q$SELECT public.staff_verify_guardian_claim(%L, 'video_call', 'CASE-7')$q$, t.claim('kidc', 'emailx')), 'staff verify the consent-email claimant');
+SELECT t.lives(format($q$SELECT public.staff_verify_guardian_claim(%L, 'video_call', 'CASE-0007')$q$, t.claim('kidc', 'emailx')), 'staff verify the consent-email claimant');
 SELECT t.reset();
 SELECT t.ok(public.is_guardian_of(t.id('emailx'), t.id('kidc')) AND NOT public.child_features_locked(t.id('kidc')), 'then the link and the consent apply');
 SELECT t.eq((SELECT terms_version FROM public.parental_consents WHERE child_user_id = t.id('kidc')), 'v9', 'with the versions the guardian accepted');
@@ -371,16 +386,16 @@ SELECT t.throws(format($q$SELECT public.staff_restore_guardian_link(%L, 'Report 
 SELECT t.reset();
 UPDATE public.profiles SET suspended_at = now() WHERE id = t.id('realmom');
 SELECT t.as_user(t.id('modone'));
-SELECT t.throws(format($q$SELECT public.staff_restore_guardian_link(%L, 'Report was mistaken', 'CASE-8')$q$, t.link('realmom', 'kidu')), 'GUARDIAN_NOT_ELIGIBLE', 'a restore re-checks the guardian');
+SELECT t.throws(format($q$SELECT public.staff_restore_guardian_link(%L, 'Report was mistaken', 'CASE-0008')$q$, t.link('realmom', 'kidu')), 'GUARDIAN_NOT_ELIGIBLE', 'a restore re-checks the guardian');
 SELECT t.reset();
 UPDATE public.profiles SET suspended_at = NULL WHERE id = t.id('realmom');
 SELECT t.as_user(t.id('modone'));
-SELECT t.lives(format($q$SELECT public.staff_restore_guardian_link(%L, 'Report was mistaken', 'CASE-8')$q$, t.link('realmom', 'kidu')), 'staff restore a wrongly revoked link');
+SELECT t.lives(format($q$SELECT public.staff_restore_guardian_link(%L, 'Report was mistaken', 'CASE-0008')$q$, t.link('realmom', 'kidu')), 'staff restore a wrongly revoked link');
 SELECT t.reset();
 SELECT t.ok(public.is_guardian_of(t.id('realmom'), t.id('kidu')), 'restored: the guardian is back');
 SELECT t.eq((SELECT status FROM public.parental_consents WHERE child_user_id = t.id('kidu')), 'approved', 'with consent');
 SELECT t.eq((SELECT actor_id::text || '/' || evidence_ref || '/' || reason FROM public.guardian_link_audit WHERE link_id = t.link('realmom', 'kidu') AND action = 'link_restored'),
-            t.id('modone')::text || '/CASE-8/Report was mistaken', 'audit: the restoration, who, the evidence and the reason');
+            t.id('modone')::text || '/CASE-0008/Report was mistaken', 'audit: the restoration, who, the evidence and the reason');
 -- a guardian ending their own link still works, and is audited
 SELECT t.as_user(t.id('oldmom'));
 SELECT t.lives(format('SELECT public.revoke_guardian_link(%L)', t.id('oldkid')), 'a guardian ends their own link');

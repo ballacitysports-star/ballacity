@@ -7,27 +7,43 @@ import { Button } from "@/components/ui/button";
 import {
   VERIFICATION_METHODS,
   describeSignals,
+  describeSuspicion,
   evidenceRefProblem,
   friendlyGuardianClaimError,
+  nameMatchNote,
+  normalizeCaseRef,
   reasonProblem,
+  verifyActionLabel,
+  verifyResultMessage,
+  type ReviewStage,
   type VerificationMethod,
 } from "@/lib/guardian-claims";
 
 type Claim = {
   request_id: string;
-  kind: "first_guardian" | "additional_guardian";
-  source: "family_invite" | "consent_email";
+  kind: "first_guardian" | "additional_guardian" | "account_recovery" | "link_restoration";
+  source: "family_invite" | "consent_email" | "staff_recovery";
   relationship: string;
   signals: string[];
   created_at: string;
   child_user_id: string;
   child_name: string | null;
+  child_username: string | null;
   child_cohort: string;
+  invite_child_name: string | null;
+  name_match: boolean | null;
   guardian_user_id: string;
   guardian_name: string | null;
   guardian_email: string | null;
   guardian_cohort: string;
   guardian_eligible: boolean;
+  suspicion: string[];
+  review_stage: ReviewStage;
+  first_review_by: string | null;
+  first_reviewer_name: string | null;
+  first_review_at: string | null;
+  first_review_method: string | null;
+  can_review: boolean;
 };
 
 const queueKey = ["admin-guardian-claims"];
@@ -35,9 +51,11 @@ const queueKey = ["admin-guardian-claims"];
 /**
  * SEC-4 staff queue: a new parent or guardian gets no access until staff verify
  * them here (or a current verified guardian approves them). The server function
- * re-checks everything; this only collects the method, the evidence reference
+ * re-checks everything; this only collects the method, the case reference
  * and, for a claimant who already shares a team, game or conversation with the
- * child, the reviewer's explicit acknowledgement.
+ * child, the reviewer's explicit acknowledgement. A suspicious claim needs two
+ * different staff members: the first call records a first review, and only a
+ * second reviewer's call links the guardian.
  */
 export function GuardianClaimQueue() {
   const qc = useQueryClient();
@@ -58,19 +76,20 @@ export function GuardianClaimQueue() {
       ref: string;
       acknowledge: boolean;
     }) => {
-      const { error } = await supabase.rpc(
+      const { data, error } = await supabase.rpc(
         "staff_verify_guardian_claim" as never,
         {
           _request: v.id,
           _method: v.method,
-          _evidence_ref: v.ref.trim(),
+          _evidence_ref: normalizeCaseRef(v.ref),
           _acknowledge_signals: v.acknowledge,
         } as never,
       );
       if (error) throw new Error(friendlyGuardianClaimError(error.message));
+      return data as unknown;
     },
-    onSuccess: () => {
-      toast.success("Verified. The guardian is now linked.");
+    onSuccess: (result) => {
+      toast.success(verifyResultMessage(result));
       void qc.invalidateQueries({ queryKey: queueKey });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not verify."),
@@ -101,8 +120,8 @@ export function GuardianClaimQueue() {
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         A new parent or guardian gets no access until they are verified. Check their identity and
-        relationship outside the app, then record how and a case reference (never the document
-        itself).
+        relationship outside the app, then record how and the case reference (never the document
+        itself). Flagged claims need a first and a second review by two different staff members.
       </p>
       {q.error ? (
         <p className="mt-3 text-xs text-muted-foreground">
@@ -147,8 +166,11 @@ function ClaimRow({
   const [reason, setReason] = React.useState("");
   const [acknowledge, setAcknowledge] = React.useState(false);
   const signals = describeSignals(claim.signals);
+  const suspicion = describeSuspicion(claim.suspicion);
+  const nameNote = nameMatchNote(claim.invite_child_name, claim.name_match);
   const refProblem = ref ? evidenceRefProblem(ref) : null;
   const canVerify =
+    claim.can_review &&
     claim.guardian_eligible &&
     !evidenceRefProblem(ref) &&
     (signals.length === 0 || acknowledge) &&
@@ -158,7 +180,19 @@ function ClaimRow({
     <li className="rounded-xl border border-border bg-background p-3 text-xs">
       <div className="text-sm font-semibold">
         {claim.guardian_name ?? "Someone"} → {claim.child_name ?? "a player"}
+        {claim.child_username ? ` (@${claim.child_username})` : ""}
       </div>
+      {nameNote ? (
+        <div
+          className={
+            claim.name_match === false
+              ? "mt-1 rounded-lg border border-destructive/40 bg-destructive/10 p-2 font-semibold"
+              : "mt-1 text-muted-foreground"
+          }
+        >
+          {nameNote}
+        </div>
+      ) : null}
       <div className="mt-1 text-muted-foreground">
         {claim.kind === "first_guardian" ? "First guardian" : "Additional guardian"} ·{" "}
         {claim.relationship} · via{" "}
@@ -170,6 +204,23 @@ function ClaimRow({
         {claim.guardian_eligible ? "" : " · not eligible (not a verified adult in good standing)"}
         {" · "}Player: {claim.child_cohort}
       </div>
+      {suspicion.length > 0 ? (
+        <div className="mt-2 text-muted-foreground">
+          Needs two reviewers: {suspicion.join(" · ")}
+        </div>
+      ) : null}
+      {claim.review_stage === "second_review" ? (
+        <div className="mt-1 font-semibold">
+          First review by {claim.first_reviewer_name ?? "another staff member"}
+          {claim.first_review_method ? ` (${claim.first_review_method.replace(/_/g, " ")})` : ""}
+          {claim.first_review_at
+            ? ` on ${new Date(claim.first_review_at).toLocaleDateString()}`
+            : ""}
+          {claim.can_review
+            ? ". Your review completes it."
+            : ". A different staff member must finish it."}
+        </div>
+      ) : null}
       {signals.length > 0 ? (
         <div className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
           <p className="font-semibold">This person already knows the player through BallaCity:</p>
@@ -204,8 +255,8 @@ function ClaimRow({
         <input
           aria-label="Evidence reference"
           className="rounded-lg border border-border bg-surface px-2 py-1.5"
-          placeholder="Case or ticket reference"
-          maxLength={200}
+          placeholder="Case reference, e.g. GV-20261104"
+          maxLength={64}
           value={ref}
           onChange={(e) => setRef(e.target.value)}
         />
@@ -213,7 +264,7 @@ function ClaimRow({
       {refProblem ? <p className="mt-1 text-destructive">{refProblem}</p> : null}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button size="sm" disabled={!canVerify} onClick={() => onVerify(method, ref, acknowledge)}>
-          Verify and link
+          {verifyActionLabel(claim.review_stage)}
         </Button>
         <input
           aria-label="Decline reason"
