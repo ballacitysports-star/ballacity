@@ -16,7 +16,8 @@ SELECT t.person('modone', 39), t.person('modtwo', 41), t.person('modthree', 42),
        t.person('fraudmom', 41), t.person('kidten', 11),
        t.person('hackedmom', 42), t.person('kideleven', 14), t.person('kidtwelve', 9), t.person('kidthirteen', 13),
        t.person('stolenmom', 43), t.person('kidfourteen', 12),
-       t.person('managedmom', 39);
+       t.person('managedmom', 39),
+       t.person('takenmom', 40), t.person('takenkid', 13), t.person('swapmom', 41), t.person('swapkid', 12), t.person('swapnew', 42);
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator'), (t.id('modtwo'), 'admin'), (t.id('modthree'), 'moderator'),
                                                      (t.id('modclaim'), 'moderator');
 
@@ -442,6 +443,53 @@ SELECT t.as_user(t.id('modone'));
 SELECT t.eq(t.res(format($q$SELECT public.staff_restore_guardian_link(%L, 'Owner proved identity', 'GV-70000003')$q$, t.link('stolenmom', 'kidfourteen'))),
             'second_review_required', 'restoring it later is a two-person decision');
 SELECT t.reset();
+
+-- review finding F1: no compromise path leaves a link that ONE staff member can restore
+-- (a) a suspended link revoked on its own during the hold; the hold then lifted with 'revoke' (which finds nothing left to revoke)
+SELECT t.guardian('takenmom', 'takenkid');
+SELECT t.as_user(t.id('modone'));
+SELECT t.lives(format($q$SELECT public.staff_suspend_guardian_authority(%L, 'Account takeover reported (ZD-70101)')$q$, t.id('takenmom')), 'setup: suspend');
+SELECT t.lives(format($q$SELECT public.staff_revoke_guardian_link(%L, 'Cleanup during review', false)$q$, t.link('takenmom', 'takenkid')),
+               'setup: the suspended link is revoked without the fraud flag');
+SELECT t.reset();
+SELECT t.eq(t.q($s$SELECT detail ->> 'suspected_fraud' FROM public.guardian_link_audit WHERE link_id = t.link('takenmom', 'takenkid') AND action = 'link_revoked'$s$),
+            ('true')::text, 'audit: revoking a suspended link is recorded as suspected fraud even when the caller did not say so');
+SELECT t.as_user(t.id('modtwo'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_lift_guardian_suspension(%L, false, 'Not the parent')$q$, t.id('takenmom'))), '0', 'setup: the hold is lifted by revoking');
+SELECT t.as_user(t.id('modone'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_restore_guardian_link(%L, 'Restore', 'GV-90000001')$q$, t.link('takenmom', 'takenkid'))), 'second_review_required',
+            'F1(a): one staff member''s restore is only a first review');
+SELECT t.like(t.res(format($q$SELECT public.staff_restore_guardian_link(%L, 'Restore', 'GV-90000001')$q$, t.link('takenmom', 'takenkid'))), '%SECOND_REVIEWER_REQUIRED%',
+              'F1(a): and the same person cannot finish it');
+SELECT t.reset();
+SELECT t.ok(NOT public.is_guardian_of(t.id('takenmom'), t.id('takenkid')), 'F1(a): the link stays revoked');
+SELECT t.as_user(t.id('modthree'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_restore_guardian_link(%L, 'Identity confirmed', 'GV-90000002')$q$, t.link('takenmom', 'takenkid'))), 'restored',
+            'F1(a): a different staff member completes it');
+SELECT t.reset();
+-- (b) the documented compromise procedure: suspend, recover to a new verified account, then lift the hold with 'revoke'
+SELECT t.guardian('swapmom', 'swapkid');
+UPDATE public.parental_consents SET parent_user_id = t.id('swapmom') WHERE child_user_id = t.id('swapkid');
+SELECT t.as_user(t.id('modone'));
+SELECT t.lives(format($q$SELECT public.staff_suspend_guardian_authority(%L, 'Account takeover reported (ZD-70102)')$q$, t.id('swapmom')), 'setup: suspend');
+SELECT t.as_user(t.id('modtwo'));
+SELECT t.lives(format($q$SELECT public.staff_open_guardian_recovery(%L, %L, 'Family lost the account; ticket ZD-70102')$q$, t.link('swapmom', 'swapkid'), t.id('swapnew')),
+               'setup: recovery to the new account');
+SELECT t.as_user(t.id('modthree'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_verify_guardian_claim(%L, 'video_call', 'GV-90000003')$q$, t.claim('swapkid', 'swapnew'))), 'second_review_required', 'setup: first review');
+SELECT t.as_user(t.id('modclaim'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_verify_guardian_claim(%L, 'government_id', 'GV-90000004')$q$, t.claim('swapkid', 'swapnew'))), 'activated', 'setup: second review');
+SELECT t.reset();
+SELECT t.eq(t.q($s$SELECT detail ->> 'suspected_fraud' FROM public.guardian_link_audit WHERE link_id = t.link('swapmom', 'swapkid') AND action = 'link_revoked'$s$),
+            ('true')::text, 'audit: the account-recovery revocation is recorded as suspected fraud');
+SELECT t.as_user(t.id('modthree'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_lift_guardian_suspension(%L, false, 'Hijacked account')$q$, t.id('swapmom'))), '0', 'setup: the hold is lifted by revoking');
+SELECT t.as_user(t.id('modone'));
+SELECT t.eq(t.res(format($q$SELECT public.staff_restore_guardian_link(%L, 'Restore', 'GV-90000005')$q$, t.link('swapmom', 'swapkid'))), 'second_review_required',
+            'F1(b): the hijacked account''s link cannot be restored by one staff member');
+SELECT t.reset();
+SELECT t.ok(NOT public.is_guardian_of(t.id('swapmom'), t.id('swapkid')) AND public.is_guardian_of(t.id('swapnew'), t.id('swapkid')),
+            'F1(b): the hijacked account stays unlinked and the verified account keeps its link');
 
 -- ================= 8. has_guardian_link after staff revoke a managed child's guardian
 INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data, raw_app_meta_data)

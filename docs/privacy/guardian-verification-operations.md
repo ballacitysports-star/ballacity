@@ -38,7 +38,9 @@ Points marked **(counsel)** need a decision from legal counsel before launch. No
 - The two reviewers of a suspicious claim are two different people.
 - The staff member who **declined** a claim cannot decide its appeal or review it again after the appeal reopens it.
 - The staff member who **suspended** a guardian cannot lift the suspension.
-- Restoring a link revoked for suspected fraud needs two different staff members.
+- Restoring a link revoked for suspected fraud needs two different staff members. The database treats a revocation as suspected fraud
+  when staff say so, when the link was suspended or its guardian was under an open hold, when account recovery replaced the guardian's
+  account, or when the guardian has a hold lifted with "revoke". No compromise path can be undone by one person (test 501, finding F1).
 
 **Separation of duties (procedural, not enforced):** a reviewer with a personal connection to the family (relative, neighbour, same
 team) hands the claim to someone else. The supervisor does not act as second reviewer on claims they assigned.
