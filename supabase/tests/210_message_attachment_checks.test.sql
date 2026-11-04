@@ -9,9 +9,11 @@ INSERT INTO public.conversation_participants (conversation_id, user_id) VALUES
   (t.id('chat'), t.id('sender')), (t.id('chat'), t.id('friend')),
   (t.id('other-chat'), t.id('sender')), (t.id('other-chat'), t.id('intruder'));
 
--- The server (service role) records a checked file.
-INSERT INTO public.message_attachment_checks (path, user_id, conversation_id, kind, mime, bytes)
-VALUES (t.id('chat') || '/' || t.id('sender') || '/ok.png', t.id('sender'), t.id('chat'), 'image', 'image/png', 1234);
+-- The server (service role) records a checked file, bound to the stored object it checked (20261106120500).
+INSERT INTO storage.objects (id, bucket_id, name, owner, version)
+VALUES (t.id('ok-object'), 'message-attachments', t.id('chat') || '/' || t.id('sender') || '/ok.png', t.id('sender'), 'v1');
+INSERT INTO public.message_attachment_checks (path, user_id, conversation_id, kind, mime, bytes, object_id, object_version)
+VALUES (t.id('chat') || '/' || t.id('sender') || '/ok.png', t.id('sender'), t.id('chat'), 'image', 'image/png', 1234, t.id('ok-object'), 'v1');
 
 SELECT t.as_user(t.id('sender'));
 SELECT t.lives(format($q$INSERT INTO public.messages (id, conversation_id, sender_id, body) VALUES (%L, %L, %L, 'no file')$q$,

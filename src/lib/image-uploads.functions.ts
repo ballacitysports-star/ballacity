@@ -1,19 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
-import {
-  MAX_IMAGE_BYTES,
-  readImageDimensions,
-  sniffImageMime,
-  validateImageMeta,
-} from "@/lib/image-validation";
 
 /**
- * Server-side gate for every uploaded image: re-validates type / size /
- * dimensions from the stored bytes (never trusting the client), then runs an
- * automated safety scan. Unsafe uploads are quarantined so nothing in the app
- * renders them until a superadmin approves.
+ * LEGACY server-side gate for an image an older client uploaded straight into a public bucket: re-validates type / size /
+ * dimensions from the stored bytes (never trusting the client), strips metadata, then runs an automated safety scan. Unsafe
+ * uploads are quarantined so nothing in the app renders them until a superadmin approves. It never rescans an object that is
+ * already quarantined or removed, and removes the object when the scan cannot run (fail closed). Retired with phase 2
+ * (docs/privacy/g3b-image-staging.md); new clients use promoteStagedImageUpload.
  */
 export const finalizeImageUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -21,159 +15,62 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
     z.object({ bucket: z.string().max(60), path: z.string().min(1).max(500) }).parse(d),
   )
   .handler(async ({ context, data }) => {
-    const { bucket, path } = data;
-    if (!(IMAGE_BUCKET_KEYS as string[]).includes(bucket)) {
-      throw new Error("Unsupported bucket");
-    }
-    if (!path.startsWith(`${context.userId}/`)) {
-      throw new Error("You can only finalize your own uploads");
-    }
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { scanImageForSafety } = await import("@/lib/image-safety.server");
-
-    const { data: blob, error: dlErr } = await supabaseAdmin.storage.from(bucket).download(path);
-    if (dlErr || !blob) throw new Error("Uploaded file could not be read");
-
-    let buffer: Uint8Array = new Uint8Array(await blob.arrayBuffer());
-    let bytes = buffer.byteLength;
-    const sniffed = sniffImageMime(buffer);
-    const dimensions = readImageDimensions(buffer);
-
-    const failure =
-      validateImageMeta({ mime: sniffed, bytes, dimensions }) ??
-      (dimensions ? null : "The file is not a readable JPG, PNG or WEBP image");
-
-    if (failure) {
-      await supabaseAdmin.storage.from(bucket).remove([path]);
-      await supabaseAdmin.from("image_moderation").upsert(
-        {
-          bucket,
-          path,
-          owner_id: context.userId,
-          status: "removed",
-          reason: failure,
-          mime: sniffed,
-          bytes,
-          width: dimensions?.width ?? null,
-          height: dimensions?.height ?? null,
-          scan: { stage: "validation", failure } as never,
-        },
-        { onConflict: "bucket,path" },
-      );
-      throw new Error(failure);
-    }
-
-    // Remove GPS, camera, time and every other personal tag from the stored bytes before anything reads, scans,
-    // resizes or publishes them. The picture and its orientation are unchanged. If the file cannot be cleaned, it is
-    // removed and the upload refused: the original is never published.
-    let metadata: { stripped: boolean; hadGps: boolean; hadExif: boolean; hadXmp: boolean } = {
-      stripped: false,
-      hadGps: false,
-      hadExif: false,
-      hadXmp: false,
-    };
-    try {
-      const { stripStoredImage } = await import("@/lib/image-metadata.server");
-      const outcome = await stripStoredImage(
-        supabaseAdmin,
-        bucket,
-        path,
-        buffer,
-        sniffed as string,
-      );
-      buffer = outcome.bytes;
-      bytes = buffer.byteLength;
-      metadata = {
-        stripped: outcome.rewritten,
-        hadGps: outcome.report.hasGps,
-        hadExif: outcome.report.hasExif,
-        hadXmp: outcome.report.hasXmp,
-      };
-    } catch {
-      await supabaseAdmin.storage.from(bucket).remove([path]);
-      await supabaseAdmin.from("image_moderation").upsert(
-        {
-          bucket,
-          path,
-          owner_id: context.userId,
-          status: "removed",
-          reason: "The image could not be cleaned of location data",
-          mime: sniffed,
-          bytes,
-          scan: { stage: "metadata" } as never,
-        },
-        { onConflict: "bucket,path" },
-      );
-      throw new Error("This image could not be processed. Please try a different photo.");
-    }
-
-    // Small enough to inline: keeps private-bucket scans off signed URLs.
-    const inlineable = bytes <= 4 * 1024 * 1024 && bytes <= MAX_IMAGE_BYTES;
-    let scanTarget: string | null = null;
-    if (inlineable) {
-      let binary = "";
-      for (let i = 0; i < buffer.length; i += 0x8000) {
-        binary += String.fromCharCode(...buffer.subarray(i, i + 0x8000));
-      }
-      scanTarget = `data:${sniffed};base64,${btoa(binary)}`;
-    } else {
-      const { imageObjectUrl } = await import("@/lib/image-moderation.server");
-      scanTarget = await imageObjectUrl(supabaseAdmin, bucket, path);
-    }
-
-    const verdict = scanTarget
-      ? await scanImageForSafety(scanTarget, { userId: context.userId })
-      : {
-          safe: true,
-          label: "unscanned",
-          reason: null,
-          categories: [],
-          scanned: false,
-          csam: false,
-        };
-
-    const quarantined = !verdict.safe;
-    const reason = quarantined
-      ? (verdict.reason ?? `Flagged by automated scan (${verdict.label})`)
-      : null;
-
-    const { error: upErr } = await supabaseAdmin.from("image_moderation").upsert(
+    const { imageObjectUrl } = await import("@/lib/image-moderation.server");
+    const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
+    const { finalizeDirectImageUpload } = await import("@/lib/image-finalize-direct.server");
+    return finalizeDirectImageUpload(
       {
-        bucket,
-        path,
-        owner_id: context.userId,
-        status: quarantined ? "quarantined" : "pending",
-        reason,
-        mime: sniffed,
-        bytes,
-        width: dimensions?.width ?? null,
-        height: dimensions?.height ?? null,
-        quarantined_at: quarantined ? new Date().toISOString() : null,
-        scan: { ...verdict, metadata } as never,
+        admin: supabaseAdmin,
+        scan: (target, userId) => scanImageForSafety(target, { userId }) as never,
+        objectUrl: (bucket, path) => imageObjectUrl(supabaseAdmin, bucket, path),
+        escalate: async (bucket, path, categories) => {
+          await escalateImageForChildSafety(supabaseAdmin, {
+            bucket,
+            path,
+            categories,
+            source: "image_upload",
+          });
+        },
       },
-      { onConflict: "bucket,path" },
+      { userId: context.userId, bucket: data.bucket, path: data.path },
     );
-    if (upErr) throw new Error(upErr.message);
+  });
 
-    if (verdict.csam) {
-      const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
-      await escalateImageForChildSafety(supabaseAdmin, {
-        bucket,
-        path,
-        categories: verdict.categories,
-        source: "image_upload",
-      });
-    }
-
-    return {
-      ok: true,
-      quarantined,
-      reason,
-      width: dimensions?.width ?? null,
-      height: dimensions?.height ?? null,
-      bytes,
-      mime: sniffed,
-      metadataStripped: metadata.stripped,
-    };
+/**
+ * Promote an image the browser staged in the private `image-staging` bucket: validate, remove personal metadata, scan, and only then
+ * publish the clean bytes to `bucket` at `targetPath`. The destination never holds the original.
+ */
+export const promoteStagedImageUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { bucket: string; stagingPath: string; targetPath: string }) =>
+    z
+      .object({
+        bucket: z.string().max(60),
+        stagingPath: z.string().min(1).max(300),
+        targetPath: z.string().min(1).max(300),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { scanImageForSafety } = await import("@/lib/image-safety.server");
+    const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
+    const { promoteStagedImage } = await import("@/lib/image-promotion.server");
+    return promoteStagedImage(
+      {
+        admin: supabaseAdmin,
+        scan: (target, userId) => scanImageForSafety(target, { userId }) as never,
+        escalate: async (bucket, path, categories) => {
+          await escalateImageForChildSafety(supabaseAdmin, {
+            bucket,
+            path,
+            categories,
+            source: "image_upload",
+          });
+        },
+      },
+      { userId: context.userId, ...data },
+    );
   });

@@ -1,14 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  MAX_ATTACHMENT_BYTES,
-  attachmentProblem,
-  classifyAttachment,
-  parseAttachmentPath,
-} from "@/lib/message-attachment-validation";
-
-const BUCKET = "message-attachments";
+import { parseAttachmentPath } from "@/lib/message-attachment-validation";
 
 /**
  * Checks an uploaded chat attachment from its stored bytes and, if it passes,
@@ -18,7 +11,9 @@ const BUCKET = "message-attachments";
  *
  * A refused file is deleted. A picture also goes through the safety scan that
  * profile photos get; an unsafe one is deleted and child-safety escalation runs
- * when the scan says so.
+ * when the scan says so. The record is bound to the storage object that was
+ * checked (see finalizeAttachment), so replacing the file at the same path
+ * afterwards does not carry the check over.
  */
 export const finalizeMessageAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -39,82 +34,24 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!member) throw new Error("You are not in this conversation");
 
-    const remove = () => supabaseAdmin.storage.from(BUCKET).remove([data.path]);
-
-    const { data: blob, error: dlErr } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .download(data.path);
-    if (dlErr || !blob) throw new Error("Uploaded file could not be read");
-    if (blob.size > MAX_ATTACHMENT_BYTES) {
-      await remove();
-      throw new Error("Attachment too large (max 20MB).");
-    }
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const problem = attachmentProblem(buffer);
-    const checked = problem ? null : classifyAttachment(buffer);
-    if (problem || !checked) {
-      await remove();
-      throw new Error(problem ?? "That file type is not allowed.");
-    }
-
-    let stored: Uint8Array = buffer;
-    if (checked.kind === "image" && /^image\/(jpeg|png|webp)$/.test(checked.mime)) {
-      // Location and device tags are removed from the stored picture before the recipient or a scanner sees it.
-      try {
-        const { stripStoredImage } = await import("@/lib/image-metadata.server");
-        stored = (await stripStoredImage(supabaseAdmin, BUCKET, data.path, buffer, checked.mime))
-          .bytes;
-      } catch {
-        await remove();
-        throw new Error("That picture can't be sent. Please try a different one.");
-      }
-    }
-
-    if (checked.kind === "image") {
-      const { scanImageForSafety } = await import("@/lib/image-safety.server");
-      let target: string | null;
-      if (stored.byteLength <= 4 * 1024 * 1024) {
-        let binary = "";
-        for (let i = 0; i < stored.length; i += 0x8000) {
-          binary += String.fromCharCode(...stored.subarray(i, i + 0x8000));
-        }
-        target = `data:${checked.mime};base64,${btoa(binary)}`;
-      } else {
-        const { imageObjectUrl } = await import("@/lib/image-moderation.server");
-        target = await imageObjectUrl(supabaseAdmin, BUCKET, data.path);
-      }
-      const verdict = target
-        ? await scanImageForSafety(target, { userId: context.userId })
-        : { safe: true, csam: false, categories: [] as string[] };
-      if (!verdict.safe) {
-        await remove();
-        if (verdict.csam) {
+    const { finalizeAttachment, ATTACHMENT_BUCKET } =
+      await import("@/lib/message-attachment-finalize.server");
+    const { scanImageForSafety } = await import("@/lib/image-safety.server");
+    const out = await finalizeAttachment(
+      {
+        admin: supabaseAdmin,
+        scan: (target, userId) => scanImageForSafety(target, { userId }),
+        escalate: async (path, categories) => {
           const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
           await escalateImageForChildSafety(supabaseAdmin, {
-            bucket: BUCKET,
-            path: data.path,
-            categories: verdict.categories,
+            bucket: ATTACHMENT_BUCKET,
+            path,
+            categories,
             source: "image_upload",
           });
-        }
-        throw new Error("That picture can't be sent.");
-      }
-    }
-
-    const { error } = await supabaseAdmin.from("message_attachment_checks" as never).upsert(
-      {
-        path: data.path,
-        user_id: context.userId,
-        conversation_id: parsed.conversationId,
-        kind: checked.kind,
-        mime: checked.mime,
-        bytes: stored.byteLength,
-      } as never,
-      { onConflict: "path" },
+        },
+      },
+      { userId: context.userId, conversationId: parsed.conversationId, path: data.path },
     );
-    if (error) {
-      await remove();
-      throw new Error("Could not record the attachment check");
-    }
-    return { ok: true as const, kind: checked.kind, mime: checked.mime, bytes: stored.byteLength };
+    return { ok: true as const, kind: out.kind, mime: out.mime, bytes: out.bytes };
   });
