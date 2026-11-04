@@ -166,6 +166,8 @@ Deploy order and `info()`:
 
 Still open after the final review:
 
+> **Update (SEC-6, branch `claude/sec6-image-reencode`):** M2, M4 and L1 below are addressed by canonical re-encoding and a restricted quarantine; see `docs/privacy/sec6-image-reencode-quarantine.md` (which also lists a release blocker: the image-processing runtime).
+
 - **M2 (Medium, open, owner decision):** the metadata stripper keeps some containers that can carry an arbitrary payload: the ICC profile (JPEG APP2 / PNG iCCP / WEBP ICCP) byte for byte, the tail before JPEG EOI, duplicate PNG/WEBP chunks of allowed types, extra IDAT, and PNG CRCs that are not verified. None of these is location or camera metadata, but each can carry hidden data through a published image. Recommendation: re-encode every published image with `sharp` (decode, re-encode, attach only a standard sRGB/Display P3 profile). That changes every image (quality, size, colour handling of real phone photos), so it is an owner decision, not part of this branch.
 - **M4 (Medium, pre-existing, open):** a chat attachment that the scan flags as child-safety content is deleted (`remove()`) before it is escalated, so the evidence is gone. Fix: move it to a service-only quarantine location (a private bucket or prefix no API role can read) and escalate with that reference, instead of deleting.
 - **L1 (Low, open):** account purge and data export do not cover `image-staging` (a user's staged and quarantined originals are neither exported nor purged; quarantined ones need a retention rule that respects evidence holds).

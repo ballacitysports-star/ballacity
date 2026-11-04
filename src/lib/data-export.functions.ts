@@ -305,6 +305,16 @@ export const requestDataExport = createServerFn({ method: "POST" })
           rowCounts[q.key] = list.length;
         }
       }
+      // Private image staging (L1): the member's own staged uploads, as metadata. Files held for a safety review are left out.
+      if (categories.includes("media_metadata")) {
+        const { listStagedImagesForExport } = await import("@/lib/image-promotion.server");
+        const staged = await listStagedImagesForExport(supabaseAdmin, userId).catch((e: Error) => {
+          if (/bucket not found|not found/i.test(e?.message ?? "")) return [];
+          throw new Error(`staged_images: ${e?.message ?? e}`);
+        });
+        payload["staged_images"] = staged;
+        rowCounts["staged_images"] = staged.length;
+      }
       payload["row_counts"] = rowCounts;
 
       const body = JSON.stringify(payload, null, 2);
