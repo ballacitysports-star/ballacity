@@ -40,14 +40,16 @@ SELECT t.eq((SELECT count(*)::int FROM public.game_payment_settings WHERE game_i
 SELECT t.eq((SELECT count(*)::int FROM public.get_game_host_payment_methods(t.id('host'), 'g-pay')), 1, 'the host''s payment methods are returned for the game');
 SELECT t.eq((SELECT count(*)::int FROM public.get_game_host_payment_methods(t.id('stranger'), 'g-pay')), 0, 'the stranger''s are not, even though a settings row names them');
 SELECT t.eq((SELECT refund_policy FROM public.get_game_refund_terms('g-pay')), 'host-policy', 'refund terms come from the host''s row');
--- the payment destination
-SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'g-pay', %L)$q$, t.id('player'), t.id('stranger')),
-  'PAYMENT_DESTINATION_INVALID', 'a payment cannot be made out to the stranger');
-SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'g-pay', %L)$q$, t.id('player'), t.id('accomplice')),
-  'PAYMENT_DESTINATION_INVALID', 'nor to any other account');
-SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'g-pay', %L)$q$, t.id('player'), t.id('host')),
-  'but to the host it can');
+-- the payment destination (SEC-8: the database names the payee; the host_id the client sends is ignored)
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'g-pay', %L)$q$, t.id('ps-s'), t.id('player'), t.id('stranger')),
+  'a payment naming the stranger is accepted');
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'g-pay', %L)$q$, t.id('ps-a'), t.id('player'), t.id('accomplice')),
+  'as is one naming any other account');
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'g-pay', %L)$q$, t.id('ps-h'), t.id('player'), t.id('host')),
+  'and one naming the host');
 SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.payment_submissions WHERE id IN (t.id('ps-s'), t.id('ps-a'), t.id('ps-h')) AND host_id = t.id('host')), 3,
+  'but every one of them is made out to the host, never to the stranger or anyone else');
 -- the join gate does not believe the stranger's "no approval, no fee" row
 SELECT t.as_user(t.id('accomplice'));
 SELECT t.throws(format($q$INSERT INTO public.game_participants (game_id, user_id) VALUES ('g-pay', %L)$q$, t.id('accomplice')),

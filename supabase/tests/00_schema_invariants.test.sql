@@ -47,9 +47,8 @@ SELECT t.eq(
       'private_sec.visible_avatars(_ids uuid[])',
       -- SEC-5: the security_invoker view hosted_games_public calls it for anonymous discovery; it answers only about the caller.
       'private_sec.game_organizer_for_caller(_game text)',
-      -- Public by design: the checkout page needs the host's PayPal merchant id and a
-      -- game's refund terms before the visitor signs in.
-      'public.get_game_host_paypal(_game_id text)',
+      -- Public by design: the checkout page needs a game's refund terms before the visitor
+      -- signs in. (The PayPal merchant id is no longer public: SEC-8.)
       'public.get_game_refund_terms(_game_id text)')),
   '', 'no unlisted SECURITY DEFINER function is callable by anonymous visitors');
 
