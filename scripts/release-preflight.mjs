@@ -1578,5 +1578,8 @@ function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  Promise.resolve(main(process.argv.slice(2))).then((code) => process.exit(code));
+  // Set the exit code and let Node drain stdout: process.exit() can truncate a large report written to a pipe.
+  Promise.resolve(main(process.argv.slice(2))).then((code) => {
+    process.exitCode = code;
+  });
 }
