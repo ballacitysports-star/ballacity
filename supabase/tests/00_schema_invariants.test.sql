@@ -40,6 +40,7 @@ SELECT t.eq(
       'private_sec.reel_game_readable(_game_id text, _owner uuid)',
       'private_sec.reel_publicly_visible(_reel_id uuid)',
       'private_sec.roster_row_visible(_team_id text, _member_user_id uuid)',
+      'private_sec.minor_host_hidden(_user uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
       -- Public by design: the checkout page needs the host's PayPal merchant id and a

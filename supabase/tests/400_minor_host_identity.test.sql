@@ -90,7 +90,7 @@ SELECT t.throws(format($q$UPDATE public.child_controls SET public_profile = true
   'MINOR_HOST_PROFILE_VISIBLE', 'a guardian cannot make the hosting teen''s profile public (whatever path writes the control)');
 UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'h2';
 SELECT t.as_user(t.id('teen2'));
-SELECT t.lives($q$UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id = (SELECT auth.uid())$q$, 'once the game is cancelled the profile can be made visible again');
+SELECT t.throws($q$UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id = (SELECT auth.uid())$q$, 'MINOR_HOST_PROFILE_VISIBLE', 'cancelling the game does not release it: the game row (and the host id) stays readable, so the profile stays private until they are an adult');
 SELECT t.reset();
 
 -- adults are unaffected
