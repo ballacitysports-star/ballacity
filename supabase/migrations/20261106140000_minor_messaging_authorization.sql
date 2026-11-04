@@ -60,8 +60,15 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT _a IS NOT NULL AND _b IS NOT NULL AND _a <> _b AND (
        public.is_guardian_of(_a, _b) OR public.is_guardian_of(_b, _a)
     OR public.shares_team(_a, _b)
+    -- an ADULT host and a confirmed participant; a non-adult participant counts only when a verified guardian approved that participation
+    -- (a stranger cannot create this context by publishing a public game, and a minor host is never reachable this way)
     OR EXISTS (SELECT 1 FROM public.hosted_games g JOIN public.game_participants p ON p.game_id = g.id
-                WHERE (g.host_id = _a AND p.user_id = _b) OR (g.host_id = _b AND p.user_id = _a))
+                WHERE ((g.host_id = _a AND p.user_id = _b) OR (g.host_id = _b AND p.user_id = _a))
+                  AND public.age_cohort_of(g.host_id) = 'adult'
+                  AND (public.age_cohort_of(p.user_id) = 'adult'
+                       OR EXISTS (SELECT 1 FROM public.join_requests jr
+                                   WHERE jr.game_id = g.id AND jr.player_id = p.user_id AND jr.guardian_approved_at IS NOT NULL
+                                     AND public.is_guardian_of(jr.guardian_approved_by, p.user_id))))
     OR EXISTS (SELECT 1 FROM public.availability_contact_requests r
                 WHERE r.status = 'accepted' AND r.needs_guardian AND r.guardian_approved_at IS NOT NULL
                   AND ((r.from_user_id = _a AND r.to_user_id = _b) OR (r.from_user_id = _b AND r.to_user_id = _a))
@@ -71,17 +78,8 @@ $$;
 REVOKE ALL ON FUNCTION private_sec.messaging_connection(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private_sec.messaging_connection(uuid, uuid) TO service_role;
 
--- Two teens of the same age band whose guardians both chose "peers" and who share a confirmed game. Never involves an adult, an under-13 or an unknown age.
-CREATE OR REPLACE FUNCTION private_sec.peer_game_context(_a uuid, _b uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT public.age_cohort_of(_a) IN ('teen_13_15', 'teen_16_17') AND public.age_cohort_of(_a) = public.age_cohort_of(_b)
-     AND EXISTS (SELECT 1 FROM public.child_controls c WHERE c.child_user_id = _a AND c.messaging = 'peers')
-     AND EXISTS (SELECT 1 FROM public.child_controls c WHERE c.child_user_id = _b AND c.messaging = 'peers')
-     AND EXISTS (SELECT 1 FROM public.game_participants pa JOIN public.game_participants pb ON pb.game_id = pa.game_id
-                  WHERE pa.user_id = _a AND pb.user_id = _b)
-$$;
-REVOKE ALL ON FUNCTION private_sec.peer_game_context(uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private_sec.peer_game_context(uuid, uuid) TO service_role;
+-- (No shared-game peer context: a shared public game alone never authorizes direct messaging. Teens reach each other through a team or
+-- through a request that the sender's guardian approved, the recipient's guardian allows (controls 'peers') and the recipient accepted.)
 
 -- Guardian-set controls only (unchanged rules, extracted so conversations, messages and contact requests share them).
 CREATE OR REPLACE FUNCTION private_sec.messaging_controls_block(_a uuid, _b uuid)
@@ -132,7 +130,6 @@ BEGIN
   IF NOT minor_a AND NOT minor_b THEN RETURN NULL; END IF;     -- adult to adult: unchanged
 
   IF private_sec.messaging_connection(_a, _b) THEN RETURN NULL; END IF;
-  IF private_sec.peer_game_context(_a, _b) THEN RETURN NULL; END IF;
 
   -- No authorized context. Say which side is the protected one, and give the fix when one exists.
   IF minor_a AND NOT minor_b THEN
@@ -168,7 +165,7 @@ AS $function$
           -- a person who is not a confirmed adult is involved: an authorized context that the guardian's controls allow, or a host dealing
           -- with a live join request (pending or approved, last 90 days); a rejected or old request is not a relationship
           WHEN COALESCE(public.age_cohort_of(_caller), 'unknown') <> 'adult' OR COALESCE(public.age_cohort_of(_target), 'unknown') <> 'adult' THEN
-            ((private_sec.messaging_connection(_caller, _target) OR private_sec.peer_game_context(_caller, _target))
+            ((private_sec.messaging_connection(_caller, _target))
               AND private_sec.messaging_controls_block(_caller, _target) IS NULL)
             -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed adult
             OR EXISTS (SELECT 1 FROM public.join_requests jr
@@ -213,7 +210,11 @@ BEGIN
       -- a minor asking anyone: needs a linked guardian, who approves it (see the gate trigger); asking another minor also needs a context
       IF NOT private_sec.has_guardian_link(NEW.from_user_id) THEN
         _block := 'needs_guardian_link:self';
-      ELSIF _ct <> 'adult' AND NOT private_sec.messaging_connection(NEW.from_user_id, NEW.to_user_id) THEN
+      ELSIF _ct <> 'adult' AND NOT private_sec.messaging_connection(NEW.from_user_id, NEW.to_user_id)
+            -- teen to teen of the same age band, when the recipient's guardian allows peers: the request then waits for the sender's
+            -- guardian and the recipient's acceptance (mutual consent); never an under-13, never across age bands
+            AND NOT (_ct IN ('teen_13_15', 'teen_16_17') AND _ct = _cf AND private_sec.has_guardian_link(NEW.to_user_id)
+                     AND EXISTS (SELECT 1 FROM public.child_controls c WHERE c.child_user_id = NEW.to_user_id AND c.messaging = 'peers')) THEN
         _block := 'needs_connection:other';
       END IF;
     END IF;
