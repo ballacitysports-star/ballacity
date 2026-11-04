@@ -4,9 +4,10 @@ import { readFileSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { IMAGE_QUARANTINE_BUCKET } from "./image-quarantine.server";
-import { ImageReencodeError, type ReencodeResult } from "./image-reencode.server";
+import { ImageReencodeError, reencodeImage, type ReencodeResult } from "./image-reencode.server";
 import {
   ANIMATED_REFUSAL,
+  PROCESSING_BUSY,
   PROCESSING_UNAVAILABLE,
   promoteStagedImage,
   sweepImageStaging,
@@ -70,7 +71,47 @@ function world(
   const moderation = new Map<string, any>();
   const items: any[] = [];
   const log: string[] = [];
+  // The database clock, for the claim's 10-minute expiry (supabase/migrations/20261108150000).
+  const clock = { now: Date.now() };
   const admin = {
+    // claim_image_processing / finish_image_processing, with the migration's semantics (each call is atomic, as in Postgres).
+    rpc: async (fn: string, a: any) => {
+      const key = `${a._bucket}|${a._path}`;
+      const row = moderation.get(key);
+      if (fn === "claim_image_processing") {
+        const stale =
+          row?.status === "processing" &&
+          (!row.claimed_at || clock.now - row.claimed_at > 10 * 60_000);
+        if (!row || !["processing", "quarantined", "removed"].includes(row.status) || stale) {
+          const token = crypto.randomUUID();
+          moderation.set(key, {
+            ...(row ?? { bucket: a._bucket, path: a._path, owner_id: a._owner_id }),
+            status: "processing",
+            claim_token: token,
+            claimed_at: clock.now,
+          });
+          log.push(`claim ${a._bucket}`);
+          return { data: [{ claim_token: token, status: "processing" }], error: null };
+        }
+        return { data: [{ claim_token: null, status: row.status }], error: null };
+      }
+      if (fn === "finish_image_processing") {
+        if (!row || row.status !== "processing" || row.claim_token !== a._claim_token)
+          return { data: false, error: null };
+        if (a._status === "released") moderation.delete(key);
+        else
+          moderation.set(key, {
+            ...row,
+            ...a._fields,
+            status: a._status,
+            claim_token: null,
+            claimed_at: null,
+          });
+        log.push(`settle ${a._bucket} ${a._status}`);
+        return { data: true, error: null };
+      }
+      return { data: null, error: { message: `unknown rpc ${fn}` } };
+    },
     storage: {
       from: (bucket: string) => ({
         download: async (path: string) => {
@@ -127,7 +168,7 @@ function world(
       },
     }),
   };
-  return { files, moderation, items, log, admin };
+  return { files, moderation, items, log, admin, clock };
 }
 const safe = { safe: true, label: "ok", reason: null, categories: [], scanned: true, csam: false };
 const deps = (
@@ -190,10 +231,14 @@ describe("promoteStagedImage", () => {
       item_id: "item-1",
     });
     expect(d.escalate).toHaveBeenCalledWith(IMAGE_QUARANTINE_BUCKET, held.object_path, ["c"]);
+    // the destination path is flagged too (R5 39ae9545, finding 1), so no concurrent call can claim or publish it
+    expect(w.moderation.get(`avatars|${TARGET}`).status).toBe("quarantined");
     // preserved and recorded before escalation, escalated before the staged copy is removed
     expect(w.log.filter((l) => !l.startsWith("upload avatars"))).toEqual([
+      `claim ${IMAGE_STAGING_BUCKET}`,
       `upload ${IMAGE_QUARANTINE_BUCKET}`,
       "record quarantine item",
+      "remove avatars",
       "escalate",
       `remove ${IMAGE_STAGING_BUCKET}`,
     ]);
@@ -498,14 +543,20 @@ describe("promoteStagedImage: final review 780eaf8f", () => {
     return uploads;
   };
 
-  it("5c: claims the destination (pending moderation row) before it writes there, then removes and inserts without upsert", async () => {
+  it("5c: claims the destination (processing moderation row) before it writes there, then removes and inserts without upsert", async () => {
     const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
     const uploads = traced(w);
     await promoteStagedImage(deps(w), input);
     const at = (l: string) => w.log.indexOf(l);
-    expect(at("moderation avatars pending")).toBeGreaterThanOrEqual(0);
-    expect(at("moderation avatars pending")).toBeLessThan(at("remove avatars"));
+    expect(at("claim avatars")).toBeGreaterThanOrEqual(0);
+    expect(at("claim avatars")).toBeLessThan(at("remove avatars"));
     expect(at("remove avatars")).toBeLessThan(at("upload avatars"));
+    // published (pending) only after the bytes are in place
+    expect(at("upload avatars")).toBeLessThan(at("settle avatars pending"));
+    expect(w.moderation.get(`avatars|${TARGET}`)).toMatchObject({
+      status: "pending",
+      claim_token: null,
+    });
     expect(uploads.find((u) => u.bucket === "avatars")).toMatchObject({
       path: TARGET,
       upsert: false,
@@ -541,20 +592,20 @@ describe("promoteStagedImage: final review 780eaf8f", () => {
     const stage = `${USER}/stage-a.png`;
     const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: png });
     const d = deps(w);
-    d.scan.mockImplementation(async (t: string) =>
-      t.startsWith("data:image/jpeg")
-        ? { ...safe, safe: false, label: "x", csam: true, categories: ["c"] }
-        : safe,
+    // picture, on white, on black: safe; the fourth scan (alpha dropped) flags
+    let calls = 0;
+    d.scan.mockImplementation(async () =>
+      ++calls === 4 ? { ...safe, safe: false, label: "x", csam: true, categories: ["c"] } : safe,
     );
     const out = await promoteStagedImage(d, {
       ...input,
       stagingPath: stage,
       targetPath: `${USER}/final-a.png`,
     });
-    expect(d.scan).toHaveBeenCalledTimes(2);
+    expect(d.scan).toHaveBeenCalledTimes(4);
     expect((d.scan.mock.calls[0][0] as string).startsWith("data:image/png")).toBe(true);
     // the rendition shows the hidden half at full contrast (alpha dropped), not the composited near-transparent one
-    const rendition = Buffer.from((d.scan.mock.calls[1][0] as string).split(",")[1], "base64");
+    const rendition = Buffer.from((d.scan.mock.calls[3][0] as string).split(",")[1], "base64");
     const r = await sharp(rendition).raw().toBuffer({ resolveWithObject: true });
     expect(r.info.channels).toBe(3);
     expect(r.data[(10 * 64 + 60) * 3 + 2]).toBeGreaterThan(150);
@@ -662,7 +713,7 @@ describe("promoteStagedImage: still images only, and the cleaned bytes are valid
           orientation: null,
           animated: false,
         },
-        alphaRemovedScanTarget: null,
+        scanRenditions: [],
       });
       await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
       expect(d.scan).not.toHaveBeenCalled();
@@ -743,6 +794,121 @@ describe("promoteStagedImage: canonical re-encode (SEC-6)", () => {
     ).rejects.toThrow(/resolution is too high/);
     expect(d.scan).not.toHaveBeenCalled();
     expect(w.files.size).toBe(0);
+  });
+});
+
+describe("promoteStagedImage: concurrent calls on one path (R5 independent review 39ae9545, finding 1)", () => {
+  const flagged = {
+    ...safe,
+    safe: false,
+    label: "x",
+    reason: "flagged",
+    csam: true,
+    categories: ["c"],
+  };
+  const gate = () => {
+    let open!: () => void;
+    const p = new Promise<void>((r) => (open = r));
+    return { p, open };
+  };
+
+  it("a flag recorded while another call is still scanning wins: nothing is published and the row stays quarantined", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const reached = gate();
+    const release = gate();
+    const b = deps(w);
+    b.scan.mockImplementation(async () => {
+      reached.open();
+      await release.p;
+      return safe;
+    });
+    const callB = promoteStagedImage(b, input);
+    await reached.p; // B has downloaded, re-encoded and is inside its scan
+    // B hangs past the claim's 10-minute expiry (a stalled worker), so A can take the path over and finish first
+    w.clock.now += 11 * 60_000;
+    const a = deps(w, flagged);
+    const outA = await promoteStagedImage(a, input);
+    expect(outA.quarantined).toBe(true);
+    expect(a.escalate).toHaveBeenCalled();
+    release.open();
+    await expect(callB).rejects.toThrow(/flagged/);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+    expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("quarantined");
+    expect(w.moderation.get(`avatars|${TARGET}`).status).toBe("quarantined");
+  });
+
+  it("a second call while the first is processing is refused before it reads anything", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const reached = gate();
+    const release = gate();
+    const b = deps(w);
+    b.scan.mockImplementation(async () => {
+      reached.open();
+      await release.p;
+      return safe;
+    });
+    const callB = promoteStagedImage(b, input);
+    await reached.p;
+    const a = deps(w, flagged);
+    await expect(promoteStagedImage(a, input)).rejects.toThrow(PROCESSING_BUSY);
+    expect(a.scan).not.toHaveBeenCalled();
+    release.open();
+    const outB = await callB;
+    expect(outB.quarantined).toBe(false);
+    expect(w.moderation.get(`avatars|${TARGET}`).status).toBe("pending");
+  });
+
+  it("a flag recorded after the bytes were written but before they are recorded as published takes them down again", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const storage = w.admin.storage.from;
+    w.admin.storage.from = ((bucket: string) => {
+      const b = storage(bucket);
+      const upload = b.upload;
+      b.upload = async (path: string, bytes: Uint8Array) => {
+        const r = await upload(path, bytes);
+        if (bucket === "avatars") {
+          // another call's flag lands now: it records the staged path and the destination as quarantined, unconditionally
+          for (const [bk, p] of [
+            [IMAGE_STAGING_BUCKET, STAGE],
+            ["avatars", TARGET],
+          ])
+            await w.admin
+              .from("image_moderation")
+              .upsert({ bucket: bk, path: p, status: "quarantined", claim_token: null });
+        }
+        return r;
+      };
+      return b;
+    }) as any;
+    await expect(promoteStagedImage(deps(w), input)).rejects.toThrow(/flagged/);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+    expect(w.moderation.get(`avatars|${TARGET}`).status).toBe("quarantined");
+    // the staged original is now the other call's evidence: it is not removed
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(true);
+  });
+});
+
+describe("promoteStagedImage: transparency renditions (R5 independent review 39ae9545, finding 2)", () => {
+  it("a flag on the second rendition (flattened on black) flags the image", async () => {
+    const stage = `${USER}/stage-r.png`;
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: jpeg() });
+    const d = deps(w);
+    d.reencode = async (b: Uint8Array): Promise<ReencodeResult> => {
+      const real = await reencodeImage(b);
+      return {
+        ...real,
+        scanRenditions: ["data:image/jpeg;base64,WHITE", "data:image/jpeg;base64,BLACK"],
+      };
+    };
+    d.scan.mockImplementation(async (t: string) =>
+      t.endsWith("BLACK")
+        ? { ...safe, safe: false, label: "x", reason: "f", categories: ["v"] }
+        : safe,
+    );
+    const out = await promoteStagedImage(d, { ...input, stagingPath: stage });
+    expect(d.scan).toHaveBeenCalledTimes(3);
+    expect(out.quarantined).toBe(true);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
   });
 });
 

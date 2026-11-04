@@ -4,11 +4,12 @@ import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   FLAGGED_REFUSAL,
+  PROCESSING_BUSY,
   SCAN_UNAVAILABLE_REFUSAL,
   finalizeDirectImageUpload,
 } from "./image-finalize-direct.server";
 import { IMAGE_QUARANTINE_BUCKET } from "./image-quarantine.server";
-import { ImageReencodeError } from "./image-reencode.server";
+import { ImageReencodeError, reencodeImage } from "./image-reencode.server";
 
 const enc = new TextEncoder();
 const cat = (...p: Uint8Array[]) => {
@@ -64,7 +65,47 @@ function world(
   const upserts: any[] = [];
   const items: any[] = [];
   const log: string[] = [];
+  // The database clock, for the claim's 10-minute expiry (supabase/migrations/20261108150000).
+  const clock = { now: Date.now() };
   const admin = {
+    // claim_image_processing / finish_image_processing, with the migration's semantics (each call is atomic, as in Postgres).
+    rpc: async (fn: string, a: any) => {
+      const key = `${a._bucket}|${a._path}`;
+      const row = rows.get(key);
+      if (fn === "claim_image_processing") {
+        const stale =
+          row?.status === "processing" &&
+          (!row.claimed_at || clock.now - row.claimed_at > 10 * 60_000);
+        if (!row || !["processing", "quarantined", "removed"].includes(row.status) || stale) {
+          const token = crypto.randomUUID();
+          rows.set(key, {
+            ...(row ?? { bucket: a._bucket, path: a._path, owner_id: a._owner_id }),
+            status: "processing",
+            claim_token: token,
+            claimed_at: clock.now,
+          });
+          log.push("moderation processing");
+          return { data: [{ claim_token: token, status: "processing" }], error: null };
+        }
+        return { data: [{ claim_token: null, status: row.status }], error: null };
+      }
+      if (fn === "finish_image_processing") {
+        if (!row || row.status !== "processing" || row.claim_token !== a._claim_token)
+          return { data: false, error: null };
+        if (a._status === "released") rows.delete(key);
+        else
+          rows.set(key, {
+            ...row,
+            ...a._fields,
+            status: a._status,
+            claim_token: null,
+            claimed_at: null,
+          });
+        log.push(`moderation ${a._status}`);
+        return { data: true, error: null };
+      }
+      return { data: null, error: { message: `unknown rpc ${fn}` } };
+    },
     storage: {
       from: (bucket: string) => ({
         download: async (path: string) => {
@@ -126,7 +167,7 @@ function world(
       },
     }),
   };
-  return { files, rows, upserts, items, log, admin, uploadOpts };
+  return { files, rows, upserts, items, log, admin, uploadOpts, clock };
 }
 const safe = { safe: true, label: "ok", reason: null, categories: [], scanned: true, csam: false };
 const deps = (w: ReturnType<typeof world>, verdict: any = safe) => ({
@@ -229,9 +270,15 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
     await finalizeDirectImageUpload(d, input);
     // a moderation row exists before the rewrite, so the uploader's own writes are refused from then on (20261108120000)
     // finding 3: the uploader's object is removed and the re-encode inserted fresh (no upsert), so the row has no end-user owner
-    expect(w.log.slice(0, 3)).toEqual(["moderation pending", "remove avatars", "upload avatars"]);
+    expect(w.log.slice(0, 3)).toEqual([
+      "moderation processing",
+      "remove avatars",
+      "upload avatars",
+    ]);
     expect(w.uploadOpts.find((o) => o.bucket === "avatars")).toMatchObject({ upsert: false });
-    expect(w.upserts[0]).toMatchObject({ status: "pending", reason: "Processing" });
+    // R5 39ae9545 finding 1: the claim is atomic (an RPC), and the outcome is written through it, never by a blind upsert
+    expect(w.upserts).toEqual([]);
+    expect(w.rows.get(KEY)).toMatchObject({ status: "pending", claim_token: null });
     const stored = w.files.get(KEY)!;
     expect(contains(stored, payload)).toBe(false);
     const scanned = Uint8Array.from(atob((d.scan.mock.calls[0][0] as string).split(",")[1]), (c) =>
@@ -322,7 +369,7 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
       expect(call[0]).not.toBe("avatars");
   });
 
-  it("finding 1: a flag on the alpha-removed rendition quarantines the image; a failed scan of it fails closed", async () => {
+  it("finding 1 / R5 finding 2: a flag on any scan rendition quarantines the image; a failed scan of one fails closed", async () => {
     const result = (bytes: Uint8Array) => ({
       bytes,
       mime: "image/jpeg" as const,
@@ -333,7 +380,8 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
       convertedFromIcc: false,
       lossless: false,
       inputReport: { hasExif: false, hasGps: false, hasXmp: false, hasOther: false } as any,
-      alphaRemovedScanTarget: "data:image/jpeg;base64,AAAA",
+      // flattened on white, flattened on black (R5 39ae9545 finding 2): the second one carries the picture
+      scanRenditions: ["data:image/jpeg;base64,WWWW", "data:image/jpeg;base64,AAAA"],
     });
     const w = world({ [KEY]: jpeg() });
     const d = deps(w);
@@ -344,7 +392,7 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
         : safe,
     );
     const out = await finalizeDirectImageUpload(d, input);
-    expect(d.scan).toHaveBeenCalledTimes(2);
+    expect(d.scan).toHaveBeenCalledTimes(3);
     expect(out).toMatchObject({ quarantined: true, published: false });
     expect(w.files.has(KEY)).toBe(false);
 
@@ -357,6 +405,81 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
     });
     await expect(finalizeDirectImageUpload(d2, input)).rejects.toThrow(SCAN_UNAVAILABLE_REFUSAL);
     expect(w2.files.has(KEY)).toBe(false);
+  });
+
+  describe("concurrent calls on one path (R5 independent review 39ae9545, finding 1)", () => {
+    const flagged = { ...safe, safe: false, csam: true, categories: ["csam"] };
+    const gate = () => {
+      let open!: () => void;
+      const p = new Promise<void>((r) => (open = r));
+      return { p, open };
+    };
+
+    it("a flag recorded while another call is still scanning wins: the object is not re-published and the row stays quarantined", async () => {
+      const w = world({ [KEY]: jpeg({ gps: true }) });
+      const reached = gate();
+      const release = gate();
+      const b = deps(w);
+      b.scan.mockImplementation(async () => {
+        reached.open();
+        await release.p;
+        return safe;
+      });
+      const callB = finalizeDirectImageUpload(b, input);
+      await reached.p; // B has rewritten the object and is inside its scan
+      // B hangs past the claim's 10-minute expiry (a stalled worker), so A can take the path over and finish first
+      w.clock.now += 11 * 60_000;
+      const a = deps(w, flagged);
+      const outA = await finalizeDirectImageUpload(a, input);
+      expect(outA).toMatchObject({ quarantined: true, published: false });
+      expect(w.files.has(KEY)).toBe(false);
+      release.open();
+      await expect(callB).rejects.toThrow(FLAGGED_REFUSAL);
+      expect(w.files.has(KEY)).toBe(false);
+      expect(w.rows.get(KEY).status).toBe("quarantined");
+    });
+
+    it("a call that re-encodes slowly does not put a flagged object back", async () => {
+      const w = world({ [KEY]: jpeg() });
+      const reached = gate();
+      const release = gate();
+      const b = deps(w);
+      b.reencode = async (bytes: Uint8Array) => {
+        reached.open();
+        await release.p;
+        return reencodeImage(bytes);
+      };
+      const callB = finalizeDirectImageUpload(b, input);
+      await reached.p; // B downloaded the original and is held in its re-encode
+      w.clock.now += 11 * 60_000;
+      const a = deps(w, flagged);
+      await finalizeDirectImageUpload(a, input);
+      release.open();
+      await expect(callB).rejects.toThrow(FLAGGED_REFUSAL);
+      expect(b.scan).not.toHaveBeenCalled();
+      expect(w.files.has(KEY)).toBe(false);
+      expect(w.rows.get(KEY).status).toBe("quarantined");
+    });
+
+    it("a second call while the first is processing is refused before it reads anything", async () => {
+      const w = world({ [KEY]: jpeg() });
+      const reached = gate();
+      const release = gate();
+      const b = deps(w);
+      b.scan.mockImplementation(async () => {
+        reached.open();
+        await release.p;
+        return safe;
+      });
+      const callB = finalizeDirectImageUpload(b, input);
+      await reached.p;
+      const a = deps(w, flagged);
+      await expect(finalizeDirectImageUpload(a, input)).rejects.toThrow(PROCESSING_BUSY);
+      expect(a.scan).not.toHaveBeenCalled();
+      release.open();
+      await expect(callB).resolves.toMatchObject({ published: true });
+      expect(w.rows.get(KEY).status).toBe("pending");
+    });
   });
 
   it("refuses another user's path and unknown buckets", async () => {

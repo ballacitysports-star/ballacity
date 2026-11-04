@@ -8,6 +8,12 @@ import {
   type QuarantineRef,
 } from "@/lib/image-quarantine.server";
 import {
+  PROCESSING_BUSY,
+  claimImagePath,
+  finishImagePath,
+  isFlaggedStatus,
+} from "@/lib/image-processing-claim.server";
+import {
   ImageReencodeError,
   REENCODE_MESSAGES,
   reencodeImage,
@@ -47,6 +53,7 @@ export const FLAGGED_REFUSAL =
   "This image was flagged by our automated safety check and is pending review.";
 export const SCAN_UNAVAILABLE_REFUSAL =
   "We couldn't check this image right now. Please try again in a few minutes.";
+export { PROCESSING_BUSY };
 
 export async function finalizeDirectImageUpload(
   deps: DirectFinalizeDeps,
@@ -61,27 +68,61 @@ export async function finalizeDirectImageUpload(
     throw new Error("You can only finalize your own uploads");
   }
 
-  // A moderator's (or the scan's) decision stands: a quarantined or removed object is never rescanned, so a call from the
-  // owner cannot reset it to 'pending' (as promoteStagedImage does for staged files).
-  const { data: existing, error: existingErr } = await admin
-    .from("image_moderation")
-    .select("status")
-    .eq("bucket", bucket)
-    .eq("path", path)
-    .maybeSingle();
-  if (existingErr) throw new Error("Could not check this image's moderation state");
-  if (existing && (existing.status === "quarantined" || existing.status === "removed")) {
-    throw new Error(FLAGGED_REFUSAL);
+  // Claim the path, atomically, in the database (R5 independent review 39ae9545, finding 1). A moderator's (or the scan's)
+  // decision stands: a quarantined or removed object is never rescanned, so a call from the owner cannot reset it to 'pending'.
+  // A second call while this one runs is refused. The claim row also makes the published-image trigger refuse any further write
+  // by the uploader at this path, a signed upload URL included (20261108120000).
+  const claim = await claimImagePath(admin, bucket, path, userId);
+  if (!claim.token) {
+    throw new Error(isFlaggedStatus(claim.status) ? FLAGGED_REFUSAL : PROCESSING_BUSY);
   }
+  const token = claim.token;
 
-  const record = (row: Record<string, unknown>) =>
-    admin
-      .from("image_moderation")
-      .upsert({ bucket, path, owner_id: userId, ...row }, { onConflict: "bucket,path" });
+  // A flag is written unconditionally (it always wins); every other outcome only while this call's claim still stands.
+  const recordFlag = (row: Record<string, unknown>) =>
+    admin.from("image_moderation").upsert(
+      { bucket, path, owner_id: userId, ...row, claim_token: null, claimed_at: null },
+      {
+        onConflict: "bucket,path",
+      },
+    );
+  const settle = (status: "pending" | "removed", row: Record<string, unknown>) =>
+    finishImagePath(admin, bucket, path, token, status, row);
   const remove = () => admin.storage.from(bucket).remove([path]);
+  // The claim was lost: another call (or a moderator) decided in between. If that decision was a flag, or the row is gone, the
+  // public object must not stay; if this call's claim still stands (the database write failed), it is removed too. Only when
+  // another call holds the path, or published it, is its object left alone.
+  const refuse = async (): Promise<Error> => {
+    const { data: row } = await admin
+      .from("image_moderation")
+      .select("status, claim_token")
+      .eq("bucket", bucket)
+      .eq("path", path)
+      .maybeSingle();
+    const ours = row?.status === "processing" && row?.claim_token === token;
+    if (!row || ours || isFlaggedStatus(row.status)) await remove();
+    if (ours) return new Error("Could not record this image's moderation state");
+    return new Error(row && isFlaggedStatus(row.status) ? FLAGGED_REFUSAL : PROCESSING_BUSY);
+  };
+  // A non-flag failure: record 'removed' (while the claim stands), then take the object down.
+  const fail = async (message: string, row: Record<string, unknown>): Promise<never> => {
+    if (await settle("removed", row)) {
+      await remove();
+      throw new Error(message);
+    }
+    throw await refuse();
+  };
 
   const { data: blob, error: dlErr } = await admin.storage.from(bucket).download(path);
-  if (dlErr || !blob) throw new Error("Uploaded file could not be read");
+  if (dlErr || !blob) {
+    // Give the claim back as 'pending' (retryable): 'removed' would block the path for good over a storage hiccup, and deleting
+    // the row could drop an earlier decision (a moderator's 'kept').
+    await finishImagePath(admin, bucket, path, token, "pending", {
+      reason: "Uploaded file could not be read",
+      scan: { stage: "download" },
+    });
+    throw new Error("Uploaded file could not be read");
+  }
 
   let buffer: Uint8Array = new Uint8Array(await blob.arrayBuffer());
   let bytes = buffer.byteLength;
@@ -93,9 +134,7 @@ export async function finalizeDirectImageUpload(
     (dimensions ? null : "The file is not a readable JPG, PNG or WEBP image");
 
   if (failure) {
-    await remove();
-    await record({
-      status: "removed",
+    await fail(failure, {
       reason: failure,
       mime: sniffed,
       bytes,
@@ -103,22 +142,11 @@ export async function finalizeDirectImageUpload(
       height: dimensions?.height ?? null,
       scan: { stage: "validation", failure },
     });
-    throw new Error(failure);
   }
 
-  // The object is public right now. Claim the path first (a moderation row makes the published-image trigger refuse any further
-  // write by the uploader, a signed upload URL included; 20261108120000), then replace the stored bytes with the canonical
-  // re-encode (src/lib/image-reencode.server.ts) before anything scans or serves them. Any failure removes the object.
+  // The object is public right now and the path is claimed (above). Replace the stored bytes with the canonical re-encode
+  // (src/lib/image-reencode.server.ts) before anything scans or serves them. Any failure removes the object.
   const original = buffer;
-  await record({
-    status: "pending",
-    reason: "Processing",
-    mime: sniffed,
-    bytes,
-    width: dimensions?.width ?? null,
-    height: dimensions?.height ?? null,
-    scan: { stage: "processing" },
-  });
   let encoded: ReencodeResult;
   try {
     encoded = await (deps.reencode ?? reencodeImage)(original);
@@ -137,9 +165,7 @@ export async function finalizeDirectImageUpload(
   } catch (e) {
     const code = e instanceof ImageReencodeError ? e.code : "unreadable";
     const message = code === "unavailable" ? SCAN_UNAVAILABLE_REFUSAL : REENCODE_MESSAGES[code];
-    await remove();
-    await record({
-      status: "removed",
+    await fail(message, {
       reason:
         code === "unavailable"
           ? "Image processing unavailable"
@@ -148,7 +174,17 @@ export async function finalizeDirectImageUpload(
       bytes,
       scan: { stage: "reencode", failure: code },
     });
-    throw new Error(message);
+    throw new Error(message); // unreachable: fail() always throws
+  }
+  // A flag recorded by another call while this one re-encoded took the object down; the rewrite above may have put it back.
+  {
+    const { data: row } = await admin
+      .from("image_moderation")
+      .select("status, claim_token")
+      .eq("bucket", bucket)
+      .eq("path", path)
+      .maybeSingle();
+    if (!(row?.status === "processing" && row?.claim_token === token)) throw await refuse();
   }
   buffer = encoded.bytes;
   bytes = buffer.byteLength;
@@ -183,26 +219,28 @@ export async function finalizeDirectImageUpload(
       verdict = null;
     }
   }
-  // Colour kept under partially transparent pixels is scanned with the alpha dropped too (final review 780eaf8f, finding 1).
-  if (verdict?.safe && encoded.alphaRemovedScanTarget) {
+  // A picture with transparency is also scanned flattened on white, flattened on black and, for partial alpha, with the alpha
+  // dropped (final review 780eaf8f finding 1; R5 independent review 39ae9545 finding 2), all made from the re-encoded pixels.
+  // A flag on any rendition flags the image; a failed scan of any of them fails closed.
+  for (const rendition of encoded.scanRenditions ?? []) {
+    if (!verdict?.safe) break;
     try {
-      const v = await scan(encoded.alphaRemovedScanTarget, userId);
+      const v = await scan(rendition, userId);
       verdict = !v.safe ? v : v.scanned === false ? null : verdict;
     } catch {
       verdict = null;
     }
   }
   if (!verdict) {
-    await remove();
-    await record({
-      status: "removed",
+    await fail(SCAN_UNAVAILABLE_REFUSAL, {
       reason: "Safety scan unavailable",
       mime: sniffed,
       bytes,
       scan: { stage: "scan_unavailable", metadata },
     });
-    throw new Error(SCAN_UNAVAILABLE_REFUSAL);
   }
+  // (fail() always throws; this narrows the type for what follows.)
+  if (!verdict) throw new Error(SCAN_UNAVAILABLE_REFUSAL);
 
   const quarantined = !verdict.safe;
   const reason = quarantined
@@ -243,30 +281,29 @@ export async function finalizeDirectImageUpload(
     sha256 = fallback?.sha256 ?? (held ? null : await sha256Hex(original));
   }
 
-  const { error: upErr } = await record({
-    status: quarantined ? "quarantined" : "pending",
+  const outcome = {
     reason,
     mime: sniffed,
     bytes,
     width: published.width,
     height: published.height,
-    quarantined_at: quarantined ? new Date().toISOString() : null,
-    scan: {
-      ...verdict,
-      metadata,
-      ...(quarantined
-        ? {
-            quarantine: held
-              ? { bucket: held.bucket, path: held.path, item_id: held.itemId }
-              : fallback
-                ? { failed: true, held: { bucket: fallback.bucket, path: fallback.path }, sha256 }
-                : { failed: true, unpreserved: true, sha256 },
-          }
-        : {}),
-    },
-  });
+  };
 
   if (quarantined) {
+    const { error: upErr } = await recordFlag({
+      ...outcome,
+      status: "quarantined",
+      quarantined_at: new Date().toISOString(),
+      scan: {
+        ...verdict,
+        metadata,
+        quarantine: held
+          ? { bucket: held.bucket, path: held.path, item_id: held.itemId }
+          : fallback
+            ? { failed: true, held: { bucket: fallback.bucket, path: fallback.path }, sha256 }
+            : { failed: true, unpreserved: true, sha256 },
+      },
+    });
     // Off the public bucket first, so a failing escalation or record cannot leave it there.
     const { error: rmErr } = await remove();
     if (verdict.csam) {
@@ -288,9 +325,10 @@ export async function finalizeDirectImageUpload(
       metadataStripped: metadata.stripped,
     };
   }
-  if (upErr) {
-    await remove();
-    throw new Error(upErr.message);
+  // Published only while this call's claim still stands: a flag written by another call in the meantime wins, and the object
+  // this call rewrote is taken down instead (R5 independent review 39ae9545, finding 1).
+  if (!(await settle("pending", { ...outcome, scan: { ...verdict, metadata } }))) {
+    throw await refuse();
   }
 
   return {

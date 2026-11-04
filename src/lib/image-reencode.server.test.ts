@@ -451,6 +451,82 @@ describe("reencodeImage: colour hidden under transparency (final review 780eaf8f
   });
 });
 
+describe("reencodeImage: a picture drawn in the alpha channel alone (R5 independent review 39ae9545, finding 2)", () => {
+  // 128x128 RGBA whose colour is uniform (all 0, or all 255) and whose alpha draws concentric rings. Composited on a background
+  // of the same colour as the RGB it is blank; on the other one the rings are plain to see. A scanner looking at one composite,
+  // or at the colour with the alpha dropped, can see nothing.
+  const S = 128;
+  const rings = (rgb: number, smooth: boolean) => {
+    const px = Buffer.alloc(S * S * 4);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const i = (y * S + x) * 4;
+        const r = Math.hypot(x - S / 2, y - S / 2);
+        px[i] = px[i + 1] = px[i + 2] = rgb;
+        px[i + 3] = smooth
+          ? Math.round(127.5 + 127.5 * Math.sin(r / 3))
+          : Math.floor(r / 8) % 2
+            ? 255
+            : 0;
+      }
+    return sharp(px, { raw: { width: S, height: S, channels: 4 } })
+      .png()
+      .toBuffer()
+      .then(u8);
+  };
+  const stdev = async (dataUrl: string) => {
+    const st = await sharp(Buffer.from(dataUrl.split(",")[1], "base64")).stats();
+    return Math.max(...st.channels.slice(0, 3).map((c) => c.stdev));
+  };
+
+  it.each([
+    [0, false],
+    [255, false],
+    [0, true],
+    [255, true],
+  ] as const)(
+    "RGB=%i, %s alpha rings: some scan rendition shows the rings",
+    async (rgb, smooth) => {
+      const out = await reencodeImage(await rings(rgb, smooth));
+      expect(out.scanRenditions.length).toBeGreaterThanOrEqual(2);
+      const spreads = await Promise.all(out.scanRenditions.map(stdev));
+      // the picture is visible in at least one rendition (a blank rendition has a standard deviation near 0)
+      expect(Math.max(...spreads)).toBeGreaterThan(60);
+      // and the two composites differ: one is the picture, the other nearly blank (hard rings) or its negative
+      if (!smooth) expect(Math.min(spreads[0], spreads[1])).toBeLessThan(5);
+    },
+  );
+
+  it("flattened on white comes first, flattened on black second, alpha dropped third (partial alpha only)", async () => {
+    const hard = await reencodeImage(await rings(0, false));
+    expect(hard.scanRenditions).toHaveLength(2);
+    const [white, black] = await Promise.all(
+      hard.scanRenditions.map(async (d) => sharp(Buffer.from(d.split(",")[1], "base64")).stats()),
+    );
+    expect(white.channels[0].stdev).toBeGreaterThan(60); // black rings on white
+    expect(black.channels[0].stdev).toBeLessThan(5); // black on black: blank
+    const soft = await reencodeImage(await rings(0, true));
+    expect(soft.scanRenditions).toHaveLength(3);
+    for (const d of soft.scanRenditions) expect(d.startsWith("data:image/jpeg;base64,")).toBe(true);
+  });
+
+  it("an opaque picture has no scan renditions", async () => {
+    const opaque = u8(
+      await sharp({
+        create: {
+          width: 64,
+          height: 64,
+          channels: 4,
+          background: { r: 51, g: 102, b: 153, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer(),
+    );
+    expect((await reencodeImage(opaque)).scanRenditions).toEqual([]);
+  });
+});
+
 describe("reencodeImage: refusals", () => {
   const code = async (p: Promise<unknown>) => {
     try {
