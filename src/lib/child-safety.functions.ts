@@ -390,14 +390,29 @@ export const approveConsentAsGuardian = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("approve_parental_consent", {
+    const { data: consentId, error } = await supabaseAdmin.rpc("approve_parental_consent", {
       _token_hash: hashToken(data.token),
       _method: "email_confirmation" satisfies ConsentMethod,
       _parent_user: userId,
       _versions: { ...(data.versions ?? {}), scope: data.scope ?? {} },
     });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    // SEC-4: opening the emailed link does not make anyone a guardian. Unless this adult is already the
+    // child's verified guardian, the approval waits as a pending request (BallaCity verifies a first
+    // guardian; a current guardian approves an additional one).
+    const { data: pending } = await supabaseAdmin
+      .from("guardian_link_requests" as never)
+      .select("kind")
+      .eq("parent_user_id", userId)
+      .eq("consent_id", consentId as unknown as string)
+      .eq("status", "pending")
+      .limit(1);
+    const kind = ((pending ?? []) as unknown as { kind: string }[])[0]?.kind ?? null;
+    return {
+      ok: true,
+      verificationRequired: kind === "first_guardian",
+      guardianApprovalRequired: kind === "additional_guardian",
+    };
   });
 
 /* ------------------------------------------------------------------ */

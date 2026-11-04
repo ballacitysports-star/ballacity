@@ -5869,6 +5869,7 @@ export type Database = {
           consent_recorded: boolean
           parent_id: string
           pending_approval: boolean
+          verification_required: boolean
         }[]
       }
       reel_audience: { Args: { _reel_id: string }; Returns: string }

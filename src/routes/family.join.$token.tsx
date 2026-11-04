@@ -7,7 +7,11 @@ import { ShieldCheck, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
 import { CHILD_POLICY_DISCLAIMER } from "@/lib/child-policy";
-import { lookupMinorInvite, redeemMinorInvite } from "@/lib/family-invites.functions";
+import {
+  lookupMinorInvite,
+  redeemMinorInvite,
+  withdrawMyGuardianClaim,
+} from "@/lib/family-invites.functions";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/family/join/$token")({
@@ -28,9 +32,13 @@ function FamilyJoinPage() {
   const navigate = useNavigate();
   const lookup = useServerFn(lookupMinorInvite);
   const redeem = useServerFn(redeemMinorInvite);
+  const withdraw = useServerFn(withdrawMyGuardianClaim);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
+  const [verification, setVerification] = useState(false);
+  const [parentId, setParentId] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
 
   const query = useQuery({
     queryKey: ["minor-invite", token],
@@ -44,11 +52,15 @@ function FamilyJoinPage() {
     try {
       const result = await redeem({ data: { token } });
       setPending(result.pendingApproval);
+      setVerification(result.verificationRequired);
+      setParentId(result.parentId);
       setDone(true);
       toast.success(
-        result.pendingApproval
-          ? "Sent. Your current parent or guardian needs to approve it."
-          : "You're connected to your parent or guardian.",
+        result.verificationRequired
+          ? "Sent. BallaCity will verify your parent or guardian first."
+          : result.pendingApproval
+            ? "Sent. Your current parent or guardian needs to approve it."
+            : "You're connected to your parent or guardian.",
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not accept that invitation.");
@@ -77,18 +89,54 @@ function FamilyJoinPage() {
     );
   }
 
+  const cancel = async () => {
+    if (!parentId) return;
+    setSubmitting(true);
+    try {
+      await withdraw({ data: { parentId } });
+      setCancelled(true);
+      toast.success("Cancelled. Nobody was connected.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not cancel that request.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (done) {
     return (
       <Shell>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-lime" />
-          <h1 className="page-title">{pending ? "Waiting for approval" : "You're all set"}</h1>
+          <h1 className="page-title">
+            {cancelled
+              ? "Request cancelled"
+              : verification
+                ? "Waiting for verification"
+                : pending
+                  ? "Waiting for approval"
+                  : "You're all set"}
+          </h1>
         </div>
         <p className="mt-2 page-subtitle">
-          {pending
-            ? "Your current parent or guardian has to approve this new connection. Nothing changes until they do."
-            : "Your parent or guardian is connected and can manage your safety settings."}
+          {cancelled
+            ? "Nobody was connected to your account."
+            : verification
+              ? "BallaCity checks every new parent or guardian before they can see or change anything on your account. Nothing changes until we verify them."
+              : pending
+                ? "Your current parent or guardian has to approve this new connection. Nothing changes until they do."
+                : "Your parent or guardian is connected and can manage your safety settings."}
         </p>
+        {pending && !cancelled && parentId ? (
+          <Button
+            variant="outline"
+            className="mt-4 w-full"
+            disabled={submitting}
+            onClick={() => void cancel()}
+          >
+            {submitting ? "Cancelling…" : "I don't know this person: cancel"}
+          </Button>
+        ) : null}
         <Button className="mt-4 w-full" onClick={() => void navigate({ to: "/settings" })}>
           Go to Settings
         </Button>
@@ -120,7 +168,11 @@ function FamilyJoinPage() {
             </li>
             <li>• They can request your data or ask us to delete your account.</li>
             <li>
-              • If you're under 13, accepting also records their consent so your account turns on.
+              • BallaCity verifies a new parent or guardian first. They get no access until then.
+            </li>
+            <li>
+              • If you're under 13, their consent is recorded once they are verified, and your
+              account turns on then.
             </li>
           </ul>
           <Button className="mt-4 w-full" disabled={submitting} onClick={() => void accept()}>

@@ -11,6 +11,7 @@ import { CHILD_POLICY_DISCLAIMER, COHORT_META, parseCohort } from "@/lib/child-p
 import { Button } from "@/components/ui/button";
 import { BirthdayCorrectionQueue } from "@/components/child/BirthdayCorrectionQueue";
 import { AdminFamilyPanel } from "@/components/child/AdminFamilyPanel";
+import { GuardianClaimQueue } from "@/components/child/GuardianClaimQueue";
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
@@ -64,6 +65,8 @@ export function ChildSafetyPanel() {
               ))}
             </div>
           </section>
+
+          <GuardianClaimQueue />
 
           <AdminFamilyPanel />
 

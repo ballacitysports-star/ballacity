@@ -7,13 +7,16 @@ type Pending = { id: string; child_user_id: string; parent_user_id: string; crea
 
 export const linkApprovalsKey = (viewerId: string) => ["guardian-link-approvals", viewerId];
 
-async function fetchPending(viewerId: string): Promise<Pending[]> {
+async function fetchPending(viewerId: string, childIds: string[]): Promise<Pending[]> {
+  if (childIds.length === 0) return [];
   // Row security returns requests for the signed-in guardian's verified children (and the guardian's own requests, filtered out here).
+  // Staff can read every request (SEC-4 review queue), so the list is also limited to this guardian's own children.
   const { data, error } = await supabase
     .from("guardian_link_requests" as never)
     .select("id, child_user_id, parent_user_id, created_at")
     .eq("status", "pending")
     .neq("parent_user_id", viewerId)
+    .in("child_user_id", childIds)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as Pending[];
@@ -32,9 +35,10 @@ export function GuardianLinkApprovals({
   childNames: Record<string, string>;
 }) {
   const qc = useQueryClient();
+  const childIds = Object.keys(childNames).sort();
   const q = useQuery({
-    queryKey: linkApprovalsKey(viewerId),
-    queryFn: () => fetchPending(viewerId),
+    queryKey: [...linkApprovalsKey(viewerId), childIds.join(",")],
+    queryFn: () => fetchPending(viewerId, childIds),
   });
   const decide = useMutation({
     mutationFn: async (v: { id: string; approve: boolean }) => {

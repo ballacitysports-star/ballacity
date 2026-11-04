@@ -69,6 +69,25 @@ async function callerCohort(context: Ctx): Promise<AgeCohort> {
   return cohort;
 }
 
+/**
+ * SEC-4: managed_accounts records who created a managed child; it is not
+ * authority. Authority is an active, verified guardian link, so a guardian
+ * whose link BallaCity staff revoked or suspended (fraud, a compromised
+ * account) can no longer act as the child or delete them, even though the
+ * managed_accounts row stays. RLS lets a guardian read only their own links.
+ */
+async function hasActiveGuardianLink(context: Ctx, childUserId: string): Promise<boolean> {
+  const { data } = await context.supabase
+    .from("guardian_links")
+    .select("id")
+    .eq("parent_user_id", context.userId)
+    .eq("child_user_id", childUserId)
+    .eq("status", "active")
+    .not("verified_at", "is", null)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 /** The Terms and Privacy versions a member is shown right now — the ones the guardian accepts. */
 async function currentLegalVersions(context: Ctx): Promise<{ terms: string; privacy: string }> {
   const { data } = await context.supabase
@@ -245,6 +264,9 @@ export const deleteManagedChild = createServerFn({ method: "POST" })
       .eq("managed_by", ctx.userId)
       .maybeSingle();
     if (!managed) throw new Error(managedChildErrorMessage("NOT_AUTHORIZED"));
+    if (!(await hasActiveGuardianLink(ctx, data.childUserId))) {
+      throw new Error(managedChildErrorMessage("NOT_AUTHORIZED"));
+    }
 
     const [{ supabaseAdmin }, { purgeUserAccount }] = await Promise.all([
       import("@/integrations/supabase/client.server"),
@@ -293,6 +315,9 @@ export const startManagedSession = createServerFn({ method: "POST" })
       .eq("managed_by", ctx.userId)
       .maybeSingle();
     if (!managed) throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+    if (!(await hasActiveGuardianLink(ctx, data.childUserId))) {
+      throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: child } = await supabaseAdmin.auth.admin.getUserById(data.childUserId);
