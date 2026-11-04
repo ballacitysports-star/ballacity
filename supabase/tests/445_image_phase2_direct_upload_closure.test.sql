@@ -58,6 +58,14 @@ SELECT t.ok((SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND pol
 -- ---- the allow-list postcondition (step 3), and negative controls: each injected policy below must make it fail
 SELECT t.eq(pg_temp.g3b_phase2_open_write_policies(), NULL::text, 'after phase 2 every browser write policy is pinned to an allowed non-image bucket');
 SELECT t.lives('SELECT pg_temp.g3b_phase2_assert_closed()', 'and the postcondition passes');
+-- a group role that authenticated (or anon, through another group) inherits from: a policy granted to it applies to API requests
+CREATE ROLE g445_writers NOLOGIN;
+CREATE ROLE g445_outer NOLOGIN;
+CREATE ROLE g445_inner NOLOGIN;
+GRANT g445_writers TO authenticated;
+GRANT g445_outer TO g445_inner;
+GRANT g445_inner TO anon;
+CREATE ROLE g445_unrelated NOLOGIN;
 CREATE TEMP TABLE nc445 (label text, ddl text);
 INSERT INTO nc445 VALUES
   ('an INSERT policy with no bucket at all', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO authenticated WITH CHECK (owner = auth.uid())$$),
@@ -68,7 +76,9 @@ INSERT INTO nc445 VALUES
   ('an UPDATE with no USING', $$CREATE POLICY "nc" ON storage.objects FOR UPDATE TO authenticated WITH CHECK (bucket_id = 'payment-proofs')$$),
   ('an AND whose first operand is not the bucket', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO authenticated WITH CHECK (owner = auth.uid() AND bucket_id = 'avatars')$$),
   ('an unknown non-image bucket', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'some-new-bucket')$$),
-  ('a top-level OR hidden behind an AND', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO authenticated WITH CHECK ((bucket_id = 'payment-proofs' AND true) OR bucket_id = 'avatars')$$);
+  ('a top-level OR hidden behind an AND', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO authenticated WITH CHECK ((bucket_id = 'payment-proofs' AND true) OR bucket_id = 'avatars')$$),
+  ('L2: a policy granted to a group role authenticated is a member of', $$CREATE POLICY "nc" ON storage.objects FOR INSERT TO g445_writers WITH CHECK (bucket_id = 'avatars')$$),
+  ('L2: a policy granted to a role anon inherits through another role', $$CREATE POLICY "nc" ON storage.objects FOR ALL TO g445_outer USING (true)$$);
 DO $nc$
 DECLARE r record; _caught boolean;
 BEGIN
@@ -93,5 +103,8 @@ $nc$;
 CREATE POLICY "ok restrictive" ON storage.objects AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "ok service" ON storage.objects FOR INSERT TO service_role WITH CHECK (true);
 CREATE POLICY "ok pinned" ON storage.objects FOR UPDATE TO authenticated USING ((bucket_id = 'highlight-videos') AND (owner = auth.uid()) AND (name LIKE 'x%' OR name LIKE 'y%'));
-SELECT t.eq(pg_temp.g3b_phase2_open_write_policies(), NULL::text, 'restrictive, service-role-only and bucket-pinned policies pass the postcondition');
+CREATE POLICY "ok unrelated role" ON storage.objects FOR INSERT TO g445_unrelated WITH CHECK (true);
+SELECT t.eq(pg_temp.g3b_phase2_open_write_policies(), NULL::text, 'restrictive, service-role-only, bucket-pinned policies and roles no API role inherits pass the postcondition');
+CREATE POLICY "nc group" ON storage.objects FOR INSERT TO g445_writers WITH CHECK (bucket_id = 'covers');
+SELECT t.eq(pg_temp.g3b_phase2_open_write_policies(), 'nc group (INSERT)', 'L2: a write policy for a group role authenticated inherits is reported by name');
 ROLLBACK;

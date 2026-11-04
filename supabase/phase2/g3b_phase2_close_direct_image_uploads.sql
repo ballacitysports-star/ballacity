@@ -68,7 +68,9 @@ CREATE POLICY "phase2 owners read own entity images" ON storage.objects FOR SELE
 --    deparsed expression must be exactly `(bucket_id = '<allowed>'::text)` or an AND whose FIRST operand is that comparison
 --    (`((bucket_id = '<allowed>'::text) AND ...)`); an OR at the top, an IN/ANY list, a missing USING or WITH CHECK, or a policy
 --    that does not mention the bucket at all fails. For UPDATE/ALL both USING and WITH CHECK (when present) must pass.
---    RESTRICTIVE policies only narrow access and are not checked. Policies granted to other roles are out of scope.
+--    RESTRICTIVE policies only narrow access and are not checked. A policy counts as an API-role policy when it names `public`
+--    or any role that anon or authenticated is a member of (directly or through other roles: pg_has_role(..., 'MEMBER')), so a
+--    policy granted to an intermediate group role is caught too. Policies only for roles neither API role inherits are out of scope.
 --    The check lives in a session-temporary function so the test can run it again against injected policies.
 CREATE OR REPLACE FUNCTION pg_temp.g3b_phase2_open_write_policies() RETURNS text LANGUAGE sql STABLE AS $fn$
   WITH allowed(re) AS (
@@ -79,7 +81,10 @@ CREATE OR REPLACE FUNCTION pg_temp.g3b_phase2_open_write_policies() RETURNS text
     FROM pg_policies p, allowed a
    WHERE p.schemaname = 'storage' AND p.tablename = 'objects' AND p.permissive = 'PERMISSIVE'
      AND p.cmd IN ('INSERT', 'UPDATE', 'ALL')
-     AND p.roles && ARRAY['authenticated', 'anon', 'public']::name[]
+     AND EXISTS (SELECT 1 FROM unnest(p.roles) AS r(name)
+                  WHERE r.name = 'public'
+                     OR (EXISTS (SELECT 1 FROM pg_roles x WHERE x.rolname = r.name)
+                         AND (pg_has_role('anon', r.name, 'MEMBER') OR pg_has_role('authenticated', r.name, 'MEMBER'))))
      AND NOT CASE p.cmd
            WHEN 'INSERT' THEN coalesce(p.with_check, '') ~ a.re
            ELSE coalesce(p.qual, '') ~ a.re AND (p.with_check IS NULL OR p.with_check ~ a.re)
