@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -41,6 +41,7 @@ const NOISE_PNG = u8(
     .png()
     .toBuffer(),
 );
+const hasGps = (b: Uint8Array) => new TextDecoder("latin1").decode(b).includes("GPS");
 const contains = (hay: Uint8Array, needle: Uint8Array) =>
   Buffer.from(hay.buffer, hay.byteOffset, hay.byteLength).indexOf(Buffer.from(needle)) >= 0;
 
@@ -48,8 +49,17 @@ const USER = "11111111-1111-1111-1111-111111111111";
 const PATH = `${USER}/avatar.jpg`;
 const KEY = `avatars|${PATH}`;
 
-function world(initial: Record<string, Uint8Array>, moderation: Record<string, any> = {}) {
+function world(
+  initial: Record<string, Uint8Array>,
+  moderation: Record<string, any> = {},
+  opts: { failUploadsTo?: string[]; userOwned?: string[] } = {},
+) {
   const files = new Map<string, Uint8Array>(Object.entries(initial));
+  // Rows the uploader wrote (Storage stamps them with the uploader as owner). Real Storage's upsert keeps that owner, so the
+  // published-path trigger refuses the server's upsert over them (supabase/tests/520, finding 3); a plain insert never
+  // overwrites an existing row.
+  const userOwned = new Set<string>(opts.userOwned ?? []);
+  const uploadOpts: any[] = [];
   const rows = new Map<string, any>(Object.entries(moderation));
   const upserts: any[] = [];
   const items: any[] = [];
@@ -63,13 +73,25 @@ function world(initial: Record<string, Uint8Array>, moderation: Record<string, a
             ? { data: new Blob([b as BlobPart]), error: null }
             : { data: null, error: { message: "not found" } };
         },
-        upload: async (path: string, bytes: Uint8Array) => {
-          files.set(`${bucket}|${path}`, bytes);
+        upload: async (path: string, bytes: Uint8Array, o: any = {}) => {
+          const key = `${bucket}|${path}`;
+          uploadOpts.push({ bucket, path, ...o });
+          if (opts.failUploadsTo?.includes(bucket)) {
+            log.push(`upload ${bucket} failed`);
+            return { data: null, error: { message: `${bucket} down` } };
+          }
+          if (files.has(key) && !o.upsert) return { data: null, error: { message: "Duplicate" } };
+          if (files.has(key) && userOwned.has(key) && rows.has(key))
+            return { data: null, error: { message: "PUBLISHED_IMAGE_FINAL" } };
+          files.set(key, bytes);
           log.push(`upload ${bucket}`);
           return { data: { id: "obj" }, error: null };
         },
         remove: async (paths: string[]) => {
-          for (const p of paths) files.delete(`${bucket}|${p}`);
+          for (const p of paths) {
+            files.delete(`${bucket}|${p}`);
+            userOwned.delete(`${bucket}|${p}`);
+          }
           log.push(`remove ${bucket}`);
           return { error: null };
         },
@@ -104,7 +126,7 @@ function world(initial: Record<string, Uint8Array>, moderation: Record<string, a
       },
     }),
   };
-  return { files, rows, upserts, items, log, admin };
+  return { files, rows, upserts, items, log, admin, uploadOpts };
 }
 const safe = { safe: true, label: "ok", reason: null, categories: [], scanned: true, csam: false };
 const deps = (w: ReturnType<typeof world>, verdict: any = safe) => ({
@@ -206,7 +228,9 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
     const d = deps(w);
     await finalizeDirectImageUpload(d, input);
     // a moderation row exists before the rewrite, so the uploader's own writes are refused from then on (20261108120000)
-    expect(w.log.slice(0, 2)).toEqual(["moderation pending", "upload avatars"]);
+    // finding 3: the uploader's object is removed and the re-encode inserted fresh (no upsert), so the row has no end-user owner
+    expect(w.log.slice(0, 3)).toEqual(["moderation pending", "remove avatars", "upload avatars"]);
+    expect(w.uploadOpts.find((o) => o.bucket === "avatars")).toMatchObject({ upsert: false });
     expect(w.upserts[0]).toMatchObject({ status: "pending", reason: "Processing" });
     const stored = w.files.get(KEY)!;
     expect(contains(stored, payload)).toBe(false);
@@ -235,6 +259,105 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
       expect(w.rows.get(KEY).status).toBe("removed");
     },
   );
+
+  it("finding 3: rewrites an object the uploader owns (an upsert over it would be refused by the published-path trigger)", async () => {
+    const w = world({ [KEY]: jpeg({ gps: true }) }, {}, { userOwned: [KEY] });
+    const out = await finalizeDirectImageUpload(deps(w), input);
+    expect(out).toMatchObject({ quarantined: false, published: true });
+    expect(hasGps(w.files.get(KEY)!)).toBe(false);
+  });
+
+  it("finding 2: a flagged image whose quarantine copy fails is held privately, never left public, and not escalated at a public path", async () => {
+    const w = world(
+      { [KEY]: jpeg({ gps: true }) },
+      {},
+      { failUploadsTo: [IMAGE_QUARANTINE_BUCKET] },
+    );
+    const d = deps(w, { ...safe, safe: false, csam: true, categories: ["csam"] });
+    const out = await finalizeDirectImageUpload(d, input);
+    expect(out).toMatchObject({ ok: true, quarantined: true, published: false });
+    expect(w.files.has(KEY)).toBe(false); // the public path is gone
+    expect(w.items).toEqual([]);
+    const heldKey = [...w.files.keys()].find((k) => k.startsWith("image-staging|_held/"))!;
+    expect(heldKey).toMatch(/^image-staging\|_held\/legacy_direct_upload\/[0-9a-f-]{36}\.jpg$/);
+    expect(w.files.get(heldKey)).toEqual(jpeg({ gps: true })); // the original, as evidence
+    const heldPath = heldKey.slice("image-staging|".length);
+    // recorded for a retry into the quarantine
+    expect(w.rows.get(heldKey)).toMatchObject({
+      status: "quarantined",
+      scan: {
+        stage: "held_fallback",
+        held_from: { bucket: "avatars", path: PATH },
+        quarantine: { failed: true, retry: true },
+      },
+    });
+    expect(w.rows.get(KEY).scan.quarantine).toMatchObject({
+      failed: true,
+      held: { bucket: "image-staging", path: heldPath },
+    });
+    expect(d.escalate).toHaveBeenCalledTimes(1);
+    expect(d.escalate).toHaveBeenCalledWith("image-staging", heldPath, ["csam"]);
+    // off the public bucket before the escalation
+    expect(w.log.indexOf("remove avatars", 2)).toBeLessThan(w.log.indexOf("escalate"));
+  });
+
+  it("finding 2: when the private fallback fails too, the public object is still removed and only the hash is escalated", async () => {
+    const w = world(
+      { [KEY]: jpeg() },
+      {},
+      { failUploadsTo: [IMAGE_QUARANTINE_BUCKET, "image-staging"] },
+    );
+    const d = deps(w, { ...safe, safe: false, csam: true, categories: ["csam"] });
+    const out = await finalizeDirectImageUpload(d, input);
+    expect(out).toMatchObject({ quarantined: true, published: false });
+    expect(w.files.has(KEY)).toBe(false);
+    const sha = createHash("sha256").update(jpeg()).digest("hex");
+    expect(w.rows.get(KEY).scan.quarantine).toEqual({
+      failed: true,
+      unpreserved: true,
+      sha256: sha,
+    });
+    expect(d.escalate).toHaveBeenCalledWith("unpreserved", `sha256:${sha}`, ["csam"]);
+    for (const call of d.escalate.mock.calls as unknown as [string, string][])
+      expect(call[0]).not.toBe("avatars");
+  });
+
+  it("finding 1: a flag on the alpha-removed rendition quarantines the image; a failed scan of it fails closed", async () => {
+    const result = (bytes: Uint8Array) => ({
+      bytes,
+      mime: "image/jpeg" as const,
+      width: 100,
+      height: 80,
+      hasAlpha: true,
+      orientation: null,
+      convertedFromIcc: false,
+      lossless: false,
+      inputReport: { hasExif: false, hasGps: false, hasXmp: false, hasOther: false } as any,
+      alphaRemovedScanTarget: "data:image/jpeg;base64,AAAA",
+    });
+    const w = world({ [KEY]: jpeg() });
+    const d = deps(w);
+    d.reencode = async (b: Uint8Array) => result(b);
+    d.scan.mockImplementation(async (t: string) =>
+      t === "data:image/jpeg;base64,AAAA"
+        ? { ...safe, safe: false, csam: true, categories: ["csam"] }
+        : safe,
+    );
+    const out = await finalizeDirectImageUpload(d, input);
+    expect(d.scan).toHaveBeenCalledTimes(2);
+    expect(out).toMatchObject({ quarantined: true, published: false });
+    expect(w.files.has(KEY)).toBe(false);
+
+    const w2 = world({ [KEY]: jpeg() });
+    const d2 = deps(w2);
+    d2.reencode = async (b: Uint8Array) => result(b);
+    d2.scan.mockImplementation(async (t: string) => {
+      if (t.endsWith("AAAA")) throw new Error("gateway down");
+      return safe;
+    });
+    await expect(finalizeDirectImageUpload(d2, input)).rejects.toThrow(SCAN_UNAVAILABLE_REFUSAL);
+    expect(w2.files.has(KEY)).toBe(false);
+  });
 
   it("refuses another user's path and unknown buckets", async () => {
     const w = world({});

@@ -3,7 +3,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import { stripImageMetadata } from "./image-metadata";
-import { ImageReencodeError, REENCODE_MESSAGES, reencodeImage } from "./image-reencode.server";
+import {
+  ImageReencodeError,
+  REENCODE_MESSAGES,
+  quantiseHiddenColour,
+  reencodeImage,
+} from "./image-reencode.server";
 
 /**
  * SEC-6 / M2: every published picture is decoded and re-encoded. These tests pin that the output is a fresh file of the same
@@ -184,8 +189,9 @@ describe("reencodeImage: real pictures", () => {
     expect(out.hasAlpha).toBe(true);
     await expectNoMetadata(out.bytes);
     const a = await sharp(input).raw().toBuffer();
+    quantiseHiddenColour(a, 4); // colour under transparency is premultiplied and quantised (finding 1)
     const b = await sharp(out.bytes).raw().toBuffer();
-    expect(Buffer.compare(a, b)).toBe(0); // lossless, RGBA identical
+    expect(Buffer.compare(a, b)).toBe(0); // lossless: alpha identical, colour identical to the quantised input
   });
 
   it("a lossy WEBP with transparency stays WEBP, keeps alpha, keeps its size", async () => {
@@ -213,6 +219,7 @@ describe("reencodeImage: real pictures", () => {
     expect(out.lossless).toBe(true);
     expect(structure(out.bytes)).toEqual(["VP8L"]);
     const a = await sharp(input).raw().toBuffer();
+    quantiseHiddenColour(a, 4);
     const b = await sharp(out.bytes).raw().toBuffer();
     expect(Buffer.compare(a, b)).toBe(0);
   });
@@ -358,6 +365,89 @@ describe("reencodeImage: payloads hidden in data the byte stripper keeps never s
     const j = u8(await solid(96, 64, "#808080").jpeg().toBuffer());
     const out = await reencodeImage(cat(j, PAYLOAD));
     expect(contains(out.bytes, PAYLOAD)).toBe(false);
+  });
+});
+
+describe("reencodeImage: colour hidden under transparency (final review 780eaf8f, finding 1)", () => {
+  // A 64x64 RGBA picture: the left half is opaque (a visible grey ramp), the right half carries an RGB gradient (the hidden
+  // picture) at a low alpha. Composited, the right half is (nearly) invisible; with the alpha channel dropped it is all there.
+  const W = 64;
+  const H = 64;
+  const hidden = (alpha: number) => {
+    const px = Buffer.alloc(W * H * 4);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (x < W / 2) {
+          px[i] = px[i + 1] = px[i + 2] = (x * 7 + y) & 255;
+          px[i + 3] = 255;
+        } else {
+          px[i] = (x * 4) & 255;
+          px[i + 1] = (y * 4) & 255;
+          px[i + 2] = (x * y) & 255;
+          px[i + 3] = alpha;
+        }
+      }
+    return px;
+  };
+  const make = async (alpha: number, format: "png" | "webp") => {
+    const s = sharp(hidden(alpha), { raw: { width: W, height: H, channels: 4 } });
+    // exact: true makes the test encoder keep the hidden RGB, as a hostile uploader's encoder would.
+    return u8(
+      await (format === "png" ? s.png() : s.webp({ lossless: true, exact: true })).toBuffer(),
+    );
+  };
+
+  it.each([
+    [0, "png"],
+    [1, "png"],
+    [0, "webp"],
+    [1, "webp"],
+  ] as const)("alpha %i in a lossless %s", async (alpha, format) => {
+    const input = await make(alpha, format);
+    // precondition: the upload really carries the hidden gradient
+    const before = await sharp(input).raw().toBuffer();
+    expect(before[(5 * W + 40) * 4]).toBe(160);
+    const out = await reencodeImage(input);
+    expect(out.lossless).toBe(true);
+    const px = await sharp(out.bytes).ensureAlpha().raw().toBuffer();
+    expect(px.length).toBe(W * H * 4);
+    const original = hidden(alpha);
+    for (let i = 0; i < px.length; i += 4) {
+      const a = px[i + 3];
+      expect(a).toBe(original[i + 3]); // alpha itself is kept
+      if (a === 255) {
+        expect([px[i], px[i + 1], px[i + 2]]).toEqual([
+          original[i],
+          original[i + 1],
+          original[i + 2],
+        ]);
+      } else if (a === 0) {
+        expect([px[i], px[i + 1], px[i + 2]]).toEqual([0, 0, 0]);
+      } else {
+        for (let c = 0; c < 3; c++) expect([0, 255]).toContain(px[i + c]);
+      }
+    }
+  });
+
+  it("partially transparent pixels keep what compositing shows (premultiplied, then quantised)", async () => {
+    const px = Buffer.from([200, 100, 50, 128, 255, 255, 255, 2, 10, 20, 30, 255, 99, 99, 99, 0]);
+    const input = u8(
+      await sharp(px, { raw: { width: 2, height: 2, channels: 4 } })
+        .resize(64, 64, { kernel: "nearest" })
+        .png()
+        .toBuffer(),
+    );
+    const out = await sharp((await reencodeImage(input)).bytes)
+      .raw()
+      .toBuffer();
+    const at = (x: number, y: number) =>
+      Array.from(out.subarray((y * 64 + x) * 4, (y * 64 + x) * 4 + 4));
+    const q = (v: number, a: number) => Math.round((Math.round((v * a) / 255) * 255) / a);
+    expect(at(0, 0)).toEqual([q(200, 128), q(100, 128), q(50, 128), 128]);
+    expect(at(63, 0)).toEqual([255, 255, 255, 2]);
+    expect(at(0, 63)).toEqual([10, 20, 30, 255]);
+    expect(at(63, 63)).toEqual([0, 0, 0, 0]);
   });
 });
 

@@ -260,6 +260,35 @@ SELECT t.as_service();
 SELECT t.lives(format($q$SELECT pg_temp.storage_put('avatars', %L, %L, 'v1')$q$, t.id('bob') || '/fresh.jpg', t.id('bob')),
                'a signed-URL upload to a fresh path is unaffected (an insert, no conflict)');
 SELECT t.reset();
+
+-- ---- final review 780eaf8f, finding 3: the server's rewrite of an object the uploader created
+-- An older client's direct upload (alice is the row's owner); the server's legacy finalize claims the path first.
+INSERT INTO storage.objects (bucket_id, name, owner, owner_id, version) VALUES
+  ('avatars', t.id('alice') || '/legacy-2.jpg', t.id('alice'), t.id('alice')::text, 'v1');
+INSERT INTO public.image_moderation (bucket, path, owner_id, status, reason) VALUES
+  ('avatars', t.id('alice') || '/legacy-2.jpg', t.id('alice'), 'pending', 'Processing');
+SELECT t.as_service();
+SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, version, metadata) VALUES ('avatars', %L, 'v2', '{"size": 3}')
+                          ON CONFLICT (bucket_id, name) DO UPDATE SET version = EXCLUDED.version, metadata = EXCLUDED.metadata$q$,
+                       t.id('alice') || '/legacy-2.jpg'),
+                'PUBLISHED_IMAGE_FINAL',
+                'an UPSERT by the service role that does not set the owner columns is refused over a user-owned row (the row keeps the user as owner)');
+SELECT t.eq(t.changed(format($q$DELETE FROM storage.objects WHERE bucket_id = 'avatars' AND name = %L$q$, t.id('alice') || '/legacy-2.jpg')), 1,
+            'the server removes the user-owned object');
+SELECT t.reset();
+SELECT t.as_user(t.id('alice'));
+SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('avatars', %L, auth.uid())$q$, t.id('alice') || '/legacy-2.jpg'),
+                'PUBLISHED_IMAGE_FINAL', 'the uploader cannot slip new bytes in between (the path is claimed)');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT t.throws(format($q$SELECT pg_temp.storage_put('avatars', %L, %L, 'v1')$q$, t.id('alice') || '/legacy-2.jpg', t.id('alice')),
+                'PUBLISHED_IMAGE_FINAL', 'nor through a signed upload URL');
+SELECT t.lives(format($q$INSERT INTO storage.objects (bucket_id, name, version, metadata) VALUES ('avatars', %L, 'v2', '{"size": 3}')$q$,
+                      t.id('alice') || '/legacy-2.jpg'),
+               'and the service role inserts the re-encoded bytes fresh (delete, then insert)');
+SELECT t.reset();
+SELECT t.ok((SELECT owner IS NULL AND owner_id IS NULL FROM storage.objects WHERE bucket_id = 'avatars' AND name = t.id('alice') || '/legacy-2.jpg'),
+            'the published row has no end-user owner');
 SELECT t.as_anon();
 SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name) VALUES ('avatars', %L)$q$, t.id('alice') || '/anon.jpg'),
                 'row-level security', 'anonymous writes stay refused by row-level security');
@@ -269,6 +298,33 @@ SELECT t.ok((SELECT tgenabled <> 'D' FROM pg_trigger WHERE tgname = 'published_i
 SELECT t.ok((SELECT tgenabled <> 'D' FROM pg_trigger WHERE tgname = 'image_quarantine_guard' AND tgrelid = 'storage.objects'::regclass),
             'and so is the quarantine guard');
 SELECT t.ok(NOT has_function_privilege('anon', 'private_sec.image_path_processed(text, text)', 'EXECUTE'), 'anonymous cannot call the processed-path helper');
+
+-- ---- final review 780eaf8f, finding 5a: a flagged staging path cannot be refilled
+-- alice's staged upload was flagged; its original went to the quarantine and the staged copy was removed (only the row is left).
+INSERT INTO public.image_moderation (bucket, path, owner_id, status, reason) VALUES
+  ('image-staging', t.id('alice') || '/flagged.jpg', t.id('alice'), 'quarantined', 'flagged');
+SELECT t.as_user(t.id('alice'));
+SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', %L, auth.uid())$q$, t.id('alice') || '/flagged.jpg'),
+                'STAGED_IMAGE_FLAGGED', 'the uploader cannot put new bytes at a flagged staging path');
+SELECT t.lives(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', %L, auth.uid())$q$, t.id('alice') || '/next.jpg'),
+               'a new staged upload in their own folder still works');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT t.throws(format($q$SELECT pg_temp.storage_put('image-staging', %L, %L, 'v1')$q$, t.id('alice') || '/flagged.jpg', t.id('alice')),
+                'STAGED_IMAGE_FLAGGED', 'nor through a signed upload URL (Storage writes as the service role with alice as owner)');
+SELECT t.lives($q$SELECT pg_temp.storage_put('image-staging', '_held/legacy_direct_upload/h1.jpg', NULL, 'v1')$q$,
+               'the service key still writes its own private paths (the held fallback)');
+SELECT t.reset();
+-- two layers: with the trigger off, the RESTRICTIVE policy alone refuses the API write
+ALTER TABLE storage.objects DISABLE TRIGGER image_staging_refuse_flagged_insert;
+SELECT t.as_user(t.id('alice'));
+SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', %L, auth.uid())$q$, t.id('alice') || '/flagged.jpg'),
+                'row-level security', 'layer 2: without the trigger, row-level security alone refuses the refill');
+SELECT t.reset();
+ALTER TABLE storage.objects ENABLE TRIGGER image_staging_refuse_flagged_insert;
+SELECT t.ok(EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+                     AND policyname = 'image_staging_no_insert_flagged' AND permissive = 'RESTRICTIVE' AND cmd = 'INSERT'),
+            'the refill policy is RESTRICTIVE, for INSERT');
 SELECT t.ok(NOT has_function_privilege('authenticated', 'private_sec.image_quarantine_deletable(text)', 'EXECUTE'),
             'API users cannot call the deletable helper');
 ROLLBACK;

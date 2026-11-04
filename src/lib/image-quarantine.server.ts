@@ -83,6 +83,81 @@ export async function quarantineOriginal(
   return { bucket: IMAGE_QUARANTINE_BUCKET, path, itemId: String(data.id) };
 }
 
+/** Private fallback for a flagged original whose quarantine copy failed (final review 780eaf8f, finding 2). */
+export const HELD_FALLBACK_BUCKET = "image-staging";
+export const HELD_FALLBACK_PREFIX = "_held/";
+
+/** A path in the private held fallback: never swept, never purged, never exported, never writable by a user. */
+export function isHeldFallbackPath(path: string): boolean {
+  return path.startsWith(HELD_FALLBACK_PREFIX);
+}
+
+export type HeldFallbackRef = { bucket: string; path: string; sha256: string; recorded: boolean };
+
+/**
+ * Last resort when quarantineOriginal failed for an original that sits in a PUBLIC bucket: write it, with the service key, to
+ * `image-staging/_held/{source}/{uuid}.{ext}` (private; users can only write `{their id}/...`), and record it as a quarantined
+ * staging row that marks it for a retry into the quarantine. The sweeper and the account purge skip `_held/`. Throws when the
+ * copy itself fails; a failed record is reported (`recorded: false`) but the private copy is kept.
+ */
+export async function holdOriginalPrivately(
+  admin: any,
+  input: QuarantineInput,
+): Promise<HeldFallbackRef> {
+  const ext = EXT[input.mime];
+  if (!ext) throw new Error("Only pictures are held");
+  const path = `${HELD_FALLBACK_PREFIX}${input.source}/${crypto.randomUUID()}.${ext}`;
+  const sha256 = await sha256Hex(input.bytes);
+  const { error: upErr } = await admin.storage
+    .from(HELD_FALLBACK_BUCKET)
+    .upload(path, input.bytes, { contentType: input.mime, upsert: false });
+  if (upErr) throw new Error(`Held copy failed: ${upErr.message ?? upErr}`);
+  let recorded = false;
+  try {
+    const { error } = await admin.from("image_moderation").upsert(
+      {
+        bucket: HELD_FALLBACK_BUCKET,
+        path,
+        owner_id: input.uploaderId,
+        mime: input.mime,
+        bytes: input.bytes.byteLength,
+        status: "quarantined",
+        reason: input.reason,
+        quarantined_at: new Date().toISOString(),
+        scan: {
+          stage: "held_fallback",
+          categories: input.categories,
+          csam: input.suspectedCsam,
+          sha256,
+          held_from: { bucket: input.sourceBucket, path: input.sourcePath },
+          quarantine: { failed: true, retry: true },
+        },
+      },
+      { onConflict: "bucket,path" },
+    );
+    recorded = !error;
+  } catch {
+    recorded = false;
+  }
+  return { bucket: HELD_FALLBACK_BUCKET, path, sha256, recorded };
+}
+
+/**
+ * Must this staged path be kept as evidence? Only when it is genuinely held (finding 5a): the held fallback, or a staging row the
+ * scan quarantined whose original was NOT confirmed copied to the quarantine (the copy failed, or the row predates SEC-6).
+ * A quarantined row whose copy exists in image-quarantine is not evidence any more (the quarantine holds the original).
+ */
+export function isGenuinelyHeldStagingRow(row: {
+  path: string;
+  status: string;
+  scan?: { quarantine?: { failed?: boolean; path?: string } | null } | null;
+}): boolean {
+  if (isHeldFallbackPath(row.path)) return true;
+  if (row.status !== "quarantined") return false;
+  const q = row.scan?.quarantine;
+  return !q || q.failed === true || !q.path;
+}
+
 export const REVIEW_URL_SECONDS = 60;
 
 /**

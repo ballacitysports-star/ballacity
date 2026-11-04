@@ -53,9 +53,34 @@ export const REENCODE_SETTINGS = {
     optimiseCoding: true,
   },
   png: { compressionLevel: 9, adaptiveFiltering: true, palette: false },
-  webpLossy: { quality: 85, alphaQuality: 100, effort: 4, smartSubsample: true },
-  webpLossless: { lossless: true, effort: 4 },
+  // `exact` is set explicitly (finding 1). Lossy: false, libwebp may rewrite the colour under transparent pixels for compression
+  // (the input there is already quantised, see quantiseHiddenColour). Lossless: true, so the published colour is exactly the
+  // quantised colour; with false, libwebp fills fully transparent pixels with colour predicted from their neighbours instead of
+  // the zero quantiseHiddenColour wrote (not upload data, but not verifiably zero either; measured in the tests).
+  webpLossy: { quality: 85, alphaQuality: 100, effort: 4, smartSubsample: true, exact: false },
+  webpLossless: { lossless: true, effort: 4, exact: true },
 } as const;
+
+/**
+ * Remove colour that transparency hides (final review 780eaf8f, finding 1). A lossless encoder keeps the RGB of a pixel whose alpha
+ * is 0 or 1 exactly, so a second picture can ride in the colour values of transparent pixels: invisible once composited (which is
+ * what the safety scanner sees), recoverable by anyone who drops the alpha channel. Each pixel's colour is premultiplied by its
+ * alpha and quantised back, keeping only what compositing can show:
+ *   rgb = a ? round(round(rgb * a / 255) * 255 / a) : 0
+ * alpha 0 becomes black, alpha 1 keeps one bit per channel (0 or 255), alpha 255 is unchanged. Operates in place on interleaved
+ * 8-bit pixels whose last channel is alpha (2 = grey+alpha, 4 = RGBA); any other layout has no alpha and is left alone.
+ */
+export function quantiseHiddenColour(data: Uint8Array, channels: number): void {
+  if (channels !== 2 && channels !== 4) return;
+  const colour = channels - 1;
+  for (let i = 0; i < data.length; i += channels) {
+    const a = data[i + colour];
+    if (a === 255) continue;
+    for (let c = 0; c < colour; c += 1) {
+      data[i + c] = a === 0 ? 0 : Math.round((Math.round((data[i + c] * a) / 255) * 255) / a);
+    }
+  }
+}
 
 export type ReencodeErrorCode =
   "unsupported" | "animated" | "too_large" | "unreadable" | "unavailable";
@@ -92,7 +117,28 @@ export type ReencodeResult = {
   lossless: boolean;
   /** What the byte inspector found in the upload (for the moderation record: counts and flags only). */
   inputReport: MetadataReport;
+  /**
+   * SCAN ONLY, never published or stored. Present when the picture has partially transparent pixels (0 < alpha < 255): the
+   * published colour with the alpha channel dropped, as a JPEG data URL of at most SCAN_RENDITION_MAX_SIDE px per side. After
+   * quantiseHiddenColour, a pixel at low alpha still keeps a posterised colour (alpha 16: about 4 bits per channel), which is
+   * nearly invisible when composited (what the scanner sees of `bytes`) but a recognisable picture to anyone who drops the
+   * alpha. Callers scan this too and treat a flag (or a failed scan) on it like one on `bytes`.
+   */
+  alphaRemovedScanTarget: string | null;
 };
+
+/** Longest side of the alpha-removed scan rendition (scanners downscale far below this). */
+export const SCAN_RENDITION_MAX_SIDE = 2048;
+
+/** Any pixel whose alpha is neither 0 (colour already zeroed) nor 255 (fully visible)? */
+function hasPartialAlpha(data: Uint8Array, channels: number): boolean {
+  if (channels !== 2 && channels !== 4) return false;
+  for (let i = channels - 1; i < data.length; i += channels) {
+    const a = data[i];
+    if (a !== 0 && a !== 255) return true;
+  }
+  return false;
+}
 
 export type ReencodeOptions = {
   /** Test seam: how sharp is loaded. Defaults to a lazy server-only import. */
@@ -205,6 +251,7 @@ export async function reencodeImage(
 
   const lossless = format === "png" || (format === "webp" && isLosslessWebp(decodable));
   let out: Buffer;
+  let alphaRemovedScanTarget: string | null = null;
   try {
     // Decode to raw 8-bit sRGB pixels: autoOrient() applies the orientation, toColourspace('srgb') converts through the embedded
     // profile (when there is one). The new file is then encoded from those pixels alone, so NOTHING else from the upload can reach
@@ -216,6 +263,8 @@ export async function reencodeImage(
       .raw({ depth: "uchar" })
       .toBuffer({ resolveWithObject: true });
     const { width, height, channels } = decoded.info;
+    // Before any encoder sees them: colour under (near-)transparent pixels is reduced to what compositing shows.
+    quantiseHiddenColour(decoded.data, channels);
     const pipeline = sharp(decoded.data, {
       raw: { width, height, channels: channels as 1 | 2 | 3 | 4 },
       limitInputPixels: maxPixels,
@@ -226,6 +275,21 @@ export async function reencodeImage(
       out = await pipeline
         .webp(lossless ? { ...REENCODE_SETTINGS.webpLossless } : { ...REENCODE_SETTINGS.webpLossy })
         .toBuffer();
+    if (hasPartialAlpha(decoded.data, channels)) {
+      // The quantised colour (what is published) with the alpha channel dropped: what a viewer sees after removing transparency.
+      const rendition = await sharp(decoded.data, {
+        raw: { width, height, channels: channels as 1 | 2 | 3 | 4 },
+        limitInputPixels: maxPixels,
+      })
+        .removeAlpha()
+        .resize(SCAN_RENDITION_MAX_SIDE, SCAN_RENDITION_MAX_SIDE, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      alphaRemovedScanTarget = `data:image/jpeg;base64,${rendition.toString("base64")}`;
+    }
   } catch (e) {
     const message = String((e as Error)?.message ?? e);
     throw new ImageReencodeError(
@@ -271,5 +335,6 @@ export async function reencodeImage(
     convertedFromIcc: !!meta.icc,
     lossless,
     inputReport: structural.report,
+    alphaRemovedScanTarget,
   };
 }

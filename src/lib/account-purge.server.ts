@@ -1,13 +1,13 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isMissingRelationError, managedChildErrorMessage } from "@/lib/managed-children";
 
-// Every bucket that stores user-uploaded media under a `<user id>/` prefix.
+// Every bucket that stores user-uploaded media under a `<user id>/` prefix. Chat attachments are not among them: they live at
+// `{conversation id}/{sender id}/{file}` (src/lib/messages.ts) and are found through the database instead (purgeChatAttachments).
 const MEDIA_BUCKETS = [
   "avatars",
   "covers",
   "game-covers",
   "highlight-videos",
-  "message-attachments",
   "payment-proofs",
   "team-covers",
   "team-avatars",
@@ -53,6 +53,105 @@ async function assertNoManagedChildren(userId: string): Promise<void> {
   }
 }
 
+const ATTACHMENT_BUCKET = "message-attachments";
+const PAGE = 1000;
+const REMOVE_BATCH = 500;
+
+/** Every row of a query, page by page (PostgREST returns at most one page per request). */
+async function selectAll<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ rows: T[]; error: unknown }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await query(from, from + PAGE - 1);
+    if (error) return { rows, error };
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) return { rows, error: null };
+  }
+}
+
+/** Every file directly inside `prefix/` of a bucket. Storage lists at most `limit` entries per call, so this pages. */
+async function listAllFiles(bucket: string, prefix: string): Promise<string[]> {
+  const out: string[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .list(prefix, { limit: PAGE, offset });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as { name?: string; id?: string | null }[];
+    // A folder entry has id null; remove() takes object names only.
+    for (const f of rows) if (f.name && f.id !== null) out.push(`${prefix}/${f.name}`);
+    if (rows.length < PAGE) return out;
+  }
+}
+
+async function removeAll(bucket: string, paths: string[]): Promise<void> {
+  for (let i = 0; i < paths.length; i += REMOVE_BATCH) {
+    const { error } = await supabaseAdmin.storage
+      .from(bucket)
+      .remove(paths.slice(i, i + REMOVE_BATCH));
+    if (error) throw new Error(error.message);
+  }
+}
+
+/**
+ * The account's chat attachments (final review 780eaf8f, finding 4). They sit under the CONVERSATION's folder
+ * (`{conversation}/{sender}/{file}`), so a listing of `{user id}/` never finds them; the paths come from the sender's messages and
+ * from the attachment checks the server recorded for them. Run before the messages are scrubbed (which clears attachment_path).
+ * A path with a quarantine record is kept: it is evidence (docs/privacy/sec6-image-reencode-quarantine.md). Throws on any
+ * lookup or removal error, before anything else is erased, so the purge can be retried.
+ */
+async function purgeChatAttachments(userId: string): Promise<void> {
+  const fromMessages = await selectAll<{ attachment_path: string | null }>(
+    (from, to) =>
+      supabaseAdmin
+        .from("messages")
+        .select("attachment_path")
+        .eq("sender_id", userId)
+        .not("attachment_path", "is", null)
+        .order("id")
+        .range(from, to) as never,
+  );
+  const fromChecks = await selectAll<{ path: string }>(
+    (from, to) =>
+      supabaseAdmin
+        .from("message_attachment_checks" as never)
+        .select("path")
+        .eq("user_id", userId)
+        .order("path")
+        .range(from, to) as never,
+  );
+  const evidence = await selectAll<{ source_path: string }>(
+    (from, to) =>
+      supabaseAdmin
+        .from("image_quarantine_items" as never)
+        .select("source_path")
+        .eq("source_bucket", ATTACHMENT_BUCKET)
+        .eq("uploader_id", userId)
+        .order("id")
+        .range(from, to) as never,
+  );
+  for (const r of [fromMessages, fromChecks, evidence]) {
+    if (r.error && !isMissingRelationError(r.error as never)) {
+      throw new Error(
+        "Could not look up chat attachments; the account was not deleted. Try again.",
+      );
+    }
+  }
+  const keep = new Set(evidence.rows.map((r) => r.source_path));
+  const paths = [
+    ...new Set([
+      ...fromMessages.rows.map((r) => r.attachment_path),
+      ...fromChecks.rows.map((r) => r.path),
+    ]),
+  ].filter((p): p is string => !!p && !keep.has(p));
+  try {
+    await removeAll(ATTACHMENT_BUCKET, paths);
+  } catch {
+    throw new Error("Could not remove chat attachments; the account was not deleted. Try again.");
+  }
+}
+
 /**
  * Permanently delete one account and everything it owns.
  *
@@ -76,6 +175,9 @@ async function assertNoManagedChildren(userId: string): Promise<void> {
 export async function purgeUserAccount(userId: string): Promise<void> {
   // 0. Nothing below can be undone, so rule out a refused delete first.
   await assertNoManagedChildren(userId);
+
+  // Chat attachments first: the scrub below clears messages.attachment_path, the only pointer to most of them.
+  await purgeChatAttachments(userId);
 
   // 1. Anonymize profile PII before removal.
   await supabaseAdmin
@@ -132,11 +234,8 @@ export async function purgeUserAccount(userId: string): Promise<void> {
   // 2. Delete uploaded media owned by this user.
   for (const bucket of MEDIA_BUCKETS) {
     try {
-      const { data: files } = await supabaseAdmin.storage.from(bucket).list(userId, {
-        limit: 1000,
-      });
-      const paths = (files ?? []).filter((f) => !!f.name).map((f) => `${userId}/${f.name}`);
-      if (paths.length > 0) await supabaseAdmin.storage.from(bucket).remove(paths);
+      // Paged: a single list() stops at 1000 files.
+      await removeAll(bucket, await listAllFiles(bucket, userId));
     } catch {
       // Bucket may not exist in every environment — deletion must still proceed.
     }

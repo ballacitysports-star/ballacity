@@ -20,9 +20,17 @@ vi.mock("@/integrations/supabase/client.server", () => {
   return {
     supabaseAdmin: {
       from: (table: string) => ({
-        select: () => ({
-          eq: async () => state.counts[table] ?? { count: 0, error: null },
-        }),
+        select: () => {
+          // count checks await `.eq()`; the attachment lookups page with `.not().order().range()`
+          const c: Record<string, unknown> = {};
+          c.eq = () => c;
+          c.not = () => c;
+          c.order = () => c;
+          c.range = async () => ({ data: [], error: null });
+          c.then = (resolve: (r: unknown) => unknown) =>
+            resolve(state.counts[table] ?? { count: 0, error: null });
+          return c;
+        },
         update: () => writeChain(`${table}.update`),
         delete: () => writeChain(`${table}.delete`),
       }),

@@ -30,11 +30,15 @@
 --   6. A trigger on the published image buckets: once the server has processed a path (it has an image_moderation row: published,
 --      quarantined or removed), only a trusted writer may write at that path again. A user's own API write, and Storage's write for
 --      a user's signed upload URL, are refused. Unprocessed legacy uploads (no moderation row) keep working until phase 2.
+--      A trusted writer's UPSERT over a row a user created is refused too (the conflicting row keeps the user as owner), so the
+--      server removes such an object and inserts a fresh one (final review 780eaf8f, finding 3).
+--   7. A flagged staging path cannot be refilled: a RESTRICTIVE INSERT policy and a trigger for Storage's own writes (finding 5a).
 --
 -- DEPENDS ON 20261106120000 (private_sec.storage_write_is_trusted) and image_moderation. Additive; the app deploys after it (the
 -- server writes quarantine rows; without this migration a flagged upload keeps its original where it is and fails closed).
--- ROLLBACK: DROP TRIGGER image_quarantine_guard, published_image_refuse_user_write ON storage.objects; drop the functions, the two
--- tables, the policy "image_quarantine_no_api_access", and (only once it is empty and no hold applies) the bucket.
+-- ROLLBACK: DROP TRIGGER image_quarantine_guard, published_image_refuse_user_write, image_staging_refuse_flagged_insert ON
+-- storage.objects; drop the functions, the two tables, the policies "image_quarantine_no_api_access" and
+-- "image_staging_no_insert_flagged", and (only once it is empty and no hold applies) the bucket.
 DO $guard$
 BEGIN
   IF to_regclass('storage.objects') IS NULL OR to_regclass('storage.buckets') IS NULL THEN
@@ -409,11 +413,52 @@ DROP TRIGGER IF EXISTS published_image_refuse_user_write ON storage.objects;
 CREATE TRIGGER published_image_refuse_user_write BEFORE INSERT OR UPDATE ON storage.objects
   FOR EACH ROW EXECUTE FUNCTION private_sec.published_image_refuse_user_write();
 
+-- 7. Final review (780eaf8f), finding 5a: a flagged staging path cannot be refilled. #268's own-folder INSERT policy does not look at
+--    image_staging_flagged, so after a flagged staged file was removed (its original copied to the quarantine) the uploader could
+--    put new bytes at the same path, which the sweeper and the purge would then have kept as "evidence". Two layers, as above:
+--    a RESTRICTIVE policy for API writes, and a trigger for the insert Storage performs itself for a user's signed upload URL
+--    (service role, signer stamped as owner; RLS never sees it). Writes by the service key itself (no end-user owner) stay
+--    allowed: the server writes `_scan/` and `_held/` paths, never a user's flagged one.
+DROP POLICY IF EXISTS "image_staging_no_insert_flagged" ON storage.objects;
+CREATE POLICY "image_staging_no_insert_flagged" ON storage.objects AS RESTRICTIVE FOR INSERT TO authenticated
+  WITH CHECK (bucket_id IS DISTINCT FROM 'image-staging' OR NOT private_sec.image_staging_flagged(name));
+
+CREATE OR REPLACE FUNCTION private_sec.image_staging_refuse_flagged_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF NEW.bucket_id IS DISTINCT FROM 'image-staging' THEN
+    RETURN NEW;
+  END IF;
+  -- An anonymous request has no write policy on staging; row-level security refuses it.
+  IF current_user = 'anon' OR private_sec.storage_write_is_trusted(NEW.owner, NEW.owner_id) THEN
+    RETURN NEW;
+  END IF;
+  -- An object still at the path: this insert either fails on the unique key or, as an upsert, becomes an UPDATE that
+  -- image_staging_refuse_overwrite (20261106120000) refuses with its own error. Only a refill of an emptied path is decided here.
+  IF EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id = 'image-staging' AND o.name = NEW.name) THEN
+    RETURN NEW;
+  END IF;
+  IF private_sec.image_staging_flagged(NEW.name) THEN
+    RAISE EXCEPTION 'STAGED_IMAGE_FLAGGED: this upload path was flagged and cannot be used again. Upload a new picture instead.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END
+$function$;
+REVOKE ALL ON FUNCTION private_sec.image_staging_refuse_flagged_insert() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS image_staging_refuse_flagged_insert ON storage.objects;
+CREATE TRIGGER image_staging_refuse_flagged_insert BEFORE INSERT ON storage.objects
+  FOR EACH ROW EXECUTE FUNCTION private_sec.image_staging_refuse_flagged_insert();
+
 DO $grant$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN
     GRANT EXECUTE ON FUNCTION private_sec.image_quarantine_deletable(text) TO supabase_storage_admin;
     GRANT EXECUTE ON FUNCTION private_sec.image_path_processed(text, text) TO supabase_storage_admin;
+    GRANT EXECUTE ON FUNCTION private_sec.image_staging_flagged(text) TO supabase_storage_admin;
   END IF;
 END
 $grant$;

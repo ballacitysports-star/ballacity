@@ -13,6 +13,7 @@ import {
   type PromotionDeps,
 } from "./image-promotion.server";
 import { IMAGE_STAGING_BUCKET, isOwnFilePath } from "./image-staging";
+import { sniffImageMime as sniff } from "./image-validation";
 
 const enc = new TextEncoder();
 const cat = (...p: Uint8Array[]) => {
@@ -303,7 +304,7 @@ describe("promoteStagedImage", () => {
     expect(out.quarantined).toBe(false);
     expect(scannedBytes).not.toBeNull();
     expect(scannedBytes!.byteLength).toBeGreaterThan(4 * 1024 * 1024);
-    expect(hasText(scannedBytes!, "GPS")).toBe(false);
+    expect(hasText(scannedBytes!, "tEXtGPS 1,2")).toBe(false);
     // what was scanned is exactly what was published
     expect(w.files.get(`avatars|${target}`)).toBe(scannedBytes);
     // the scratch copy is gone
@@ -459,6 +460,139 @@ const animatedWebp = () => {
   return cat(enc.encode("RIFF"), le32(4 + body.length), enc.encode("WEBP"), body);
 };
 
+describe("promoteStagedImage: final review 780eaf8f", () => {
+  /** Records moderation upserts and storage upload options into the world's log. */
+  const traced = (w: ReturnType<typeof world>, userOwned: string[] = []) => {
+    const owned = new Set(userOwned);
+    const uploads: any[] = [];
+    const from = w.admin.from;
+    w.admin.from = ((t: string) => {
+      const q = from(t);
+      const upsert = q.upsert;
+      q.upsert = async (row: any) => {
+        w.log.push(`moderation ${row.bucket} ${row.status}`);
+        return upsert(row);
+      };
+      return q;
+    }) as any;
+    const storage = w.admin.storage.from;
+    w.admin.storage.from = ((bucket: string) => {
+      const b = storage(bucket);
+      const upload = b.upload;
+      const remove = b.remove;
+      b.upload = async (path: string, bytes: Uint8Array, o: any = {}) => {
+        const key = `${bucket}|${path}`;
+        uploads.push({ bucket, path, ...o });
+        if (w.files.has(key) && !o.upsert) return { error: { message: "Duplicate" } };
+        // real Storage's upsert keeps the uploader as owner: the published-path trigger refuses it (supabase/tests/520)
+        if (w.files.has(key) && owned.has(key))
+          return { error: { message: "PUBLISHED_IMAGE_FINAL" } };
+        return upload(path, bytes);
+      };
+      b.remove = async (paths: string[]) => {
+        for (const p of paths) owned.delete(`${bucket}|${p}`);
+        return remove(paths);
+      };
+      return b;
+    }) as any;
+    return uploads;
+  };
+
+  it("5c: claims the destination (pending moderation row) before it writes there, then removes and inserts without upsert", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const uploads = traced(w);
+    await promoteStagedImage(deps(w), input);
+    const at = (l: string) => w.log.indexOf(l);
+    expect(at("moderation avatars pending")).toBeGreaterThanOrEqual(0);
+    expect(at("moderation avatars pending")).toBeLessThan(at("remove avatars"));
+    expect(at("remove avatars")).toBeLessThan(at("upload avatars"));
+    expect(uploads.find((u) => u.bucket === "avatars")).toMatchObject({
+      path: TARGET,
+      upsert: false,
+    });
+  });
+
+  it("3: publishes over an object a legacy client wrote at the destination (an upsert would keep the uploader as owner)", async () => {
+    const legacy = `avatars|${TARGET}`;
+    const w = world({
+      [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }),
+      [legacy]: enc.encode("legacy"),
+    });
+    traced(w, [legacy]);
+    const out = await promoteStagedImage(deps(w), input);
+    expect(out.quarantined).toBe(false);
+    const published = w.files.get(legacy)!;
+    expect(sniff(published)).toBe("image/jpeg");
+    expect(hasText(published, "GPS")).toBe(false);
+  });
+
+  it("1: an image with partially transparent pixels is also scanned with its alpha removed; a flag there quarantines it", async () => {
+    // 64x64 RGBA: an opaque left half, a hidden gradient at alpha 16 on the right
+    const px = Buffer.alloc(64 * 64 * 4);
+    for (let i = 0; i < 64 * 64; i++) {
+      const x = i % 64;
+      px.set(x < 32 ? [90, 90, 90, 255] : [(x * 4) & 255, (i >> 4) & 255, 200, 16], i * 4);
+    }
+    const png = u8(
+      await sharp(px, { raw: { width: 64, height: 64, channels: 4 } })
+        .png()
+        .toBuffer(),
+    );
+    const stage = `${USER}/stage-a.png`;
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: png });
+    const d = deps(w);
+    d.scan.mockImplementation(async (t: string) =>
+      t.startsWith("data:image/jpeg")
+        ? { ...safe, safe: false, label: "x", csam: true, categories: ["c"] }
+        : safe,
+    );
+    const out = await promoteStagedImage(d, {
+      ...input,
+      stagingPath: stage,
+      targetPath: `${USER}/final-a.png`,
+    });
+    expect(d.scan).toHaveBeenCalledTimes(2);
+    expect((d.scan.mock.calls[0][0] as string).startsWith("data:image/png")).toBe(true);
+    // the rendition shows the hidden half at full contrast (alpha dropped), not the composited near-transparent one
+    const rendition = Buffer.from((d.scan.mock.calls[1][0] as string).split(",")[1], "base64");
+    const r = await sharp(rendition).raw().toBuffer({ resolveWithObject: true });
+    expect(r.info.channels).toBe(3);
+    expect(r.data[(10 * 64 + 60) * 3 + 2]).toBeGreaterThan(150);
+    expect(out.quarantined).toBe(true);
+    expect(w.files.has(`avatars|${USER}/final-a.png`)).toBe(false);
+  });
+
+  it("1: a rendition scan that cannot run holds the upload (fail closed)", async () => {
+    const px = Buffer.alloc(64 * 64 * 4, 128); // alpha 128 everywhere
+    const png = u8(
+      await sharp(px, { raw: { width: 64, height: 64, channels: 4 } })
+        .png()
+        .toBuffer(),
+    );
+    const stage = `${USER}/stage-b.png`;
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: png });
+    const d = deps(w);
+    d.scan.mockImplementation(async (t: string) =>
+      t.startsWith("data:image/jpeg") ? { ...safe, scanned: false } : safe,
+    );
+    const out = await promoteStagedImage(d, {
+      ...input,
+      stagingPath: stage,
+      targetPath: `${USER}/final-b.png`,
+    });
+    expect(out.held).toBe(true);
+    expect(w.files.has(`avatars|${USER}/final-b.png`)).toBe(false);
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${stage}`)).toBe(true);
+  });
+
+  it("1: an opaque image is scanned once", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const d = deps(w);
+    await promoteStagedImage(d, input);
+    expect(d.scan).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("promoteStagedImage: still images only, and the cleaned bytes are validated", () => {
   it.each([
     ["an animated PNG (APNG)", "png", apng],
@@ -528,6 +662,7 @@ describe("promoteStagedImage: still images only, and the cleaned bytes are valid
           orientation: null,
           animated: false,
         },
+        alphaRemovedScanTarget: null,
       });
       await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
       expect(d.scan).not.toHaveBeenCalled();
@@ -616,6 +751,8 @@ describe("sweepImageStaging", () => {
   const listing = (
     items: Record<string, { name: string; id: string | null; created_at: string | null }[]>,
     flaggedPaths: string[] = [],
+    rowsFor: Record<string, any> = {},
+    lookupError = false,
   ) => {
     const removed: string[] = [];
     const deletedRows: string[] = [];
@@ -639,11 +776,20 @@ describe("sweepImageStaging", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            in: async (_c: string, paths: string[]) => ({
-              data: paths
-                .filter((p) => flaggedPaths.includes(p))
-                .map((path) => ({ path, status: "quarantined" })),
-            }),
+            in: async (_c: string, paths: string[]) =>
+              lookupError
+                ? { data: null, error: { message: "db down" } }
+                : {
+                    data: [
+                      ...paths
+                        .filter((p) => flaggedPaths.includes(p))
+                        .map((path) => ({ path, status: "quarantined" })),
+                      ...paths
+                        .filter((p) => rowsFor[p])
+                        .map((path) => ({ path, ...rowsFor[path] })),
+                    ],
+                    error: null,
+                  },
           }),
         }),
         delete: () => ({
@@ -678,6 +824,33 @@ describe("sweepImageStaging", () => {
   });
   it("never removes a quarantined file (possible child-safety evidence)", async () => {
     const { admin, removed } = listing({ u1: [old] }, ["u1/a.jpg"]);
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
+    expect(removed).toEqual([]);
+    expect(r.keptFlagged).toBe(1);
+  });
+  it("5a: protects a flagged file only while it is genuinely held (its quarantine copy failed or was never made)", async () => {
+    const copied = { name: "c.jpg", id: "o-c", created_at: "2026-11-03T00:00:00Z" };
+    const failed = { name: "d.jpg", id: "o-d", created_at: "2026-11-03T00:00:00Z" };
+    const { admin, removed } = listing({ u1: [copied, failed] }, [], {
+      "u1/c.jpg": {
+        status: "quarantined",
+        scan: {
+          quarantine: { bucket: IMAGE_QUARANTINE_BUCKET, path: "image_upload/x.jpg", item_id: "i" },
+        },
+      },
+      "u1/d.jpg": { status: "quarantined", scan: { quarantine: { failed: true } } },
+    });
+    const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
+    expect(removed).toEqual(["u1/c.jpg"]); // the quarantine holds that original
+    expect(r.keptFlagged).toBe(1);
+  });
+  it("5a/2: never sweeps the private held fallback (_held/)", async () => {
+    const { admin, removed } = listing({ _held: [old] });
+    await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
+    expect(removed).toEqual([]);
+  });
+  it("keeps everything when the moderation state cannot be read", async () => {
+    const { admin, removed } = listing({ u1: [old] }, [], {}, true);
     const r = await sweepImageStaging(admin, { olderThanMs: 1000, now: NOW });
     expect(removed).toEqual([]);
     expect(r.keptFlagged).toBe(1);

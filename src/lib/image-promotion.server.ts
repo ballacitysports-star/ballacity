@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
 import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
-import { quarantineOriginal, type QuarantineRef } from "@/lib/image-quarantine.server";
+import {
+  isGenuinelyHeldStagingRow,
+  isHeldFallbackPath,
+  quarantineOriginal,
+  type QuarantineRef,
+} from "@/lib/image-quarantine.server";
 import {
   ImageReencodeError,
   REENCODE_MESSAGES,
@@ -266,6 +271,16 @@ export async function promoteStagedImage(
       if (scratchPath) await admin.storage.from(IMAGE_STAGING_BUCKET).remove([scratchPath]);
     }
   }
+  // Colour kept under partially transparent pixels is scanned with the alpha dropped too (final review 780eaf8f, finding 1):
+  // a flag there counts like a flag on the picture, and a scan that cannot run holds the upload.
+  if (verdict?.safe && encoded.alphaRemovedScanTarget) {
+    try {
+      const v = await scan(encoded.alphaRemovedScanTarget, userId);
+      verdict = !v.safe ? v : v.scanned ? verdict : null;
+    } catch {
+      verdict = null;
+    }
+  }
 
   const meta = {
     stripped: true,
@@ -379,12 +394,8 @@ export async function promoteStagedImage(
   if (priorTarget && (priorTarget.status === "quarantined" || priorTarget.status === "removed")) {
     throw new Error("This image was flagged by our automated safety check and is pending review.");
   }
-  const { error: upErr } = await admin.storage.from(bucket).upload(targetPath, clean, {
-    contentType: mime as string,
-    upsert: true,
-    cacheControl: "31536000",
-  });
-  if (upErr) throw new Error(`Could not publish the image: ${upErr.message}`);
+  // Claim the destination before anything is written there (final review 780eaf8f, finding 5c): from the moment this row exists,
+  // published_image_refuse_user_write refuses every user write at the path, a signed upload URL included.
   const { error: modErr } = await admin.from("image_moderation").upsert(
     {
       bucket,
@@ -397,6 +408,17 @@ export async function promoteStagedImage(
     { onConflict: "bucket,path" },
   );
   if (modErr) throw new Error(modErr.message);
+  // Remove, then insert without upsert (finding 3). A legacy client may already have an object of its own at this path; an upsert
+  // over it would keep the uploader as the row's owner, so the published-path trigger would refuse the server's own write. A fresh
+  // insert by the service key has no owner. The claim above keeps the uploader from re-inserting in between.
+  const { error: clearErr } = await admin.storage.from(bucket).remove([targetPath]);
+  if (clearErr) throw new Error(`Could not publish the image: ${clearErr.message}`);
+  const { error: upErr } = await admin.storage.from(bucket).upload(targetPath, clean, {
+    contentType: mime as string,
+    upsert: false,
+    cacheControl: "31536000",
+  });
+  if (upErr) throw new Error(`Could not publish the image: ${upErr.message}`);
   await admin.storage.from(IMAGE_STAGING_BUCKET).remove([stagingPath]);
 
   return {
@@ -455,6 +477,8 @@ export async function sweepImageStaging(
 
   for (const folder of await listAll("")) {
     if (folder.id) continue; // a loose root file cannot be written through the API
+    // The held fallback (flagged originals whose quarantine copy failed) is evidence: never swept.
+    if (isHeldFallbackPath(`${folder.name}/`)) continue;
     const files = await listAll(folder.name);
     const stale: string[] = [];
     for (const f of files) {
@@ -470,14 +494,19 @@ export async function sweepImageStaging(
       else result.kept += 1;
     }
     if (stale.length === 0) continue;
-    const { data: flagged } = await admin
+    const { data: flagged, error: flaggedErr } = await admin
       .from("image_moderation")
-      .select("path, status")
+      .select("path, status, scan")
       .eq("bucket", IMAGE_STAGING_BUCKET)
       .in("path", stale);
+    // Without the moderation state nothing in this folder can be told apart from evidence: keep it all.
+    if (flaggedErr) {
+      result.keptFlagged += stale.length;
+      continue;
+    }
     const protectedPaths = new Set(
-      ((flagged ?? []) as { path: string; status: string }[])
-        .filter((r) => r.status === "quarantined")
+      ((flagged ?? []) as { path: string; status: string; scan?: any }[])
+        .filter(isGenuinelyHeldStagingRow)
         .map((r) => r.path),
     );
     const removable = stale.filter((p) => !protectedPaths.has(p));
@@ -531,19 +560,21 @@ async function listOwnStaged(admin: any, userId: string, pageSize = 1000): Promi
   return out;
 }
 
-async function heldStagingPaths(admin: any, paths: string[]): Promise<Set<string>> {
+type StagingRow = { path: string; status: string; scan?: any };
+
+async function heldStagingPaths(
+  admin: any,
+  paths: string[],
+  keep: (row: StagingRow) => boolean = isGenuinelyHeldStagingRow,
+): Promise<Set<string>> {
   if (paths.length === 0) return new Set();
   const { data, error } = await admin
     .from("image_moderation")
-    .select("path, status")
+    .select("path, status, scan")
     .eq("bucket", IMAGE_STAGING_BUCKET)
     .in("path", paths);
   if (error) throw new Error(error.message ?? "Could not read moderation state");
-  return new Set(
-    ((data ?? []) as { path: string; status: string }[])
-      .filter((r) => r.status === "quarantined")
-      .map((r) => r.path),
-  );
+  return new Set(((data ?? []) as StagingRow[]).filter(keep).map((r) => r.path));
 }
 
 /**
@@ -584,9 +615,11 @@ export async function listStagedImagesForExport(
   userId: string,
 ): Promise<{ name: string; bytes: number | null; uploaded_at: string | null }[]> {
   const files = await listOwnStaged(admin, userId);
+  // Export hides every flagged file, not only the ones kept as evidence: listing it would tell the uploader it was flagged.
   const held = await heldStagingPaths(
     admin,
     files.map((f) => f.path),
+    (r) => r.status === "quarantined" || isGenuinelyHeldStagingRow(r),
   );
   return files
     .filter((f) => !held.has(f.path))

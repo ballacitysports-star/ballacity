@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally in tests */
 import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
-import { quarantineOriginal, type QuarantineRef } from "@/lib/image-quarantine.server";
+import {
+  holdOriginalPrivately,
+  quarantineOriginal,
+  sha256Hex,
+  type HeldFallbackRef,
+  type QuarantineRef,
+} from "@/lib/image-quarantine.server";
 import {
   ImageReencodeError,
   REENCODE_MESSAGES,
@@ -116,9 +122,15 @@ export async function finalizeDirectImageUpload(
   let encoded: ReencodeResult;
   try {
     encoded = await (deps.reencode ?? reencodeImage)(original);
+    // Remove, then insert without upsert (final review 780eaf8f, finding 3). The object was written by the uploader, so its row
+    // carries them as owner; an upsert keeps that owner and published_image_refuse_user_write (the path is claimed above) would
+    // refuse the server's own rewrite. A fresh insert by the service key has no owner. The claim keeps the uploader from
+    // re-inserting at the path in between.
+    const { error: clearErr } = await remove();
+    if (clearErr) throw new Error(clearErr.message);
     const { error: rewriteErr } = await admin.storage.from(bucket).upload(path, encoded.bytes, {
       contentType: sniffed as string,
-      upsert: true,
+      upsert: false,
       cacheControl: "3600",
     });
     if (rewriteErr) throw new Error(rewriteErr.message);
@@ -171,6 +183,15 @@ export async function finalizeDirectImageUpload(
       verdict = null;
     }
   }
+  // Colour kept under partially transparent pixels is scanned with the alpha dropped too (final review 780eaf8f, finding 1).
+  if (verdict?.safe && encoded.alphaRemovedScanTarget) {
+    try {
+      const v = await scan(encoded.alphaRemovedScanTarget, userId);
+      verdict = !v.safe ? v : v.scanned === false ? null : verdict;
+    } catch {
+      verdict = null;
+    }
+  }
   if (!verdict) {
     await remove();
     await record({
@@ -188,26 +209,38 @@ export async function finalizeDirectImageUpload(
     ? (verdict.reason ?? `Flagged by automated scan (${verdict.label})`)
     : null;
 
-  // A flagged picture never stays at a public URL: the original goes to the restricted quarantine, and the public object is
-  // removed once that copy exists. If the copy fails, the object stays (hidden app-wide by its quarantined status) and is
-  // escalated where it is.
+  // A flagged picture never stays at a public URL (final review 780eaf8f, finding 2). The original goes to the restricted
+  // quarantine; if that copy fails, to a private held fallback (image-staging/_held/..., service key, recorded for a retry); if
+  // even that fails, only its SHA-256 is kept for the escalation. In every case the public object is removed (before the
+  // escalation), and the escalation never points at a public path.
   let held: QuarantineRef | null = null;
+  let fallback: HeldFallbackRef | null = null;
+  let sha256: string | null = null;
   if (quarantined) {
+    const evidence = {
+      source: "legacy_direct_upload" as const,
+      sourceBucket: bucket,
+      sourcePath: path,
+      uploaderId: userId,
+      bytes: original,
+      mime: sniffed as string,
+      categories: verdict.categories,
+      suspectedCsam: verdict.csam,
+      reason,
+    };
     try {
-      held = await quarantineOriginal(admin, {
-        source: "legacy_direct_upload",
-        sourceBucket: bucket,
-        sourcePath: path,
-        uploaderId: userId,
-        bytes: original,
-        mime: sniffed as string,
-        categories: verdict.categories,
-        suspectedCsam: verdict.csam,
-        reason,
-      });
+      held = await quarantineOriginal(admin, evidence);
     } catch {
       held = null;
     }
+    if (!held) {
+      try {
+        fallback = await holdOriginalPrivately(admin, evidence);
+      } catch {
+        fallback = null;
+      }
+    }
+    sha256 = fallback?.sha256 ?? (held ? null : await sha256Hex(original));
   }
 
   const { error: upErr } = await record({
@@ -225,21 +258,45 @@ export async function finalizeDirectImageUpload(
         ? {
             quarantine: held
               ? { bucket: held.bucket, path: held.path, item_id: held.itemId }
-              : { failed: true },
+              : fallback
+                ? { failed: true, held: { bucket: fallback.bucket, path: fallback.path }, sha256 }
+                : { failed: true, unpreserved: true, sha256 },
           }
         : {}),
     },
   });
-  if (upErr) throw new Error(upErr.message);
 
-  if (verdict.csam) {
-    await escalate(held?.bucket ?? bucket, held?.path ?? path, verdict.categories);
+  if (quarantined) {
+    // Off the public bucket first, so a failing escalation or record cannot leave it there.
+    const { error: rmErr } = await remove();
+    if (verdict.csam) {
+      if (held) await escalate(held.bucket, held.path, verdict.categories);
+      else if (fallback) await escalate(fallback.bucket, fallback.path, verdict.categories);
+      else await escalate("unpreserved", `sha256:${sha256}`, verdict.categories);
+    }
+    if (rmErr) throw new Error(`${FLAGGED_REFUSAL} (removal pending)`);
+    if (upErr) throw new Error(upErr.message);
+    return {
+      ok: true as const,
+      quarantined: true,
+      published: false,
+      reason,
+      width: published.width,
+      height: published.height,
+      bytes,
+      mime: sniffed,
+      metadataStripped: metadata.stripped,
+    };
   }
-  if (held) await remove();
+  if (upErr) {
+    await remove();
+    throw new Error(upErr.message);
+  }
 
   return {
     ok: true as const,
-    quarantined,
+    quarantined: false,
+    published: true,
     reason,
     width: published.width,
     height: published.height,
