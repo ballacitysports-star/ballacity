@@ -42,6 +42,7 @@ SELECT t.eq(
       'private_sec.review_is_publishable(_review_id uuid)',
       'private_sec.insight_is_publishable(_kind text, _reviewee_id text)',
       'private_sec.roster_row_visible(_team_id text, _member_user_id uuid)',
+      'private_sec.minor_host_hidden(_user uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
       -- Public by design: the checkout page needs the host's PayPal merchant id and a
