@@ -1,6 +1,6 @@
 # R7: messaging policy audit (stranger-to-minor direct messaging)
 
-Status: audit and regression test only. **No behaviour is changed by this pull request.** Nothing applied to production.
+Status: audit (merged, #267) plus the **implementation of the approved policy (migration `20261106140000_minor_messaging_authorization.sql`): implemented locally, open in a pull request. Not merged, not applied to production, not verified in production.**
 
 Intended policy (owner, 2026-11-04): keep guardian-mediated messaging for minors; adult-to-adult communication continues with block, report and privacy controls; **no stranger-to-minor direct messaging**.
 
@@ -26,10 +26,28 @@ Intended policy (owner, 2026-11-04): keep guardian-mediated messaging for minors
 - **E4. Shared-game context.** For 13-15 year olds (and under-13 when `child_adult_dm_requires_guardian_link` is turned off) the rule is "shares a game or chat", and any adult who has joined the same public game qualifies. Whether that is a "stranger" is a policy decision.
 - **E5. Contact requests by a minor.** A 16-17 year old with no guardian controls can send a contact request to an adult through the adult's post (R2 keeps this; a request to a minor is the thing that is now gated).
 
-## Proposed fix (not implemented; changes product behaviour, needs owner approval)
+## Implemented policy (owner approval 2026-11-04): exceptions E1 to E5 closed
 
-Add one rule to `minor_messaging_block`, behind a new `age_policy` flag (`minor_dm_requires_connection`, default on): when one side is not an adult and the other is an adult, require the adult to be a guardian or `private_sec.can_see_minor_name(adult, minor)`; and for two minors, require `shares_team` or a shared game. Ship it with the flag readable by the superadmin age-policy panel so it can be tuned without a migration. Verify with test 430 (the three KNOWN EXCEPTION assertions then become refusals and are renamed).
+One backend decision, `public.minor_messaging_block`, is used for conversation creation, for every message (so revocation, control changes and new rules apply inside existing conversations), and, through the same controls and contexts, for contact requests. `public.can_notify`, the gate for every server-written notification and push, applies the same test whenever a minor is involved. Unknown age counts as a minor; missing authorization means refused.
+
+Authorized contexts (anything else is refused): a verified guardian and their child; two members of one team (players, coaches, managers); a game's host and a confirmed participant; an organization's administrator and its member; an accepted contact request that a verified guardian approved, while that guardian link stays active. Shared chat history and a shared public game are **not** contexts. Two minors may also talk when both guardians chose "peers" **and** they share a confirmed game; "peers" never involves an adult. Guardian controls (off, guardian only, teammates), blocks and the recipient's privacy settings apply first, as before.
+
+| Exception                                          | Now                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1 unlinked 16-17 messaged by an adult             | refused with `needs_guardian_link`; the app tells the child to ask a parent or guardian to link the account, and tells the adult the player cannot be messaged yet                                                                                                                                             |
+| E2 unrelated minors                                | refused unless a context above exists                                                                                                                                                                                                                                                                          |
+| E3 guardian "peers" authorizes an adult            | never; peers can only authorize two minors with a confirmed shared game                                                                                                                                                                                                                                        |
+| E4 shared public game authorizes messaging a 13-15 | no; a host and a confirmed participant is a context, two co-participants are not                                                                                                                                                                                                                               |
+| E5 a minor contacts an adult through a post        | needs a linked guardian; the request is created as `awaiting_guardian`, invisible to the recipient, no notification to them, until a verified guardian approves it on the Guardian dashboard (declining withdraws it). Only after the recipient accepts does the request count as a context for a conversation |
+
+Notifications: a person who is not authorized cannot place a notification or push in a minor's inbox (previously any game-mate or contact-request party could). Blocks stop notifications. Guardians are notified when their child's request is waiting.
+
+Revocation: removing a guardian link, removing someone from a team, or changing the controls takes effect at the next message; history stays readable by both participants. The `age_policy` flags `child_adult_dm_requires_guardian_link` and `teen_adult_dm_requires_shared_context` can no longer loosen adult-to-minor messaging (the backend floor does not depend on them); the admin panel text should say so.
+
+Compatibility and expected product effect: self-registered 16-17 year olds without a guardian link lose adult messaging until a guardian is linked; existing conversations that no longer have an authorized context stop accepting new messages and remain readable; older apps see the generic safety-settings message for the new reason codes. Recovery is forward only; relaxing the policy needs an owner-approved migration.
+
+Not covered by tests: the organization-administrator context (verified by reading the helper only; add a fixture in the sandbox, ST-7.6). Guardian approval is a dashboard card, not a push to the guardian's phone beyond the existing in-app notification.
 
 ## Test
 
-`supabase/tests/430_messaging_policy_audit.test.sql` (18 assertions, runs on `main` alone).
+`supabase/tests/430_messaging_policy_audit.test.sql` (18 assertions; E1 to E3 now assert refusals) and `supabase/tests/460_minor_messaging_authorization.test.sql` (62 assertions: every cohort including unknown age, contexts, controls, revocation and history, the guardian-mediated request flow, notifications, blocks, bypass attempts and grants). Tests 120, 200 and 420 were updated where they asserted the old behaviour.

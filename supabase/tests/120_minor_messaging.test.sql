@@ -28,9 +28,9 @@ SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kidone')),
   'MINOR_MESSAGING_BLOCKED:child_needs_guardian', 'an adult who is not the guardian cannot message an under-13');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teenone')),
-  'MINOR_MESSAGING_BLOCKED:teen_needs_shared_game', 'an adult cannot message a 13-15 without a shared game');
-SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'an adult may message a 16-17 once messaging is open to peers');
+  'MINOR_MESSAGING_BLOCKED:needs_connection', 'an adult cannot message a 13-15 without an authorized context (a shared public game is not one)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
+  'MINOR_MESSAGING_BLOCKED:needs_connection', 'a guardian''s peers setting never authorizes an unrelated adult to message a 16-17');
 SELECT t.reset();
 
 -- The refusal holds from the minor's side too.
@@ -39,7 +39,7 @@ SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('hos
   'MINOR_MESSAGING_BLOCKED', 'an under-13 cannot start a conversation with an adult stranger');
 SELECT t.as_user(t.id('teenone'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('host')),
-  'MINOR_MESSAGING_BLOCKED:teen_needs_shared_game', 'a 13-15 cannot start one either');
+  'MINOR_MESSAGING_BLOCKED:needs_connection', 'a 13-15 cannot start one either');
 SELECT t.reset();
 
 -- ---- a guardian reaches their own child, and only their own -----------------

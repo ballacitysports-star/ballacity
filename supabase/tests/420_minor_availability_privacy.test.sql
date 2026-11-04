@@ -96,7 +96,7 @@ SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_i
 SELECT t.as_user(t.id('guardian'));
 SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('guardian'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'dinner?')$q$, 'a guardian can contact their own child');
 SELECT t.as_user(t.id('teenfree'));
-SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teenfree'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'a 17-year-old without guardian controls can still contact an adult through the adult''s post (unchanged; see the R7 note)');
+SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teenfree'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'needs_guardian_link', 'a 17-year-old with no linked guardian cannot contact an adult through a post (R7: link a guardian first)');
 SELECT t.reset();
 -- ================= 4. legacy data procedure (defined, never run by the migration)
 SET LOCAL session_replication_role = replica;
