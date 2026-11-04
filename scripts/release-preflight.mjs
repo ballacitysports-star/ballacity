@@ -737,8 +737,9 @@ function ledgerKnowledge(manifest, root) {
     const name = String(row.name).replace(/\.sql$/, "");
     const stem = fileStem(f.path);
     if (name !== stem && name !== stem.slice(15)) return false;
-    const skew = Math.abs(versionSeconds(row.version) - versionSeconds(f.version));
-    return skew <= LEDGER_NAME_SKEW_SECONDS;
+    // the row is written AFTER the file's timestamp (0 to LEDGER_NAME_SKEW_SECONDS); never before it
+    const skew = versionSeconds(row.version) - versionSeconds(f.version);
+    return skew >= 0 && skew <= LEDGER_NAME_SKEW_SECONDS;
   };
   return {
     files,
@@ -831,7 +832,8 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
       const recognized =
         kn.supabaseVersions.has(v) ||
         kn.drizzleVersions.has(v) ||
-        kn.supabase.some((f) => kn.nameMatch(row, f)) ||
+        // only a historical file's name can recognize a historical row (never a release-range file's)
+        kn.supabase.some((f) => f.version < from && kn.nameMatch(row, f)) ||
         knownRowsWithoutFile.some((k) => k.version === v && k.name === row.name);
       if (!recognized)
         errors.push(
