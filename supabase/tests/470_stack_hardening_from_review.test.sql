@@ -82,7 +82,7 @@ SELECT t.eq((SELECT home_court FROM public.team_facility_private WHERE team_id =
 -- ---- 7. (F) location-disclosure reports: sockpuppets do not count; the automatic step is a reversible hold with evidence
 SELECT t.person('sock1', 30), t.person('sock2', 30), t.person('vet1', 30), t.person('vet2', 30), t.person('modtwo', 39);
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modtwo'), 'moderator');
-UPDATE public.profiles SET created_at = now() - interval '60 days' WHERE id IN (t.id('vet1'), t.id('vet2'));
+UPDATE auth.users SET created_at = now() - interval '60 days' WHERE id IN (t.id('vet1'), t.id('vet2'));   -- the auth account's age (the profile row's is client-writable)
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, description, host_snapshot) VALUES
   ('rg', t.id('host'), 'basketball', 'U12 by the river', now() + interval '3 days', 8, 12, 'Gym', 'Riverside', 'Fun run', '{"name":"Host"}'::jsonb);

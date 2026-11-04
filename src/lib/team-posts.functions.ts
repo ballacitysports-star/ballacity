@@ -191,6 +191,11 @@ export const deleteTeamPost = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** An edit that leaves the venue empty removes it (see clear_team_post_venue). */
+function venueRemoved(location: string | null | undefined): boolean {
+  return !location?.trim();
+}
+
 export const updateTeamPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -238,6 +243,14 @@ export const updateTeamPost = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     if (!count) throw new Error("You can't edit this post.");
+    if (venueRemoved(data.location)) {
+      // Removing a venue is explicit: for a youth team an empty write cannot be told from an older client sending back the blank public value,
+      // so the database keeps the exact copy unless asked (SEC-1 review round 4, F1-1). Runs as the editor: author or team manager only.
+      const { error: clearErr } = await (context.supabase.rpc as any)("clear_team_post_venue", {
+        _post: data.id,
+      });
+      if (clearErr) throw new Error(clearErr.message);
+    }
     const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", data.id, screen);
     return { ok: true, held: status !== "approved" };
   });
