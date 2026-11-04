@@ -114,8 +114,16 @@ function ConsentApprovalPage() {
   const submit = async () => {
     setSubmitting(true);
     try {
-      await approve({ data: { token, acknowledgedPolicies: true, scope: { all: true } } });
-      toast.success("Approved — you can manage settings in the Parent Center.");
+      const result = await approve({
+        data: { token, acknowledgedPolicies: true, scope: { all: true } },
+      });
+      toast.success(
+        result.verificationRequired
+          ? "Thanks. BallaCity verifies every new parent or guardian before the account turns on. We'll contact you."
+          : result.guardianApprovalRequired
+            ? "Thanks. The child's current parent or guardian needs to approve you first."
+            : "Approved — you can manage settings in the Parent Center.",
+      );
       void navigate({ to: "/parent" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not approve this request.");
@@ -128,9 +136,7 @@ function ConsentApprovalPage() {
     <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="section-eyebrow">
-          Parent / guardian approval
-        </span>
+        <span className="section-eyebrow">Parent / guardian approval</span>
       </div>
       <h1 className="mt-2 page-title">
         Approve {info?.childDisplayName ?? "a child"}&rsquo;s BallaCity account

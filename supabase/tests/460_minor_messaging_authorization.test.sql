@@ -414,9 +414,9 @@ SELECT t.reset();
 SELECT t.ok(NOT public.is_guardian_of(t.id('stranger'), t.id('t14')), 'R4-F6: a declined request links nobody');
 SELECT t.ok(public.is_guardian_of(t.id('stranger'), t.id('t16')), 'R4-F6: an approved one is active');
 SELECT t.as_user(t.id('t17u'));
-SELECT t.eq((SELECT pending_approval FROM public.redeem_minor_invite(repeat('c', 64))), false, 'a child with no guardian links at once (how the first guardian links)');
+SELECT t.eq((SELECT verification_required FROM public.redeem_minor_invite(repeat('c', 64))), true, 'SEC-4: a child with no guardian creates a first-guardian claim that waits for verification');
 SELECT t.reset();
-SELECT t.ok(public.is_guardian_of(t.id('stranger'), t.id('t17u')), 'the first guardian is active');
+SELECT t.ok(NOT public.is_guardian_of(t.id('stranger'), t.id('t17u')), 'SEC-4: the first guardian is NOT active on redemption (see 500_first_guardian_verification)');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE title = 'Approve a new guardian'), 2, 'and no one new is asked to approve (only the two earlier requests)');
 SELECT t.eq(has_function_privilege('anon', 'public.guardian_decide_link_request(uuid, boolean)', 'EXECUTE'), false, 'anonymous cannot decide link requests');
 

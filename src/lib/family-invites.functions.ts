@@ -9,8 +9,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  * An adult creates an invitation for a minor they are responsible for. The
  * plain code is returned exactly once so it can be handed to the child — only
  * its hash is stored, and the database enforces single use, expiry, adult-only
- * creation and per-parent caps. Redeeming links the guardian and, for under-13
- * members, records approved parental consent plus default safety controls.
+ * creation and per-parent caps. Redeeming never links anyone on its own
+ * (SEC-4): it creates a pending request. A child with no guardian waits for
+ * BallaCity staff to verify the adult; a child who already has one waits for
+ * that guardian to approve. Consent and controls apply once it is approved.
  */
 
 const INVITE_TTL_DAYS = 14;
@@ -135,19 +137,54 @@ export const redeemMinorInvite = createServerFn({ method: "POST" })
     z.object({ token: z.string().trim().min(16).max(128) }).parse(d),
   )
   .handler(
-    async ({ data, context }): Promise<{ consentRecorded: boolean; pendingApproval: boolean }> => {
+    async ({
+      data,
+      context,
+    }): Promise<{
+      consentRecorded: boolean;
+      pendingApproval: boolean;
+      verificationRequired: boolean;
+      parentId: string | null;
+    }> => {
       const { data: rows, error } = await context.supabase.rpc("redeem_minor_invite", {
         _token_hash: hashToken(data.token),
       });
       if (error) throw new Error(friendly(error.message));
       const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | null;
-      // pendingApproval: the player already has a guardian, who must approve this new one first.
+      // pendingApproval: nothing is linked yet. verificationRequired: BallaCity verifies this first
+      // guardian; otherwise the player's current guardian approves the new one.
       return {
         consentRecorded: row?.["consent_recorded"] === true,
         pendingApproval: row?.["pending_approval"] === true,
+        verificationRequired: row?.["verification_required"] === true,
+        parentId: (row?.["parent_id"] as string | null) ?? null,
       };
     },
   );
+
+/** The invited player cancels their own pending request (for a link they did not expect). */
+export const withdrawMyGuardianClaim = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { parentId: string }) => z.object({ parentId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    // Row security returns only requests this player is a party to.
+    const { data: rows, error } = await context.supabase
+      .from("guardian_link_requests" as never)
+      .select("id")
+      .eq("child_user_id", context.userId)
+      .eq("parent_user_id", data.parentId)
+      .eq("status", "pending")
+      .limit(1);
+    if (error) throw new Error("Could not cancel that request.");
+    const id = ((rows ?? []) as unknown as { id: string }[])[0]?.id;
+    if (!id) throw new Error("That request is no longer waiting.");
+    const { error: wErr } = await context.supabase.rpc(
+      "withdraw_guardian_claim" as never,
+      { _request: id } as never,
+    );
+    if (wErr) throw new Error("Could not cancel that request.");
+    return { ok: true };
+  });
 
 function friendly(message: string): string {
   const m = message ?? "";
@@ -164,6 +201,8 @@ function friendly(message: string): string {
   if (m.includes("ALREADY_REQUESTED"))
     return "This connection is already waiting for your parent or guardian to approve it.";
   if (m.includes("ADULT_CANNOT_REDEEM")) return "Family invitations are for players under 18.";
+  if (m.includes("CLAIM_RATE_LIMITED"))
+    return "This invitation can't be used right now. Try again later or contact support.";
   if (m.includes("AGE_VERIFICATION_REQUIRED"))
     return "Add your date of birth first, then open the invitation again.";
   if (m.includes("AUTH_REQUIRED")) return "Sign in first.";
