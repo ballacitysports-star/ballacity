@@ -120,7 +120,12 @@ function preflight(db, extraArgs = [], { root, manifestPath } = {}) {
   const env = { ...process.env };
   delete env.PREFLIGHT_DATABASE_URL;
   const beforeState = db && { fp: scratch.fingerprint(db), ledger: ledgerCount(db) };
-  const r = spawnSync(process.execPath, args, { encoding: "utf8", env });
+  // A full release can report hundreds of protections; the default 1 MB buffer would truncate the output.
+  const r = spawnSync(process.execPath, args, {
+    encoding: "utf8",
+    env,
+    maxBuffer: 256 * 1024 * 1024,
+  });
   if (db) {
     assert.equal(
       scratch.fingerprint(db),
