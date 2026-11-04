@@ -45,9 +45,11 @@ SELECT t.eq(t.dm('stranger', 't14'), 'needs_connection:other', 'a co-participant
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t16');
 
 -- ================= 3. minors with each other (E2)
-SELECT t.ok(t.dm('t16', 't15b') IS NULL, 'two minors whose guardians both chose peers and who share a confirmed game');
+SELECT t.ok(t.dm('t14', 't15b') IS NULL, 'two 13-15 year olds whose guardians both chose peers and who share a confirmed game');
+SELECT t.eq(t.dm('t16', 't15b'), 'needs_connection:other', 'but not across age bands (a 16-17 and a 13-15), even with peers and a shared game');
+SELECT t.eq(t.dm('kid', 't14'), 'needs_connection:other', 'and never an under-13');
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('t15b');
-SELECT t.eq(t.dm('t16', 't15b'), 'teammates_only:other', 'the other guardian''s stricter setting wins');
+SELECT t.eq(t.dm('t14', 't15b'), 'teammates_only:other', 'the other guardian''s stricter setting wins');
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t15b');
 SELECT t.ok(t.dm('t16', 't14') IS NULL, 'teammates of the same team');
 SELECT t.eq(t.dm('t16u', 't17u'), 'needs_guardian_link:self', 'two unlinked minors cannot');
@@ -132,6 +134,106 @@ SELECT t.ok(public.can_notify(t.id('coach'), t.id('t14')), 'a coach can notify a
 SELECT t.ok(public.can_notify(t.id('stranger'), t.id('host')), 'adult to adult through a shared game is unchanged');
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('host'), t.id('stranger'));
 SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('host')), 'a block stops notifications');
+
+-- ================= 8. fixes from the independent review
+-- F1: the recipient cannot forge or reuse an approval
+SELECT t.as_user(t.id('t16'));
+SELECT t.lives($q$SELECT t.req('t16', 'b1', 'adultpost')$q$, 'setup: a linked minor asks an adult again');
+SELECT t.as_user(t.id('gmom'));
+SELECT t.eq(public.guardian_decide_contact_request((SELECT id FROM public.availability_contact_requests WHERE from_user_id = t.id('t16') AND status = 'awaiting_guardian'), false), 'declined', 'the guardian declines');
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.eq(t.count($$SELECT 1 FROM public.availability_contact_requests WHERE status = 'withdrawn'$$), 0, 'a declined request is invisible to the recipient');
+SELECT t.eq(t.changed($$UPDATE public.availability_contact_requests SET status = 'accepted', guardian_approved_by = auth.uid(), guardian_approved_at = now() WHERE status = 'withdrawn'$$), 0, 'and cannot be revived or self-approved');
+SELECT t.reset();
+-- a legacy pending row from a minor (created before this migration: no approval, needs_guardian backfilled)
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.availability_contact_requests (id, availability_id, from_user_id, to_user_id, status, kind, needs_guardian) VALUES
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000b1', t.id('t16'), t.id('stranger'), 'pending', 'contact', true);
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count($$SELECT 1 FROM public.availability_contact_requests WHERE id = '00000000-0000-0000-0000-0000000000d1'$$), 0, 'a legacy pending request from a minor is not visible to the recipient');
+SELECT t.eq(t.changed($$UPDATE public.availability_contact_requests SET status = 'accepted', guardian_approved_by = auth.uid(), guardian_approved_at = now() WHERE id = '00000000-0000-0000-0000-0000000000d1'$$), 0, 'nor can it be accepted or self-approved');
+SELECT t.reset();
+SELECT t.ok(t.dm('stranger', 't16') IS NOT NULL, 'and gives no authorization');
+-- a visible pending request: the recipient still cannot write the approval columns
+SELECT t.as_user(t.id('t15b'));
+SELECT t.lives($q$SELECT t.req('t15b', 'b1', 'adultpost')$q$, 'setup: another minor asks');
+SELECT t.as_user(t.id('gdad'));
+SELECT t.eq(public.guardian_decide_contact_request((SELECT id FROM public.availability_contact_requests WHERE from_user_id = t.id('t15b') AND status = 'awaiting_guardian'), true), 'approved', 'the guardian approves');
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.lives($q$UPDATE public.availability_contact_requests SET status = 'accepted', guardian_approved_by = t.id('stranger'), guardian_approved_at = now() - interval '1 year' WHERE from_user_id = t.id('t15b')$q$, 'the recipient accepts (extra columns are ignored)');
+SELECT t.reset();
+SELECT t.eq((SELECT guardian_approved_by FROM public.availability_contact_requests WHERE from_user_id = t.id('t15b') AND status = 'accepted'), t.id('gdad'), 'the approval columns were not overwritten');
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.throws($q$UPDATE public.availability_contact_requests SET status = 'pending' WHERE from_user_id = t.id('t15b')$q$, 'cannot be changed that way', 'an accepted request cannot be moved back by the recipient');
+SELECT t.reset();
+
+-- F2: an organization administrator can no longer create a context by adding a minor (no consent) or by creating an organization
+INSERT INTO public.trainer_orgs (id, name, handle, owner_id) VALUES ('00000000-0000-0000-0000-0000000000e1', 'Pwn Gym', 'pwngym', t.id('stranger'));
+INSERT INTO public.org_members (org_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000e1', t.id('t17u')), ('00000000-0000-0000-0000-0000000000e1', t.id('t14'));
+SELECT t.eq(t.dm('stranger', 't17u'), 'needs_guardian_link:other', 'an organization admin who added an unlinked teen is still a stranger');
+SELECT t.eq(t.dm('stranger', 't14'), 'needs_connection:other', 'and a linked 13-15 member');
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t17u')), 'and cannot notify');
+
+-- F3: a rejected or old join request is not a relationship; controls still apply to the connection branch
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('pub', t.id('t14'), t.id('stranger'), 'k-rej', 'rejected');
+SET LOCAL session_replication_role = origin;
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t14')), 'a rejected join request does not allow notifying the child');
+UPDATE public.join_requests SET status = 'pending' WHERE idempotency_key = 'k-rej';
+SELECT t.ok(public.can_notify(t.id('stranger'), t.id('t14')), 'a live pending request does (the host is dealing with it)');
+UPDATE public.join_requests SET created_at = now() - interval '200 days' WHERE idempotency_key = 'k-rej';
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t14')), 'but not an old one');
+UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('t14');
+SELECT t.ok(NOT public.can_notify(t.id('coach'), t.id('t14')), 'guardian controls (messaging off) also stop notifications from a teammate-coach');
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t14');
+
+-- review round 2: a stranger cannot push to a minor host through a join request; peers can be notified
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('pub', t.id('stranger'), t.id('t16'), 'k-creep', 'pending');
+SET LOCAL session_replication_role = origin;
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t16')), 'an adult with a join request to a minor host cannot notify that host');
+SELECT t.ok(public.can_notify(t.id('t16'), t.id('stranger')), 'but the host can notify the requester (host to player)');
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id IN (t.id('t14'), t.id('t15b'));
+SELECT t.ok(public.can_notify(t.id('t14'), t.id('t15b')), 'two peers with a shared game can notify each other (message notices keep working)');
+
+-- F4: approval re-checks blocks and privacy; the guardian sees who is being contacted (names come from visible_avatars in the app)
+SELECT t.as_user(t.id('t16'));
+SELECT t.lives($q$SELECT t.req('t16', 'b1', 'adultpost')$q$, 'setup: ask again');
+SELECT t.reset();
+INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('adultpost'), t.id('t16'));
+SELECT t.as_user(t.id('gmom'));
+SELECT t.eq(public.guardian_decide_contact_request((SELECT id FROM public.availability_contact_requests WHERE from_user_id = t.id('t16') AND status = 'awaiting_guardian'), true), 'blocked', 'approving a request to someone who has since blocked the child is refused');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('adultpost') AND type = 'contact_request'), 2, 'and notifies nobody (only the two earlier approved requests produced one each)');
+
+-- F5: team invitations to a minor carry no free text and no direct notification
+SELECT t.as_user(t.id('coach'));
+SELECT t.lives(format($q$SELECT public.team_invite_player('squad', %L, 'player', 'text me on snap: xyz')$q$, t.id('t17u')), 'a team manager invites a minor');
+SELECT t.reset();
+SELECT t.ok((SELECT message IS NULL FROM public.team_invites WHERE invitee_id = t.id('t17u') ORDER BY created_at DESC LIMIT 1), 'the free-text message is dropped');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('t17u') AND type = 'team_invite'), 0, 'and the minor gets no direct notification from the manager');
+SELECT t.as_user(t.id('coach'));
+SELECT t.lives(format($q$SELECT public.team_invite_player('squad', %L, 'player', 'welcome aboard')$q$, t.id('adultpost')), 'an adult invitee is unchanged');
+SELECT t.reset();
+SELECT t.eq((SELECT message FROM public.team_invites WHERE invitee_id = t.id('adultpost') ORDER BY created_at DESC LIMIT 1), 'welcome aboard', 'message kept for an adult');
+
+-- F6: reactions follow the same decision as messages
+SELECT t.as_user(t.id('coach'));
+SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('t14')), 'setup: a coach opens a conversation with a teammate');
+SELECT t.reset();
+INSERT INTO public.messages (conversation_id, sender_id, body) SELECT conversation_id, t.id('t14'), 'hi coach' FROM public.conversation_participants WHERE user_id = t.id('t14') AND conversation_id IN (SELECT conversation_id FROM public.conversation_participants WHERE user_id = t.id('coach')) LIMIT 1;
+DELETE FROM public.team_members WHERE team_id = 'squad' AND user_id = t.id('t14');
+SELECT t.as_user(t.id('coach'));
+SELECT t.throws($q$INSERT INTO public.message_reactions (message_id, user_id, emoji) SELECT id, t.id('coach'), 'x' FROM public.messages WHERE body = 'hi coach'$q$, 'MINOR_MESSAGING_BLOCKED', 'a lapsed context also stops reactions');
+SELECT t.reset();
+
+-- F7: no oracle for third parties
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.eq(public.minor_messaging_block(t.id('gmom'), t.id('t16')), 'needs_connection:other', 'a third party gets the same answer for a guardian pair as for any other');
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t17u')), 'needs_guardian_link:other', 'a party to the pair still gets the reason');
+SELECT t.ok(NOT public.can_notify(t.id('gmom'), t.id('t16')), 'can_notify says no to a third party');
+SELECT t.reset();
 
 -- ================= 7. bypass attempts
 SELECT set_config('t.conv', (SELECT conversation_id::text FROM public.conversation_participants WHERE user_id = t.id('t16') LIMIT 1), false);
