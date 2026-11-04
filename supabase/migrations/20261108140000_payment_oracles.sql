@@ -168,6 +168,28 @@ END $function$;
 REVOKE ALL ON FUNCTION public.enforce_payment_destination() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enforce_payment_destination() TO service_role;
 
+-- R5 review F1: an API update that moves a claim to another game or payee is refused first, with one answer, before the destination check
+-- could tell a guessed payee from any other account. SECURITY INVOKER on purpose: current_user is the API role for a direct statement and
+-- the function owner inside definer code (settle_*, the refund engine), which keeps its own rules. No client path changes these columns.
+CREATE OR REPLACE FUNCTION public.lock_payment_submission_keys()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY INVOKER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF current_user IN ('anon', 'authenticated')
+     AND (NEW.game_id IS DISTINCT FROM OLD.game_id OR NEW.host_id IS DISTINCT FROM OLD.host_id OR NEW.player_id IS DISTINCT FROM OLD.player_id) THEN
+    RAISE EXCEPTION 'PAYMENT_FIELD_FORBIDDEN: the game, payee and player of a payment cannot be changed.' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $function$;
+REVOKE ALL ON FUNCTION public.lock_payment_submission_keys() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.lock_payment_submission_keys() TO anon, authenticated, service_role;
+DROP TRIGGER IF EXISTS a00_payment_keys_locked ON public.payment_submissions;
+CREATE TRIGGER a00_payment_keys_locked BEFORE UPDATE ON public.payment_submissions
+  FOR EACH ROW EXECUTE FUNCTION public.lock_payment_submission_keys();
+
 -- ======================================================================================== 5. guardian-first also for the service role
 CREATE OR REPLACE FUNCTION public.enforce_guardian_before_payment()
  RETURNS trigger
