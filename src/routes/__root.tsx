@@ -602,6 +602,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Guardian ⇄ managed-child switching: reload tabs whose identity changed,
   // and restore a parked guardian if the child's session disappears.
   useManagedSessionWatcher();
+  // After an application update, sensitive client caches from older builds (and legacy keys) are forgotten once.
+  useEffect(() => {
+    void import("@/lib/client-storage-manifest")
+      .then((m) => m.runClientCacheEpoch())
+      .catch(() => {});
+  }, []);
   // Delivers due pre-game reminders for the signed-in player.
   useGameReminderFlush();
 

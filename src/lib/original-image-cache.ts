@@ -120,3 +120,8 @@ export function originalImageCache() {
   shared ??= createOriginalCache(typeof indexedDB === "undefined" ? noStore : indexedDbStore());
   return shared;
 }
+
+/** Drop the in-memory handle so the next use opens a fresh database (called after the database itself was deleted). */
+export function forgetOriginalImageCache(): void {
+  shared = null;
+}
