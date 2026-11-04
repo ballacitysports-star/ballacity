@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 import type { PushInput } from "@/lib/push.server";
+import { isConfirmedAdult, minorSafeNotification } from "@/lib/notification-templates";
 
 const ONESIGNAL_APP_ID = "c6024ea7-b1a2-4f64-b43a-783971d802f9";
 const ONESIGNAL_API = "https://api.onesignal.com/notifications";
@@ -16,6 +17,7 @@ function validate(input: unknown): PushInput {
     title: i.title.slice(0, 200),
     body: i.body ? String(i.body).slice(0, 500) : null,
     url: i.url ? String(i.url).slice(0, 500) : null,
+    type: typeof i.type === "string" ? i.type.slice(0, 64) : null,
   };
 }
 
@@ -40,7 +42,20 @@ export const sendPushToUser = createServerFn({ method: "POST" })
       }
     }
 
-    const { deliverPush } = await import("@/lib/push.server");
+    const { deliverPush, absolutizeUrl } = await import("@/lib/push.server");
+    if (data.userId !== context.userId) {
+      // A recipient who is not a confirmed adult gets fixed wording by type, never the caller's text or link.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      if (!(await isConfirmedAdult(supabaseAdmin as any, data.userId))) {
+        const safe = minorSafeNotification(data.type);
+        return deliverPush({
+          userId: data.userId,
+          title: safe.title,
+          body: safe.body,
+          url: (await absolutizeUrl(safe.link)) ?? null,
+        });
+      }
+    }
     return deliverPush(data);
   });
 

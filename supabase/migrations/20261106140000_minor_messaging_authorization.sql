@@ -12,10 +12,14 @@
 --   E5 a minor contacting an adult (or another minor) through a post goes through a guardian: the request waits, invisible to the
 --      recipient, until a verified guardian approves it. A minor with no linked guardian is refused with guidance to link one.
 --
--- AUTHORIZED CONTEXTS (private_sec.messaging_connection): a verified guardian and their child; two members of the same team
--- (players, coaches, managers); a game's host and a confirmed participant; an organization's administrator and its member;
--- an accepted contact request that a verified guardian approved (and that guardian link is still active). Shared chat history is NOT
--- a context (it would authorize itself).
+-- AUTHORIZED CONTEXTS (private_sec.messaging_connection): a verified guardian and their child; two members of the same team whose
+-- memberships both count (an adult owner or an adult who accepted an invitation; a non-adult only through an accepted invitation a
+-- currently verified guardian approved; never a direct roster add); an adult host and a participant of an approved request (guardian-approved
+-- for a non-adult) until 30 days after the game; an accepted contact request from a non-adult that their verified guardian approved (and that
+-- guardian link is still active). Organization membership and shared chat history are NOT contexts.
+-- Review round 4 (2026-11-05, section at the end of this file): join-request approvals are server-written only, can_notify's join-request
+-- branch obeys controls and the under-13 rule, direct roster adds of unknown ages are refused, family invitations cannot create a guardian
+-- without an existing guardian's approval, and contact requests from adults cannot carry guardian columns.
 --
 -- ENFORCED IN ONE PLACE. public.minor_messaging_block is the single decision used by create_direct_conversation (conversation creation) and by
 -- the per-message trigger (sending, so guardian revocation, control changes and new rules apply inside existing conversations). Existing
@@ -55,23 +59,52 @@ $$;
 REVOKE ALL ON FUNCTION private_sec.has_guardian_link(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private_sec.has_guardian_link(uuid) TO service_role;
 
+-- Review round 4 (F3, F5): which team memberships count as a messaging context when a non-adult is involved. A roster row alone does not:
+-- a manager can write one directly (any adult or teen can create a team), so it proves no consent. Only these count:
+--   * an ADULT: the team's owner, or someone who accepted an invitation to that team themselves;
+--   * anyone else (minor or unknown age): an accepted invitation to that team that a CURRENTLY verified guardian approved (guardian
+--     revocation ends it). An unlinked minor, a minor team owner and a directly added member never count.
+-- team_invites cannot be written by clients (team_invites_no_direct_insert / _update); only the definer invite functions write them.
+CREATE OR REPLACE FUNCTION private_sec.team_membership_authorizes(_team text, _user uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT CASE WHEN COALESCE(public.age_cohort_of(_user), 'unknown') = 'adult' THEN
+           EXISTS (SELECT 1 FROM public.teams t WHERE t.id = _team AND t.owner_id = _user)
+           OR EXISTS (SELECT 1 FROM public.team_invites i WHERE i.team_id = _team AND i.invitee_id = _user AND i.status = 'accepted')
+         ELSE
+           EXISTS (SELECT 1 FROM public.team_invites i
+                    WHERE i.team_id = _team AND i.invitee_id = _user AND i.status = 'accepted'
+                      AND i.guardian_approved_at IS NOT NULL AND public.is_guardian_of(i.guardian_approved_by, _user))
+         END
+$$;
+REVOKE ALL ON FUNCTION private_sec.team_membership_authorizes(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.team_membership_authorizes(text, uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION private_sec.messaging_connection(_a uuid, _b uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT _a IS NOT NULL AND _b IS NOT NULL AND _a <> _b AND (
        public.is_guardian_of(_a, _b) OR public.is_guardian_of(_b, _a)
-    OR public.shares_team(_a, _b)
-    -- an ADULT host and a confirmed participant; a non-adult participant counts only when a verified guardian approved that participation
-    -- (a stranger cannot create this context by publishing a public game, and a minor host is never reachable this way)
+    -- two members of one team, each through a membership that counts (see team_membership_authorizes)
+    OR EXISTS (SELECT 1 FROM public.team_members ma JOIN public.team_members mb ON mb.team_id = ma.team_id
+                WHERE ma.user_id = _a AND mb.user_id = _b
+                  AND private_sec.team_membership_authorizes(ma.team_id, _a)
+                  AND private_sec.team_membership_authorizes(ma.team_id, _b))
+    -- an ADULT host and a confirmed participant of an approved request, until 30 days after the game; a non-adult participant counts only when
+    -- a verified guardian approved that participation (a stranger cannot create this context by publishing a public game, and a minor host is
+    -- never reachable this way)
     OR EXISTS (SELECT 1 FROM public.hosted_games g JOIN public.game_participants p ON p.game_id = g.id
                 WHERE ((g.host_id = _a AND p.user_id = _b) OR (g.host_id = _b AND p.user_id = _a))
                   AND public.age_cohort_of(g.host_id) = 'adult'
+                  AND COALESCE(g.ends_at, g.date) > now() - interval '30 days'
                   AND (public.age_cohort_of(p.user_id) = 'adult'
                        OR EXISTS (SELECT 1 FROM public.join_requests jr
-                                   WHERE jr.game_id = g.id AND jr.player_id = p.user_id AND jr.guardian_approved_at IS NOT NULL
+                                   WHERE jr.game_id = g.id AND jr.player_id = p.user_id AND jr.status = 'approved'
+                                     AND jr.guardian_approved_at IS NOT NULL
                                      AND public.is_guardian_of(jr.guardian_approved_by, p.user_id))))
+    -- an accepted request FROM a non-adult that their verified guardian approved (an adult sender cannot manufacture one: see the gate trigger)
     OR EXISTS (SELECT 1 FROM public.availability_contact_requests r
                 WHERE r.status = 'accepted' AND r.needs_guardian AND r.guardian_approved_at IS NOT NULL
                   AND ((r.from_user_id = _a AND r.to_user_id = _b) OR (r.from_user_id = _b AND r.to_user_id = _a))
+                  AND COALESCE(public.age_cohort_of(r.from_user_id), 'unknown') <> 'adult'
                   AND public.is_guardian_of(r.guardian_approved_by, r.from_user_id))
   )
 $$;
@@ -162,16 +195,21 @@ AS $function$
         (auth.uid() IS NULL OR auth.uid() IN (_caller, _target))
         AND NOT public.blocks_exist_between(_caller, _target)
         AND CASE
-          -- a person who is not a confirmed adult is involved: an authorized context that the guardian's controls allow, or a host dealing
+          -- a person who is not a confirmed adult is involved: the guardian's controls first, then an authorized context, or a host dealing
           -- with a live join request (pending or approved, last 90 days); a rejected or old request is not a relationship
           WHEN COALESCE(public.age_cohort_of(_caller), 'unknown') <> 'adult' OR COALESCE(public.age_cohort_of(_target), 'unknown') <> 'adult' THEN
-            ((private_sec.messaging_connection(_caller, _target))
-              AND private_sec.messaging_controls_block(_caller, _target) IS NULL)
-            -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed adult
-            OR EXISTS (SELECT 1 FROM public.join_requests jr
-                        WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
-                          AND ((jr.host_id = _caller AND jr.player_id = _target)
-                               OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult')))
+            private_sec.messaging_controls_block(_caller, _target) IS NULL
+            AND (
+              private_sec.messaging_connection(_caller, _target)
+              -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed
+              -- adult; an under-13 player's request counts only once a verified guardian approved it (under-13 contact stays guardian-mediated)
+              OR EXISTS (SELECT 1 FROM public.join_requests jr
+                          WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
+                            AND ((jr.host_id = _caller AND jr.player_id = _target)
+                                 OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult'))
+                            AND (COALESCE(public.age_cohort_of(jr.player_id), 'unknown') <> 'child_under_13'
+                                 OR (jr.guardian_approved_at IS NOT NULL AND public.is_guardian_of(jr.guardian_approved_by, jr.player_id))))
+            )
           ELSE
             EXISTS (SELECT 1 FROM public.conversation_participants a
                       JOIN public.conversation_participants b ON b.conversation_id = a.conversation_id
@@ -226,14 +264,16 @@ BEGIN
 END $$;
 
 -- Runs after the validator (which forces 'pending'): a request from a non-adult waits for a guardian and is invisible to the recipient.
+-- Review round 4 (F7): every insert, from any sender, starts with no approval and needs_guardian computed from the sender's age, so an adult
+-- cannot insert a request that already carries a forged needs_guardian/approval and so counts as a context.
 CREATE OR REPLACE FUNCTION public.gate_contact_request_for_guardian()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 BEGIN
-  IF auth.uid() IS NOT NULL AND COALESCE(public.age_cohort_of(NEW.from_user_id), 'unknown') <> 'adult' THEN
+  NEW.needs_guardian := COALESCE(public.age_cohort_of(NEW.from_user_id), 'unknown') <> 'adult';
+  NEW.guardian_approved_by := NULL;
+  NEW.guardian_approved_at := NULL;
+  IF NEW.needs_guardian THEN
     NEW.status := 'awaiting_guardian';
-    NEW.needs_guardian := true;
-    NEW.guardian_approved_by := NULL;
-    NEW.guardian_approved_at := NULL;
   END IF;
   RETURN NEW;
 END $$;
@@ -398,3 +438,281 @@ GRANT EXECUTE ON FUNCTION public.enforce_minor_messaging_reaction() TO service_r
 DROP TRIGGER IF EXISTS trg_enforce_minor_messaging_reaction ON public.message_reactions;
 CREATE TRIGGER trg_enforce_minor_messaging_reaction BEFORE INSERT ON public.message_reactions
   FOR EACH ROW EXECUTE FUNCTION public.enforce_minor_messaging_reaction();
+
+-- ================================================================================================ review round 4 corrections (2026-11-05)
+-- -------------------------------------------------------------------------------------------- F1: join-request guardian approval
+-- guardian_approved_at/by on join_requests were client-writable: a minor could insert a request carrying a forged approval, and a host (or a
+-- player resubmitting) could stamp one, which created the host-to-minor game context above and satisfied enforce_child_game_participation and
+-- enforce_guardian_before_payment. Now an insert always starts without an approval, and an update keeps the stored values unless
+-- guardian_approve_join_request (which sets the transaction-local flag app.guardian_approve_join_request) is writing them.
+-- Names match SEC-1 (20261107100000), whose later CREATE OR REPLACE of protect_join_request_guardian_approval and re-creation of
+-- a0_protect_join_request_guardian_approval_trg (UPDATE only) simply replace the update half; the insert half has its own trigger, which SEC-1
+-- does not touch.
+CREATE OR REPLACE FUNCTION public.protect_join_request_guardian_approval()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF auth.uid() IS NULL OR COALESCE(current_setting('app.guardian_approve_join_request', true), '') = 'on' THEN RETURN NEW; END IF;
+  NEW.guardian_approved_at := OLD.guardian_approved_at;
+  NEW.guardian_approved_by := OLD.guardian_approved_by;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.protect_join_request_guardian_approval() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.protect_join_request_guardian_approval() TO service_role;
+DROP TRIGGER IF EXISTS a0_protect_join_request_guardian_approval_trg ON public.join_requests;
+CREATE TRIGGER a0_protect_join_request_guardian_approval_trg BEFORE UPDATE ON public.join_requests
+  FOR EACH ROW EXECUTE FUNCTION public.protect_join_request_guardian_approval();
+
+CREATE OR REPLACE FUNCTION public.clear_join_request_guardian_approval_on_insert()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF;   -- service role and definer-owned maintenance
+  NEW.guardian_approved_at := NULL;
+  NEW.guardian_approved_by := NULL;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.clear_join_request_guardian_approval_on_insert() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.clear_join_request_guardian_approval_on_insert() TO service_role;
+DROP TRIGGER IF EXISTS a0_clear_join_request_guardian_approval_ins_trg ON public.join_requests;
+CREATE TRIGGER a0_clear_join_request_guardian_approval_ins_trg BEFORE INSERT ON public.join_requests
+  FOR EACH ROW EXECUTE FUNCTION public.clear_join_request_guardian_approval_on_insert();
+
+-- Unchanged from 20261027130000_guardian_join_request_either_order.sql except that the approval write sets (and then clears) the flag.
+CREATE OR REPLACE FUNCTION public.guardian_approve_join_request(_request uuid, _approve boolean DEFAULT true)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _me uuid := auth.uid();
+  _row public.join_requests;
+BEGIN
+  IF _me IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  SELECT * INTO _row FROM public.join_requests WHERE id = _request FOR UPDATE;
+  IF _row.id IS NULL THEN RAISE EXCEPTION 'REQUEST_NOT_FOUND'; END IF;
+  IF NOT public.is_guardian_of(_me, _row.player_id) THEN RAISE EXCEPTION 'NOT_GUARDIAN'; END IF;
+  IF _row.status NOT IN ('pending', 'approved') THEN RAISE EXCEPTION 'REQUEST_NOT_PENDING'; END IF;
+  IF EXISTS (SELECT 1 FROM public.game_participants gp
+              WHERE gp.game_id = _row.game_id AND gp.user_id = _row.player_id) THEN
+    RAISE EXCEPTION 'ALREADY_ON_ROSTER: this child is already in the game; cancel their spot from the game page.';
+  END IF;
+
+  IF _approve THEN
+    PERFORM set_config('app.guardian_approve_join_request', 'on', true);
+    UPDATE public.join_requests
+       SET guardian_approved_at = COALESCE(guardian_approved_at, now()),
+           guardian_approved_by = COALESCE(guardian_approved_by, _me)
+     WHERE id = _request AND status IN ('pending', 'approved');
+    PERFORM set_config('app.guardian_approve_join_request', '', true);
+
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (_row.player_id, 'join_request_guardian_approved', 'Your guardian approved this request',
+            CASE WHEN _row.status = 'approved'
+                 THEN 'Your guardian and the host both said yes. You can take your place now.'
+                 ELSE 'Your guardian approved your request to join this game.' END,
+            '/games/' || _row.game_id);
+  ELSE
+    -- join_requests has no 'withdrawn-by-guardian' concept distinct from the
+    -- player's own withdrawal; reuse the existing 'rejected' status rather
+    -- than widening join_requests_status_chk for a guardian-specific value.
+    UPDATE public.join_requests
+       SET status = 'rejected', reviewed_at = now(), reviewer_notes = 'Declined by guardian'
+     WHERE id = _request AND status IN ('pending', 'approved');
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.guardian_approve_join_request(uuid, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.guardian_approve_join_request(uuid, boolean) TO authenticated;
+
+-- -------------------------------------------------------------------------------------------- F4: unknown age fails closed on direct adds
+-- team_members_manager_write used NOT is_minor(user_id), which is false for a person with no birthday, so a manager could add an unknown-age
+-- account directly. A manager may add only people of known adult age directly; everyone else joins through an invitation (and their guardian).
+-- (Direct adds never count as a messaging context for a non-adult anyway: see team_membership_authorizes.)
+DROP POLICY IF EXISTS "team_members_manager_write" ON public.team_members;
+CREATE POLICY "team_members_manager_write"
+ON public.team_members
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  public.is_team_manager(team_id, auth.uid())
+  AND role <> 'owner'::team_role
+  -- a known age (age_verified: cohort is not 'unknown') that is not a minor; both helpers are callable by clients, age_cohort_of is not
+  AND public.age_verified(user_id)
+  AND NOT public.is_minor(user_id)
+);
+
+-- -------------------------------------------------------------------------------------------- F6: family invitations cannot fake a guardian
+-- redeem_minor_invite made any adult who sent a link a verified guardian after one click by the person who opened it: an adult could redeem
+-- one (so two adults could make each other "guardians"), and a child who already had a guardian gained a new one with no word to that guardian.
+-- Now: an adult cannot redeem; a child who already has a verified guardian gets a PENDING request that one of their current guardians must
+-- approve (guardian_decide_link_request; the guardians are notified); a child with no guardian links as before (that is how the first guardian
+-- links) and no one new is notified.
+CREATE TABLE IF NOT EXISTS public.guardian_link_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  child_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  parent_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  relationship text NOT NULL DEFAULT 'parent',
+  invite_id uuid,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'declined')),
+  decided_by uuid,
+  decided_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS guardian_link_requests_one_pending ON public.guardian_link_requests (child_user_id, parent_user_id) WHERE status = 'pending';
+ALTER TABLE public.guardian_link_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Child, requester or current guardian can read" ON public.guardian_link_requests;
+CREATE POLICY "Child, requester or current guardian can read" ON public.guardian_link_requests FOR SELECT TO authenticated
+  USING (child_user_id = auth.uid() OR parent_user_id = auth.uid() OR public.is_guardian_of(auth.uid(), child_user_id));
+REVOKE ALL ON public.guardian_link_requests FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.guardian_link_requests TO authenticated;
+GRANT ALL ON public.guardian_link_requests TO service_role;
+
+-- The return type gains pending_approval, so the function is dropped and re-created (grants restored below).
+DROP FUNCTION IF EXISTS public.redeem_minor_invite(text);
+CREATE FUNCTION public.redeem_minor_invite(_token_hash text)
+ RETURNS TABLE(parent_id uuid, consent_recorded boolean, pending_approval boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE _uid uuid := auth.uid(); _inv public.minor_invites; _cohort text;
+        _consent boolean := false; _cid uuid; _prev text; _parent uuid;
+BEGIN
+  IF _uid IS NULL THEN
+    RAISE EXCEPTION 'AUTH_REQUIRED: sign in to accept a family invitation.';
+  END IF;
+
+  SELECT * INTO _inv FROM public.minor_invites WHERE token_hash = _token_hash FOR UPDATE;
+  IF _inv.id IS NULL THEN
+    RAISE EXCEPTION 'INVITE_INVALID: that invitation link is not valid.';
+  END IF;
+  IF _inv.status = 'revoked' THEN
+    RAISE EXCEPTION 'INVITE_REVOKED: that invitation was cancelled.';
+  END IF;
+  IF _inv.status = 'redeemed' THEN
+    RAISE EXCEPTION 'INVITE_USED: that invitation was already used.';
+  END IF;
+  IF _inv.expires_at <= now() THEN
+    RAISE EXCEPTION 'INVITE_EXPIRED: that invitation has expired.';
+  END IF;
+  _parent := _inv.parent_user_id;
+  IF _parent = _uid THEN
+    RAISE EXCEPTION 'INVITE_SELF: you cannot accept your own invitation.';
+  END IF;
+
+  SELECT age_cohort INTO _cohort FROM public.profiles WHERE id = _uid;
+  IF COALESCE(_cohort, 'unknown') = 'unknown' THEN
+    RAISE EXCEPTION 'AGE_VERIFICATION_REQUIRED: add your date of birth first.';
+  END IF;
+  -- NEW (R7 review round 4): a family invitation links a minor; an adult account cannot become anyone's "child"
+  IF _cohort = 'adult' THEN
+    RAISE EXCEPTION 'ADULT_CANNOT_REDEEM: family invitations are for players under 18.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.guardian_links g
+              WHERE g.parent_user_id = _parent AND g.child_user_id = _uid) THEN
+    RAISE EXCEPTION 'ALREADY_LINKED: you are already connected to this parent or guardian.';
+  END IF;
+
+  -- NEW (R7 review round 4): a child who already has a verified guardian cannot add another by their own click; a current guardian approves
+  IF private_sec.has_guardian_link(_uid) THEN
+    IF EXISTS (SELECT 1 FROM public.guardian_link_requests r
+                WHERE r.child_user_id = _uid AND r.parent_user_id = _parent AND r.status = 'pending') THEN
+      RAISE EXCEPTION 'ALREADY_REQUESTED: this request is already waiting for your parent or guardian.';
+    END IF;
+    INSERT INTO public.guardian_link_requests (child_user_id, parent_user_id, relationship, invite_id)
+    VALUES (_uid, _parent, _inv.relationship, _inv.id);
+    UPDATE public.minor_invites
+       SET status = 'redeemed', child_user_id = _uid, redeemed_at = now()
+     WHERE id = _inv.id;
+    PERFORM public.notify_guardians_of(_uid, 'guardian_approval', 'Approve a new guardian',
+      'Someone asked to be added as a parent or guardian of your child. Open Guardian to approve or decline. Nothing changes until you approve.',
+      '/guardian');
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (_uid, 'guardian_link', 'Waiting for your parent or guardian',
+            'Your current parent or guardian needs to approve this new connection.', '/settings');
+    RETURN QUERY SELECT _parent, false, true;
+    RETURN;
+  END IF;
+
+  INSERT INTO public.guardian_links (parent_user_id, child_user_id, relationship, status, verified_at)
+  VALUES (_parent, _uid, _inv.relationship, 'active', now())
+  ON CONFLICT (parent_user_id, child_user_id) DO NOTHING;
+
+  -- LEGAL REVIEW REQUIRED: consent-required age band is configurable policy,
+  -- not hardcoded to under-13; mirrors platform_status(). The invited adult
+  -- holds a confirmed account email, so the method is email_confirmation.
+  IF public.parental_consent_required(_cohort) THEN
+    SELECT id, status INTO _cid, _prev FROM public.parental_consents WHERE child_user_id = _uid;
+    IF _cid IS NULL THEN
+      INSERT INTO public.parental_consents (
+        child_user_id, parent_email, parent_name, parent_user_id, relationship,
+        status, method, jurisdiction, approved_at, requested_at)
+      VALUES (_uid, COALESCE((SELECT email FROM auth.users u WHERE u.id = _parent), ''),
+              (SELECT display_name FROM public.profiles p WHERE p.id = _parent),
+              _parent, _inv.relationship, 'approved', 'email_confirmation', 'US_FEDERAL',
+              now(), now())
+      RETURNING id INTO _cid;
+      _prev := 'required';
+    ELSIF _prev <> 'approved' THEN
+      UPDATE public.parental_consents
+         SET status = 'approved', method = 'email_confirmation',
+             parent_user_id = _parent, relationship = _inv.relationship,
+             approved_at = now(), revoked_at = NULL, revoked_reason = NULL,
+             verification_token_hash = NULL, token_expires_at = NULL
+       WHERE id = _cid;
+    END IF;
+
+    INSERT INTO public.parental_consent_events
+      (consent_id, child_user_id, actor_id, action, from_status, to_status, detail)
+    VALUES (_cid, _uid, _uid, 'consent_approved', COALESCE(_prev, 'required'), 'approved',
+            jsonb_build_object('method', 'email_confirmation', 'invite_id', _inv.id));
+
+    INSERT INTO public.child_controls (child_user_id, updated_by)
+    VALUES (_uid, _parent)
+    ON CONFLICT (child_user_id) DO NOTHING;
+
+    _consent := true;
+  END IF;
+
+  UPDATE public.minor_invites
+     SET status = 'redeemed', child_user_id = _uid, redeemed_at = now()
+   WHERE id = _inv.id;
+
+  INSERT INTO public.notifications (user_id, type, title, body, link)
+  VALUES (_parent, 'guardian_link', 'Family invitation accepted',
+          COALESCE(_inv.child_name, 'Your minor') || ' is now linked to your account.', '/parent'),
+         (_uid, 'guardian_link', 'Parent or guardian connected',
+          'Your parent or guardian can now manage your safety settings.', '/settings');
+
+  RETURN QUERY SELECT _parent, _consent, false;
+END $function$;
+REVOKE ALL ON FUNCTION public.redeem_minor_invite(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.redeem_minor_invite(text) TO authenticated, service_role;
+
+-- A current verified guardian approves or declines a pending request to add another guardian.
+CREATE OR REPLACE FUNCTION public.guardian_decide_link_request(_request uuid, _approve boolean)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE _r public.guardian_link_requests;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in required' USING ERRCODE = 'insufficient_privilege'; END IF;
+  SELECT * INTO _r FROM public.guardian_link_requests WHERE id = _request AND status = 'pending' FOR UPDATE;
+  IF NOT FOUND OR NOT public.is_guardian_of(auth.uid(), _r.child_user_id) THEN
+    RAISE EXCEPTION 'REQUEST_NOT_FOUND: nothing to decide.' USING ERRCODE = 'no_data_found';
+  END IF;
+  IF NOT _approve OR COALESCE(public.age_cohort_of(_r.parent_user_id), 'unknown') <> 'adult' THEN
+    UPDATE public.guardian_link_requests SET status = 'declined', decided_by = auth.uid(), decided_at = now() WHERE id = _request;
+    RETURN 'declined';
+  END IF;
+  INSERT INTO public.guardian_links (parent_user_id, child_user_id, relationship, status, verified_at)
+  VALUES (_r.parent_user_id, _r.child_user_id, _r.relationship, 'active', now())
+  ON CONFLICT (parent_user_id, child_user_id) DO UPDATE SET status = 'active', verified_at = now();
+  UPDATE public.guardian_link_requests SET status = 'approved', decided_by = auth.uid(), decided_at = now() WHERE id = _request;
+  INSERT INTO public.notifications (user_id, type, title, body, link)
+  VALUES (_r.parent_user_id, 'guardian_link', 'Family invitation accepted',
+          'You are now linked as a parent or guardian.', '/parent'),
+         (_r.child_user_id, 'guardian_link', 'Parent or guardian connected',
+          'Your parent or guardian approved the new connection.', '/settings');
+  RETURN 'approved';
+END $$;
+REVOKE ALL ON FUNCTION public.guardian_decide_link_request(uuid, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.guardian_decide_link_request(uuid, boolean) TO authenticated, service_role;
