@@ -91,6 +91,15 @@ describe("planGuardianApprovalPush", () => {
     expect(plan.writeNotification).toBe(false);
   });
 
+  it("tells nobody about an invite suppressed by a block (SEC-7)", async () => {
+    const plan = await planGuardianApprovalPush(
+      fakeAdmin(world({ team_invite_suppressions: [{ invite_id: "inv1" }] })) as any,
+      { kind: "team_invite", id: "inv1", callerId: "coach" },
+    );
+    expect(plan.messages).toEqual([]);
+    expect(plan.writeNotification).toBe(false);
+  });
+
   it("only the child who asked can raise it, and only the inviter an invite", async () => {
     const admin = fakeAdmin(world()) as any;
     for (const [kind, id, callerId] of [

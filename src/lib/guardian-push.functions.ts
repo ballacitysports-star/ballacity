@@ -19,7 +19,9 @@ export const notifyGuardiansOfPending = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }): Promise<{ notified: number }> => {
+  // The answer is the same whatever happened: how many guardians were told would tell a manager
+  // whether the invitee is a minor, or that the invitation was suppressed by a block (SEC-7).
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { planGuardianApprovalPush, sendGuardianApprovalPush } =
@@ -31,14 +33,14 @@ export const notifyGuardiansOfPending = createServerFn({ method: "POST" })
         id: data.id,
         callerId: context.userId,
       });
-      if (plan.messages.length === 0) return { notified: 0 };
-      const notified = await sendGuardianApprovalPush(admin, plan, {
+      if (plan.messages.length === 0) return { ok: true as const };
+      await sendGuardianApprovalPush(admin, plan, {
         push: (m) => deliverPush({ userId: m.userId, title: m.title, body: m.body, url: m.url }),
       });
-      return { notified };
+      return { ok: true as const };
     } catch (e) {
       console.warn("[guardian-push] failed", e);
-      return { notified: 0 };
+      return { ok: true as const };
     }
   });
 

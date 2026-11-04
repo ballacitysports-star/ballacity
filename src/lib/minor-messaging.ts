@@ -13,7 +13,10 @@
  * `MINOR_MESSAGING_BLOCKED:<code>:<side>`. The code names the rule; the side
  * says whose restriction it is — `self` when it is the sender's own account
  * (a teen messaging a host), `other` when it is the recipient's (a host
- * messaging a teen). Older databases send only the code.
+ * messaging a teen). Older databases send only the code. A sender who is not
+ * a confirmed adult only ever gets `self` codes that do not depend on the other
+ * person's age: their own guardian controls, `needs_guardian_link` or
+ * `needs_connection` (SEC-7), so nothing here is told about the recipient.
  *
  * What to say depends on both, and on who is being messaged: "once they've
  * joined one of your games" is right for a host messaging a player and wrong,

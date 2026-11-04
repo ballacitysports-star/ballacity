@@ -62,4 +62,17 @@ SELECT t.eq(public.guardian_reapprove_team_membership('squad', t.id('kid')), 'al
 SELECT t.reset();
 SELECT t.eq((SELECT count(*)::int FROM public.family_audit_log WHERE child_user_id = t.id('kid') AND action = 'team_membership_reapproved'), 1, 'and writes no second audit row');
 
+-- SEC-7 final review (3): re-approval needs a declared age, like every other way onto a team
+SELECT t.person('ukid', 15);
+SELECT t.guardian('newg', 'ukid');
+SELECT t.invited_member('squad', 'ukid', 'oldg');
+SET LOCAL session_replication_role = replica;
+UPDATE public.profiles SET age_cohort = 'unknown' WHERE id = t.id('ukid');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('newg'));
+SELECT t.throws(format($q$SELECT public.guardian_reapprove_team_membership('squad', %L)$q$, t.id('ukid')), 'AGE_VERIFICATION_REQUIRED',
+  'a child with no declared age cannot be re-approved');
+SELECT t.reset();
+SELECT t.ok(NOT private_sec.team_membership_authorizes('squad', t.id('ukid')), 'and the membership still does not count');
+
 ROLLBACK;
