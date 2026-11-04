@@ -234,3 +234,33 @@ migration decision. Summary:
 ## See also
 
 PR #229 (`docs/migration-ledger.md`, opened 2026-10-28, not merged) is an earlier, separate record of what production contained for the 65 files then newer than the last ledger row, including that `20261023130000_follow_approval` was applied to production on 2026-10-28 on the owner's approval. It uses a different method (object presence by name) and covers a different set; the two do not conflict, and neither inserts a ledger row.
+
+## 8. Proposed dispositions (documentation only; nothing is inserted)
+
+`docs/migration-evidence/ledger-evidence.csv` now has three more columns per entry: `proposed_disposition`, `disposition_basis`
+and `supporting_evidence_summary`. They are proposals for the owner; no production migration-history write is approved.
+
+| Disposition                    | Entries | Meaning                                                                                                                                                                                  |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INSERT-PROTECTIVE (priority)   | 1       | Re-running the file would change data (`20261023100000_owner_hide_listings` would relabel owner-hidden listings as moderator-hidden). A row stops a version-matching tool from doing it. |
+| INSERT-PROTECTIVE              | 27      | Later files redefine or drop objects this file creates; re-running it would silently regress them. A row records "applied, then superseded".                                             |
+| INSERT-AFTER-OWNER-REVIEW      | 6       | Effects proven by outcome (data, bucket or small-table checks); the owner reads the postconditions first.                                                                                |
+| INSERT-OPTIONAL (history only) | 32      | Effects present with identical fingerprints; nothing depends on a re-run. A row only completes the ledger.                                                                               |
+| HOLD-DRIFT                     | 4       | Production differs in a definition or grant. No row until the drift capture (#253, and #245 for `player_trait_counts`) is merged, applied and re-verified.                               |
+| HOLD-OWNER                     | 1       | `20261030120000_sport_hubs_setting`: the setting exists but an operator set it to `{"enabled": false}`; confirm that is intended.                                                        |
+
+Guardrails that apply to every disposition:
+
+- No historical migration is replayed. No source file is fabricated or reconstructed. No obsolete column is restored (the
+  archived `20260708185348` original would re-create a dropped column and must never run).
+- The two recovered originals stay under `docs/migration-evidence/original-sources/` as evidence, outside any executable folder.
+- A ledger row records that a file was applied; it never applies it. If rows are approved, each is a single `INSERT` into
+  `supabase_migrations.schema_migrations` made in its own transaction with the owner's written approval, with `version` = the
+  file's timestamp and `name` = the file name without `.sql`. Whether `statements` holds the file's text or stays empty is the owner's
+  decision (the text is faithful to what was applied by hand; an empty array claims nothing). Template, **not executed**:
+
+```sql
+-- one approved entry per transaction; verify the file's SHA-256 against the CSV first
+insert into supabase_migrations.schema_migrations (version, name, statements)
+values ('<version_if_inserted>', '<source_file without .sql>', array[]::text[]);
+```
