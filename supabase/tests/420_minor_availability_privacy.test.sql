@@ -98,4 +98,35 @@ SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id
 SELECT t.as_user(t.id('teenfree'));
 SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teenfree'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'a 17-year-old without guardian controls can still contact an adult through the adult''s post (unchanged; see the R7 note)');
 SELECT t.reset();
+-- ================= 4. legacy data procedure (defined, never run by the migration)
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.player_availabilities (id, user_id, sports, skill_level, recurring_days, city, travel_radius_km, note, status, time_slots, lat, lng, formatted_address, place_id) VALUES
+  ('00000000-0000-0000-0000-0000000000c1', t.id('teen17'), ARRAY['Tennis'], 'All Levels', ARRAY['Mon'], 'Atlanta', 10, 'Meet at 77 Birch Ave', 'closed', '[]'::jsonb, 33.77, -84.37, '77 Birch Ave', 'p9'),
+  ('00000000-0000-0000-0000-0000000000c2', t.id('kid11'), ARRAY['Tennis'], 'All Levels', ARRAY['Mon'], 'Atlanta', 10, 'ok', 'closed', '[]'::jsonb, 33.78, -84.38, '1 Pine St', 'p8'),
+  ('00000000-0000-0000-0000-0000000000c3', t.id('adultpost'), ARRAY['Tennis'], 'All Levels', ARRAY['Mon'], 'Atlanta', 10, 'adult note', 'closed', '[]'::jsonb, 33.79, -84.39, '5 Oak Rd', 'p7');
+SET LOCAL session_replication_role = origin;
+SELECT t.eq(has_function_privilege('authenticated', 'private_sec.blank_minor_availability_location(integer)', 'EXECUTE'), false, 'clients cannot run the blanking procedure');
+SELECT t.eq((SELECT count(*)::int FROM public.player_availabilities WHERE user_id IN (t.id('teen17'), t.id('kid11')) AND (lat IS NOT NULL OR formatted_address IS NOT NULL OR place_id IS NOT NULL)), 3, 'before: legacy rows by minors hold precise values (a2 from the fixture, c1, c2)');
+SELECT t.eq(private_sec.blank_minor_availability_location(1), 1, 'a batch of one blanks one row');
+SELECT t.eq(private_sec.blank_minor_availability_location(500), 2, 'the rest in the next batch');
+SELECT t.eq(private_sec.blank_minor_availability_location(500), 0, 'then it returns 0 and is idempotent');
+SELECT t.eq((SELECT count(*)::int FROM public.player_availabilities WHERE user_id IN (t.id('teen17'), t.id('kid11')) AND (lat IS NOT NULL OR lng IS NOT NULL OR formatted_address IS NOT NULL OR place_id IS NOT NULL)), 0, 'after: no minor row holds a coordinate, address or place id');
+SELECT t.eq((SELECT city FROM public.player_availabilities WHERE id = '00000000-0000-0000-0000-0000000000c1'), 'Atlanta', 'the city is kept');
+SELECT t.ok((SELECT lat IS NOT NULL AND formatted_address = '5 Oak Rd' FROM public.player_availabilities WHERE id = '00000000-0000-0000-0000-0000000000c3'), 'an adult''s row is untouched');
+SELECT t.eq((SELECT sum((metadata ->> 'rows')::int)::int FROM public.admin_audit_log WHERE action = 'minor_availability_location_blanked'), 3, 'the run is audited with counts only');
+SELECT t.as_user(t.id('teen17'));
+SELECT t.lives($q$UPDATE public.player_availabilities SET lat = 33.1, lng = -84.1, formatted_address = '9 New St' WHERE id = '00000000-0000-0000-0000-0000000000c1'$q$, 'the owner can edit the post');
+SELECT t.reset();
+SELECT t.ok((SELECT lat IS NULL AND formatted_address IS NULL FROM public.player_availabilities WHERE id = '00000000-0000-0000-0000-0000000000c1'), 'but a precise value never returns to a minor''s row');
+SELECT t.as_user(t.id('modone'));
+SELECT t.ok((SELECT count(*) FROM public.list_minor_availability_notes_with_location_text() WHERE post_id = '00000000-0000-0000-0000-0000000000c1') = 1, 'a moderator finds the note that names a place');
+SELECT t.ok((SELECT count(*) FROM public.list_minor_availability_notes_with_location_text() WHERE post_id = '00000000-0000-0000-0000-0000000000c3') = 0, 'but not an adult''s');
+SELECT t.lives($q$SELECT public.moderator_scrub_availability_note('00000000-0000-0000-0000-0000000000c1', 'names a place')$q$, 'and scrubs it');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.throws($q$SELECT * FROM public.list_minor_availability_notes_with_location_text()$q$, 'Moderators only', 'a member cannot list');
+SELECT t.throws($q$SELECT public.moderator_scrub_availability_note('00000000-0000-0000-0000-0000000000c1')$q$, 'Moderators only', 'or scrub');
+SELECT t.reset();
+SELECT t.ok((SELECT note IS NULL FROM public.player_availabilities WHERE id = '00000000-0000-0000-0000-0000000000c1'), 'the note is removed');
+SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE action = 'availability_note_scrubbed' AND actor_id = t.id('modone') AND reason = 'names a place'), 1, 'audited with the moderator and without a copy of the text');
+
 ROLLBACK;
