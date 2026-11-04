@@ -1,6 +1,18 @@
 # Privacy gap register (youth safety release)
 
-Status date: 2026-11-04. Audited on `main` (`153f6009` or later) combined with the open pull requests #245, #247, #248, #249 and #256 (#253 merged on 2026-11-04), using code reading, a replayed combined database and read-only production catalog queries. Nothing here was changed. The release is **not complete while any "Open" row remains** unless the owner records an explicit acceptance.
+Status date: 2026-11-04 (revision 3). Audited on `main` (`a453f2a0`, which contains only repository governance, tests and documentation: #251 to #255 and #257) combined with every open privacy pull request, using code reading, a replayed combined database and read-only production catalog queries. **No privacy change is merged. Nothing has been applied to, or verified in, production.** Production is NO-GO.
+
+## How to read a status
+
+Each item is classified on five separate lines. A later line is never implied by an earlier one, and "local tests pass" never means "fixed".
+
+| Word                       | Meaning                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Implemented locally**    | code and tests exist and pass in a local replay of the migrations. Says nothing about any real project.                         |
+| **Open in PR**             | the change is in a pull request that is not merged; the number is given.                                                        |
+| **Merged**                 | the change is in `main`. Merging applies nothing: Lovable syncs `main`, migrations are applied by hand, publishing is separate. |
+| **Applied to production**  | the migration has been run and the application published in the production project.                                             |
+| **Verified in production** | the read-only checks in the runbook (sections 3, 7, 12) have been run against production after it was applied, and match.       |
 
 Policy this register enforces (owner, 2026-11-04):
 
@@ -9,62 +21,45 @@ Policy this register enforces (owner, 2026-11-04):
 - Precise youth-game locations never enter general-purpose client caches; legacy caches are purged on update, account switch and logout. Rollback never restores exact locations into public columns. Residual copies (backups, offline devices) are documented with retention and mitigations.
 - Invitations hold only coarse location. Eligibility, approval, revocation and payment rules are verified.
 
-## Closed by open pull requests (pending staging rehearsal)
+## Master status (revision 3)
 
-| Path                                                                                                             | Closed by                               | Evidence                                                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `hosted_games` exact location/coordinates readable by any signed-in account                                      | #247 (+ coarsening step in the runbook) | test 320 (98 assertions); coarsening not yet rehearsed in a real project                                                       |
-| Invitations (contact request, message, notification) carrying the exact venue                                    | #256                                    | test 360 (76 assertions) including pending, rejected, approved, revoked, unpaid, payment-pending, verified and refunded states |
-| Address or venue typed into a youth game's title, description, neighborhood, rules, equipment, cancellation text | #256                                    | test 360; moderator scan function; heuristic limits below                                                                      |
-| Local cache `openrun.hostedGames.v1`/`v2`, avatar cache `v1`/`v2`                                                | #249                                    | unit tests: v1 deleted on first load, v2 coarse only, reset on sign-out and user switch                                        |
-| Reminders, passport, guardian activity, MCP output                                                               | #249                                    | unit tests                                                                                                                     |
-| Minor host's name via `visible_avatars`; neutral host snapshot                                                   | #248                                    | test 335 (62 assertions)                                                                                                       |
+Every row below: Merged = **No**, Applied to production = **No**, Verified in production = **No**, unless a cell says otherwise.
 
-## Open: gaps requiring implementation
+| Item                                                                                  | Implemented locally                                             | Open in PR             | Evidence (local only)                                              | What is still open                                                                                                                                       |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRIV-1 reviews/reputation about adults only                                           | Yes                                                             | #245                   | test 310, 340, 345, 350                                            | merge, apply, verify                                                                                                                                     |
+| PRIV-2A private storage of exact youth-game location                                  | Yes                                                             | #247                   | test 320 (98)                                                      | merge, apply, **coarsening of existing rows (separate step)**, verify                                                                                    |
+| PRIV-2B age eligibility, minor hosting, host identity snapshot                        | Yes                                                             | #248                   | test 330, 335 (62)                                                 | merge, apply, verify                                                                                                                                     |
+| PRIV-2C app-side location handling and caches                                         | Yes                                                             | #249 (stack base)      | unit tests                                                         | its DB check has never run on its own head (base is the stack branch); run after retarget to `main`                                                      |
+| PRIV-2D free text and invitations                                                     | Yes                                                             | #256                   | test 360 (76)                                                      | merge, apply, verify; detector is a heuristic                                                                                                            |
+| G1 team-post exact venue                                                              | Yes                                                             | #259                   | test 370 (78)                                                      | merge, apply, **coarsening of existing posts**, verify                                                                                                   |
+| G2 team facility details                                                              | Yes                                                             | #260                   | test 380 (61)                                                      | merge, apply, **coarsening of existing teams**, verify; owner to confirm what counts as a youth team                                                     |
+| G3 image metadata stripped server-side                                                | Yes                                                             | #258                   | unit tests with GPS fixtures                                       | merge, deploy, verify in a real project                                                                                                                  |
+| G3b private staging for uploads (closes the exposure window found in the #258 review) | Yes                                                             | #268 (stacked on #258) | 11 unit tests; test 440 (16)                                       | merge, apply, deploy; **the old direct-upload path stays open until a later approved migration**; CDN and Storage behaviour only testable in the sandbox |
+| G4 restricted organizer lookup, minor host profile privacy                            | Yes                                                             | #263                   | test 400 (36)                                                      | merge, apply, verify                                                                                                                                     |
+| R1 minor host's account id used to look up team or skill rating                       | Yes                                                             | #266 (stacked on #263) | test 410 (39)                                                      | merge, apply, verify; the id itself stays in public rows by design (accepted residual)                                                                   |
+| R2 minor availability posts and contact requests                                      | Yes                                                             | #265                   | test 420 (37)                                                      | merge, apply, verify; **existing posts by minors keep stored coordinates until a separately approved blanking step**                                     |
+| R7 messaging policy                                                                   | Audit and regression test only                                  | #267                   | test 430 (18)                                                      | **five exceptions to "no stranger-to-minor direct messaging" remain (E1 to E5, `docs/privacy/r7-messaging-audit.md`); a fix needs owner approval**       |
+| MOD-1 reporting of team posts, comments and media                                     | Database and client helpers; **no report buttons yet**          | #269 (stacked on #262) | test 450 (67)                                                      | UI wiring, merge, apply, verify; retention purge not scheduled; legal review of retention windows                                                        |
+| G5 client caches                                                                      | Yes                                                             | #261                   | manifest tests (7) and a scan for unregistered storage keys        | merge, deploy; devices that never open the new build keep old data; delivered push notifications cannot be recalled                                      |
+| G6 human review of location disclosures                                               | Yes                                                             | #262                   | test 390 (37)                                                      | merge, apply, verify; the detector remains a heuristic                                                                                                   |
+| Historical images keep GPS/EXIF                                                       | **Not implemented** (inventory and plan only)                   | #268 (document)        | read-only inventory: 32 image objects, all with moderation records | assessment run, then a sandbox rewrite, then a separately approved production rewrite                                                                    |
+| Guarded coarsening of existing production rows (games, team posts, team facilities)   | Implemented as guarded batch functions, never run outside tests | in the PRs above       | runbook section 8 and S9                                           | separate written approval after the adoption window                                                                                                      |
+| Supabase sandbox verified                                                             | No                                                              | n/a                    | `docs/release/sandbox-verification.md`                             | owner verification, then S0 to S11                                                                                                                       |
 
-Severity: **High** = an unauthorized account can read a private location or identity today. **Medium** = needs work before the release counts as complete. **Low** = defence in depth or documentation.
+### Combined local result (integration branch `staging/priv-rehearsal`, not pushed as a PR, not a deployment source)
 
-### G1 (High). Team posts expose exact venues to anonymous visitors
+Merged in order: `main`, #245, #249 (with its stack), #256, #259, #260, #258, #268, #263, #266, #265, #267, #261, #262, #269. No conflicts; migration versions unique apart from the four historical duplicates. **SQL suite 1691 passed, 0 failed; unit tests 3094 passed, 22 skipped, 0 failed; `tsc --noEmit` clean; production build succeeds** (needs `NODE_OPTIONS=--max-old-space-size=6144` on a small machine). Required CI checks (Unit tests, Lint, Typecheck & build, Replay migrations and run SQL tests) were read from GitHub for each head on 2026-11-04: **all four green** on #258, #259, #260, #262, #263, #264, #265, #266, #267, #268 and #269 (Playwright fails at its sandbox preflight and is not required). **#261 and #249 have no database check on their current heads** because their stack bases carry the older, path-filtered workflow; they need the check after they are updated against `main`. The heads of #245, #247, #248, #249 and #256 date from 2026-11-03, before #253 and #257 were merged; they must be updated against `main` and their checks re-read before any merge.
 
-- Fact: policy `team_posts_public_read` is granted to `public` (anonymous included) and `anon` has table-level SELECT on `team_posts`. Every non-hidden post of a non-hidden team exposes `location`, `formatted_address`, `lat`, `lng` and `place_id`. `teams.age_groups` can be `youth`, and the anonymous-read test asserts that a youth team's tryouts are deliberately public. There is no per-post visibility, no coarse form, no private table, no public-venue policy, and no text guard on title, body or location.
-- Required policy: private youth activities show no exact location; a verified public venue may be shown under an explicit policy.
-- Proposed implementation (a new migration + small app change, to be reviewed before any production use):
-  1. `team_posts.location_visibility` (`'private'` | `'public_venue'`), default `'private'` for teams whose `age_groups` include `youth` or that have any minor member; `'public_venue'` is set only through a moderator/owner-approved function that records who verified the venue and when (`venue_verified_by`, `venue_verified_at`) and refuses unless the post is for a recognized public facility (organization listing or verified venue).
-  2. A private table `team_post_private` (exact location, coordinates, place id) with RLS for the author, team managers, team members and verified guardians of members; a BEFORE trigger writes the exact copy and stores the coarse form (city/area, 2-decimal coordinates) in the public columns for `'private'` posts.
-  3. Reuse `private_sec.text_discloses_location` for title, body and location of `'private'` posts.
-  4. Tests for anonymous, signed-in stranger, member, guardian of a member, manager, moderator and administrator; event notifications and tryout alerts built from the coarse form; sitemap and search read only public columns.
-- Open decision for the owner: whether youth-team tryouts keep their precise venue public as a deliberate product choice (then each needs the explicit policy and verification above) or default to private.
+## Remaining open items (owner decisions or later work)
 
-### G2 (High). Youth teams' facility addresses are readable by every signed-in account
-
-- Fact: `teams.home_court`, `venues`, `venue_addresses`, `primary_venue`, `venue_geo` and `availability_slots` have column privileges for `authenticated` (not `anon`); the signed-in read policy shows any non-hidden team. For a youth team these are practice venues.
-- Proposed implementation: revoke those columns from `authenticated` and expose them through a function that returns them only to managers, members, verified guardians of members and (for verified public facilities) everyone; keep a coarse `city` public. Tests as in G1.
-- Decision needed: which teams count as "youth" (`age_groups` contains `youth`, or any minor member).
-
-### G3 (Medium). Image metadata (EXIF/GPS) is not stripped on the server
-
-- Fact: uploads to `game-covers`, avatars, covers and team/org images go through `finalizeImageUpload`, which re-validates type/size and safety-scans but does not re-encode or strip metadata. The only re-encoding is the message-attachment compressor, which touches JPEG/PNG over 300 KB; smaller files are sent unchanged. Child reel clips have a separate client-side location-removal step. The `ballacity-originals` IndexedDB cache keeps original images on the device.
-- Proposed implementation: re-encode in `finalizeImageUpload` (drop all metadata) for every bucket, and strip on the message path regardless of size; tests with GPS-EXIF fixtures (`scripts/generate-exif-fixtures.py` exists); document the device cache and clear it on sign-out.
-
-### G4 (Medium). No restricted organizer-information path for minor hosts; `host_id` is public
-
-- Fact: `hosted_games.host_id` (the account id of the host) is readable by any signed-in account for youth games. #248 neutralizes the host snapshot and hides the name via `visible_avatars`, but there is no function that gives a participant, guardian or moderator the permitted organizer information, and the id itself identifies the account.
-- Proposed implementation: the per-game `host_ref` design (option B in the earlier proposal): a stable opaque reference replaces `host_id` in public reads for non-adult hosts; `get_game_organizer(game_id)` (restricted, definer) returns the permitted details to the host, roster members with settled participation, their verified guardians, organization admins and moderators; everyone else gets the neutral snapshot.
-- Test coverage today: test 335 covers anonymous, signed-in stranger, teen mate, payer, guardian, other guardian, organization admin, host and an administrator. **Not covered: a moderator role and a roster participant for the identity rules.** Add both, and re-run the identity tests through the API in staging.
-
-### G5 (Medium). Client caches: residual and structural gaps
-
-- Closed by #249: hosted-games and avatar caches (v1 deleted, v2 coarse), reset on sign-out and user switch.
-- Gaps: (a) no generic "cache epoch" that purges unknown legacy keys on application update (each new version must remember to list the old key); (b) the `ballacity-originals` IndexedDB cache is not in the reset list; (c) push notifications and browser history already delivered before the update cannot be recalled.
-- Proposed implementation: a versioned client-storage manifest that deletes every key not in the current manifest on update, sign-out and user switch; add the originals cache to the reset; unit tests; staging check on a device holding the old build's data.
-
-### G6 (Medium). Free-text detection is a heuristic
-
-- The detector (#256) refuses addresses, map links, coordinates, units and the venue name; it cannot see paraphrases. Mitigation in place: `list_youth_games_with_location_text()` for moderators, existing hide tools. Needed: a user-facing report path on game pages for "this reveals a location", a moderation runbook, and a periodic scan (V6 in the runbook).
-
-### G7 (Low). Messages between users
-
-- A person telling another a place is a conversation, governed by the messaging rules. Recorded as accepted by design; the owner confirms.
+- **R1 residual:** `host_id` remains in public rows of youth games (a pattern, not a name). An opaque per-game reference would change payments and policies; accepted risk until the owner decides.
+- **R3:** images already stored keep their metadata until assessed and rewritten (sandbox first).
+- **R5:** guarded coarsening of existing rows is a separate, irreversible, separately approved step.
+- **R6:** the sandbox is unverified; no remote end-to-end run has happened. Playwright must not become a required check before then.
+- **R7:** exceptions E1 to E5 in the messaging audit need an owner decision; a rule is proposed, not implemented.
+- **MOD-1:** report and appeal buttons are not wired; retention durations need legal review.
+- **Team posts and facilities of minors** also depend on the owner's definition of a youth team (G2).
 
 ## Residual data and retention (documented, not removable)
 
