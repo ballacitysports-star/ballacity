@@ -4,9 +4,14 @@ Status: **prepared, not run.** No sandbox is verified yet: `docs/release/verifie
 `scripts/rehearsal-guard.mjs` refuses every step. This plan touches no production system. Nothing in it is approval to
 run anything; each step below needs the owner's go-ahead at the time.
 
-Build under test: branch `staging/priv-rehearsal-r4` at `c637ec5e` (integration r4: R7, SEC-2, SEC-1, PAY-1, #268 and
-the preflight). It is a throwaway integration branch. It is never merged and never deployed to production. The
-migration list is `docs/release/release-manifest.json` on that branch (28 files, `20261103100000` to `20261107110000`).
+Build under test: the throwaway integration branch the owner names at the time of the rehearsal. It is never merged
+and never deployed to production. `staging/priv-rehearsal-r4` at `c637ec5e` (integration r4: R7, SEC-2, SEC-1, PAY-1,
+#268 and the preflight) holds the R4 part only: 28 files, `20261103100000` to `20261107110000`. The release is now
+**32 migrations**: those 28 plus SEC-4, SEC-5, SEC-6 and SEC-7 (`20261108100000_first_guardian_verification`,
+`20261108110000_public_organizer_ref`, `20261108120000_image_quarantine_reencode`,
+`20261108130000_remaining_security_defects`), and 33 if a payments PR adds `20261108140000`. The authoritative list,
+order and sha256s are `docs/release/release-manifest.json` on the build under test at the time of the rehearsal,
+regenerated with the preflight from PR #277 (section 3); this document does not fix them.
 
 Related: runbook sections 4, 4a, 5 and 15 (`youth-privacy-release-runbook.md`); `sandbox-verification.md`;
 `staging-test-checklist.md` (the ST-* IDs below); `privacy-gap-register.md`; `docs/privacy/*.md`.
@@ -89,12 +94,13 @@ bun run preflight -- --offline                                  # manifest vs ch
 bun run preflight -- --json > rehearsal-pre.json                # read-only; uses PREFLIGHT_DATABASE_URL
 ```
 
-- It must exit 0 and list all 28 migrations as pending, in the order of section 4.
-- **16-vs-17.** The r4 manifest was generated on Postgres 16 (`generated.server_version_num` 160015), while the
-  sandbox runs 17. The preflight on r4 only warns about this. For the rehearsal, treat that warning as blocking. Use
-  the fail-closed preflight from PR #277 (`claude/release-preflight`), with a manifest regenerated from this branch
-  and merged with its PG17 hashes from the `Release preflight (PG17)` CI artifact (`docs/release/release-preflight.md`
-  on that branch). Any "unrecognized" result stops the rehearsal.
+- It must exit 0 and list every manifest migration as pending (32, or 33 with `20261108140000`), in manifest order.
+  That pending list, with its sha256s, is the order of section 4.
+- **16-vs-17.** Use the fail-closed preflight from PR #277 (`claude/release-preflight`), with a manifest regenerated
+  from the build under test and merged with its PG17 hashes from the `Release preflight (PG17)` CI artifact
+  (`docs/release/release-preflight.md` on that branch). It **fails** (exit 1) when the manifest carries no hashes for
+  the target's major; it does not warn or fall back. The sandbox runs 17, so a manifest generated only on 16 is
+  refused. Any failure, including "unrecognized state", stops the rehearsal.
 - Keep the JSON with the rehearsal record. The preflight is read-only (`BEGIN READ ONLY`, aborts unless
   `transaction_read_only = on`) and never writes the ledger.
 
@@ -121,6 +127,9 @@ COMMIT;
 ```
 
 This is the same ledger insertion the release will use: `statements` holds the file content as one text element.
+The preflight checks it: a release-range row whose `name` is not the file stem, whose `statements` is empty, or whose
+`statements[1]` does not hash to the manifest sha256 fails. psql's backquote expansion drops the file's final newline,
+and the preflight accepts exactly that difference and no other.
 Do **not** use `supabase db push`. It would also try the historical files, which are ledgered differently (runbook
 section 1).
 
@@ -137,6 +146,31 @@ EXCLUSIVE for `ALTER TABLE` and `ALTER/CREATE POLICY`; SHARE ROW EXCLUSIVE for `
 timeout the transaction rolls back completely. Wait, check `pg_stat_activity` for the blocker (read-only), and retry at
 most three times. Never raise `lock_timeout` above `30s`, and never terminate another backend without the owner's
 approval. Record every retry with its duration: production needs these numbers.
+
+**Order.** Apply the files in the order of the pre-check's pending list (the manifest at the time of the rehearsal),
+checking each file's sha256 against that manifest. The table below is **R4 only** (files 1-28, as recorded on
+`c637ec5e`), kept for its dependency and lock notes; its sha256 column is not authoritative. Files 29-32 (SEC-4 to
+SEC-7, `20261108100000` to `20261108130000`, then `20261108140000` if present) follow in timestamp order, with the
+dependency guards the manifest records for them, `lock_timeout = '3s'` and a quiet window.
+
+**Before SEC-7 (`20261108130000`): count the legacy payment settings.** SEC-7 forces `requires_approval = true` on
+existing paid or `ballacity_processed` payment settings of games whose host is not a verified adult. Record, read-only,
+before applying it:
+
+```sql
+BEGIN READ ONLY;
+SELECT count(*)                                                    AS ballacity_processed_rows,
+       count(*) FILTER (WHERE NOT coalesce(s.requires_approval, false)) AS without_approval,
+       count(*) FILTER (WHERE coalesce(public.age_cohort_of(g.host_id), 'unknown') <> 'adult') AS non_adult_host
+  FROM public.game_payment_settings s
+  LEFT JOIN public.hosted_games g ON g.id = s.game_id
+ WHERE s.payment_mode = 'ballacity_processed';
+ROLLBACK;
+```
+
+Keep the three counts with the per-file log. After SEC-7, the rows with a non-adult host must all have
+`requires_approval = true`. In the sandbox these rows come only from the synthetic fixtures. For production the same
+count is a separate read-only step that needs its own approval.
 
 | #   | File                                                         | sha256 (first 12) | Dependency guard (must exist before; from the manifest `requires`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Tables locked by DDL                                                                                                                                                                                           | lock_timeout                 |
 | --- | ------------------------------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
@@ -222,8 +256,8 @@ Run the guard first. Then:
 bun run preflight -- --verify-after --json > rehearsal-post.json
 ```
 
-It must exit 0: all 28 applied, and every protected function and policy equal to `expect_after` for the sandbox's
-major (with the PG17 manifest of section 3). Then re-run the catalog fingerprint and the runbook section 12b
+It must exit 0: every manifest migration applied (32, or 33), and every protected function, policy, table and bucket
+equal to `expect_after` for the sandbox's major (with the PG17 manifest of section 3). Then re-run the catalog fingerprint and the runbook section 12b
 aggregates (expect the switch-OFF values; no coarsening has run). Record durations, row counts and anything
 surprising (runbook 4.6).
 
@@ -264,8 +298,8 @@ surprising (runbook 4.6).
 | 1   | Sandbox verified (P1-P8); allow-list entry committed                       | sign-off, commit SHA                       |          |       |      |
 | 2   | Guard prints OK on the operator machine; no production variable in the env | guard output                               |          |       |      |
 | 3   | R0 rebuild: fingerprint equals local replay; previous build works          | fingerprint diff (empty)                   |          |       |      |
-| 4   | Pre-check preflight exit 0, 28 pending, PG17 hashes                        | `rehearsal-pre.json`                       |          |       |      |
-| 5   | Migrations 1-28 applied in order; per-file checks; lock retries recorded   | per-file log with durations                |          |       |      |
+| 4   | Pre-check preflight exit 0, all 32 (or 33) pending, PG17 hashes            | `rehearsal-pre.json`                       |          |       |      |
+| 5   | Migrations 1-32 (or 33) in manifest order; SEC-7 pre-count; lock retries   | per-file log with durations                |          |       |      |
 | 6   | V1-V3 Storage (owner stamping, triggers, `info()` version, signed URLs)    | requests and responses                     |          |       |      |
 | 7   | V4 CDN, V5 sweeper, V6 old and new clients (V7 only if approved)           | timings, counts                            |          |       |      |
 | 8   | V8 pg_graphql, V9 schema cache, V10 realtime                               | queries, payload captures                  |          |       |      |

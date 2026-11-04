@@ -5,7 +5,11 @@
 //
 // It refuses (exit 1) unless SANDBOX_PROJECT_REF is set, is a well-formed Supabase project ref, is not a production
 // identifier, and is listed in docs/release/verified-sandboxes.json with the owner's verification and sign-off. It
-// also refuses when a Supabase URL or a readable JWT in the environment names a different project or a production one.
+// also refuses when a Supabase URL or a readable JWT in the environment names a different project or a production one,
+// and when a database target does not resolve to the sandbox: every postgres:// URL or conninfo string (after the
+// host, hostaddr, user and service query parameters that override its authority) and the libpq variables PGHOST,
+// PGHOSTADDR, PGUSER, PGSERVICE and PGSERVICEFILE must name db.<ref>.supabase.co, or a Supabase pooler host with
+// user postgres.<ref>, for the verified <ref>. hostaddr and services are refused outright.
 //
 // It connects to nothing: no network, no database, no Supabase API. It reads only the environment and repository
 // files, and prints only the sandbox ref and the names of failed checks, never another variable's value or a key.
@@ -76,21 +80,97 @@ function jwtRef(value) {
   }
 }
 
-/** The project ref a Supabase API or database URL names (api host, db.<ref> host, or pooler user postgres.<ref>). */
+/** The project ref a Supabase API URL names (https://<ref>.supabase.co); database URLs are checked by dbTargetFailures. */
 function urlRef(value) {
   try {
     const url = new URL(String(value).trim());
-    const host = url.hostname.toLowerCase();
-    const m = /^(?:db\.)?([a-z0-9]+)\.supabase\.(co|in)$/.exec(host);
-    if (m) return m[1];
-    if (/\.pooler\.supabase\.com$/.test(host)) {
-      const u = /\.([a-z0-9]{20})$/.exec(decodeURIComponent(url.username).toLowerCase());
-      return u ? u[1] : "";
-    }
-    return null;
+    const m = /^(?:db\.)?([a-z0-9]+)\.supabase\.(co|in)$/.exec(url.hostname.toLowerCase());
+    return m ? m[1] : null;
   } catch {
     return null;
   }
+}
+
+const POOLER_HOST = /^[a-z0-9-]+\.pooler\.supabase\.com$/;
+const isDbUrl = (v) => /^\s*postgres(?:ql)?:\/\//i.test(v);
+/** libpq keyword/value conninfo ("host=... user=..."), recognized when it names a host, hostaddr or service. */
+function conninfoParams(v) {
+  const s = String(v).trim();
+  if (!/^(?:[a-z_]+\s*=\s*(?:'(?:[^'\\]|\\.)*'|\S+)\s*)+$/i.test(s)) return null;
+  const params = {};
+  for (const m of s.matchAll(/([a-z_]+)\s*=\s*('(?:[^'\\]|\\.)*'|\S+)/gi))
+    params[m[1].toLowerCase()] = m[2].startsWith("'")
+      ? m[2].slice(1, -1).replace(/\\(.)/g, "$1")
+      : m[2];
+  return "host" in params || "hostaddr" in params || "service" in params ? params : null;
+}
+
+/**
+ * Failures for one database target (a URL, a conninfo string, or the PG* variables), given the host, hostaddr,
+ * user and service libpq would use. The only accepted targets are db.<ref>.supabase.co and a Supabase pooler host
+ * with user postgres.<ref>, where <ref> is the verified sandbox. Messages name the variable, never its value.
+ */
+function targetFailures(what, { host, hostaddr, user, service }, r) {
+  const out = [];
+  if (service) out.push(`${what} names a libpq service, which can point at any host; refused`);
+  if (hostaddr)
+    out.push(
+      `${what} sets hostaddr, which connects to an address that cannot be verified as the sandbox; refused`,
+    );
+  const hosts = norm(host)
+    .split(",")
+    .map((h) => h.trim().replace(/^\[|\]$/g, ""));
+  for (const h of hosts) {
+    if (h === "") {
+      out.push(`${what} names no host (a local socket or an ambient PGHOST), not the sandbox`);
+      continue;
+    }
+    const direct = /^db\.([a-z0-9]*)\.supabase\.co$/.exec(h);
+    if (direct) {
+      if (direct[1] !== r) out.push(`${what} connects to another project's database host`);
+      continue;
+    }
+    if (POOLER_HOST.test(h)) {
+      const u = /^[^.]+\.([a-z0-9]*)$/.exec(norm(user));
+      if (!u || u[1] === "")
+        out.push(
+          `${what} uses a Supabase pooler without a project ref in its user (postgres.<ref>); refused`,
+        );
+      else if (u[1] !== r) out.push(`${what} uses the pooler with another project's user`);
+      continue;
+    }
+    out.push(
+      `${what} connects to a host that is not the sandbox's database (db.<ref>.supabase.co or its pooler)`,
+    );
+  }
+  return out;
+}
+
+/** Failures for a database URL: the ?host, ?hostaddr, ?user and ?service query parameters override the authority. */
+export function dbUrlFailures(name, value, r) {
+  let url;
+  try {
+    url = new URL(String(value).trim());
+  } catch {
+    return [`environment variable ${name} is a database URL that cannot be parsed; refused`];
+  }
+  const q = (k) => url.searchParams.get(k);
+  let user = "";
+  try {
+    user = decodeURIComponent(url.username);
+  } catch {
+    user = url.username;
+  }
+  return targetFailures(
+    `environment variable ${name}`,
+    {
+      host: q("host") ?? url.hostname,
+      hostaddr: q("hostaddr"),
+      user: q("user") ?? user,
+      service: q("service"),
+    },
+    r,
+  );
 }
 
 /**
@@ -142,12 +222,45 @@ export function checkSandbox({ ref, allowList, env = {}, production }) {
   }
 
   // Nothing in the environment may point at another project: URLs and readable JWT claims must name the sandbox.
+  // Database targets (postgres:// URLs, conninfo strings and the libpq PG* variables) must resolve to the
+  // sandbox's own host, after the query parameters libpq applies over the URL's authority.
+  const has = (k) => typeof env[k] === "string" && env[k] !== "";
+  if (has("PGHOST") || has("PGHOSTADDR") || has("PGSERVICE") || has("PGSERVICEFILE"))
+    failures.push(
+      ...targetFailures(
+        "the libpq environment (PGHOST/PGHOSTADDR/PGUSER/PGSERVICE)",
+        {
+          host: env.PGHOST ?? "",
+          hostaddr: env.PGHOSTADDR,
+          user: env.PGUSER,
+          service: env.PGSERVICE || env.PGSERVICEFILE,
+        },
+        r,
+      ),
+    );
+  if (has("PGUSER")) {
+    const u = /^postgres\.([a-z0-9]*)$/.exec(norm(env.PGUSER));
+    if (u && u[1] !== r)
+      failures.push("environment variable PGUSER names another project's pooler user");
+  }
   for (const [name, value] of Object.entries(env)) {
     if (typeof value !== "string" || value === "" || name === "SANDBOX_PROJECT_REF") continue;
     const v = norm(value);
     if ([...prod].some((p) => v.includes(p)))
       failures.push(`environment variable ${name} contains a production identifier`);
-    const u = /SUPABASE|_URL$/i.test(name) ? urlRef(value) : null;
+    if (isDbUrl(value)) failures.push(...dbUrlFailures(name, value, r));
+    else {
+      const ci = conninfoParams(value);
+      if (ci)
+        failures.push(
+          ...targetFailures(
+            `environment variable ${name}`,
+            { host: ci.host ?? "", hostaddr: ci.hostaddr, user: ci.user, service: ci.service },
+            r,
+          ),
+        );
+    }
+    const u = !isDbUrl(value) && /SUPABASE|_URL$/i.test(name) ? urlRef(value) : null;
     if (u && u !== r)
       failures.push(`environment variable ${name} is a Supabase URL for another project`);
     const j = jwtRef(value);
