@@ -57,13 +57,26 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       throw new Error(problem ?? "That file type is not allowed.");
     }
 
+    let stored: Uint8Array = buffer;
+    if (checked.kind === "image" && /^image\/(jpeg|png|webp)$/.test(checked.mime)) {
+      // Location and device tags are removed from the stored picture before the recipient or a scanner sees it.
+      try {
+        const { stripStoredImage } = await import("@/lib/image-metadata.server");
+        stored = (await stripStoredImage(supabaseAdmin, BUCKET, data.path, buffer, checked.mime))
+          .bytes;
+      } catch {
+        await remove();
+        throw new Error("That picture can't be sent. Please try a different one.");
+      }
+    }
+
     if (checked.kind === "image") {
       const { scanImageForSafety } = await import("@/lib/image-safety.server");
       let target: string | null;
-      if (buffer.byteLength <= 4 * 1024 * 1024) {
+      if (stored.byteLength <= 4 * 1024 * 1024) {
         let binary = "";
-        for (let i = 0; i < buffer.length; i += 0x8000) {
-          binary += String.fromCharCode(...buffer.subarray(i, i + 0x8000));
+        for (let i = 0; i < stored.length; i += 0x8000) {
+          binary += String.fromCharCode(...stored.subarray(i, i + 0x8000));
         }
         target = `data:${checked.mime};base64,${btoa(binary)}`;
       } else {
@@ -95,7 +108,7 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
         conversation_id: parsed.conversationId,
         kind: checked.kind,
         mime: checked.mime,
-        bytes: buffer.byteLength,
+        bytes: stored.byteLength,
       } as never,
       { onConflict: "path" },
     );
@@ -103,5 +116,5 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       await remove();
       throw new Error("Could not record the attachment check");
     }
-    return { ok: true as const, kind: checked.kind, mime: checked.mime, bytes: buffer.byteLength };
+    return { ok: true as const, kind: checked.kind, mime: checked.mime, bytes: stored.byteLength };
   });
