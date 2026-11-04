@@ -109,6 +109,9 @@ SELECT t.lives(format($q$UPDATE public.team_posts SET location = 'New Gym', lat 
 SELECT t.eq((SELECT location FROM public.team_post_private WHERE post_id = t.id('p-new')), 'New Gym', 'the private copy follows');
 SELECT t.eq(t.pub('p-new'), 'Atlanta', 'and the public column stays coarse');
 SELECT t.lives(format($q$UPDATE public.team_posts SET spots_taken = 3, pinned = true WHERE id = %L$q$, t.id('p-new')), 'unrelated updates (spots, pin) do not disturb it');
+SELECT t.lives(format($q$UPDATE public.team_posts SET lat = 33.4444, lng = -84.3333 WHERE id = %L$q$, t.id('p-new')), 'a partial edit (coordinates only) works');
+SELECT t.ok((SELECT location = 'New Gym' AND lat = 33.4444 FROM public.team_post_private WHERE post_id = t.id('p-new')), 'and does not overwrite the private venue name with the coarse one');
+SELECT t.ok((SELECT location = 'Atlanta' AND lat = 33.44 AND lng = -84.33 FROM public.team_posts WHERE id = t.id('p-new')), 'while the public columns stay coarse');
 SELECT t.reset();
 
 -- ---- text of a private youth post

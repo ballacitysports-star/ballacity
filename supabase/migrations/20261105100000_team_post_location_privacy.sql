@@ -115,7 +115,7 @@ DECLARE
   _changed   boolean;
   _became_private boolean := false;
   _label     text;
-  _looks_coarse boolean;
+  _c_loc boolean; _c_addr boolean; _c_lat boolean; _c_lng boolean; _c_place boolean;
 BEGIN
   -- Only the moderator function may make a venue public.
   IF TG_OP = 'INSERT' THEN
@@ -126,33 +126,42 @@ BEGIN
 
   IF NOT private_sec.team_is_youth(NEW.team_id) THEN RETURN NEW; END IF;
 
-  _changed := TG_OP = 'INSERT'
-    OR (NEW.location, NEW.formatted_address, NEW.lat, NEW.lng, NEW.place_id)
-       IS DISTINCT FROM (OLD.location, OLD.formatted_address, OLD.lat, OLD.lng, OLD.place_id);
+  -- Which venue columns this write changes. A client that sends back the coarse values it was given changes nothing.
+  _c_loc   := TG_OP = 'INSERT' OR NEW.location          IS DISTINCT FROM OLD.location;
+  _c_addr  := TG_OP = 'INSERT' OR NEW.formatted_address IS DISTINCT FROM OLD.formatted_address;
+  _c_lat   := TG_OP = 'INSERT' OR NEW.lat               IS DISTINCT FROM OLD.lat;
+  _c_lng   := TG_OP = 'INSERT' OR NEW.lng               IS DISTINCT FROM OLD.lng;
+  _c_place := TG_OP = 'INSERT' OR NEW.place_id          IS DISTINCT FROM OLD.place_id;
+  _changed := _c_loc OR _c_addr OR _c_lat OR _c_lng OR _c_place;
   IF TG_OP = 'UPDATE' THEN
     IF OLD.public_venue AND _changed AND NOT _verifying THEN NEW.public_venue := false; END IF;   -- moving a verified venue needs a new verification
     _became_private := OLD.public_venue AND NOT NEW.public_venue;
+    IF _became_private THEN
+      _c_loc := true; _c_addr := true; _c_lat := true; _c_lng := true; _c_place := true;           -- everything is currently public and exact
+    END IF;
   END IF;
 
   IF NEW.public_venue THEN RETURN NEW; END IF;
-  IF NEW.location IS NULL AND NEW.formatted_address IS NULL AND NEW.lat IS NULL AND NEW.lng IS NULL AND NEW.place_id IS NULL THEN
-    RETURN NEW;
+  IF NOT (_changed OR _became_private) OR _existing THEN RETURN NEW; END IF;
+  IF NEW.location IS NULL AND NEW.formatted_address IS NULL AND NEW.lat IS NULL AND NEW.lng IS NULL AND NEW.place_id IS NULL
+     AND NOT EXISTS (SELECT 1 FROM public.team_post_private WHERE post_id = NEW.id) THEN
+    RETURN NEW;                                                  -- nothing to protect (an announcement)
   END IF;
 
-  _label := private_sec.coarse_team_post_label(NEW.team_id);
-  _looks_coarse := NEW.location IS NOT DISTINCT FROM _label AND NEW.formatted_address IS NULL AND NEW.place_id IS NULL
-                   AND NEW.lat IS NOT DISTINCT FROM round(NEW.lat, 2) AND NEW.lng IS NOT DISTINCT FROM round(NEW.lng, 2);
+  -- Keep the exact copy: write only the columns this statement changed, so a partial edit never overwrites a private value with a coarse one.
+  INSERT INTO public.team_post_private AS x (post_id, location, formatted_address, lat, lng, place_id)
+  VALUES (NEW.id, NEW.location, NEW.formatted_address, NEW.lat, NEW.lng, NEW.place_id)
+  ON CONFLICT (post_id) DO UPDATE
+    SET location          = CASE WHEN _c_loc   THEN EXCLUDED.location          ELSE x.location          END,
+        formatted_address = CASE WHEN _c_addr  THEN EXCLUDED.formatted_address ELSE x.formatted_address END,
+        lat               = CASE WHEN _c_lat   THEN EXCLUDED.lat               ELSE x.lat               END,
+        lng               = CASE WHEN _c_lng   THEN EXCLUDED.lng               ELSE x.lng               END,
+        place_id          = CASE WHEN _c_place THEN EXCLUDED.place_id          ELSE x.place_id          END,
+        updated_at = now();
 
-  IF (_changed OR _became_private) AND NOT _looks_coarse AND NOT _existing THEN
-    INSERT INTO public.team_post_private (post_id, location, formatted_address, lat, lng, place_id)
-    VALUES (NEW.id, NEW.location, NEW.formatted_address, NEW.lat, NEW.lng, NEW.place_id)
-    ON CONFLICT (post_id) DO UPDATE
-      SET location = EXCLUDED.location, formatted_address = EXCLUDED.formatted_address, lat = EXCLUDED.lat,
-          lng = EXCLUDED.lng, place_id = EXCLUDED.place_id, updated_at = now();
-  END IF;
-
-  IF _coarsen AND NOT _existing AND (_changed OR _became_private) THEN
-    NEW.location := _label;
+  IF _coarsen THEN
+    _label := private_sec.coarse_team_post_label(NEW.team_id);
+    NEW.location := CASE WHEN NEW.location IS NULL THEN NULL ELSE _label END;
     NEW.formatted_address := NULL;
     NEW.place_id := NULL;
     NEW.lat := round(NEW.lat, 2);
