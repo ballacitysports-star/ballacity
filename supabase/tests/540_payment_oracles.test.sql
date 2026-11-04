@@ -210,4 +210,20 @@ SELECT t.as_user(t.id('payer'));
 SELECT t.eq((SELECT string_agg(merchant_id, ',') FROM public.get_game_host_paypal('m-paid')), 'MERCH-GUARDIAN',
   '6: an involved player of the minor-hosted game gets only the payee''s merchant id, never the minor''s');
 SELECT t.reset();
+-- ============================================================ R5 review F1: moving one's own claim does not confirm a payee
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, game_id, host_id) VALUES (%L, %L, 'pub-open', %L)$q$, t.id('ps-move'), t.id('stranger'), t.id('ahost')),
+  'F1 setup: a stranger''s own pending claim on an open adult game');
+SELECT set_config('t.u_guard', t.err(format($q$UPDATE public.payment_submissions SET game_id = 'm-paid', host_id = %L WHERE id = %L$q$, t.id('guardian'), t.id('ps-move'))), true);
+SELECT set_config('t.u_other', t.err(format($q$UPDATE public.payment_submissions SET game_id = 'm-paid', host_id = %L WHERE id = %L$q$, t.id('other'), t.id('ps-move'))), true);
+SELECT set_config('t.u_host', t.err(format($q$UPDATE public.payment_submissions SET host_id = %L WHERE id = %L$q$, t.id('guardian'), t.id('ps-move'))), true);
+SELECT t.reset();
+SELECT t.ok(current_setting('t.u_other') ILIKE '%PAYMENT_FIELD_FORBIDDEN%', 'F1: moving a claim to another game or payee is refused');
+SELECT t.eq(current_setting('t.u_guard'), current_setting('t.u_other'), 'F1: guessing the real guardian payee gives the identical error');
+SELECT t.eq(current_setting('t.u_host'), current_setting('t.u_other'), 'F1: so does changing only the payee');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives(format($q$UPDATE public.payment_submissions SET notes = 'sent' WHERE id = %L$q$, t.id('ps-move')), 'F1: the player still edits their own pending claim');
+SELECT t.reset();
+SELECT t.eq((SELECT game_id || '/' || host_id::text FROM public.payment_submissions WHERE id = t.id('ps-move')), ('pub-open/' || t.id('ahost')::text), 'F1: the claim keeps its game and payee');
+
 ROLLBACK;
