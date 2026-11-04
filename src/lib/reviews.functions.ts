@@ -59,6 +59,15 @@ export const submitReview = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { moderateReviewText } = await import("@/lib/review-ai.server");
+    const { assertReviewAllowedByAge } = await import("@/lib/review-age.server");
+
+    // Before any text goes to an AI service: only an adult writes a review, and only about an
+    // adult (when it is about a person). The database enforces the same rules.
+    await assertReviewAllowedByAge(supabaseAdmin, {
+      authorId: context.userId,
+      revieweeKind: data.revieweeKind,
+      revieweeId: data.revieweeId,
+    });
 
     // Screen before insert so blocked text is never stored where others can read it.
     const mod = await moderateReviewText(supabaseAdmin, {

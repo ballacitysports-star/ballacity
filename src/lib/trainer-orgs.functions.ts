@@ -26,7 +26,11 @@ function publicClient() {
   const url = process.env.SUPABASE_URL!;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
   return createClient<Database>(url, key, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    auth: {
+      storage: undefined,
+      persistSession: false,
+      autoRefreshToken: false,
+    },
     global: {
       fetch: (input, init) => {
         const h = new Headers(init?.headers);
@@ -52,7 +56,11 @@ function viewerClient() {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_KEY!,
     {
-      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+      auth: {
+        storage: undefined,
+        persistSession: false,
+        autoRefreshToken: false,
+      },
       global: { headers: { Authorization: bearer } },
     },
   );
@@ -118,75 +126,84 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
  * the public-visibility rules are applied explicitly here (hidden trainers and
  * facilities, private/flagged reviews) and the result carries no user ids.
  */
-export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).handler(
-  async (): Promise<FeaturedTrainer | null> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: links, error } = await supabaseAdmin
-      .from("trainer_org_members")
-      .select(
-        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,avatar_url,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
-      )
-      .limit(200);
-    if (error) throw new Error(error.message);
+export const getFeaturedFacilityTrainer = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<FeaturedTrainer | null> => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: links, error } = await supabaseAdmin
+    .from("trainer_org_members")
+    .select(
+      "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,avatar_url,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
+    )
+    .limit(200);
+  if (error) throw new Error(error.message);
 
-    type Row = {
-      org: { id: string; name: string; city: string | null; hidden_at: string | null } | null;
-      teams: {
-        id: string;
-        kind: string | null;
-        owner_id: string | null;
-        name: string;
-        avatar: string | null;
-        avatar_url?: string | null;
-        city: string | null;
-        sports: string[] | null;
-        verified: boolean | null;
-        rate_per_hour: number | null;
-        session_types: string[] | null;
-        tagline: string | null;
-        bio: string | null;
-        availability_slots: unknown;
-        availability_rules: unknown;
-        hidden_at: string | null;
-      } | null;
-    };
-    const candidates: TrainerCandidate[] = [];
-    for (const row of (links ?? []) as unknown as Row[]) {
-      const t = row.teams;
-      if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
-      candidates.push({
-        id: t.id,
-        kind: t.kind,
-        ownerId: t.owner_id,
-        name: t.name,
-        avatar: teamAvatarDisplay(t) || null,
-        city: t.city,
-        sports: t.sports ?? [],
-        verified: !!t.verified,
-        ratePerHour: t.rate_per_hour,
-        sessionTypes: t.session_types ?? [],
-        tagline: t.tagline,
-        bio: t.bio,
-        availabilitySlots: t.availability_slots,
-        availabilityRules: t.availability_rules,
-        facility: { id: row.org.id, name: row.org.name, city: row.org.city },
-      });
-    }
-    if (candidates.length === 0) return null;
+  type Row = {
+    org: {
+      id: string;
+      name: string;
+      city: string | null;
+      hidden_at: string | null;
+    } | null;
+    teams: {
+      id: string;
+      kind: string | null;
+      owner_id: string | null;
+      name: string;
+      avatar: string | null;
+      avatar_url?: string | null;
+      city: string | null;
+      sports: string[] | null;
+      verified: boolean | null;
+      rate_per_hour: number | null;
+      session_types: string[] | null;
+      tagline: string | null;
+      bio: string | null;
+      availability_slots: unknown;
+      availability_rules: unknown;
+      hidden_at: string | null;
+    } | null;
+  };
+  const candidates: TrainerCandidate[] = [];
+  for (const row of (links ?? []) as unknown as Row[]) {
+    const t = row.teams;
+    if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
+    candidates.push({
+      id: t.id,
+      kind: t.kind,
+      ownerId: t.owner_id,
+      name: t.name,
+      avatar: teamAvatarDisplay(t) || null,
+      city: t.city,
+      sports: t.sports ?? [],
+      verified: !!t.verified,
+      ratePerHour: t.rate_per_hour,
+      sessionTypes: t.session_types ?? [],
+      tagline: t.tagline,
+      bio: t.bio,
+      availabilitySlots: t.availability_slots,
+      availabilityRules: t.availability_rules,
+      facility: { id: row.org.id, name: row.org.name, city: row.org.city },
+    });
+  }
+  if (candidates.length === 0) return null;
 
-    const { data: reviews } = await supabaseAdmin
-      .from("reviews")
-      .select("reviewee_id, rating")
-      .eq("reviewee_kind", "trainer")
-      .eq("is_private", false)
-      .eq("flagged", false)
-      .in(
-        "reviewee_id",
-        candidates.map((c) => c.id),
-      );
-    return pickFeaturedTrainer(candidates, summarizeRatings(reviews ?? []));
-  },
-);
+  const { data: allReviews } = await supabaseAdmin
+    .from("reviews")
+    .select("id, reviewee_id, rating")
+    .eq("reviewee_kind", "trainer")
+    .eq("is_private", false)
+    .eq("flagged", false)
+    .in(
+      "reviewee_id",
+      candidates.map((c) => c.id),
+    );
+  // Only reviews that may be published count: nothing written by or about someone who was a minor feeds this
+  // public aggregate (the database decides; a failed lookup counts none).
+  const { onlyPublishable } = await import("@/lib/review-age.server");
+  const reviews = await onlyPublishable(supabaseAdmin, allReviews ?? []);
+  return pickFeaturedTrainer(candidates, summarizeRatings(reviews));
+});
 
 export const listMyOrgs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -197,7 +214,12 @@ export const listMyOrgs = createServerFn({ method: "GET" })
       .eq("owner_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []) as { id: string; name: string; handle: string; avatar: string | null }[];
+    return (data ?? []) as {
+      id: string;
+      name: string;
+      handle: string;
+      avatar: string | null;
+    }[];
   });
 
 // Columns anonymous visitors may read. `phone`/`email` are deliberately absent:
@@ -400,7 +422,10 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
           address: z.string().max(300).optional(),
           placeId: z.string().max(200).optional(),
           geo: z
-            .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+            .object({
+              lat: z.number().min(-90).max(90),
+              lng: z.number().min(-180).max(180),
+            })
             .nullable()
             .optional(),
         })
@@ -456,7 +481,12 @@ export const listInvitesForTrainer = createServerFn({ method: "GET" })
 export const respondToTrainerOrgInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { inviteId: string; action: "accept" | "decline" }) =>
-    z.object({ inviteId: z.string().uuid(), action: z.enum(["accept", "decline"]) }).parse(d),
+    z
+      .object({
+        inviteId: z.string().uuid(),
+        action: z.enum(["accept", "decline"]),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     if (data.action === "accept") {
@@ -550,7 +580,9 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (data.action === "approve") {
-      const { error } = await context.supabase.rpc("approve_trainer_org_join", { _req: data.id });
+      const { error } = await context.supabase.rpc("approve_trainer_org_join", {
+        _req: data.id,
+      });
       if (error) throw new Error(error.message);
       return { ok: true };
     }
@@ -705,7 +737,10 @@ export const getMyJoinRequestsForOrg = createServerFn({ method: "GET" })
 // -----------------------------------------------------------------------
 
 const geoSchema = z
-  .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+  .object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  })
   .nullable()
   .optional();
 
@@ -799,7 +834,12 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
     if (seed) {
       await context.supabase
         .from("trainer_org_members")
-        .insert({ org_id: row.id, trainer_id: seed, user_id: context.userId, role: "owner" })
+        .insert({
+          org_id: row.id,
+          trainer_id: seed,
+          user_id: context.userId,
+          role: "owner",
+        })
         .then(
           () => undefined,
           () => undefined,
@@ -997,18 +1037,30 @@ export const listOrgMembers = createServerFn({ method: "GET" })
       profiles = profs ?? [];
     }
     const map = new Map(profiles.map((p) => [p.id, p]));
-    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profile: map.get(r.user_id) ?? null,
+    }));
   });
 
 export const requestOrgMembership = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; message?: string }) =>
-    z.object({ orgId: z.string().uuid(), message: z.string().max(500).optional() }).parse(d),
+    z
+      .object({
+        orgId: z.string().uuid(),
+        message: z.string().max(500).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("org_member_requests")
-      .insert({ org_id: data.orgId, user_id: context.userId, message: data.message ?? null })
+      .insert({
+        org_id: data.orgId,
+        user_id: context.userId,
+        message: data.message ?? null,
+      })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -1069,7 +1121,10 @@ export const listOrgMemberRequests = createServerFn({ method: "GET" })
       profiles = profs ?? [];
     }
     const map = new Map(profiles.map((p) => [p.id, p]));
-    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profile: map.get(r.user_id) ?? null,
+    }));
   });
 
 export const approveOrgMemberRequest = createServerFn({ method: "POST" })
