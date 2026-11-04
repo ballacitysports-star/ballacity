@@ -12,7 +12,8 @@
 -- permission error); owner approval; sandbox rehearsal first. To ship it, copy it into a new timestamped file in supabase/migrations
 -- (AGENTS.md: every live change is a migration file). Tested by supabase/tests/510_public_organizer_ref.test.sql, which applies this file
 -- inside a rolled-back transaction.
--- No BEGIN/COMMIT here: the operator (or the test) owns the transaction. Set a lock_timeout before running it.
+-- Rollback: supabase/phase2/sec5_phase2_rollback.sql (tested in 511). Preflight, adoption window and measurement: docs/privacy/sec5-public-organizer-ref.md,
+-- "Phase 2 compatibility results". No BEGIN/COMMIT here: the operator (or the test) owns the transaction. Set a lock_timeout before running it.
 
 DO $guard$
 BEGIN

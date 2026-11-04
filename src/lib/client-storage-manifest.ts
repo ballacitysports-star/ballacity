@@ -55,6 +55,11 @@ export const CLIENT_STORAGE_MANIFEST: readonly StorageEntry[] = [
   { key: "openrun:play-view", cls: "device" },
   { key: "openrun:loc-prompt-hidden", cls: "device" },
   { key: "openrun:boot-retry-at", cls: "device" },
+  {
+    key: "ballacity.clientGenerationReload",
+    cls: "device",
+    note: "reload loop guard (client-generation.ts)",
+  },
   { key: "openrun:last-visited", cls: "device" },
   { key: "ballacity:pwa-dismissed-at", cls: "device" },
   { key: "openrun:debug-mode", cls: "device" },
