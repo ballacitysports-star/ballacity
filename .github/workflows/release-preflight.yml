@@ -100,6 +100,17 @@ jobs:
             echo "Majors in release-manifest-merged.json: $(node -p 'Object.keys(require("/tmp/release-manifest-merged.json").generated.majors).join(", ")')"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The artifact is the primary copy. Some reviewers cannot download artifacts (egress-restricted
+      # environments), so the PG17 manifest is also printed into the log as gzip+base64 between markers.
+      # A reader rebuilds it and must compare its sha256 with the one printed in the step above before using it.
+      - name: Print the PG17 manifest into the log (gzip+base64, verify against the sha256 above)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "M17_SHA256 $(sha256sum /tmp/m17.json | cut -d' ' -f1)"
+          echo "-----BEGIN M17 GZIP BASE64-----"
+          gzip -9 -n -c /tmp/m17.json | base64 -w 76
+          echo "-----END M17 GZIP BASE64-----"
+
       - name: Upload the PG17 manifest
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
