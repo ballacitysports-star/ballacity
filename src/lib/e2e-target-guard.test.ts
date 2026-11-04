@@ -14,6 +14,14 @@ import {
 } from "../../e2e/safety/target-guard";
 import { devServerWebServer } from "../../e2e/safety/dev-server";
 
+// These tests exercise a sandbox whose isolation the owner HAS recorded. The shipped record is empty
+// (e2e/safety/sandbox-isolation.ts); src/lib/e2e-sandbox-isolation.test.ts checks that it is refused.
+vi.mock("../../e2e/safety/sandbox-isolation", () => ({
+  VERIFIED_E2E_SANDBOX_ISOLATION: {
+    qkukefvzwlyusvspablz: { verified_by: "test", verified_on: "2026-11-04", evidence: "unit test" },
+  },
+}));
+
 const PROD = PRODUCTION_PROJECT_REFS[0];
 const SANDBOX = NON_PRODUCTION_E2E_PROJECT_REFS[0];
 const UNKNOWN = "abcdefghijklmnopqrst"; // a valid-looking ref nobody designated

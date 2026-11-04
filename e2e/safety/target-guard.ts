@@ -22,17 +22,35 @@
  * Enforced from playwright.config.ts (every `playwright test` run, whatever the
  * entry point) and again as the first statement of e2e/global-setup.ts.
  */
+import { type SandboxIsolation, VERIFIED_E2E_SANDBOX_ISOLATION } from "./sandbox-isolation";
 
 /** Project references that serve real users. Always blocked. */
 export const PRODUCTION_PROJECT_REFS: readonly string[] = ["cpqihhcqeivbgxqbzatv"];
 
 /**
  * Projects designated for E2E. Must never overlap PRODUCTION_PROJECT_REFS.
- * `olrbulvwexrkjcxddjxq` is the E2E sandbox named in supabase/config.e2e.toml and
- * docs/supabase-cli.md. Add a ref here only after confirming the project is not
- * production, and review that change like a security change.
+ * `qkukefvzwlyusvspablz` is the Supabase project "ballacity-staging", named in
+ * supabase/config.e2e.toml and docs/supabase-cli.md. It replaces the earlier,
+ * never-verified `olrbulvwexrkjcxddjxq`. Add a ref here only after confirming the
+ * project is not production, and review that change like a security change.
+ *
+ * Designation alone is not enough: a remote target is accepted only when the owner
+ * has also recorded its isolation in VERIFIED_E2E_SANDBOX_ISOLATION
+ * (e2e/safety/sandbox-isolation.ts).
  */
-export const NON_PRODUCTION_E2E_PROJECT_REFS: readonly string[] = ["olrbulvwexrkjcxddjxq"];
+export const NON_PRODUCTION_E2E_PROJECT_REFS: readonly string[] = ["qkukefvzwlyusvspablz"];
+
+/** A complete owner record: every field present, and a real date. */
+export function isolationRecorded(entry: SandboxIsolation | undefined): boolean {
+  if (!entry) return false;
+  const filled = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  return (
+    filled(entry.verified_by) &&
+    filled(entry.evidence) &&
+    filled(entry.verified_on) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(entry.verified_on.trim())
+  );
+}
 
 /** Hosts the app under test may be served from. Everything else is refused. */
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -204,6 +222,16 @@ export function resolveE2eTarget(
       );
     }
   }
+  for (const ref of Object.keys(VERIFIED_E2E_SANDBOX_ISOLATION).map(normalizeRef)) {
+    if (production.has(ref))
+      reasons.push(
+        `Project ${ref} is PRODUCTION but has an isolation record. Fix sandbox-isolation.ts.`,
+      );
+    else if (!sandboxes.has(ref))
+      reasons.push(
+        `Project ${ref} has an isolation record but is not a designated E2E sandbox. Fix sandbox-isolation.ts.`,
+      );
+  }
 
   reasons.push(...checkBaseUrl(env.E2E_BASE_URL));
 
@@ -314,6 +342,16 @@ export function resolveE2eTarget(
   const ref = refs[0];
   if (!ref || !sandboxes.has(ref)) {
     reasons.push(`Project ${ref ?? "(unknown)"} is not a designated E2E sandbox.`);
+    return { ok: false, reasons };
+  }
+  // 4. Designated is not enough: the owner must have recorded that it is isolated.
+  const record = Object.entries(VERIFIED_E2E_SANDBOX_ISOLATION).find(
+    ([k]) => normalizeRef(k) === ref,
+  )?.[1];
+  if (!isolationRecorded(record)) {
+    reasons.push(
+      `Project ${ref} is a designated E2E sandbox, but its isolation from production has not been verified and recorded by the owner (VERIFIED_E2E_SANDBOX_ISOLATION in e2e/safety/sandbox-isolation.ts). Fixture writes are refused until then.`,
+    );
     return { ok: false, reasons };
   }
   return { ok: true, target: { kind: "sandbox", ref } };

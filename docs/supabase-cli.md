@@ -2,10 +2,10 @@
 
 Two Supabase projects appear in this repository. They are not interchangeable.
 
-| Purpose                         | Project ref            | Where it is configured                      |
-| ------------------------------- | ---------------------- | ------------------------------------------- |
-| Default / canonical (app + CLI) | `cpqihhcqeivbgxqbzatv` | `supabase/config.toml`, `.env.production`   |
-| E2E / test sandbox (optional)   | `olrbulvwexrkjcxddjxq` | `supabase/config.e2e.toml` (reference only) |
+| Purpose                         | Project ref            | Where it is configured                                                                                            |
+| ------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Default / canonical (app + CLI) | `cpqihhcqeivbgxqbzatv` | `supabase/config.toml`, `.env.production`                                                                         |
+| E2E / test sandbox (optional)   | `qkukefvzwlyusvspablz` | `supabase/config.e2e.toml` (reference only); Supabase project `ballacity-staging`; isolation **not yet verified** |
 
 ## Normal contributor commands
 
@@ -91,6 +91,36 @@ Run the suite locally with those values exported as `SUPABASE_*` /
 bun run test:e2e
 ```
 
+## E2E sandbox isolation
+
+`qkukefvzwlyusvspablz` (Supabase project `ballacity-staging`) is the designated E2E sandbox. It replaces
+`olrbulvwexrkjcxddjxq`, which was never verified and is no longer accepted. Designation is not enough: the
+suite seeds fixture accounts and rows with the service-role key, so `e2e/safety/target-guard.ts` refuses
+a remote target until the owner has recorded its isolation in `VERIFIED_E2E_SANDBOX_ISOLATION`
+(`e2e/safety/sandbox-isolation.ts`). That record ships empty. Production `cpqihhcqeivbgxqbzatv` is refused
+whatever the records say, and a record that names production or a project that is not designated stops
+every run.
+
+What the GitHub preflight proves, and what it does not: `.github/e2e-preflight.mjs` confirms that the
+`E2E_*` secrets agree with each other and with the `E2E_SANDBOX_PROJECT_REF` variable, and that none names
+production. It cannot see the dashboard, so it does not prove isolation.
+
+The owner verifies, in the Supabase and GitHub dashboards (`docs/release/sandbox-verification.md`):
+
+1. `qkukefvzwlyusvspablz` is the `ballacity-staging` project, owned by an account or organization the owner
+   controls, and is not the project that serves ballacity.com.
+2. It holds no production data (synthetic rows only), and has no replication, foreign data wrapper, webhook,
+   Edge Function secret or auth redirect that points at production or ballacity.com.
+3. The `e2e-sandbox` Environment's `E2E_SUPABASE_URL`, `E2E_SUPABASE_PROJECT_ID`, publishable key and
+   service-role key were copied from this project's API settings, and `E2E_SANDBOX_PROJECT_REF` is
+   `qkukefvzwlyusvspablz`. The keys are refused by production (a public read returns 401).
+4. Recommended before recording: add required reviewers to the `e2e-sandbox` Environment, so that no run
+   writes fixtures without an approval.
+
+Then add one entry to `VERIFIED_E2E_SANDBOX_ISOLATION` in a reviewed commit: `verified_by`, `verified_on`
+(YYYY-MM-DD) and `evidence` (where the written record lives; never a key or a connection string). Remove the
+entry to revoke it.
+
 ## Using the E2E project from the CLI
 
 The Supabase CLI has no flag for an alternate config file, so
@@ -99,7 +129,7 @@ CLI loads. To point the CLI at the test sandbox, link it explicitly and link
 back afterwards:
 
 ```sh
-supabase link --project-ref olrbulvwexrkjcxddjxq   # test sandbox
+supabase link --project-ref qkukefvzwlyusvspablz   # test sandbox
 supabase link --project-ref cpqihhcqeivbgxqbzatv   # back to default
 ```
 
