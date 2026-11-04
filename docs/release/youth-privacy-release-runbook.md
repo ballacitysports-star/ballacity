@@ -341,25 +341,39 @@ Nothing below touches production. It starts only after the owner has verified th
 
 Gate to a production plan: S0 to S11 recorded and reviewed, every "Open" row of the gap register closed or accepted in writing, a separate final release plan approved by the owner. Each production step then needs its own written approval.
 
-## 16. Gap-closing pull requests G1 to G6 (revision 5, 2026-11-04)
+## 16. Gap-closing pull requests (revision 6, 2026-11-04)
 
-None of these is merged or applied. They extend sections 2, 13 and 15; where this section and an earlier one differ, this section is current.
+None of these is merged or applied. They extend sections 2, 13 and 15; where this section and an earlier one differ, this section is current. Status words follow `privacy-gap-register.md`.
 
 **Additional migrations, applied after step 9 of section 2, one file at a time (switch still OFF):**
 
-| #   | File                                                  | Needs                          | Effect                                                                                                        |
-| --- | ----------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| 10  | `20261105100000_team_post_location_privacy.sql` (G1)  | 4, 7 (shared switch, detector) | `team_post_private`, venue policy, text guard, batch coarsening function; switch guard extended               |
-| 11  | `20261105110000_team_facility_privacy.sql` (G2)       | 4                              | `team_facility_private`, clear function, moderator verification of public facilities, second activation guard |
-| 12  | `20261105130000_location_disclosure_reports.sql` (G6) | 7, 8, `is_moderator`           | report reason, two-report automatic removal (no copy kept), team-post scan and scrub                          |
-| 13  | `20261105140000_minor_host_identity.sql` (G4)         | 5, 6                           | `get_game_organizer`, service-only helper                                                                     |
+| #   | File                                                  | Needs                                          | Effect                                                                                                  |
+| --- | ----------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 10  | `20261105100000_team_post_location_privacy.sql` (G1)  | 4, 7                                           | `team_post_private`, venue policy, text guard, batch coarsening function; switch guard extended         |
+| 11  | `20261105110000_team_facility_privacy.sql` (G2)       | 4                                              | `team_facility_private`, clear function, moderator verification, second activation guard                |
+| 12  | `20261105130000_location_disclosure_reports.sql` (G6) | 7, 8, `is_moderator`                           | report reason, two-report automatic removal (no copy kept), team-post scan and scrub                    |
+| 13  | `20261105140000_minor_host_identity.sql` (G4)         | 5, 6                                           | `get_game_organizer`, service-only helper                                                               |
+| 14  | `20261106100000_minor_availability_privacy.sql` (R2)  | 6 (`can_see_minor_name`), 7                    | availability read policy, write trigger for minors, contact-request guard                               |
+| 15  | `20261106110000_minor_host_correlation.sql` (R1)      | 13; redefines `private_sec.roster_row_visible` | roster and skill-rating visibility for a minor host (production definition fingerprint-checked)         |
+| 16  | `20261106120000_private_image_staging.sql` (G3b)      | none                                           | private `image-staging` bucket and policies                                                             |
+| 17  | `20261106130000_team_content_reports.sql` (MOD-1)     | 12                                             | report subject types, hold ledger, appeals, moderator decisions, retention purge function (unscheduled) |
 
-G3 (#258) and G5 (#261) have no migration. The migration number 20261105120000 is unused on purpose.
+G3 (#258) and G5 (#261) have no migration. `20261105120000` is unused on purpose. Before step 15, re-run the section 3 comparison for `private_sec.roster_row_visible(text,uuid)` and the `skill_ratings` policy against production (they matched on 2026-11-04: md5 `f50c575f…` and `e6c0fa6f…`).
 
-**Pull request order.** Existing order first (#247 -> #248 -> #245 -> #249 retargeted to `main` -> #256 retargeted). Then, each retargeted to `main` after #256 and re-run on the merge result: #259 (G1), #260 (G2), #262 (G6), #263 (G4), #261 (G5). #258 (G3) is independent and may merge at any point after the owner approves it. G1 and G2 are independent: each adds its own guard trigger on the shared switch, and both define `private_sec.team_is_youth` with an identical body, so either order works (checked by diffing the two definitions). Nothing here is merged without separate written authorization.
+**Pull request order (each merge needs separate written authorization, a branch updated against `main`, the four required checks read on the final head, and a replay of the merge result):**
 
-**Rehearsal.** `staging/priv-rehearsal` is rebuilt (never pushed to a deployment source) by merging main, #245, #249, #256, #259, #260, #258, #263, #261, #262. Local result: SQL 1514/0, unit 3079/0, tsc clean, build OK. In the verified sandbox, S1 gains migrations 10 to 13, S5 uses the G3 fixtures, and S9 repeats for the three batch functions (`coarsen_existing_youth_games`, `coarsen_existing_youth_team_posts`, `coarsen_existing_youth_team_facilities`), each run to 0 only after the adoption window and with the adoption flag set.
+1. #247 -> #248 -> #245 -> #249 (retargeted to `main`) -> #256.
+2. #259 and #260 (independent of each other; both define `private_sec.team_is_youth` identically).
+3. #262 (G6), then #269 (MOD-1, needs #262).
+4. #263 (G4), then #266 (R1, needs #263), then #265 (R2).
+5. #261 (G5).
+6. #258 (G3), then #268 (G3b, needs #258). #258 and #261 are independent of the database.
+7. #267 (R7 audit test) and this documentation pull request (#264) may merge at any time after review; they change no behaviour.
 
-**Compatibility.** Every G migration is additive with the switch OFF. An older app keeps working; the text guards refuse new addresses in youth team posts with an explanation, and cancellations or unrelated edits are not blocked. Image re-encoding (G3) is application-side: an old build keeps writing unstripped files until replaced.
+**Rehearsal.** `staging/priv-rehearsal` is rebuilt (never a deployment source) by merging main, #245, #249, #256, #259, #260, #258, #268, #263, #266, #265, #267, #261, #262, #269. Local result (2026-11-04): SQL 1691/0, unit 3094/0 (22 skipped), tsc clean, build OK. The definitive sandbox sequence is `docs/release/staging-test-checklist.md`; S1 gains migrations 10 to 17, S5 uses the G3/G3b fixtures, and S9 repeats for the three batch functions (`coarsen_existing_youth_games`, `coarsen_existing_youth_team_posts`, `coarsen_existing_youth_team_facilities`), each run to 0 only after the adoption window and with the adoption flag set.
 
-**Recovery.** No procedure restores exact data to a public column. A wrong private copy is corrected by the service role; a guard false positive is fixed forward in a new migration that edits the detector only; an app rollback is allowed only to a build that keeps the v2 caches and the client-storage manifest (the PRIV-2C build or later) once activation has happened.
+**Application order.** Database first (switch OFF), then publish the application, then the adoption window, then guarded coarsening. G3b: publish the migration before the app (the app falls back if the bucket is missing); close the old direct-upload policies only in a later approved migration after the adoption window.
+
+**Compatibility.** Every migration here is additive except two replaced definitions (roster visibility, availability read policy), which only reduce what unrelated viewers can read. An older app keeps working and sees less. Text guards refuse new addresses in youth team posts and minors' availability notes with an explanation; cancellations and unrelated edits are not blocked.
+
+**Recovery.** No procedure restores exact data to a public column or re-opens a minor's post to strangers. A wrong private copy is corrected by the service role; a guard false positive is fixed forward by editing the detector only; an app rollback is allowed only to a build that keeps the v2 caches and the client-storage manifest (PRIV-2C or later) once activation has happened.
