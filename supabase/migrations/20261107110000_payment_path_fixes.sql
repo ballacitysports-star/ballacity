@@ -1,13 +1,13 @@
 -- PAY-1: payment-path fixes found by independent review (payments are NOT enabled or activated by this migration).
---  1. A guardian payment manager (the payee of a minor-hosted game) received no payment notifications: can_notify had no payer/payee relation.
---     Added for adults and minors alike: the payer and the game's current payee, about a live payment or join request.
---  2. Refunds owed on a minor-hosted paid game notified the host, not the payee who holds the money. Now the current payee (the host when the host
---     is the payee).
---  3. A minor host could not save settings for a FREE game (the payee is NULL when no manager is needed), so every free minor-hosted game was
---     request-to-join. The real host may now write settings with entry_fee 0; paid settings still need the payee.
---  4. payment_submissions: the host_id stored on a submission could still read and verify it after the payee changed or a guardian link was revoked.
---     Reading needs the stored host to be the current payee or the game's host; verifying needs the current payee.
---     get_game_host_payment_methods answered for private games to anyone with the ids; now only for a visible listing or someone involved.
+--  1. Guardian payment managers received no payment notifications. can_notify gains the ONE-WAY private_sec.payer_to_payee(payer, payee):
+--     an actual payment submission, payer to the adult who holds or now manages it (inside the guardian-controls check for minors).
+--  2. Refund notices go to each submission's stored host_id (the person who was paid), one summary per holder on cancellation; that adult
+--     keeps read access to rows whose refund is owed.
+--  3. A minor host with no payee can save FREE settings for a FREE listing; private_sec.game_settings_holder makes that row readable and
+--     used by the join gate. Payment destinations still use game_payee only.
+--  4. payment_submissions: reading needs the current payee manager (or an owed refund held by that adult); verifying needs the current payee.
+--     get_game_host_payment_methods answers only for a visible listing or an involved caller (host, payee, APPROVED requester, participant,
+--     or their guardian).
 -- Replaces (definitions taken from the release stack's final versions): can_notify (R7), settle_paid_spot, settle_on_game_cancelled,
 -- get_game_host_payment_methods (PRIV-2B). Forward-fix only.
 
@@ -294,9 +294,12 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
 $$;
 REVOKE ALL ON FUNCTION private_sec.is_game_host(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private_sec.is_game_host(text) TO authenticated, service_role;
+-- final review #5: only for a game that is itself free; a paid listing whose payee went away (guardian link revoked) cannot be turned
+-- into a free, open game by the minor host's own settings row.
 CREATE OR REPLACE FUNCTION private_sec.is_game_host_without_payee(_game text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT private_sec.is_game_host(_game) AND private_sec.game_payee(_game) IS NULL
+     AND EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game AND COALESCE(g.price, 0) = 0)
 $$;
 REVOKE ALL ON FUNCTION private_sec.is_game_host_without_payee(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private_sec.is_game_host_without_payee(text) TO authenticated, service_role;
@@ -318,7 +321,8 @@ CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_p
 -- enforce_minor_payment_settings). Payment destinations still use game_payee only (enforce_payment_destination is unchanged).
 CREATE OR REPLACE FUNCTION private_sec.game_settings_holder(_game_id text)
 RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT COALESCE(private_sec.game_payee(g.id), g.host_id) FROM public.hosted_games g WHERE g.id = _game_id
+  SELECT COALESCE(private_sec.game_payee(g.id), CASE WHEN COALESCE(g.price, 0) = 0 THEN g.host_id END)   -- final review #5: free listings only
+    FROM public.hosted_games g WHERE g.id = _game_id
 $$;
 REVOKE ALL ON FUNCTION private_sec.game_settings_holder(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION private_sec.game_settings_holder(text) TO service_role;
