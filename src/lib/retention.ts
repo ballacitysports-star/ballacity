@@ -68,7 +68,8 @@ export const RETENTION_RULES: RetentionRule[] = [
   {
     category: "reports",
     label: "Reports & safety records",
-    retention: "Kept indefinitely today; a defined window needs legal review.",
+    retention:
+      "Kept indefinitely today; a defined window needs legal review. Closed team-content reports and decided appeals have a 24-month purge function (not scheduled); escalated items and open appeals are never purged.",
     contains:
       "Reports filed about or by an account, blocks, moderation state and safety acknowledgments.",
     onAccountDeletion:
@@ -76,7 +77,13 @@ export const RETENTION_RULES: RetentionRule[] = [
     reason:
       "Safety cases must outlive the reported account, otherwise deleting and re-registering erases the history.",
     survivesDeletion: true,
-    sources: ["user_reports", "user_blocks", "game_safety_acknowledgments"],
+    sources: [
+      "user_reports",
+      "user_blocks",
+      "game_safety_acknowledgments",
+      "content_report_holds",
+      "moderation_appeals",
+    ],
   },
   {
     category: "media",
