@@ -76,10 +76,28 @@ export async function promoteStagedImage(
     throw new Error("You can only finalize your own uploads");
   }
 
+  // A file that was flagged stays flagged: it is never re-scanned until it passes, and never promoted.
+  const { data: flagged } = await admin
+    .from("image_moderation")
+    .select("status")
+    .eq("bucket", IMAGE_STAGING_BUCKET)
+    .eq("path", stagingPath)
+    .maybeSingle();
+  if (flagged && (flagged.status === "quarantined" || flagged.status === "removed")) {
+    throw new Error("This image was flagged by our automated safety check and is pending review.");
+  }
+
   const { data: blob, error: dlErr } = await admin.storage
     .from(IMAGE_STAGING_BUCKET)
     .download(stagingPath);
   if (dlErr || !blob) {
+    // Only a genuinely missing file may fall back to a recorded outcome; any other storage error is a failure, not a success.
+    if (
+      dlErr &&
+      !/not.?found|404|does not exist/i.test(String((dlErr as { message?: string }).message ?? ""))
+    ) {
+      throw new Error("Uploaded file could not be read");
+    }
     // A retry after success: the staged copy is gone but the destination exists with a recorded outcome.
     const { data: prior } = await admin
       .from("image_moderation")
@@ -144,17 +162,29 @@ export async function promoteStagedImage(
     throw new Error("This image could not be processed. Please try a different photo.");
   }
 
+  // The scanner must see exactly the bytes that will be published. Up to 4 MB they travel inline. Above that, the CLEAN bytes are written to a
+  // server-only scratch name (users can only write `{their own id}/...`, never `_scan/...`) and the scanner fetches that copy, which is then
+  // deleted. The staged object itself is never re-fetched by the scanner, so a swap of it cannot change what is scanned.
   let target: string | null = null;
+  let scratchPath: string | null = null;
   if (clean.byteLength <= INLINE_SCAN_LIMIT) {
     let binary = "";
     for (let i = 0; i < clean.length; i += 0x8000)
       binary += String.fromCharCode(...clean.subarray(i, i + 0x8000));
     target = `data:${mime};base64,${btoa(binary)}`;
   } else {
-    const { data } = await admin.storage
+    scratchPath = `_scan/${crypto.randomUUID()}.${ext}`;
+    const { error: scratchErr } = await admin.storage
       .from(IMAGE_STAGING_BUCKET)
-      .createSignedUrl(stagingPath, 300);
-    target = (data?.signedUrl as string | undefined) ?? null;
+      .upload(scratchPath, clean, { contentType: mime as string, upsert: false });
+    if (!scratchErr) {
+      const { data } = await admin.storage
+        .from(IMAGE_STAGING_BUCKET)
+        .createSignedUrl(scratchPath, 300);
+      target = (data?.signedUrl as string | undefined) ?? null;
+    } else {
+      scratchPath = null;
+    }
   }
   // Fail closed: if the scan cannot run (no target, scanner off or erroring), nothing is published.
   let verdict: ScanVerdict | null = null;
@@ -164,6 +194,8 @@ export async function promoteStagedImage(
       verdict = v.scanned || !v.safe ? v : null;
     } catch {
       verdict = null;
+    } finally {
+      if (scratchPath) await admin.storage.from(IMAGE_STAGING_BUCKET).remove([scratchPath]);
     }
   }
 
@@ -236,6 +268,15 @@ export async function promoteStagedImage(
     };
   }
 
+  const { data: priorTarget } = await admin
+    .from("image_moderation")
+    .select("status")
+    .eq("bucket", bucket)
+    .eq("path", targetPath)
+    .maybeSingle();
+  if (priorTarget && (priorTarget.status === "quarantined" || priorTarget.status === "removed")) {
+    throw new Error("This image was flagged by our automated safety check and is pending review.");
+  }
   const { error: upErr } = await admin.storage.from(bucket).upload(targetPath, clean, {
     contentType: mime as string,
     upsert: true,
@@ -269,38 +310,79 @@ export async function promoteStagedImage(
   };
 }
 
-export type StagingSweepResult = { examined: number; removed: number; kept: number };
+export type StagingSweepResult = {
+  examined: number;
+  removed: number;
+  kept: number;
+  keptFlagged: number;
+};
 
 /**
  * Remove files that have waited in private staging longer than `olderThanMs` (abandoned uploads, failed publishes, held scans).
- * Staging is private, so a leftover is a retention matter, not an exposure. Superadmin-triggered; not scheduled.
+ * Staging is private, so a leftover is a retention matter, not an exposure. Files whose moderation record is quarantined (flagged,
+ * possibly child-safety evidence) are NEVER removed here. Listings are paginated. The moderation rows of removed files are removed too.
+ * Superadmin-triggered; not scheduled.
  */
 export async function sweepImageStaging(
   admin: any,
-  opts: { olderThanMs: number; now?: number; dryRun?: boolean; maxFolders?: number },
+  opts: { olderThanMs: number; now?: number; dryRun?: boolean; pageSize?: number },
 ): Promise<StagingSweepResult> {
   const now = opts.now ?? Date.now();
-  const result: StagingSweepResult = { examined: 0, removed: 0, kept: 0 };
+  const page = opts.pageSize ?? 1000;
+  const result: StagingSweepResult = { examined: 0, removed: 0, kept: 0, keptFlagged: 0 };
   const bucket = admin.storage.from(IMAGE_STAGING_BUCKET);
-  const { data: top } = await bucket.list("", { limit: opts.maxFolders ?? 1000 });
-  for (const folder of (top ?? []) as { name: string; id?: string | null }[]) {
-    if (folder.id) continue; // a loose file at the root cannot be written through the API; ignore
-    const { data: files } = await bucket.list(folder.name, { limit: 1000 });
+
+  const listAll = async (prefix: string) => {
+    const all: { name: string; id?: string | null; created_at?: string | null }[] = [];
+    for (let offset = 0; ; offset += page) {
+      const { data } = await bucket.list(prefix, { limit: page, offset });
+      const rows = (data ?? []) as typeof all;
+      all.push(...rows);
+      if (rows.length < page) break;
+    }
+    return all;
+  };
+
+  for (const folder of await listAll("")) {
+    if (folder.id) continue; // a loose root file cannot be written through the API
+    const files = await listAll(folder.name);
     const stale: string[] = [];
-    for (const f of (files ?? []) as { name: string; created_at?: string | null }[]) {
+    for (const f of files) {
       result.examined += 1;
       const created = f.created_at ? Date.parse(f.created_at) : NaN;
       if (Number.isFinite(created) && now - created > opts.olderThanMs)
         stale.push(`${folder.name}/${f.name}`);
       else result.kept += 1;
     }
-    if (stale.length && !opts.dryRun) {
-      const { error } = await bucket.remove(stale);
-      if (error) result.kept += stale.length;
-      else result.removed += stale.length;
-    } else if (stale.length) {
-      result.removed += stale.length; // reported as would-remove in a dry run
+    if (stale.length === 0) continue;
+    const { data: flagged } = await admin
+      .from("image_moderation")
+      .select("path, status")
+      .eq("bucket", IMAGE_STAGING_BUCKET)
+      .in("path", stale);
+    const protectedPaths = new Set(
+      ((flagged ?? []) as { path: string; status: string }[])
+        .filter((r) => r.status === "quarantined")
+        .map((r) => r.path),
+    );
+    const removable = stale.filter((p) => !protectedPaths.has(p));
+    result.keptFlagged += stale.length - removable.length;
+    if (removable.length === 0) continue;
+    if (opts.dryRun) {
+      result.removed += removable.length; // reported as would-remove in a dry run
+      continue;
     }
+    const { error } = await bucket.remove(removable);
+    if (error) {
+      result.kept += removable.length;
+      continue;
+    }
+    result.removed += removable.length;
+    await admin
+      .from("image_moderation")
+      .delete()
+      .eq("bucket", IMAGE_STAGING_BUCKET)
+      .in("path", removable);
   }
   return result;
 }

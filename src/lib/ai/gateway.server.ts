@@ -277,7 +277,8 @@ export function createLovableGatewayProvider(config: AiProviderConfig): AiProvid
       reason?: string;
     }>(out.content);
     return {
-      safe: parsed.safe !== false,
+      // fail closed: anything but an explicit boolean true is not a verdict
+      safe: parsed.safe === true,
       label: typeof parsed.label === "string" ? parsed.label : "unknown",
       categories: stringList(parsed.categories),
       reason: typeof parsed.reason === "string" ? parsed.reason.slice(0, 300) : null,

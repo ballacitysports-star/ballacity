@@ -12,16 +12,19 @@ SELECT t.as_user(t.id('alice'));
 SELECT t.lives(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', %L, auth.uid())$q$, t.id('alice') || '/a.jpg'), 'a user can stage a file in their own folder');
 SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', %L, auth.uid())$q$, t.id('bob') || '/b.jpg'), 'row-level security', 'but not in someone else''s folder');
 SELECT t.throws($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', 'loose.jpg', auth.uid())$q$, 'row-level security', 'nor at the root');
-SELECT t.eq(t.count($$SELECT 1 FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'the owner cannot read back what they staged (only the server can)');
+CREATE TEMP TABLE r440(n int); GRANT ALL ON r440 TO PUBLIC;
+WITH i AS (INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('image-staging', t.id('alice') || '/returning.jpg', auth.uid()) RETURNING id) INSERT INTO r440 SELECT count(*) FROM i;
+SELECT t.eq((SELECT n FROM r440), 1, 'an insert that returns the new row works (this is how Storage inserts)');
+SELECT t.eq(t.count($$SELECT 1 FROM storage.objects WHERE bucket_id = 'image-staging'$$), 2, 'the owner can read back their own staged files');
 SELECT t.eq(t.changed(format($q$UPDATE storage.objects SET name = %L WHERE bucket_id = 'image-staging'$q$, t.id('alice') || '/c.jpg')), 0, 'and cannot replace it');
 SELECT t.reset();
-SELECT t.eq((SELECT count(*)::int FROM storage.objects WHERE bucket_id = 'image-staging'), 1, 'the staged file exists for the service role');
+SELECT t.eq((SELECT count(*)::int FROM storage.objects WHERE bucket_id = 'image-staging'), 2, 'the staged files exist for the service role');
 
 SELECT t.as_user(t.id('bob'));
 SELECT t.eq(t.count($$SELECT 1 FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'another user sees nothing');
-SELECT t.eq(t.changed($$DELETE FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'and cannot delete it');
+SELECT t.eq(t.changed($$DELETE FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'and cannot delete them');
 SELECT t.as_user(t.id('alice'));
-SELECT t.eq(t.changed($$DELETE FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'the owner cannot delete it either (the server promotes or removes staged files)');
+SELECT t.eq(t.changed($$DELETE FROM storage.objects WHERE bucket_id = 'image-staging'$$), 2, 'the owner can delete their own staged files');
 SELECT t.as_anon();
 SELECT t.eq(t.count($$SELECT 1 FROM storage.objects WHERE bucket_id = 'image-staging'$$), 0, 'anonymous sees nothing');
 SELECT t.throws($q$INSERT INTO storage.objects (bucket_id, name) VALUES ('image-staging', 'x/y.jpg')$q$, 'row-level security', 'anonymous cannot stage a file');
@@ -42,5 +45,5 @@ SELECT t.eq((SELECT count(*)::int FROM storage.objects o LEFT JOIN public.image_
 
 -- the public destinations are unchanged (the direct path stays during the adoption window)
 SELECT t.ok((SELECT bool_and(public) FROM storage.buckets WHERE id IN ('avatars', 'covers', 'team-avatars', 'org-avatars')), 'public destination buckets are unchanged');
-SELECT t.ok((SELECT count(*) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'image_staging_%' AND cmd = 'SELECT') = 0, 'there is no SELECT policy for the staging bucket');
+SELECT t.ok((SELECT count(*) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'image_staging_%' AND cmd = 'SELECT') = 1, 'the only staging SELECT policy is the own-folder one');
 ROLLBACK;
