@@ -4,7 +4,14 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
-    exclude: ["e2e/**", "node_modules/**", "dist/**", ".lovable/**"],
+    // release-preflight.test.mjs is a node:test suite that needs a local Postgres (bun run preflight:test).
+    exclude: [
+      "e2e/**",
+      "node_modules/**",
+      "dist/**",
+      ".lovable/**",
+      "scripts/release-preflight.test.mjs",
+    ],
     environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
   },
 });
