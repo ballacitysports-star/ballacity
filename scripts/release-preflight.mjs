@@ -19,6 +19,12 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_MANIFEST = "docs/release/release-manifest.json";
 export const LEDGER = "supabase_migrations.schema_migrations";
 export const DRIZZLE_LEDGER = "drizzle.__drizzle_migrations";
+export const LEDGER_SCHEMA = "supabase_migrations";
+export const MANIFEST_FORMAT = 2;
+/** Postgres majors the preflight knows how to read. Anything else fails closed. */
+export const SUPPORTED_MAJORS = [16, 17];
+/** Lovable-applied rows carry a version one or two seconds after the file's timestamp and the file stem as name. */
+export const LEDGER_NAME_SKEW_SECONDS = 10;
 
 const HELP = `release-preflight: read-only checks before applying the privacy release migrations.
 
@@ -26,7 +32,10 @@ Usage
   node scripts/release-preflight.mjs --db-url <conninfo URL> [--verify-after] [--json]
   PREFLIGHT_DATABASE_URL=<URL> node scripts/release-preflight.mjs [--verify-after] [--json]
   node scripts/release-preflight.mjs --offline [--json]             manifest/file checks only, no database
-  node scripts/release-preflight.mjs --write-manifest --from <version>  regenerate the manifest (local scratch only)
+  node scripts/release-preflight.mjs --write-manifest --from <version> [--manifest <out>]
+                                                                    regenerate the manifest (local scratch only)
+  node scripts/release-preflight.mjs --merge-hashes <other.json> [--manifest <base>]
+                                                                    add another major's hashes to a manifest
 
 Options
   --db-url <url>     target connection string (postgresql://user:pass@host:port/db?sslmode=require).
@@ -36,11 +45,14 @@ Options
                      function/policy must match the md5 recorded from a full replay (expect_after).
   --offline          skip the database; check the manifest against the checkout only.
   --json             print the full report as JSON instead of the human summary.
-  --manifest <path>  manifest to use (default ${DEFAULT_MANIFEST}).
+  --manifest <path>  manifest to use or write (default ${DEFAULT_MANIFEST}).
   --root <dir>       repository checkout to read migrations from (default: this checkout).
   --write-manifest   regenerate the manifest from the checkout; needs --from <version>. Replays the
                      migrations into a throwaway database on the LOCAL Postgres used by bun run test:db
                      (PGHOST must be a unix socket or localhost) and drops it afterwards. Refuses --db-url.
+                     The hashes are recorded for the local server's major only.
+  --merge-hashes <p> copy the per-major hashes of manifest <p> (e.g. the PG17 CI artifact) into --manifest.
+                     Refused unless both list exactly the same migrations, sha256s, protections and allow-lists.
 
 What it checks (each failure exits 1 with a message)
   1. Manifest integrity: every release file is listed in apply order with the sha256 of its bytes; a
@@ -49,11 +61,18 @@ What it checks (each failure exits 1 with a message)
   2. Dependencies: each migration's declared requires (functions as regprocedure signatures, tables,
      schemas, earlier migrations) must exist in the target or be provided by an earlier pending entry.
   3. Ledger: reads ${LEDGER} (and ${DRIZZLE_LEDGER} for drizzle files) and prints the
-     exact pending list. Applied versions must be a prefix of the manifest order (no gaps); a ledger
-     row in the release range that the manifest does not know fails.
+     exact pending list. Applied versions must be a prefix of the manifest order (no gaps). Every ledger
+     row, in or before the release range, must match a file in supabase/migrations or the drizzle journal
+     (or the manifest's known_ledger_rows_without_file); every file before the range must have a ledger
+     row unless the manifest lists it in known_unledgered.
   4. Protections: a pending migration that would overwrite a function or policy whose later definition
-     is already applied fails; protections whose every definer is applied must match expect_after;
-     --verify-after compares all of them.
+     is already applied fails. Every protected function and policy must be in a recognized state:
+     absent or expect_before when all its defining migrations are pending, the recorded snapshot after the
+     last applied definer when some are, expect_after when all are. Anything else is drift and fails.
+     --verify-after requires every protection to equal expect_after.
+  5. Server: the target must run Postgres ${SUPPORTED_MAJORS.join(" or ")} and have the ${LEDGER_SCHEMA}
+     schema, and the manifest must carry hashes generated on the target's major. A missing major fails;
+     md5s of deparsed definitions are never compared across majors.
 
 Read-only guarantee
   Every query runs in one session with SET SESSION default_transaction_read_only = on inside
@@ -159,6 +178,20 @@ export function guardRequirements(text) {
 
 const fnName = (sig) => sig.slice(0, sig.indexOf("("));
 const policyKey = (p) => `${p.schema}|${p.table}|${p.policy}`;
+export const majorOf = (serverVersionNum) => Math.floor(Number(serverVersionNum) / 10000);
+/** The majors a manifest carries hashes for, as strings ("16", "17"). */
+export const manifestMajors = (manifest) => Object.keys(manifest?.generated?.majors ?? {}).sort();
+
+/** 14-digit migration version to epoch seconds (UTC), or NaN. */
+function versionSeconds(v) {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(v));
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000 : Number.NaN;
+}
+const fileStem = (path) =>
+  String(path)
+    .split("/")
+    .pop()
+    .replace(/\.sql$/, "");
 
 // ------------------------------------------------------------------------------ manifest integrity
 
@@ -270,6 +303,66 @@ export function checkManifest(manifest, root = ROOT) {
         );
     }
   }
+
+  // Format 2: per-major hashes with before/step/after states, and explicit allow-lists.
+  if (manifest.format !== MANIFEST_FORMAT)
+    errors.push(
+      `manifest: format must be ${MANIFEST_FORMAT} (per-major expect_before/expect_steps/expect_after); regenerate it with --write-manifest`,
+    );
+  const majors = manifestMajors(manifest);
+  if (majors.length === 0)
+    errors.push("manifest: generated.majors is empty; it carries no hashes for any Postgres major");
+  for (const mj of majors)
+    if (!SUPPORTED_MAJORS.includes(Number(mj)))
+      errors.push(`manifest: hashes for unsupported Postgres major ${mj}`);
+  for (const p of allProtections(manifest)) {
+    const label = protectionLabel(p);
+    for (const mj of majors) {
+      if (!(p.expect_before && mj in p.expect_before))
+        errors.push(`protection ${label}: no expect_before for Postgres ${mj}`);
+      if (!(p.expect_after && mj in p.expect_after) || p.expect_after[mj] === null)
+        errors.push(`protection ${label}: no expect_after for Postgres ${mj}`);
+      for (const v of p.defined_by ?? [])
+        if (!(p.expect_steps?.[mj] && v in p.expect_steps[mj]))
+          errors.push(`protection ${label}: no snapshot after ${v} for Postgres ${mj}`);
+    }
+  }
+  const allFiles = migrationOrder(root);
+  const filePaths = new Set(allFiles.map((m) => m.path));
+  const fileVersions = new Set(allFiles.map((m) => m.version));
+  const seenUnledgered = new Set();
+  for (const k of manifest.known_unledgered ?? []) {
+    const where = `known_unledgered ${k.path}`;
+    if (seenUnledgered.has(k.path)) errors.push(`${where}: listed twice`);
+    seenUnledgered.add(k.path);
+    if (!filePaths.has(k.path) || !existsSync(join(root, k.path))) {
+      errors.push(`${where}: no such migration file`);
+      continue;
+    }
+    if (from && fileStem(k.path).slice(0, 14) >= from)
+      errors.push(`${where}: is in the release range; only historical files may lack a ledger row`);
+    if (sha256File(join(root, k.path)) !== k.sha256)
+      errors.push(
+        `${where}: sha256 differs from the file (the allow-list covers the reviewed bytes only)`,
+      );
+  }
+  for (const k of manifest.known_ledger_rows_without_file ?? []) {
+    const where = `known_ledger_rows_without_file ${k.version}`;
+    if (!/^\d{14}$/.test(k.version ?? "") || typeof k.name !== "string")
+      errors.push(`${where}: needs a 14-digit version and a name`);
+    if (fileVersions.has(k.version))
+      errors.push(`${where}: a migration file has this version, so it is not without a file`);
+    if (k.evidence && !existsSync(join(root, k.evidence)))
+      errors.push(`${where}: evidence ${k.evidence} is missing from the checkout`);
+  }
+  for (const k of manifest.known_drizzle_rows_without_file ?? [])
+    if (!/^[0-9a-f]{64}$/.test(k.hash ?? "") || !/^\d+$/.test(String(k.created_at ?? "")))
+      errors.push(
+        `known_drizzle_rows_without_file: entry needs a sha256 hash and a numeric created_at`,
+      );
+  for (const c of manifest.drift_captures ?? [])
+    if (!order.has(c.version))
+      errors.push(`drift_captures: ${c.version} is not a manifest migration`);
   return { errors, warnings };
 }
 
@@ -384,6 +477,7 @@ export function readTarget(env, manifest) {
     env,
     `SELECT json_build_object(
        'server_version_num', current_setting('server_version_num')::int,
+       'ledger_schema', to_regnamespace('${LEDGER_SCHEMA}') IS NOT NULL,
        'ledger', to_regclass('${LEDGER}') IS NOT NULL,
        'drizzle', to_regclass('${DRIZZLE_LEDGER}') IS NOT NULL)`,
   );
@@ -415,13 +509,60 @@ export function readTarget(env, manifest) {
     env,
     `SELECT json_build_object(
        'ledger_rows', ${head.ledger ? `(SELECT count(*) FROM ${LEDGER})` : "NULL"},
-       'ledger_versions', ${head.ledger ? `(SELECT coalesce(json_agg(version::text ORDER BY version::text), '[]') FROM ${LEDGER} WHERE version::text >= ${lit(manifest.release_range.from)})` : "'[]'::json"},
+       'ledger_all', ${head.ledger ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name') ORDER BY s.version::text), '[]') FROM ${LEDGER} s)` : "'[]'::json"},
        'drizzle_rows', ${head.drizzle ? `(SELECT coalesce(json_agg(json_build_object('hash', hash, 'created_at', created_at::text)), '[]') FROM ${DRIZZLE_LEDGER})` : "'[]'::json"},
        'requirements', ${reqSql},
        'functions', ${fnSql},
        'policies', ${polSql})`,
   );
-  return { ...head, ...body };
+  const from = manifest.release_range.from;
+  return {
+    ...head,
+    ...body,
+    ledger_versions: (body.ledger_all ?? []).map((r) => r.version).filter((v) => v >= from),
+  };
+}
+
+/** Same state: both absent, or equal md5 (function) / equal qual, with_check and shape (policy). */
+export function sameState(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined)
+    return (a ?? null) === (b ?? null);
+  if (typeof a === "string" || typeof b === "string") return a === b;
+  return a.qual === b.qual && a.with_check === b.with_check && a.shape === b.shape;
+}
+const showState = (s) =>
+  s === null || s === undefined
+    ? "absent"
+    : typeof s === "string"
+      ? `md5 ${s.slice(0, 12)}`
+      : `qual ${String(s.qual).slice(0, 8)} with_check ${String(s.with_check).slice(0, 8)} shape ${String(s.shape).slice(0, 8)}`;
+
+/** Ledger rows and files that the checks treat as known, built from the checkout and the manifest. */
+function ledgerKnowledge(manifest, root) {
+  const files = migrationOrder(root);
+  const supabase = files.filter((f) => f.source === "supabase");
+  const drizzle = files.filter((f) => f.source === "drizzle");
+  for (const f of drizzle)
+    f.sha256 = existsSync(join(root, f.path)) ? sha256File(join(root, f.path)) : null;
+  // A Lovable-applied row: name is the file stem (or the part after the version) and the version is a
+  // few seconds after the file's timestamp (docs/migration-history-reconciliation.md section 1).
+  const nameMatch = (row, f) => {
+    if (!row.name) return false;
+    const name = String(row.name).replace(/\.sql$/, "");
+    const stem = fileStem(f.path);
+    if (name !== stem && name !== stem.slice(15)) return false;
+    const skew = Math.abs(versionSeconds(row.version) - versionSeconds(f.version));
+    return skew <= LEDGER_NAME_SKEW_SECONDS;
+  };
+  return {
+    files,
+    supabase,
+    drizzle,
+    nameMatch,
+    supabaseVersions: new Set(supabase.map((f) => f.version)),
+    drizzleVersions: new Set(drizzle.map((f) => f.version)),
+    unledgered: new Set((manifest.known_unledgered ?? []).map((k) => k.path)),
+  };
 }
 
 /** Pure evaluation of the checks against data read from the target. */
@@ -431,9 +572,21 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
   const entries = manifest.migrations;
   const from = manifest.release_range.from;
 
-  if (!target.ledger)
+  // 5. server and ledger schema: fail closed on anything this tool was not built for
+  const major = target.server_version_num ? majorOf(target.server_version_num) : null;
+  if (!SUPPORTED_MAJORS.includes(major))
+    errors.push(
+      `unsupported Postgres major ${major ?? "(unknown)"} (server_version_num ${target.server_version_num ?? "?"}): the preflight supports ${SUPPORTED_MAJORS.join(" and ")} only; this is not a recognized production server`,
+    );
+  if (!target.ledger_schema)
+    errors.push(
+      `schema ${LEDGER_SCHEMA} does not exist in the target; this is not the expected database (a Supabase project always has its migration ledger)`,
+    );
+  else if (!target.ledger)
     errors.push(`ledger ${LEDGER} does not exist in the target; this is not the expected database`);
-  const ledger = new Set(target.ledger_versions ?? []);
+
+  const ledgerAll = target.ledger_all ?? [];
+  const ledger = new Set(ledgerAll.map((r) => r.version).filter((v) => v >= from));
   const drizzleHashes = new Set((target.drizzle_rows ?? []).map((r) => r.hash));
   const drizzleWhen = new Set((target.drizzle_rows ?? []).map((r) => String(r.created_at)));
   const isApplied = (e) =>
@@ -443,13 +596,67 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
   const applied = entries.filter(isApplied);
   const pending = entries.filter((e) => !isApplied(e));
 
-  // 3. ledger rows in the release range the manifest does not know about
+  // 3. ledger rows the manifest and the checkout do not know about, in and before the release range
   const known = new Set(entries.filter((e) => e.source !== "drizzle").map((e) => e.version));
-  for (const v of ledger)
-    if (!known.has(v))
+  const kn = ledgerKnowledge(manifest, root);
+  const knownRowsWithoutFile = manifest.known_ledger_rows_without_file ?? [];
+  if (target.ledger) {
+    for (const row of ledgerAll) {
+      const v = row.version;
+      if (v >= from) {
+        if (!known.has(v))
+          errors.push(
+            `ledger row ${v} is in the release range (>= ${from}) but not in the manifest: production has a migration this release does not know`,
+          );
+        continue;
+      }
+      const recognized =
+        kn.supabaseVersions.has(v) ||
+        kn.drizzleVersions.has(v) ||
+        kn.supabase.some((f) => kn.nameMatch(row, f)) ||
+        knownRowsWithoutFile.some((k) => k.version === v && k.name === row.name);
+      if (!recognized)
+        errors.push(
+          `unknown ledger row ${v} (name ${JSON.stringify(row.name ?? null)}): no file in supabase/migrations or the drizzle journal has this version or name, and it is not in the manifest's known_ledger_rows_without_file; the target ran a migration this checkout does not have`,
+        );
+    }
+    // every historical file must be ledgered unless the manifest names it as known-unledgered
+    for (const f of kn.supabase) {
+      if (f.version >= from) continue;
+      const covered = ledgerAll.some((r) => r.version === f.version || kn.nameMatch(r, f));
+      if (!covered && !kn.unledgered.has(f.path))
+        errors.push(
+          `unrecognized history: ${f.path} (before the release range) has no ledger row and is not in the manifest's known_unledgered list; the target is missing it or applied it unrecorded`,
+        );
+    }
+  }
+  for (const f of kn.drizzle) {
+    if (f.version >= from) continue;
+    const covered =
+      (f.sha256 && drizzleHashes.has(f.sha256)) ||
+      drizzleWhen.has(String(f.when)) ||
+      ledgerAll.some((r) => r.version === f.version);
+    if (!covered && !kn.unledgered.has(f.path))
       errors.push(
-        `ledger row ${v} is in the release range (>= ${from}) but not in the manifest: production has a migration this release does not know`,
+        target.drizzle
+          ? `unrecognized history: ${f.path} (drizzle, before the release range) has no row in ${DRIZZLE_LEDGER} and is not in known_unledgered`
+          : `unrecognized history: ${f.path} (drizzle) is in the journal but the target has no ${DRIZZLE_LEDGER}`,
       );
+  }
+  const journalHashes = new Set(kn.drizzle.map((f) => f.sha256));
+  const journalWhen = new Set(kn.drizzle.map((f) => String(f.when)));
+  for (const r of target.drizzle_rows ?? []) {
+    const ok =
+      journalHashes.has(r.hash) ||
+      journalWhen.has(String(r.created_at)) ||
+      (manifest.known_drizzle_rows_without_file ?? []).some(
+        (k) => k.hash === r.hash && String(k.created_at) === String(r.created_at),
+      );
+    if (!ok)
+      errors.push(
+        `unknown ${DRIZZLE_LEDGER} row (created_at ${r.created_at}, hash ${String(r.hash).slice(0, 16)}...): matches no drizzle journal file and is not in known_drizzle_rows_without_file`,
+      );
+  }
 
   // 3. gaps: the applied set must be a prefix of the manifest order
   const firstPending = entries.findIndex((e) => !isApplied(e));
@@ -497,9 +704,20 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     }
   }
 
+  // 5 + 4. hashes are compared only on the major they were generated on
+  const majors = manifestMajors(manifest);
+  const mj = major === null ? null : String(major);
+  const haveHashes = mj !== null && majors.includes(mj);
+  const protectionList = allProtections(manifest);
+  if (!haveHashes && protectionList.length)
+    errors.push(
+      `${verifyAfter ? "--verify-after" : "protections"}: the manifest's hashes were generated on Postgres ${majors.join(", ") || "(none)"}, the target runs ${major ?? "(unknown)"}. Deparsed definitions (pg_get_functiondef, policy expressions) can differ between majors, so ${protectionList.length} protected objects cannot be compared and the target's state is unrecognized. Use a manifest with hashes for ${major ?? "the target's major"} (the release-preflight CI artifact holds PG17 hashes; merge them with --merge-hashes).`,
+    );
+  const captures = new Set((manifest.drift_captures ?? []).map((c) => c.version));
+
   // 4. protections
   const protections = [];
-  for (const p of allProtections(manifest)) {
+  for (const p of protectionList) {
     const label = protectionLabel(p);
     const defs = p.defined_by ?? [];
     const defEntries = defs.map((v) => entries[order.get(v)]).filter(Boolean);
@@ -507,24 +725,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
       p.kind === "function"
         ? (target.functions?.[p.signature] ?? null)
         : (target.policies?.[policyKey(p)] ?? null);
-    const expected = p.expect_after;
-    const matches =
-      p.kind === "function"
-        ? actual === expected
-        : actual !== null &&
-          actual.qual === expected.qual &&
-          actual.with_check === expected.with_check &&
-          actual.shape === expected.shape;
     const allApplied = defEntries.every(isApplied);
-    const row = {
-      kind: p.kind,
-      name: label,
-      expected,
-      actual,
-      matches,
-      all_definers_applied: allApplied,
-    };
-    protections.push(row);
 
     defEntries.forEach((d, k) => {
       if (isApplied(d)) return;
@@ -539,29 +740,64 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
           `${label}: ${d.version} defines it and is superseded by ${laterPending.map((x) => x.version).join(", ")} later in this release; the final definition must be the one from ${defs[defs.length - 1]}`,
         );
     });
-    if (!matches && (verifyAfter || allApplied)) {
-      const what =
-        actual === null
-          ? "is missing from the target"
-          : `differs from expect_after (target ${p.kind === "function" ? String(actual).slice(0, 12) : JSON.stringify(actual)}, expected ${p.kind === "function" ? String(expected).slice(0, 12) : JSON.stringify(expected)})`;
+
+    const row = { kind: p.kind, name: label, actual, all_definers_applied: allApplied };
+    protections.push(row);
+    if (!haveHashes) continue;
+    const before = p.expect_before?.[mj] ?? null;
+    const expectedAfter = p.expect_after?.[mj] ?? null;
+    const steps = p.expect_steps?.[mj] ?? {};
+    row.expected = expectedAfter;
+    row.matches = sameState(actual, expectedAfter);
+
+    // Recognized states, from the ledger: before / after the last applied definer / after.
+    let lastApplied = -1;
+    defEntries.forEach((d, k) => {
+      if (isApplied(d)) lastApplied = k;
+    });
+    const allowed = [];
+    if (lastApplied < 0)
+      allowed.push({
+        state: before,
+        why:
+          before === null
+            ? "absent (a pending migration creates it)"
+            : `expect_before (its defining migrations ${defs.join(", ")} are all pending)`,
+      });
+    else if (allApplied)
+      allowed.push({
+        state: expectedAfter,
+        why: `expect_after (every defining migration ${defs.join(", ")} is applied)`,
+      });
+    else
+      allowed.push({
+        state: steps[defs[lastApplied]] ?? null,
+        why: `the snapshot after ${defs[lastApplied]}, the last applied of its defining migrations ${defs.join(", ")}`,
+      });
+    // A drift capture records a hand fix production already has; while it is the next pending definer the
+    // target may already hold the captured definition (runbook section 1a).
+    const nextDef = defs[lastApplied + 1];
+    if (nextDef && captures.has(nextDef))
+      allowed.push({
+        state: steps[nextDef] ?? null,
+        why: `the snapshot after drift capture ${nextDef} (the hand fix the capture records)`,
+      });
+    row.recognized = allowed.some((a) => sameState(actual, a.state));
+    row.recognized_as = allowed.find((a) => sameState(actual, a.state))?.why ?? null;
+
+    if (verifyAfter) {
+      if (!row.matches)
+        errors.push(
+          `protection ${label} ${actual === null ? "is missing from the target" : `differs from expect_after (target ${showState(actual)}, expected ${showState(expectedAfter)})`}${allApplied ? `; every migration that defines it (${defs.join(", ")}) is applied, so the target has drifted or was regressed` : ""}`,
+        );
+    } else if (!row.recognized)
       errors.push(
-        `protection ${label} ${what}${allApplied ? `; every migration that defines it (${defs.join(", ")}) is applied, so the target has drifted or was regressed` : ""}`,
+        `unrecognized state: protection ${label} is ${showState(actual)} in the target, but the ledger says it must be ${allowed.map((a) => `${a.why} [${showState(a.state)}]`).join(" or ")}; the target has drifted or was regressed`,
       );
-    }
   }
   if (verifyAfter && pending.length)
     errors.push(
       `--verify-after: ${pending.length} manifest migration(s) are not applied yet (first: ${pending[0].version} ${pending[0].path})`,
-    );
-
-  const genVer = manifest.generated?.server_version_num;
-  if (
-    genVer &&
-    target.server_version_num &&
-    Math.floor(genVer / 10000) !== Math.floor(target.server_version_num / 10000)
-  )
-    warnings.push(
-      `expect_after hashes were generated on Postgres ${Math.floor(genVer / 10000)}, the target runs ${Math.floor(target.server_version_num / 10000)}; a deparsed definition (BEGIN ATOMIC SQL bodies, policy expressions) can differ between majors`,
     );
 
   return {
@@ -575,6 +811,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
       sha256: e.sha256,
     })),
     protections,
+    hashes_major: haveHashes ? mj : null,
   };
 }
 
@@ -650,6 +887,8 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       `Replayed ${before.length} migrations before ${from}; recording the ${range.length} release migrations one at a time.`,
     );
     let prev = scratch.snapshot(db);
+    const initial = prev;
+    const stepSnaps = new Map();
     const entries = [];
     const fnChanged = new Map();
     const fnByName = new Map();
@@ -685,6 +924,7 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
 
       scratch.applyMigration(db, join(root, m.path), stripMaintain);
       const next = scratch.snapshot(db);
+      stepSnaps.set(m.version, next);
       const provides = {
         functions: Object.keys(next.functions)
           .filter((s) => !(s in prev.functions))
@@ -727,24 +967,36 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
     for (const key of Object.keys(finalState.policies))
       if (polByKey.has(key))
         polChanged.set(key, [...(polChanged.get(key) ?? []), ...polByKey.get(key)]);
+    const major = String(majorOf(serverVersion));
+    // Per-major states: before the range, after each defining migration, and after the whole range.
+    const states = (kind, key, defined_by) => {
+      const at = (snap) => snap[kind][key] ?? null;
+      return {
+        expect_before: { [major]: at(initial) },
+        expect_steps: {
+          [major]: Object.fromEntries(defined_by.map((v) => [v, at(stepSnaps.get(v))])),
+        },
+        expect_after: { [major]: at(finalState) },
+      };
+    };
     const functions = [...fnChanged]
       .filter(([sig]) => sig in finalState.functions)
-      .map(([signature, defs]) => ({
-        signature,
-        expect_after: finalState.functions[signature],
-        defined_by: inOrder(defs),
-      }))
+      .map(([signature, defs]) => {
+        const defined_by = inOrder(defs);
+        return { signature, defined_by, ...states("functions", signature, defined_by) };
+      })
       .sort((a, b) => a.signature.localeCompare(b.signature));
     const policies = [...polChanged]
       .filter(([key]) => key in finalState.policies)
       .map(([key, defs]) => {
         const defined_by = inOrder(defs);
         const [schema, table, policy] = key.split("|");
-        return { schema, table, policy, expect_after: finalState.policies[key], defined_by };
+        return { schema, table, policy, defined_by, ...states("policies", key, defined_by) };
       })
       .sort((a, b) => policyKey(a).localeCompare(policyKey(b)));
+    const known_unledgered = knownUnledgered(root, from);
     const manifest = {
-      format: 1,
+      format: MANIFEST_FORMAT,
       description:
         "Privacy release migrations in apply order. Checked by scripts/release-preflight.mjs; regenerate with --write-manifest --from <version> and review the diff.",
       release_range: {
@@ -754,11 +1006,17 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       },
       ledger: LEDGER,
       generated: {
-        server_version_num: serverVersion,
+        majors: { [major]: { server_version_num: serverVersion } },
         search_path: "",
         method:
-          "full local replay (stub + every earlier migration), catalog snapshot after each release file; expect_after = md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles in the final state",
+          "full local replay (stub + every earlier migration), catalog snapshot before the range and after each release file; states are md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles, keyed by Postgres major (null = absent). expect_before = before the range, expect_steps[v] = after defining migration v, expect_after = after the whole range. Hashes are never compared across majors; add another major with --merge-hashes.",
       },
+      known_unledgered_basis:
+        "Runbook section 1 / docs/migration-history-reconciliation.md section 3: these historical files are in production by catalog evidence (docs/migration-evidence/ledger-evidence.csv) but have no ledger row. Only they may lack one; the sha256 is the reviewed file.",
+      known_unledgered,
+      known_ledger_rows_without_file: KNOWN_LEDGER_ROWS_WITHOUT_FILE,
+      known_drizzle_rows_without_file: KNOWN_DRIZZLE_ROWS_WITHOUT_FILE,
+      drift_captures: DRIFT_CAPTURES.filter((c) => entries.some((e) => e.version === c.version)),
       migrations: entries.map((e, i) => ({ order: i + 1, ...e })),
       protections: { functions, policies },
     };
@@ -770,6 +1028,113 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
   } finally {
     scratch.dropDb(db);
   }
+}
+
+// Explicit allow-lists, each from the reconciliation record. Anything not listed here fails closed.
+const KNOWN_LEDGER_ROWS_WITHOUT_FILE = [
+  {
+    version: "20260708185350",
+    name: "20260708185348_97d89a2e-6e82-4a38-b870-5da2e718a847",
+    evidence:
+      "docs/migration-evidence/original-sources/20260708185348_97d89a2e-6e82-4a38-b870-5da2e718a847.sql.orig",
+    basis:
+      "docs/migration-history-reconciliation.md section 1 (Lovable commit c3288250; never re-run)",
+  },
+  {
+    version: "20260725025124",
+    name: "20260725025123_dc6f1a08-f936-4a43-9806-de61c4ed9c77",
+    evidence:
+      "docs/migration-evidence/original-sources/20260725025123_dc6f1a08-f936-4a43-9806-de61c4ed9c77.sql.orig",
+    basis:
+      "docs/migration-history-reconciliation.md section 1 (Lovable commit b1553001; never re-run)",
+  },
+];
+const KNOWN_DRIZZLE_ROWS_WITHOUT_FILE = [
+  {
+    created_at: "1792495848439",
+    hash: "b266e30fd6947963a6fbe8aa0eaac5e5d0de4e06c574ed5ad2dfe9ba1ad98292",
+    basis:
+      "docs/migration-history-reconciliation.md section 2 (0021_hide_team_posts_moderation_hidden_at.sql, commit f97dd5f8, origin/lovable-sync only)",
+  },
+];
+// Release migrations that write down a hand fix production already has (runbook section 1a). Until one is
+// applied, the target may already hold the definition it records.
+const DRIFT_CAPTURES = [
+  {
+    version: "20261103101000",
+    basis: "runbook 1a item 4: enforce_gym_review system-update bypass",
+  },
+  { version: "20261103102000", basis: "runbook 1a item 5: review_ring_suspects mean_rating alias" },
+  { version: "20261103103000", basis: "runbook 1a item 6: enforce_skill_vote EXECUTE" },
+  { version: "20261103104000", basis: "runbook 1a item 2: enforce_review_integrity EXECUTE" },
+  {
+    version: "20261103110000",
+    basis:
+      "runbook 1a item 1: structured reviews (enforce_review_integrity, player_trait_counts, review_question_keys, review_tag_keys)",
+  },
+];
+const UNLEDGERED_CSV = "docs/migration-evidence/ledger-evidence.csv";
+
+/** The reviewed list of historical files without ledger rows, with the sha256 the evidence was taken on. */
+function knownUnledgered(root, from) {
+  const csv = join(root, UNLEDGERED_CSV);
+  if (!existsSync(csv))
+    throw new Error(`${UNLEDGERED_CSV} is missing; known_unledgered cannot be built`);
+  const out = [];
+  for (const line of readFileSync(csv, "utf8").split("\n").slice(1)) {
+    const m = /^\d+,([^,]+\.sql),([0-9a-f]{64}),/.exec(line);
+    if (!m) continue;
+    const path = `supabase/migrations/${m[1]}`;
+    if (!existsSync(join(root, path))) throw new Error(`${UNLEDGERED_CSV}: ${path} does not exist`);
+    if (sha256File(join(root, path)) !== m[2])
+      throw new Error(`${UNLEDGERED_CSV}: ${path} changed since its evidence was taken`);
+    if (m[1].slice(0, 14) >= from)
+      throw new Error(`${UNLEDGERED_CSV}: ${path} is inside the release range ${from}`);
+    out.push({ version: m[1].slice(0, 14), path, sha256: m[2] });
+  }
+  return out;
+}
+
+/** Copies another manifest's per-major hashes into the base manifest; everything else must be identical. */
+export function mergeHashes(baseManifestPath, otherManifestPath) {
+  const base = loadManifest(baseManifestPath);
+  const other = loadManifest(otherManifestPath);
+  const structure = (m) => {
+    const c = structuredClone(m);
+    delete c.generated?.majors;
+    delete c.description;
+    for (const p of [...(c.protections?.functions ?? []), ...(c.protections?.policies ?? [])]) {
+      delete p.expect_before;
+      delete p.expect_after;
+      delete p.expect_steps;
+    }
+    return JSON.stringify(c);
+  };
+  if (base.format !== MANIFEST_FORMAT || other.format !== MANIFEST_FORMAT)
+    throw new Error(`both manifests must be format ${MANIFEST_FORMAT}`);
+  if (structure(base) !== structure(other))
+    throw new Error(
+      "the manifests differ in more than their hashes (migrations, sha256s, requires/provides, protections, defined_by or allow-lists); regenerate both from the same checkout",
+    );
+  const key = (p) => (p.signature ? `f:${p.signature}` : `p:${policyKey(p)}`);
+  const otherBy = new Map(
+    [...other.protections.functions, ...other.protections.policies].map((p) => [key(p), p]),
+  );
+  const added = manifestMajors(other);
+  for (const p of [...base.protections.functions, ...base.protections.policies]) {
+    const o = otherBy.get(key(p));
+    for (const mj of added) {
+      p.expect_before[mj] = o.expect_before[mj];
+      p.expect_steps[mj] = o.expect_steps[mj];
+      p.expect_after[mj] = o.expect_after[mj];
+    }
+  }
+  for (const mj of added) base.generated.majors[mj] = other.generated.majors[mj];
+  base.generated.majors = Object.fromEntries(
+    Object.entries(base.generated.majors).sort(([a], [b]) => a.localeCompare(b)),
+  );
+  writeFileSync(baseManifestPath, `${JSON.stringify(base, null, 2)}\n`);
+  return { majors: manifestMajors(base), added };
 }
 
 function readFn(snap, name) {
@@ -810,6 +1175,7 @@ export function runPreflight({
   const ev = evaluate(manifest, target, { verifyAfter, root });
   report.target = {
     server_version_num: target.server_version_num,
+    hashes_major: ev.hashes_major,
     ledger_rows: target.ledger_rows,
     ledger_versions_in_range: target.ledger_versions,
     drizzle_ledger_rows: target.drizzle ? target.drizzle_rows.length : null,
@@ -818,8 +1184,10 @@ export function runPreflight({
   report.pending = ev.pending;
   report.protections = {
     checked: ev.protections.length,
-    matching: ev.protections.filter((p) => p.matches).length,
-    mismatched: ev.protections.filter((p) => !p.matches).map((p) => p.name),
+    matching: ev.protections.filter((p) => p.matches === true).length,
+    mismatched: ev.protections.filter((p) => p.matches !== true).map((p) => p.name),
+    recognized: ev.protections.filter((p) => p.recognized === true).length,
+    unrecognized: ev.protections.filter((p) => p.recognized !== true).map((p) => p.name),
   };
   report.errors.push(...ev.errors);
   report.warnings.push(...ev.warnings);
@@ -834,7 +1202,7 @@ function printHuman(r, { verifyAfter }) {
   );
   if (r.target) {
     out.push(
-      `Target: Postgres ${r.target.server_version_num}, ledger rows ${r.target.ledger_rows ?? "(no ledger)"}, in release range ${r.target.ledger_versions_in_range.length}`,
+      `Target: Postgres ${r.target.server_version_num} (manifest hashes for this major: ${r.target.hashes_major ? "yes" : "NO"}), ledger rows ${r.target.ledger_rows ?? "(no ledger)"}, in release range ${r.target.ledger_versions_in_range.length}`,
     );
     out.push(
       `Applied (${r.applied.length}): ${r.applied.map((a) => a.version).join(" ") || "none"}`,
@@ -847,7 +1215,7 @@ function printHuman(r, { verifyAfter }) {
         `  ${String(p.order).padStart(2)}. ${p.version}  ${p.path}  sha256 ${p.sha256.slice(0, 16)}`,
       );
     out.push(
-      `Protections: ${r.protections.matching}/${r.protections.checked} match expect_after${verifyAfter ? "" : " (only fully applied ones are enforced without --verify-after)"}`,
+      `Protections: ${r.protections.recognized}/${r.protections.checked} in a recognized state for the ledger; ${r.protections.matching}/${r.protections.checked} equal expect_after${verifyAfter ? " (all required)" : ""}`,
     );
   } else out.push("Offline: no database checks were run.");
   if (r.warnings.length) {
@@ -895,6 +1263,18 @@ function main(argv) {
         return 1;
       },
     );
+  }
+  if (option("--merge-hashes")) {
+    try {
+      const r = mergeHashes(manifestPath, resolve(option("--merge-hashes")));
+      console.log(
+        `Merged Postgres ${r.added.join(", ")} hashes into ${manifestPath}; it now carries ${r.majors.join(", ")}.`,
+      );
+      return 0;
+    } catch (e) {
+      console.error(`--merge-hashes refused: ${e.message}`);
+      return 1;
+    }
   }
   const offline = flag("--offline");
   const dbUrl = option("--db-url") ?? process.env.PREFLIGHT_DATABASE_URL;

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "description": "Privacy release migrations in apply order. Checked by scripts/release-preflight.mjs; regenerate with --write-manifest --from <version> and review the diff.",
   "release_range": {
     "from": "20261103100000",
@@ -7,10 +7,415 @@
   },
   "ledger": "supabase_migrations.schema_migrations",
   "generated": {
-    "server_version_num": 160015,
+    "majors": {
+      "16": {
+        "server_version_num": 160015
+      }
+    },
     "search_path": "",
-    "method": "full local replay (stub + every earlier migration), catalog snapshot after each release file; expect_after = md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles in the final state"
+    "method": "full local replay (stub + every earlier migration), catalog snapshot before the range and after each release file; states are md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles, keyed by Postgres major (null = absent). expect_before = before the range, expect_steps[v] = after defining migration v, expect_after = after the whole range. Hashes are never compared across majors; add another major with --merge-hashes."
   },
+  "known_unledgered_basis": "Runbook section 1 / docs/migration-history-reconciliation.md section 3: these historical files are in production by catalog evidence (docs/migration-evidence/ledger-evidence.csv) but have no ledger row. Only they may lack one; the sha256 is the reviewed file.",
+  "known_unledgered": [
+    {
+      "version": "20260915214000",
+      "path": "supabase/migrations/20260915214000_freeze_payment_claim_metadata_on_dispute.sql",
+      "sha256": "fc39ebd0fe110819bd24f2ff6e475ce8c2e0af017cf6629e681e12c58eda71a2"
+    },
+    {
+      "version": "20260915225631",
+      "path": "supabase/migrations/20260915225631_guard_profile_moderation_fields.sql",
+      "sha256": "a5fe5b4f717576dcce567a8870137deb5f594818733f75687e2c4661181cac6f"
+    },
+    {
+      "version": "20260930120000",
+      "path": "supabase/migrations/20260930120000_managed_children.sql",
+      "sha256": "7e92077b15da1d882ac194328325c0491349cfe62baa83508feab84a04cda9ba"
+    },
+    {
+      "version": "20260930121000",
+      "path": "supabase/migrations/20260930121000_freeze_player_profiles.sql",
+      "sha256": "f3f123455c0337f7ec7fcdb008c3c3bb21052615b1890b65d30638f6df56d7da"
+    },
+    {
+      "version": "20261006120000",
+      "path": "supabase/migrations/20261006120000_hosted_games_org_authorization.sql",
+      "sha256": "cc382a54b808996669550c1869718e4a9efaaf19d038f60381dcb3c727190d30"
+    },
+    {
+      "version": "20261006130000",
+      "path": "supabase/migrations/20261006130000_org_court_inquiries.sql",
+      "sha256": "94cfdce7bf2d6c9df4a1480a3bf97b99fd6bd96414626a166531d87f84682814"
+    },
+    {
+      "version": "20261006140000",
+      "path": "supabase/migrations/20261006140000_org_featured.sql",
+      "sha256": "2e40b22b5c9f6ae9d66440d0e52af7c1e506be2183c30228de3672a418dc0a38"
+    },
+    {
+      "version": "20261006150000",
+      "path": "supabase/migrations/20261006150000_court_booking_model.sql",
+      "sha256": "d1cfac395d311a7b999db4b6103f0fb93bc765aea44942fec7fe7d7834227c82"
+    },
+    {
+      "version": "20261006160000",
+      "path": "supabase/migrations/20261006160000_trainer_age_groups.sql",
+      "sha256": "30c91efeec33c3547318cdf5f38c7b5b6692de5a220fda80810389624b050345"
+    },
+    {
+      "version": "20261006180000",
+      "path": "supabase/migrations/20261006180000_hosted_games_community_runs.sql",
+      "sha256": "11fae6058b63379e0d0a8891178bd73674cd910dbdefd8e34ceb554ceed1ef91"
+    },
+    {
+      "version": "20261006190000",
+      "path": "supabase/migrations/20261006190000_reel_advanced_analytics.sql",
+      "sha256": "50556107a59df982ff23c5dd1d32385f63fd1aac56a56f5004c7152fe7ff99fd"
+    },
+    {
+      "version": "20261006200000",
+      "path": "supabase/migrations/20261006200000_restore_child_ai_processing_on_approval.sql",
+      "sha256": "aba1c0c2ecaa62168dfea558db2b3f9a1956bbae680f060e1801c23717982f8d"
+    },
+    {
+      "version": "20261007120000",
+      "path": "supabase/migrations/20261007120000_payment_spot_hold.sql",
+      "sha256": "46fcb98b740f23137e04333821a95ce6ea21b5fb09a010889b36f29372b86cc9"
+    },
+    {
+      "version": "20261007140000",
+      "path": "supabase/migrations/20261007140000_worker_secret_check.sql",
+      "sha256": "11cb2ddf1b4078e3a217be0801cb5c0287cf076f6ede14e9c3d233d8c16716fc"
+    },
+    {
+      "version": "20261007160000",
+      "path": "supabase/migrations/20261007160000_trainer_session_cancel_accepted.sql",
+      "sha256": "ed87eec97acbfc3a69152d2a568af9a7097a8a5d9122cf4b0dda848cf904f7a3"
+    },
+    {
+      "version": "20261008120000",
+      "path": "supabase/migrations/20261008120000_cancel_windows.sql",
+      "sha256": "19d5755ea99bb345f6578ae59eac4311d13111659cf65e5d705bb14c86a4a65d"
+    },
+    {
+      "version": "20261008130000",
+      "path": "supabase/migrations/20261008130000_reel_drafts.sql",
+      "sha256": "2a09f4240201defbd27d7337e156120ed557af53590b525f13393da2a64b913a"
+    },
+    {
+      "version": "20261008140000",
+      "path": "supabase/migrations/20261008140000_refund_policies.sql",
+      "sha256": "b29f4ecc15b01546cddcff3fe8a0ba626b07c59caa312edd87c21510e42bfcad"
+    },
+    {
+      "version": "20261008140000",
+      "path": "supabase/migrations/20261008140000_teen_reel_sharing.sql",
+      "sha256": "4a2cfad0277551f911972fb129061023899d6f3269d3291f6f0e0057fc5bf53a"
+    },
+    {
+      "version": "20261008150000",
+      "path": "supabase/migrations/20261008150000_family_posts.sql",
+      "sha256": "c49b25898710a0f5cde7d4649b4b192c7ed9bc1bcef63e0242adc9fc0f102956"
+    },
+    {
+      "version": "20261008160000",
+      "path": "supabase/migrations/20261008160000_family_post_links.sql",
+      "sha256": "fae7996c35d56a930e6481eb1f3d342307f3e93dab9342edb2bf6e72ce851bc1"
+    },
+    {
+      "version": "20261008160000",
+      "path": "supabase/migrations/20261008160000_guardian_cancel_child_game.sql",
+      "sha256": "017eb9f75bcbfbd6e862204dfe72f68ed792e8f69ea5165583cf83e3e0772a6a"
+    },
+    {
+      "version": "20261008170000",
+      "path": "supabase/migrations/20261008170000_family_post_team_tier.sql",
+      "sha256": "6bca5ed6ff76a45fd24c0bda22413de474b4ecae7454718b2dad9b88fcf6d7ba"
+    },
+    {
+      "version": "20261008170000",
+      "path": "supabase/migrations/20261008170000_guardian_refund_notices.sql",
+      "sha256": "30c858c9c3f988ebbd77c6e39d383623ec058371849494d90508e7a34091af5d"
+    },
+    {
+      "version": "20261008180000",
+      "path": "supabase/migrations/20261008180000_family_sharing_guardian_toggles.sql",
+      "sha256": "2278b7b888828faba4b35870777c5caffbe40f2657e775799d5cc400525bdaf5"
+    },
+    {
+      "version": "20261008190000",
+      "path": "supabase/migrations/20261008190000_public_xp_toggle.sql",
+      "sha256": "ad06f32bded0144dc51b661eb1190b867a772f478bc1ec8b94e0d50766b0a6f2"
+    },
+    {
+      "version": "20261008200000",
+      "path": "supabase/migrations/20261008200000_coach_analytics_sharing.sql",
+      "sha256": "3b59d194bdd36c37eb1de58ba1cb7ea3965be39804a03b50a77bab71dd59df57"
+    },
+    {
+      "version": "20261009120000",
+      "path": "supabase/migrations/20261009120000_superadmin_inherits_admin_roles.sql",
+      "sha256": "c1ebd254ad42a4409a0cd54ae84d9cc1e9fd7ad20b381cd11854725c375d5298"
+    },
+    {
+      "version": "20261012120000",
+      "path": "supabase/migrations/20261012120000_review_integrity.sql",
+      "sha256": "96de1ac2befa61fae05771ec5d746e8faffc7453a75d51bcf71b30971d10b6a1"
+    },
+    {
+      "version": "20261012130000",
+      "path": "supabase/migrations/20261012130000_review_ring_detection.sql",
+      "sha256": "de6a5f4fdbde6c7e1d56a8518dd6124424616758f191f79c6bf219104df01e4f"
+    },
+    {
+      "version": "20261012140000",
+      "path": "supabase/migrations/20261012140000_review_ai.sql",
+      "sha256": "92e615527856930c1ec18619fe5297593eb8c85e071d1256f4447f9696c3c4fa"
+    },
+    {
+      "version": "20261012150000",
+      "path": "supabase/migrations/20261012150000_skill_ratings.sql",
+      "sha256": "220c4df493a854725b7953da46977f4f291a586385e71c54731ee30c610ab31f"
+    },
+    {
+      "version": "20261014120000",
+      "path": "supabase/migrations/20261014120000_game_refund_terms.sql",
+      "sha256": "791d92a5e23cf24f2b3c89f660b5d1d434d83e789a0cf890ee3460d058bb1f76"
+    },
+    {
+      "version": "20261014130000",
+      "path": "supabase/migrations/20261014130000_minor_messaging_block_side.sql",
+      "sha256": "2e3b7b39ac733e77b3310c52216400d7ebccaea6c3530566a9c2804889e937ec"
+    },
+    {
+      "version": "20261015120000",
+      "path": "supabase/migrations/20261015120000_teen_reel_team_approval.sql",
+      "sha256": "687a1ed0079153a1472b390864119baa164f0936a8f4a4d2c89451f02c0c55ee"
+    },
+    {
+      "version": "20261016120000",
+      "path": "supabase/migrations/20261016120000_post_text_moderation.sql",
+      "sha256": "302a7c1487282bd85ab77f328e7cd458c070d8263f4f2c037c0eb5bc79929831"
+    },
+    {
+      "version": "20261016130000",
+      "path": "supabase/migrations/20261016130000_team_event_availability.sql",
+      "sha256": "4f1a40b1dea90337526c3b363e7999b4ac93aebb0ec8befe3a80dc4f877771e4"
+    },
+    {
+      "version": "20261016140000",
+      "path": "supabase/migrations/20261016140000_availability_levels_and_intent.sql",
+      "sha256": "3119708a64dcfb5012aefcb15cb8ae6b3b3eee30bbafba6e92b5642d03679dd4"
+    },
+    {
+      "version": "20261020120000",
+      "path": "supabase/migrations/20261020120000_accept_message_request.sql",
+      "sha256": "fdb3d8675ab1fc2d45c61f92d43b47a7ffd72b824ab5ae453c07bdc873f446ef"
+    },
+    {
+      "version": "20261020120000",
+      "path": "supabase/migrations/20261020120000_hide_posts_and_comments.sql",
+      "sha256": "170ce696646a1d9f03bf80b709b22ce0972576c463442f147ee9fb253b5fad14"
+    },
+    {
+      "version": "20261020130000",
+      "path": "supabase/migrations/20261020130000_unsent_attachments_stay_private.sql",
+      "sha256": "d55c627b19bf3b97af5362c0a03c57db67318221600cac575804b3a65381dd31"
+    },
+    {
+      "version": "20261020160000",
+      "path": "supabase/migrations/20261020160000_capture_live_function_changes.sql",
+      "sha256": "17062bf813bb8c3b5bb14ea2d1417d76db165a6e586299aaf89500eeafc8b8c3"
+    },
+    {
+      "version": "20261021120000",
+      "path": "supabase/migrations/20261021120000_team_post_images.sql",
+      "sha256": "80fdecc0fdfb37bd580bc8e8df87339f12c1bcca0c2c0ae1250088efe68a1530"
+    },
+    {
+      "version": "20261021130000",
+      "path": "supabase/migrations/20261021130000_team_logo_column.sql",
+      "sha256": "d566f87603ee2b4c379e154ede6b800bedab243162e74cbf21157b718cce3270"
+    },
+    {
+      "version": "20261021140000",
+      "path": "supabase/migrations/20261021140000_listing_discovery.sql",
+      "sha256": "404daa4db0413a988b702be37dc6ff1a92cf2b5df4bc06053337c692cc067583"
+    },
+    {
+      "version": "20261021150000",
+      "path": "supabase/migrations/20261021150000_teams_anon_read_narrow.sql",
+      "sha256": "73f8ec585b5f7c8f4c38a8c4f1888b68777ca2a62f43ae6f7e5bd5360278b6a2"
+    },
+    {
+      "version": "20261021160000",
+      "path": "supabase/migrations/20261021160000_trainer_orgs_anon_internal_columns.sql",
+      "sha256": "abe132b4459ce4c3601251d1623cf24834a0e3987eb1a9e6aa789f06acf680cc"
+    },
+    {
+      "version": "20261022130000",
+      "path": "supabase/migrations/20261022130000_listing_claim_review.sql",
+      "sha256": "f99b7f2b6e6f5cf2b276ffcb491356bd2621c4dae7398ee5709fcfe05e7db613"
+    },
+    {
+      "version": "20261023100000",
+      "path": "supabase/migrations/20261023100000_owner_hide_listings.sql",
+      "sha256": "47c3ebc667656d1d317116c20275e3ffebb597313e4ee3a1a6a26f697c1b0352"
+    },
+    {
+      "version": "20261023110000",
+      "path": "supabase/migrations/20261023110000_team_posts_no_pickup.sql",
+      "sha256": "9da7d18e81d64fb486dcfa85565671deb10a771f24b27726a88f413ae375e70d"
+    },
+    {
+      "version": "20261023120000",
+      "path": "supabase/migrations/20261023120000_payment_health_metrics.sql",
+      "sha256": "86fe3df2112ce0e41b070a8cf5fd12f382929e381ae2d1d41ea0e29fcce7c80b"
+    },
+    {
+      "version": "20261023120100",
+      "path": "supabase/migrations/20261023120100_guardian_can_message_own_teen.sql",
+      "sha256": "1af230fca6d141d2f64ff94e853e224c812b970b1cc468b0a798e65381a992bc"
+    },
+    {
+      "version": "20261023130000",
+      "path": "supabase/migrations/20261023130000_follow_approval.sql",
+      "sha256": "6a5219b8ce2b758de9ae35c10ccee2b093a08ca4d0412cfbc3640a33930df315"
+    },
+    {
+      "version": "20261023130100",
+      "path": "supabase/migrations/20261023130100_quarantine_policy_sees_moderation_rows.sql",
+      "sha256": "1ca988869e9d3cb847a389e8129ef904e33b524cfe42194cfedf924bb13c2bf5"
+    },
+    {
+      "version": "20261023140000",
+      "path": "supabase/migrations/20261023140000_reports_start_as_new.sql",
+      "sha256": "bce2956167875d88a7c2242774695b7cd4684faa1bd895b3172886cee3a03977"
+    },
+    {
+      "version": "20261027120000",
+      "path": "supabase/migrations/20261027120000_join_gate_hardening.sql",
+      "sha256": "b82304067dbd403e4f22eb568b801d9a59f8186230444143a03e1152f6027912"
+    },
+    {
+      "version": "20261027130000",
+      "path": "supabase/migrations/20261027130000_guardian_join_request_either_order.sql",
+      "sha256": "399a853213fcd4f86fcd0c53ab8dec6b06b43d0bf552b35415702eaa8ef4a787"
+    },
+    {
+      "version": "20261027140000",
+      "path": "supabase/migrations/20261027140000_team_members_no_direct_minor_add.sql",
+      "sha256": "95c9d759ecf174c8ef464786b78fcb9979cd7600fdc8c6f79ac6c4cce3d2454c"
+    },
+    {
+      "version": "20261027150000",
+      "path": "supabase/migrations/20261027150000_waitlist_notified_on_leave.sql",
+      "sha256": "4f94ce0d56a39beb5d334ca075b22234361509edd264404424614127a6301ca7"
+    },
+    {
+      "version": "20261027160000",
+      "path": "supabase/migrations/20261027160000_trainer_org_no_forged_affiliation.sql",
+      "sha256": "1bead9eb15d57c9ff499d78e1b3b184f14b2e2ce63efdf5bd4a908c64c36473c"
+    },
+    {
+      "version": "20261028120000",
+      "path": "supabase/migrations/20261028120000_message_attachment_checks.sql",
+      "sha256": "9ed9a92871865e9f85d5ed2f926c0483f62cb7249e608742663d86c2f81b9349"
+    },
+    {
+      "version": "20261028130000",
+      "path": "supabase/migrations/20261028130000_image_bucket_mime_types.sql",
+      "sha256": "c5f1bcc4056cdab8082eca297be94ff9527a8430c5b08c064732e6846d7bc55b"
+    },
+    {
+      "version": "20261028140000",
+      "path": "supabase/migrations/20261028140000_guardian_before_payment.sql",
+      "sha256": "f66fc2884aaec1f4331a11d5381e5930e15595cfebed103252a83a57dffedb21"
+    },
+    {
+      "version": "20261028150000",
+      "path": "supabase/migrations/20261028150000_host_blocks_stop_joins.sql",
+      "sha256": "9145d553461d4162589b8edd345e69210a09e5ec097b7ddd6936033eacbf77c3"
+    },
+    {
+      "version": "20261028160000",
+      "path": "supabase/migrations/20261028160000_fix_revoke_parental_consent.sql",
+      "sha256": "880347ab2bf0dc051aa37a0309ecd1aa9ff5f1e1ad4fb2fa24334b67582ab43e"
+    },
+    {
+      "version": "20261028170000",
+      "path": "supabase/migrations/20261028170000_team_manager_null_guard.sql",
+      "sha256": "a673155922ed170c0e15350472aae812d9bc22d495765ac744c0a8adde531fff"
+    },
+    {
+      "version": "20261028180000",
+      "path": "supabase/migrations/20261028180000_unsend_message_allows_deleted.sql",
+      "sha256": "4aa0af6cc1f5c1f2f432cbd41511c42e0c2739fd27a20391b5daddb477a7920b"
+    },
+    {
+      "version": "20261029120000",
+      "path": "supabase/migrations/20261029120000_remove_unclaimed_listing.sql",
+      "sha256": "2a313e271167c223b87c6578c151b0737aeff3b70d05ee59e00c05a6d853b12a"
+    },
+    {
+      "version": "20261029150000",
+      "path": "supabase/migrations/20261029150000_hosted_games_anon_minors_guard.sql",
+      "sha256": "ebad1d40687e5bb8a2d4bbe79baf03dd4be726a9e399239e5d9eb5c3b6784c4c"
+    },
+    {
+      "version": "20261029190000",
+      "path": "supabase/migrations/20261029190000_highlight_reels_restricted_game_guard.sql",
+      "sha256": "47133deda031639573b3720fe4c9b0c816ee61466106eaea0b5542458241511a"
+    },
+    {
+      "version": "20261030120000",
+      "path": "supabase/migrations/20261030120000_sport_hubs_setting.sql",
+      "sha256": "be6be45747778e8d633c7279c6478118c138a4d83533fda067fce9767d6a51a5"
+    }
+  ],
+  "known_ledger_rows_without_file": [
+    {
+      "version": "20260708185350",
+      "name": "20260708185348_97d89a2e-6e82-4a38-b870-5da2e718a847",
+      "evidence": "docs/migration-evidence/original-sources/20260708185348_97d89a2e-6e82-4a38-b870-5da2e718a847.sql.orig",
+      "basis": "docs/migration-history-reconciliation.md section 1 (Lovable commit c3288250; never re-run)"
+    },
+    {
+      "version": "20260725025124",
+      "name": "20260725025123_dc6f1a08-f936-4a43-9806-de61c4ed9c77",
+      "evidence": "docs/migration-evidence/original-sources/20260725025123_dc6f1a08-f936-4a43-9806-de61c4ed9c77.sql.orig",
+      "basis": "docs/migration-history-reconciliation.md section 1 (Lovable commit b1553001; never re-run)"
+    }
+  ],
+  "known_drizzle_rows_without_file": [
+    {
+      "created_at": "1792495848439",
+      "hash": "b266e30fd6947963a6fbe8aa0eaac5e5d0de4e06c574ed5ad2dfe9ba1ad98292",
+      "basis": "docs/migration-history-reconciliation.md section 2 (0021_hide_team_posts_moderation_hidden_at.sql, commit f97dd5f8, origin/lovable-sync only)"
+    }
+  ],
+  "drift_captures": [
+    {
+      "version": "20261103101000",
+      "basis": "runbook 1a item 4: enforce_gym_review system-update bypass"
+    },
+    {
+      "version": "20261103102000",
+      "basis": "runbook 1a item 5: review_ring_suspects mean_rating alias"
+    },
+    {
+      "version": "20261103103000",
+      "basis": "runbook 1a item 6: enforce_skill_vote EXECUTE"
+    },
+    {
+      "version": "20261103104000",
+      "basis": "runbook 1a item 2: enforce_review_integrity EXECUTE"
+    },
+    {
+      "version": "20261103110000",
+      "basis": "runbook 1a item 1: structured reviews (enforce_review_integrity, player_trait_counts, review_question_keys, review_tag_keys)"
+    }
+  ],
   "migrations": [
     {
       "order": 1,
@@ -677,867 +1082,2097 @@
     "functions": [
       {
         "signature": "private_sec.apply_content_hold()",
-        "expect_after": "7c69e685e987ada374a1dbb1d2f32a71",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "7c69e685e987ada374a1dbb1d2f32a71"
+          }
+        },
+        "expect_after": {
+          "16": "7c69e685e987ada374a1dbb1d2f32a71"
+        }
       },
       {
         "signature": "private_sec.availability_post_visible(uuid)",
-        "expect_after": "daa99f5c08d61e286c5f3d88cdea4d39",
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "daa99f5c08d61e286c5f3d88cdea4d39"
+          }
+        },
+        "expect_after": {
+          "16": "daa99f5c08d61e286c5f3d88cdea4d39"
+        }
       },
       {
         "signature": "private_sec.blank_minor_availability_location(integer)",
-        "expect_after": "aefb642773a879735f992336c9408f2a",
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "aefb642773a879735f992336c9408f2a"
+          }
+        },
+        "expect_after": {
+          "16": "aefb642773a879735f992336c9408f2a"
+        }
       },
       {
         "signature": "private_sec.can_manage_game_payment_settings(text)",
-        "expect_after": "5a61f1454e986888987775c3a5f5e9f1",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "5a61f1454e986888987775c3a5f5e9f1"
+          }
+        },
+        "expect_after": {
+          "16": "5a61f1454e986888987775c3a5f5e9f1"
+        }
       },
       {
         "signature": "private_sec.can_read_game_payment_settings(text,uuid)",
-        "expect_after": "146c08b9c2a10ee4004ffefdc9924cca",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "146c08b9c2a10ee4004ffefdc9924cca"
+          }
+        },
+        "expect_after": {
+          "16": "146c08b9c2a10ee4004ffefdc9924cca"
+        }
       },
       {
         "signature": "private_sec.can_see_exact_game_location(text)",
-        "expect_after": "f5c69f6663b48c0ce5e18a09db64e8c4",
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "f5c69f6663b48c0ce5e18a09db64e8c4"
+          }
+        },
+        "expect_after": {
+          "16": "f5c69f6663b48c0ce5e18a09db64e8c4"
+        }
       },
       {
         "signature": "private_sec.can_see_exact_team_post_location(uuid)",
-        "expect_after": "06e398bab595abf5a48ae6ba2cbb195c",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "06e398bab595abf5a48ae6ba2cbb195c"
+          }
+        },
+        "expect_after": {
+          "16": "06e398bab595abf5a48ae6ba2cbb195c"
+        }
       },
       {
         "signature": "private_sec.can_see_minor_name(uuid,uuid)",
-        "expect_after": "7ccbba4b5e8823b9585e64d8bc8866f2",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "7ccbba4b5e8823b9585e64d8bc8866f2"
+          }
+        },
+        "expect_after": {
+          "16": "7ccbba4b5e8823b9585e64d8bc8866f2"
+        }
       },
       {
         "signature": "private_sec.can_see_team_facility(text)",
-        "expect_after": "d204256f002eed932eeb1e94fa50b8dd",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "d204256f002eed932eeb1e94fa50b8dd"
+          }
+        },
+        "expect_after": {
+          "16": "d204256f002eed932eeb1e94fa50b8dd"
+        }
       },
       {
         "signature": "private_sec.coarse_game_label(text)",
-        "expect_after": "fe16d20642d8a90d7a72ac08d7a3958c",
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "fe16d20642d8a90d7a72ac08d7a3958c"
+          }
+        },
+        "expect_after": {
+          "16": "fe16d20642d8a90d7a72ac08d7a3958c"
+        }
       },
       {
         "signature": "private_sec.coarse_team_post_label(text)",
-        "expect_after": "45f5d63e5f036d840b7cdbce03d75d29",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "45f5d63e5f036d840b7cdbce03d75d29"
+          }
+        },
+        "expect_after": {
+          "16": "45f5d63e5f036d840b7cdbce03d75d29"
+        }
       },
       {
         "signature": "private_sec.content_author(text,uuid)",
-        "expect_after": "d70f7341a509e34c5d502c96e279b6ac",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "d70f7341a509e34c5d502c96e279b6ac"
+          }
+        },
+        "expect_after": {
+          "16": "d70f7341a509e34c5d502c96e279b6ac"
+        }
       },
       {
         "signature": "private_sec.game_fee_satisfied(text,uuid)",
-        "expect_after": "54777a2a6045282e650a4f8fc6305523",
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "54777a2a6045282e650a4f8fc6305523"
+          }
+        },
+        "expect_after": {
+          "16": "54777a2a6045282e650a4f8fc6305523"
+        }
       },
       {
         "signature": "private_sec.game_payee(text)",
-        "expect_after": "aa1388e86cadfd362c4f77e2f75d2ec9",
         "defined_by": [
           "20261103140000",
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "883af9b3905190368f4ea6efa29b088e",
+            "20261104120000": "aa1388e86cadfd362c4f77e2f75d2ec9"
+          }
+        },
+        "expect_after": {
+          "16": "aa1388e86cadfd362c4f77e2f75d2ec9"
+        }
       },
       {
         "signature": "private_sec.has_guardian_link(uuid)",
-        "expect_after": "9e89fdc6db9368b092f6d75c70790bca",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "9e89fdc6db9368b092f6d75c70790bca"
+          }
+        },
+        "expect_after": {
+          "16": "9e89fdc6db9368b092f6d75c70790bca"
+        }
       },
       {
         "signature": "private_sec.insight_is_publishable(text,text)",
-        "expect_after": "52db615a82a090c65400bb3e85aa82b6",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "52db615a82a090c65400bb3e85aa82b6"
+          }
+        },
+        "expect_after": {
+          "16": "52db615a82a090c65400bb3e85aa82b6"
+        }
       },
       {
         "signature": "private_sec.location_tokens(text)",
-        "expect_after": "c899d3b1f47a7395bcb77dab9eadb5ba",
         "defined_by": [
           "20261104130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104130000": "c899d3b1f47a7395bcb77dab9eadb5ba"
+          }
+        },
+        "expect_after": {
+          "16": "c899d3b1f47a7395bcb77dab9eadb5ba"
+        }
       },
       {
         "signature": "private_sec.messaging_connection(uuid,uuid)",
-        "expect_after": "e77e14d0a9ff85b5f3117aff313df330",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "e77e14d0a9ff85b5f3117aff313df330"
+          }
+        },
+        "expect_after": {
+          "16": "e77e14d0a9ff85b5f3117aff313df330"
+        }
       },
       {
         "signature": "private_sec.messaging_controls_block(uuid,uuid)",
-        "expect_after": "c76b4a5fe4be68f52e86eed0427dd811",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "c76b4a5fe4be68f52e86eed0427dd811"
+          }
+        },
+        "expect_after": {
+          "16": "c76b4a5fe4be68f52e86eed0427dd811"
+        }
       },
       {
         "signature": "private_sec.minor_game_payment_manager(text)",
-        "expect_after": "02b53c214b964dfd2a2180b45a4bf2f9",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "02b53c214b964dfd2a2180b45a4bf2f9"
+          }
+        },
+        "expect_after": {
+          "16": "02b53c214b964dfd2a2180b45a4bf2f9"
+        }
       },
       {
         "signature": "private_sec.minor_has_active_youth_game(uuid)",
-        "expect_after": "af89af13a2fafcf27e79982bd1e5f949",
         "defined_by": [
           "20261105140000",
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105140000": "e3d3364bc1eaa0ab2340d256b31cab15",
+            "20261106110000": "af89af13a2fafcf27e79982bd1e5f949"
+          }
+        },
+        "expect_after": {
+          "16": "af89af13a2fafcf27e79982bd1e5f949"
+        }
       },
       {
         "signature": "private_sec.minor_host_hidden(uuid)",
-        "expect_after": "2ab395defb041c981461b8544fd125f6",
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": "2ab395defb041c981461b8544fd125f6"
+          }
+        },
+        "expect_after": {
+          "16": "2ab395defb041c981461b8544fd125f6"
+        }
       },
       {
         "signature": "private_sec.organizer_details(uuid,uuid)",
-        "expect_after": "b87137b72fb7c9d084cd78747ff320c5",
         "defined_by": [
           "20261105140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105140000": "b87137b72fb7c9d084cd78747ff320c5"
+          }
+        },
+        "expect_after": {
+          "16": "b87137b72fb7c9d084cd78747ff320c5"
+        }
       },
       {
         "signature": "private_sec.player_meets_game_age(text,uuid)",
-        "expect_after": "ab0f1a38fd336b9945c8e49d3fbfff32",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "ab0f1a38fd336b9945c8e49d3fbfff32"
+          }
+        },
+        "expect_after": {
+          "16": "ab0f1a38fd336b9945c8e49d3fbfff32"
+        }
       },
       {
         "signature": "private_sec.purge_closed_content_reports(interval)",
-        "expect_after": "2cd963cd7181c2a531b7de6d1ea17fd1",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "2cd963cd7181c2a531b7de6d1ea17fd1"
+          }
+        },
+        "expect_after": {
+          "16": "2cd963cd7181c2a531b7de6d1ea17fd1"
+        }
       },
       {
         "signature": "private_sec.reel_publicly_visible(uuid)",
-        "expect_after": "acce939db9f86f9e5d8989afb31f5e68",
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": "94cead462ab09f8a64f24f00cb2d9715"
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": "acce939db9f86f9e5d8989afb31f5e68"
+          }
+        },
+        "expect_after": {
+          "16": "acce939db9f86f9e5d8989afb31f5e68"
+        }
       },
       {
         "signature": "private_sec.review_author_is_adult(uuid)",
-        "expect_after": "6090dfc2a78fd566e5a520b810eee09d",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "6090dfc2a78fd566e5a520b810eee09d"
+          }
+        },
+        "expect_after": {
+          "16": "6090dfc2a78fd566e5a520b810eee09d"
+        }
       },
       {
         "signature": "private_sec.review_is_publishable(uuid)",
-        "expect_after": "af4930f18dd1c2cea5b16f76af216e64",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "af4930f18dd1c2cea5b16f76af216e64"
+          }
+        },
+        "expect_after": {
+          "16": "af4930f18dd1c2cea5b16f76af216e64"
+        }
       },
       {
         "signature": "private_sec.review_subject_is_public(text,text)",
-        "expect_after": "ee7abb2dc861ecd0cff4e16501af4ed1",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "ee7abb2dc861ecd0cff4e16501af4ed1"
+          }
+        },
+        "expect_after": {
+          "16": "ee7abb2dc861ecd0cff4e16501af4ed1"
+        }
       },
       {
         "signature": "private_sec.review_was_minor_involved(timestamp with time zone,uuid,text,text)",
-        "expect_after": "463a8bfa6eab4b1bfefa37a933991153",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "463a8bfa6eab4b1bfefa37a933991153"
+          }
+        },
+        "expect_after": {
+          "16": "463a8bfa6eab4b1bfefa37a933991153"
+        }
       },
       {
         "signature": "private_sec.roster_row_visible(text,uuid)",
-        "expect_after": "ec4ed619ec85f0a943716e0b65995128",
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": "f50c575fb15c51b82e9c4a4f42c7c3e7"
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": "ec4ed619ec85f0a943716e0b65995128"
+          }
+        },
+        "expect_after": {
+          "16": "ec4ed619ec85f0a943716e0b65995128"
+        }
       },
       {
         "signature": "private_sec.scrub_game_public_text(text)",
-        "expect_after": "c3af7e169c4ed3cb7db1f21e641fbe1c",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "c3af7e169c4ed3cb7db1f21e641fbe1c"
+          }
+        },
+        "expect_after": {
+          "16": "c3af7e169c4ed3cb7db1f21e641fbe1c"
+        }
       },
       {
         "signature": "private_sec.subject_was_minor_at(text,text,timestamp with time zone)",
-        "expect_after": "2815f87438046fa6b85bc681d18f8a5a",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "2815f87438046fa6b85bc681d18f8a5a"
+          }
+        },
+        "expect_after": {
+          "16": "2815f87438046fa6b85bc681d18f8a5a"
+        }
       },
       {
         "signature": "private_sec.team_is_youth(text)",
-        "expect_after": "6b6ec67bc9693e41781283dcc90c33c0",
         "defined_by": [
           "20261105100000",
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "6b6ec67bc9693e41781283dcc90c33c0",
+            "20261105110000": "6b6ec67bc9693e41781283dcc90c33c0"
+          }
+        },
+        "expect_after": {
+          "16": "6b6ec67bc9693e41781283dcc90c33c0"
+        }
       },
       {
         "signature": "private_sec.tell_host_location_removed(uuid,text)",
-        "expect_after": "be41c2935dfddf42c1c6c383ab5b111e",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "be41c2935dfddf42c1c6c383ab5b111e"
+          }
+        },
+        "expect_after": {
+          "16": "be41c2935dfddf42c1c6c383ab5b111e"
+        }
       },
       {
         "signature": "private_sec.text_discloses_location(text,text)",
-        "expect_after": "713f23bbcad25c0bbb0940b3506830d0",
         "defined_by": [
           "20261104130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104130000": "713f23bbcad25c0bbb0940b3506830d0"
+          }
+        },
+        "expect_after": {
+          "16": "713f23bbcad25c0bbb0940b3506830d0"
+        }
       },
       {
         "signature": "private_sec.visible_avatars(uuid[])",
-        "expect_after": "32165e20b9a865c23cf393fe94889817",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "887480253fb5adc2529a8c53dcf70e04"
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "32165e20b9a865c23cf393fe94889817"
+          }
+        },
+        "expect_after": {
+          "16": "32165e20b9a865c23cf393fe94889817"
+        }
       },
       {
         "signature": "private_sec.was_minor_at(uuid,timestamp with time zone)",
-        "expect_after": "9d45f5ea0ecf5260e201d778a28939f4",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "9d45f5ea0ecf5260e201d778a28939f4"
+          }
+        },
+        "expect_after": {
+          "16": "9d45f5ea0ecf5260e201d778a28939f4"
+        }
       },
       {
         "signature": "public.appeal_content_decision(text,uuid,text)",
-        "expect_after": "f9c40b465b6a0ecbbb3db6b8e3f1c157",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "f9c40b465b6a0ecbbb3db6b8e3f1c157"
+          }
+        },
+        "expect_after": {
+          "16": "f9c40b465b6a0ecbbb3db6b8e3f1c157"
+        }
       },
       {
         "signature": "public.bind_minor_hosting_approval()",
-        "expect_after": "3b08736352fc480462fa2ee8a4330d0c",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "3b08736352fc480462fa2ee8a4330d0c"
+          }
+        },
+        "expect_after": {
+          "16": "3b08736352fc480462fa2ee8a4330d0c"
+        }
       },
       {
         "signature": "public.can_notify(uuid,uuid)",
-        "expect_after": "18359fe7fe02ad91599ab199ea617f71",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "d0d2e4656f877b17006facfe6ff650d1"
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "18359fe7fe02ad91599ab199ea617f71"
+          }
+        },
+        "expect_after": {
+          "16": "18359fe7fe02ad91599ab199ea617f71"
+        }
       },
       {
         "signature": "public.clear_team_facility_details(text,text[])",
-        "expect_after": "1d4332bfb7abd0d5f8899850e9e756c4",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "1d4332bfb7abd0d5f8899850e9e756c4"
+          }
+        },
+        "expect_after": {
+          "16": "1d4332bfb7abd0d5f8899850e9e756c4"
+        }
       },
       {
         "signature": "public.coarsen_existing_youth_games(integer)",
-        "expect_after": "d44049a36179a7430a1ac70f516f79ca",
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "d44049a36179a7430a1ac70f516f79ca"
+          }
+        },
+        "expect_after": {
+          "16": "d44049a36179a7430a1ac70f516f79ca"
+        }
       },
       {
         "signature": "public.coarsen_existing_youth_team_facilities(integer)",
-        "expect_after": "acf19158772d4233c4c6709506921eae",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "acf19158772d4233c4c6709506921eae"
+          }
+        },
+        "expect_after": {
+          "16": "acf19158772d4233c4c6709506921eae"
+        }
       },
       {
         "signature": "public.coarsen_existing_youth_team_posts(integer)",
-        "expect_after": "01691031069a874a1ad9e134dc0bb54d",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "01691031069a874a1ad9e134dc0bb54d"
+          }
+        },
+        "expect_after": {
+          "16": "01691031069a874a1ad9e134dc0bb54d"
+        }
       },
       {
         "signature": "public.enforce_adult_payee_records()",
-        "expect_after": "540feae461707367607fd277dd0f5b83",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "540feae461707367607fd277dd0f5b83"
+          }
+        },
+        "expect_after": {
+          "16": "540feae461707367607fd277dd0f5b83"
+        }
       },
       {
         "signature": "public.enforce_approval_before_payment()",
-        "expect_after": "3ffff8c3b95ae10ce43cdc4197cc886a",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "bab0360b60a83411e7ef8416343f5ae8"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "3ffff8c3b95ae10ce43cdc4197cc886a"
+          }
+        },
+        "expect_after": {
+          "16": "3ffff8c3b95ae10ce43cdc4197cc886a"
+        }
       },
       {
         "signature": "public.enforce_game_age_requirement()",
-        "expect_after": "6d5f102d05a8558a7c1cce86948b0295",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": "a978b62c4004040d8388fe5a87803788"
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "6d5f102d05a8558a7c1cce86948b0295"
+          }
+        },
+        "expect_after": {
+          "16": "6d5f102d05a8558a7c1cce86948b0295"
+        }
       },
       {
         "signature": "public.enforce_game_join_gate()",
-        "expect_after": "9d4924a2d53915fca8fa245e15281a25",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "43b524caefefd95a2c1d38da9e71ac92"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "9d4924a2d53915fca8fa245e15281a25"
+          }
+        },
+        "expect_after": {
+          "16": "9d4924a2d53915fca8fa245e15281a25"
+        }
       },
       {
         "signature": "public.enforce_game_payment_cohort()",
-        "expect_after": "91b1c3d4d024a11ab393909f56805b18",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "aadeafedb16085a27b6e67f46fc4abfa"
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "91b1c3d4d024a11ab393909f56805b18"
+          }
+        },
+        "expect_after": {
+          "16": "91b1c3d4d024a11ab393909f56805b18"
+        }
       },
       {
         "signature": "public.enforce_gym_review()",
-        "expect_after": "1c776a864a0f9e4aac3d17d45cf31c9f",
         "defined_by": [
           "20261103101000"
-        ]
+        ],
+        "expect_before": {
+          "16": "4ba3abe0b564325d16180a21f4094161"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103101000": "1c776a864a0f9e4aac3d17d45cf31c9f"
+          }
+        },
+        "expect_after": {
+          "16": "1c776a864a0f9e4aac3d17d45cf31c9f"
+        }
       },
       {
         "signature": "public.enforce_join_request_age()",
-        "expect_after": "6e567dd36dd6d9f96952c687024bb2a0",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "6e567dd36dd6d9f96952c687024bb2a0"
+          }
+        },
+        "expect_after": {
+          "16": "6e567dd36dd6d9f96952c687024bb2a0"
+        }
       },
       {
         "signature": "public.enforce_minor_game_price()",
-        "expect_after": "b126461b0548877a10ab89c068733ff9",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "b126461b0548877a10ab89c068733ff9"
+          }
+        },
+        "expect_after": {
+          "16": "b126461b0548877a10ab89c068733ff9"
+        }
       },
       {
         "signature": "public.enforce_minor_hosting_rules()",
-        "expect_after": "366c0480d5c0a15f3927e9d6fc939191",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "366c0480d5c0a15f3927e9d6fc939191"
+          }
+        },
+        "expect_after": {
+          "16": "366c0480d5c0a15f3927e9d6fc939191"
+        }
       },
       {
         "signature": "public.enforce_minor_messaging_reaction()",
-        "expect_after": "24231b464242e151bd2dd1c06b1e1a3e",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "24231b464242e151bd2dd1c06b1e1a3e"
+          }
+        },
+        "expect_after": {
+          "16": "24231b464242e151bd2dd1c06b1e1a3e"
+        }
       },
       {
         "signature": "public.enforce_minor_payment_settings()",
-        "expect_after": "bc7a4de19ee1d0aebf808bfa3d07626c",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "bc7a4de19ee1d0aebf808bfa3d07626c"
+          }
+        },
+        "expect_after": {
+          "16": "bc7a4de19ee1d0aebf808bfa3d07626c"
+        }
       },
       {
         "signature": "public.enforce_payment_destination()",
-        "expect_after": "9966e4bbbab1c529c669a5f0d0b4a6f8",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "9966e4bbbab1c529c669a5f0d0b4a6f8"
+          }
+        },
+        "expect_after": {
+          "16": "9966e4bbbab1c529c669a5f0d0b4a6f8"
+        }
       },
       {
         "signature": "public.enforce_review_age_rules()",
-        "expect_after": "3fecaee645b78330f0b919132fa526a3",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "3fecaee645b78330f0b919132fa526a3"
+          }
+        },
+        "expect_after": {
+          "16": "3fecaee645b78330f0b919132fa526a3"
+        }
       },
       {
         "signature": "public.enforce_review_integrity()",
-        "expect_after": "812c8faae4c3e643ac0b8360913395d5",
         "defined_by": [
           "20261103110000",
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "c28d743aa2110220e0251edc054e73d2"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103110000": "e9ed9c0d454e638dedb722d29719c1a0",
+            "20261103120000": "812c8faae4c3e643ac0b8360913395d5"
+          }
+        },
+        "expect_after": {
+          "16": "812c8faae4c3e643ac0b8360913395d5"
+        }
       },
       {
         "signature": "public.game_payee_id(text)",
-        "expect_after": "67eeb66c163762cd7785055e215395fc",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "67eeb66c163762cd7785055e215395fc"
+          }
+        },
+        "expect_after": {
+          "16": "67eeb66c163762cd7785055e215395fc"
+        }
       },
       {
         "signature": "public.gate_contact_request_for_guardian()",
-        "expect_after": "e541afbc615e007a8f52c64ed42c0bc1",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "e541afbc615e007a8f52c64ed42c0bc1"
+          }
+        },
+        "expect_after": {
+          "16": "e541afbc615e007a8f52c64ed42c0bc1"
+        }
       },
       {
         "signature": "public.get_game_host_payment_methods(uuid,text)",
-        "expect_after": "7a4271f3a602ce58d33dd5e2c999cc3f",
         "defined_by": [
           "20261103140000",
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "d1d2e4b9114567e822dab2f60f0c2db3"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "ca5a74909181a98cf1416c6a5d37d156",
+            "20261104120000": "7a4271f3a602ce58d33dd5e2c999cc3f"
+          }
+        },
+        "expect_after": {
+          "16": "7a4271f3a602ce58d33dd5e2c999cc3f"
+        }
       },
       {
         "signature": "public.get_game_organizer(text)",
-        "expect_after": "01eb8ad8b3e8a01600d2547da9e35940",
         "defined_by": [
           "20261105140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105140000": "01eb8ad8b3e8a01600d2547da9e35940"
+          }
+        },
+        "expect_after": {
+          "16": "01eb8ad8b3e8a01600d2547da9e35940"
+        }
       },
       {
         "signature": "public.get_game_refund_terms(text)",
-        "expect_after": "b3a83c3ae050ffd7f92869d29df5c6b5",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "423ea1872ecd7a73ab03eabd29a0114f"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "b3a83c3ae050ffd7f92869d29df5c6b5"
+          }
+        },
+        "expect_after": {
+          "16": "b3a83c3ae050ffd7f92869d29df5c6b5"
+        }
       },
       {
         "signature": "public.get_host_payment_methods(uuid)",
-        "expect_after": "def8c17f5437500f0586cfd80ef260d6",
         "defined_by": [
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "e1df7c305aac34eddd3ece7482a5ef71"
+        },
+        "expect_steps": {
+          "16": {
+            "20261104120000": "def8c17f5437500f0586cfd80ef260d6"
+          }
+        },
+        "expect_after": {
+          "16": "def8c17f5437500f0586cfd80ef260d6"
+        }
       },
       {
         "signature": "public.grant_minor_hosting_approval(uuid,integer,boolean)",
-        "expect_after": "8e9327fc078650b79f1e485cd2acb66a",
         "defined_by": [
           "20261104110000",
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": null,
+            "20261104120000": "8e9327fc078650b79f1e485cd2acb66a"
+          }
+        },
+        "expect_after": {
+          "16": "8e9327fc078650b79f1e485cd2acb66a"
+        }
       },
       {
         "signature": "public.grant_org_minor_hosting_approval(uuid,uuid,integer,boolean)",
-        "expect_after": "ac4228a7299f56a367485e13bbd44915",
         "defined_by": [
           "20261104110000",
           "20261104120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": null,
+            "20261104120000": "ac4228a7299f56a367485e13bbd44915"
+          }
+        },
+        "expect_after": {
+          "16": "ac4228a7299f56a367485e13bbd44915"
+        }
       },
       {
         "signature": "public.guard_contact_request_location()",
-        "expect_after": "b11ffa8d3bd97ed26934b18b9dc55bf3",
         "defined_by": [
           "20261104150000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104150000": "b11ffa8d3bd97ed26934b18b9dc55bf3"
+          }
+        },
+        "expect_after": {
+          "16": "b11ffa8d3bd97ed26934b18b9dc55bf3"
+        }
       },
       {
         "signature": "public.guard_contact_request_minor_recipient()",
-        "expect_after": "33ec774443357f49c961d247d6269400",
         "defined_by": [
           "20261106100000",
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "c60458369ca9e891f93b4a7b524774b5",
+            "20261106140000": "33ec774443357f49c961d247d6269400"
+          }
+        },
+        "expect_after": {
+          "16": "33ec774443357f49c961d247d6269400"
+        }
       },
       {
         "signature": "public.guard_escalated_report_closure()",
-        "expect_after": "6bb1060d99e39a8937b44993b1dafa05",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "6bb1060d99e39a8937b44993b1dafa05"
+          }
+        },
+        "expect_after": {
+          "16": "6bb1060d99e39a8937b44993b1dafa05"
+        }
       },
       {
         "signature": "public.guard_game_invite_notification()",
-        "expect_after": "a28463a1396b92deb035bfeed0ab8f84",
         "defined_by": [
           "20261104150000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104150000": "a28463a1396b92deb035bfeed0ab8f84"
+          }
+        },
+        "expect_after": {
+          "16": "a28463a1396b92deb035bfeed0ab8f84"
+        }
       },
       {
         "signature": "public.guard_minor_availability_write()",
-        "expect_after": "1e32774c53ff16db6ce6e290dde21d94",
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "1e32774c53ff16db6ce6e290dde21d94"
+          }
+        },
+        "expect_after": {
+          "16": "1e32774c53ff16db6ce6e290dde21d94"
+        }
       },
       {
         "signature": "public.guard_profile_insert()",
-        "expect_after": "0a5bf62fa1a84f369d10be46a9bbe4dc",
         "defined_by": [
           "20261103130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103130000": "0a5bf62fa1a84f369d10be46a9bbe4dc"
+          }
+        },
+        "expect_after": {
+          "16": "0a5bf62fa1a84f369d10be46a9bbe4dc"
+        }
       },
       {
         "signature": "public.guard_team_post_text()",
-        "expect_after": "59aa0253f1da29bc5afb16200e3994a8",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "59aa0253f1da29bc5afb16200e3994a8"
+          }
+        },
+        "expect_after": {
+          "16": "59aa0253f1da29bc5afb16200e3994a8"
+        }
       },
       {
         "signature": "public.guard_youth_game_public_text()",
-        "expect_after": "1cd141fdfed2064326a69c788cb1edab",
         "defined_by": [
           "20261104140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104140000": "1cd141fdfed2064326a69c788cb1edab"
+          }
+        },
+        "expect_after": {
+          "16": "1cd141fdfed2064326a69c788cb1edab"
+        }
       },
       {
         "signature": "public.guard_youth_location_switch_team_facilities()",
-        "expect_after": "081ed46b6ed69a2d511fbea67e1ea5ea",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "081ed46b6ed69a2d511fbea67e1ea5ea"
+          }
+        },
+        "expect_after": {
+          "16": "081ed46b6ed69a2d511fbea67e1ea5ea"
+        }
       },
       {
         "signature": "public.guard_youth_location_switch()",
-        "expect_after": "2d248f5b3035db1395060c5775c6b1a4",
         "defined_by": [
           "20261104100000",
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "0a20fa8b21fd8a8179f0e82156dea0df",
+            "20261105100000": "2d248f5b3035db1395060c5775c6b1a4"
+          }
+        },
+        "expect_after": {
+          "16": "2d248f5b3035db1395060c5775c6b1a4"
+        }
       },
       {
         "signature": "public.guardian_content_holds()",
-        "expect_after": "7eaa2a7b36768e4a8686d62cfaf5cefe",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "7eaa2a7b36768e4a8686d62cfaf5cefe"
+          }
+        },
+        "expect_after": {
+          "16": "7eaa2a7b36768e4a8686d62cfaf5cefe"
+        }
       },
       {
         "signature": "public.guardian_decide_contact_request(uuid,boolean)",
-        "expect_after": "a7635828c7fe9f7c6e96c2bb4ad41a75",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "a7635828c7fe9f7c6e96c2bb4ad41a75"
+          }
+        },
+        "expect_after": {
+          "16": "a7635828c7fe9f7c6e96c2bb4ad41a75"
+        }
       },
       {
         "signature": "public.handle_content_report()",
-        "expect_after": "96ca9b36fa57825f75320f083d9fdb18",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "96ca9b36fa57825f75320f083d9fdb18"
+          }
+        },
+        "expect_after": {
+          "16": "96ca9b36fa57825f75320f083d9fdb18"
+        }
       },
       {
         "signature": "public.handle_location_disclosure_report()",
-        "expect_after": "3813db3e8fad1f252a94cf828d367c54",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "3813db3e8fad1f252a94cf828d367c54"
+          }
+        },
+        "expect_after": {
+          "16": "3813db3e8fad1f252a94cf828d367c54"
+        }
       },
       {
         "signature": "public.host_attendance_stats(uuid)",
-        "expect_after": "5e7c94e22cb6ba69a769142c0f68b07d",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "c191e0b6a52fd5e5532823528367c155"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "5e7c94e22cb6ba69a769142c0f68b07d"
+          }
+        },
+        "expect_after": {
+          "16": "5e7c94e22cb6ba69a769142c0f68b07d"
+        }
       },
       {
         "signature": "public.keep_minor_host_profile_private()",
-        "expect_after": "c76a54d19197222dcc96aae9a7eadce5",
         "defined_by": [
           "20261105140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105140000": "c76a54d19197222dcc96aae9a7eadce5"
+          }
+        },
+        "expect_after": {
+          "16": "c76a54d19197222dcc96aae9a7eadce5"
+        }
       },
       {
         "signature": "public.list_minor_availability_notes_with_location_text()",
-        "expect_after": "c898782ec4e475be9b2b0bd17f8ea59a",
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "c898782ec4e475be9b2b0bd17f8ea59a"
+          }
+        },
+        "expect_after": {
+          "16": "c898782ec4e475be9b2b0bd17f8ea59a"
+        }
       },
       {
         "signature": "public.list_team_facility_requests()",
-        "expect_after": "3b06bc69691199cbec37f988a73c1de9",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "3b06bc69691199cbec37f988a73c1de9"
+          }
+        },
+        "expect_after": {
+          "16": "3b06bc69691199cbec37f988a73c1de9"
+        }
       },
       {
         "signature": "public.list_team_post_venue_requests()",
-        "expect_after": "ef7f0f30eaaaec73a4a9abd9779254b8",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "ef7f0f30eaaaec73a4a9abd9779254b8"
+          }
+        },
+        "expect_after": {
+          "16": "ef7f0f30eaaaec73a4a9abd9779254b8"
+        }
       },
       {
         "signature": "public.list_team_posts_with_location_text()",
-        "expect_after": "622900e17e305d4bc69d1df84d8fa89b",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "622900e17e305d4bc69d1df84d8fa89b"
+          }
+        },
+        "expect_after": {
+          "16": "622900e17e305d4bc69d1df84d8fa89b"
+        }
       },
       {
         "signature": "public.list_youth_games_with_location_text()",
-        "expect_after": "437e0aa65ea6a73545c97ea4c0b6d643",
         "defined_by": [
           "20261104140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104140000": "437e0aa65ea6a73545c97ea4c0b6d643"
+          }
+        },
+        "expect_after": {
+          "16": "437e0aa65ea6a73545c97ea4c0b6d643"
+        }
       },
       {
         "signature": "public.minor_messaging_block(uuid,uuid)",
-        "expect_after": "2fef4a502c1951d772c57720f1080c23",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "52f406f804b691e474bccfd8d9805302"
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "2fef4a502c1951d772c57720f1080c23"
+          }
+        },
+        "expect_after": {
+          "16": "2fef4a502c1951d772c57720f1080c23"
+        }
       },
       {
         "signature": "public.moderator_decide_content_report(uuid,text,text)",
-        "expect_after": "d544151b5711d81fb5d31569024772b4",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "d544151b5711d81fb5d31569024772b4"
+          }
+        },
+        "expect_after": {
+          "16": "d544151b5711d81fb5d31569024772b4"
+        }
       },
       {
         "signature": "public.moderator_review_appeal(uuid,boolean,text)",
-        "expect_after": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "eebf7cda9d0c9be1e6bc6387cb76b3ce"
+          }
+        },
+        "expect_after": {
+          "16": "eebf7cda9d0c9be1e6bc6387cb76b3ce"
+        }
       },
       {
         "signature": "public.moderator_scrub_availability_note(uuid,text)",
-        "expect_after": "1c43024c8ff3f0f5ba7621cc6e122443",
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": "1c43024c8ff3f0f5ba7621cc6e122443"
+          }
+        },
+        "expect_after": {
+          "16": "1c43024c8ff3f0f5ba7621cc6e122443"
+        }
       },
       {
         "signature": "public.moderator_scrub_game_text(text,text)",
-        "expect_after": "13e48c98a07c2dcecf4959b5761df41e",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "13e48c98a07c2dcecf4959b5761df41e"
+          }
+        },
+        "expect_after": {
+          "16": "13e48c98a07c2dcecf4959b5761df41e"
+        }
       },
       {
         "signature": "public.moderator_scrub_team_post_text(uuid,text)",
-        "expect_after": "7992397a4dccc60e5c5572d301915484",
         "defined_by": [
           "20261105130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105130000": "7992397a4dccc60e5c5572d301915484"
+          }
+        },
+        "expect_after": {
+          "16": "7992397a4dccc60e5c5572d301915484"
+        }
       },
       {
         "signature": "public.my_content_holds()",
-        "expect_after": "c79cfa770205af1040efc4582fb1031d",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "c79cfa770205af1040efc4582fb1031d"
+          }
+        },
+        "expect_after": {
+          "16": "c79cfa770205af1040efc4582fb1031d"
+        }
       },
       {
         "signature": "public.my_reviewable(text,text)",
-        "expect_after": "f7dd92639df120118836d0dfb1e47e24",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "cd8cd4b41a07a76dcddf5bbd9ccc5cdc"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "f7dd92639df120118836d0dfb1e47e24"
+          }
+        },
+        "expect_after": {
+          "16": "f7dd92639df120118836d0dfb1e47e24"
+        }
       },
       {
         "signature": "public.neutralize_minor_host_snapshot()",
-        "expect_after": "234aacafa0fe779298ced1f5cbfb50e2",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "234aacafa0fe779298ced1f5cbfb50e2"
+          }
+        },
+        "expect_after": {
+          "16": "234aacafa0fe779298ced1f5cbfb50e2"
+        }
       },
       {
         "signature": "public.notify_guardians_of_contact_request()",
-        "expect_after": "00db0a223295107ed68f3a35f6e5a543",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "00db0a223295107ed68f3a35f6e5a543"
+          }
+        },
+        "expect_after": {
+          "16": "00db0a223295107ed68f3a35f6e5a543"
+        }
       },
       {
         "signature": "public.player_activity_stats(uuid)",
-        "expect_after": "8dae1e12c3612739f31a2a04475a0b4a",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "8c9c47ba0239d7c0a16f5c14f5f46c92"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "8dae1e12c3612739f31a2a04475a0b4a"
+          }
+        },
+        "expect_after": {
+          "16": "8dae1e12c3612739f31a2a04475a0b4a"
+        }
       },
       {
         "signature": "public.player_trait_counts(uuid)",
-        "expect_after": "0e1d7c44b6c5cb9f4754dc55e5fd482f",
         "defined_by": [
           "20261103110000",
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": "2db9ca9bffde64daef4dad682cf2d913"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103110000": "7e67cc15ef27d076bf8735e05b7a76e8",
+            "20261103120000": "0e1d7c44b6c5cb9f4754dc55e5fd482f"
+          }
+        },
+        "expect_after": {
+          "16": "0e1d7c44b6c5cb9f4754dc55e5fd482f"
+        }
       },
       {
         "signature": "public.protect_contact_request_approval()",
-        "expect_after": "3f8b0db0259fa7101335e1a6d22cb12b",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "3f8b0db0259fa7101335e1a6d22cb12b"
+          }
+        },
+        "expect_after": {
+          "16": "3f8b0db0259fa7101335e1a6d22cb12b"
+        }
       },
       {
         "signature": "public.publishable_review_ids(uuid[])",
-        "expect_after": "0ba48ca27785730652f464eb1fe8f26b",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "0ba48ca27785730652f464eb1fe8f26b"
+          }
+        },
+        "expect_after": {
+          "16": "0ba48ca27785730652f464eb1fe8f26b"
+        }
       },
       {
         "signature": "public.refuse_minor_host_team_owner()",
-        "expect_after": "64a1e276607fafa5d77742fa689fc99f",
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": "64a1e276607fafa5d77742fa689fc99f"
+          }
+        },
+        "expect_after": {
+          "16": "64a1e276607fafa5d77742fa689fc99f"
+        }
       },
       {
         "signature": "public.release_expired_payment_holds(text)",
-        "expect_after": "3eee00253e98ac807138ccf333f1c498",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "a6873c70c0a21f7bd453f0521f8b257d"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "3eee00253e98ac807138ccf333f1c498"
+          }
+        },
+        "expect_after": {
+          "16": "3eee00253e98ac807138ccf333f1c498"
+        }
       },
       {
         "signature": "public.require_private_profile_for_minor_host()",
-        "expect_after": "49d158be0f23f3bae66af6cd99c92bbe",
         "defined_by": [
           "20261105140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105140000": "49d158be0f23f3bae66af6cd99c92bbe"
+          }
+        },
+        "expect_after": {
+          "16": "49d158be0f23f3bae66af6cd99c92bbe"
+        }
       },
       {
         "signature": "public.review_question_keys(text)",
-        "expect_after": "b0335fe985bbb4fc222a1db15a953584",
         "defined_by": [
           "20261103110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103110000": "b0335fe985bbb4fc222a1db15a953584"
+          }
+        },
+        "expect_after": {
+          "16": "b0335fe985bbb4fc222a1db15a953584"
+        }
       },
       {
         "signature": "public.review_ring_suspects(integer)",
-        "expect_after": "f41ec9f31e2ef4b00a08dde328ea4f51",
         "defined_by": [
           "20261103102000"
-        ]
+        ],
+        "expect_before": {
+          "16": "7e13a32e2ce008afd90065cd14a5967e"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103102000": "f41ec9f31e2ef4b00a08dde328ea4f51"
+          }
+        },
+        "expect_after": {
+          "16": "f41ec9f31e2ef4b00a08dde328ea4f51"
+        }
       },
       {
         "signature": "public.review_tag_keys(text)",
-        "expect_after": "762aec1bf99a3e7032d6b5513aa06290",
         "defined_by": [
           "20261103110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103110000": "762aec1bf99a3e7032d6b5513aa06290"
+          }
+        },
+        "expect_after": {
+          "16": "762aec1bf99a3e7032d6b5513aa06290"
+        }
       },
       {
         "signature": "public.revoke_minor_hosting_approval(uuid)",
-        "expect_after": "8a0a2d00478282196b5489808618ff8d",
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": "8a0a2d00478282196b5489808618ff8d"
+          }
+        },
+        "expect_after": {
+          "16": "8a0a2d00478282196b5489808618ff8d"
+        }
       },
       {
         "signature": "public.revoke_team_facility_public(text)",
-        "expect_after": "88aa8a365eaf291b4051b856ab80e22d",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "88aa8a365eaf291b4051b856ab80e22d"
+          }
+        },
+        "expect_after": {
+          "16": "88aa8a365eaf291b4051b856ab80e22d"
+        }
       },
       {
         "signature": "public.revoke_team_post_public_venue(uuid)",
-        "expect_after": "147681928a5538480df0e6c0567be54c",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "147681928a5538480df0e6c0567be54c"
+          }
+        },
+        "expect_after": {
+          "16": "147681928a5538480df0e6c0567be54c"
+        }
       },
       {
         "signature": "public.set_insight_minor_protected()",
-        "expect_after": "8ebda00d3972a23d476cb121f9bbb2eb",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "8ebda00d3972a23d476cb121f9bbb2eb"
+          }
+        },
+        "expect_after": {
+          "16": "8ebda00d3972a23d476cb121f9bbb2eb"
+        }
       },
       {
         "signature": "public.set_review_minor_protected()",
-        "expect_after": "51837778606e41a58586d56e0575e005",
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": "51837778606e41a58586d56e0575e005"
+          }
+        },
+        "expect_after": {
+          "16": "51837778606e41a58586d56e0575e005"
+        }
       },
       {
         "signature": "public.settle_paid_spot(text,uuid,text)",
-        "expect_after": "57f56d6ca1f73350c5896219236713ee",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "55d8ce38f4ca17dcc6c82cbb1eeac06d"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "57f56d6ca1f73350c5896219236713ee"
+          }
+        },
+        "expect_after": {
+          "16": "57f56d6ca1f73350c5896219236713ee"
+        }
       },
       {
         "signature": "public.sync_hosted_game_private()",
-        "expect_after": "284ab03c32e5e425253621f2a01ccefd",
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": "284ab03c32e5e425253621f2a01ccefd"
+          }
+        },
+        "expect_after": {
+          "16": "284ab03c32e5e425253621f2a01ccefd"
+        }
       },
       {
         "signature": "public.sync_team_facility_private()",
-        "expect_after": "074069f2e2bc716c46e46d5b5f207414",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "074069f2e2bc716c46e46d5b5f207414"
+          }
+        },
+        "expect_after": {
+          "16": "074069f2e2bc716c46e46d5b5f207414"
+        }
       },
       {
         "signature": "public.sync_team_post_private()",
-        "expect_after": "6e18f8b5d6210b4efc654e80d8bdcc20",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "6e18f8b5d6210b4efc654e80d8bdcc20"
+          }
+        },
+        "expect_after": {
+          "16": "6e18f8b5d6210b4efc654e80d8bdcc20"
+        }
       },
       {
         "signature": "public.team_invite_player(text,uuid,public.team_role,text)",
-        "expect_after": "a87fed7c86fd6e778b11c6e4bb05a3f1",
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "7a94b55c10833a805eb1d3e9ad76a82e"
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": "a87fed7c86fd6e778b11c6e4bb05a3f1"
+          }
+        },
+        "expect_after": {
+          "16": "a87fed7c86fd6e778b11c6e4bb05a3f1"
+        }
       },
       {
         "signature": "public.validate_content_report()",
-        "expect_after": "d20d590cc55fdf52589654220267acde",
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": "d20d590cc55fdf52589654220267acde"
+          }
+        },
+        "expect_after": {
+          "16": "d20d590cc55fdf52589654220267acde"
+        }
       },
       {
         "signature": "public.validate_join_request()",
-        "expect_after": "360371fe6b5b898d64af524f45ca563c",
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": "f454b5eb8d9623c5d18e9b639fd92ac8"
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": "360371fe6b5b898d64af524f45ca563c"
+          }
+        },
+        "expect_after": {
+          "16": "360371fe6b5b898d64af524f45ca563c"
+        }
       },
       {
         "signature": "public.verify_team_facility_public(text,text)",
-        "expect_after": "c8ee8761e79ecb7f3a974dd99be95323",
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": "c8ee8761e79ecb7f3a974dd99be95323"
+          }
+        },
+        "expect_after": {
+          "16": "c8ee8761e79ecb7f3a974dd99be95323"
+        }
       },
       {
         "signature": "public.verify_team_post_public_venue(uuid,text)",
-        "expect_after": "a1b29be247d2620b1b4ac0ec0e0d37a1",
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": "a1b29be247d2620b1b4ac0ec0e0d37a1"
+          }
+        },
+        "expect_after": {
+          "16": "a1b29be247d2620b1b4ac0ec0e0d37a1"
+        }
       }
     ],
     "policies": [
@@ -1545,300 +3180,658 @@
         "schema": "public",
         "table": "availability_contact_requests",
         "policy": "Recipient updates status",
-        "expect_after": {
-          "qual": "b8434e9321103114888b46550ee3de9d",
-          "with_check": "b8434e9321103114888b46550ee3de9d",
-          "shape": "7ec094e1068502b6675cfec62ed75864"
-        },
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "ee91e9bba2768d12739381274a1ec9f5",
+            "with_check": "ee91e9bba2768d12739381274a1ec9f5",
+            "shape": "7ec094e1068502b6675cfec62ed75864"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": {
+              "qual": "b8434e9321103114888b46550ee3de9d",
+              "with_check": "b8434e9321103114888b46550ee3de9d",
+              "shape": "7ec094e1068502b6675cfec62ed75864"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "b8434e9321103114888b46550ee3de9d",
+            "with_check": "b8434e9321103114888b46550ee3de9d",
+            "shape": "7ec094e1068502b6675cfec62ed75864"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "availability_contact_requests",
         "policy": "Sender, released recipient or guardian can read",
-        "expect_after": {
-          "qual": "6f1f649e6cb34a42541a61aa9c54137f",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261106140000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106140000": {
+              "qual": "6f1f649e6cb34a42541a61aa9c54137f",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "6f1f649e6cb34a42541a61aa9c54137f",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "content_report_holds",
         "policy": "Moderators read content holds",
-        "expect_after": {
-          "qual": "958335aa339bcc91733eafce37fd246a",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": {
+              "qual": "958335aa339bcc91733eafce37fd246a",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "958335aa339bcc91733eafce37fd246a",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "game_payment_settings",
         "policy": "Host and linked players read payment settings",
-        "expect_after": {
-          "qual": "d8a6d8f704a956191fc0e949650e5c3f",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "fbb858c4304a3de8d40246611157987e",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": {
+              "qual": "d8a6d8f704a956191fc0e949650e5c3f",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "d8a6d8f704a956191fc0e949650e5c3f",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "game_payment_settings",
         "policy": "Hosts manage own game payment settings (insert)",
-        "expect_after": {
-          "qual": null,
-          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
-          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
-        },
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": null,
+            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": {
+              "qual": null,
+              "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+              "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": null,
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+            "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "game_payment_settings",
         "policy": "Hosts manage own game payment settings (update)",
-        "expect_after": {
-          "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
-          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
-          "shape": "7ec094e1068502b6675cfec62ed75864"
-        },
         "defined_by": [
           "20261103140000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "shape": "7ec094e1068502b6675cfec62ed75864"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103140000": {
+              "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
+              "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+              "shape": "7ec094e1068502b6675cfec62ed75864"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+            "shape": "7ec094e1068502b6675cfec62ed75864"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "hosted_game_private",
         "policy": "Authorized people read exact game location",
-        "expect_after": {
-          "qual": "971bf84a9f672605fb426461557ccd72",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261104100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104100000": {
+              "qual": "971bf84a9f672605fb426461557ccd72",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "971bf84a9f672605fb426461557ccd72",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "minor_hosting_approvals",
         "policy": "Parties read hosting approvals",
-        "expect_after": {
-          "qual": "c9d524fe3c41ba840a01c619f299bfce",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261104110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261104110000": {
+              "qual": "c9d524fe3c41ba840a01c619f299bfce",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "c9d524fe3c41ba840a01c619f299bfce",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "moderation_appeals",
         "policy": "Appellants and moderators read appeals",
-        "expect_after": {
-          "qual": "1ed88d2f83d89f11490b293baca528f3",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261106130000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106130000": {
+              "qual": "1ed88d2f83d89f11490b293baca528f3",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "1ed88d2f83d89f11490b293baca528f3",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "player_availabilities",
         "policy": "Availability visible to permitted viewers",
-        "expect_after": {
-          "qual": "2958ca17990d20645e015400b7fb352e",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261106100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106100000": {
+              "qual": "2958ca17990d20645e015400b7fb352e",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "2958ca17990d20645e015400b7fb352e",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "post_comments",
         "policy": "post_comments_minor_host_author_hidden",
-        "expect_after": {
-          "qual": "4c599f02aec7770f6c12e4a95f74a385",
-          "with_check": null,
-          "shape": "5c14eda3516437e8296a45f8829ce154"
-        },
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": {
+              "qual": "4c599f02aec7770f6c12e4a95f74a385",
+              "with_check": null,
+              "shape": "5c14eda3516437e8296a45f8829ce154"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "4c599f02aec7770f6c12e4a95f74a385",
+            "with_check": null,
+            "shape": "5c14eda3516437e8296a45f8829ce154"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "post_reactions",
         "policy": "post_reactions_minor_host_author_hidden",
-        "expect_after": {
-          "qual": "7ff085be4973961c917ccdcd7cf704fd",
-          "with_check": null,
-          "shape": "5c14eda3516437e8296a45f8829ce154"
-        },
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": {
+              "qual": "7ff085be4973961c917ccdcd7cf704fd",
+              "with_check": null,
+              "shape": "5c14eda3516437e8296a45f8829ce154"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "7ff085be4973961c917ccdcd7cf704fd",
+            "with_check": null,
+            "shape": "5c14eda3516437e8296a45f8829ce154"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "reputation_insights",
         "policy": "Insights are public",
-        "expect_after": {
-          "qual": "cee52a8dff0567babf4e3109e871ca95",
-          "with_check": null,
-          "shape": "aa22d555890e438d8e200736028c7f95"
-        },
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "b326b5062b2f0e69046810717534cb09",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": {
+              "qual": "cee52a8dff0567babf4e3109e871ca95",
+              "with_check": null,
+              "shape": "aa22d555890e438d8e200736028c7f95"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "cee52a8dff0567babf4e3109e871ca95",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "reviews",
         "policy": "Gym admins view reviews about their gym",
-        "expect_after": {
-          "qual": "b12329282e6a2373f884b4dc29b88077",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "2f03469453c03b72caadcdaf1a9601a7",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": {
+              "qual": "b12329282e6a2373f884b4dc29b88077",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "b12329282e6a2373f884b4dc29b88077",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "reviews",
         "policy": "Public reviews are viewable by everyone",
-        "expect_after": {
-          "qual": "066361292831d7a35380d426a57abec4",
-          "with_check": null,
-          "shape": "aa22d555890e438d8e200736028c7f95"
-        },
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "fe325ba42d356cc34d0e38553c582c5e",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": {
+              "qual": "066361292831d7a35380d426a57abec4",
+              "with_check": null,
+              "shape": "aa22d555890e438d8e200736028c7f95"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "066361292831d7a35380d426a57abec4",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "reviews",
         "policy": "Reviewees view their private reviews",
-        "expect_after": {
-          "qual": "1651800bf3c03d96d0c8a7c8edba3985",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261103120000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261103120000": {
+              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "skill_ratings",
         "policy": "Skill ratings visible unless hidden",
-        "expect_after": {
-          "qual": "00a0a4d23096066f6e763ef3fa77773f",
-          "with_check": null,
-          "shape": "aa22d555890e438d8e200736028c7f95"
-        },
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": {
+            "qual": "353b15d7acc78a9fc96833ff937fddbe",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": {
+              "qual": "00a0a4d23096066f6e763ef3fa77773f",
+              "with_check": null,
+              "shape": "aa22d555890e438d8e200736028c7f95"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "00a0a4d23096066f6e763ef3fa77773f",
+            "with_check": null,
+            "shape": "aa22d555890e438d8e200736028c7f95"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "team_facility_private",
         "policy": "team_facility_private_read",
-        "expect_after": {
-          "qual": "e880d172a9c0a0f4aa8649a598a053c9",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261105110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105110000": {
+              "qual": "e880d172a9c0a0f4aa8649a598a053c9",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "e880d172a9c0a0f4aa8649a598a053c9",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "team_post_private",
         "policy": "team_post_private_read",
-        "expect_after": {
-          "qual": "f8e6c5c6ac9a05932b60272156dd4fe8",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261105100000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261105100000": {
+              "qual": "f8e6c5c6ac9a05932b60272156dd4fe8",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "f8e6c5c6ac9a05932b60272156dd4fe8",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       },
       {
         "schema": "public",
         "table": "team_posts",
         "policy": "team_posts_minor_host_author_hidden",
-        "expect_after": {
-          "qual": "4c599f02aec7770f6c12e4a95f74a385",
-          "with_check": null,
-          "shape": "5c14eda3516437e8296a45f8829ce154"
-        },
         "defined_by": [
           "20261106110000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106110000": {
+              "qual": "4c599f02aec7770f6c12e4a95f74a385",
+              "with_check": null,
+              "shape": "5c14eda3516437e8296a45f8829ce154"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "4c599f02aec7770f6c12e4a95f74a385",
+            "with_check": null,
+            "shape": "5c14eda3516437e8296a45f8829ce154"
+          }
+        }
       },
       {
         "schema": "storage",
         "table": "objects",
         "policy": "image_staging_delete_own_folder",
-        "expect_after": {
-          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
-          "with_check": null,
-          "shape": "df3998b48f95cfc4b78649656c78449a"
-        },
         "defined_by": [
           "20261106120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106120000": {
+              "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+              "with_check": null,
+              "shape": "df3998b48f95cfc4b78649656c78449a"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+            "with_check": null,
+            "shape": "df3998b48f95cfc4b78649656c78449a"
+          }
+        }
       },
       {
         "schema": "storage",
         "table": "objects",
         "policy": "image_staging_insert_own_folder",
-        "expect_after": {
-          "qual": null,
-          "with_check": "1eb7bb2bc6f6fb3995998e614cdb69df",
-          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
-        },
         "defined_by": [
           "20261106120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106120000": {
+              "qual": null,
+              "with_check": "1eb7bb2bc6f6fb3995998e614cdb69df",
+              "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": null,
+            "with_check": "1eb7bb2bc6f6fb3995998e614cdb69df",
+            "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+          }
+        }
       },
       {
         "schema": "storage",
         "table": "objects",
         "policy": "image_staging_select_own_folder",
-        "expect_after": {
-          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
-          "with_check": null,
-          "shape": "39541017f712a94460453c4925e65a3f"
-        },
         "defined_by": [
           "20261106120000"
-        ]
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261106120000": {
+              "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+              "with_check": null,
+              "shape": "39541017f712a94460453c4925e65a3f"
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+            "with_check": null,
+            "shape": "39541017f712a94460453c4925e65a3f"
+          }
+        }
       }
     ]
   }

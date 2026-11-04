@@ -1,0 +1,110 @@
+name: Release preflight (PG17)
+
+# Runs the release preflight's self-tests (scripts/release-preflight.test.mjs) on Postgres 17, the major
+# production runs, and regenerates the release manifest there so the release operator has PG17 hashes
+# (docs/release/release-preflight.md, "PG17 manifest from CI").
+#
+# NOT a required check, on purpose: it is path-filtered, and a path-filtered required check would stay
+# "Expected" on unrelated pull requests. Do not add it to branch protection. No secrets, no access to any
+# real database: the Postgres below exists only for this job, and the preflight only ever connects to it.
+on:
+  pull_request:
+    paths:
+      - "scripts/release-preflight*"
+      - "docs/release/release-manifest.json"
+      - "supabase/migrations/**"
+      - ".github/workflows/release-preflight.yml"
+  workflow_dispatch:
+
+# Least privilege: checkout and artifact upload only.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Release preflight on Postgres 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        # Same service as db-tests.yml. Supabase (and production) runs Postgres 17.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Make sure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Server version
+        run: psql -X -At -d postgres -c "SELECT version(), current_setting('server_version_num')"
+
+      # The self-tests only use node built-ins, so no dependency install is needed.
+      - name: Preflight self-tests (bun run preflight:test)
+        run: bun run preflight:test
+
+      - name: Regenerate the manifest on Postgres 17
+        if: ${{ !cancelled() }}
+        run: |
+          FROM="$(node -p 'require("./docs/release/release-manifest.json").release_range.from')"
+          echo "release_range.from = $FROM"
+          node scripts/release-preflight.mjs --write-manifest --from "$FROM" --manifest /tmp/m17.json
+          node scripts/release-preflight.mjs --offline --manifest /tmp/m17.json
+
+      - name: Merge the PG17 hashes into a copy of the checked-in manifest
+        if: ${{ !cancelled() }}
+        run: |
+          cp docs/release/release-manifest.json /tmp/release-manifest-merged.json
+          node scripts/release-preflight.mjs --merge-hashes /tmp/m17.json --manifest /tmp/release-manifest-merged.json
+          node scripts/release-preflight.mjs --offline --manifest /tmp/release-manifest-merged.json
+
+      - name: Server version and manifest sha256
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Release preflight on Postgres 17"
+            echo
+            echo "Server: \`$(psql -X -At -d postgres -c 'SHOW server_version')\` (server_version_num $(psql -X -At -d postgres -c 'SHOW server_version_num'))"
+            echo
+            echo '```'
+            sha256sum /tmp/m17.json /tmp/release-manifest-merged.json docs/release/release-manifest.json
+            echo '```'
+            echo
+            echo "Majors in m17.json: $(node -p 'Object.keys(require("/tmp/m17.json").generated.majors).join(", ")')"
+            echo "Majors in release-manifest-merged.json: $(node -p 'Object.keys(require("/tmp/release-manifest-merged.json").generated.majors).join(", ")')"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the PG17 manifest
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preflight-manifest-pg17
+          path: |
+            /tmp/m17.json
+            /tmp/release-manifest-merged.json
+          if-no-files-found: error
+          retention-days: 30
