@@ -333,11 +333,15 @@ export function connEnvFromUrl(raw) {
   return env;
 }
 
-const lit = (s) => {
-  if (typeof s !== "string" || /['\\;\n\r]/.test(s))
+// SQL string literal for a manifest value. Apostrophes are doubled (policy names such as "Guardians view their children's
+// join requests" or "invitee can respond; admin can revoke" contain them); backslashes and control characters are refused. The session
+// runs with standard_conforming_strings on (asserted in the read-only preamble), so doubling is the complete escape.
+export const sqlLiteral = (s) => {
+  if (typeof s !== "string" || /[\\\u0000-\u001f]/.test(s))
     throw new Error(`Refusing unsafe manifest value: ${JSON.stringify(s)}`);
-  return `'${s}'`;
+  return `'${s.replaceAll("'", "''")}'`;
 };
+const lit = sqlLiteral;
 
 /** Runs one SELECT returning a single JSON value, inside a read-only transaction. */
 export function readOnlyQuery(env, select) {
@@ -346,6 +350,7 @@ BEGIN READ ONLY;
 SET LOCAL search_path = '';
 SET LOCAL statement_timeout = '60s';
 SET LOCAL lock_timeout = '5s';
+SET LOCAL standard_conforming_strings = on;
 SELECT json_build_object('read_only', current_setting('transaction_read_only'), 'v', (${select}));
 ROLLBACK;
 `;

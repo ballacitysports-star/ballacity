@@ -405,3 +405,14 @@ test("guard requirements: only complete literal arguments count (dynamic names a
   assert.deepEqual(r.functions, ["private_sec.game_payee(text)"]);
   assert.deepEqual(r.tables, ["public.teams"]);
 });
+
+test("policy names with apostrophes are quoted, not refused; unsafe characters still are", async () => {
+  const { sqlLiteral } = await import("./release-preflight.mjs");
+  assert.equal(
+    sqlLiteral("Guardians view their children's join requests"),
+    "'Guardians view their children''s join requests'",
+  );
+  assert.equal(sqlLiteral("x'; drop table y"), "'x''; drop table y'");
+  assert.throws(() => sqlLiteral("a\nb"), /unsafe/);
+  assert.throws(() => sqlLiteral("a\\b"), /unsafe/);
+});
