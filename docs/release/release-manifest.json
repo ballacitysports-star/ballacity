@@ -1,0 +1,1845 @@
+{
+  "format": 1,
+  "description": "Privacy release migrations in apply order. Checked by scripts/release-preflight.mjs; regenerate with --write-manifest --from <version> and review the diff.",
+  "release_range": {
+    "from": "20261103100000",
+    "chosen_because": "Runbook section 2 step 0a (20261103100000) is the first migration of the privacy release. Section 1's first unledgered file (20260915214000) is not used: the 71 files from 20260915214000 to 20261030120000 are already in production by catalog evidence but have no ledger rows, and 20260926155719 is ledgered after them, so a range starting there would always look like a gap and would list historical files as pending. Their ledger rows are a separate owner decision, and historical files must never be re-run."
+  },
+  "ledger": "supabase_migrations.schema_migrations",
+  "generated": {
+    "server_version_num": 160015,
+    "search_path": "",
+    "method": "full local replay (stub + every earlier migration), catalog snapshot after each release file; expect_after = md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles in the final state"
+  },
+  "migrations": [
+    {
+      "order": 1,
+      "version": "20261103100000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103100000_single_review_helpfuls_trigger.sql",
+      "sha256": "c7040ea0de8b971da3b294c8489f4bb64f01b246a3daadab346ed5ae7e8fbf70",
+      "requires": {
+        "functions": [
+          "public.bump_helpful_count()"
+        ],
+        "tables": [
+          "public.review_helpfuls",
+          "public.reviews"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 2,
+      "version": "20261103101000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103101000_capture_enforce_gym_review.sql",
+      "sha256": "553ced7669d0b1b914bf33a934d3c0dde24d53d98e7e31c992c604bcc7b1768b",
+      "requires": {
+        "functions": [
+          "public.has_verified_gym_visit(uuid,uuid)",
+          "public.try_uuid(text)"
+        ],
+        "tables": [
+          "public.trainer_orgs"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 3,
+      "version": "20261103102000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103102000_capture_review_ring_suspects.sql",
+      "sha256": "cadae5a3d1393b95c9502128f26ad5815706d1bd213cb747c1da09bd870918b1",
+      "requires": {
+        "functions": [
+          "public.is_moderator(uuid)",
+          "public.try_uuid(text)"
+        ],
+        "tables": [
+          "public.reviews"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 4,
+      "version": "20261103103000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103103000_revoke_enforce_skill_vote_execute.sql",
+      "sha256": "2d1258558f49a8861dcdea2372f41ae9e5fa830007dba54f67166a9d6f82be82",
+      "requires": {
+        "functions": [
+          "public.enforce_skill_vote()"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 5,
+      "version": "20261103104000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103104000_revoke_enforce_review_integrity_execute.sql",
+      "sha256": "3b76ac3b41306dd14bc7cbd89b2a03be3670a02f1bb64d6d459f9f679740d72c",
+      "requires": {
+        "functions": [
+          "public.enforce_review_integrity()"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 6,
+      "version": "20261103110000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103110000_capture_structured_reviews.sql",
+      "sha256": "77618c88adc80f2c8bd86dc4f7df565f022ecadae5fe9b284d7f8e42fb9718d0",
+      "requires": {
+        "functions": [
+          "public.enforce_review_integrity()",
+          "public.player_trait_counts(uuid)"
+        ],
+        "tables": [
+          "public.reviews"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "public.review_question_keys(text)",
+          "public.review_tag_keys(text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 7,
+      "version": "20261103120000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103120000_minor_review_privacy.sql",
+      "sha256": "67320ad16218b1cc31a8c4bf9cc94a66f53f6a1a8c3e9de083c7b373a84fa2cc",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261103110000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.insight_is_publishable(text,text)",
+          "private_sec.review_author_is_adult(uuid)",
+          "private_sec.review_is_publishable(uuid)",
+          "private_sec.review_subject_is_public(text,text)",
+          "private_sec.review_was_minor_involved(timestamp with time zone,uuid,text,text)",
+          "private_sec.subject_was_minor_at(text,text,timestamp with time zone)",
+          "private_sec.was_minor_at(uuid,timestamp with time zone)",
+          "public.enforce_review_age_rules()",
+          "public.publishable_review_ids(uuid[])",
+          "public.set_insight_minor_protected()",
+          "public.set_review_minor_protected()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 8,
+      "version": "20261103130000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103130000_profile_insert_guard.sql",
+      "sha256": "2194cbdc6229ef5332e47129208ffed23f58d462d6a26ec297bf474caedf8b8f",
+      "requires": {
+        "functions": [],
+        "tables": [
+          "public.profiles"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "public.guard_profile_insert()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 9,
+      "version": "20261103140000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103140000_payment_settings_host_guard.sql",
+      "sha256": "5c74b31e9ca99617b731b4361758acf8fb7b5e164c0008143e19b1d7006eb678",
+      "requires": {
+        "functions": [],
+        "tables": [
+          "public.game_payment_settings",
+          "public.payment_submissions"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.can_manage_game_payment_settings(text)",
+          "private_sec.can_read_game_payment_settings(text,uuid)",
+          "private_sec.game_payee(text)",
+          "public.enforce_payment_destination()",
+          "public.game_payee_id(text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 10,
+      "version": "20261104100000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104100000_youth_game_private_location.sql",
+      "sha256": "09ec9a76977549d7782aa5eb1b4c9d22d333ec56b9194aaceadf56743b33af48",
+      "requires": {
+        "functions": [
+          "public.game_age_range_is_adult_only(integer,integer)"
+        ],
+        "tables": [
+          "public.app_settings",
+          "public.game_participants",
+          "public.guardian_links",
+          "public.hosted_games",
+          "public.payment_submissions"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.can_see_exact_game_location(text)",
+          "private_sec.coarse_game_label(text)",
+          "private_sec.game_fee_satisfied(text,uuid)",
+          "public.coarsen_existing_youth_games(integer)",
+          "public.guard_youth_location_switch()",
+          "public.sync_hosted_game_private()"
+        ],
+        "tables": [
+          "public.hosted_game_private"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 11,
+      "version": "20261104110000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104110000_game_age_and_minor_hosting.sql",
+      "sha256": "0ea54a6f3394b452dbb20b42ad0b1da6991b2b159ad3a59dfec1d34317ebf97b",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261103140000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.player_meets_game_age(text,uuid)",
+          "public.bind_minor_hosting_approval()",
+          "public.enforce_join_request_age()",
+          "public.enforce_minor_hosting_rules()",
+          "public.grant_minor_hosting_approval(uuid,integer)",
+          "public.grant_org_minor_hosting_approval(uuid,uuid,integer)",
+          "public.neutralize_minor_host_snapshot()",
+          "public.revoke_minor_hosting_approval(uuid)"
+        ],
+        "tables": [
+          "public.minor_hosting_approvals"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 12,
+      "version": "20261104120000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104120000_minor_host_payments_and_identity.sql",
+      "sha256": "b241100551888c4306079f903c7e26f36594c82229d42c6bb17982f5f65cc38d",
+      "requires": {
+        "functions": [
+          "private_sec.game_payee(text)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261103140000",
+          "20261104110000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.can_see_minor_name(uuid,uuid)",
+          "private_sec.minor_game_payment_manager(text)",
+          "public.enforce_adult_payee_records()",
+          "public.enforce_minor_game_price()",
+          "public.enforce_minor_payment_settings()",
+          "public.grant_minor_hosting_approval(uuid,integer,boolean)",
+          "public.grant_org_minor_hosting_approval(uuid,uuid,integer,boolean)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 13,
+      "version": "20261104130000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104130000_location_text_detector.sql",
+      "sha256": "b80eedac6ddcec8dd4bd369ce8393c339320be7e6955870e332caa7f242a2322",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.location_tokens(text)",
+          "private_sec.text_discloses_location(text,text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 14,
+      "version": "20261104140000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104140000_youth_game_public_text_guard.sql",
+      "sha256": "f8e1d84d94d72e95b4f76c93797236f70a3b1e53dab5bd2e9917497f0fe8a820",
+      "requires": {
+        "functions": [
+          "public.is_moderator(uuid)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104100000",
+          "20261104130000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "public.guard_youth_game_public_text()",
+          "public.list_youth_games_with_location_text()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 15,
+      "version": "20261104150000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261104150000_contact_request_coarse_location.sql",
+      "sha256": "441f647df3cedd1cea3ccd0f45ffa0852f45510bd4b4921528301ca8d11a4c65",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104100000",
+          "20261104130000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "public.guard_contact_request_location()",
+          "public.guard_game_invite_notification()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 16,
+      "version": "20261105100000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261105100000_team_post_location_privacy.sql",
+      "sha256": "c423c874fd0126db3feef29dfcc912265696de653fe509043eb4805d4a6961e0",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104100000",
+          "20261104130000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.can_see_exact_team_post_location(uuid)",
+          "private_sec.coarse_team_post_label(text)",
+          "private_sec.team_is_youth(text)",
+          "public.coarsen_existing_youth_team_posts(integer)",
+          "public.guard_team_post_text()",
+          "public.list_team_post_venue_requests()",
+          "public.revoke_team_post_public_venue(uuid)",
+          "public.sync_team_post_private()",
+          "public.verify_team_post_public_venue(uuid,text)"
+        ],
+        "tables": [
+          "public.team_post_private",
+          "public.team_post_public_venues"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 17,
+      "version": "20261105110000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261105110000_team_facility_privacy.sql",
+      "sha256": "44a53898b5061c95292c967c9c3fa233b81c740d70002c96d54f77fb3f30cd20",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104100000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.can_see_team_facility(text)",
+          "public.clear_team_facility_details(text,text[])",
+          "public.coarsen_existing_youth_team_facilities(integer)",
+          "public.guard_youth_location_switch_team_facilities()",
+          "public.list_team_facility_requests()",
+          "public.revoke_team_facility_public(text)",
+          "public.sync_team_facility_private()",
+          "public.verify_team_facility_public(text,text)"
+        ],
+        "tables": [
+          "public.team_facility_private",
+          "public.team_public_facilities"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 18,
+      "version": "20261105130000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261105130000_location_disclosure_reports.sql",
+      "sha256": "d75b62ba4ccaea55fe458c232f2ef987e3e131a062a8677b5076762410b8f80d",
+      "requires": {
+        "functions": [
+          "public.is_moderator(uuid)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104130000",
+          "20261104140000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.scrub_game_public_text(text)",
+          "private_sec.tell_host_location_removed(uuid,text)",
+          "public.handle_location_disclosure_report()",
+          "public.list_team_posts_with_location_text()",
+          "public.moderator_scrub_game_text(text,text)",
+          "public.moderator_scrub_team_post_text(uuid,text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 19,
+      "version": "20261105140000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261105140000_minor_host_identity.sql",
+      "sha256": "5be4429020f02443cf304433ca12ec0ca5fd4cf22cb8ff69f07875d7dfc5f4c3",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104110000",
+          "20261104120000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.minor_has_active_youth_game(uuid)",
+          "private_sec.organizer_details(uuid,uuid)",
+          "public.get_game_organizer(text)",
+          "public.keep_minor_host_profile_private()",
+          "public.require_private_profile_for_minor_host()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 20,
+      "version": "20261106100000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106100000_minor_availability_privacy.sql",
+      "sha256": "d743f376c7e6a3651f02b6da7a3eaaab063ee960c673fe81be59e5ddd55402d3",
+      "requires": {
+        "functions": [
+          "private_sec.can_see_minor_name(uuid,uuid)",
+          "private_sec.text_discloses_location(text,text)",
+          "public.minor_messaging_block(uuid,uuid)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261104120000",
+          "20261104130000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.availability_post_visible(uuid)",
+          "private_sec.blank_minor_availability_location(integer)",
+          "public.guard_contact_request_minor_recipient()",
+          "public.guard_minor_availability_write()",
+          "public.list_minor_availability_notes_with_location_text()",
+          "public.moderator_scrub_availability_note(uuid,text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 21,
+      "version": "20261106110000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106110000_minor_host_correlation.sql",
+      "sha256": "f7731f0fc6da30e3bb959aea0b5b01d3317d1995ee62d4be4729579f9fce0ae8",
+      "requires": {
+        "functions": [
+          "private_sec.can_see_minor_name(uuid,uuid)",
+          "private_sec.minor_has_active_youth_game(uuid)",
+          "private_sec.roster_row_visible(text,uuid)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": [
+          "20261105140000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.minor_host_hidden(uuid)",
+          "public.refuse_minor_host_team_owner()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 22,
+      "version": "20261106120000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106120000_private_image_staging.sql",
+      "sha256": "4b02efa0ddfde04026afa17d14bfd4e2de0e82829816e3183f10d177fe0a3120",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 23,
+      "version": "20261106130000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106130000_team_content_reports.sql",
+      "sha256": "2b3a965bb31e5b637c4c91e19881a4a183964baad2a5b3de19e5bd03e557bd4a",
+      "requires": {
+        "functions": [
+          "private_sec.scrub_game_public_text(text)",
+          "public.age_cohort_of(uuid)",
+          "public.is_moderator(uuid)"
+        ],
+        "tables": [
+          "public.post_comments",
+          "public.team_posts",
+          "public.user_reports"
+        ],
+        "schemas": [],
+        "migrations": [
+          "20261105130000"
+        ]
+      },
+      "provides": {
+        "functions": [
+          "private_sec.apply_content_hold()",
+          "private_sec.content_author(text,uuid)",
+          "private_sec.purge_closed_content_reports(interval)",
+          "public.appeal_content_decision(text,uuid,text)",
+          "public.guard_escalated_report_closure()",
+          "public.guardian_content_holds()",
+          "public.handle_content_report()",
+          "public.moderator_decide_content_report(uuid,text,text)",
+          "public.moderator_review_appeal(uuid,boolean,text)",
+          "public.my_content_holds()",
+          "public.validate_content_report()"
+        ],
+        "tables": [
+          "public.content_report_holds",
+          "public.moderation_appeals"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 24,
+      "version": "20261106140000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106140000_minor_messaging_authorization.sql",
+      "sha256": "70bcc1c5cb70f4798b67c3f29cff599f01b0282124459d59607137da293bbce3",
+      "requires": {
+        "functions": [
+          "private_sec.availability_post_visible(uuid)",
+          "private_sec.can_see_minor_name(uuid,uuid)",
+          "public.can_notify(uuid,uuid)",
+          "public.guard_contact_request_minor_recipient()",
+          "public.minor_messaging_block(uuid,uuid)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.has_guardian_link(uuid)",
+          "private_sec.messaging_connection(uuid,uuid)",
+          "private_sec.messaging_controls_block(uuid,uuid)",
+          "public.enforce_minor_messaging_reaction()",
+          "public.gate_contact_request_for_guardian()",
+          "public.guardian_decide_contact_request(uuid,boolean)",
+          "public.notify_guardians_of_contact_request()",
+          "public.protect_contact_request_approval()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    }
+  ],
+  "protections": {
+    "functions": [
+      {
+        "signature": "private_sec.apply_content_hold()",
+        "expect_after": "7c69e685e987ada374a1dbb1d2f32a71",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "private_sec.availability_post_visible(uuid)",
+        "expect_after": "daa99f5c08d61e286c5f3d88cdea4d39",
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "signature": "private_sec.blank_minor_availability_location(integer)",
+        "expect_after": "aefb642773a879735f992336c9408f2a",
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_manage_game_payment_settings(text)",
+        "expect_after": "5a61f1454e986888987775c3a5f5e9f1",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_read_game_payment_settings(text,uuid)",
+        "expect_after": "146c08b9c2a10ee4004ffefdc9924cca",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_see_exact_game_location(text)",
+        "expect_after": "f5c69f6663b48c0ce5e18a09db64e8c4",
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_see_exact_team_post_location(uuid)",
+        "expect_after": "06e398bab595abf5a48ae6ba2cbb195c",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_see_minor_name(uuid,uuid)",
+        "expect_after": "7ccbba4b5e8823b9585e64d8bc8866f2",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_see_team_facility(text)",
+        "expect_after": "d204256f002eed932eeb1e94fa50b8dd",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "private_sec.coarse_game_label(text)",
+        "expect_after": "fe16d20642d8a90d7a72ac08d7a3958c",
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "signature": "private_sec.coarse_team_post_label(text)",
+        "expect_after": "45f5d63e5f036d840b7cdbce03d75d29",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "private_sec.content_author(text,uuid)",
+        "expect_after": "d70f7341a509e34c5d502c96e279b6ac",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "private_sec.game_fee_satisfied(text,uuid)",
+        "expect_after": "54777a2a6045282e650a4f8fc6305523",
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "signature": "private_sec.game_payee(text)",
+        "expect_after": "aa1388e86cadfd362c4f77e2f75d2ec9",
+        "defined_by": [
+          "20261103140000",
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "private_sec.has_guardian_link(uuid)",
+        "expect_after": "9e89fdc6db9368b092f6d75c70790bca",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "private_sec.insight_is_publishable(text,text)",
+        "expect_after": "52db615a82a090c65400bb3e85aa82b6",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.location_tokens(text)",
+        "expect_after": "c899d3b1f47a7395bcb77dab9eadb5ba",
+        "defined_by": [
+          "20261104130000"
+        ]
+      },
+      {
+        "signature": "private_sec.messaging_connection(uuid,uuid)",
+        "expect_after": "e77e14d0a9ff85b5f3117aff313df330",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "private_sec.messaging_controls_block(uuid,uuid)",
+        "expect_after": "c76b4a5fe4be68f52e86eed0427dd811",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_game_payment_manager(text)",
+        "expect_after": "02b53c214b964dfd2a2180b45a4bf2f9",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_has_active_youth_game(uuid)",
+        "expect_after": "af89af13a2fafcf27e79982bd1e5f949",
+        "defined_by": [
+          "20261105140000",
+          "20261106110000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_host_hidden(uuid)",
+        "expect_after": "2ab395defb041c981461b8544fd125f6",
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "signature": "private_sec.organizer_details(uuid,uuid)",
+        "expect_after": "b87137b72fb7c9d084cd78747ff320c5",
+        "defined_by": [
+          "20261105140000"
+        ]
+      },
+      {
+        "signature": "private_sec.player_meets_game_age(text,uuid)",
+        "expect_after": "ab0f1a38fd336b9945c8e49d3fbfff32",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "private_sec.purge_closed_content_reports(interval)",
+        "expect_after": "2cd963cd7181c2a531b7de6d1ea17fd1",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "private_sec.reel_publicly_visible(uuid)",
+        "expect_after": "acce939db9f86f9e5d8989afb31f5e68",
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "signature": "private_sec.review_author_is_adult(uuid)",
+        "expect_after": "6090dfc2a78fd566e5a520b810eee09d",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.review_is_publishable(uuid)",
+        "expect_after": "af4930f18dd1c2cea5b16f76af216e64",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.review_subject_is_public(text,text)",
+        "expect_after": "ee7abb2dc861ecd0cff4e16501af4ed1",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.review_was_minor_involved(timestamp with time zone,uuid,text,text)",
+        "expect_after": "463a8bfa6eab4b1bfefa37a933991153",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.roster_row_visible(text,uuid)",
+        "expect_after": "ec4ed619ec85f0a943716e0b65995128",
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "signature": "private_sec.scrub_game_public_text(text)",
+        "expect_after": "c3af7e169c4ed3cb7db1f21e641fbe1c",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "private_sec.subject_was_minor_at(text,text,timestamp with time zone)",
+        "expect_after": "2815f87438046fa6b85bc681d18f8a5a",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "private_sec.team_is_youth(text)",
+        "expect_after": "6b6ec67bc9693e41781283dcc90c33c0",
+        "defined_by": [
+          "20261105100000",
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "private_sec.tell_host_location_removed(uuid,text)",
+        "expect_after": "be41c2935dfddf42c1c6c383ab5b111e",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "private_sec.text_discloses_location(text,text)",
+        "expect_after": "713f23bbcad25c0bbb0940b3506830d0",
+        "defined_by": [
+          "20261104130000"
+        ]
+      },
+      {
+        "signature": "private_sec.visible_avatars(uuid[])",
+        "expect_after": "32165e20b9a865c23cf393fe94889817",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "private_sec.was_minor_at(uuid,timestamp with time zone)",
+        "expect_after": "9d45f5ea0ecf5260e201d778a28939f4",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.appeal_content_decision(text,uuid,text)",
+        "expect_after": "f9c40b465b6a0ecbbb3db6b8e3f1c157",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.bind_minor_hosting_approval()",
+        "expect_after": "3b08736352fc480462fa2ee8a4330d0c",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.can_notify(uuid,uuid)",
+        "expect_after": "18359fe7fe02ad91599ab199ea617f71",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.clear_team_facility_details(text,text[])",
+        "expect_after": "1d4332bfb7abd0d5f8899850e9e756c4",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.coarsen_existing_youth_games(integer)",
+        "expect_after": "d44049a36179a7430a1ac70f516f79ca",
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "signature": "public.coarsen_existing_youth_team_facilities(integer)",
+        "expect_after": "acf19158772d4233c4c6709506921eae",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.coarsen_existing_youth_team_posts(integer)",
+        "expect_after": "01691031069a874a1ad9e134dc0bb54d",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.enforce_adult_payee_records()",
+        "expect_after": "540feae461707367607fd277dd0f5b83",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.enforce_approval_before_payment()",
+        "expect_after": "3ffff8c3b95ae10ce43cdc4197cc886a",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.enforce_game_age_requirement()",
+        "expect_after": "6d5f102d05a8558a7c1cce86948b0295",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.enforce_game_join_gate()",
+        "expect_after": "9d4924a2d53915fca8fa245e15281a25",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.enforce_game_payment_cohort()",
+        "expect_after": "91b1c3d4d024a11ab393909f56805b18",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.enforce_gym_review()",
+        "expect_after": "1c776a864a0f9e4aac3d17d45cf31c9f",
+        "defined_by": [
+          "20261103101000"
+        ]
+      },
+      {
+        "signature": "public.enforce_join_request_age()",
+        "expect_after": "6e567dd36dd6d9f96952c687024bb2a0",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.enforce_minor_game_price()",
+        "expect_after": "b126461b0548877a10ab89c068733ff9",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.enforce_minor_hosting_rules()",
+        "expect_after": "366c0480d5c0a15f3927e9d6fc939191",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.enforce_minor_messaging_reaction()",
+        "expect_after": "24231b464242e151bd2dd1c06b1e1a3e",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.enforce_minor_payment_settings()",
+        "expect_after": "bc7a4de19ee1d0aebf808bfa3d07626c",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.enforce_payment_destination()",
+        "expect_after": "9966e4bbbab1c529c669a5f0d0b4a6f8",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.enforce_review_age_rules()",
+        "expect_after": "3fecaee645b78330f0b919132fa526a3",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.enforce_review_integrity()",
+        "expect_after": "812c8faae4c3e643ac0b8360913395d5",
+        "defined_by": [
+          "20261103110000",
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.game_payee_id(text)",
+        "expect_after": "67eeb66c163762cd7785055e215395fc",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.gate_contact_request_for_guardian()",
+        "expect_after": "e541afbc615e007a8f52c64ed42c0bc1",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.get_game_host_payment_methods(uuid,text)",
+        "expect_after": "7a4271f3a602ce58d33dd5e2c999cc3f",
+        "defined_by": [
+          "20261103140000",
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.get_game_organizer(text)",
+        "expect_after": "01eb8ad8b3e8a01600d2547da9e35940",
+        "defined_by": [
+          "20261105140000"
+        ]
+      },
+      {
+        "signature": "public.get_game_refund_terms(text)",
+        "expect_after": "b3a83c3ae050ffd7f92869d29df5c6b5",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.get_host_payment_methods(uuid)",
+        "expect_after": "def8c17f5437500f0586cfd80ef260d6",
+        "defined_by": [
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.grant_minor_hosting_approval(uuid,integer,boolean)",
+        "expect_after": "8e9327fc078650b79f1e485cd2acb66a",
+        "defined_by": [
+          "20261104110000",
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.grant_org_minor_hosting_approval(uuid,uuid,integer,boolean)",
+        "expect_after": "ac4228a7299f56a367485e13bbd44915",
+        "defined_by": [
+          "20261104110000",
+          "20261104120000"
+        ]
+      },
+      {
+        "signature": "public.guard_contact_request_location()",
+        "expect_after": "b11ffa8d3bd97ed26934b18b9dc55bf3",
+        "defined_by": [
+          "20261104150000"
+        ]
+      },
+      {
+        "signature": "public.guard_contact_request_minor_recipient()",
+        "expect_after": "33ec774443357f49c961d247d6269400",
+        "defined_by": [
+          "20261106100000",
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.guard_escalated_report_closure()",
+        "expect_after": "6bb1060d99e39a8937b44993b1dafa05",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.guard_game_invite_notification()",
+        "expect_after": "a28463a1396b92deb035bfeed0ab8f84",
+        "defined_by": [
+          "20261104150000"
+        ]
+      },
+      {
+        "signature": "public.guard_minor_availability_write()",
+        "expect_after": "1e32774c53ff16db6ce6e290dde21d94",
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "signature": "public.guard_profile_insert()",
+        "expect_after": "0a5bf62fa1a84f369d10be46a9bbe4dc",
+        "defined_by": [
+          "20261103130000"
+        ]
+      },
+      {
+        "signature": "public.guard_team_post_text()",
+        "expect_after": "59aa0253f1da29bc5afb16200e3994a8",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.guard_youth_game_public_text()",
+        "expect_after": "1cd141fdfed2064326a69c788cb1edab",
+        "defined_by": [
+          "20261104140000"
+        ]
+      },
+      {
+        "signature": "public.guard_youth_location_switch_team_facilities()",
+        "expect_after": "081ed46b6ed69a2d511fbea67e1ea5ea",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.guard_youth_location_switch()",
+        "expect_after": "2d248f5b3035db1395060c5775c6b1a4",
+        "defined_by": [
+          "20261104100000",
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.guardian_content_holds()",
+        "expect_after": "7eaa2a7b36768e4a8686d62cfaf5cefe",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.guardian_decide_contact_request(uuid,boolean)",
+        "expect_after": "a7635828c7fe9f7c6e96c2bb4ad41a75",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.handle_content_report()",
+        "expect_after": "96ca9b36fa57825f75320f083d9fdb18",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.handle_location_disclosure_report()",
+        "expect_after": "3813db3e8fad1f252a94cf828d367c54",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "public.host_attendance_stats(uuid)",
+        "expect_after": "5e7c94e22cb6ba69a769142c0f68b07d",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.keep_minor_host_profile_private()",
+        "expect_after": "c76a54d19197222dcc96aae9a7eadce5",
+        "defined_by": [
+          "20261105140000"
+        ]
+      },
+      {
+        "signature": "public.list_minor_availability_notes_with_location_text()",
+        "expect_after": "c898782ec4e475be9b2b0bd17f8ea59a",
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "signature": "public.list_team_facility_requests()",
+        "expect_after": "3b06bc69691199cbec37f988a73c1de9",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.list_team_post_venue_requests()",
+        "expect_after": "ef7f0f30eaaaec73a4a9abd9779254b8",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.list_team_posts_with_location_text()",
+        "expect_after": "622900e17e305d4bc69d1df84d8fa89b",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "public.list_youth_games_with_location_text()",
+        "expect_after": "437e0aa65ea6a73545c97ea4c0b6d643",
+        "defined_by": [
+          "20261104140000"
+        ]
+      },
+      {
+        "signature": "public.minor_messaging_block(uuid,uuid)",
+        "expect_after": "2fef4a502c1951d772c57720f1080c23",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.moderator_decide_content_report(uuid,text,text)",
+        "expect_after": "d544151b5711d81fb5d31569024772b4",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.moderator_review_appeal(uuid,boolean,text)",
+        "expect_after": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.moderator_scrub_availability_note(uuid,text)",
+        "expect_after": "1c43024c8ff3f0f5ba7621cc6e122443",
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "signature": "public.moderator_scrub_game_text(text,text)",
+        "expect_after": "13e48c98a07c2dcecf4959b5761df41e",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "public.moderator_scrub_team_post_text(uuid,text)",
+        "expect_after": "7992397a4dccc60e5c5572d301915484",
+        "defined_by": [
+          "20261105130000"
+        ]
+      },
+      {
+        "signature": "public.my_content_holds()",
+        "expect_after": "c79cfa770205af1040efc4582fb1031d",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.my_reviewable(text,text)",
+        "expect_after": "f7dd92639df120118836d0dfb1e47e24",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.neutralize_minor_host_snapshot()",
+        "expect_after": "234aacafa0fe779298ced1f5cbfb50e2",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.notify_guardians_of_contact_request()",
+        "expect_after": "00db0a223295107ed68f3a35f6e5a543",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.player_activity_stats(uuid)",
+        "expect_after": "8dae1e12c3612739f31a2a04475a0b4a",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.player_trait_counts(uuid)",
+        "expect_after": "0e1d7c44b6c5cb9f4754dc55e5fd482f",
+        "defined_by": [
+          "20261103110000",
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.protect_contact_request_approval()",
+        "expect_after": "3f8b0db0259fa7101335e1a6d22cb12b",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.publishable_review_ids(uuid[])",
+        "expect_after": "0ba48ca27785730652f464eb1fe8f26b",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.refuse_minor_host_team_owner()",
+        "expect_after": "64a1e276607fafa5d77742fa689fc99f",
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "signature": "public.release_expired_payment_holds(text)",
+        "expect_after": "3eee00253e98ac807138ccf333f1c498",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.require_private_profile_for_minor_host()",
+        "expect_after": "49d158be0f23f3bae66af6cd99c92bbe",
+        "defined_by": [
+          "20261105140000"
+        ]
+      },
+      {
+        "signature": "public.review_question_keys(text)",
+        "expect_after": "b0335fe985bbb4fc222a1db15a953584",
+        "defined_by": [
+          "20261103110000"
+        ]
+      },
+      {
+        "signature": "public.review_ring_suspects(integer)",
+        "expect_after": "f41ec9f31e2ef4b00a08dde328ea4f51",
+        "defined_by": [
+          "20261103102000"
+        ]
+      },
+      {
+        "signature": "public.review_tag_keys(text)",
+        "expect_after": "762aec1bf99a3e7032d6b5513aa06290",
+        "defined_by": [
+          "20261103110000"
+        ]
+      },
+      {
+        "signature": "public.revoke_minor_hosting_approval(uuid)",
+        "expect_after": "8a0a2d00478282196b5489808618ff8d",
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "signature": "public.revoke_team_facility_public(text)",
+        "expect_after": "88aa8a365eaf291b4051b856ab80e22d",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.revoke_team_post_public_venue(uuid)",
+        "expect_after": "147681928a5538480df0e6c0567be54c",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.set_insight_minor_protected()",
+        "expect_after": "8ebda00d3972a23d476cb121f9bbb2eb",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.set_review_minor_protected()",
+        "expect_after": "51837778606e41a58586d56e0575e005",
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.settle_paid_spot(text,uuid,text)",
+        "expect_after": "57f56d6ca1f73350c5896219236713ee",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.sync_hosted_game_private()",
+        "expect_after": "284ab03c32e5e425253621f2a01ccefd",
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "signature": "public.sync_team_facility_private()",
+        "expect_after": "074069f2e2bc716c46e46d5b5f207414",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.sync_team_post_private()",
+        "expect_after": "6e18f8b5d6210b4efc654e80d8bdcc20",
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.team_invite_player(text,uuid,public.team_role,text)",
+        "expect_after": "a87fed7c86fd6e778b11c6e4bb05a3f1",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.validate_content_report()",
+        "expect_after": "d20d590cc55fdf52589654220267acde",
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.validate_join_request()",
+        "expect_after": "360371fe6b5b898d64af524f45ca563c",
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "signature": "public.verify_team_facility_public(text,text)",
+        "expect_after": "c8ee8761e79ecb7f3a974dd99be95323",
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "signature": "public.verify_team_post_public_venue(uuid,text)",
+        "expect_after": "a1b29be247d2620b1b4ac0ec0e0d37a1",
+        "defined_by": [
+          "20261105100000"
+        ]
+      }
+    ],
+    "policies": [
+      {
+        "schema": "public",
+        "table": "availability_contact_requests",
+        "policy": "Recipient updates status",
+        "expect_after": {
+          "qual": "b8434e9321103114888b46550ee3de9d",
+          "with_check": "b8434e9321103114888b46550ee3de9d",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "availability_contact_requests",
+        "policy": "Sender, released recipient or guardian can read",
+        "expect_after": {
+          "qual": "6f1f649e6cb34a42541a61aa9c54137f",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "content_report_holds",
+        "policy": "Moderators read content holds",
+        "expect_after": {
+          "qual": "958335aa339bcc91733eafce37fd246a",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "game_payment_settings",
+        "policy": "Host and linked players read payment settings",
+        "expect_after": {
+          "qual": "d8a6d8f704a956191fc0e949650e5c3f",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "game_payment_settings",
+        "policy": "Hosts manage own game payment settings (insert)",
+        "expect_after": {
+          "qual": null,
+          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "game_payment_settings",
+        "policy": "Hosts manage own game payment settings (update)",
+        "expect_after": {
+          "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
+          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103140000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "hosted_game_private",
+        "policy": "Authorized people read exact game location",
+        "expect_after": {
+          "qual": "971bf84a9f672605fb426461557ccd72",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261104100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "minor_hosting_approvals",
+        "policy": "Parties read hosting approvals",
+        "expect_after": {
+          "qual": "c9d524fe3c41ba840a01c619f299bfce",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261104110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "moderation_appeals",
+        "policy": "Appellants and moderators read appeals",
+        "expect_after": {
+          "qual": "1ed88d2f83d89f11490b293baca528f3",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106130000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "player_availabilities",
+        "policy": "Availability visible to permitted viewers",
+        "expect_after": {
+          "qual": "2958ca17990d20645e015400b7fb352e",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "post_comments",
+        "policy": "post_comments_minor_host_author_hidden",
+        "expect_after": {
+          "qual": "4c599f02aec7770f6c12e4a95f74a385",
+          "with_check": null,
+          "shape": "5c14eda3516437e8296a45f8829ce154"
+        },
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "post_reactions",
+        "policy": "post_reactions_minor_host_author_hidden",
+        "expect_after": {
+          "qual": "7ff085be4973961c917ccdcd7cf704fd",
+          "with_check": null,
+          "shape": "5c14eda3516437e8296a45f8829ce154"
+        },
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "reputation_insights",
+        "policy": "Insights are public",
+        "expect_after": {
+          "qual": "cee52a8dff0567babf4e3109e871ca95",
+          "with_check": null,
+          "shape": "aa22d555890e438d8e200736028c7f95"
+        },
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "reviews",
+        "policy": "Gym admins view reviews about their gym",
+        "expect_after": {
+          "qual": "b12329282e6a2373f884b4dc29b88077",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "reviews",
+        "policy": "Public reviews are viewable by everyone",
+        "expect_after": {
+          "qual": "066361292831d7a35380d426a57abec4",
+          "with_check": null,
+          "shape": "aa22d555890e438d8e200736028c7f95"
+        },
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "reviews",
+        "policy": "Reviewees view their private reviews",
+        "expect_after": {
+          "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103120000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "skill_ratings",
+        "policy": "Skill ratings visible unless hidden",
+        "expect_after": {
+          "qual": "00a0a4d23096066f6e763ef3fa77773f",
+          "with_check": null,
+          "shape": "aa22d555890e438d8e200736028c7f95"
+        },
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_facility_private",
+        "policy": "team_facility_private_read",
+        "expect_after": {
+          "qual": "e880d172a9c0a0f4aa8649a598a053c9",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261105110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_post_private",
+        "policy": "team_post_private_read",
+        "expect_after": {
+          "qual": "f8e6c5c6ac9a05932b60272156dd4fe8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261105100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_posts",
+        "policy": "team_posts_minor_host_author_hidden",
+        "expect_after": {
+          "qual": "4c599f02aec7770f6c12e4a95f74a385",
+          "with_check": null,
+          "shape": "5c14eda3516437e8296a45f8829ce154"
+        },
+        "defined_by": [
+          "20261106110000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "image_staging_delete_own_folder",
+        "expect_after": {
+          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "image_staging_insert_own_folder",
+        "expect_after": {
+          "qual": null,
+          "with_check": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "image_staging_select_own_folder",
+        "expect_after": {
+          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106120000"
+        ]
+      }
+    ]
+  }
+}
