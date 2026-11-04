@@ -16,6 +16,7 @@ export type ReportReason =
   | "minor_safety"
   | "fake_game"
   | "unsafe_location"
+  | "location_disclosed"
   | "misleading"
   | "illegal"
   | "payment_scam"
@@ -45,6 +46,10 @@ export const GAME_REPORT_REASONS: ReasonOption[] = [
   { value: "fake_game", label: "Fake game" },
   { value: "scam", label: "Scam" },
   { value: "unsafe_location", label: "Unsafe location" },
+  {
+    value: "location_disclosed",
+    label: "Reveals a private location (address, map link or landmark)",
+  },
   { value: "unsafe_conditions", label: "Unsafe venue or playing conditions" },
   { value: "injury_risk", label: "Injury risk or unsafe play" },
   { value: "unsafe_behavior", label: "Unsafe behavior by players or host" },
