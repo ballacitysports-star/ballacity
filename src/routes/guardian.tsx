@@ -1,7 +1,6 @@
 import { ParentPortalSections } from "@/components/child/ParentPortalSections";
 import { ChildTryoutsSection } from "@/components/child/ChildTryoutsSection";
 import { GuardianHostingApprovals } from "@/components/youth/GuardianHostingApprovals";
-import { ContentUnderReview } from "@/components/moderation/ContentUnderReview";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,6 +17,7 @@ import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploa
 import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ContentUnderReview } from "@/components/moderation/ContentUnderReview";
 
 export const Route = createFileRoute("/guardian")({
   head: () => ({
@@ -301,14 +301,14 @@ function GuardianDashboard() {
             </div>
           </section>
 
+          <GuardianHostingApprovals viewerId={(user as { id: string }).id} />
+          <ChildTryoutsSection kids={shown} multi={multi} />
+          <ParentPortalSections kids={shown} multi={multi} onSigned={() => q.refetch()} />
           <ContentUnderReview
             scope="children"
             viewerId={(user as { id: string }).id}
             childNames={Object.fromEntries(kids.map((k) => [k.childUserId, k.name]))}
           />
-          <GuardianHostingApprovals viewerId={(user as { id: string }).id} />
-          <ChildTryoutsSection kids={shown} multi={multi} />
-          <ParentPortalSections kids={shown} multi={multi} onSigned={() => q.refetch()} />
 
           <section className="mt-6">
             <h2 className="font-display text-sm font-bold">Recent games</h2>
