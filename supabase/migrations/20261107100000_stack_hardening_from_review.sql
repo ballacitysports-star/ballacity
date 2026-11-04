@@ -468,7 +468,7 @@ END $rewrap$;
 
 -- ------------------------------------------------------------------- D. a minor host's public organizer display must be authorized
 -- A game may show a team or organization as its organizer instead of a person. For a host who is not a confirmed adult that display must be one
--- they are entitled to (a team they manage, an organization they administer); otherwise a minor could be linked to, or impersonate, any team.
+-- they are entitled to (a team they manage, an organization they administer or that approved them to host under it); otherwise a minor could be linked to, or impersonate, any team.
 CREATE OR REPLACE FUNCTION public.check_minor_host_organizer_display()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
 BEGIN
@@ -478,7 +478,11 @@ BEGIN
     RAISE EXCEPTION 'ORGANIZER_DISPLAY_NOT_ALLOWED: a host under 18 can show only a team they manage as the organizer.' USING ERRCODE = '42501';
   END IF;
   IF NEW.org_id IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.org_id IS DISTINCT FROM OLD.org_id)
-     AND NOT public.is_trainer_org_admin(NEW.org_id::uuid, NEW.host_id) THEN
+     AND NOT public.is_trainer_org_admin(NEW.org_id::uuid, NEW.host_id)
+     -- or the organization itself approved this minor to host under it (PRIV-2B organization approval, active or used)
+     AND NOT EXISTS (SELECT 1 FROM public.minor_hosting_approvals a
+                      WHERE a.kind = 'organization' AND a.org_id = NEW.org_id::uuid AND a.minor_id = NEW.host_id
+                        AND a.status IN ('active', 'used') AND public.is_trainer_org_admin(a.org_id, a.approver_id)) THEN
     RAISE EXCEPTION 'ORGANIZER_DISPLAY_NOT_ALLOWED: a host under 18 can show only an organization they administer as the organizer.' USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
