@@ -7,7 +7,10 @@ const enc = new TextEncoder();
 const cat = (...p: Uint8Array[]) => {
   const o = new Uint8Array(p.reduce((n, x) => n + x.length, 0));
   let k = 0;
-  for (const x of p) (o.set(x, k), (k += x.length));
+  for (const x of p) {
+    o.set(x, k);
+    k += x.length;
+  }
   return o;
 };
 const seg = (m: number, payload: Uint8Array) =>
