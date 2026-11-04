@@ -30,6 +30,14 @@
 -- 2026-11-04: md5 52f406f8... and d0d2e465...).
 
 -- ---------------------------------------------------------------------------------------------------------------- columns
+-- Dependency guard: fail loudly, before changing anything, if a migration this one needs has not been applied (plpgsql bodies would otherwise fail only at user time).
+DO $guard$ BEGIN
+  IF to_regprocedure('private_sec.can_see_minor_name(uuid,uuid)') IS NULL OR to_regprocedure('public.minor_messaging_block(uuid,uuid)') IS NULL OR to_regprocedure('public.can_notify(uuid,uuid)') IS NULL OR to_regprocedure('private_sec.availability_post_visible(uuid)') IS NULL OR to_regprocedure('public.guard_contact_request_minor_recipient()') IS NULL THEN
+    RAISE EXCEPTION 'R7: a required earlier release migration has not been applied (see docs/release/youth-privacy-release-runbook.md, sections 2 and 16)';
+  END IF;
+END $guard$;
+
+
 ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS guardian_approved_by uuid;
 ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS guardian_approved_at timestamptz;
 ALTER TABLE public.availability_contact_requests ADD COLUMN IF NOT EXISTS needs_guardian boolean NOT NULL DEFAULT false;

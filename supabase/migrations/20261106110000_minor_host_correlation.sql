@@ -26,6 +26,14 @@
 -- Production check done before writing: the current definitions of private_sec.roster_row_visible(text,uuid), private_sec.reel_publicly_visible(uuid), the team_posts policies and the skill_ratings
 -- policy match the repository (read-only fingerprint comparison, 2026-11-04). Depends on 20261105140000 (G4) and 20261104120000.
 
+-- Dependency guard: fail loudly, before changing anything, if a migration this one needs has not been applied (plpgsql bodies would otherwise fail only at user time).
+DO $guard$ BEGIN
+  IF to_regprocedure('private_sec.can_see_minor_name(uuid,uuid)') IS NULL OR to_regprocedure('private_sec.minor_has_active_youth_game(uuid)') IS NULL OR to_regprocedure('private_sec.roster_row_visible(text,uuid)') IS NULL THEN
+    RAISE EXCEPTION 'R1: a required earlier release migration has not been applied (see docs/release/youth-privacy-release-runbook.md, sections 2 and 16)';
+  END IF;
+END $guard$;
+
+
 CREATE OR REPLACE FUNCTION private_sec.minor_host_hidden(_user uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT COALESCE(public.age_cohort_of(_user), 'unknown') <> 'adult'
@@ -122,3 +130,25 @@ CREATE TRIGGER yy_minor_host_team_owner_trg BEFORE INSERT OR UPDATE OF host_id, 
 DROP TRIGGER IF EXISTS yy_minor_host_team_owner_trg ON public.teams;
 CREATE TRIGGER yy_minor_host_team_owner_trg BEFORE INSERT OR UPDATE OF owner_id, hidden_at ON public.teams
   FOR EACH ROW EXECUTE FUNCTION public.refuse_minor_host_team_owner();
+
+-- ------------------------------------------------------------------------------------------------------------ second review round
+-- (a) Comments and reactions by a minor host carry author_id / user_id and are public wherever the content is public (the existing policy tests the
+--     owner of the CONTENT, not the author). Same restrictive rule as team posts.
+DROP POLICY IF EXISTS "post_comments_minor_host_author_hidden" ON public.post_comments;
+CREATE POLICY "post_comments_minor_host_author_hidden" ON public.post_comments AS RESTRICTIVE FOR SELECT
+  USING (author_id = auth.uid() OR NOT private_sec.minor_host_hidden(author_id));
+DROP POLICY IF EXISTS "post_reactions_minor_host_author_hidden" ON public.post_reactions;
+CREATE POLICY "post_reactions_minor_host_author_hidden" ON public.post_reactions AS RESTRICTIVE FOR SELECT
+  USING (user_id = auth.uid() OR NOT private_sec.minor_host_hidden(user_id));
+
+-- (b) The protection must not lapse while the id is still public. A hosted game row stays readable (host_id included) after the game ends, is
+--     cancelled, or is simply never marked completed, so "has an active game" left the id resolvable later. The status is now permanent for a
+--     person who is not a confirmed adult: once they have hosted a youth-inclusive game, the restrictions above, the private-profile rule (G4)
+--     and the team-ownership guard apply until they are a confirmed adult. The cost is documented in docs/privacy/r1-minor-host-identifier.md.
+CREATE OR REPLACE FUNCTION private_sec.minor_has_active_youth_game(_user uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.hosted_games g
+     WHERE g.host_id = _user
+       AND NOT public.game_age_range_is_adult_only(g.min_age, g.max_age))
+$$;

@@ -94,31 +94,47 @@ SELECT t.eq((SELECT display_name FROM public.visible_avatars(ARRAY[t.id('teenhos
 SELECT t.eq(t.count('SELECT 1 FROM public.profiles WHERE id = ''' || t.id('teenhost') || ''''), 0, 'nor a profile');
 SELECT t.reset();
 
--- ================= the restriction ends with the game =================
+-- ================= the restriction does not end with the game: the game row, and the id in it, stay readable
 UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'mh';
 SELECT t.as_user(t.id('stranger'));
-SELECT t.eq(t.seen('team_members', 'user_id'), 1, 'after the game is cancelled the roster row is listed as before');
-SELECT t.eq(t.seen('skill_ratings', 'user_id'), 1, 'and the rating is visible as before');
-SELECT t.eq(t.seen('team_posts', 'author_id'), 1, 'and the team post');
-SELECT t.eq(t.seen('highlight_reels', 'user_id'), 1, 'and the reel');
+SELECT t.eq(t.seen('team_members', 'user_id'), 0, 'after the game is cancelled the roster row is still hidden from strangers');
+SELECT t.eq(t.seen('skill_ratings', 'user_id'), 0, 'and the rating');
+SELECT t.eq(t.seen('team_posts', 'author_id'), 0, 'and the team post');
+SELECT t.eq(t.seen('highlight_reels', 'user_id'), 0, 'and the reel');
+SELECT t.eq(t.seen('post_comments', 'author_id'), 0, 'and comments');
+SELECT t.reset();
+UPDATE public.hosted_games SET completed_at = now(), date = now() - interval '30 days' WHERE id = 'mh';
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.seen('team_members', 'user_id'), 0, 'a completed game from last month changes nothing');
+SELECT t.reset();
+
+-- ================= comments and reactions by the host do not resolve the id (second review round)
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.post_comments (subject_type, subject_id, author_id, body, moderation_status) VALUES ('game', 'ah', t.id('teenhost'), 'see you there', 'approved');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_anon();
+SELECT t.eq(t.seen('post_comments', 'author_id'), 0, 'anonymous: a comment by the host on an adult''s game is hidden');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.seen('post_comments', 'author_id'), 0, 'stranger: the same');
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.ok(t.seen('post_comments', 'author_id') >= 1, 'the host sees their own comments');
+SELECT t.as_user(t.id('mate'));
+SELECT t.ok(t.seen('post_comments', 'author_id') >= 1, 'a teammate sees them');
 SELECT t.reset();
 
 -- ================= a team the host owns would link the id to a name (teams.owner_id is readable)
-UPDATE public.hosted_games SET cancelled_at = NULL WHERE id = 'mh';
 SELECT t.as_user(t.id('teenhost'));
-SELECT t.throws($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('mine', 'team', 'Teen Team', 'teenteam', auth.uid())$q$, 'MINOR_HOST_TEAM_OWNER', 'a minor who hosts a youth game cannot create a team they own');
-SELECT t.reset();
-UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'mh';
-SELECT t.as_user(t.id('teenhost'));
-SELECT t.lives($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('mine', 'team', 'Teen Team', 'teenteam', auth.uid())$q$, 'with no active game they can');
+SELECT t.throws($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('mine', 'team', 'Teen Team', 'teenteam', auth.uid())$q$, 'MINOR_HOST_TEAM_OWNER', 'a minor who has hosted a youth game cannot create a team they own');
+SELECT t.as_user(t.id('quiet'));
+SELECT t.lives($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('quietteam', 'team', 'Quiet Team', 'quietteam', auth.uid())$q$, 'a minor who has never hosted can');
 SELECT t.reset();
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, host_snapshot) VALUES
-  ('mh2', t.id('teenhost'), 'basketball', 'Second run', now() + interval '4 days', 12, 15, 'Gym', 'North', '{"neutral": true}'::jsonb);
+  ('q1', t.id('quiet'), 'basketball', 'Quiet run', now() + interval '4 days', 12, 15, 'Gym', 'North', '{"neutral": true}'::jsonb);
 SET LOCAL session_replication_role = origin;
-SELECT t.throws($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'mh2'$q$, 'MINOR_HOST_TEAM_OWNER', 'and cannot publish a youth game while owning a visible team');
-UPDATE public.teams SET hidden_at = now() WHERE id = 'mine';
-SELECT t.lives($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'mh2'$q$, 'unless the team is hidden');
+SELECT t.throws($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'q1'$q$, 'MINOR_HOST_TEAM_OWNER', 'and then cannot publish a youth game while owning a visible team');
+UPDATE public.teams SET hidden_at = now() WHERE id = 'quietteam';
+SELECT t.lives($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'q1'$q$, 'unless the team is hidden');
 
 -- ================= grants =================
 SELECT t.eq(has_function_privilege('anon', 'private_sec.minor_host_hidden(uuid)', 'EXECUTE'), true, 'the helper must be callable by anonymous policy evaluation');
