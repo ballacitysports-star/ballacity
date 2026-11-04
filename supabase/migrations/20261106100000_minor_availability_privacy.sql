@@ -53,6 +53,8 @@ DECLARE _why text;
 BEGIN
   IF COALESCE(public.age_cohort_of(NEW.user_id), 'unknown') = 'adult' THEN RETURN NEW; END IF;
   NEW.lat := NULL; NEW.lng := NULL; NEW.formatted_address := NULL; NEW.place_id := NULL;
+  -- only text being written now is checked, so a legacy note never blocks blanking or an unrelated edit
+  IF TG_OP = 'UPDATE' AND NEW.note IS NOT DISTINCT FROM OLD.note THEN RETURN NEW; END IF;
   _why := private_sec.text_discloses_location(NEW.note);
   IF _why IS NOT NULL THEN
     RAISE EXCEPTION 'LOCATION_IN_PUBLIC_TEXT: the note on an availability post by someone under 18 cannot contain an address, map link, coordinates or a venue name (found: %). Describe the sport and the days instead.', _why
@@ -89,3 +91,59 @@ GRANT EXECUTE ON FUNCTION public.guard_contact_request_minor_recipient() TO serv
 DROP TRIGGER IF EXISTS a1_guard_contact_request_minor_recipient_trg ON public.availability_contact_requests;
 CREATE TRIGGER a1_guard_contact_request_minor_recipient_trg BEFORE INSERT ON public.availability_contact_requests
   FOR EACH ROW EXECUTE FUNCTION public.guard_contact_request_minor_recipient();
+
+-- ---------------------------------------------------------------------------------------------------------------------------
+-- LEGACY DATA PROCEDURE (defined here, NOT run by this migration). Posts by non-adults written before this migration may still hold stored
+-- coordinates, a street address or a place id, and notes that name a place. They are already unreadable to unrelated accounts; these
+-- tools remove the residue when the owner approves a run (see docs/release/legacy-data-procedures.md). Blanking deletes the precise value
+-- and keeps the city; nothing is copied anywhere and nothing is ever written back to a public field.
+-- ---------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private_sec.blank_minor_availability_location(_limit integer DEFAULT 500)
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE _n integer;
+BEGIN
+  IF _limit IS NULL OR _limit < 1 OR _limit > 5000 THEN RAISE EXCEPTION 'limit must be between 1 and 5000'; END IF;
+  WITH pick AS (
+    SELECT a.id FROM public.player_availabilities a
+     WHERE (a.lat IS NOT NULL OR a.lng IS NOT NULL OR a.formatted_address IS NOT NULL OR a.place_id IS NOT NULL)
+       AND COALESCE(public.age_cohort_of(a.user_id), 'unknown') <> 'adult'
+     ORDER BY a.id LIMIT _limit FOR UPDATE SKIP LOCKED
+  )
+  UPDATE public.player_availabilities a SET lat = NULL, lng = NULL, formatted_address = NULL, place_id = NULL
+    FROM pick WHERE a.id = pick.id;
+  GET DIAGNOSTICS _n = ROW_COUNT;
+  IF _n > 0 THEN
+    INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, reason, metadata)
+    VALUES (NULL, 'minor_availability_location_blanked', 'player_availabilities', 'batch', 'legacy data procedure', jsonb_build_object('rows', _n));
+  END IF;
+  RETURN _n;   -- run repeatedly until it returns 0
+END $$;
+REVOKE ALL ON FUNCTION private_sec.blank_minor_availability_location(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private_sec.blank_minor_availability_location(integer) TO service_role;
+
+-- Moderators: posts by non-adults whose note names a place (the detector is a heuristic), without returning the text.
+CREATE OR REPLACE FUNCTION public.list_minor_availability_notes_with_location_text()
+RETURNS TABLE (post_id uuid, reason text) LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_moderator(auth.uid()) THEN RAISE EXCEPTION 'Moderators only' USING ERRCODE = 'insufficient_privilege'; END IF;
+  RETURN QUERY
+    SELECT a.id, private_sec.text_discloses_location(a.note)
+      FROM public.player_availabilities a
+     WHERE a.note IS NOT NULL AND COALESCE(public.age_cohort_of(a.user_id), 'unknown') <> 'adult'
+       AND private_sec.text_discloses_location(a.note) IS NOT NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.list_minor_availability_notes_with_location_text() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.list_minor_availability_notes_with_location_text() TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.moderator_scrub_availability_note(_post uuid, _reason text DEFAULT NULL)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_moderator(auth.uid()) THEN RAISE EXCEPTION 'Moderators only' USING ERRCODE = 'insufficient_privilege'; END IF;
+  UPDATE public.player_availabilities a SET note = NULL
+   WHERE a.id = _post AND COALESCE(public.age_cohort_of(a.user_id), 'unknown') <> 'adult';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Nothing to scrub'; END IF;
+  INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, reason)
+  VALUES (auth.uid(), 'availability_note_scrubbed', 'player_availabilities', _post::text, _reason);   -- no copy of the removed text is kept
+END $$;
+REVOKE ALL ON FUNCTION public.moderator_scrub_availability_note(uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.moderator_scrub_availability_note(uuid, text) TO authenticated, service_role;
