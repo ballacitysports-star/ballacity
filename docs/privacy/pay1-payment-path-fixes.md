@@ -9,7 +9,9 @@ Test: `supabase/tests/490_payment_path_fixes.test.sql`
 Depends on: SEC-1 (`20261107100000_stack_hardening_from_review.sql`) and, through it, R7 and PRIV-2B.
 It has a dependency guard that fails if `private_sec.game_payee` or R7's `can_notify` is missing.
 
-## Fixes
+## First design (8a8876d2), superseded
+
+The table below records the first design. Rows 1, 2 and 4a were replaced after independent review; the corrections sections below describe the code as it is.
 
 | #   | Finding                                                                                                                                                   | Fix                                                                                                                                                                                                                                                                                                                 |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,3 +44,12 @@ It has a dependency guard that fails if `private_sec.game_payee` or R7's `can_no
 | 6   | A public minor-hosted paid game exposes the guardian payee's handles (often a real name) to signed-in callers who know the guardian's id                                                                                       | Info, pre-existing | **open**: tracked with minor host correlation (SEC-1 D-5); payments remain disabled                                                                                                                                                                                                     |
 
 Test 490 now has 31 assertions; on 8a8876d2, 11 of them fail (negative control). Full suite 1923 passed, 0 failed.
+
+## Final independent review of 889cc73b (fresh-context reviewer; Codex not available)
+
+All five corrections above were verified **FIXED**; payments stay disabled. New findings:
+
+| #   | Finding                                                                                                                                     | Severity | Disposition                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| 5   | After a guardian link was revoked, the minor host could save free settings for a PAID listing and players joined without paying or approval | Low/Info | **Fixed**: the no-payee settings path and `game_settings_holder` apply only to listings whose price is 0 (test 490) |
+| 7   | The migration header and the first table described the superseded design                                                                    | Docs     | **Fixed**                                                                                                           |

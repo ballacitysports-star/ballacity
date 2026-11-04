@@ -45,6 +45,11 @@ SET LOCAL session_replication_role = replica;
 UPDATE public.payment_submissions SET status = 'verified', paid_amount = 10 WHERE game_id = 'p-ok';
 SET LOCAL session_replication_role = origin;
 UPDATE public.guardian_links SET status = 'revoked' WHERE child_user_id = t.id('teenhost');
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.throws(format($q$INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval) VALUES ('p-ok', %L, 0, false)$q$, t.id('teenhost')), 'row-level security',
+  'final #5: once the payee is gone, the minor host cannot turn a paid listing into a free, open one');
+SELECT t.reset();
+SELECT t.eq(private_sec.game_settings_holder('p-ok'), NULL::uuid, 'final #5: and no settings row of theirs would count for a paid listing');
 UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'p-ok';
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE type = 'payment_refund_owed' AND user_id = t.id('guardian')), 1, 'the refund owed goes to the adult who was paid, even after the link was revoked');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE type = 'payment_refund_owed' AND user_id = t.id('teenhost')), 0, 'never to the minor host');
