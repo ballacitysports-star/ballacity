@@ -236,8 +236,13 @@ SELECT t.reset();
 
 -- F7: no oracle for third parties
 SELECT t.as_user(t.id('adultpost'));
-SELECT t.eq(public.minor_messaging_block(t.id('gmom'), t.id('t16')), 'needs_connection:other', 'a third party gets the same answer for a guardian pair as for any other');
-SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t17u')), 'needs_guardian_link:other', 'a party to the pair still gets the reason');
+-- With SEC-2's containment (#273) applied, every direct client call gets one fixed answer instead ('not_permitted:other').
+SELECT t.eq(public.minor_messaging_block(t.id('gmom'), t.id('t16')),
+            CASE WHEN to_regprocedure('private_sec.rpc_probe_denied(text,uuid[],name)') IS NOT NULL THEN 'not_permitted:other' ELSE 'needs_connection:other' END,
+            'a third party gets the same answer for a guardian pair as for any other');
+SELECT t.eq(public.minor_messaging_block(t.id('adultpost'), t.id('t17u')),
+            CASE WHEN to_regprocedure('private_sec.rpc_probe_denied(text,uuid[],name)') IS NOT NULL THEN 'not_permitted:other' ELSE 'needs_guardian_link:other' END,
+            'a party to the pair gets the reason, or (with SEC-2) the same fixed answer as everyone');
 SELECT t.ok(NOT public.can_notify(t.id('gmom'), t.id('t16')), 'can_notify says no to a third party');
 SELECT t.reset();
 
