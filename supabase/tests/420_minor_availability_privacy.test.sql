@@ -9,6 +9,9 @@ SELECT t.team('squad', 'mgr');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator'), (t.id('adminone'), 'admin');
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.team_members (team_id, user_id) VALUES ('squad', t.id('teen17')), ('squad', t.id('mate'));
+-- both joined through accepted invitations, the teen's approved by their guardian (R7: what counts as a messaging context)
+INSERT INTO public.team_invites (team_id, invitee_id, invited_by, status, guardian_approved_at, guardian_approved_by) VALUES
+  ('squad', t.id('teen17'), t.id('mgr'), 'accepted', now(), t.id('guardian')), ('squad', t.id('mate'), t.id('mgr'), 'accepted', NULL, NULL);
 INSERT INTO public.follows (follower_id, followee_id) VALUES (t.id('follower'), t.id('teen17'));
 UPDATE public.profiles SET age_cohort = 'unknown' WHERE id = t.id('unk');
 INSERT INTO public.player_availabilities (id, user_id, sports, skill_level, recurring_days, city, travel_radius_km, note, status, time_slots, lat, lng, formatted_address, place_id) VALUES

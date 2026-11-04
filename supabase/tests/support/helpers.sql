@@ -133,6 +133,17 @@ BEGIN
   ON CONFLICT (team_id, user_id) DO UPDATE SET role = EXCLUDED.role;
 END $$;
 
+-- A member who joined through an accepted invitation, approved by `p_guardian` when given: the only kind of
+-- membership that counts as a messaging context when a minor is involved (R7). t.member() is a direct roster
+-- row, which keeps working for team features but never opens messaging with a minor.
+CREATE FUNCTION t.invited_member(p_team text, p_handle text, p_guardian text DEFAULT NULL) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO public.team_invites (team_id, invitee_id, invited_by, role, status, responded_at, guardian_approved_at, guardian_approved_by)
+  VALUES (p_team, t.id(p_handle), (SELECT owner_id FROM public.teams WHERE id = p_team), 'player', 'accepted', now(),
+          CASE WHEN p_guardian IS NULL THEN NULL ELSE now() END, CASE WHEN p_guardian IS NULL THEN NULL ELSE t.id(p_guardian) END);
+  PERFORM t.member(p_team, p_handle);
+END $$;
+
 -- Switch the session to a signed-in user / an anonymous visitor / the service
 -- role, as a PostgREST request would. t.reset() goes back to the superuser.
 CREATE FUNCTION t.as_user(uid uuid) RETURNS void LANGUAGE plpgsql AS $$

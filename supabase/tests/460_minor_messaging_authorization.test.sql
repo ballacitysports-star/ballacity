@@ -8,8 +8,9 @@ SET LOCAL session_replication_role = replica;
 UPDATE public.profiles SET age_cohort = 'unknown' WHERE id = t.id('unk');
 SET LOCAL session_replication_role = origin;
 SELECT t.team('squad', 'coach');
-SELECT t.member('squad', 't16');
-SELECT t.member('squad', 't14');
+-- a minor joins a team through an invitation their verified guardian approved (the only membership that counts as a messaging context)
+SELECT t.invited_member('squad', 't16', 'gmom');
+SELECT t.invited_member('squad', 't14', 'gmom');
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, host_snapshot) VALUES
   ('pub', t.id('host'), 'basketball', 'Open run', now() + interval '2 days', 12, 17, 'Gym', 'North', '{"name":"Host"}'::jsonb);
@@ -266,4 +267,151 @@ SELECT t.reset();
 SELECT t.eq(has_function_privilege('authenticated', 'private_sec.messaging_connection(uuid, uuid)', 'EXECUTE'), false, 'the connection helper is not callable by clients (no oracle)');
 SELECT t.eq(has_function_privilege('authenticated', 'public.gate_contact_request_for_guardian()', 'EXECUTE'), false, 'nor the gate trigger');
 SELECT t.eq(has_function_privilege('anon', 'public.can_notify(uuid, uuid)', 'EXECUTE'), false, 'nor can anonymous call can_notify');
+
+-- ================= 9. review round 4 (each finding has a regression test, labelled R4-Fn)
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id IN (t.id('kid'), t.id('t14'), t.id('t16'), t.id('t15b'));
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, host_snapshot) VALUES
+  ('pub3', t.id('host'), 'basketball', 'Open run 3', now() + interval '3 days', 8, 17, 'Gym', 'North', '{"name":"Host"}'::jsonb);
+SET LOCAL session_replication_role = origin;
+
+-- F1: only guardian_approve_join_request writes a join request's guardian approval
+SELECT t.as_user(t.id('t15b'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, guardian_approved_at, guardian_approved_by) VALUES ('pub3', %L, %L, 'k-forge', now(), %L)$q$, t.id('t15b'), t.id('host'), t.id('gdad')), 'setup: a 15 year old sends a join request carrying a forged guardian approval');
+SELECT t.reset();
+SELECT t.ok((SELECT guardian_approved_at IS NULL AND guardian_approved_by IS NULL FROM public.join_requests WHERE idempotency_key = 'k-forge'), 'R4-F1: a forged approval is cleared on insert');
+SELECT t.as_user(t.id('host'));
+SELECT t.lives($q$UPDATE public.join_requests SET guardian_approved_at = now(), guardian_approved_by = t.id('gdad') WHERE idempotency_key = 'k-forge'$q$, 'the host tries to stamp a guardian approval');
+SELECT t.reset();
+SELECT t.ok((SELECT guardian_approved_at IS NULL AND guardian_approved_by IS NULL FROM public.join_requests WHERE idempotency_key = 'k-forge'), 'R4-F1: a stamped approval is not stored');
+SELECT t.as_user(t.id('t15b'));
+SELECT t.throws($q$INSERT INTO public.game_participants (game_id, user_id) VALUES ('pub3', t.id('t15b'))$q$, 'GUARDIAN_APPROVAL_REQUIRED', 'R4-F1: so the participation gate still waits for the guardian');
+SELECT t.reset();
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('pub3', t.id('t15b'));
+SET LOCAL session_replication_role = origin;
+SELECT t.eq(t.dm('host', 't15b'), 'needs_connection:other', 'R4-F1: and no host-to-minor context exists without a real approval');
+DELETE FROM public.game_participants WHERE game_id = 'pub3' AND user_id = t.id('t15b');
+SELECT t.as_user(t.id('gdad'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', (SELECT id FROM public.join_requests WHERE idempotency_key = 'k-forge')), 'the verified guardian approves through the function');
+SELECT t.reset();
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE idempotency_key = 'k-forge'), t.id('gdad'), 'R4-F1: which stores the approval');
+
+-- F8: the game context needs the host's approval too, and ends 30 days after the game
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('pub3', t.id('t15b'));
+SET LOCAL session_replication_role = origin;
+SELECT t.eq(t.dm('host', 't15b'), 'needs_connection:other', 'R4-F8: a guardian-approved request the host has not approved is not a context');
+SELECT t.as_user(t.id('host'));
+SELECT t.lives($q$UPDATE public.join_requests SET status = 'approved' WHERE idempotency_key = 'k-forge'$q$, 'the host approves');
+SELECT t.reset();
+SELECT t.ok(t.dm('host', 't15b') IS NULL, 'R4-F8: approved by host and guardian: a context');
+SET LOCAL session_replication_role = replica;
+UPDATE public.hosted_games SET date = now() - interval '45 days', ends_at = now() - interval '44 days' WHERE id = 'pub3';
+SET LOCAL session_replication_role = origin;
+SELECT t.eq(t.dm('host', 't15b'), 'needs_connection:other', 'R4-F8: but not once the game ended more than 30 days ago');
+SET LOCAL session_replication_role = replica;
+UPDATE public.hosted_games SET date = now() + interval '3 days', ends_at = NULL WHERE id = 'pub3';
+SET LOCAL session_replication_role = origin;
+
+-- F2: the join-request branch of can_notify respects the guardian's controls and keeps under-13 contact guardian-mediated
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status) VALUES ('pub3', t.id('kid'), t.id('host'), 'k-kid', 'pending');
+SET LOCAL session_replication_role = origin;
+SELECT t.ok(NOT public.can_notify(t.id('host'), t.id('kid')), 'R4-F2: a host cannot notify an under-13 whose request no guardian approved');
+UPDATE public.join_requests SET guardian_approved_at = now(), guardian_approved_by = t.id('gmom') WHERE idempotency_key = 'k-kid';
+SELECT t.ok(public.can_notify(t.id('host'), t.id('kid')), 'once a verified guardian approved it, the host can');
+UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('kid');
+SELECT t.ok(NOT public.can_notify(t.id('host'), t.id('kid')), 'R4-F2: but not when the guardian turned messaging off');
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('kid');
+SELECT t.ok(public.can_notify(t.id('t15b'), t.id('host')), 'a minor can notify the adult host they asked');
+UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('t15b');
+SELECT t.ok(NOT public.can_notify(t.id('t15b'), t.id('host')), 'R4-F2: unless their guardian turned messaging off');
+SELECT t.ok(NOT public.can_notify(t.id('host'), t.id('t15b')), 'R4-F2: in either direction');
+UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('t15b');
+
+-- F7: an adult cannot insert a request carrying guardian columns, and an adult's request is never a guardian-approved context
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message, needs_guardian, guardian_approved_by, guardian_approved_at) VALUES (t.id('stranger'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000b1', 'contact', 'hi', true, t.id('gmom'), now())$q$, 'setup: an adult sends a request with forged guardian columns');
+SELECT t.reset();
+SELECT t.ok((SELECT NOT needs_guardian AND guardian_approved_at IS NULL AND guardian_approved_by IS NULL AND status = 'pending' FROM public.availability_contact_requests WHERE from_user_id = t.id('stranger') AND to_user_id = t.id('adultpost')), 'R4-F7: the guardian columns are reset on insert');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.guardian_links (parent_user_id, child_user_id, relationship, status, verified_at) VALUES (t.id('gdad'), t.id('adultpost'), 'parent', 'active', now());
+INSERT INTO public.availability_contact_requests (id, availability_id, from_user_id, to_user_id, status, kind, needs_guardian, guardian_approved_by, guardian_approved_at) VALUES
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000b3', t.id('adultpost'), t.id('t14'), 'accepted', 'contact', true, t.id('gdad'), now());
+SET LOCAL session_replication_role = origin;
+SELECT t.eq(t.dm('adultpost', 't14'), 'needs_connection:other', 'R4-F7: an accepted, "guardian-approved" request from an adult is not a context');
+DELETE FROM public.guardian_links WHERE child_user_id = t.id('adultpost');
+
+-- F4: unknown age fails closed for direct roster adds
+SELECT t.as_user(t.id('coach'));
+SELECT t.throws(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('squad', %L, 'player')$q$, t.id('unk')), 'row-level security', 'R4-F4: a manager cannot add a person of unknown age directly');
+SELECT t.lives(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('squad', %L, 'coach')$q$, t.id('modone')), 'a confirmed adult can still be added directly');
+SELECT t.reset();
+
+-- F3: an unlinked minor's team membership never opens messaging, even after accepting an invitation
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives($q$INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES ('lure', t.id('stranger'), 'team', 'Lure', 'lure')$q$, 'setup: an adult creates their own team');
+SELECT t.lives(format($q$SELECT public.team_invite_player('lure', %L, 'player', NULL)$q$, t.id('t17u')), 'and invites an unlinked 17 year old');
+SELECT t.as_user(t.id('t17u'));
+SELECT t.lives($q$SELECT public.team_respond_invite((SELECT id FROM public.team_invites WHERE team_id = 'lure' AND invitee_id = t.id('t17u')), true)$q$, 'who accepts with no guardian');
+SELECT t.reset();
+SELECT t.ok(public.shares_team(t.id('stranger'), t.id('t17u')), 'they are teammates (team posts and RSVPs work)');
+SELECT t.eq(t.dm('stranger', 't17u'), 'needs_guardian_link:other', 'R4-F3: but that opens no messaging with an unlinked minor');
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t17u')), 'R4-F3: nor notifications');
+SELECT t.as_user(t.id('t17u'));
+SELECT t.lives($q$INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES ('kidsq', t.id('t17u'), 'team', 'Kidsq', 'kidsq')$q$, 'setup: an unlinked 17 year old creates a team');
+SELECT t.lives(format($q$SELECT public.team_invite_player('kidsq', %L, 'player', NULL)$q$, t.id('t16u')), 'and invites an unlinked 16 year old');
+SELECT t.as_user(t.id('t16u'));
+SELECT t.lives($q$SELECT public.team_respond_invite((SELECT id FROM public.team_invites WHERE team_id = 'kidsq' AND invitee_id = t.id('t16u')), true)$q$, 'who accepts');
+SELECT t.reset();
+SELECT t.eq(t.dm('t17u', 't16u'), 'needs_guardian_link:self', 'R4-F3: two unlinked minors on a team they made cannot message');
+SELECT t.as_user(t.id('coach'));
+SELECT t.lives(format($q$SELECT public.team_invite_player('squad', %L, 'player', NULL)$q$, t.id('t15b')), 'setup: a coach invites a linked 15 year old');
+SELECT t.as_user(t.id('gdad'));
+SELECT t.lives(format('SELECT public.guardian_approve_team_invite(%L, true)', (SELECT id FROM public.team_invites WHERE team_id = 'squad' AND invitee_id = t.id('t15b'))), 'whose verified guardian approves (the player joins)');
+SELECT t.reset();
+SELECT t.ok(t.dm('coach', 't15b') IS NULL, 'R4-F3: a guardian-approved membership is a context with the team owner');
+SELECT t.ok(public.can_notify(t.id('coach'), t.id('t15b')), 'and the coach can notify the player');
+
+-- F5: a direct roster add (by any manager, any age) never counts for a pair involving a non-adult
+SELECT t.eq(t.dm('modone', 't15b'), 'needs_connection:other', 'R4-F5: an adult added directly by a manager is not a context for the team''s minors');
+SELECT t.as_user(t.id('t16'));
+SELECT t.lives($q$INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES ('teenteam', t.id('t16'), 'team', 'Teenteam', 'teenteam')$q$, 'setup: a linked teen creates a team');
+SELECT t.lives(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('teenteam', %L, 'player')$q$, t.id('stranger')), 'and adds an adult directly');
+SELECT t.reset();
+SELECT t.ok(public.shares_team(t.id('stranger'), t.id('t16')), 'they share a roster');
+SELECT t.eq(t.dm('stranger', 't16'), 'needs_connection:other', 'R4-F5: that never opens messaging without a guardian');
+SELECT t.ok(NOT public.can_notify(t.id('stranger'), t.id('t16')), 'R4-F5: nor notifications');
+
+-- F6: a family invitation cannot make a fake guardian
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives($q$SELECT public.create_minor_invite('Kiddo', 'parent', repeat('a', 64), now() + interval '1 day')$q$, 'setup: an adult creates family invitations');
+SELECT t.lives($q$SELECT public.create_minor_invite('Kiddo', 'parent', repeat('b', 64), now() + interval '1 day')$q$, 'setup: a second one');
+SELECT t.lives($q$SELECT public.create_minor_invite('Kiddo', 'parent', repeat('c', 64), now() + interval '1 day')$q$, 'setup: a third one');
+SELECT t.as_user(t.id('adultpost'));
+SELECT t.throws($q$SELECT * FROM public.redeem_minor_invite(repeat('a', 64))$q$, 'ADULT_CANNOT_REDEEM', 'R4-F6: an adult cannot redeem a family invitation');
+SELECT t.as_user(t.id('t16'));
+SELECT t.eq((SELECT pending_approval FROM public.redeem_minor_invite(repeat('a', 64))), true, 'R4-F6: a child who already has a guardian only creates a pending request');
+SELECT t.reset();
+SELECT t.ok(NOT public.is_guardian_of(t.id('stranger'), t.id('t16')), 'R4-F6: the inviter is not a guardian yet');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('gmom') AND title = 'Approve a new guardian'), 1, 'R4-F6: the current guardian is notified');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.throws(format('SELECT public.guardian_decide_link_request(%L, true)', (SELECT id FROM public.guardian_link_requests WHERE child_user_id = t.id('t16'))), 'REQUEST_NOT_FOUND', 'R4-F6: the requester cannot approve themselves');
+SELECT t.as_user(t.id('t16'));
+SELECT t.throws(format('SELECT public.guardian_decide_link_request(%L, true)', (SELECT id FROM public.guardian_link_requests WHERE child_user_id = t.id('t16'))), 'REQUEST_NOT_FOUND', 'R4-F6: nor the child');
+SELECT t.as_user(t.id('t14'));
+SELECT t.eq((SELECT pending_approval FROM public.redeem_minor_invite(repeat('b', 64))), true, 'setup: another linked child redeems');
+SELECT t.as_user(t.id('gmom'));
+SELECT t.eq(public.guardian_decide_link_request((SELECT id FROM public.guardian_link_requests WHERE child_user_id = t.id('t14')), false), 'declined', 'the current guardian declines one');
+SELECT t.eq(public.guardian_decide_link_request((SELECT id FROM public.guardian_link_requests WHERE child_user_id = t.id('t16')), true), 'approved', 'and approves the other');
+SELECT t.reset();
+SELECT t.ok(NOT public.is_guardian_of(t.id('stranger'), t.id('t14')), 'R4-F6: a declined request links nobody');
+SELECT t.ok(public.is_guardian_of(t.id('stranger'), t.id('t16')), 'R4-F6: an approved one is active');
+SELECT t.as_user(t.id('t17u'));
+SELECT t.eq((SELECT pending_approval FROM public.redeem_minor_invite(repeat('c', 64))), false, 'a child with no guardian links at once (how the first guardian links)');
+SELECT t.reset();
+SELECT t.ok(public.is_guardian_of(t.id('stranger'), t.id('t17u')), 'the first guardian is active');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE title = 'Approve a new guardian'), 2, 'and no one new is asked to approve (only the two earlier requests)');
+SELECT t.eq(has_function_privilege('anon', 'public.guardian_decide_link_request(uuid, boolean)', 'EXECUTE'), false, 'anonymous cannot decide link requests');
 ROLLBACK;

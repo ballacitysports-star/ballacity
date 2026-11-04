@@ -81,7 +81,7 @@ SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('tee
   'MINOR_MESSAGING_BLOCKED:teammates_only', 'teammates-only blocks a non-teammate');
 SELECT t.reset();
 SELECT t.team('squad', 'host');
-SELECT t.member('squad', 'teentwo');
+SELECT t.invited_member('squad', 'teentwo', 'parenttwo');   -- a guardian-approved membership
 SELECT t.as_user(t.id('host'));
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
   'and admits a teammate');

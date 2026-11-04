@@ -40,6 +40,7 @@ export async function createNotification(input: {
         // Push providers need an absolute URL so tapping the alert opens the
         // exact game / chat / profile the notification refers to.
         url: toAbsoluteDeepLink(input.link ?? null, input.type),
+        type: input.type,
       },
     }).catch((e) => console.warn("push send failed", e));
   } catch (e) {

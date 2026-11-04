@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { isConfirmedAdult, shapeNotificationForRecipient } from "@/lib/notification-templates";
 
 const inputSchema = z.object({
   user_id: z.string().uuid(),
@@ -27,12 +28,23 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // A recipient who is not a confirmed adult gets fixed wording by type, never the caller's text or link.
+    const isSelf = data.user_id === callerId;
+    const content = shapeNotificationForRecipient(
+      { type: data.type, title: data.title, body: data.body ?? null, link: data.link ?? null },
+      {
+        isSelf,
+        isConfirmedAdult: isSelf
+          ? true
+          : await isConfirmedAdult(supabaseAdmin as any, data.user_id),
+      },
+    );
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: data.user_id,
-      type: data.type,
-      title: data.title,
-      body: data.body ?? null,
-      link: data.link ?? null,
+      type: content.type,
+      title: content.title,
+      body: content.body,
+      link: content.link,
     });
     if (error) throw new Error(error.message);
     return { ok: true };

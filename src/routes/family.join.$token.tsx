@@ -30,6 +30,7 @@ function FamilyJoinPage() {
   const redeem = useServerFn(redeemMinorInvite);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [pending, setPending] = useState(false);
 
   const query = useQuery({
     queryKey: ["minor-invite", token],
@@ -41,9 +42,14 @@ function FamilyJoinPage() {
   const accept = async () => {
     setSubmitting(true);
     try {
-      await redeem({ data: { token } });
+      const result = await redeem({ data: { token } });
+      setPending(result.pendingApproval);
       setDone(true);
-      toast.success("You're connected to your parent or guardian.");
+      toast.success(
+        result.pendingApproval
+          ? "Sent. Your current parent or guardian needs to approve it."
+          : "You're connected to your parent or guardian.",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not accept that invitation.");
     } finally {
@@ -76,10 +82,12 @@ function FamilyJoinPage() {
       <Shell>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-lime" />
-          <h1 className="page-title">You're all set</h1>
+          <h1 className="page-title">{pending ? "Waiting for approval" : "You're all set"}</h1>
         </div>
         <p className="mt-2 page-subtitle">
-          Your parent or guardian is connected and can manage your safety settings.
+          {pending
+            ? "Your current parent or guardian has to approve this new connection. Nothing changes until they do."
+            : "Your parent or guardian is connected and can manage your safety settings."}
         </p>
         <Button className="mt-4 w-full" onClick={() => void navigate({ to: "/settings" })}>
           Go to Settings

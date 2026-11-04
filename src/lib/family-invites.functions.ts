@@ -134,14 +134,20 @@ export const redeemMinorInvite = createServerFn({ method: "POST" })
   .inputValidator((d: { token: string }) =>
     z.object({ token: z.string().trim().min(16).max(128) }).parse(d),
   )
-  .handler(async ({ data, context }): Promise<{ consentRecorded: boolean }> => {
-    const { data: rows, error } = await context.supabase.rpc("redeem_minor_invite", {
-      _token_hash: hashToken(data.token),
-    });
-    if (error) throw new Error(friendly(error.message));
-    const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | null;
-    return { consentRecorded: row?.["consent_recorded"] === true };
-  });
+  .handler(
+    async ({ data, context }): Promise<{ consentRecorded: boolean; pendingApproval: boolean }> => {
+      const { data: rows, error } = await context.supabase.rpc("redeem_minor_invite", {
+        _token_hash: hashToken(data.token),
+      });
+      if (error) throw new Error(friendly(error.message));
+      const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | null;
+      // pendingApproval: the player already has a guardian, who must approve this new one first.
+      return {
+        consentRecorded: row?.["consent_recorded"] === true,
+        pendingApproval: row?.["pending_approval"] === true,
+      };
+    },
+  );
 
 function friendly(message: string): string {
   const m = message ?? "";
@@ -155,6 +161,9 @@ function friendly(message: string): string {
   if (m.includes("INVITE_SELF")) return "You cannot accept your own invitation.";
   if (m.includes("INVITE_INVALID")) return "That invitation link is not valid.";
   if (m.includes("ALREADY_LINKED")) return "You are already connected to this parent or guardian.";
+  if (m.includes("ALREADY_REQUESTED"))
+    return "This connection is already waiting for your parent or guardian to approve it.";
+  if (m.includes("ADULT_CANNOT_REDEEM")) return "Family invitations are for players under 18.";
   if (m.includes("AGE_VERIFICATION_REQUIRED"))
     return "Add your date of birth first, then open the invitation again.";
   if (m.includes("AUTH_REQUIRED")) return "Sign in first.";
