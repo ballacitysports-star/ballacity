@@ -18,18 +18,19 @@ DO $guard$ BEGIN
   END IF;
 END $guard$;
 
-CREATE OR REPLACE FUNCTION private_sec.payment_relation(_a uuid, _b uuid)
+-- Review round 4: the relation is DIRECTIONAL (payer -> money holder) and comes only from an actual payment submission the payer made.
+-- A join request alone is not a payment relation; the payee never gains a way to reach a minor through it (payee -> payer notices
+-- about a payment are written by the server's own definer functions, not through can_notify).
+CREATE OR REPLACE FUNCTION private_sec.payer_to_payee(_payer uuid, _payee uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT _a IS NOT NULL AND _b IS NOT NULL AND _a <> _b AND (
-    EXISTS (SELECT 1 FROM public.payment_submissions ps
-             WHERE ps.submitted_at > now() - interval '120 days'
-               AND ((ps.player_id = _a AND private_sec.game_payee(ps.game_id) = _b) OR (ps.player_id = _b AND private_sec.game_payee(ps.game_id) = _a)))
-    OR EXISTS (SELECT 1 FROM public.join_requests jr
-                WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
-                  AND ((jr.player_id = _a AND private_sec.game_payee(jr.game_id) = _b) OR (jr.player_id = _b AND private_sec.game_payee(jr.game_id) = _a))))
+  SELECT _payer IS NOT NULL AND _payee IS NOT NULL AND _payer <> _payee
+     AND public.age_cohort_of(_payee) = 'adult'
+     AND EXISTS (SELECT 1 FROM public.payment_submissions ps
+                  WHERE ps.player_id = _payer AND ps.submitted_at > now() - interval '120 days'
+                    AND (ps.host_id = _payee OR private_sec.game_payee(ps.game_id) = _payee))
 $$;
-REVOKE ALL ON FUNCTION private_sec.payment_relation(uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private_sec.payment_relation(uuid, uuid) TO service_role;
+REVOKE ALL ON FUNCTION private_sec.payer_to_payee(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private_sec.payer_to_payee(uuid, uuid) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.can_notify(_caller uuid, _target uuid)
  RETURNS boolean
@@ -50,15 +51,15 @@ AS $function$
           WHEN COALESCE(public.age_cohort_of(_caller), 'unknown') <> 'adult' OR COALESCE(public.age_cohort_of(_target), 'unknown') <> 'adult' THEN
             ((private_sec.messaging_connection(_caller, _target))
               AND private_sec.messaging_controls_block(_caller, _target) IS NULL)
-            -- PAY-1: the payer and the game's current payee (a guardian payment manager included) about a live payment
-            OR private_sec.payment_relation(_caller, _target)
+            -- PAY-1: a payer may notify the adult who holds (or now manages) their payment; never the reverse
+            OR private_sec.payer_to_payee(_caller, _target)
             -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed adult
             OR EXISTS (SELECT 1 FROM public.join_requests jr
                         WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
                           AND ((jr.host_id = _caller AND jr.player_id = _target)
                                OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult')))
           ELSE
-            private_sec.payment_relation(_caller, _target)
+            private_sec.payer_to_payee(_caller, _target)
             OR EXISTS (SELECT 1 FROM public.conversation_participants a
                       JOIN public.conversation_participants b ON b.conversation_id = a.conversation_id
                      WHERE a.user_id = _caller AND b.user_id = _target)
@@ -103,7 +104,7 @@ BEGIN
   SELECT id, title, date, host_id, cancel_cutoff_min INTO g FROM public.hosted_games WHERE id = _game;
   IF g.id IS NULL THEN RETURN 'none'; END IF;
   SELECT entry_fee, refund_rule, late_refund_pct INTO ps
-    FROM public.game_payment_settings WHERE game_id = _game AND host_id = private_sec.game_payee(_game) ORDER BY created_at DESC LIMIT 1;
+    FROM public.game_payment_settings WHERE game_id = _game AND host_id = s.host_id ORDER BY created_at DESC LIMIT 1;  -- PAY-1: the terms of the person who was paid
 
   _phase := CASE
     WHEN now() >= g.date THEN 'started'
@@ -152,7 +153,7 @@ BEGIN
     IF _reason <> 'game_cancelled' THEN
       INSERT INTO public.notifications (user_id, type, title, body, link)
       VALUES (
-        COALESCE(private_sec.game_payee(g.id), g.host_id), 'payment_refund_owed',   -- PAY-1: the person who holds the money
+        s.host_id, 'payment_refund_owed',   -- PAY-1: the person who received the money (never a minor host who was not paid)
         left('Refund owed · $' || _amount || ' to ' || COALESCE(_who, 'a player'), 200),
         g.title || ': ' || _rule_text || ', and your refund policy gives back ' || _pct ||
           '%. Send it in your payment app, then mark it refunded on the game''s Payments tab.',
@@ -211,8 +212,7 @@ CREATE OR REPLACE FUNCTION public.settle_on_game_cancelled()
 AS $function$
 DECLARE
   p record;
-  _n integer := 0;
-  _total numeric := 0;
+  h record;
 BEGIN
   IF OLD.cancelled_at IS NOT NULL OR NEW.cancelled_at IS NULL THEN RETURN NEW; END IF;
   FOR p IN
@@ -221,18 +221,21 @@ BEGIN
   LOOP
     PERFORM public.settle_paid_spot(NEW.id, p.player_id, 'game_cancelled');
   END LOOP;
-  SELECT count(*), COALESCE(sum(refund_amount), 0) INTO _n, _total
-    FROM public.payment_submissions
-   WHERE game_id = NEW.id AND refund_reason = 'game_cancelled' AND refund_status = 'owed';
-  IF _n > 0 AND NEW.host_id IS NOT NULL THEN
+  -- PAY-1: one summary per person who actually received money for this game (the stored payee of each submission)
+  FOR h IN
+    SELECT ps.host_id AS holder, count(*) AS n, COALESCE(sum(ps.refund_amount), 0) AS total
+      FROM public.payment_submissions ps
+     WHERE ps.game_id = NEW.id AND ps.refund_reason = 'game_cancelled' AND ps.refund_status = 'owed' AND ps.host_id IS NOT NULL
+     GROUP BY ps.host_id
+  LOOP
     INSERT INTO public.notifications (user_id, type, title, body, link)
     VALUES (
-      COALESCE(private_sec.game_payee(NEW.id), NEW.host_id), 'payment_refund_owed',   -- PAY-1: the payee
-      left(_n || CASE WHEN _n = 1 THEN ' refund' ELSE ' refunds' END || ' owed · $' || _total, 200),
+      h.holder, 'payment_refund_owed',
+      left(h.n || CASE WHEN h.n = 1 THEN ' refund' ELSE ' refunds' END || ' owed · $' || h.total, 200),
       NEW.title || ' was cancelled, so everyone who paid gets a full refund. Send them in your payment app, then mark each one refunded on the game''s Payments tab.',
       '/games/' || NEW.id
     );
-  END IF;
+  END LOOP;
   RETURN NEW;
 END;
 $function$
@@ -251,11 +254,11 @@ BEGIN
   IF auth.uid() IS NULL THEN RETURN; END IF;
   IF public.age_cohort_of(_host_id) IS DISTINCT FROM 'adult' THEN RETURN; END IF;
   IF _host_id IS DISTINCT FROM private_sec.game_payee(_game_id) THEN RETURN; END IF;
-  -- PAY-1: only someone who can see the game (a public listing) or is involved with it (host, payee, requester, participant, or their guardian)
+  -- PAY-1: only someone who can see the game (a public listing) or is involved with it (host, payee, approved requester, participant, or their guardian)
   IF NOT EXISTS (SELECT 1 FROM public.hosted_games g WHERE g.id = _game_id
                   AND ((NOT COALESCE(g.is_private, false) AND g.hidden_at IS NULL)
                        OR g.host_id = auth.uid() OR auth.uid() = _host_id
-                       OR EXISTS (SELECT 1 FROM public.join_requests jr WHERE jr.game_id = g.id
+                       OR EXISTS (SELECT 1 FROM public.join_requests jr WHERE jr.game_id = g.id AND jr.status = 'approved'   -- a self-made request is not involvement
                                    AND (jr.player_id = auth.uid() OR public.is_guardian_of(auth.uid(), jr.player_id)))
                        OR EXISTS (SELECT 1 FROM public.game_participants gp WHERE gp.game_id = g.id
                                    AND (gp.user_id = auth.uid() OR public.is_guardian_of(auth.uid(), gp.user_id))))) THEN
@@ -303,10 +306,174 @@ CREATE POLICY "Hosts manage own game payment settings (update)" ON public.game_p
   WITH CHECK (host_id = auth.uid() AND (private_sec.can_manage_game_payment_settings(game_id)
               OR (COALESCE(entry_fee, 0) = 0 AND private_sec.is_game_host_without_payee(game_id))));
 
+-- 3b. (review round 4) The free-settings row of a minor host with no payment manager must also be READ and USED: the settings read
+-- policy, the client's upsert (which needs SELECT) and the join gate all looked only for the payee's row. The settings holder is the
+-- payee, or, when the game has no payee, its host; such a row can only ever be free (insert/update policies above, plus
+-- enforce_minor_payment_settings). Payment destinations still use game_payee only (enforce_payment_destination is unchanged).
+CREATE OR REPLACE FUNCTION private_sec.game_settings_holder(_game_id text)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT COALESCE(private_sec.game_payee(g.id), g.host_id) FROM public.hosted_games g WHERE g.id = _game_id
+$$;
+REVOKE ALL ON FUNCTION private_sec.game_settings_holder(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private_sec.game_settings_holder(text) TO service_role;
+
+CREATE OR REPLACE FUNCTION private_sec.can_read_game_payment_settings(_game_id text, _host_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  SELECT auth.uid() IS NOT NULL
+     AND _host_id = private_sec.game_settings_holder(_game_id)  -- PAY-1
+     AND (
+       _host_id = auth.uid()
+       OR EXISTS (SELECT 1 FROM public.join_requests jr
+                   WHERE jr.game_id = _game_id AND jr.player_id = auth.uid() AND jr.status = 'approved')
+       OR EXISTS (SELECT 1 FROM public.payment_submissions ps
+                   WHERE ps.game_id = _game_id AND ps.player_id = auth.uid())
+       OR EXISTS (SELECT 1 FROM public.game_participants gp
+                   WHERE gp.game_id = _game_id AND gp.user_id = auth.uid())
+     )
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.enforce_game_join_gate()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  g record;
+  _count int;
+  _is_host boolean;
+  _self boolean;
+  _approved boolean;
+  _requires_approval boolean;
+  _fee numeric;
+  _ends timestamptz;
+BEGIN
+  -- Lock the game while its roster is checked, so two joins for the last spot
+  -- queue up instead of both counting an empty seat. NO KEY UPDATE does not
+  -- conflict with the key-share lock the roster row's foreign key takes, so it
+  -- cannot deadlock against other writes that reference the game.
+  SELECT id, host_id, status, cancelled_at, completed_at, joins_closed,
+         signup_cutoff_min, max_players, date, ends_at, duration, price
+    INTO g
+  FROM public.hosted_games WHERE id = NEW.game_id
+  FOR NO KEY UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  _is_host := (g.host_id = auth.uid()) OR (g.host_id = NEW.user_id);
+  _self := auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id;
+
+  IF g.cancelled_at IS NOT NULL OR g.status = 'cancelled' THEN
+    RAISE EXCEPTION 'GAME_CANCELLED: this game was cancelled by the host.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF g.completed_at IS NOT NULL OR g.status = 'completed' THEN
+    RAISE EXCEPTION 'GAME_COMPLETED: this game has already ended.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  -- Host roster management bypasses the soft gates below.
+  IF _is_host OR public.is_moderator(auth.uid()) THEN
+    RETURN NEW;
+  END IF;
+
+  -- Over by the clock, whether or not anyone marked it completed.
+  IF _self THEN
+    _ends := CASE
+      WHEN g.ends_at IS NOT NULL AND g.ends_at > g.date THEN g.ends_at
+      ELSE g.date + make_interval(mins => public.game_duration_minutes(g.duration))
+    END;
+    IF now() >= _ends THEN
+      RAISE EXCEPTION 'GAME_COMPLETED: this game has already ended.'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.join_requests jr
+     WHERE jr.game_id = NEW.game_id
+       AND jr.player_id = NEW.user_id
+       AND jr.status = 'approved'
+  ) INTO _approved;
+
+  -- Closing joining, or the signup cutoff, stops new players. A player the host
+  -- has already approved keeps their place in line to pay and be rostered.
+  IF NOT _approved THEN
+    IF g.joins_closed THEN
+      RAISE EXCEPTION 'GAME_JOINS_CLOSED: the host has closed joining for this game.'
+        USING ERRCODE = 'P0001';
+    END IF;
+
+    IF COALESCE(g.signup_cutoff_min, 0) > 0
+       AND now() >= g.date - make_interval(mins => g.signup_cutoff_min) THEN
+      RAISE EXCEPTION 'GAME_SIGNUP_CLOSED: signups closed before start time.'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  -- What the join screen requires of a player joining for themselves. With no
+  -- settings row the screen treats the game as request-to-join, so this does.
+  IF _self THEN
+    SELECT s.requires_approval, s.entry_fee
+      INTO _requires_approval, _fee
+    FROM public.game_payment_settings s
+    WHERE s.game_id = NEW.game_id
+      AND s.host_id = private_sec.game_settings_holder(s.game_id)  -- PAY-1: a free minor-hosted game's own settings count
+    ORDER BY s.created_at DESC
+    LIMIT 1;
+    IF NOT FOUND THEN
+      _requires_approval := true;
+      _fee := g.price;
+    END IF;
+
+    IF COALESCE(_requires_approval, true) AND NOT _approved THEN
+      RAISE EXCEPTION 'GAME_APPROVAL_REQUIRED: the host has to approve your request to join first.'
+        USING ERRCODE = 'P0001';
+    END IF;
+
+    IF COALESCE(_fee, 0) > 0 AND NOT EXISTS (
+      SELECT 1 FROM public.payment_submissions ps
+       WHERE ps.game_id = NEW.game_id
+         AND ps.player_id = NEW.user_id
+         AND ps.status = 'verified'
+    ) THEN
+      RAISE EXCEPTION 'GAME_PAYMENT_REQUIRED: the entry fee has to be confirmed by the host first.'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  SELECT COUNT(*) INTO _count FROM public.game_participants WHERE game_id = NEW.game_id;
+  IF _count >= GREATEST(g.max_players, 1) THEN
+    RAISE EXCEPTION 'GAME_FULL: the roster is full.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private_sec.caller_is_adult()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT auth.uid() IS NOT NULL AND public.age_cohort_of(auth.uid()) = 'adult'
+$$;
+REVOKE ALL ON FUNCTION private_sec.caller_is_adult() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private_sec.caller_is_adult() TO authenticated, service_role;
+
 -- 4. submissions follow the current payee
 DROP POLICY IF EXISTS "Hosts see submissions for their games" ON public.payment_submissions;
 CREATE POLICY "Hosts see submissions for their games" ON public.payment_submissions FOR SELECT TO authenticated
-  USING (host_id = auth.uid() AND (private_sec.can_manage_game_payment_settings(game_id) OR private_sec.is_game_host(game_id)));
+  -- the current payee manager; or the adult who received the money, for refunds they still owe (mark_refund_sent is keyed on them)
+  USING (host_id = auth.uid() AND (private_sec.can_manage_game_payment_settings(game_id)
+         OR (refund_status = 'owed' AND private_sec.caller_is_adult())));
 DROP POLICY IF EXISTS "Hosts update submissions for their games" ON public.payment_submissions;
 CREATE POLICY "Hosts update submissions for their games" ON public.payment_submissions FOR UPDATE TO authenticated
   USING (host_id = auth.uid() AND private_sec.can_manage_game_payment_settings(game_id))
