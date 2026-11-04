@@ -33,7 +33,15 @@ vi.mock("@/integrations/supabase/client.server", () => {
   return {
     supabaseAdmin: {
       from: table,
-      storage: { from: () => ({ list: async () => ({ data: [] }), remove: async () => ({}) }) },
+      storage: {
+        from: (bucket: string) => ({
+          list: async () => {
+            log.push(`list ${bucket}`);
+            return { data: [] };
+          },
+          remove: async () => ({}),
+        }),
+      },
       auth: {
         admin: {
           deleteUser: async (id: string) => {
@@ -67,6 +75,13 @@ describe("purgeUserAccount", () => {
   it.each(NOT_CASCADED)("removes the account's %s rows itself", async (table) => {
     await purgeUserAccount(USER);
     expect(log).toContain(`delete ${table}.user_id=${USER}`);
+  });
+
+  it("L1: also clears the private image-staging bucket, before it deletes the auth user", async () => {
+    await purgeUserAccount(USER);
+    const listed = log.indexOf("list image-staging");
+    expect(listed).toBeGreaterThanOrEqual(0);
+    expect(listed).toBeLessThan(log.indexOf(`auth.deleteUser ${USER}`));
   });
 
   it("removes them before it deletes the auth user, and deletes that last", async () => {

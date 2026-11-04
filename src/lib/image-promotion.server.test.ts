@@ -1,19 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
+import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
-import type { StripResult } from "./image-metadata";
-
-// Pass-through by default; a test can replace the stripper's output to prove the clean bytes are validated again.
-const stripOverride = vi.hoisted(() => ({ fn: null as null | ((b: Uint8Array) => StripResult) }));
-vi.mock("@/lib/image-metadata", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./image-metadata")>();
-  return {
-    ...real,
-    stripImageMetadata: (b: Uint8Array) =>
-      stripOverride.fn ? stripOverride.fn(b) : real.stripImageMetadata(b),
-  };
-});
+import { IMAGE_QUARANTINE_BUCKET } from "./image-quarantine.server";
+import { ImageReencodeError, type ReencodeResult } from "./image-reencode.server";
 import {
   ANIMATED_REFUSAL,
+  PROCESSING_UNAVAILABLE,
   promoteStagedImage,
   sweepImageStaging,
   type PromotionDeps,
@@ -30,26 +24,51 @@ const cat = (...p: Uint8Array[]) => {
   }
   return o;
 };
+const u8 = (b: Buffer) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 const seg = (m: number, payload: Uint8Array) =>
   cat(Uint8Array.from([0xff, m, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload);
-const jpeg = (opts: { gps?: boolean; pad?: number } = {}) =>
-  cat(
-    Uint8Array.from([0xff, 0xd8]),
-    ...(opts.gps ? [seg(0xe1, enc.encode("Exif\0\0GPS 33.7488,-84.3877"))] : []),
-    seg(0xc0, Uint8Array.from([8, 0, 80, 0, 100, 1, 1, 0x11, 0])),
-    seg(0xda, Uint8Array.from([1, 1, 0, 0, 63, 0])),
-    new Uint8Array(opts.pad ?? 3).fill(1),
-    Uint8Array.from([0xff, 0xd9]),
+// A real, decodable JPEG (SEC-6: every published picture is decoded and re-encoded), optionally with a GPS-bearing APP1.
+const BASE_JPEG = u8(
+  await sharp({ create: { width: 100, height: 80, channels: 3, background: "#3366cc" } })
+    .jpeg()
+    .toBuffer(),
+);
+const jpeg = (opts: { gps?: boolean } = {}) =>
+  opts.gps
+    ? cat(
+        BASE_JPEG.subarray(0, 2),
+        seg(0xe1, enc.encode("Exif\0\0GPS 33.7488,-84.3877")),
+        BASE_JPEG.subarray(2),
+      )
+    : BASE_JPEG.slice();
+// Noise does not compress: a PNG whose re-encoded bytes are over the 4 MB inline-scan limit and under the 8 MB cap.
+const NOISE_PNG = await (async () => {
+  const w = 1300;
+  const h = 1200;
+  const raw = randomBytes(w * h * 3);
+  return u8(
+    await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer(),
   );
+})();
 const hasText = (b: Uint8Array, t: string) => new TextDecoder("latin1").decode(b).includes(t);
+const contains = (hay: Uint8Array, needle: Uint8Array) =>
+  Buffer.from(hay.buffer, hay.byteOffset, hay.byteLength).indexOf(Buffer.from(needle)) >= 0;
 
 const USER = "11111111-1111-1111-1111-111111111111";
 const STAGE = `${USER}/stage-1.jpg`;
 const TARGET = `${USER}/final-1.jpg`;
 
-function world(initial: Record<string, Uint8Array> = {}, uploadError: string | null = null) {
+function world(
+  initial: Record<string, Uint8Array> = {},
+  uploadError: string | null = null,
+  opts: { quarantineFails?: boolean } = {},
+) {
   const files = new Map<string, Uint8Array>(Object.entries(initial)); // key: bucket|path
   const moderation = new Map<string, any>();
+  const items: any[] = [];
+  const log: string[] = [];
   const admin = {
     storage: {
       from: (bucket: string) => ({
@@ -60,12 +79,17 @@ function world(initial: Record<string, Uint8Array> = {}, uploadError: string | n
             : { data: null, error: { message: "not found" } };
         },
         upload: async (path: string, bytes: Uint8Array) => {
-          if (uploadError) return { error: { message: uploadError } };
+          if (bucket === IMAGE_QUARANTINE_BUCKET && opts.quarantineFails)
+            return { error: { message: "quarantine down" } };
+          if (uploadError && bucket !== IMAGE_STAGING_BUCKET && bucket !== IMAGE_QUARANTINE_BUCKET)
+            return { error: { message: uploadError } };
           files.set(`${bucket}|${path}`, bytes);
+          log.push(`upload ${bucket}`);
           return { error: null };
         },
         remove: async (paths: string[]) => {
           for (const p of paths) files.delete(`${bucket}|${p}`);
+          log.push(`remove ${bucket}`);
           return { error: null };
         },
         createSignedUrl: async (path: string) => ({
@@ -73,7 +97,19 @@ function world(initial: Record<string, Uint8Array> = {}, uploadError: string | n
         }),
       }),
     },
-    from: () => ({
+    from: (table: string) => ({
+      insert: (row: any) => ({
+        select: () => ({
+          single: async () => {
+            if (table !== "image_quarantine_items")
+              return { data: null, error: { message: table } };
+            const id = `item-${items.length + 1}`;
+            items.push({ id, ...row });
+            log.push("record quarantine item");
+            return { data: { id }, error: null };
+          },
+        }),
+      }),
       upsert: async (row: any) => {
         moderation.set(`${row.bucket}|${row.path}`, row);
         return { error: null };
@@ -90,7 +126,7 @@ function world(initial: Record<string, Uint8Array> = {}, uploadError: string | n
       },
     }),
   };
-  return { files, moderation, admin };
+  return { files, moderation, items, log, admin };
 }
 const safe = { safe: true, label: "ok", reason: null, categories: [], scanned: true, csam: false };
 const deps = (
@@ -99,7 +135,9 @@ const deps = (
 ): PromotionDeps & { scan: any; escalate: any } => ({
   admin: w.admin,
   scan: vi.fn().mockResolvedValue(verdict),
-  escalate: vi.fn().mockResolvedValue(undefined),
+  escalate: vi.fn(async () => {
+    w.log.push("escalate");
+  }),
 });
 const input = { userId: USER, bucket: "avatars", stagingPath: STAGE, targetPath: TARGET };
 
@@ -128,9 +166,73 @@ describe("promoteStagedImage", () => {
     const out = await promoteStagedImage(d, input);
     expect(out.quarantined).toBe(true);
     expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+    // SEC-6: the original, exactly as uploaded, is preserved in the restricted quarantine, then removed from staging
+    const held = w.items[0];
+    expect(held).toMatchObject({
+      source: "image_upload",
+      source_bucket: IMAGE_STAGING_BUCKET,
+      source_path: STAGE,
+      uploader_id: USER,
+      suspected_csam: true,
+      categories: ["c"],
+    });
+    expect(held.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(w.files.get(`${IMAGE_QUARANTINE_BUCKET}|${held.object_path}`)).toEqual(
+      jpeg({ gps: true }),
+    );
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(false);
+    const row = w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`);
+    expect(row.status).toBe("quarantined");
+    expect(row.scan.quarantine).toEqual({
+      bucket: IMAGE_QUARANTINE_BUCKET,
+      path: held.object_path,
+      item_id: "item-1",
+    });
+    expect(d.escalate).toHaveBeenCalledWith(IMAGE_QUARANTINE_BUCKET, held.object_path, ["c"]);
+    // preserved and recorded before escalation, escalated before the staged copy is removed
+    expect(w.log.filter((l) => !l.startsWith("upload avatars"))).toEqual([
+      `upload ${IMAGE_QUARANTINE_BUCKET}`,
+      "record quarantine item",
+      "escalate",
+      `remove ${IMAGE_STAGING_BUCKET}`,
+    ]);
+  });
+
+  it("keeps the staged original (and escalates it there) when the quarantine copy fails", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() }, null, {
+      quarantineFails: true,
+    });
+    const d = deps(w, {
+      ...safe,
+      safe: false,
+      label: "x",
+      reason: "f",
+      csam: true,
+      categories: ["c"],
+    });
+    const out = await promoteStagedImage(d, input);
+    expect(out.quarantined).toBe(true);
     expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(true);
-    expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("quarantined");
+    expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).scan.quarantine).toEqual({
+      failed: true,
+    });
     expect(d.escalate).toHaveBeenCalledWith(IMAGE_STAGING_BUCKET, STAGE, ["c"]);
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+  });
+
+  it("a non-child-safety flag is quarantined too, without escalation", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg() });
+    const d = deps(w, {
+      ...safe,
+      safe: false,
+      label: "violence",
+      reason: "f",
+      categories: ["violence"],
+    });
+    await promoteStagedImage(d, input);
+    expect(w.items[0]).toMatchObject({ suspected_csam: false, categories: ["violence"] });
+    expect(d.escalate).not.toHaveBeenCalled();
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(false);
   });
 
   it("scans the cleaned bytes, not the original", async () => {
@@ -178,9 +280,17 @@ describe("promoteStagedImage", () => {
   });
 
   it("scans a large image through a server-only scratch copy of the CLEAN bytes, then deletes it", async () => {
-    const w = world({
-      [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true, pad: 4.5 * 1024 * 1024 }),
-    });
+    const stage = `${USER}/big.png`;
+    const target = `${USER}/big-final.png`;
+    const big = cat(
+      NOISE_PNG.subarray(0, 33),
+      // a tEXt chunk the re-encode drops (CRC is not checked by the stripper, which drops it anyway)
+      Uint8Array.from([0, 0, 0, 7]),
+      enc.encode("tEXtGPS 1,2"),
+      Uint8Array.from([0, 0, 0, 0]),
+      NOISE_PNG.subarray(33),
+    );
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: big });
     const d = deps(w);
     let scannedBytes: Uint8Array | null = null;
     d.scan.mockImplementation(async (url: string) => {
@@ -189,12 +299,13 @@ describe("promoteStagedImage", () => {
       scannedBytes = w.files.get(`${IMAGE_STAGING_BUCKET}|${m![1]}`) ?? null;
       return safe;
     });
-    const out = await promoteStagedImage(d, input);
+    const out = await promoteStagedImage(d, { ...input, stagingPath: stage, targetPath: target });
     expect(out.quarantined).toBe(false);
     expect(scannedBytes).not.toBeNull();
+    expect(scannedBytes!.byteLength).toBeGreaterThan(4 * 1024 * 1024);
     expect(hasText(scannedBytes!, "GPS")).toBe(false);
     // what was scanned is exactly what was published
-    expect(w.files.get(`avatars|${TARGET}`)).toBe(scannedBytes);
+    expect(w.files.get(`avatars|${target}`)).toBe(scannedBytes);
     // the scratch copy is gone
     expect([...w.files.keys()].some((k) => k.includes("_scan/"))).toBe(false);
   });
@@ -390,37 +501,113 @@ describe("promoteStagedImage: still images only, and the cleaned bytes are valid
     expect(w.files.size).toBe(0);
   });
 
-  it("re-validates the cleaned bytes: a cleaned result of another size, type or none at all is never published", async () => {
+  it("re-validates the re-encoded bytes: a result of another size, type or none at all is never published", async () => {
     const outputs: Uint8Array[] = [
-      jpeg().map((x, i) => (i === 10 ? 0 : x)), // height 80 -> 0: not the same picture, and too small
+      u8(await sharp(BASE_JPEG).resize(90, 80, { fit: "fill" }).jpeg().toBuffer()), // not the same picture size
       enc.encode("not an image"),
       new Uint8Array(0),
     ];
-    try {
-      for (const bytes of outputs) {
-        stripOverride.fn = () => ({
-          bytes,
-          changed: true,
-          report: {
-            format: "jpeg",
-            hasExif: false,
-            hasGps: false,
-            hasXmp: false,
-            hasOther: false,
-            orientation: null,
-            animated: false,
-          },
-        });
-        const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
-        const d = deps(w);
-        await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
-        expect(d.scan).not.toHaveBeenCalled();
-        expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
-        expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("removed");
-      }
-    } finally {
-      stripOverride.fn = null;
+    for (const bytes of outputs) {
+      const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
+      const d = deps(w);
+      d.reencode = async (): Promise<ReencodeResult> => ({
+        bytes,
+        mime: "image/jpeg",
+        width: 100,
+        height: 80,
+        hasAlpha: false,
+        orientation: null,
+        convertedFromIcc: false,
+        lossless: false,
+        inputReport: {
+          format: "jpeg",
+          hasExif: false,
+          hasGps: false,
+          hasXmp: false,
+          hasOther: false,
+          orientation: null,
+          animated: false,
+        },
+      });
+      await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
+      expect(d.scan).not.toHaveBeenCalled();
+      expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+      expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`).status).toBe("removed");
     }
+  });
+});
+
+describe("promoteStagedImage: canonical re-encode (SEC-6)", () => {
+  it("publishes exactly the bytes it scanned, and they hold none of a payload hidden before the JPEG EOI", async () => {
+    const payload = enc.encode("HIDDEN-SECOND-IMAGE-PAYLOAD-0123456789");
+    const crafted = cat(
+      BASE_JPEG.subarray(0, BASE_JPEG.length - 2),
+      payload,
+      Uint8Array.from([0xff, 0xd9]),
+    );
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: crafted });
+    const d = deps(w);
+    await promoteStagedImage(d, input);
+    const published = w.files.get(`avatars|${TARGET}`)!;
+    const scanned = Uint8Array.from(atob((d.scan.mock.calls[0][0] as string).split(",")[1]), (c) =>
+      c.charCodeAt(0),
+    );
+    expect(Buffer.compare(Buffer.from(published), Buffer.from(scanned))).toBe(0);
+    expect(contains(published, payload)).toBe(false);
+  });
+
+  it("publishes a phone photo upright with no metadata (orientation applied to the pixels)", async () => {
+    const photo = u8(readFileSync("e2e/fixtures/exif/o6.jpg"));
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: photo });
+    const out = await promoteStagedImage(deps(w), input);
+    expect([out.width, out.height]).toEqual([200, 100]); // stored 100x200, orientation 6
+    const m = await sharp(w.files.get(`avatars|${TARGET}`)!).metadata();
+    expect([m.width, m.height, m.exif, m.icc, m.orientation]).toEqual([
+      200,
+      100,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(w.moderation.get(`avatars|${TARGET}`).scan.metadata).toMatchObject({
+      reencoded: true,
+      orientation: 6,
+    });
+  });
+
+  it("fails closed when the image library is unavailable: nothing scanned or published, the original stays private", async () => {
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${STAGE}`]: jpeg({ gps: true }) });
+    const d = deps(w);
+    d.reencode = async () => {
+      throw new ImageReencodeError("unavailable");
+    };
+    const out = await promoteStagedImage(d, input);
+    expect(out.held).toBe(true);
+    expect(out.reason).toBe(PROCESSING_UNAVAILABLE);
+    expect(d.scan).not.toHaveBeenCalled();
+    expect(w.files.has(`avatars|${TARGET}`)).toBe(false);
+    expect(w.files.has(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toBe(true);
+    expect(w.moderation.get(`${IMAGE_STAGING_BUCKET}|${STAGE}`)).toMatchObject({
+      status: "pending",
+      reason: PROCESSING_UNAVAILABLE,
+    });
+  });
+
+  it("refuses a decompression bomb with a clear error and publishes nothing", async () => {
+    // within the 8 MB and 6000 px header checks it would fail anyway; here the header passes and the pixel cap refuses
+    const bomb = u8(
+      await sharp({ create: { width: 5800, height: 5800, channels: 3, background: "#000" } })
+        .png({ compressionLevel: 9 })
+        .toBuffer(),
+    );
+    const stage = `${USER}/bomb.png`;
+    const w = world({ [`${IMAGE_STAGING_BUCKET}|${stage}`]: bomb });
+    const d = deps(w);
+    await expect(
+      promoteStagedImage(d, { ...input, stagingPath: stage, targetPath: `${USER}/bomb-final.png` }),
+    ).rejects.toThrow(/resolution is too high/);
+    expect(d.scan).not.toHaveBeenCalled();
+    expect(w.files.size).toBe(0);
   });
 });
 

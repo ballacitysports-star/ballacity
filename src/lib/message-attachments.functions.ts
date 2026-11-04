@@ -10,7 +10,8 @@ import { parseAttachmentPath } from "@/lib/message-attachment-validation";
  * conversation, so the check cannot be skipped by calling the API directly.
  *
  * A refused file is deleted. A picture also goes through the safety scan that
- * profile photos get; an unsafe one is deleted and child-safety escalation runs
+ * profile photos get; an unsafe one is moved to the restricted quarantine
+ * (never simply deleted: it is evidence) and child-safety escalation runs
  * when the scan says so. The record is bound to the storage object that was
  * checked (see finalizeAttachment), so replacing the file at the same path
  * afterwards does not carry the check over.
@@ -34,17 +35,16 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!member) throw new Error("You are not in this conversation");
 
-    const { finalizeAttachment, ATTACHMENT_BUCKET } =
-      await import("@/lib/message-attachment-finalize.server");
+    const { finalizeAttachment } = await import("@/lib/message-attachment-finalize.server");
     const { scanImageForSafety } = await import("@/lib/image-safety.server");
     const out = await finalizeAttachment(
       {
         admin: supabaseAdmin,
         scan: (target, userId) => scanImageForSafety(target, { userId }),
-        escalate: async (path, categories) => {
+        escalate: async (bucket, path, categories) => {
           const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
           await escalateImageForChildSafety(supabaseAdmin, {
-            bucket: ATTACHMENT_BUCKET,
+            bucket,
             path,
             categories,
             source: "image_upload",

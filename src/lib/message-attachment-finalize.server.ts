@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally in tests */
 import { stripStoredImage } from "@/lib/image-metadata.server";
+import { quarantineOriginal, type QuarantineRef } from "@/lib/image-quarantine.server";
 import {
   MAX_ATTACHMENT_BYTES,
   attachmentProblem,
@@ -26,7 +27,8 @@ export type AttachmentScanVerdict = {
 export type AttachmentFinalizeDeps = {
   admin: any;
   scan: (target: string, userId: string) => Promise<AttachmentScanVerdict>;
-  escalate: (path: string, categories: string[]) => Promise<void>;
+  /** Escalate a child-safety hit, with the quarantine copy's location (or the attachment's own, if the copy failed). */
+  escalate: (bucket: string, path: string, categories: string[]) => Promise<void>;
 };
 
 export type AttachmentFinalizeResult = {
@@ -168,8 +170,30 @@ export async function finalizeAttachment(
       throw new Error("We couldn't check this image right now. Please try again in a few minutes.");
     }
     if (!verdict.safe) {
-      await remove();
-      if (verdict.csam) await escalate(path, verdict.categories);
+      // M4: the original is evidence. Preserve it (as uploaded, metadata included) in the restricted quarantine, escalate with
+      // that reference, and only then remove it from the conversation folder. If preserving fails, the file is NOT removed: it
+      // stays at its private path with no check row (so it can never be sent) and is escalated from there.
+      let held: QuarantineRef | null = null;
+      try {
+        held = await quarantineOriginal(admin, {
+          source: "message_attachment",
+          sourceBucket: ATTACHMENT_BUCKET,
+          sourcePath: path,
+          uploaderId: userId,
+          conversationId,
+          bytes: buffer,
+          mime: checked.mime,
+          categories: verdict.categories,
+          suspectedCsam: verdict.csam,
+          reason: "Flagged by automated scan",
+        });
+      } catch {
+        held = null;
+      }
+      if (verdict.csam) {
+        await escalate(held?.bucket ?? ATTACHMENT_BUCKET, held?.path ?? path, verdict.categories);
+      }
+      if (held) await remove();
       throw new Error("That picture can't be sent.");
     }
   }

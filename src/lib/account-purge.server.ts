@@ -142,6 +142,20 @@ export async function purgeUserAccount(userId: string): Promise<void> {
     }
   }
 
+  // Private image staging (L1). Abandoned, held and failed uploads are removed; a staged original the safety scan quarantined
+  // (before SEC-6 moved such files to the restricted quarantine) is evidence under legal hold and is kept. Items in the
+  // image-quarantine bucket are never purged here: they are retained under docs/privacy/sec6-image-reencode-quarantine.md.
+  // A failure stops the purge before the account is deleted, so it can be retried; only a missing bucket is skipped.
+  try {
+    const { purgeStagedImagesForUser } = await import("@/lib/image-promotion.server");
+    await purgeStagedImagesForUser(supabaseAdmin, userId);
+  } catch (e) {
+    const { isMissingBucketError } = await import("@/lib/image-staging");
+    if (!isMissingBucketError((e as Error)?.message)) {
+      throw new Error("Could not remove staged images; the account was not deleted. Try again.");
+    }
+  }
+
   // 3. Delete the auth user (cascades the user's remaining rows).
   const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
   if (error) throw new Error(error.message);

@@ -166,3 +166,45 @@ export const superadminSweepImageStaging = createServerFn({ method: "POST" })
     }
     return { dryRun, ...result };
   });
+
+/**
+ * Open a quarantined original for safety review (SEC-6). The reviewer's own client calls the SECURITY DEFINER RPC, which checks the
+ * role, requires a reason and writes the audit row; the server then exchanges the single-use grant for a 60-second signed URL.
+ * Show it blurred by default and never re-share it (docs/privacy/sec6-image-reencode-quarantine.md, "Reviewer exposure").
+ */
+export const superadminReviewQuarantinedImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { itemId: string; reason: string }) =>
+    z.object({ itemId: z.string().uuid(), reason: z.string().trim().min(10).max(500) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    const admin = await getAdmin();
+    const { mintQuarantineReviewUrl } = await import("@/lib/image-quarantine.server");
+    return mintQuarantineReviewUrl(context.supabase, admin, data);
+  });
+
+/**
+ * Destroy quarantined originals whose retention has ended and that are not under legal hold (SEC-6). Dry run by default; the
+ * database refuses to delete anything still held, whatever this asks. Not scheduled.
+ */
+export const superadminSweepExpiredQuarantine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { dryRun?: boolean }) =>
+    z.object({ dryRun: z.boolean().optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    const admin = await getAdmin();
+    const { sweepExpiredQuarantine } = await import("@/lib/image-quarantine.server");
+    const dryRun = data.dryRun ?? true;
+    const result = await sweepExpiredQuarantine(admin, { dryRun });
+    if (!dryRun) {
+      await writeAudit(admin, context.userId, {
+        action: "image_quarantine_sweep",
+        targetType: "storage_objects",
+        metadata: { ...result },
+      });
+    }
+    return { dryRun, ...result };
+  });

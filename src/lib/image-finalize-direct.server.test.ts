@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally */
+import { randomBytes } from "node:crypto";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   FLAGGED_REFUSAL,
   SCAN_UNAVAILABLE_REFUSAL,
   finalizeDirectImageUpload,
 } from "./image-finalize-direct.server";
+import { IMAGE_QUARANTINE_BUCKET } from "./image-quarantine.server";
+import { ImageReencodeError } from "./image-reencode.server";
 
 const enc = new TextEncoder();
 const cat = (...p: Uint8Array[]) => {
@@ -16,17 +20,29 @@ const cat = (...p: Uint8Array[]) => {
   }
   return o;
 };
+const u8 = (b: Buffer) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 const seg = (m: number, payload: Uint8Array) =>
   cat(Uint8Array.from([0xff, m, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload);
-const jpeg = (opts: { gps?: boolean; pad?: number } = {}) =>
-  cat(
-    Uint8Array.from([0xff, 0xd8]),
-    ...(opts.gps ? [seg(0xe1, enc.encode("Exif\0\0GPS 33.7488,-84.3877"))] : []),
-    seg(0xc0, Uint8Array.from([8, 0, 80, 0, 100, 1, 1, 0x11, 0])),
-    seg(0xda, Uint8Array.from([1, 1, 0, 0, 63, 0])),
-    new Uint8Array(opts.pad ?? 3).fill(1),
-    Uint8Array.from([0xff, 0xd9]),
-  );
+const BASE = u8(
+  await sharp({ create: { width: 100, height: 80, channels: 3, background: "#cc6633" } })
+    .jpeg()
+    .toBuffer(),
+);
+const jpeg = (opts: { gps?: boolean } = {}) =>
+  opts.gps
+    ? cat(
+        BASE.subarray(0, 2),
+        seg(0xe1, enc.encode("Exif\0\0GPS 33.7488,-84.3877")),
+        BASE.subarray(2),
+      )
+    : BASE.slice();
+const NOISE_PNG = u8(
+  await sharp(randomBytes(1300 * 1200 * 3), { raw: { width: 1300, height: 1200, channels: 3 } })
+    .png()
+    .toBuffer(),
+);
+const contains = (hay: Uint8Array, needle: Uint8Array) =>
+  Buffer.from(hay.buffer, hay.byteOffset, hay.byteLength).indexOf(Buffer.from(needle)) >= 0;
 
 const USER = "11111111-1111-1111-1111-111111111111";
 const PATH = `${USER}/avatar.jpg`;
@@ -36,6 +52,8 @@ function world(initial: Record<string, Uint8Array>, moderation: Record<string, a
   const files = new Map<string, Uint8Array>(Object.entries(initial));
   const rows = new Map<string, any>(Object.entries(moderation));
   const upserts: any[] = [];
+  const items: any[] = [];
+  const log: string[] = [];
   const admin = {
     storage: {
       from: (bucket: string) => ({
@@ -47,18 +65,30 @@ function world(initial: Record<string, Uint8Array>, moderation: Record<string, a
         },
         upload: async (path: string, bytes: Uint8Array) => {
           files.set(`${bucket}|${path}`, bytes);
+          log.push(`upload ${bucket}`);
           return { data: { id: "obj" }, error: null };
         },
         remove: async (paths: string[]) => {
           for (const p of paths) files.delete(`${bucket}|${p}`);
+          log.push(`remove ${bucket}`);
           return { error: null };
         },
       }),
     },
     from: () => ({
+      insert: (row: any) => ({
+        select: () => ({
+          single: async () => {
+            items.push({ id: `item-${items.length + 1}`, ...row });
+            log.push("record quarantine item");
+            return { data: { id: `item-${items.length}` }, error: null };
+          },
+        }),
+      }),
       upsert: async (row: any) => {
         upserts.push(row);
         rows.set(`${row.bucket}|${row.path}`, row);
+        log.push(`moderation ${row.status}`);
         return { error: null };
       },
       select: () => {
@@ -74,14 +104,17 @@ function world(initial: Record<string, Uint8Array>, moderation: Record<string, a
       },
     }),
   };
-  return { files, rows, upserts, admin };
+  return { files, rows, upserts, items, log, admin };
 }
 const safe = { safe: true, label: "ok", reason: null, categories: [], scanned: true, csam: false };
 const deps = (w: ReturnType<typeof world>, verdict: any = safe) => ({
   admin: w.admin,
   scan: vi.fn().mockResolvedValue(verdict),
   objectUrl: vi.fn().mockResolvedValue("https://public/avatars/x.jpg"),
-  escalate: vi.fn().mockResolvedValue(undefined),
+  escalate: vi.fn(async () => {
+    w.log.push("escalate");
+  }),
+  reencode: undefined as any,
 });
 const input = { userId: USER, bucket: "avatars", path: PATH };
 
@@ -133,23 +166,75 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
   });
 
   it("M3: fails closed when there is no scan target (large image, no URL)", async () => {
-    const w = world({ [KEY]: jpeg({ pad: 4.5 * 1024 * 1024 }) });
+    const big = `${USER}/big.png`;
+    const w = world({ [`avatars|${big}`]: NOISE_PNG });
     const d = deps(w);
     d.objectUrl.mockResolvedValue(null);
-    await expect(finalizeDirectImageUpload(d, input)).rejects.toThrow(SCAN_UNAVAILABLE_REFUSAL);
+    await expect(finalizeDirectImageUpload(d, { ...input, path: big })).rejects.toThrow(
+      SCAN_UNAVAILABLE_REFUSAL,
+    );
     expect(d.scan).not.toHaveBeenCalled();
-    expect(w.files.has(KEY)).toBe(false);
-    expect(w.rows.get(KEY)).toEqual(expect.objectContaining({ status: "removed" }));
+    expect(w.files.has(`avatars|${big}`)).toBe(false);
+    expect(w.rows.get(`avatars|${big}`)).toEqual(expect.objectContaining({ status: "removed" }));
   });
 
-  it("quarantines and escalates an unsafe image", async () => {
-    const w = world({ [KEY]: jpeg() });
+  it("SEC-6: moves a flagged image's original to the quarantine, removes the public object, then escalates", async () => {
+    const w = world({ [KEY]: jpeg({ gps: true }) });
     const d = deps(w, { ...safe, safe: false, csam: true, categories: ["csam"] });
     const out = await finalizeDirectImageUpload(d, input);
     expect(out.quarantined).toBe(true);
+    const held = w.items[0];
+    expect(held).toMatchObject({
+      source: "legacy_direct_upload",
+      source_bucket: "avatars",
+      source_path: PATH,
+      suspected_csam: true,
+    });
+    expect(w.files.get(`${IMAGE_QUARANTINE_BUCKET}|${held.object_path}`)).toEqual(
+      jpeg({ gps: true }),
+    );
+    expect(w.files.has(KEY)).toBe(false); // no longer at a public URL
     expect(w.rows.get(KEY).status).toBe("quarantined");
-    expect(d.escalate).toHaveBeenCalledWith("avatars", PATH, ["csam"]);
+    expect(w.rows.get(KEY).scan.quarantine.path).toBe(held.object_path);
+    expect(d.escalate).toHaveBeenCalledWith(IMAGE_QUARANTINE_BUCKET, held.object_path, ["csam"]);
   });
+
+  it("SEC-6: claims the path before rewriting it, rewrites it with the re-encoded bytes, and scans exactly those", async () => {
+    const payload = enc.encode("HIDDEN-PAYLOAD-IN-THE-JPEG-TAIL-0123456789");
+    const crafted = cat(BASE.subarray(0, BASE.length - 2), payload, Uint8Array.from([0xff, 0xd9]));
+    const w = world({ [KEY]: crafted });
+    const d = deps(w);
+    await finalizeDirectImageUpload(d, input);
+    // a moderation row exists before the rewrite, so the uploader's own writes are refused from then on (20261108120000)
+    expect(w.log.slice(0, 2)).toEqual(["moderation pending", "upload avatars"]);
+    expect(w.upserts[0]).toMatchObject({ status: "pending", reason: "Processing" });
+    const stored = w.files.get(KEY)!;
+    expect(contains(stored, payload)).toBe(false);
+    const scanned = Uint8Array.from(atob((d.scan.mock.calls[0][0] as string).split(",")[1]), (c) =>
+      c.charCodeAt(0),
+    );
+    expect(Buffer.compare(Buffer.from(stored), Buffer.from(scanned))).toBe(0);
+    expect((await sharp(stored).metadata()).exif).toBeUndefined();
+  });
+
+  it.each([
+    ["unavailable", SCAN_UNAVAILABLE_REFUSAL],
+    ["animated", "Animated images"],
+    ["too_large", "resolution is too high"],
+  ] as const)(
+    "SEC-6: a re-encode failure (%s) removes the public object and refuses",
+    async (code, msg) => {
+      const w = world({ [KEY]: jpeg() });
+      const d = deps(w);
+      d.reencode = async () => {
+        throw new ImageReencodeError(code);
+      };
+      await expect(finalizeDirectImageUpload(d, input)).rejects.toThrow(msg);
+      expect(d.scan).not.toHaveBeenCalled();
+      expect(w.files.has(KEY)).toBe(false);
+      expect(w.rows.get(KEY).status).toBe("removed");
+    },
+  );
 
   it("refuses another user's path and unknown buckets", async () => {
     const w = world({});

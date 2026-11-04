@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the storage/database client is faked structurally in tests */
 import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
-import { stripStoredImage } from "@/lib/image-metadata.server";
+import { quarantineOriginal, type QuarantineRef } from "@/lib/image-quarantine.server";
+import {
+  ImageReencodeError,
+  REENCODE_MESSAGES,
+  reencodeImage,
+  type ReencodeResult,
+} from "@/lib/image-reencode.server";
 import {
   MAX_IMAGE_BYTES,
   readImageDimensions,
@@ -27,6 +33,8 @@ export type DirectFinalizeDeps = {
   /** A URL the scanner can fetch for an image too large to inline. */
   objectUrl: (bucket: string, path: string) => Promise<string | null>;
   escalate: (bucket: string, path: string, categories: string[]) => Promise<void>;
+  /** Test seam: the canonical re-encoder. */
+  reencode?: (bytes: Uint8Array) => Promise<ReencodeResult>;
 };
 
 export const FLAGGED_REFUSAL =
@@ -92,30 +100,54 @@ export async function finalizeDirectImageUpload(
     throw new Error(failure);
   }
 
-  // Remove GPS, camera, time and every other personal tag from the stored bytes before anything reads, scans, resizes or
-  // publishes them. If the file cannot be cleaned, it is removed and the upload refused: the original is never kept.
-  let metadata = { stripped: false, hadGps: false, hadExif: false, hadXmp: false };
+  // The object is public right now. Claim the path first (a moderation row makes the published-image trigger refuse any further
+  // write by the uploader, a signed upload URL included; 20261108120000), then replace the stored bytes with the canonical
+  // re-encode (src/lib/image-reencode.server.ts) before anything scans or serves them. Any failure removes the object.
+  const original = buffer;
+  await record({
+    status: "pending",
+    reason: "Processing",
+    mime: sniffed,
+    bytes,
+    width: dimensions?.width ?? null,
+    height: dimensions?.height ?? null,
+    scan: { stage: "processing" },
+  });
+  let encoded: ReencodeResult;
   try {
-    const outcome = await stripStoredImage(admin, bucket, path, buffer, sniffed as string);
-    buffer = outcome.bytes;
-    bytes = buffer.byteLength;
-    metadata = {
-      stripped: outcome.rewritten,
-      hadGps: outcome.report.hasGps,
-      hadExif: outcome.report.hasExif,
-      hadXmp: outcome.report.hasXmp,
-    };
-  } catch {
+    encoded = await (deps.reencode ?? reencodeImage)(original);
+    const { error: rewriteErr } = await admin.storage.from(bucket).upload(path, encoded.bytes, {
+      contentType: sniffed as string,
+      upsert: true,
+      cacheControl: "3600",
+    });
+    if (rewriteErr) throw new Error(rewriteErr.message);
+  } catch (e) {
+    const code = e instanceof ImageReencodeError ? e.code : "unreadable";
+    const message = code === "unavailable" ? SCAN_UNAVAILABLE_REFUSAL : REENCODE_MESSAGES[code];
     await remove();
     await record({
       status: "removed",
-      reason: "The image could not be cleaned of location data",
+      reason:
+        code === "unavailable"
+          ? "Image processing unavailable"
+          : "The image could not be re-encoded",
       mime: sniffed,
       bytes,
-      scan: { stage: "metadata" },
+      scan: { stage: "reencode", failure: code },
     });
-    throw new Error("This image could not be processed. Please try a different photo.");
+    throw new Error(message);
   }
+  buffer = encoded.bytes;
+  bytes = buffer.byteLength;
+  const published = { width: encoded.width, height: encoded.height };
+  const metadata = {
+    stripped: true,
+    reencoded: true,
+    hadGps: encoded.inputReport.hasGps,
+    hadExif: encoded.inputReport.hasExif,
+    hadXmp: encoded.inputReport.hasXmp,
+  };
 
   // Small enough to inline: keeps private-bucket scans off signed URLs.
   let scanTarget: string | null = null;
@@ -156,26 +188,61 @@ export async function finalizeDirectImageUpload(
     ? (verdict.reason ?? `Flagged by automated scan (${verdict.label})`)
     : null;
 
+  // A flagged picture never stays at a public URL: the original goes to the restricted quarantine, and the public object is
+  // removed once that copy exists. If the copy fails, the object stays (hidden app-wide by its quarantined status) and is
+  // escalated where it is.
+  let held: QuarantineRef | null = null;
+  if (quarantined) {
+    try {
+      held = await quarantineOriginal(admin, {
+        source: "legacy_direct_upload",
+        sourceBucket: bucket,
+        sourcePath: path,
+        uploaderId: userId,
+        bytes: original,
+        mime: sniffed as string,
+        categories: verdict.categories,
+        suspectedCsam: verdict.csam,
+        reason,
+      });
+    } catch {
+      held = null;
+    }
+  }
+
   const { error: upErr } = await record({
     status: quarantined ? "quarantined" : "pending",
     reason,
     mime: sniffed,
     bytes,
-    width: dimensions?.width ?? null,
-    height: dimensions?.height ?? null,
+    width: published.width,
+    height: published.height,
     quarantined_at: quarantined ? new Date().toISOString() : null,
-    scan: { ...verdict, metadata },
+    scan: {
+      ...verdict,
+      metadata,
+      ...(quarantined
+        ? {
+            quarantine: held
+              ? { bucket: held.bucket, path: held.path, item_id: held.itemId }
+              : { failed: true },
+          }
+        : {}),
+    },
   });
   if (upErr) throw new Error(upErr.message);
 
-  if (verdict.csam) await escalate(bucket, path, verdict.categories);
+  if (verdict.csam) {
+    await escalate(held?.bucket ?? bucket, held?.path ?? path, verdict.categories);
+  }
+  if (held) await remove();
 
   return {
     ok: true as const,
     quarantined,
     reason,
-    width: dimensions?.width ?? null,
-    height: dimensions?.height ?? null,
+    width: published.width,
+    height: published.height,
     bytes,
     mime: sniffed,
     metadataStripped: metadata.stripped,
