@@ -30,6 +30,36 @@ function pseudoCoord(id: string, salt: number): number {
 
 export type MapItemLike = { id: string };
 
+type GameForPin = {
+  id: string;
+  sport: string;
+  lat?: number | null;
+  lng?: number | null;
+  urgent?: boolean;
+  locationPrecision?: "exact" | "approximate";
+};
+
+/**
+ * Pins for games. A game the viewer is not entitled to the exact venue of (youth-inclusive, not on the roster) is
+ * marked approximate so the map draws an area, not a precise spot. Games whose venue was never geocoded have no
+ * coordinates and are skipped rather than dropped at a placeholder.
+ */
+export function mapPinsFromGames(
+  games: GameForPin[],
+  emojiBySport: Record<string, string>,
+): MapPinItem[] {
+  return games
+    .filter((g) => typeof g.lat === "number" && typeof g.lng === "number")
+    .map((g) => ({
+      id: g.id,
+      emoji: emojiBySport[g.sport] ?? "📍",
+      lat: g.lat as number,
+      lng: g.lng as number,
+      urgent: g.urgent,
+      approximate: g.locationPrecision === "approximate",
+    }));
+}
+
 /**
  * Generic map surface. Feed uses it for games (default behavior when no
  * props are supplied). Players and Teams pages pass their own pins + card.
@@ -67,24 +97,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   const pins: MapPinItem[] = useMemo(() => {
     if (props?.pins) return props.pins;
     // No explicit pins: derive them from the (already filtered/sorted) items.
-    const games = items as unknown as Array<{
-      id: string;
-      sport: string;
-      lat?: number | null;
-      lng?: number | null;
-      urgent?: boolean;
-    }>;
-    // Games whose venue was never geocoded have no coordinates — skip them
-    // instead of dropping a pin at a placeholder location.
-    return games
-      .filter((g) => typeof g.lat === "number" && typeof g.lng === "number")
-      .map((g) => ({
-        id: g.id,
-        emoji: emojiBySport[g.sport] ?? "📍",
-        lat: g.lat as number,
-        lng: g.lng as number,
-        urgent: g.urgent,
-      }));
+    return mapPinsFromGames(items as unknown as GameForPin[], emojiBySport);
   }, [props?.pins, items]);
 
   const [active, setActive] = useState<string>(items[0]?.id ?? "");

@@ -54,7 +54,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const myRange = useMySkillRange(game.sport);
   const fit = myRange ? levelFit(game.sport, game.skill, myRange) : "open";
   const [opening, setOpening] = useState(false);
-  const hostUserId = (game as { hostUserId?: string }).hostUserId;
+  // A youth host is shown only as the organizer: no profile link and no direct message button.
+  const hostUserId = game.hostNeutral ? undefined : (game as { hostUserId?: string }).hostUserId;
   // A game hosted as a team or an official gym event is hosted by that profile; its organizer stays the contact.
   const hostTeam = useGameHost(game);
   const liveStatus = useLiveStatus(game);
@@ -277,7 +278,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 </button>
               ) : (
                 <UserAvatarById
-                  userId={game.hostUserId}
+                  userId={game.hostNeutral ? undefined : game.hostUserId}
                   initials={game.host.avatar}
                   name={game.host.name}
                   size="xs"

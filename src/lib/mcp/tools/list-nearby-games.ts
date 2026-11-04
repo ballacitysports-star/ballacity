@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { shapeGameForApi } from "@/lib/mcp/game-output";
 
 function supabaseForUser(ctx: ToolContext) {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
@@ -36,7 +37,7 @@ export default defineTool({
     let query = supabaseForUser(ctx)
       .from("hosted_games")
       .select(
-        "id,title,sport,date,duration,location,neighborhood,skill,price,joined,max_players,host_id",
+        "id,title,sport,date,duration,location,neighborhood,skill,price,joined,max_players,host_id,min_age,max_age",
       )
       .gte("date", today)
       .order("date", { ascending: true })
@@ -46,9 +47,11 @@ export default defineTool({
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
+    const viewerId = ctx.getUserId() ?? null;
+    const games = (data ?? []).map((g) => shapeGameForApi(g, viewerId));
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
-      structuredContent: { games: data ?? [] },
+      content: [{ type: "text", text: JSON.stringify(games) }],
+      structuredContent: { games },
     };
   },
 });

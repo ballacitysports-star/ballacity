@@ -7,8 +7,6 @@ import type { ComponentProps } from "react";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicGamePreview } from "@/components/games/PublicGamePreview";
 import { emailLocalPart } from "@/lib/managed-children";
-import { Navigation } from "lucide-react";
-import { OpenInMaps } from "@/components/OpenInMaps";
 import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
@@ -158,6 +156,7 @@ import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
 import { GameDistance } from "@/components/GameDistance";
+import { GameLocationCard } from "@/components/games/GameLocationCard";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
 import { ShareSheet } from "@/components/ShareSheet";
@@ -916,13 +915,13 @@ function GameDetail() {
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
   const hostRequiresApproval = settings ? !!settings.requires_approval : true;
-  // An age requirement forces the request-to-join flow for anyone outside the
-  // range (or who hasn't shared a birthday), even on instant-join games.
+  // An age requirement is strict: anyone outside the range (or who hasn't shared
+  // a birthday) cannot join or request a spot, and no host approval overrides it.
   const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
   const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
-  const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
-  const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
-  const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
+  const ageBlocked = !isHost && (ageGate === "ineligible" || ageGate === "unknown_age");
+  const requiresApproval = hostRequiresApproval;
+  const ageNotice = ageBlocked ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
@@ -1086,6 +1085,10 @@ function GameDetail() {
         setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
       }
+      return;
+    }
+    if (ageBlocked) {
+      toast.error(ageNotice ?? "This game isn't open to your age.");
       return;
     }
     // Signup window: started games, host-closed games and the host's blackout
@@ -1976,9 +1979,13 @@ function GameDetail() {
               timezone: game.timezone ?? null,
               location: [game.location, game.neighborhood].filter(Boolean).join(", "),
               description: game.description ?? undefined,
-              mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                [game.location, game.neighborhood].filter(Boolean).join(", "),
-              )}`,
+              // No map link for an approximate location: it would point at the coarse area, not the venue.
+              mapUrl:
+                game.locationPrecision === "approximate"
+                  ? undefined
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      [game.location, game.neighborhood].filter(Boolean).join(", "),
+                    )}`,
               url: typeof window !== "undefined" ? window.location.href : undefined,
               uid: `game-${game.id}@ballacity`,
             }}
@@ -1987,54 +1994,15 @@ function GameDetail() {
 
         {viewerCountsAsJoined && <GameReminderCard gameId={game.id} />}
 
-        {/* Location card */}
-        <div className="rounded-3xl border border-border bg-surface overflow-hidden">
-          <div
-            className="h-32 relative"
-            style={{
-              background:
-                "radial-gradient(50% 60% at 50% 50%, oklch(0.30 0.08 145 / 0.5), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
-            }}
-          >
-            <svg className="absolute inset-0 h-full w-full opacity-30" aria-hidden>
-              <defs>
-                <pattern id="g2" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path
-                    d="M 32 0 L 0 0 0 32"
-                    fill="none"
-                    stroke="oklch(1 0 0 / 0.1)"
-                    strokeWidth="1"
-                  />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#g2)" />
-            </svg>
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-lime text-primary-foreground glow-lime">
-              <MapPin className="h-5 w-5" />
-            </div>
-          </div>
-          <OpenInMaps address={[game.location, game.neighborhood].filter(Boolean).join(", ")}>
-            <div className="flex items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold underline-offset-2 hover:underline">
-                  {game.location}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}
-                </div>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-semibold text-lime">
-                <Navigation className="h-3.5 w-3.5" /> Directions
-              </span>
-            </div>
-          </OpenInMaps>
+        {/* Location card: exact only for people the database released it to */}
+        <GameLocationCard game={game} signedIn={!!user}>
           <VenueHostedAt orgId={game.orgId} />
-        </div>
+        </GameLocationCard>
 
         {/* Host */}
         <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
           {(() => {
-            const hostId = settings?.host_id ?? game.hostUserId;
+            const hostId = game.hostNeutral ? undefined : (settings?.host_id ?? game.hostUserId);
             const NameTag: any = hostId ? Link : "span";
             const nameProps = hostId
               ? {
@@ -2104,13 +2072,17 @@ function GameDetail() {
                   </div>
                   <div className="font-semibold">
                     <NameTag {...nameProps}>{game.host.name}</NameTag>{" "}
-                    <span className="text-muted-foreground font-normal text-sm">
-                      {game.host.username}
-                    </span>
+                    {game.host.username ? (
+                      <span className="text-muted-foreground font-normal text-sm">
+                        {game.host.username}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="text-xs text-lime font-semibold">
-                    ★ {game.host.rating} host rating
-                  </div>
+                  {game.host.rating ? (
+                    <div className="text-xs text-lime font-semibold">
+                      ★ {game.host.rating} host rating
+                    </div>
+                  ) : null}
                 </div>
               </>
             );
@@ -3243,19 +3215,22 @@ function GameDetail() {
                 // join; leaving/withdrawing a join made before consent was
                 // revoked stays available.
                 const consentBlocksNewJoin = !alreadyInFlow && !participationDecision.allowed;
+                const ageBlocksNewJoin = !alreadyInFlow && ageBlocked;
                 const canJoinAction = alreadyInFlow || spotsLeft > 0;
                 const waitlistCta =
                   spotsLeft <= 0 &&
                   !alreadyInFlow &&
                   !lockedForNewJoin &&
                   !consentBlocksNewJoin &&
+                  !ageBlocksNewJoin &&
                   viewerGate.waitlistOpen;
                 const buttonDisabled =
                   requesting ||
                   processing ||
                   (!canJoinAction && !waitlistCta) ||
                   lockedForNewJoin ||
-                  consentBlocksNewJoin;
+                  consentBlocksNewJoin ||
+                  ageBlocksNewJoin;
                 const hasPaymentAttempt =
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
@@ -3339,6 +3314,10 @@ function GameDetail() {
                         );
                         return;
                       }
+                      if (ageBlocksNewJoin) {
+                        toast.error(ageNotice ?? "This game isn't open to your age.");
+                        return;
+                      }
                       if (waitlistCta) {
                         document
                           .getElementById("waitlist")
@@ -3373,7 +3352,10 @@ function GameDetail() {
                           ? "bg-surface border border-coral/40 text-coral"
                           : joined
                             ? "bg-surface border border-lime/40 text-lime"
-                            : lockedForNewJoin || spotsLeft <= 0 || consentBlocksNewJoin
+                            : lockedForNewJoin ||
+                                spotsLeft <= 0 ||
+                                consentBlocksNewJoin ||
+                                ageBlocksNewJoin
                               ? "bg-surface border border-border text-muted-foreground"
                               : "bg-lime-gradient text-primary-foreground glow-lime"
                     }`}
@@ -3396,6 +3378,10 @@ function GameDetail() {
                     ) : consentBlocksNewJoin ? (
                       <>
                         <Lock className="h-4 w-4" /> Parent approval needed
+                      </>
+                    ) : ageBlocksNewJoin ? (
+                      <>
+                        <Lock className="h-4 w-4" /> Not open to your age
                       </>
                     ) : lockedForNewJoin ? (
                       <>
