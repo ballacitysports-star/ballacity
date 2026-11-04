@@ -633,7 +633,7 @@
       "version": "20261106120000",
       "source": "supabase",
       "path": "supabase/migrations/20261106120000_private_image_staging.sql",
-      "sha256": "509af4bb22647e92651e427a497e0bf21cb9bc52aa7d9c3d00ba1736b94ebed1",
+      "sha256": "fb29a6167ba833f8519c16f6b7ea5f64b0c1d2865fafc12b691a949020021695",
       "requires": {
         "functions": [],
         "tables": [],
@@ -641,7 +641,11 @@
         "migrations": []
       },
       "provides": {
-        "functions": [],
+        "functions": [
+          "private_sec.image_staging_flagged(text)",
+          "private_sec.image_staging_refuse_overwrite()",
+          "private_sec.storage_write_is_trusted(uuid,text)"
+        ],
         "tables": [],
         "schemas": []
       }
@@ -651,9 +655,11 @@
       "version": "20261106120500",
       "source": "supabase",
       "path": "supabase/migrations/20261106120500_attachment_check_binding.sql",
-      "sha256": "a512ad5f22eec043bf75f22d45861d5da3b45e4b0ef0842437037dde54872d44",
+      "sha256": "b4a04e39c49fe3ad479a77ed19a7b4f01becdb14aa27c69e9abc4490e40a9745",
       "requires": {
-        "functions": [],
+        "functions": [
+          "private_sec.storage_write_is_trusted(uuid,text)"
+        ],
         "tables": [
           "public.message_attachment_checks",
           "storage.objects"
@@ -665,7 +671,9 @@
       },
       "provides": {
         "functions": [
-          "private_sec.message_attachment_path_checked(text)"
+          "private_sec.message_attachment_in_live_message(text)",
+          "private_sec.message_attachment_path_checked(text)",
+          "private_sec.message_attachment_refuse_rewrite()"
         ],
         "tables": [],
         "schemas": []
@@ -719,11 +727,12 @@
       "version": "20261106140000",
       "source": "supabase",
       "path": "supabase/migrations/20261106140000_minor_messaging_authorization.sql",
-      "sha256": "0e56748ae6d7504a32f981fc52463b5dff6a5f955ac3aee582e52faddabd46f7",
+      "sha256": "215916e7867e60982200ec814b51962212a6ca8a3b27d7999946493a17dd6b7a",
       "requires": {
         "functions": [
           "private_sec.availability_post_visible(uuid)",
           "private_sec.can_see_minor_name(uuid,uuid)",
+          "private_sec.wrap_oracle_helpers()",
           "public.can_notify(uuid,uuid)",
           "public.guard_contact_request_minor_recipient()",
           "public.minor_messaging_block(uuid,uuid)"
@@ -758,7 +767,7 @@
       "version": "20261107100000",
       "source": "supabase",
       "path": "supabase/migrations/20261107100000_stack_hardening_from_review.sql",
-      "sha256": "9951b86a328830d2cc774c351c393951968461c84da0f1f1fb1fabd31a7bbde9",
+      "sha256": "662989465cb41a8dd70031c77f59c341e03a85fed21cee51044c55e04e642926",
       "requires": {
         "functions": [
           "private_sec.can_see_minor_name(uuid,uuid)",
@@ -787,7 +796,7 @@
           "private_sec.minor_host_public_snapshot(text,uuid,text,uuid,uuid)",
           "private_sec.minor_org_display_ok(text,uuid,uuid,uuid,boolean)",
           "private_sec.minor_team_display_ok(uuid,text)",
-          "private_sec.neutralize_minor_host_games(uuid,integer,boolean)",
+          "private_sec.neutralize_minor_host_games(uuid,integer,boolean,text)",
           "private_sec.text_array_is_blank(text[])",
           "public.check_minor_host_organizer_display()",
           "public.clear_team_post_venue(uuid,text[])",
@@ -796,7 +805,7 @@
           "public.guard_youth_switch_tamper()",
           "public.moderator_confirm_location_hold(text,text)",
           "public.moderator_restore_game_text(text,text)",
-          "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean)"
+          "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean,text)"
         ],
         "tables": [
           "public.location_report_evidence"
@@ -809,7 +818,7 @@
       "version": "20261107110000",
       "source": "supabase",
       "path": "supabase/migrations/20261107110000_payment_path_fixes.sql",
-      "sha256": "00ec647ab5ba6f412e26186fd577ae8db3c3c9bb266c32e178d86c032db679c7",
+      "sha256": "b72234c6d57baf4073e8249c8bed2afef5eeafdb4f8af5d192a8803b4a2a5b79",
       "requires": {
         "functions": [
           "private_sec.can_manage_game_payment_settings(text)",
@@ -897,7 +906,7 @@
         "expect_after": "9bb6954806b65f834f2280fdfe4d556c",
         "defined_by": [
           "20261103150000",
-          "20261107100000",
+          "20261106140000",
           "20261107110000"
         ]
       },
@@ -1004,7 +1013,7 @@
       },
       {
         "signature": "private_sec.game_settings_holder(text)",
-        "expect_after": "b145312cb7da65b4ae6f8e670498c3fb",
+        "expect_after": "2f8d1318b24ec4d52b4f9a945ccd0e61",
         "defined_by": [
           "20261107110000"
         ]
@@ -1031,6 +1040,20 @@
         ]
       },
       {
+        "signature": "private_sec.image_staging_flagged(text)",
+        "expect_after": "97ab23362bf38e6f10c33cb4a28293aa",
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
+        "signature": "private_sec.image_staging_refuse_overwrite()",
+        "expect_after": "5b921a77b784321d0e0e6d62cb443ada",
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
         "signature": "private_sec.insight_is_publishable(text,text)",
         "expect_after": "52db615a82a090c65400bb3e85aa82b6",
         "defined_by": [
@@ -1046,7 +1069,7 @@
       },
       {
         "signature": "private_sec.is_game_host_without_payee(text)",
-        "expect_after": "033ada8298cbf996385e8c8238f28e7f",
+        "expect_after": "e8e670ed2295cb4226f1467420793165",
         "defined_by": [
           "20261107110000"
         ]
@@ -1157,8 +1180,22 @@
         ]
       },
       {
+        "signature": "private_sec.message_attachment_in_live_message(text)",
+        "expect_after": "e94214f63b3db09f792f8ab73c7317b0",
+        "defined_by": [
+          "20261106120500"
+        ]
+      },
+      {
         "signature": "private_sec.message_attachment_path_checked(text)",
         "expect_after": "5ca7e6fac733727d4991471c9aac7fc0",
+        "defined_by": [
+          "20261106120500"
+        ]
+      },
+      {
+        "signature": "private_sec.message_attachment_refuse_rewrite()",
+        "expect_after": "2a2cdbba4cf5167411af00fed3a9dc2c",
         "defined_by": [
           "20261106120500"
         ]
@@ -1225,7 +1262,7 @@
         "expect_after": "dd12144b1b5a12b540b63518170264ec",
         "defined_by": [
           "20261103150000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -1243,8 +1280,8 @@
         ]
       },
       {
-        "signature": "private_sec.neutralize_minor_host_games(uuid,integer,boolean)",
-        "expect_after": "d605e4e6aa880f208534cd778d7852e5",
+        "signature": "private_sec.neutralize_minor_host_games(uuid,integer,boolean,text)",
+        "expect_after": "814c6c8aafe8506b4fcda1be3e27f8ac",
         "defined_by": [
           "20261107100000"
         ]
@@ -1346,6 +1383,13 @@
         "expect_after": "58bd86bcae535c7616eb2fc3e1926f16",
         "defined_by": [
           "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.storage_write_is_trusted(uuid,text)",
+        "expect_after": "8c05dd6136601f305ecc1a68d4ad41b0",
+        "defined_by": [
+          "20261106120000"
         ]
       },
       {
@@ -1467,7 +1511,6 @@
         "defined_by": [
           "20261103150000",
           "20261106140000",
-          "20261107100000",
           "20261107110000"
         ]
       },
@@ -1526,6 +1569,13 @@
         "expect_after": "01691031069a874a1ad9e134dc0bb54d",
         "defined_by": [
           "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.create_direct_conversation(uuid,text)",
+        "expect_after": "3fab2f45bd106d9eb92ac4b3c07d9c79",
+        "defined_by": [
+          "20261106140000"
         ]
       },
       {
@@ -1711,7 +1761,7 @@
       },
       {
         "signature": "public.guard_contact_request_minor_recipient()",
-        "expect_after": "33ec774443357f49c961d247d6269400",
+        "expect_after": "edfca1041aeff4686da819e73159714f",
         "defined_by": [
           "20261106100000",
           "20261106140000"
@@ -1839,7 +1889,7 @@
       },
       {
         "signature": "public.handle_location_disclosure_report()",
-        "expect_after": "c56fcba3239347088f01f9ad4f39b8ca",
+        "expect_after": "ba1feb22107dd36aa2b03d5f43ee0c5f",
         "defined_by": [
           "20261105130000",
           "20261107100000"
@@ -1864,6 +1914,13 @@
         "expect_after": "5e7c94e22cb6ba69a769142c0f68b07d",
         "defined_by": [
           "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.host_cancel_game(text,text)",
+        "expect_after": "7491066a451688319d7607647308089c",
+        "defined_by": [
+          "20261106140000"
         ]
       },
       {
@@ -2001,7 +2058,7 @@
       },
       {
         "signature": "public.messages_require_checked_attachment()",
-        "expect_after": "b995da03e862d349973159774a217495",
+        "expect_after": "e84dc11b7ff39296215daea898ddf00d",
         "defined_by": [
           "20261106120500"
         ]
@@ -2025,8 +2082,7 @@
         "expect_after": "7e0918b5cd9212f7d55c5b4f10006b30",
         "defined_by": [
           "20261103150000",
-          "20261106140000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -2095,8 +2151,8 @@
         ]
       },
       {
-        "signature": "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean)",
-        "expect_after": "bb971bd884b14568a92de2ded5f85b00",
+        "signature": "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean,text)",
+        "expect_after": "86cf32239c58699669fc41ae8981cf7f",
         "defined_by": [
           "20261107100000"
         ]
@@ -2162,7 +2218,7 @@
       },
       {
         "signature": "public.reclamp_privacy_on_cohort_change()",
-        "expect_after": "b74b196862bbaa0c9d57e29e13092d07",
+        "expect_after": "796eabc7abf13cfea571eb39916a23ea",
         "defined_by": [
           "20261107100000"
         ]
@@ -2496,8 +2552,7 @@
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106140000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -2589,7 +2644,7 @@
         },
         "defined_by": [
           "20261106130000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -2734,8 +2789,7 @@
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106140000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -3074,7 +3128,7 @@
         },
         "defined_by": [
           "20261104110000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -3101,7 +3155,7 @@
         },
         "defined_by": [
           "20261106130000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -3298,7 +3352,7 @@
         },
         "defined_by": [
           "20261106100000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -3547,8 +3601,7 @@
         },
         "defined_by": [
           "20261103150000",
-          "20261106140000",
-          "20261107100000"
+          "20261106140000"
         ]
       },
       {
@@ -4050,7 +4103,7 @@
         "table": "objects",
         "policy": "image_staging_select_own_folder",
         "expect_after": {
-          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "qual": "df49226bccdd0fd7d7a7eb5529e041be",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
@@ -4066,6 +4119,19 @@
           "qual": null,
           "with_check": "3f43f41bef06c75be90084b7555d90ab",
           "shape": "963710155ea3a4ff039feaea7c626c47"
+        },
+        "defined_by": [
+          "20261106120500"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "msg_attach_delete_sender",
+        "expect_after": {
+          "qual": "85078e8cfbb0b68314a738d209ad6ca3",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
         },
         "defined_by": [
           "20261106120500"
