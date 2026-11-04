@@ -35,8 +35,7 @@ no row data), run with `search_path = ''` exactly as the preflight reads a targe
 - **Never** replace expected hashes with production or test hashes wholesale. The reviewed options are:
   1. Comment-stripped functions: record them as `known_equivalent_drift` entries (production md5 + the evidence above),
      approved by the owner, or re-apply the repository definitions in production through a separately approved migration.
-  2. `review_helpfuls`: confirm whether the replay's duplicate trigger exists only in the replay (two migrations creating
-     the same trigger under two names) and fix the repository, or record the production state as known.
+  2. `review_helpfuls`: production already equals the state after release migration `20261103100000_single_review_helpfuls_trigger.sql` (its header documents that the duplicate `bump_helpful_count_trg` was removed by hand in production). It is not in the manifest's `drift_captures` list, so the preflight flags it; the reviewed fix is to add `20261103100000` to `drift_captures` with that evidence.
   3. `sandbox_exec`: confirm with the hosting platform what this role is and who holds its credentials. If it is the
      platform's query role, model it as a known platform grant in the preflight (a named, reviewed exception), not as an
      ignored difference.
