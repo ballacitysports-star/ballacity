@@ -230,6 +230,56 @@
     },
     {
       "order": 10,
+      "version": "20261103150000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261103150000_helper_oracle_containment.sql",
+      "sha256": "cfad8daa58dd87b639d1474d002a0e53674c16ecdc834ad8a6727d719c939e1a",
+      "requires": {
+        "functions": [],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.age_verified(uuid)",
+          "private_sec.ai_analysis_allowed(uuid)",
+          "private_sec.blocks_exist_between(uuid,uuid)",
+          "private_sec.can_notify(uuid,uuid)",
+          "private_sec.child_game_participation_allowed(uuid)",
+          "private_sec.default_profile_visibility_for(uuid)",
+          "private_sec.game_payments_allowed(uuid)",
+          "private_sec.has_entitlement(uuid,text,text)",
+          "private_sec.has_role(uuid,public.app_role)",
+          "private_sec.is_conversation_participant(uuid,uuid)",
+          "private_sec.is_game_participant(text,uuid)",
+          "private_sec.is_guardian_of(uuid,uuid)",
+          "private_sec.is_gym_admin_text(text,uuid)",
+          "private_sec.is_managed_account(uuid)",
+          "private_sec.is_minor(uuid)",
+          "private_sec.is_moderator(uuid)",
+          "private_sec.is_org_member(uuid,uuid)",
+          "private_sec.is_superadmin(uuid)",
+          "private_sec.is_team_manager(text,uuid)",
+          "private_sec.is_team_member(text,uuid)",
+          "private_sec.is_trainer_org_admin(uuid,uuid)",
+          "private_sec.is_trainer_org_member(uuid,uuid)",
+          "private_sec.minor_messaging_allowed(uuid,uuid)",
+          "private_sec.minor_messaging_block(uuid,uuid)",
+          "private_sec.minor_messaging_block_reason(uuid,uuid)",
+          "private_sec.platform_status(uuid)",
+          "private_sec.rpc_probe_denied(text,uuid[],name)",
+          "private_sec.shares_team(uuid,uuid)",
+          "private_sec.team_role_of(text,uuid)",
+          "private_sec.trainer_profile_owned_by(text,uuid)",
+          "private_sec.wrap_oracle_helpers()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 11,
       "version": "20261104100000",
       "source": "supabase",
       "path": "supabase/migrations/20261104100000_youth_game_private_location.sql",
@@ -264,7 +314,7 @@
       }
     },
     {
-      "order": 11,
+      "order": 12,
       "version": "20261104110000",
       "source": "supabase",
       "path": "supabase/migrations/20261104110000_game_age_and_minor_hosting.sql",
@@ -295,7 +345,7 @@
       }
     },
     {
-      "order": 12,
+      "order": 13,
       "version": "20261104120000",
       "source": "supabase",
       "path": "supabase/migrations/20261104120000_minor_host_payments_and_identity.sql",
@@ -326,7 +376,7 @@
       }
     },
     {
-      "order": 13,
+      "order": 14,
       "version": "20261104130000",
       "source": "supabase",
       "path": "supabase/migrations/20261104130000_location_text_detector.sql",
@@ -347,7 +397,7 @@
       }
     },
     {
-      "order": 14,
+      "order": 15,
       "version": "20261104140000",
       "source": "supabase",
       "path": "supabase/migrations/20261104140000_youth_game_public_text_guard.sql",
@@ -373,7 +423,7 @@
       }
     },
     {
-      "order": 15,
+      "order": 16,
       "version": "20261104150000",
       "source": "supabase",
       "path": "supabase/migrations/20261104150000_contact_request_coarse_location.sql",
@@ -397,7 +447,7 @@
       }
     },
     {
-      "order": 16,
+      "order": 17,
       "version": "20261105100000",
       "source": "supabase",
       "path": "supabase/migrations/20261105100000_team_post_location_privacy.sql",
@@ -431,7 +481,7 @@
       }
     },
     {
-      "order": 17,
+      "order": 18,
       "version": "20261105110000",
       "source": "supabase",
       "path": "supabase/migrations/20261105110000_team_facility_privacy.sql",
@@ -463,7 +513,7 @@
       }
     },
     {
-      "order": 18,
+      "order": 19,
       "version": "20261105130000",
       "source": "supabase",
       "path": "supabase/migrations/20261105130000_location_disclosure_reports.sql",
@@ -493,7 +543,7 @@
       }
     },
     {
-      "order": 19,
+      "order": 20,
       "version": "20261105140000",
       "source": "supabase",
       "path": "supabase/migrations/20261105140000_minor_host_identity.sql",
@@ -520,7 +570,7 @@
       }
     },
     {
-      "order": 20,
+      "order": 21,
       "version": "20261106100000",
       "source": "supabase",
       "path": "supabase/migrations/20261106100000_minor_availability_privacy.sql",
@@ -552,7 +602,7 @@
       }
     },
     {
-      "order": 21,
+      "order": 22,
       "version": "20261106110000",
       "source": "supabase",
       "path": "supabase/migrations/20261106110000_minor_host_correlation.sql",
@@ -579,11 +629,11 @@
       }
     },
     {
-      "order": 22,
+      "order": 23,
       "version": "20261106120000",
       "source": "supabase",
       "path": "supabase/migrations/20261106120000_private_image_staging.sql",
-      "sha256": "4b02efa0ddfde04026afa17d14bfd4e2de0e82829816e3183f10d177fe0a3120",
+      "sha256": "509af4bb22647e92651e427a497e0bf21cb9bc52aa7d9c3d00ba1736b94ebed1",
       "requires": {
         "functions": [],
         "tables": [],
@@ -597,7 +647,32 @@
       }
     },
     {
-      "order": 23,
+      "order": 24,
+      "version": "20261106120500",
+      "source": "supabase",
+      "path": "supabase/migrations/20261106120500_attachment_check_binding.sql",
+      "sha256": "a512ad5f22eec043bf75f22d45861d5da3b45e4b0ef0842437037dde54872d44",
+      "requires": {
+        "functions": [],
+        "tables": [
+          "public.message_attachment_checks",
+          "storage.objects"
+        ],
+        "schemas": [
+          "private_sec"
+        ],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.message_attachment_path_checked(text)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 25,
       "version": "20261106130000",
       "source": "supabase",
       "path": "supabase/migrations/20261106130000_team_content_reports.sql",
@@ -640,11 +715,11 @@
       }
     },
     {
-      "order": 24,
+      "order": 26,
       "version": "20261106140000",
       "source": "supabase",
       "path": "supabase/migrations/20261106140000_minor_messaging_authorization.sql",
-      "sha256": "70bcc1c5cb70f4798b67c3f29cff599f01b0282124459d59607137da293bbce3",
+      "sha256": "0e56748ae6d7504a32f981fc52463b5dff6a5f955ac3aee582e52faddabd46f7",
       "requires": {
         "functions": [
           "private_sec.availability_post_visible(uuid)",
@@ -662,11 +737,97 @@
           "private_sec.has_guardian_link(uuid)",
           "private_sec.messaging_connection(uuid,uuid)",
           "private_sec.messaging_controls_block(uuid,uuid)",
+          "private_sec.team_membership_authorizes(text,uuid)",
+          "public.clear_join_request_guardian_approval_on_insert()",
           "public.enforce_minor_messaging_reaction()",
           "public.gate_contact_request_for_guardian()",
           "public.guardian_decide_contact_request(uuid,boolean)",
+          "public.guardian_decide_link_request(uuid,boolean)",
           "public.notify_guardians_of_contact_request()",
-          "public.protect_contact_request_approval()"
+          "public.protect_contact_request_approval()",
+          "public.protect_join_request_guardian_approval()"
+        ],
+        "tables": [
+          "public.guardian_link_requests"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 27,
+      "version": "20261107100000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261107100000_stack_hardening_from_review.sql",
+      "sha256": "9951b86a328830d2cc774c351c393951968461c84da0f1f1fb1fabd31a7bbde9",
+      "requires": {
+        "functions": [
+          "private_sec.can_see_minor_name(uuid,uuid)",
+          "private_sec.minor_has_active_youth_game(uuid)",
+          "private_sec.tell_host_location_removed(uuid,text)",
+          "private_sec.wrap_oracle_helpers()",
+          "public.coarsen_existing_youth_games(integer)",
+          "public.guard_youth_location_switch()",
+          "public.minor_messaging_block(uuid,uuid)",
+          "public.moderator_scrub_game_text(text,text)",
+          "public.moderator_scrub_team_post_text(uuid,text)",
+          "public.set_listing_hidden(text,text,boolean)",
+          "public.sync_hosted_game_private()"
+        ],
+        "tables": [
+          "public.minor_hosting_approvals",
+          "public.team_post_private"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.capture_and_scrub_game_text(text,boolean)",
+          "private_sec.jsonb_array_is_blank(jsonb)",
+          "private_sec.minor_host_public_snapshot(text,uuid,text,uuid,uuid)",
+          "private_sec.minor_org_display_ok(text,uuid,uuid,uuid,boolean)",
+          "private_sec.minor_team_display_ok(uuid,text)",
+          "private_sec.neutralize_minor_host_games(uuid,integer,boolean)",
+          "private_sec.text_array_is_blank(text[])",
+          "public.check_minor_host_organizer_display()",
+          "public.clear_team_post_venue(uuid,text[])",
+          "public.guard_location_hold_report_closure()",
+          "public.guard_profile_created_at()",
+          "public.guard_youth_switch_tamper()",
+          "public.moderator_confirm_location_hold(text,text)",
+          "public.moderator_restore_game_text(text,text)",
+          "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean)"
+        ],
+        "tables": [
+          "public.location_report_evidence"
+        ],
+        "schemas": []
+      }
+    },
+    {
+      "order": 28,
+      "version": "20261107110000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261107110000_payment_path_fixes.sql",
+      "sha256": "00ec647ab5ba6f412e26186fd577ae8db3c3c9bb266c32e178d86c032db679c7",
+      "requires": {
+        "functions": [
+          "private_sec.can_manage_game_payment_settings(text)",
+          "private_sec.game_payee(text)",
+          "private_sec.messaging_connection(uuid,uuid)",
+          "private_sec.wrap_oracle_helpers()"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.caller_is_adult()",
+          "private_sec.game_settings_holder(text)",
+          "private_sec.is_game_host(text)",
+          "private_sec.is_game_host_without_payee(text)",
+          "private_sec.payer_to_payee(uuid,uuid)"
         ],
         "tables": [],
         "schemas": []
@@ -675,6 +836,20 @@
   ],
   "protections": {
     "functions": [
+      {
+        "signature": "private_sec.age_verified(uuid)",
+        "expect_after": "b0d98cfa1d930ab9f086221ed898a402",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.ai_analysis_allowed(uuid)",
+        "expect_after": "d67930b98e7c4350055461bba32b2c7b",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
       {
         "signature": "private_sec.apply_content_hold()",
         "expect_after": "7c69e685e987ada374a1dbb1d2f32a71",
@@ -697,6 +872,20 @@
         ]
       },
       {
+        "signature": "private_sec.blocks_exist_between(uuid,uuid)",
+        "expect_after": "fc478255d60d1e16e45acfa0a78ef60d",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.caller_is_adult()",
+        "expect_after": "228b6cf3aaeff08f0b0883ec17d1a4fb",
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
         "signature": "private_sec.can_manage_game_payment_settings(text)",
         "expect_after": "5a61f1454e986888987775c3a5f5e9f1",
         "defined_by": [
@@ -704,10 +893,20 @@
         ]
       },
       {
-        "signature": "private_sec.can_read_game_payment_settings(text,uuid)",
-        "expect_after": "146c08b9c2a10ee4004ffefdc9924cca",
+        "signature": "private_sec.can_notify(uuid,uuid)",
+        "expect_after": "9bb6954806b65f834f2280fdfe4d556c",
         "defined_by": [
-          "20261103140000"
+          "20261103150000",
+          "20261107100000",
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "private_sec.can_read_game_payment_settings(text,uuid)",
+        "expect_after": "df9ba2743354d74678d40a73f8169e44",
+        "defined_by": [
+          "20261103140000",
+          "20261107110000"
         ]
       },
       {
@@ -726,9 +925,10 @@
       },
       {
         "signature": "private_sec.can_see_minor_name(uuid,uuid)",
-        "expect_after": "7ccbba4b5e8823b9585e64d8bc8866f2",
+        "expect_after": "1aba2737911132fd34512e57fec4eaf5",
         "defined_by": [
-          "20261104120000"
+          "20261104120000",
+          "20261107100000"
         ]
       },
       {
@@ -736,6 +936,20 @@
         "expect_after": "d204256f002eed932eeb1e94fa50b8dd",
         "defined_by": [
           "20261105110000"
+        ]
+      },
+      {
+        "signature": "private_sec.capture_and_scrub_game_text(text,boolean)",
+        "expect_after": "ac5d5ab995f26672aeb1520dc7c3166b",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.child_game_participation_allowed(uuid)",
+        "expect_after": "ddcae39876b9b98e985d14509988268f",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -760,6 +974,13 @@
         ]
       },
       {
+        "signature": "private_sec.default_profile_visibility_for(uuid)",
+        "expect_after": "59644d480dbb3454bb7128041a48245f",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "private_sec.game_fee_satisfied(text,uuid)",
         "expect_after": "54777a2a6045282e650a4f8fc6305523",
         "defined_by": [
@@ -775,10 +996,38 @@
         ]
       },
       {
+        "signature": "private_sec.game_payments_allowed(uuid)",
+        "expect_after": "672f7e92393d937724a168024c88b909",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.game_settings_holder(text)",
+        "expect_after": "b145312cb7da65b4ae6f8e670498c3fb",
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "private_sec.has_entitlement(uuid,text,text)",
+        "expect_after": "182e1a01b64c489be818302e64757ece",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "private_sec.has_guardian_link(uuid)",
         "expect_after": "9e89fdc6db9368b092f6d75c70790bca",
         "defined_by": [
           "20261106140000"
+        ]
+      },
+      {
+        "signature": "private_sec.has_role(uuid,public.app_role)",
+        "expect_after": "26eb1fe81c094c93f7896000dd434e42",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -789,6 +1038,118 @@
         ]
       },
       {
+        "signature": "private_sec.is_conversation_participant(uuid,uuid)",
+        "expect_after": "de5561301bf5106ed0b503b30497d879",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_game_host_without_payee(text)",
+        "expect_after": "033ada8298cbf996385e8c8238f28e7f",
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_game_host(text)",
+        "expect_after": "8a677990b776ffa9ded102dd85755269",
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_game_participant(text,uuid)",
+        "expect_after": "03b07202b249369e75ef518eb0943b5a",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_guardian_of(uuid,uuid)",
+        "expect_after": "fca052252aa7ddf08fea68ba651ac246",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_gym_admin_text(text,uuid)",
+        "expect_after": "93328fef35ce6a3b7976e6d6cc70ce96",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_managed_account(uuid)",
+        "expect_after": "75c931e64c3ad528a63cc545b23c573b",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_minor(uuid)",
+        "expect_after": "83881de63d70c5c1c28fc3fa7691d6fb",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_moderator(uuid)",
+        "expect_after": "4c4e7fcd8d60c68a5f131db343e92add",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_org_member(uuid,uuid)",
+        "expect_after": "b0d90578756deefb0840977245d769d7",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_superadmin(uuid)",
+        "expect_after": "81bd0c765185adf8caeaa78bbde9e294",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_team_manager(text,uuid)",
+        "expect_after": "99b30d151675c188f5e6a19e04833df7",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_team_member(text,uuid)",
+        "expect_after": "9dc208ccfa60a233c022fb2774afca2d",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_trainer_org_admin(uuid,uuid)",
+        "expect_after": "fa229522b27e1101e940292b30562f73",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.is_trainer_org_member(uuid,uuid)",
+        "expect_after": "4a1446227825ce1e57b47be4ac407501",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.jsonb_array_is_blank(jsonb)",
+        "expect_after": "e0de634b52f25f40883f259b699ad00a",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "private_sec.location_tokens(text)",
         "expect_after": "c899d3b1f47a7395bcb77dab9eadb5ba",
         "defined_by": [
@@ -796,8 +1157,15 @@
         ]
       },
       {
+        "signature": "private_sec.message_attachment_path_checked(text)",
+        "expect_after": "5ca7e6fac733727d4991471c9aac7fc0",
+        "defined_by": [
+          "20261106120500"
+        ]
+      },
+      {
         "signature": "private_sec.messaging_connection(uuid,uuid)",
-        "expect_after": "e77e14d0a9ff85b5f3117aff313df330",
+        "expect_after": "27a81e20fe21266b2124da0e2dd8688c",
         "defined_by": [
           "20261106140000"
         ]
@@ -832,10 +1200,74 @@
         ]
       },
       {
+        "signature": "private_sec.minor_host_public_snapshot(text,uuid,text,uuid,uuid)",
+        "expect_after": "0ec973845679438607036da81c1eb9e6",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_messaging_allowed(uuid,uuid)",
+        "expect_after": "3aa01e64c64abdb580e35135629956c2",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_messaging_block_reason(uuid,uuid)",
+        "expect_after": "87ab9f579a4d680b064417ed8e60253a",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_messaging_block(uuid,uuid)",
+        "expect_after": "dd12144b1b5a12b540b63518170264ec",
+        "defined_by": [
+          "20261103150000",
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_org_display_ok(text,uuid,uuid,uuid,boolean)",
+        "expect_after": "c19a867647353370f4ea033ad66db8ca",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.minor_team_display_ok(uuid,text)",
+        "expect_after": "ecfbdfd135a494ccfbf9bf85b3f53863",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.neutralize_minor_host_games(uuid,integer,boolean)",
+        "expect_after": "d605e4e6aa880f208534cd778d7852e5",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "private_sec.organizer_details(uuid,uuid)",
         "expect_after": "b87137b72fb7c9d084cd78747ff320c5",
         "defined_by": [
           "20261105140000"
+        ]
+      },
+      {
+        "signature": "private_sec.payer_to_payee(uuid,uuid)",
+        "expect_after": "344e407bc9dec305e3742f4a4f9034fe",
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "private_sec.platform_status(uuid)",
+        "expect_after": "6dbbdf0ef2d8cc08f6715bef54cddefb",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -895,10 +1327,25 @@
         ]
       },
       {
-        "signature": "private_sec.scrub_game_public_text(text)",
-        "expect_after": "c3af7e169c4ed3cb7db1f21e641fbe1c",
+        "signature": "private_sec.rpc_probe_denied(text,uuid[],name)",
+        "expect_after": "a968210e2de9322cd818e0700bf01461",
         "defined_by": [
-          "20261105130000"
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "private_sec.scrub_game_public_text(text)",
+        "expect_after": "b8658c629eabf7d87404faeb3c32cbe7",
+        "defined_by": [
+          "20261105130000",
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "private_sec.shares_team(uuid,uuid)",
+        "expect_after": "58bd86bcae535c7616eb2fc3e1926f16",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -917,6 +1364,20 @@
         ]
       },
       {
+        "signature": "private_sec.team_membership_authorizes(text,uuid)",
+        "expect_after": "76715f87c21cd8c162a1cda84bbc3e8b",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "private_sec.team_role_of(text,uuid)",
+        "expect_after": "437bde50dbfb7720476c1b13c31a1785",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "private_sec.tell_host_location_removed(uuid,text)",
         "expect_after": "be41c2935dfddf42c1c6c383ab5b111e",
         "defined_by": [
@@ -924,10 +1385,24 @@
         ]
       },
       {
+        "signature": "private_sec.text_array_is_blank(text[])",
+        "expect_after": "c79bae7c58d3e47b280d28a88698fa32",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "private_sec.text_discloses_location(text,text)",
         "expect_after": "713f23bbcad25c0bbb0940b3506830d0",
         "defined_by": [
           "20261104130000"
+        ]
+      },
+      {
+        "signature": "private_sec.trainer_profile_owned_by(text,uuid)",
+        "expect_after": "2c9cd5cb4fb3bb985baf128d7b96adb9",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -945,6 +1420,27 @@
         ]
       },
       {
+        "signature": "private_sec.wrap_oracle_helpers()",
+        "expect_after": "912b4ec3fcc66ac0a0ac54f02e7fb029",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.age_verified(uuid)",
+        "expect_after": "c49b7607819ad84c1aef6411817ade64",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.ai_analysis_allowed(uuid)",
+        "expect_after": "e8412e4ad335221fe1f04f9148d9dc04",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "public.appeal_content_decision(text,uuid,text)",
         "expect_after": "f9c40b465b6a0ecbbb3db6b8e3f1c157",
         "defined_by": [
@@ -959,8 +1455,39 @@
         ]
       },
       {
+        "signature": "public.blocks_exist_between(uuid,uuid)",
+        "expect_after": "ab2c1c3546e4c42334fbf6d0debf0ddb",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "public.can_notify(uuid,uuid)",
-        "expect_after": "18359fe7fe02ad91599ab199ea617f71",
+        "expect_after": "528318bb8f7441ec76521f123ea95680",
+        "defined_by": [
+          "20261103150000",
+          "20261106140000",
+          "20261107100000",
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "public.check_minor_host_organizer_display()",
+        "expect_after": "c64e29f75b932bb1bb4b6aee36697453",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.child_game_participation_allowed(uuid)",
+        "expect_after": "d618a6be6883feb591ca635dc749932b",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.clear_join_request_guardian_approval_on_insert()",
+        "expect_after": "c92afbadcdb3f97ac357d392ed56aa3f",
         "defined_by": [
           "20261106140000"
         ]
@@ -973,10 +1500,18 @@
         ]
       },
       {
-        "signature": "public.coarsen_existing_youth_games(integer)",
-        "expect_after": "d44049a36179a7430a1ac70f516f79ca",
+        "signature": "public.clear_team_post_venue(uuid,text[])",
+        "expect_after": "9acefa521218d908f60cc739ce79250a",
         "defined_by": [
-          "20261104100000"
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.coarsen_existing_youth_games(integer)",
+        "expect_after": "2eae32753f2e03070abe2bf31ff6a388",
+        "defined_by": [
+          "20261104100000",
+          "20261107100000"
         ]
       },
       {
@@ -991,6 +1526,13 @@
         "expect_after": "01691031069a874a1ad9e134dc0bb54d",
         "defined_by": [
           "20261105100000"
+        ]
+      },
+      {
+        "signature": "public.default_profile_visibility_for(uuid)",
+        "expect_after": "cd648af3468ff1fb711dfbe221ab8232",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1016,9 +1558,10 @@
       },
       {
         "signature": "public.enforce_game_join_gate()",
-        "expect_after": "9d4924a2d53915fca8fa245e15281a25",
+        "expect_after": "970d8a7a95edd923500875c35ddd5775",
         "defined_by": [
-          "20261103140000"
+          "20261103140000",
+          "20261107110000"
         ]
       },
       {
@@ -1100,18 +1643,26 @@
         ]
       },
       {
+        "signature": "public.game_payments_allowed(uuid)",
+        "expect_after": "b66e165bb2dd78f225f34ec77939e00e",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
         "signature": "public.gate_contact_request_for_guardian()",
-        "expect_after": "e541afbc615e007a8f52c64ed42c0bc1",
+        "expect_after": "c5a379174de81b62b174f78afbe546c0",
         "defined_by": [
           "20261106140000"
         ]
       },
       {
         "signature": "public.get_game_host_payment_methods(uuid,text)",
-        "expect_after": "7a4271f3a602ce58d33dd5e2c999cc3f",
+        "expect_after": "8b1879187f74762fe42f4b6c94266688",
         "defined_by": [
           "20261103140000",
-          "20261104120000"
+          "20261104120000",
+          "20261107110000"
         ]
       },
       {
@@ -1181,6 +1732,13 @@
         ]
       },
       {
+        "signature": "public.guard_location_hold_report_closure()",
+        "expect_after": "e18af19793dcf1c5eb4979662e9b3fa5",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "public.guard_minor_availability_write()",
         "expect_after": "1e32774c53ff16db6ce6e290dde21d94",
         "defined_by": [
@@ -1188,10 +1746,24 @@
         ]
       },
       {
+        "signature": "public.guard_profile_created_at()",
+        "expect_after": "d3d82bd6639a0d7e39b2614164058fa4",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "public.guard_profile_insert()",
         "expect_after": "0a5bf62fa1a84f369d10be46a9bbe4dc",
         "defined_by": [
           "20261103130000"
+        ]
+      },
+      {
+        "signature": "public.guard_team_member_role_change()",
+        "expect_after": "ed28cb513b678454d487d7497e2ec5f9",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1224,6 +1796,20 @@
         ]
       },
       {
+        "signature": "public.guard_youth_switch_tamper()",
+        "expect_after": "cbf10754ace05152c79496586a7c61d2",
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.guardian_approve_join_request(uuid,boolean)",
+        "expect_after": "7c20a3443139b8c5175068d82d3ee605",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
         "signature": "public.guardian_content_holds()",
         "expect_after": "7eaa2a7b36768e4a8686d62cfaf5cefe",
         "defined_by": [
@@ -1238,6 +1824,13 @@
         ]
       },
       {
+        "signature": "public.guardian_decide_link_request(uuid,boolean)",
+        "expect_after": "0ba0859b3b72ea6d63c5c0f4d8c5820e",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
         "signature": "public.handle_content_report()",
         "expect_after": "96ca9b36fa57825f75320f083d9fdb18",
         "defined_by": [
@@ -1246,9 +1839,24 @@
       },
       {
         "signature": "public.handle_location_disclosure_report()",
-        "expect_after": "3813db3e8fad1f252a94cf828d367c54",
+        "expect_after": "c56fcba3239347088f01f9ad4f39b8ca",
         "defined_by": [
-          "20261105130000"
+          "20261105130000",
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.has_entitlement(uuid,text,text)",
+        "expect_after": "f88373f028a7fae868d801cf601ce43a",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.has_role(uuid,public.app_role)",
+        "expect_after": "06add9b8ab473f3d777dacbe11ef6258",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1256,6 +1864,97 @@
         "expect_after": "5e7c94e22cb6ba69a769142c0f68b07d",
         "defined_by": [
           "20261103120000"
+        ]
+      },
+      {
+        "signature": "public.is_conversation_participant(uuid,uuid)",
+        "expect_after": "5055aeb683aa4ffc59294e6b061c299c",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_game_participant(text,uuid)",
+        "expect_after": "ded4e3b7b8a4f39e1a2be40ec9e6fd21",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_guardian_of(uuid,uuid)",
+        "expect_after": "bd54ad5f32577a8f941ae7d64d8c89f5",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_gym_admin_text(text,uuid)",
+        "expect_after": "8af871640788bd2785de74c0268f7ec3",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_managed_account(uuid)",
+        "expect_after": "553bd2a585cf014e14bcda66ad0b5bd7",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_minor(uuid)",
+        "expect_after": "cab399622f0753d092b36442295e71ce",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_moderator(uuid)",
+        "expect_after": "5458ae011a69d7109ddc7d589cf4774a",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_org_member(uuid,uuid)",
+        "expect_after": "7914fa780b596ad5a3e2b2b16902307e",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_superadmin(uuid)",
+        "expect_after": "fdbf7c8113a6ee9a91ceb11cdceb1d0a",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_team_manager(text,uuid)",
+        "expect_after": "aab3711c7fe5433598b2c86acae539e4",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_team_member(text,uuid)",
+        "expect_after": "d35abd457d24128a7478611ee1937c39",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_trainer_org_admin(uuid,uuid)",
+        "expect_after": "be219820a4ec72247beb85808ec66e48",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.is_trainer_org_member(uuid,uuid)",
+        "expect_after": "b1eea797b5498e8d3b5478d9ad12a7bc",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1301,10 +2000,40 @@
         ]
       },
       {
-        "signature": "public.minor_messaging_block(uuid,uuid)",
-        "expect_after": "2fef4a502c1951d772c57720f1080c23",
+        "signature": "public.messages_require_checked_attachment()",
+        "expect_after": "b995da03e862d349973159774a217495",
         "defined_by": [
-          "20261106140000"
+          "20261106120500"
+        ]
+      },
+      {
+        "signature": "public.minor_messaging_allowed(uuid,uuid)",
+        "expect_after": "6a292568a9b0ea8b823a8065664a5e4d",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.minor_messaging_block_reason(uuid,uuid)",
+        "expect_after": "e8a673465956f8cc787d45caecac3d7e",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.minor_messaging_block(uuid,uuid)",
+        "expect_after": "7e0918b5cd9212f7d55c5b4f10006b30",
+        "defined_by": [
+          "20261103150000",
+          "20261106140000",
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.moderator_confirm_location_hold(text,text)",
+        "expect_after": "c433d8601523b96fa2b2f3ffe74af512",
+        "defined_by": [
+          "20261107100000"
         ]
       },
       {
@@ -1312,6 +2041,13 @@
         "expect_after": "d544151b5711d81fb5d31569024772b4",
         "defined_by": [
           "20261106130000"
+        ]
+      },
+      {
+        "signature": "public.moderator_restore_game_text(text,text)",
+        "expect_after": "38dd8da5673316844ccaa11f78c2b57e",
+        "defined_by": [
+          "20261107100000"
         ]
       },
       {
@@ -1330,16 +2066,18 @@
       },
       {
         "signature": "public.moderator_scrub_game_text(text,text)",
-        "expect_after": "13e48c98a07c2dcecf4959b5761df41e",
+        "expect_after": "0a68a0e175594bb011b5693621ba2f24",
         "defined_by": [
-          "20261105130000"
+          "20261105130000",
+          "20261107100000"
         ]
       },
       {
         "signature": "public.moderator_scrub_team_post_text(uuid,text)",
-        "expect_after": "7992397a4dccc60e5c5572d301915484",
+        "expect_after": "10e176f414f5b943588f75c9bcee6a19",
         "defined_by": [
-          "20261105130000"
+          "20261105130000",
+          "20261107100000"
         ]
       },
       {
@@ -1357,10 +2095,18 @@
         ]
       },
       {
-        "signature": "public.neutralize_minor_host_snapshot()",
-        "expect_after": "234aacafa0fe779298ced1f5cbfb50e2",
+        "signature": "public.neutralize_existing_minor_host_snapshots(integer,boolean,boolean)",
+        "expect_after": "bb971bd884b14568a92de2ded5f85b00",
         "defined_by": [
-          "20261104110000"
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.neutralize_minor_host_snapshot()",
+        "expect_after": "d0f0c2122f7db5d658fd568c6a271114",
+        "defined_by": [
+          "20261104110000",
+          "20261107100000"
         ]
       },
       {
@@ -1368,6 +2114,13 @@
         "expect_after": "00db0a223295107ed68f3a35f6e5a543",
         "defined_by": [
           "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.platform_status(uuid)",
+        "expect_after": "76652922395bdeb2fdac62cc2269042e",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1393,6 +2146,14 @@
         ]
       },
       {
+        "signature": "public.protect_join_request_guardian_approval()",
+        "expect_after": "3746e4da66cc0a02e83ef30dfe7a0406",
+        "defined_by": [
+          "20261106140000",
+          "20261107100000"
+        ]
+      },
+      {
         "signature": "public.publishable_review_ids(uuid[])",
         "expect_after": "0ba48ca27785730652f464eb1fe8f26b",
         "defined_by": [
@@ -1400,10 +2161,25 @@
         ]
       },
       {
-        "signature": "public.refuse_minor_host_team_owner()",
-        "expect_after": "64a1e276607fafa5d77742fa689fc99f",
+        "signature": "public.reclamp_privacy_on_cohort_change()",
+        "expect_after": "b74b196862bbaa0c9d57e29e13092d07",
         "defined_by": [
-          "20261106110000"
+          "20261107100000"
+        ]
+      },
+      {
+        "signature": "public.redeem_minor_invite(text)",
+        "expect_after": "823db7a13c88fefcbf3706df1d43895b",
+        "defined_by": [
+          "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.refuse_minor_host_team_owner()",
+        "expect_after": "93049082f042b185ff2cb7e1871e979a",
+        "defined_by": [
+          "20261106110000",
+          "20261107100000"
         ]
       },
       {
@@ -1477,31 +2253,49 @@
         ]
       },
       {
-        "signature": "public.settle_paid_spot(text,uuid,text)",
-        "expect_after": "57f56d6ca1f73350c5896219236713ee",
+        "signature": "public.settle_on_game_cancelled()",
+        "expect_after": "ec182b83b34e3df9f08d47a4f591ef60",
         "defined_by": [
-          "20261103140000"
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "public.settle_paid_spot(text,uuid,text)",
+        "expect_after": "fe9b79a5183dd47e3e4ed30e628ae135",
+        "defined_by": [
+          "20261103140000",
+          "20261107110000"
+        ]
+      },
+      {
+        "signature": "public.shares_team(uuid,uuid)",
+        "expect_after": "7a822734fac95b2f9490414968e373c0",
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
         "signature": "public.sync_hosted_game_private()",
-        "expect_after": "284ab03c32e5e425253621f2a01ccefd",
+        "expect_after": "d62046a6f8836c53cb5a9b158b7f708a",
         "defined_by": [
-          "20261104100000"
+          "20261104100000",
+          "20261107100000"
         ]
       },
       {
         "signature": "public.sync_team_facility_private()",
-        "expect_after": "074069f2e2bc716c46e46d5b5f207414",
+        "expect_after": "75440ba8db20f09b9216dbf474f3d21d",
         "defined_by": [
-          "20261105110000"
+          "20261105110000",
+          "20261107100000"
         ]
       },
       {
         "signature": "public.sync_team_post_private()",
-        "expect_after": "6e18f8b5d6210b4efc654e80d8bdcc20",
+        "expect_after": "31f78ad1ca23c91e944e3114ab1bdef6",
         "defined_by": [
-          "20261105100000"
+          "20261105100000",
+          "20261107100000"
         ]
       },
       {
@@ -1509,6 +2303,27 @@
         "expect_after": "a87fed7c86fd6e778b11c6e4bb05a3f1",
         "defined_by": [
           "20261106140000"
+        ]
+      },
+      {
+        "signature": "public.team_role_of(text,uuid)",
+        "expect_after": "55166285d26919d595c0f394669f7f27",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.trainer_profile_owned_by(text,uuid)",
+        "expect_after": "62275165bc422b3a2428794000e9927b",
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "signature": "public.user_reports_start_as_new()",
+        "expect_after": "3782253f94e555d98fc8a76f69fc92b1",
+        "defined_by": [
+          "20261107100000"
         ]
       },
       {
@@ -1543,6 +2358,123 @@
     "policies": [
       {
         "schema": "public",
+        "table": "admin_audit_log",
+        "policy": "Moderators read audit log",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "admin_audit_log",
+        "policy": "Superadmins read audit log",
+        "expect_after": {
+          "qual": "1fb19d05dd2e780d6dfc8be3ab38ef04",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "age_change_events",
+        "policy": "Guardian reads child age change history",
+        "expect_after": {
+          "qual": "b148fc77c5ebfb3f1247292c372e941b",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "age_change_events",
+        "policy": "Moderators read age change history",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "ai_generation_jobs",
+        "policy": "Own AI jobs are readable",
+        "expect_after": {
+          "qual": "9c3de25676e20ec5851e7c9c6fa84059",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "ai_text_moderation",
+        "policy": "Own AI text verdicts are readable",
+        "expect_after": {
+          "qual": "9c3de25676e20ec5851e7c9c6fa84059",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "ai_usage_events",
+        "policy": "Own AI usage is readable",
+        "expect_after": {
+          "qual": "9c3de25676e20ec5851e7c9c6fa84059",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "app_settings",
+        "policy": "Superadmins read all settings",
+        "expect_after": {
+          "qual": "1fb19d05dd2e780d6dfc8be3ab38ef04",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "auth_signin_events",
+        "policy": "Admins can read signin events",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
         "table": "availability_contact_requests",
         "policy": "Recipient updates status",
         "expect_after": {
@@ -1559,12 +2491,91 @@
         "table": "availability_contact_requests",
         "policy": "Sender, released recipient or guardian can read",
         "expect_after": {
-          "qual": "6f1f649e6cb34a42541a61aa9c54137f",
+          "qual": "afd94c89da313703392a754057f81ec1",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106140000"
+          "20261106140000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "birthday_change_audit",
+        "policy": "Members and admins read birthday audit",
+        "expect_after": {
+          "qual": "f0eefe45fe8ef9028f0d0f88e2836d5a",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "birthday_correction_requests",
+        "policy": "Members read own birthday corrections",
+        "expect_after": {
+          "qual": "f0eefe45fe8ef9028f0d0f88e2836d5a",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "child_controls",
+        "policy": "Guardian reads child controls",
+        "expect_after": {
+          "qual": "5ca150ba195e567e3ccc743e12a1b975",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "content_approvals",
+        "policy": "staff read content approvals",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "content_drafts",
+        "policy": "staff read content drafts",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "content_publish_attempts",
+        "policy": "staff read publish attempts",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1572,12 +2583,91 @@
         "table": "content_report_holds",
         "policy": "Moderators read content holds",
         "expect_after": {
-          "qual": "958335aa339bcc91733eafce37fd246a",
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106130000"
+          "20261106130000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "content_sources",
+        "policy": "staff read content sources",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "conversation_participants",
+        "policy": "Users see participant rows in own conversations",
+        "expect_after": {
+          "qual": "d333787b1a63cf62dd16dd252f755642",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "conversations",
+        "policy": "Participants read conversations",
+        "expect_after": {
+          "qual": "4785a5e43d3ad2c2d34b8702e196d136",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "family_audit_log",
+        "policy": "Family and moderators can read family activity",
+        "expect_after": {
+          "qual": "25021013dd4c2f944d297028c1756dab",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "follow_requests",
+        "policy": "follow_requests_parties_read",
+        "expect_after": {
+          "qual": "1861eee8f52ba15a00f75d4b90ea036d",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "game_participants",
+        "policy": "Host or same-game participants view roster",
+        "expect_after": {
+          "qual": "fb2c86677c522789cbecc962f3dabf1a",
+          "with_check": null,
+          "shape": "aa22d555890e438d8e200736028c7f95"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1599,11 +2689,12 @@
         "policy": "Hosts manage own game payment settings (insert)",
         "expect_after": {
           "qual": null,
-          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "with_check": "5279a93af4261b6817d4e5483c626467",
           "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
         },
         "defined_by": [
-          "20261103140000"
+          "20261103140000",
+          "20261107110000"
         ]
       },
       {
@@ -1612,11 +2703,78 @@
         "policy": "Hosts manage own game payment settings (update)",
         "expect_after": {
           "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
-          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "with_check": "5279a93af4261b6817d4e5483c626467",
           "shape": "7ec094e1068502b6675cfec62ed75864"
         },
         "defined_by": [
-          "20261103140000"
+          "20261103140000",
+          "20261107110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "game_safety_acknowledgments",
+        "policy": "Moderators view all safety acknowledgments",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "guardian_link_requests",
+        "policy": "Child, requester or current guardian can read",
+        "expect_after": {
+          "qual": "109b1fc27cc0138741f8c45bab11d854",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261106140000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "guardian_links",
+        "policy": "Moderators read guardian links",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "highlight_reels",
+        "policy": "Admins update reels",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "highlight_reels",
+        "policy": "Admins view all reels",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1634,15 +2792,302 @@
       },
       {
         "schema": "public",
-        "table": "minor_hosting_approvals",
-        "policy": "Parties read hosting approvals",
+        "table": "hosted_games",
+        "policy": "Hidden public games viewable by host and players",
         "expect_after": {
-          "qual": "c9d524fe3c41ba840a01c619f299bfce",
+          "qual": "858683cfd2f13379fd2113433c444ace",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261104110000"
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "hosted_games",
+        "policy": "Private games viewable by host, players and requesters",
+        "expect_after": {
+          "qual": "0f4ab356d78581d4b02ef6a4adfc75c9",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "image_moderation",
+        "policy": "Superadmins read image moderation",
+        "expect_after": {
+          "qual": "1fb19d05dd2e780d6dfc8be3ab38ef04",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "join_requests",
+        "policy": "Guardians view their children's join requests",
+        "expect_after": {
+          "qual": "f5f68cb167bfe4e608f2606e006f8ad2",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "late_cancellations",
+        "policy": "Involved people can read late cancellations",
+        "expect_after": {
+          "qual": "3c26ab8b35cdcd3df21df92e7d13a96a",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "legal_consents",
+        "policy": "Admins view all consents",
+        "expect_after": {
+          "qual": "8ac5bde88174882ff7d2be2a8581b94c",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "legal_documents",
+        "policy": "Admins can create drafts",
+        "expect_after": {
+          "qual": null,
+          "with_check": "d3d05a8e3e8a2e2d9c2b5f4f9fbe0c1f",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "legal_documents",
+        "policy": "Admins can delete unpublished drafts",
+        "expect_after": {
+          "qual": "7d9169c9d51addd271eafecd0ef4d0ea",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "legal_documents",
+        "policy": "Admins can edit drafts",
+        "expect_after": {
+          "qual": "8ac5bde88174882ff7d2be2a8581b94c",
+          "with_check": "8ac5bde88174882ff7d2be2a8581b94c",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "legal_documents",
+        "policy": "Admins can read every version",
+        "expect_after": {
+          "qual": "8ac5bde88174882ff7d2be2a8581b94c",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "listing_claims",
+        "policy": "listing_claims moderator read",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "location_denial_events",
+        "policy": "Admins can delete denial events",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "location_denial_events",
+        "policy": "Admins can read denial events",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "location_report_evidence",
+        "policy": "Moderators read location report evidence",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "managed_accounts",
+        "policy": "Managed accounts visible to manager, child and moderators",
+        "expect_after": {
+          "qual": "ac9255df30c909865eee552872a3e661",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "managed_device_pairings",
+        "policy": "Device pairings visible to the managing guardian and moderators",
+        "expect_after": {
+          "qual": "55e2e47857b7834a13a2580790366457",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "message_reactions",
+        "policy": "reactions_insert_own",
+        "expect_after": {
+          "qual": null,
+          "with_check": "811edfde5693cb502ea3b5612c25336b",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "message_reactions",
+        "policy": "reactions_select_participants",
+        "expect_after": {
+          "qual": "dcc3ac036fa097c6ca873ff97d806281",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "messages",
+        "policy": "Participants read messages",
+        "expect_after": {
+          "qual": "5ffecc50f0fb40c55deaaddad84def17",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "messages",
+        "policy": "Participants send messages",
+        "expect_after": {
+          "qual": null,
+          "with_check": "128c2072e0db59dbe7bb39b1c5574577",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "messages",
+        "policy": "Recipients mark read",
+        "expect_after": {
+          "qual": "0aaa430916aad39966d7b7fc6b8b6349",
+          "with_check": "0aaa430916aad39966d7b7fc6b8b6349",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "minor_hosting_approvals",
+        "policy": "Parties read hosting approvals",
+        "expect_after": {
+          "qual": "91032fc30cc9597a547de244ffa4e9fa",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261104110000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "minor_invites",
+        "policy": "Parents read own minor invites",
+        "expect_after": {
+          "qual": "f928228f970e476e4eee589601141673",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1650,12 +3095,196 @@
         "table": "moderation_appeals",
         "policy": "Appellants and moderators read appeals",
         "expect_after": {
-          "qual": "1ed88d2f83d89f11490b293baca528f3",
+          "qual": "4f074ae0df8ab9b6f2cedbc89f3765c9",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106130000"
+          "20261106130000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_court_inquiries",
+        "policy": "Facility managers resolve inquiries",
+        "expect_after": {
+          "qual": "f31c62205424c4d1cf81f23a72b9345e",
+          "with_check": "f31c62205424c4d1cf81f23a72b9345e",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_court_inquiries",
+        "policy": "Requesters and facility managers read inquiries",
+        "expect_after": {
+          "qual": "930460c998f61ce5036a3b540313d310",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_member_requests",
+        "policy": "Admins can update org requests",
+        "expect_after": {
+          "qual": "f31c62205424c4d1cf81f23a72b9345e",
+          "with_check": "f31c62205424c4d1cf81f23a72b9345e",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_member_requests",
+        "policy": "Admins can view org requests",
+        "expect_after": {
+          "qual": "f31c62205424c4d1cf81f23a72b9345e",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_members",
+        "policy": "Admins can insert org members",
+        "expect_after": {
+          "qual": null,
+          "with_check": "90d93f56608baabf6246aaf4a551ff25",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_members",
+        "policy": "Admins can update org members",
+        "expect_after": {
+          "qual": "f31c62205424c4d1cf81f23a72b9345e",
+          "with_check": "f31c62205424c4d1cf81f23a72b9345e",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_members",
+        "policy": "Admins or self can delete org members",
+        "expect_after": {
+          "qual": "9cf3162d92b33b2c1be325ca3d66e31f",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "org_members",
+        "policy": "Org-scoped members can view org members",
+        "expect_after": {
+          "qual": "a91e864511f0aa0a2b2550c57cde5ab9",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "parent_requests",
+        "policy": "Moderators read parent requests",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "parental_consent_events",
+        "policy": "Guardian reads child consent history",
+        "expect_after": {
+          "qual": "5ca150ba195e567e3ccc743e12a1b975",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "parental_consent_events",
+        "policy": "Moderators read consent history",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "parental_consents",
+        "policy": "Moderators review consent records",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "payment_submissions",
+        "policy": "Hosts see submissions for their games",
+        "expect_after": {
+          "qual": "dc1b6194df8ba6d9fb8ad4f096516e0a",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261107110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "payment_submissions",
+        "policy": "Hosts update submissions for their games",
+        "expect_after": {
+          "qual": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261107110000"
         ]
       },
       {
@@ -1663,12 +3292,13 @@
         "table": "player_availabilities",
         "policy": "Availability visible to permitted viewers",
         "expect_after": {
-          "qual": "2958ca17990d20645e015400b7fb352e",
+          "qual": "2d66641431e51a0f49fdfdd5f4777dcf",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261106100000"
+          "20261106100000",
+          "20261107100000"
         ]
       },
       {
@@ -1699,6 +3329,19 @@
       },
       {
         "schema": "public",
+        "table": "profile_birthdays",
+        "policy": "Own birthday select",
+        "expect_after": {
+          "qual": "df9fda00e2f41912a17cb094781fc270",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
         "table": "reputation_insights",
         "policy": "Insights are public",
         "expect_after": {
@@ -1712,15 +3355,29 @@
       },
       {
         "schema": "public",
-        "table": "reviews",
-        "policy": "Gym admins view reviews about their gym",
+        "table": "review_reports",
+        "policy": "Moderators read review reports",
         "expect_after": {
-          "qual": "b12329282e6a2373f884b4dc29b88077",
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
           "with_check": null,
           "shape": "39541017f712a94460453c4925e65a3f"
         },
         "defined_by": [
-          "20261103120000"
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "reviews",
+        "policy": "Gym admins view reviews about their gym",
+        "expect_after": {
+          "qual": "12234a5b722b0d7b79f2e570bf85e308",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103120000",
+          "20261103150000"
         ]
       },
       {
@@ -1751,6 +3408,32 @@
       },
       {
         "schema": "public",
+        "table": "scheduled_notifications",
+        "policy": "Members read their own queued notifications",
+        "expect_after": {
+          "qual": "7de82de74a2862c8abae369e558f43fc",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "session_activity",
+        "policy": "Members read their own session activity",
+        "expect_after": {
+          "qual": "7de82de74a2862c8abae369e558f43fc",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
         "table": "skill_ratings",
         "policy": "Skill ratings visible unless hidden",
         "expect_after": {
@@ -1764,6 +3447,32 @@
       },
       {
         "schema": "public",
+        "table": "social_page_connections",
+        "policy": "staff read page connections",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_event_availability",
+        "policy": "Own, guardian or manager reads availability",
+        "expect_after": {
+          "qual": "71c970a8cfe9f686b8581758b36ba5c1",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
         "table": "team_facility_private",
         "policy": "team_facility_private_read",
         "expect_after": {
@@ -1773,6 +3482,86 @@
         },
         "defined_by": [
           "20261105110000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_invites",
+        "policy": "Guardians view their children's pending team invites",
+        "expect_after": {
+          "qual": "db1cacc9f3173e212ebbca2cc64a6aae",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_invites",
+        "policy": "team_invites_read",
+        "expect_after": {
+          "qual": "f96da0de7ee8fe2709ae6edee4d42308",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_members",
+        "policy": "team_members_delete",
+        "expect_after": {
+          "qual": "3522db34cb406a372af368b9fe22146d",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_members",
+        "policy": "team_members_manager_update",
+        "expect_after": {
+          "qual": "a8707c79c90e93949b1a851ede7183ea",
+          "with_check": "d07cd0cb380c8bac5431176cf1b6c191",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_members",
+        "policy": "team_members_manager_write",
+        "expect_after": {
+          "qual": null,
+          "with_check": "253b4735cd8ade42fd96be50a5f508af",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000",
+          "20261106140000",
+          "20261107100000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_members",
+        "policy": "team_members_read",
+        "expect_after": {
+          "qual": "db568508c67efa08cdf9238f4c1b962f",
+          "with_check": null,
+          "shape": "8d25074217b7db52284b4d6aac048d9a"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1791,6 +3580,58 @@
       {
         "schema": "public",
         "table": "team_posts",
+        "policy": "team_posts author or manager delete",
+        "expect_after": {
+          "qual": "890168f2b38d0e2dda23836a45624ca0",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_posts",
+        "policy": "team_posts author or manager update",
+        "expect_after": {
+          "qual": "890168f2b38d0e2dda23836a45624ca0",
+          "with_check": "890168f2b38d0e2dda23836a45624ca0",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_posts",
+        "policy": "team_posts member insert",
+        "expect_after": {
+          "qual": null,
+          "with_check": "b70eed23e34f0375523880c2b26f30d6",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_posts",
+        "policy": "team_posts member read hidden",
+        "expect_after": {
+          "qual": "6850c1322efffd4c3a5ea5133268cdec",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_posts",
         "policy": "team_posts_minor_host_author_hidden",
         "expect_after": {
           "qual": "4c599f02aec7770f6c12e4a95f74a385",
@@ -1802,16 +3643,367 @@
         ]
       },
       {
-        "schema": "storage",
-        "table": "objects",
-        "policy": "image_staging_delete_own_folder",
+        "schema": "public",
+        "table": "team_roster_details",
+        "policy": "Team managers manage roster details",
         "expect_after": {
-          "qual": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "qual": "a8707c79c90e93949b1a851ede7183ea",
+          "with_check": "a8707c79c90e93949b1a851ede7183ea",
+          "shape": "8c23296e5e41b053d7e78ff7dcee2dc3"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_waiver_signatures",
+        "policy": "team_waiver_signatures_read",
+        "expect_after": {
+          "qual": "32f90a512b1f05c01e666df36abb67b2",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_waivers",
+        "policy": "team_waivers_manager_delete_draft",
+        "expect_after": {
+          "qual": "329a42b55694893ce488c0d018e9a9ad",
           "with_check": null,
           "shape": "df3998b48f95cfc4b78649656c78449a"
         },
         "defined_by": [
-          "20261106120000"
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_waivers",
+        "policy": "team_waivers_manager_insert",
+        "expect_after": {
+          "qual": null,
+          "with_check": "708ea95b9ca3b14cd9339dc994104a25",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_waivers",
+        "policy": "team_waivers_manager_update",
+        "expect_after": {
+          "qual": "a8707c79c90e93949b1a851ede7183ea",
+          "with_check": "a8707c79c90e93949b1a851ede7183ea",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "team_waivers",
+        "policy": "team_waivers_read",
+        "expect_after": {
+          "qual": "c5cc367aacfd73c6dbbe64b6b4757c31",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "teams",
+        "policy": "moderators edit unclaimed teams",
+        "expect_after": {
+          "qual": "237721ab307d2c3a1684a532ce4eaf0c",
+          "with_check": "237721ab307d2c3a1684a532ce4eaf0c",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "teams",
+        "policy": "teams_read_signed_in",
+        "expect_after": {
+          "qual": "ad2341bfad66b2e13daabc299eb1eb33",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_invites",
+        "policy": "admin can delete invites",
+        "expect_after": {
+          "qual": "9645ee26ab548a4dcedb272596b433b1",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_invites",
+        "policy": "invite visible to org admins or invitee",
+        "expect_after": {
+          "qual": "d44fd191e21606d9124bc51bfa8269ff",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_invites",
+        "policy": "invitee can respond; admin can revoke",
+        "expect_after": {
+          "qual": "1851d027c9b8b93315e7568d032b3bc7",
+          "with_check": "1851d027c9b8b93315e7568d032b3bc7",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_invites",
+        "policy": "owner/admin can create invites",
+        "expect_after": {
+          "qual": null,
+          "with_check": "93446507185dccba58aaa3e82b0f83d5",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_join_requests",
+        "policy": "join req visible to requester or org admin",
+        "expect_after": {
+          "qual": "c236abb99926d46e180515a7fba52887",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_join_requests",
+        "policy": "requester or admin can delete join request",
+        "expect_after": {
+          "qual": "c236abb99926d46e180515a7fba52887",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_join_requests",
+        "policy": "requester or admin can update join request",
+        "expect_after": {
+          "qual": "c236abb99926d46e180515a7fba52887",
+          "with_check": "c236abb99926d46e180515a7fba52887",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_members",
+        "policy": "admin can add their own trainer profile",
+        "expect_after": {
+          "qual": null,
+          "with_check": "99df6c01484444201ba3b6d7dc2b4893",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_members",
+        "policy": "member can leave; admin/owner can remove others (not owner)",
+        "expect_after": {
+          "qual": "0f6014bd84ccafac64d518f985d1a166",
+          "with_check": null,
+          "shape": "df3998b48f95cfc4b78649656c78449a"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_members",
+        "policy": "Org-scoped members can view trainer org members",
+        "expect_after": {
+          "qual": "a1e38895cfef6982252ee866fd813c62",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_org_members",
+        "policy": "owner/admin can change roles",
+        "expect_after": {
+          "qual": "990f1104e38692e5d5174ef5034c69a9",
+          "with_check": "2e49cd073c9f54306082952211786705",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_orgs",
+        "policy": "moderators edit unclaimed orgs",
+        "expect_after": {
+          "qual": "237721ab307d2c3a1684a532ce4eaf0c",
+          "with_check": "237721ab307d2c3a1684a532ce4eaf0c",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_orgs",
+        "policy": "owner or admin can update org",
+        "expect_after": {
+          "qual": "7bd4ca26e004f7c70129d4eceb859dd9",
+          "with_check": "7bd4ca26e004f7c70129d4eceb859dd9",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "trainer_orgs",
+        "policy": "Visible orgs viewable by signed-in users",
+        "expect_after": {
+          "qual": "200b5f62b365896e2688adb91839aeb5",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "tryout_evaluations",
+        "policy": "Team managers manage tryout evaluations",
+        "expect_after": {
+          "qual": "a8707c79c90e93949b1a851ede7183ea",
+          "with_check": "f929a3a3bb30ca36de21dba74375364a",
+          "shape": "8c23296e5e41b053d7e78ff7dcee2dc3"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "tryout_rsvps",
+        "policy": "tryout_rsvps_read",
+        "expect_after": {
+          "qual": "c8bd91d6a4e869fd8632413b429a999c",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "user_reports",
+        "policy": "Moderators read all reports",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "user_reports",
+        "policy": "Moderators update reports",
+        "expect_after": {
+          "qual": "d30e9660e4a0b394a1a55b89965d01d8",
+          "with_check": "d30e9660e4a0b394a1a55b89965d01d8",
+          "shape": "7ec094e1068502b6675cfec62ed75864"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "user_roles",
+        "policy": "Admins manage roles",
+        "expect_after": {
+          "qual": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "with_check": "c1b229aeb4e892b5d0f504fed6b3f3d0",
+          "shape": "8c23296e5e41b053d7e78ff7dcee2dc3"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "public",
+        "table": "user_roles",
+        "policy": "Users view own roles",
+        "expect_after": {
+          "qual": "c193a0d2a7976a36b87c62aa69a4a7ae",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       },
       {
@@ -1820,8 +4012,34 @@
         "policy": "image_staging_insert_own_folder",
         "expect_after": {
           "qual": null,
-          "with_check": "1eb7bb2bc6f6fb3995998e614cdb69df",
+          "with_check": "b8192cd83ed508e21b24dc3c664ddf84",
           "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "image_staging_no_api_delete",
+        "expect_after": {
+          "qual": "81dff2d1e14189856b9a1e52485c19b3",
+          "with_check": null,
+          "shape": "236680f5af67d2a722968ca2dc78e2df"
+        },
+        "defined_by": [
+          "20261106120000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "image_staging_no_api_update",
+        "expect_after": {
+          "qual": "81dff2d1e14189856b9a1e52485c19b3",
+          "with_check": "81dff2d1e14189856b9a1e52485c19b3",
+          "shape": "4f208c379b356ac90c20d706f12f5288"
         },
         "defined_by": [
           "20261106120000"
@@ -1838,6 +4056,58 @@
         },
         "defined_by": [
           "20261106120000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "msg_attach_checked_path_is_final",
+        "expect_after": {
+          "qual": null,
+          "with_check": "3f43f41bef06c75be90084b7555d90ab",
+          "shape": "963710155ea3a4ff039feaea7c626c47"
+        },
+        "defined_by": [
+          "20261106120500"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "msg_attach_insert_sender",
+        "expect_after": {
+          "qual": null,
+          "with_check": "9dc22c766eab0a08d54b13afae0f1686",
+          "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "msg_attach_read_participants",
+        "expect_after": {
+          "qual": "12994c1c0398228be143306362ac61d5",
+          "with_check": null,
+          "shape": "39541017f712a94460453c4925e65a3f"
+        },
+        "defined_by": [
+          "20261103150000"
+        ]
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "policy": "Org admins write org images",
+        "expect_after": {
+          "qual": "e3e1774fdee898ecc9f9e6752893b90f",
+          "with_check": "e3e1774fdee898ecc9f9e6752893b90f",
+          "shape": "8c23296e5e41b053d7e78ff7dcee2dc3"
+        },
+        "defined_by": [
+          "20261103150000"
         ]
       }
     ]
