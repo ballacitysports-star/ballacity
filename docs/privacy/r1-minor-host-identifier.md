@@ -25,7 +25,7 @@ Can an unrelated account retrieve or correlate a minor host's account id through
 
 ## Tests
 
-`supabase/tests/410_minor_host_id_correlation.test.sql` (53 assertions): anonymous, adult stranger, teen stranger, host, guardian, teammate, manager, player, follower, moderator, administrator; an adult host and a non-hosting teen are unchanged; restriction ends when the game is cancelled; the id still carries ownership and gives no name. Without the migration it fails.
+`supabase/tests/410_minor_host_id_correlation.test.sql` (59 assertions): anonymous, adult stranger, teen stranger, host, guardian, teammate, manager, player, follower, moderator, administrator; an adult host and a non-hosting teen are unchanged; restriction ends when the game is cancelled; the id still carries ownership and gives no name. Without the migration it fails.
 
 ## Exploitability and trade-offs (documented before any risk is accepted)
 
@@ -37,3 +37,10 @@ Can an unrelated account retrieve or correlate a minor host's account id through
 ## Rollout, compatibility, recovery
 
 Additive plus replaced definitions that only reduce what unrelated viewers can read. Older apps see fewer rows for such hosts. Forward-only recovery. Needs G4 (#263) and PRIV-2B.
+
+## Second review round (independent reviewer, 2026-11-05) and what changed
+
+- **Comments and reactions** by the minor host (on adult content) carried `author_id` and were public wherever the content was; the first fixture used a comment on the minor's own post, so it passed vacuously. A restrictive policy now hides them from unrelated viewers (and Realtime, which uses the same policies).
+- **The protection lapsed when the game ended** (or was never marked completed) although the game row, and the id in it, stay readable. The status is now permanent for a person who is not a confirmed adult: after hosting a youth-inclusive game, the roster, rating, post, comment and reel restrictions, the private-profile rule (G4) and the team-ownership guard apply until they are a confirmed adult. **Cost:** a teen who hosted once keeps a private profile and cannot own a visible team until 18; their teammates, guardians, participants and staff are unaffected. This replaces the earlier "restriction ends with the game" behaviour and the matching assertions in tests 400 and 410.
+- **Reported against earlier work and fixed in SEC-1 (see `sec1-stack-hardening.md`):** a stranger could make themselves "related" with an unaccepted team invitation or an organization membership they created alone; this opened every restriction above. Without SEC-1 these protections can be bypassed.
+- **Open (documented, not fixed here):** public helper functions (`is_team_member`, `is_game_participant`, `team_role_of`, `is_team_manager`, `shares_team`, `is_guardian_of`, `blocks_exist_between`, `is_minor`) answer for any user id and bypass the roster hiding (an unrelated adult can ask "which teams is this id on?"). Closing them needs an internal/external split of the helpers used by many policies and triggers; see the register.
