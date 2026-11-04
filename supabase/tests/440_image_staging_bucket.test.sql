@@ -27,6 +27,19 @@ SELECT t.eq(t.count($$SELECT 1 FROM storage.objects WHERE bucket_id = 'image-sta
 SELECT t.throws($q$INSERT INTO storage.objects (bucket_id, name) VALUES ('image-staging', 'x/y.jpg')$q$, 'row-level security', 'anonymous cannot stage a file');
 SELECT t.reset();
 
+-- ---- legacy direct uploads (older clients) keep working during the adoption window, and the sweep finds them
+SELECT t.as_user(t.id('alice'));
+SELECT t.lives(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('avatars', %L, auth.uid())$q$, t.id('alice') || '/old-client.jpg'), 'LEGACY PATH (kept until the separately approved phase 2): an older client can still upload straight into a public bucket');
+SELECT t.throws(format($q$INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('avatars', %L, auth.uid())$q$, t.id('bob') || '/forged.jpg'), 'row-level security', 'but never into someone else''s folder');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM storage.objects o LEFT JOIN public.image_moderation m ON m.bucket = o.bucket_id AND m.path = o.name
+              WHERE o.bucket_id IN ('avatars', 'covers', 'org-avatars', 'org-covers', 'team-avatars', 'team-covers', 'trainer-avatars') AND m.id IS NULL), 1,
+            'the read-only sweep (public-bucket objects with no moderation record) finds the unfinalized legacy upload');
+INSERT INTO public.image_moderation (bucket, path, owner_id, status) VALUES ('avatars', t.id('alice') || '/old-client.jpg', t.id('alice'), 'pending');
+SELECT t.eq((SELECT count(*)::int FROM storage.objects o LEFT JOIN public.image_moderation m ON m.bucket = o.bucket_id AND m.path = o.name
+              WHERE o.bucket_id IN ('avatars', 'covers', 'org-avatars', 'org-covers', 'team-avatars', 'team-covers', 'trainer-avatars') AND m.id IS NULL), 0,
+            'and it disappears once the object has been finalized');
+
 -- the public destinations are unchanged (the direct path stays during the adoption window)
 SELECT t.ok((SELECT bool_and(public) FROM storage.buckets WHERE id IN ('avatars', 'covers', 'team-avatars', 'org-avatars')), 'public destination buckets are unchanged');
 SELECT t.ok((SELECT count(*) FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'image_staging_%' AND cmd = 'SELECT') = 0, 'there is no SELECT policy for the staging bucket');

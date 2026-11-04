@@ -24,6 +24,8 @@ export type PromotionDeps = {
 export type PromotionResult = {
   ok: true;
   quarantined: boolean;
+  /** The safety scan could not run. Nothing was published; the file waits in private staging (fail closed). */
+  held?: boolean;
   reason: string | null;
   path: string;
   width: number | null;
@@ -154,9 +156,16 @@ export async function promoteStagedImage(
       .createSignedUrl(stagingPath, 300);
     target = (data?.signedUrl as string | undefined) ?? null;
   }
-  const verdict: ScanVerdict = target
-    ? await scan(target, userId)
-    : { safe: true, label: "unscanned", reason: null, categories: [], scanned: false, csam: false };
+  // Fail closed: if the scan cannot run (no target, scanner off or erroring), nothing is published.
+  let verdict: ScanVerdict | null = null;
+  if (target) {
+    try {
+      const v = await scan(target, userId);
+      verdict = v.scanned || !v.safe ? v : null;
+    } catch {
+      verdict = null;
+    }
+  }
 
   const meta = {
     stripped: clean !== original,
@@ -171,6 +180,32 @@ export async function promoteStagedImage(
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
   };
+
+  if (!verdict) {
+    await admin.from("image_moderation").upsert(
+      {
+        bucket: IMAGE_STAGING_BUCKET,
+        path: stagingPath,
+        ...base,
+        status: "pending",
+        reason: "Safety scan unavailable",
+        scan: { stage: "scan_unavailable", metadata: meta },
+      },
+      { onConflict: "bucket,path" },
+    );
+    return {
+      ok: true,
+      quarantined: false,
+      held: true,
+      reason: "Safety scan unavailable",
+      path: targetPath,
+      width: base.width,
+      height: base.height,
+      bytes: base.bytes,
+      mime: mime as string,
+      metadataStripped: meta.stripped,
+    };
+  }
 
   if (!verdict.safe) {
     // Held privately: the staged original stays in the private bucket for review and is never copied to a public one.
@@ -232,4 +267,40 @@ export async function promoteStagedImage(
     mime: mime as string,
     metadataStripped: meta.stripped,
   };
+}
+
+export type StagingSweepResult = { examined: number; removed: number; kept: number };
+
+/**
+ * Remove files that have waited in private staging longer than `olderThanMs` (abandoned uploads, failed publishes, held scans).
+ * Staging is private, so a leftover is a retention matter, not an exposure. Superadmin-triggered; not scheduled.
+ */
+export async function sweepImageStaging(
+  admin: any,
+  opts: { olderThanMs: number; now?: number; dryRun?: boolean; maxFolders?: number },
+): Promise<StagingSweepResult> {
+  const now = opts.now ?? Date.now();
+  const result: StagingSweepResult = { examined: 0, removed: 0, kept: 0 };
+  const bucket = admin.storage.from(IMAGE_STAGING_BUCKET);
+  const { data: top } = await bucket.list("", { limit: opts.maxFolders ?? 1000 });
+  for (const folder of (top ?? []) as { name: string; id?: string | null }[]) {
+    if (folder.id) continue; // a loose file at the root cannot be written through the API; ignore
+    const { data: files } = await bucket.list(folder.name, { limit: 1000 });
+    const stale: string[] = [];
+    for (const f of (files ?? []) as { name: string; created_at?: string | null }[]) {
+      result.examined += 1;
+      const created = f.created_at ? Date.parse(f.created_at) : NaN;
+      if (Number.isFinite(created) && now - created > opts.olderThanMs)
+        stale.push(`${folder.name}/${f.name}`);
+      else result.kept += 1;
+    }
+    if (stale.length && !opts.dryRun) {
+      const { error } = await bucket.remove(stale);
+      if (error) result.kept += stale.length;
+      else result.removed += stale.length;
+    } else if (stale.length) {
+      result.removed += stale.length; // reported as would-remove in a dry run
+    }
+  }
+  return result;
 }

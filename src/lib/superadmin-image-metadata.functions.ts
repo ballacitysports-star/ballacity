@@ -129,3 +129,40 @@ export const superadminStripStoredImages = createServerFn({ method: "POST" })
     }
     return { dryRun, results };
   });
+
+/**
+ * Remove stale files from the private `image-staging` bucket (abandoned uploads, failed publishes, held scans). Defaults to a dry run
+ * and to files older than 24 hours. Not scheduled; running it for real is the superadmin's explicit action.
+ */
+export const superadminSweepImageStaging = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { olderThanHours?: number; dryRun?: boolean }) =>
+    z
+      .object({
+        olderThanHours: z
+          .number()
+          .min(1)
+          .max(24 * 30)
+          .optional(),
+        dryRun: z.boolean().optional(),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    const admin = await getAdmin();
+    const { sweepImageStaging } = await import("@/lib/image-promotion.server");
+    const dryRun = data.dryRun ?? true;
+    const result = await sweepImageStaging(admin, {
+      olderThanMs: (data.olderThanHours ?? 24) * 3600 * 1000,
+      dryRun,
+    });
+    if (!dryRun) {
+      await writeAudit(admin, context.userId, {
+        action: "image_staging_sweep",
+        targetType: "storage_objects",
+        metadata: { ...result },
+      });
+    }
+    return { dryRun, ...result };
+  });
