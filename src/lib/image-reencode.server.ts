@@ -24,7 +24,7 @@
  * published, the staged original stays private. See the doc's "Runtime" section: this must be resolved before release.
  */
 import type SharpType from "sharp";
-import type { Metadata as SharpMetadata } from "sharp";
+import type { Metadata as SharpMetadata, Sharp } from "sharp";
 import {
   inspectImageMetadata,
   stripImageMetadata,
@@ -118,17 +118,30 @@ export type ReencodeResult = {
   /** What the byte inspector found in the upload (for the moderation record: counts and flags only). */
   inputReport: MetadataReport;
   /**
-   * SCAN ONLY, never published or stored. Present when the picture has partially transparent pixels (0 < alpha < 255): the
-   * published colour with the alpha channel dropped, as a JPEG data URL of at most SCAN_RENDITION_MAX_SIDE px per side. After
-   * quantiseHiddenColour, a pixel at low alpha still keeps a posterised colour (alpha 16: about 4 bits per channel), which is
-   * nearly invisible when composited (what the scanner sees of `bytes`) but a recognisable picture to anyone who drops the
-   * alpha. Callers scan this too and treat a flag (or a failed scan) on it like one on `bytes`.
+   * SCAN ONLY, never published or stored: extra renditions of the published pixels, each a JPEG data URL of at most
+   * SCAN_RENDITION_MAX_SIDE px per side. Empty for a fully opaque picture. When any pixel is transparent (alpha < 255):
+   *   * flattened on white and flattened on black. A picture can live in the alpha channel alone (RGB all 0, or all 255, with
+   *     the shape drawn in alpha): it is invisible when composited on one of the two and plain to see on the other, and a
+   *     viewer chooses the background (R5 independent review 39ae9545, finding 2);
+   *   * when some alpha is strictly between 0 and 255, also the colour with the alpha channel dropped (final review 780eaf8f,
+   *     finding 1): after quantiseHiddenColour a pixel at low alpha keeps a posterised colour (alpha 16: about 4 bits per
+   *     channel), nearly invisible composited but a recognisable picture to anyone who drops the alpha.
+   * Callers scan `bytes` AND every rendition, and treat a flag (or a failed scan) on any of them as a flag on the image.
    */
-  alphaRemovedScanTarget: string | null;
+  scanRenditions: string[];
 };
 
-/** Longest side of the alpha-removed scan rendition (scanners downscale far below this). */
+/** Longest side of a scan rendition (scanners downscale far below this). */
 export const SCAN_RENDITION_MAX_SIDE = 2048;
+
+/** Any pixel that is not fully opaque? */
+function hasTransparency(data: Uint8Array, channels: number): boolean {
+  if (channels !== 2 && channels !== 4) return false;
+  for (let i = channels - 1; i < data.length; i += channels) {
+    if (data[i] !== 255) return true;
+  }
+  return false;
+}
 
 /** Any pixel whose alpha is neither 0 (colour already zeroed) nor 255 (fully visible)? */
 function hasPartialAlpha(data: Uint8Array, channels: number): boolean {
@@ -251,7 +264,7 @@ export async function reencodeImage(
 
   const lossless = format === "png" || (format === "webp" && isLosslessWebp(decodable));
   let out: Buffer;
-  let alphaRemovedScanTarget: string | null = null;
+  const scanRenditions: string[] = [];
   try {
     // Decode to raw 8-bit sRGB pixels: autoOrient() applies the orientation, toColourspace('srgb') converts through the embedded
     // profile (when there is one). The new file is then encoded from those pixels alone, so NOTHING else from the upload can reach
@@ -275,20 +288,25 @@ export async function reencodeImage(
       out = await pipeline
         .webp(lossless ? { ...REENCODE_SETTINGS.webpLossless } : { ...REENCODE_SETTINGS.webpLossy })
         .toBuffer();
-    if (hasPartialAlpha(decoded.data, channels)) {
-      // The quantised colour (what is published) with the alpha channel dropped: what a viewer sees after removing transparency.
-      const rendition = await sharp(decoded.data, {
-        raw: { width, height, channels: channels as 1 | 2 | 3 | 4 },
-        limitInputPixels: maxPixels,
-      })
-        .removeAlpha()
-        .resize(SCAN_RENDITION_MAX_SIDE, SCAN_RENDITION_MAX_SIDE, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 90 })
-        .toBuffer();
-      alphaRemovedScanTarget = `data:image/jpeg;base64,${rendition.toString("base64")}`;
+    if (hasTransparency(decoded.data, channels)) {
+      // Scan renditions of the quantised pixels (what is published); see ReencodeResult.scanRenditions.
+      const raw = { width, height, channels: channels as 1 | 2 | 3 | 4 };
+      const rendition = async (shape: (s: Sharp) => Sharp) => {
+        const jpegBytes = await shape(sharp(decoded.data, { raw, limitInputPixels: maxPixels }))
+          .resize(SCAN_RENDITION_MAX_SIDE, SCAN_RENDITION_MAX_SIDE, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        return `data:image/jpeg;base64,${jpegBytes.toString("base64")}`;
+      };
+      scanRenditions.push(await rendition((s) => s.flatten({ background: "#ffffff" })));
+      scanRenditions.push(await rendition((s) => s.flatten({ background: "#000000" })));
+      if (hasPartialAlpha(decoded.data, channels)) {
+        // What a viewer sees after removing transparency.
+        scanRenditions.push(await rendition((s) => s.removeAlpha()));
+      }
     }
   } catch (e) {
     const message = String((e as Error)?.message ?? e);
@@ -335,6 +353,6 @@ export async function reencodeImage(
     convertedFromIcc: !!meta.icc,
     lossless,
     inputReport: structural.report,
-    alphaRemovedScanTarget,
+    scanRenditions,
   };
 }

@@ -12,6 +12,12 @@ import {
   reencodeImage,
   type ReencodeResult,
 } from "@/lib/image-reencode.server";
+import {
+  PROCESSING_BUSY,
+  claimImagePath,
+  finishImagePath,
+  isFlaggedStatus,
+} from "@/lib/image-processing-claim.server";
 import { IMAGE_STAGING_BUCKET, extForImageMime, isOwnFilePath } from "@/lib/image-staging";
 import { readImageDimensions, sniffImageMime, validateImageMeta } from "@/lib/image-validation";
 
@@ -51,35 +57,18 @@ export type PromotionResult = {
 const INLINE_SCAN_LIMIT = 4 * 1024 * 1024;
 export const ANIMATED_REFUSAL = REENCODE_MESSAGES.animated;
 export const PROCESSING_UNAVAILABLE = "Image processing unavailable";
-
-async function removeStaged(
-  admin: any,
-  userId: string,
-  path: string,
-  reason: string,
-  stage: string,
-  extra: object,
-) {
-  await admin.storage.from(IMAGE_STAGING_BUCKET).remove([path]);
-  await admin.from("image_moderation").upsert(
-    {
-      bucket: IMAGE_STAGING_BUCKET,
-      path,
-      owner_id: userId,
-      status: "removed",
-      reason,
-      scan: { stage, ...extra },
-    },
-    { onConflict: "bucket,path" },
-  );
-}
+export const FLAGGED_PENDING_REVIEW =
+  "This image was flagged by our automated safety check and is pending review.";
+export { PROCESSING_BUSY };
 
 /**
  * Validate, re-encode, scan, then publish a staged image. The destination bucket never holds the original: the re-encoded bytes
  * (src/lib/image-reencode.server.ts) are written only after validation, re-encoding and a safety scan all pass, and they are
  * exactly the bytes that were scanned. A flagged original is moved to the restricted quarantine (image-quarantine.server.ts);
- * every other failure leaves the object in private staging or removes it; nothing unprocessed is ever published. Safe to retry: the destination write is an upsert
- * under the caller's own folder, and a retry after the staged file was already promoted returns the recorded outcome.
+ * every other failure leaves the object in private staging or removes it; nothing unprocessed is ever published. One call at a
+ * time per path: the staged path and the destination are claimed atomically in the database (image-processing-claim.server.ts),
+ * so a concurrent call is refused and a flag recorded by any call wins over another call's "safe" verdict. Safe to retry: a
+ * retry after the staged file was already promoted returns the recorded outcome.
  */
 export async function promoteStagedImage(
   deps: PromotionDeps,
@@ -92,16 +81,24 @@ export async function promoteStagedImage(
     throw new Error("You can only finalize your own uploads");
   }
 
-  // A file that was flagged stays flagged: it is never re-scanned until it passes, and never promoted.
-  const { data: flagged } = await admin
-    .from("image_moderation")
-    .select("status")
-    .eq("bucket", IMAGE_STAGING_BUCKET)
-    .eq("path", stagingPath)
-    .maybeSingle();
-  if (flagged && (flagged.status === "quarantined" || flagged.status === "removed")) {
-    throw new Error("This image was flagged by our automated safety check and is pending review.");
+  // Claim the staged path before anything else (R5 independent review 39ae9545, finding 1). The claim is atomic in the database:
+  // a second call on the same path while this one runs is refused, and a file that was flagged stays flagged (it is never
+  // re-scanned until it passes, and never promoted). Every outcome below except a flag is written only while this claim stands.
+  const stageClaim = await claimImagePath(admin, IMAGE_STAGING_BUCKET, stagingPath, userId);
+  if (!stageClaim.token) {
+    throw new Error(isFlaggedStatus(stageClaim.status) ? FLAGGED_PENDING_REVIEW : PROCESSING_BUSY);
   }
+  const stageToken = stageClaim.token;
+  const settleStaged = (
+    status: "pending" | "removed" | "released",
+    fields: Record<string, unknown> = {},
+  ) => finishImagePath(admin, IMAGE_STAGING_BUCKET, stagingPath, stageToken, status, fields);
+  // A non-flag failure: record it and remove the staged file, but only while this call still holds the claim. Without it another
+  // call has decided (possibly a flag whose staged original is the evidence), so nothing is touched.
+  const removeStaged = async (reason: string, stage: string, extra: object) => {
+    const settled = await settleStaged("removed", { reason, scan: { stage, ...extra } });
+    if (settled) await admin.storage.from(IMAGE_STAGING_BUCKET).remove([stagingPath]);
+  };
 
   const { data: blob, error: dlErr } = await admin.storage
     .from(IMAGE_STAGING_BUCKET)
@@ -112,8 +109,14 @@ export async function promoteStagedImage(
       dlErr &&
       !/not.?found|404|does not exist/i.test(String((dlErr as { message?: string }).message ?? ""))
     ) {
+      // The file is still there: keep it closed to its uploader, retryable ('pending').
+      await settleStaged("pending", {
+        reason: "Uploaded file could not be read",
+        scan: { stage: "download" },
+      });
       throw new Error("Uploaded file could not be read");
     }
+    await settleStaged("released");
     // A retry after success: the staged copy is gone but the destination exists with a recorded outcome.
     const { data: prior } = await admin
       .from("image_moderation")
@@ -121,6 +124,7 @@ export async function promoteStagedImage(
       .eq("bucket", bucket)
       .eq("path", targetPath)
       .maybeSingle();
+    if (prior?.status === "processing") throw new Error(PROCESSING_BUSY);
     if (prior && prior.status !== "removed") {
       return {
         ok: true,
@@ -144,19 +148,12 @@ export async function promoteStagedImage(
     validateImageMeta({ mime, bytes: original.byteLength, dimensions }) ??
     (dimensions ? null : "The file is not a readable JPG, PNG or WEBP image");
   if (failure) {
-    await removeStaged(admin, userId, stagingPath, failure, "validation", { failure });
+    await removeStaged(failure, "validation", { failure });
     throw new Error(failure);
   }
   const ext = extForImageMime(mime as string);
   if (!ext || !targetPath.endsWith(`.${ext}`)) {
-    await removeStaged(
-      admin,
-      userId,
-      stagingPath,
-      "The file type does not match its name",
-      "validation",
-      {},
-    );
+    await removeStaged("The file type does not match its name", "validation", {});
     throw new Error("The file type does not match its name");
   }
 
@@ -169,17 +166,11 @@ export async function promoteStagedImage(
     const code = e instanceof ImageReencodeError ? e.code : "unreadable";
     if (code === "unavailable") {
       // Fail closed and retryable, like an unavailable scan: nothing is published, the original stays private.
-      await admin.from("image_moderation").upsert(
-        {
-          bucket: IMAGE_STAGING_BUCKET,
-          path: stagingPath,
-          owner_id: userId,
-          status: "pending",
-          reason: PROCESSING_UNAVAILABLE,
-          scan: { stage: "reencode_unavailable" },
-        },
-        { onConflict: "bucket,path" },
-      );
+      const settled = await settleStaged("pending", {
+        reason: PROCESSING_UNAVAILABLE,
+        scan: { stage: "reencode_unavailable" },
+      });
+      if (!settled) throw new Error(PROCESSING_BUSY);
       return {
         ok: true,
         quarantined: false,
@@ -194,16 +185,9 @@ export async function promoteStagedImage(
       };
     }
     const message = REENCODE_MESSAGES[code];
-    await removeStaged(
-      admin,
-      userId,
-      stagingPath,
-      message,
-      code === "animated" ? "validation" : "reencode",
-      {
-        failure: code,
-      },
-    );
+    await removeStaged(message, code === "animated" ? "validation" : "reencode", {
+      failure: code,
+    });
     throw new Error(message);
   }
   const clean = encoded.bytes;
@@ -228,7 +212,7 @@ export async function promoteStagedImage(
       ? null
       : "The cleaned image is not readable");
   if (cleanFailure) {
-    await removeStaged(admin, userId, stagingPath, cleanFailure, "validation", {
+    await removeStaged(cleanFailure, "validation", {
       failure: cleanFailure,
       cleaned: true,
     });
@@ -271,11 +255,14 @@ export async function promoteStagedImage(
       if (scratchPath) await admin.storage.from(IMAGE_STAGING_BUCKET).remove([scratchPath]);
     }
   }
-  // Colour kept under partially transparent pixels is scanned with the alpha dropped too (final review 780eaf8f, finding 1):
-  // a flag there counts like a flag on the picture, and a scan that cannot run holds the upload.
-  if (verdict?.safe && encoded.alphaRemovedScanTarget) {
+  // A picture with transparency is also scanned flattened on white, flattened on black and, for partial alpha, with the alpha
+  // dropped (final review 780eaf8f finding 1; R5 independent review 39ae9545 finding 2). These renditions are made from the
+  // re-encoded pixels, never from the upload. A flag on any of them counts like a flag on the picture, and a scan that cannot run
+  // on any of them holds the upload.
+  for (const rendition of encoded.scanRenditions ?? []) {
+    if (!verdict?.safe) break;
     try {
-      const v = await scan(encoded.alphaRemovedScanTarget, userId);
+      const v = await scan(rendition, userId);
       verdict = !v.safe ? v : v.scanned ? verdict : null;
     } catch {
       verdict = null;
@@ -300,17 +287,12 @@ export async function promoteStagedImage(
   };
 
   if (!verdict) {
-    await admin.from("image_moderation").upsert(
-      {
-        bucket: IMAGE_STAGING_BUCKET,
-        path: stagingPath,
-        ...base,
-        status: "pending",
-        reason: "Safety scan unavailable",
-        scan: { stage: "scan_unavailable", metadata: meta },
-      },
-      { onConflict: "bucket,path" },
-    );
+    const settled = await settleStaged("pending", {
+      ...base,
+      reason: "Safety scan unavailable",
+      scan: { stage: "scan_unavailable", metadata: meta },
+    });
+    if (!settled) throw new Error(PROCESSING_BUSY);
     return {
       ok: true,
       quarantined: false,
@@ -346,6 +328,9 @@ export async function promoteStagedImage(
     } catch {
       held = null;
     }
+    // A flag is written unconditionally, whoever holds the claim: it always wins over a concurrent "safe" verdict, whose
+    // finish_image_processing then matches nothing (R5 independent review 39ae9545, finding 1).
+    const quarantinedAt = new Date().toISOString();
     await admin.from("image_moderation").upsert(
       {
         bucket: IMAGE_STAGING_BUCKET,
@@ -353,7 +338,9 @@ export async function promoteStagedImage(
         ...base,
         status: "quarantined",
         reason,
-        quarantined_at: new Date().toISOString(),
+        quarantined_at: quarantinedAt,
+        claim_token: null,
+        claimed_at: null,
         scan: {
           ...verdict,
           metadata: meta,
@@ -364,6 +351,27 @@ export async function promoteStagedImage(
       },
       { onConflict: "bucket,path" },
     );
+    // The destination path is flagged too, so a concurrent call's destination claim is refused, and anything a concurrent call
+    // already put there is taken down (it is the same picture).
+    await admin.from("image_moderation").upsert(
+      {
+        bucket,
+        path: targetPath,
+        ...base,
+        status: "quarantined",
+        reason,
+        quarantined_at: quarantinedAt,
+        claim_token: null,
+        claimed_at: null,
+        scan: {
+          stage: "flagged_upload",
+          staging_path: stagingPath,
+          categories: verdict.categories,
+        },
+      },
+      { onConflict: "bucket,path" },
+    );
+    await admin.storage.from(bucket).remove([targetPath]);
     if (verdict.csam) {
       await escalate(
         held?.bucket ?? IMAGE_STAGING_BUCKET,
@@ -385,41 +393,64 @@ export async function promoteStagedImage(
     };
   }
 
-  const { data: priorTarget } = await admin
-    .from("image_moderation")
-    .select("status")
-    .eq("bucket", bucket)
-    .eq("path", targetPath)
-    .maybeSingle();
-  if (priorTarget && (priorTarget.status === "quarantined" || priorTarget.status === "removed")) {
-    throw new Error("This image was flagged by our automated safety check and is pending review.");
-  }
-  // Claim the destination before anything is written there (final review 780eaf8f, finding 5c): from the moment this row exists,
+  // Claim the destination before anything is written there (final review 780eaf8f, finding 5c; R5 39ae9545, finding 1): the claim
+  // is refused for a quarantined or removed destination and while another call holds it, and from the moment the row exists
   // published_image_refuse_user_write refuses every user write at the path, a signed upload URL included.
-  const { error: modErr } = await admin.from("image_moderation").upsert(
-    {
-      bucket,
-      path: targetPath,
-      ...base,
-      status: "pending",
-      reason: null,
-      scan: { ...verdict, metadata: meta },
-    },
-    { onConflict: "bucket,path" },
-  );
-  if (modErr) throw new Error(modErr.message);
+  const destClaim = await claimImagePath(admin, bucket, targetPath, userId);
+  if (!destClaim.token) {
+    await settleStaged("released");
+    throw new Error(isFlaggedStatus(destClaim.status) ? FLAGGED_PENDING_REVIEW : PROCESSING_BUSY);
+  }
+  const destToken = destClaim.token;
+  const publishedRow = { ...base, reason: null, scan: { ...verdict, metadata: meta } };
+  const failPublish = async (message: string): Promise<never> => {
+    await finishImagePath(admin, bucket, targetPath, destToken, "pending", {
+      ...publishedRow,
+      reason: "Publish failed",
+    });
+    await settleStaged("released");
+    throw new Error(`Could not publish the image: ${message}`);
+  };
   // Remove, then insert without upsert (finding 3). A legacy client may already have an object of its own at this path; an upsert
   // over it would keep the uploader as the row's owner, so the published-path trigger would refuse the server's own write. A fresh
   // insert by the service key has no owner. The claim above keeps the uploader from re-inserting in between.
   const { error: clearErr } = await admin.storage.from(bucket).remove([targetPath]);
-  if (clearErr) throw new Error(`Could not publish the image: ${clearErr.message}`);
+  if (clearErr) await failPublish(clearErr.message);
   const { error: upErr } = await admin.storage.from(bucket).upload(targetPath, clean, {
     contentType: mime as string,
     upsert: false,
     cacheControl: "31536000",
   });
-  if (upErr) throw new Error(`Could not publish the image: ${upErr.message}`);
-  await admin.storage.from(IMAGE_STAGING_BUCKET).remove([stagingPath]);
+  if (upErr) await failPublish(upErr.message);
+  // The picture is public only if BOTH claims still stand once it is written. A flag recorded by another call in the meantime
+  // (on the staged path, then the destination) makes one of these fail, and what this call wrote is taken down again.
+  const stagedReleased = await settleStaged("released");
+  const published =
+    stagedReleased &&
+    (await finishImagePath(admin, bucket, targetPath, destToken, "pending", publishedRow));
+  if (!published) {
+    await admin.storage.from(bucket).remove([targetPath]);
+    // Give the destination claim back as an unpublished row (a no-op when a flag already replaced it).
+    await finishImagePath(admin, bucket, targetPath, destToken, "pending", {
+      ...publishedRow,
+      reason: "Publish interrupted",
+    });
+    const { data: current } = await admin
+      .from("image_moderation")
+      .select("status")
+      .eq("bucket", bucket)
+      .eq("path", targetPath)
+      .maybeSingle();
+    throw new Error(isFlaggedStatus(current?.status) ? FLAGGED_PENDING_REVIEW : PROCESSING_BUSY);
+  }
+  // The staged copy goes only once nothing else has recorded it (a flag recorded since would make it evidence).
+  const { data: stagedRow } = await admin
+    .from("image_moderation")
+    .select("status")
+    .eq("bucket", IMAGE_STAGING_BUCKET)
+    .eq("path", stagingPath)
+    .maybeSingle();
+  if (!stagedRow) await admin.storage.from(IMAGE_STAGING_BUCKET).remove([stagingPath]);
 
   return {
     ok: true,
