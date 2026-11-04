@@ -31,6 +31,8 @@ type Props = {
   conversationId?: string | null;
   messageId?: string | null;
   reelId?: string | null;
+  teamPostId?: string | null;
+  commentId?: string | null;
 };
 
 const TITLES: Record<ReportSubjectType, string> = {
@@ -39,6 +41,8 @@ const TITLES: Record<ReportSubjectType, string> = {
   message: "Report message",
   reel: "Report highlight",
   payment: "Report a payment problem",
+  team_post: "Report post",
+  comment: "Report comment",
 };
 
 export function ReportDialog({
@@ -51,6 +55,8 @@ export function ReportDialog({
   conversationId,
   messageId,
   reelId,
+  teamPostId,
+  commentId,
 }: Props) {
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState("");
@@ -70,6 +76,8 @@ export function ReportDialog({
         conversationId,
         messageId,
         reelId,
+        teamPostId,
+        commentId,
       });
       toast.success("Report submitted. Our moderators will review it.");
       onOpenChange(false);
