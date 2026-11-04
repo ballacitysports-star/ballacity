@@ -835,8 +835,10 @@ BEGIN
    WHERE id = _r.id;
   -- account recovery: the lost account's link ends as the verified account's link begins
   IF _r.kind = 'account_recovery' AND _r.recovery_link_id IS NOT NULL THEN
+    -- the lost account is presumed compromised: restoring its link later needs two staff members
     PERFORM set_config('app.guardian_audit', jsonb_build_object('actor_role', _actor_role, 'method', 'account_recovery', 'request_id', _r.id,
-                                                                'reason', 'Replaced by a verified account (account recovery)')::text, true);
+                                                                'reason', 'Replaced by a verified account (account recovery)',
+                                                                'detail', jsonb_build_object('suspected_fraud', true))::text, true);
     UPDATE public.guardian_links SET status = 'revoked'
      WHERE id = _r.recovery_link_id AND child_user_id = _r.child_user_id AND status IN ('active', 'suspended')
     RETURNING * INTO _old;
@@ -1100,7 +1102,14 @@ BEGIN
                                                               'method', CASE WHEN private_sec.guardian_eligible(_l.parent_user_id)
                                                                              THEN 'staff_revocation' ELSE 'staff_revocation_ineligible_guardian' END,
                                                               'detail', jsonb_strip_nulls(jsonb_build_object(
-                                                                'suspected_fraud', CASE WHEN COALESCE(_suspected_fraud, false) THEN true END))));
+                                                                'suspected_fraud', CASE WHEN COALESCE(_suspected_fraud, false)
+                                                                                          -- a suspended link, or one whose guardian is under an
+                                                                                          -- open hold, is revoked during a security review
+                                                                                          OR _l.status = 'suspended'
+                                                                                          OR EXISTS (SELECT 1 FROM public.guardian_authority_holds h
+                                                                                                      WHERE h.guardian_user_id = _l.parent_user_id
+                                                                                                        AND h.lifted_at IS NULL)
+                                                                                        THEN true END))));
   UPDATE public.guardian_links SET status = 'revoked' WHERE id = _link;
   PERFORM private_sec.guardian_write_end();
   UPDATE public.parental_consents
@@ -1115,11 +1124,21 @@ END $$;
 REVOKE ALL ON FUNCTION public.staff_revoke_guardian_link(uuid, text, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.staff_revoke_guardian_link(uuid, text, boolean) TO authenticated;
 
--- Was this link's latest revocation for suspected fraud (a staff revocation that said so, or a hold lifted with the outcome 'revoked')?
+-- Does restoring this link need two staff members? Fail-safe: true when ANY of these holds, so no compromise path can be undone by one person:
+--   * any revocation of the link was recorded as suspected fraud (a staff revocation that said so, a revocation of a suspended link or
+--     during an open hold, a hold lifted with the outcome 'revoked', or an account recovery that replaced the guardian's account);
+--   * any revocation of the link came from account recovery (also covers audit rows written before the flag was added);
+--   * the link was ever suspended by a hold that was not lifted with 'reinstated';
+--   * the guardian has an open hold, or a hold lifted with the outcome 'revoked'.
 CREATE OR REPLACE FUNCTION private_sec.guardian_link_revoked_for_fraud(_link uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
-  SELECT COALESCE((SELECT (a.detail ->> 'suspected_fraud')::boolean FROM public.guardian_link_audit a
-                    WHERE a.link_id = _link AND a.action = 'link_revoked' ORDER BY a.id DESC LIMIT 1), false)
+  SELECT EXISTS (SELECT 1 FROM public.guardian_link_audit a
+                  WHERE a.link_id = _link AND a.action = 'link_revoked'
+                    AND (COALESCE((a.detail ->> 'suspected_fraud')::boolean, false) OR a.method = 'account_recovery'))
+      OR EXISTS (SELECT 1 FROM public.guardian_authority_holds h
+                  WHERE _link = ANY (h.suspended_links) AND h.outcome IS DISTINCT FROM 'reinstated')
+      OR EXISTS (SELECT 1 FROM public.guardian_links g JOIN public.guardian_authority_holds h ON h.guardian_user_id = g.parent_user_id
+                  WHERE g.id = _link AND (h.lifted_at IS NULL OR h.outcome = 'revoked'))
 $$;
 REVOKE ALL ON FUNCTION private_sec.guardian_link_revoked_for_fraud(uuid) FROM PUBLIC, anon, authenticated;
 
