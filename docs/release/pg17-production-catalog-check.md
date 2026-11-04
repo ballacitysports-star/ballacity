@@ -46,7 +46,19 @@ no row data), run with `search_path = ''` exactly as the preflight reads a targe
 
 ## 4. Ledger name rule checked against production (2026-11-04, read-only)
 
-Every Lovable-named production ledger row (`<timestamp>_<uuid>`) has a version 0 to 13 seconds **after** the
-timestamp in its name. None is earlier. R5 review finding F5 restricts the preflight's name rule to rows after a
-**historical** file's timestamp (0 to 10 s). This closes a duplicate row placed just before the release range. Rows that
-fall outside 10 s were already handled by `known_ledger_rows_without_file` or by an exact version, as before.
+Every Lovable-named production ledger row (`<timestamp>_<uuid>`) has a version **after** the timestamp in its name;
+none is earlier. R5 review finding F5 restricts the preflight's name rule to rows 0 to 10 s after a **historical**
+file's timestamp, which closes a duplicate row placed just before the release range.
+
+Three production rows are further than 10 s from their file, both before and after this change (the old rule used
+the absolute skew with the same 10 s limit), so the preflight **fails closed** on them today:
+
+| Ledger row       | File                                                      | Skew |
+| ---------------- | --------------------------------------------------------- | ---- |
+| `20260718214541` | `20260718214528_cbc407df-c6aa-4df5-ba2f-ae581526bc09.sql` | 13 s |
+| `20260719230101` | `20260719230031_a66617fa-84dc-4481-a23a-414363a80e97.sql` | 30 s |
+| `20260722230218` | `20260722230205_a28148a8-85b7-49cf-a15f-fd379cced385.sql` | 13 s |
+
+Reviewed option (owner approval, like section 3): list these three exact (version, name) pairs in the manifest's
+`known_ledger_rows_without_file` and the three files in `known_unledgered`, after comparing each file's objects with
+production. Do **not** widen `LEDGER_NAME_SKEW_SECONDS`.
