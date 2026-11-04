@@ -24,7 +24,7 @@ import {
   decideLocationHold,
   type ModerationReport,
 } from "@/lib/moderation.functions";
-import { blockedByLocationHold, hasOpenLocationHold } from "@/lib/location-hold";
+import { blockedByLocationHold, evidenceFields, hasOpenLocationHold } from "@/lib/location-hold";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
 
 export const Route = createFileRoute("/admin/moderation")({
@@ -293,6 +293,26 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
                 <Link to="/games/$gameId" params={{ gameId: report.gameId }} className="underline">
                   {report.gameTitle ?? report.gameId}
                 </Link>
+              </dd>
+            </div>
+          ) : null}
+          {held && report.heldEvidence ? (
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">
+                Held listing text (evidence, moderators only · held{" "}
+                {new Date(report.heldEvidence.capturedAt).toLocaleString()})
+              </dt>
+              <dd className="space-y-1 rounded-lg border border-border bg-surface p-2">
+                {evidenceFields(report.heldEvidence).length === 0 ? (
+                  <p className="text-muted-foreground">(the held fields were empty)</p>
+                ) : (
+                  evidenceFields(report.heldEvidence).map((f) => (
+                    <div key={f.label}>
+                      <span className="text-muted-foreground">{f.label}: </span>
+                      <span className="whitespace-pre-wrap">{f.value}</span>
+                    </div>
+                  ))
+                )}
               </dd>
             </div>
           ) : null}

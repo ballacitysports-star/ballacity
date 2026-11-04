@@ -38,8 +38,7 @@ const ERRORS: Record<string, string> = {
   NOT_GUARDIAN: "You're not linked as this child's guardian.",
   INVITE_NOT_PENDING: "This invite was already answered.",
   REQUEST_NOT_PENDING: "This request was already answered.",
-  ALREADY_ON_ROSTER:
-    "They're already in this game. Open the game to cancel their spot instead.",
+  ALREADY_ON_ROSTER: "They're already in this game. Open the game to cancel their spot instead.",
   INVITE_NOT_FOUND: "That invite no longer exists.",
   REQUEST_NOT_FOUND: "That request no longer exists.",
   WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
@@ -65,8 +64,9 @@ export function useGuardianApprovals() {
     staleTime: 15_000,
     queryFn: async () => {
       const [inv, req] = await Promise.all([
+        // Through the inbox function: guardians cannot read team_invites directly (SEC-7).
         supabase
-          .from("team_invites")
+          .rpc("team_invites_inbox")
           .select("id, team_id, invitee_id, role, message, expires_at, created_at")
           .in("invitee_id", ids)
           .eq("status", "pending")

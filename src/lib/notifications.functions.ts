@@ -26,8 +26,16 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
         _caller: callerId,
         _target: data.user_id,
       });
-      if (relErr) throw new Error(relErr.message);
-      if (!allowed) throw new Error("Not authorized to notify this user");
+      // A refusal (or a failed check) is not told to the caller: the answer would say whether the
+      // target is a minor, has guardian controls, or blocked them. The notification is dropped and
+      // the caller gets the same answer as when it is delivered; the refusal is logged here only.
+      if (relErr || !allowed) {
+        console.warn("[notifications] not delivered", {
+          reason: relErr ? "check_failed" : "not_permitted",
+          type: data.type,
+        });
+        return { ok: true };
+      }
     }
 
     // A recipient who is not a confirmed adult gets fixed wording by type, never the caller's text or link.

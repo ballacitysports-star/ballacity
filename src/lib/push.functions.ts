@@ -21,6 +21,9 @@ function validate(input: unknown): PushInput {
   };
 }
 
+/** What a caller is told about a push to someone else, whatever happened to it. */
+const OTHER_USER_RESULT = { ok: true as const };
+
 /**
  * Sends a OneSignal push to a single user, identified by their Supabase user id
  * (registered as the OneSignal external_id alias on the client).
@@ -41,8 +44,15 @@ export const sendPushToUser = createServerFn({ method: "POST" })
         _caller: context.userId,
         _target: data.userId,
       });
+      // A refusal is not told to the caller (it would say whether the target is a minor, has
+      // guardian controls or blocked them): nothing is pushed and the answer is the same as for a
+      // delivered push. The refusal is logged on the server only.
       if (relErr || !allowed) {
-        return { ok: false as const, reason: "not_authorized" };
+        console.warn("[push] not delivered", {
+          reason: relErr ? "check_failed" : "not_permitted",
+          type: data.type,
+        });
+        return OTHER_USER_RESULT;
       }
     }
 
@@ -52,13 +62,17 @@ export const sendPushToUser = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       if (!(await isConfirmedAdult(supabaseAdmin as any, data.userId))) {
         const safe = minorSafeNotification(data.type);
-        return deliverPush({
+        await deliverPush({
           userId: data.userId,
           title: safe.title,
           body: safe.body,
           url: (await absolutizeUrl(safe.link)) ?? null,
         });
+        return OTHER_USER_RESULT;
       }
+      // Delivery details (curfew, recipients, provider errors) are about the recipient: not returned.
+      await deliverPush(data);
+      return OTHER_USER_RESULT;
     }
     return deliverPush(data);
   });

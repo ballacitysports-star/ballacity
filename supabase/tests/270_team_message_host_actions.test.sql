@@ -35,8 +35,10 @@ SELECT t.lives(format('SELECT public.team_invite_player(%L, %L, %L::public.team_
 SELECT t.reset();
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('stranger'), t.id('manager'));
 SELECT t.as_user(t.id('manager'));
-SELECT t.throws(format('SELECT public.team_invite_player(%L, %L, %L::public.team_role, NULL)', 'squad', t.id('stranger'), 'player'),
-  'BLOCKED', 'but not someone who has blocked them');
+SELECT t.lives(format('SELECT public.team_invite_player(%L, %L, %L::public.team_role, NULL)', 'squad', t.id('stranger'), 'player'),
+  'inviting someone who has blocked them looks the same to the manager (SEC-7 final review 5)');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count($q$SELECT 1 FROM public.team_invites_inbox() WHERE team_id = 'squad'$q$), 0, 'but the person who blocked them never sees it');
 SELECT t.reset();
 
 -- ---- team_remove_member ---------------------------------------------------

@@ -5,6 +5,7 @@ import { exactLocationMap, withExactTeamPostLocation } from "@/lib/team-post-loc
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
+import { inviteGuardianColumns } from "@/lib/team-invite-tracker";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
@@ -464,7 +465,8 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
     ]);
     const rows = inv.data ?? [];
     const ids = [...new Set(rows.map((r) => r.invitee_id))];
-    const [profiles, sigs, guardians] = await Promise.all([
+    // No guardian-link read: whether an invitee has a guardian would tell any inviter they are a minor (inviteGuardianColumns).
+    const [profiles, sigs] = await Promise.all([
       ids.length
         ? supabaseAdmin.from("profiles").select("id,display_name,username,avatar_url").in("id", ids)
         : Promise.resolve({ data: [] as any[] }),
@@ -475,17 +477,9 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
             .eq("waiver_id", waiver.data.id)
             .in("signer_user_id", ids)
         : Promise.resolve({ data: [] as any[] }),
-      ids.length
-        ? supabaseAdmin
-            .from("guardian_links")
-            .select("child_user_id")
-            .eq("status", "active")
-            .in("child_user_id", ids)
-        : Promise.resolve({ data: [] as any[] }),
     ]);
     const p = new Map((profiles.data ?? []).map((x: any) => [x.id, x]));
     const s = new Map((sigs.data ?? []).map((x: any) => [x.signer_user_id, !!x.signed_by]));
-    const minors = new Set((guardians.data ?? []).map((g: any) => g.child_user_id));
     const now = Date.now();
     return {
       waiverVersion: waiver.data?.version ?? null,
@@ -502,8 +496,7 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
           status: (expired ? "expired" : r.status) as string,
           sentAt: r.created_at,
           respondedAt: r.responded_at,
-          needsGuardian: minors.has(r.invitee_id),
-          guardianApproved: !!r.guardian_approved_at,
+          ...inviteGuardianColumns(r),
           waiverSigned: s.has(r.invitee_id),
           waiverByGuardian: s.get(r.invitee_id) ?? false,
         };

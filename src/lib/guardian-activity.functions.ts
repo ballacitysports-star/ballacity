@@ -114,14 +114,26 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
         .in("player_id", ids)
         .in("status", ["pending", "approved"]),
     ]);
-    const inv = await supabaseAdmin
+    const invRead = await supabaseAdmin
       .from("team_invites")
       .select("id,team_id,invitee_id,role,status,created_at,guardian_approved_at")
       .in("invitee_id", ids)
       .order("created_at", { ascending: false })
       .limit(50);
+    // An invitation written for a manager the child blocked (or who blocked them) does not exist for
+    // the child or their guardians (SEC-7): leave suppressed ones out of this service-role read.
+    const invIds = (invRead.data ?? []).map((r) => r.id);
+    const suppressed = new Set<string>();
+    if (invIds.length) {
+      const { data: sup } = await supabaseAdmin
+        .from("team_invite_suppressions")
+        .select("invite_id")
+        .in("invite_id", invIds);
+      for (const r of sup ?? []) suppressed.add(r.invite_id);
+    }
+    const inv = { data: (invRead.data ?? []).filter((r) => !suppressed.has(r.id)) };
     const memberTeamIds = [...new Set((tm.data ?? []).map((r) => r.team_id))];
-    const teamIds = [...new Set([...memberTeamIds, ...(inv.data ?? []).map((r) => r.team_id)])];
+    const teamIds = [...new Set([...memberTeamIds, ...inv.data.map((r) => r.team_id)])];
     const [wv, sg, posts] = await Promise.all([
       teamIds.length
         ? supabaseAdmin
