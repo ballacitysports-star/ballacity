@@ -1,6 +1,7 @@
 import { ParentPortalSections } from "@/components/child/ParentPortalSections";
 import { ChildTryoutsSection } from "@/components/child/ChildTryoutsSection";
 import { GuardianHostingApprovals } from "@/components/youth/GuardianHostingApprovals";
+import { ContentUnderReview } from "@/components/moderation/ContentUnderReview";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -300,6 +301,11 @@ function GuardianDashboard() {
             </div>
           </section>
 
+          <ContentUnderReview
+            scope="children"
+            viewerId={(user as { id: string }).id}
+            childNames={Object.fromEntries(kids.map((k) => [k.childUserId, k.name]))}
+          />
           <GuardianHostingApprovals viewerId={(user as { id: string }).id} />
           <ChildTryoutsSection kids={shown} multi={multi} />
           <ParentPortalSections kids={shown} multi={multi} onSigned={() => q.refetch()} />
