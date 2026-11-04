@@ -823,6 +823,41 @@ export async function updateHostedGame(
   return updated;
 }
 
+export type GameLocationField = "location" | "lat" | "lng";
+
+/** What a game reads after its location was removed: the same text a new game without a location gets. */
+export const REMOVED_GAME_LOCATION = "TBD";
+
+/**
+ * Remove a hosted game's location on purpose (host only; `clear_hosted_game_location`). An edit that sends an empty location is not
+ * a removal: for a youth-inclusive game it cannot be told apart from an older client sending back a blank value, so the database keeps
+ * the exact copy unless asked (SEC-7).
+ */
+export async function clearHostedGameLocation(
+  id: string,
+  fields: GameLocationField[] = ["location", "lat", "lng"],
+): Promise<void> {
+  const { error } = await (supabase.rpc as any)("clear_hosted_game_location", {
+    _game: id,
+    _fields: fields,
+  });
+  if (error) throw error;
+  loadLocal();
+  cache = cache.map((g) =>
+    g.id !== id
+      ? g
+      : {
+          ...g,
+          ...(fields.includes("location") ? { location: REMOVED_GAME_LOCATION } : {}),
+          ...(fields.includes("lat") ? { lat: null } : {}),
+          ...(fields.includes("lng") ? { lng: null } : {}),
+        },
+  );
+  exactLocations.delete(id);
+  emit();
+  await refreshExactLocation(id);
+}
+
 /** Delete a hosted game locally and in the DB. */
 export async function deleteHostedGame(id: string): Promise<void> {
   loadLocal();

@@ -74,7 +74,11 @@ SELECT t.reset();
 SELECT t.eq(private_sec.game_payee('p-ok'), t.id('guardian'), 'the payee of that game is its payment manager');
 SELECT t.eq(private_sec.game_payee('legacy-free-adult'), t.id('adult'), 'and of an adult host''s game, the host');
 
--- payers: only the manager can be named as payee
+-- payers: only the manager can be named as payee. SEC-7: a paid minor-hosted game always needs approval before payment, so the payer
+-- has an approved request first.
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, status, idempotency_key) VALUES ('p-ok', t.id('payer'), t.id('teenhost'), 'approved', 'kpayer');
+SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('payer'));
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'p-ok', %L)$q$, t.id('payer'), t.id('teenhost')),
   'PAYMENT_DESTINATION_INVALID', 'a payment cannot be made out to the minor host');

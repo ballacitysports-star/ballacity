@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isMissingRelationError, managedChildErrorMessage } from "@/lib/managed-children";
+import { IMAGE_STAGING_BUCKET } from "@/lib/image-staging";
 
 // Every bucket that stores user-uploaded media under a `<user id>/` prefix.
 const MEDIA_BUCKETS = [
@@ -15,6 +16,55 @@ const MEDIA_BUCKETS = [
   "org-avatars",
   "trainer-avatars",
 ];
+
+/** image_moderation statuses that put a staged file under a hold: kept as evidence (possible child-safety content), never purged. */
+const STAGING_HOLD_STATUSES = new Set(["quarantined"]);
+
+/**
+ * Remove the account's staged image uploads (`image-staging/{userId}/...`, SEC-7), except any file the scan or a reviewer put on hold:
+ * a quarantined original is evidence and stays (its image_moderation row keeps it findable; owner_id becomes NULL with the account).
+ * Fails closed: if the hold lookup fails, nothing in staging is removed. Moderation rows of removed files are removed with them.
+ */
+export async function purgeImageStaging(
+  admin: any,
+  userId: string,
+): Promise<{ removed: number; held: number }> {
+  const bucket = admin.storage.from(IMAGE_STAGING_BUCKET);
+  const page = 1000;
+  const paths: string[] = [];
+  for (let offset = 0; ; offset += page) {
+    const { data, error } = await bucket.list(userId, { limit: page, offset });
+    if (error) return { removed: 0, held: 0 }; // no bucket in this environment, or nothing readable: nothing to remove
+    const rows = (data ?? []) as { name?: string; id?: string | null }[];
+    // files only: Storage lists a sub-folder with no id, and the staging policy allows no sub-folders anyway
+    for (const f of rows) if (f.name && f.id) paths.push(`${userId}/${f.name}`);
+    if (rows.length < page) break;
+  }
+  if (paths.length === 0) return { removed: 0, held: 0 };
+
+  const { data: flagged, error: flagErr } = await admin
+    .from("image_moderation")
+    .select("path, status")
+    .eq("bucket", IMAGE_STAGING_BUCKET)
+    .in("path", paths);
+  if (flagErr) throw new Error("Could not check held images before deleting staged uploads.");
+  const held = new Set(
+    ((flagged ?? []) as { path: string; status: string }[])
+      .filter((r) => STAGING_HOLD_STATUSES.has(r.status))
+      .map((r) => r.path),
+  );
+  const removable = paths.filter((p) => !held.has(p));
+  if (removable.length > 0) {
+    const { error } = await bucket.remove(removable);
+    if (error) throw new Error(error.message);
+    await admin
+      .from("image_moderation")
+      .delete()
+      .eq("bucket", IMAGE_STAGING_BUCKET)
+      .in("path", removable);
+  }
+  return { removed: removable.length, held: held.size };
+}
 
 /**
  * Refuse, before anything is erased, when the database will refuse the final delete.
@@ -140,6 +190,14 @@ export async function purgeUserAccount(userId: string): Promise<void> {
     } catch {
       // Bucket may not exist in every environment — deletion must still proceed.
     }
+  }
+
+  // Staged originals in the private image-staging bucket, except files held as evidence (quarantined). If the hold check fails nothing
+  // there is removed and the deletion still proceeds, like the buckets above; leftovers are not held, so the staging sweep removes them.
+  try {
+    await purgeImageStaging(supabaseAdmin, userId);
+  } catch {
+    // see above
   }
 
   // 3. Delete the auth user (cascades the user's remaining rows).
