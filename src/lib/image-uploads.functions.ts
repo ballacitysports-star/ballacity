@@ -177,3 +177,40 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
       metadataStripped: metadata.stripped,
     };
   });
+
+/**
+ * Promote an image the browser staged in the private `image-staging` bucket: validate, remove personal metadata, scan, and only then
+ * publish the clean bytes to `bucket` at `targetPath`. The destination never holds the original.
+ */
+export const promoteStagedImageUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { bucket: string; stagingPath: string; targetPath: string }) =>
+    z
+      .object({
+        bucket: z.string().max(60),
+        stagingPath: z.string().min(1).max(300),
+        targetPath: z.string().min(1).max(300),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { scanImageForSafety } = await import("@/lib/image-safety.server");
+    const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
+    const { promoteStagedImage } = await import("@/lib/image-promotion.server");
+    return promoteStagedImage(
+      {
+        admin: supabaseAdmin,
+        scan: (target, userId) => scanImageForSafety(target, { userId }) as never,
+        escalate: async (bucket, path, categories) => {
+          await escalateImageForChildSafety(supabaseAdmin, {
+            bucket,
+            path,
+            categories,
+            source: "image_upload",
+          });
+        },
+      },
+      { userId: context.userId, ...data },
+    );
+  });
