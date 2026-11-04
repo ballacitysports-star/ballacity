@@ -91,6 +91,8 @@ import {
   saveCreateDraft,
   type CreateDraft,
 } from "@/lib/create-draft";
+import { isYouthInclusiveGame } from "@/lib/youth-game-location";
+import { describeLocationInPublicText } from "@/lib/youth-location-text";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -800,6 +802,17 @@ function Create() {
           if (isTeenHost && approvalProblem) {
             toast.error(approvalProblem);
             return;
+          }
+          if (isYouthInclusiveGame({ minAge, maxAge })) {
+            // A game that may include children shows only the area publicly; the database refuses a place in the text.
+            const textProblem = describeLocationInPublicText(
+              { title, description, rules: effectivePolicy.gameRules },
+              location,
+            );
+            if (textProblem) {
+              toast.error(textProblem);
+              return;
+            }
           }
           if (!hostAck) {
             toast.error("Acknowledge your host responsibilities to publish");
