@@ -25,6 +25,14 @@
 -- on the new one both work; the older app simply sees fewer posts. Recovery: fix forward; the policy can be relaxed only by a new
 -- migration approved by the owner. Depends on 20261104120000 (can_see_minor_name) and 20261104130000 (detector).
 
+-- Dependency guard: fail loudly, before changing anything, if a migration this one needs has not been applied (plpgsql bodies would otherwise fail only at user time).
+DO $guard$ BEGIN
+  IF to_regprocedure('private_sec.can_see_minor_name(uuid,uuid)') IS NULL OR to_regprocedure('private_sec.text_discloses_location(text,text)') IS NULL OR to_regprocedure('public.minor_messaging_block(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION 'R2: a required earlier release migration has not been applied (see docs/release/youth-privacy-release-runbook.md, sections 2 and 16)';
+  END IF;
+END $guard$;
+
+
 CREATE OR REPLACE FUNCTION private_sec.availability_post_visible(_owner uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
   SELECT auth.uid() IS NOT NULL AND (
