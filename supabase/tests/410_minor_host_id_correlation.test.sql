@@ -15,11 +15,13 @@ INSERT INTO public.game_participants (game_id, user_id) VALUES ('mh', t.id('play
 INSERT INTO public.team_members (team_id, user_id) VALUES ('pubteam', t.id('teenhost')), ('pubteam', t.id('quiet')), ('pubteam', t.id('mate')), ('pubteam', t.id('adulthost'));
 INSERT INTO public.skill_ratings (user_id, sport, mu, sigma, low, high, status, label)
   SELECT t.id(h), 'basketball', 25, 8, 1, 5, 'established', 'x' FROM unnest(ARRAY['teenhost', 'quiet', 'adulthost']) h;
-INSERT INTO public.highlight_reels (user_id, video_path) VALUES (t.id('teenhost'), 'p/v.mp4');
-INSERT INTO public.team_posts (team_id, author_id, kind, title) VALUES ('pubteam', t.id('teenhost'), 'announcement', 'hello');
+INSERT INTO public.team_posts (team_id, author_id, kind, title, moderation_status) VALUES ('pubteam', t.id('teenhost'), 'recap', 'Nice game', 'approved'), ('pubteam', t.id('quiet'), 'recap', 'Quiet recap', 'approved');
+INSERT INTO public.post_comments (subject_type, subject_id, author_id, body, moderation_status) SELECT 'team_post', id::text, t.id('teenhost'), 'gg', 'approved' FROM public.team_posts WHERE author_id = t.id('quiet');
 INSERT INTO public.skill_votes (game_id, voter_id, subject_id, sport, vote) VALUES ('mh', t.id('adulthost'), t.id('teenhost'), 'basketball', 1);
 INSERT INTO public.follows (follower_id, followee_id) VALUES (t.id('teenhost'), t.id('adulthost')), (t.id('follower'), t.id('teenhost'));
 SET LOCAL session_replication_role = origin;
+SELECT t.reel('teenhost', 'a');
+SELECT t.reel('quiet', 'q');
 
 CREATE FUNCTION t.seen(tbl text, col text, who text DEFAULT 'teenhost') RETURNS integer LANGUAGE plpgsql AS $f$
 DECLARE n integer;
@@ -36,6 +38,7 @@ SELECT t.eq(t.seen('highlight_reels', 'user_id'), 0, 'anonymous: no reel');
 SELECT t.eq(t.seen('team_posts', 'author_id'), 0, 'anonymous: no team post by this author');
 SELECT t.eq(t.seen('skill_votes', 'subject_id'), 0, 'anonymous: no skill vote');
 SELECT t.eq(t.seen('follows', 'follower_id'), 0, 'anonymous: no follow');
+SELECT t.eq(t.seen('post_comments', 'author_id'), 0, 'anonymous: no comment by this author');
 SELECT t.eq(t.seen('skill_ratings', 'user_id', 'adulthost'), 1, 'anonymous: an adult host''s rating is still public (unchanged)');
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq(t.seen('team_members', 'user_id'), 0, 'stranger: no team roster row');
@@ -44,6 +47,9 @@ SELECT t.eq(t.seen('highlight_reels', 'user_id'), 0, 'stranger: no reel');
 SELECT t.eq(t.seen('team_posts', 'author_id'), 0, 'stranger: no team post by this author');
 SELECT t.eq(t.seen('skill_votes', 'subject_id'), 0, 'stranger: no skill vote');
 SELECT t.eq(t.seen('follows', 'follower_id'), 0, 'stranger: no follow');
+SELECT t.eq(t.seen('post_comments', 'author_id'), 0, 'stranger: no comment by this author');
+SELECT t.eq(t.seen('highlight_reels', 'user_id', 'quiet'), 1, 'stranger: a 17-year-old who hosts nothing keeps their members-visible reel (unchanged)');
+SELECT t.eq(t.seen('team_posts', 'author_id', 'quiet'), 1, 'stranger: and their public team post');
 SELECT t.eq(t.seen('team_members', 'user_id', 'adulthost'), 1, 'stranger: an adult host''s roster row is visible (unchanged)');
 SELECT t.eq(t.seen('skill_ratings', 'user_id', 'adulthost'), 1, 'stranger: an adult host''s rating is visible (unchanged)');
 SELECT t.eq(t.seen('team_members', 'user_id', 'quiet'), 1, 'stranger: a 17-year-old who hosts nothing is listed as before');
@@ -52,15 +58,19 @@ SELECT t.as_user(t.id('teenstranger'));
 SELECT t.eq(t.seen('team_members', 'user_id'), 0, 'teen stranger: no team roster row');
 SELECT t.eq(t.seen('skill_ratings', 'user_id'), 0, 'teen stranger: no skill rating');
 SELECT t.eq(t.seen('team_posts', 'author_id'), 0, 'teen stranger: no team post by this author');
+SELECT t.eq(t.seen('highlight_reels', 'user_id'), 0, 'teen stranger: no reel');
 
 -- ================= related people keep what they need =================
 SELECT t.as_user(t.id('teenhost'));
+SELECT t.eq(t.seen('team_posts', 'author_id'), 1, 'the host sees their own post');
 SELECT t.eq(t.seen('team_members', 'user_id'), 1, 'the host sees their own roster row');
 SELECT t.eq(t.seen('skill_ratings', 'user_id'), 1, 'and their own rating');
 SELECT t.as_user(t.id('guardian'));
 SELECT t.eq(t.seen('team_members', 'user_id'), 1, 'the guardian sees the roster row');
 SELECT t.eq(t.seen('skill_ratings', 'user_id'), 1, 'and the rating');
 SELECT t.as_user(t.id('mate'));
+SELECT t.eq(t.seen('team_posts', 'author_id'), 1, 'a teammate sees the host''s team post');
+SELECT t.eq(t.seen('highlight_reels', 'user_id'), 1, 'and the reel');
 SELECT t.eq(t.seen('team_members', 'user_id'), 1, 'a teammate sees the roster row');
 SELECT t.eq(t.seen('skill_ratings', 'user_id'), 1, 'and the rating');
 SELECT t.as_user(t.id('mgr'));
@@ -89,7 +99,26 @@ UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'mh';
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq(t.seen('team_members', 'user_id'), 1, 'after the game is cancelled the roster row is listed as before');
 SELECT t.eq(t.seen('skill_ratings', 'user_id'), 1, 'and the rating is visible as before');
+SELECT t.eq(t.seen('team_posts', 'author_id'), 1, 'and the team post');
+SELECT t.eq(t.seen('highlight_reels', 'user_id'), 1, 'and the reel');
 SELECT t.reset();
+
+-- ================= a team the host owns would link the id to a name (teams.owner_id is readable)
+UPDATE public.hosted_games SET cancelled_at = NULL WHERE id = 'mh';
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.throws($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('mine', 'team', 'Teen Team', 'teenteam', auth.uid())$q$, 'MINOR_HOST_TEAM_OWNER', 'a minor who hosts a youth game cannot create a team they own');
+SELECT t.reset();
+UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'mh';
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.lives($q$INSERT INTO public.teams (id, kind, name, handle, owner_id) VALUES ('mine', 'team', 'Teen Team', 'teenteam', auth.uid())$q$, 'with no active game they can');
+SELECT t.reset();
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, min_age, max_age, location, neighborhood, host_snapshot) VALUES
+  ('mh2', t.id('teenhost'), 'basketball', 'Second run', now() + interval '4 days', 12, 15, 'Gym', 'North', '{"neutral": true}'::jsonb);
+SET LOCAL session_replication_role = origin;
+SELECT t.throws($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'mh2'$q$, 'MINOR_HOST_TEAM_OWNER', 'and cannot publish a youth game while owning a visible team');
+UPDATE public.teams SET hidden_at = now() WHERE id = 'mine';
+SELECT t.lives($q$UPDATE public.hosted_games SET max_age = 15 WHERE id = 'mh2'$q$, 'unless the team is hidden');
 
 -- ================= grants =================
 SELECT t.eq(has_function_privilege('anon', 'private_sec.minor_host_hidden(uuid)', 'EXECUTE'), true, 'the helper must be callable by anonymous policy evaluation');
