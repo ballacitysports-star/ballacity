@@ -1252,7 +1252,7 @@
       "version": "20261108100000",
       "source": "supabase",
       "path": "supabase/migrations/20261108100000_first_guardian_verification.sql",
-      "sha256": "931bbd0835302d1f2c7862cbd57feec1c15c686a979bd9dae2840d34d3f6dd60",
+      "sha256": "6a7677f1b458177dfde701f185a4184e2d11eaaf558bec4d6bffafde79a88bbc",
       "requires": {
         "functions": [
           "private_sec.has_guardian_link(uuid)",
@@ -1457,7 +1457,7 @@
       "version": "20261108140000",
       "source": "supabase",
       "path": "supabase/migrations/20261108140000_payment_oracles.sql",
-      "sha256": "7c4f185ad04a9425ff8430267d13833bf6f619ef71d311cef3a4b950f2eecdaf",
+      "sha256": "3f33c4f2c4c9f0f5b480ab667af4b6200e3980e3c0bb6c1db0bef0c0388bea86",
       "requires": {
         "functions": [
           "private_sec.can_notify(uuid,uuid)",
@@ -1490,7 +1490,33 @@
           "public.enforce_join_request_self_only()",
           "public.enforce_participant_self_only()",
           "public.enforce_payment_self_only()",
+          "public.lock_payment_submission_keys()",
           "public.payment_precondition_error(text,uuid)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 34,
+      "version": "20261108150000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108150000_image_processing_claim.sql",
+      "sha256": "067fc0698e40daeee556ca4b39f0d3787e7a348aaa9795afb94dda35a79ca486",
+      "requires": {
+        "functions": [
+          "private_sec.image_path_processed(text,text)"
+        ],
+        "tables": [
+          "public.image_moderation"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "public.claim_image_processing(text,text,uuid)",
+          "public.finish_image_processing(text,text,uuid,text,jsonb)"
         ],
         "tables": [],
         "schemas": []
@@ -2594,7 +2620,7 @@
         "expect_steps": {
           "16": {
             "20261108100000": {
-              "def": "985fbfc38074fa47f60a040f000293e2",
+              "def": "96bdc9cfa7f6a7dff468c5741df26f3a",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2606,7 +2632,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "985fbfc38074fa47f60a040f000293e2",
+            "def": "96bdc9cfa7f6a7dff468c5741df26f3a",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -2899,7 +2925,7 @@
         "expect_steps": {
           "16": {
             "20261108100000": {
-              "def": "60977d4f8a053ba0e16d7402d1334dbf",
+              "def": "5d789a0131c27307ac2287aea7b8e528",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2911,7 +2937,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "60977d4f8a053ba0e16d7402d1334dbf",
+            "def": "5d789a0131c27307ac2287aea7b8e528",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3354,7 +3380,8 @@
         "signature": "private_sec.image_staging_flagged(text)",
         "defined_by": [
           "20261106120000",
-          "20261108120000"
+          "20261108120000",
+          "20261108150000"
         ],
         "expect_before": {
           "16": null
@@ -3383,12 +3410,24 @@
                 "service_role:EXECUTE",
                 "supabase_storage_admin:EXECUTE"
               ]
+            },
+            "20261108150000": {
+              "def": "98ee40bb693a28d00bbfe299426f6dc7",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "97ab23362bf38e6f10c33cb4a28293aa",
+            "def": "98ee40bb693a28d00bbfe299426f6dc7",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -6558,6 +6597,41 @@
         }
       },
       {
+        "signature": "public.claim_image_processing(text,text,uuid)",
+        "defined_by": [
+          "20261108150000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108150000": {
+              "def": "a150fadee5bea08881b6bce1aef7b46d",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "a150fadee5bea08881b6bce1aef7b46d",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.clear_hosted_game_location(text,text[])",
         "defined_by": [
           "20261108130000"
@@ -8079,6 +8153,41 @@
             "owner": "postgres",
             "secdef": false,
             "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "public.finish_image_processing(text,text,uuid,text,jsonb)",
+        "defined_by": [
+          "20261108150000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108150000": {
+              "def": "df7cf2617718fba6bd9d86a74e53e417",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "df7cf2617718fba6bd9d86a74e53e417",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
             "acl": [
               "postgres:EXECUTE",
               "service_role:EXECUTE"
@@ -10599,6 +10708,45 @@
         }
       },
       {
+        "signature": "public.lock_payment_submission_keys()",
+        "defined_by": [
+          "20261108140000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108140000": {
+              "def": "8ee7f47ff0bffceae71f6ff56c87c74f",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "8ee7f47ff0bffceae71f6ff56c87c74f",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.messages_require_checked_attachment()",
         "defined_by": [
           "20261106120500"
@@ -12913,7 +13061,7 @@
         "expect_steps": {
           "16": {
             "20261108100000": {
-              "def": "9ebea8782e0c9d95e5b9c5e9e0619413",
+              "def": "02378f56e05a50c7d2a77523beece6b6",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -12927,7 +13075,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "9ebea8782e0c9d95e5b9c5e9e0619413",
+            "def": "02378f56e05a50c7d2a77523beece6b6",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -22883,7 +23031,7 @@
         "schema": "public",
         "table": "image_moderation",
         "defined_by": [
-          "20261103150000"
+          "20261108150000"
         ],
         "expect_before": {
           "16": {
@@ -22922,7 +23070,7 @@
         },
         "expect_steps": {
           "16": {
-            "20261103150000": {
+            "20261108150000": {
               "rls": true,
               "force_rls": false,
               "acl": [
@@ -26124,6 +26272,7 @@
                 "service_role:UPDATE"
               ],
               "triggers": [
+                "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
                 "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
                 "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
                 "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
@@ -26175,6 +26324,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
               "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
               "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
               "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
