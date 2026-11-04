@@ -43,3 +43,10 @@ no row data), run with `search_path = ''` exactly as the preflight reads a targe
      sandbox (a Supabase project of the same version), never from the local stub.
 - The full 33-migration manifest must be generated on PG17 from the final integration tree and these exceptions reviewed
   before any production preflight run.
+
+## 4. Ledger name rule checked against production (2026-11-04, read-only)
+
+Every Lovable-named production ledger row (`<timestamp>_<uuid>`) has a version 0 to 13 seconds **after** the
+timestamp in its name. None is earlier. R5 review finding F5 restricts the preflight's name rule to rows after a
+**historical** file's timestamp (0 to 10 s). This closes a duplicate row placed just before the release range. Rows that
+fall outside 10 s were already handled by `known_ledger_rows_without_file` or by an exact version, as before.

@@ -712,6 +712,26 @@ describe("fail closed: unknown and unledgered history (rule c)", () => {
     assert.match(text, new RegExp(`unknown ledger row ${far}`));
   });
 
+  test("R5 review F5: a release-range file's name cannot recognize a row just before the range", () => {
+    const f = migrationOrder(ROOT).find((m) => m.version >= FROM && m.source === "supabase");
+    const db = newDb(PRE);
+    const before = shiftVersion(f.version, -2);
+    scratch.sql(db, `INSERT INTO ${LEDGER} (version, name) VALUES ('${before}', '${f.name}')`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(text, new RegExp(`unknown ledger row ${before}`));
+  });
+
+  test("R5 review F5: a Lovable-style name counts only AFTER the file's timestamp", () => {
+    const f = migrationOrder(ROOT).find((m) => m.version < FROM && LOVABLE_NAME.test(m.name));
+    const db = newDb(PRE);
+    const early = shiftVersion(f.version, -2);
+    scratch.sql(db, `INSERT INTO ${LEDGER} (version, name) VALUES ('${early}', '${f.name}')`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(text, new RegExp(`unknown ledger row ${early}`));
+  });
+
   test("a historical file without a ledger row that known_unledgered does not list fails", () => {
     const db = newDb(PRE);
     scratch.sql(db, `DELETE FROM ${LEDGER} WHERE version = '20260926155719'`);
