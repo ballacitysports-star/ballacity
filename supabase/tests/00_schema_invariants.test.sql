@@ -45,6 +45,8 @@ SELECT t.eq(
       'private_sec.minor_host_hidden(_user uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
+      -- SEC-5: the security_invoker view hosted_games_public calls it for anonymous discovery; it answers only about the caller.
+      'private_sec.game_organizer_for_caller(_game text)',
       -- Public by design: the checkout page needs the host's PayPal merchant id and a
       -- game's refund terms before the visitor signs in.
       'public.get_game_host_paypal(_game_id text)',

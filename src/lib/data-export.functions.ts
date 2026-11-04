@@ -34,7 +34,9 @@ const SELECT_COLUMNS =
  */
 const CATEGORY_QUERIES: Record<
   ExportCategory,
-  Array<{ key: string; table: string; columns: string; column: string }>
+  // `value` defaults to the caller's id; "games I host" reads hosted_games_public by viewer_is_host (SEC-5: host_id
+  // is not readable by clients after phase 2).
+  Array<{ key: string; table: string; columns: string; column: string; value?: boolean }>
 > = {
   profile: [
     {
@@ -94,8 +96,9 @@ const CATEGORY_QUERIES: Record<
   games_created: [
     {
       key: "games_created",
-      table: "hosted_games",
-      column: "host_id",
+      table: "hosted_games_public",
+      column: "viewer_is_host",
+      value: true,
       columns:
         "id, sport, title, date, ends_at, all_day, timezone, duration, location, neighborhood, lat, lng, max_players, joined, skill, price, indoor, is_private, status, description, equipment, min_age, max_age, created_at",
     },
@@ -294,7 +297,7 @@ export const requestDataExport = createServerFn({ method: "POST" })
           const { data: rows, error } = await context.supabase
             .from(q.table as never)
             .select(q.columns)
-            .eq(q.column, userId);
+            .eq(q.column, q.value ?? userId);
           if (error) throw new Error(`${q.key}: ${error.message}`);
           const list = (rows ?? []) as unknown[];
           payload[q.key] = list;

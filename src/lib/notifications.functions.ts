@@ -51,3 +51,69 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const gameHostInputSchema = z.object({
+  game_id: z.string().min(1).max(200),
+  type: z.string().min(1).max(64),
+  title: z.string().min(1).max(200),
+  body: z.string().max(2000).nullable().optional(),
+  link: z.string().max(2000).nullable().optional(),
+});
+
+/**
+ * Notify the host of a game the caller can see, without the caller knowing who the host is (SEC-5: a minor host's
+ * account id is masked for unrelated players, so the browser cannot name them). The host is looked up here with the
+ * service role and never returned; the same relationship check and minor-safe wording as createNotificationForUser
+ * apply, plus a best-effort push.
+ */
+export const notifyGameHost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => gameHostInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const callerId = context.userId;
+    // The caller must be able to read the game (row security, as the caller).
+    const { data: visible } = await context.supabase
+      .from("hosted_games_public")
+      .select("id")
+      .eq("id", data.game_id)
+      .maybeSingle();
+    if (!visible) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: game } = await supabaseAdmin
+      .from("hosted_games")
+      .select("host_id")
+      .eq("id", data.game_id)
+      .maybeSingle();
+    const hostId = (game as { host_id?: string } | null)?.host_id ?? null;
+    if (!hostId || hostId === callerId) return { ok: false as const };
+    const { data: allowed, error: relErr } = await supabaseAdmin.rpc("can_notify" as any, {
+      _caller: callerId,
+      _target: hostId,
+    });
+    if (relErr || !allowed) return { ok: false as const };
+    const content = shapeNotificationForRecipient(
+      { type: data.type, title: data.title, body: data.body ?? null, link: data.link ?? null },
+      { isSelf: false, isConfirmedAdult: await isConfirmedAdult(supabaseAdmin as any, hostId) },
+    );
+    const { error } = await supabaseAdmin.from("notifications").insert({
+      user_id: hostId,
+      type: content.type,
+      title: content.title,
+      body: content.body,
+      link: content.link,
+    });
+    if (error) return { ok: false as const };
+    try {
+      const { deliverPush, absolutizeUrl } = await import("@/lib/push.server");
+      await deliverPush({
+        userId: hostId,
+        title: content.title,
+        body: content.body,
+        url: (await absolutizeUrl(content.link)) ?? null,
+        type: content.type,
+      });
+    } catch {
+      /* push is best effort */
+    }
+    return { ok: true as const };
+  });

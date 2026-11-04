@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { pageHead } from "@/lib/seo";
 import type { ListingKind } from "@/lib/listing-visibility";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 export const Route = createFileRoute("/account/hidden")({
   head: () =>
@@ -31,14 +32,20 @@ type HiddenRow = {
 /** Everything the signed-in person has hidden themselves, one list, so nothing is lost once it is out of the feed. */
 async function loadHidden(userId: string): Promise<HiddenRow[]> {
   // The generated types predate the hide columns.
-  const q = (table: string, columns: string, ownerColumn: string) =>
+  const q = (
+    table: string,
+    columns: string,
+    ownerColumn: string,
+    owner: string | boolean = userId,
+  ) =>
     supabase
       .from(table as never)
       .select(columns)
-      .eq(ownerColumn, userId)
+      .eq(ownerColumn, owner)
       .not("owner_hidden_at", "is", null);
   const [games, posts, teams, gyms] = await Promise.all([
-    q("hosted_games", "id, title", "host_id"),
+    // SEC-5: games I host are viewer_is_host on the view, not a filter on host_id.
+    q(GAMES_READ, "id, title", "viewer_is_host", true),
     q("team_posts", "id, title, team_id", "author_id"),
     q("teams", "id, name, kind", "owner_id"),
     q("trainer_orgs", "id, name", "owner_id"),

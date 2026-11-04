@@ -352,16 +352,20 @@ describe("who is asking: role flags only, through the caller's own permissions",
     expect(viewer.roles.sort()).toEqual(["coach", "host", "parent", "player"]);
     expect(sb.calls.map((c) => c.table).sort()).toEqual([
       "guardian_links",
-      "hosted_games",
+      "hosted_games_public",
       "profiles",
       "team_members",
     ]);
     for (const c of sb.calls) {
       const scoped = Object.entries(c.filters).filter(([k]) =>
-        ["id", "parent_user_id", "user_id", "host_id"].includes(k),
+        ["id", "parent_user_id", "user_id", "viewer_is_host"].includes(k),
       );
       expect(scoped.length).toBeGreaterThan(0);
-      expect(scoped.every(([, v]) => v === "u1")).toBe(true);
+      // Own rows: an id filter is the caller's id; hosting is the view's "this is my game" flag, never someone's host_id.
+      expect(scoped.every(([k, v]) => (k === "viewer_is_host" ? v === true : v === "u1"))).toBe(
+        true,
+      );
+      expect(sb.calls.some((c) => "host_id" in c.filters)).toBe(false);
     }
   });
 

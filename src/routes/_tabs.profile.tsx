@@ -79,6 +79,7 @@ import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { FamilyCard } from "@/components/child/FamilyCard";
+import { stripMaskedColumns } from "@/lib/organizer-access";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -212,10 +213,15 @@ function PlayerProfile() {
         if (payload.eventType === "DELETE") {
           return prev.filter((r) => r.id !== payload.old?.id);
         }
-        const row = payload.new as JoinRequest;
-        if (!row) return prev;
+        // SEC-5: the realtime row comes from the table, not join_requests_visible, so it may carry a host id this
+        // viewer is not entitled to. Only the status fields are merged into rows already read through the view; a
+        // new row arrives through the refresh that follows.
+        const row = stripMaskedColumns(
+          payload.new as Record<string, unknown> | null,
+        ) as Partial<JoinRequest> | null;
+        if (!row?.id) return prev;
         const idx = prev.findIndex((r) => r.id === row.id);
-        if (idx === -1) return [row, ...prev];
+        if (idx === -1) return prev;
         const next = prev.slice();
         next[idx] = { ...next[idx], ...row };
         return next;
@@ -238,12 +244,9 @@ function PlayerProfile() {
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "join_requests",
-          filter: `host_id=eq.${profileUser.id}`,
-        },
+        // Requests for games I host. No host_id filter (SEC-5 phase 2 closes that column to clients): row security
+        // already limits events to rows this account may read, and the refresh reads them through the view.
+        { event: "*", schema: "public", table: "join_requests" },
         (payload) => {
           applyPayload(payload as any, "host");
           refreshRequests({ silent: true });

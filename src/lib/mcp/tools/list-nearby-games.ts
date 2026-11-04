@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { shapeGameForApi } from "@/lib/mcp/game-output";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 function supabaseForUser(ctx: ToolContext) {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
@@ -35,7 +36,8 @@ export default defineTool({
     }
     const today = new Date().toISOString().slice(0, 10);
     let query = supabaseForUser(ctx)
-      .from("hosted_games")
+      // SEC-5: the view masks a minor host's id for unrelated callers; shapeGameForApi still drops it for youth games.
+      .from(GAMES_READ)
       .select(
         "id,title,sport,date,duration,location,neighborhood,skill,price,joined,max_players,host_id,min_age,max_age",
       )

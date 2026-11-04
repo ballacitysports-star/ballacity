@@ -63,6 +63,13 @@ export type Game = {
    * organization, else "Youth host"), with no username, photo or rating, and the UI shows no profile link.
    */
   hostNeutral?: boolean;
+  /**
+   * SEC-5: true when the signed-in viewer hosts this game. Use this, not `hostUserId === me`, for "is this my game": `hostUserId` is
+   * absent when the host is not a confirmed adult and the viewer is not related to them (hosted_games_public masks it).
+   */
+  viewerIsHost?: boolean;
+  /** SEC-5: opaque per-game organizer reference (hosted_games.organizer_ref). Never equal across games; not an account id. */
+  organizerRef?: string;
   date: string; // ISO
   duration: string; // "90 min"
   location: string;

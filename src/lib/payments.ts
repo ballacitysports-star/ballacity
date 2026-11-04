@@ -3,6 +3,7 @@ import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
 import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import { JOIN_REQUESTS_READ } from "@/lib/organizer-access";
 
 export type PaymentType =
   "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
@@ -42,7 +43,12 @@ export type JoinRequest = {
   id: string;
   game_id: string;
   player_id: string;
-  host_id: string;
+  /**
+   * The game's host, from join_requests_visible (SEC-5): null when this viewer may not know the organizer (a host
+   * who is not a confirmed adult, seen by an unrelated requester). Use `viewer_is_host` for "a request for my game".
+   */
+  host_id: string | null;
+  viewer_is_host?: boolean;
   status: "pending" | "approved" | "rejected";
   message: string | null;
   reviewer_notes: string | null;
@@ -522,7 +528,8 @@ export async function deleteMyPendingSubmission(id: string) {
  */
 export async function createJoinRequest(input: {
   game_id: string;
-  host_id: string;
+  /** Ignored by the database, which names the host from the game (SEC-5); kept for older callers. */
+  host_id?: string | null;
   message?: string | null;
   idempotency_key?: string;
 }): Promise<JoinRequest> {
@@ -531,23 +538,35 @@ export async function createJoinRequest(input: {
 
   const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 
-  const attemptInsert = async () =>
+  // The database fills in host_id from the game (SEC-5), so the client never needs the host's account id to ask.
+  // No `.select()` on the insert: returning the row would read host_id from the table; it is read back through the view.
+  const readBack = async () =>
     supabase
-      .from("join_requests")
-      .insert({
-        game_id: input.game_id,
-        host_id: input.host_id,
-        player_id: u.user!.id,
-        message: input.message ?? null,
-        idempotency_key,
-      })
+      .from(JOIN_REQUESTS_READ)
       .select("*")
-      .single();
+      .eq("player_id", u.user!.id)
+      .eq("idempotency_key", idempotency_key)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  const attemptInsert = async () =>
+    supabase.from("join_requests").insert({
+      game_id: input.game_id,
+      player_id: u.user!.id,
+      message: input.message ?? null,
+      idempotency_key,
+    });
 
-  const { data, error } = await attemptInsert();
-  if (!error && data) {
-    void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", (data as JoinRequest).id));
-    return data as JoinRequest;
+  const { error } = await attemptInsert();
+  if (!error) {
+    const { data, error: readErr } = await readBack();
+    if (readErr) throw readErr;
+    if (data) {
+      void import("@/lib/guardian-push.functions").then((m) =>
+        m.pingGuardians("join_request", (data as JoinRequest).id),
+      );
+      return data as JoinRequest;
+    }
   }
 
   // 23505 = unique_violation. Either (player_id, idempotency_key) or the
@@ -559,7 +578,7 @@ export async function createJoinRequest(input: {
   // successful idempotent result.
   if (error && (error as { code?: string }).code === "23505") {
     const { data: existing, error: readErr } = await supabase
-      .from("join_requests")
+      .from(JOIN_REQUESTS_READ)
       .select("*")
       .eq("player_id", u.user.id)
       .or(`idempotency_key.eq.${idempotency_key},and(game_id.eq.${input.game_id})`)
@@ -582,7 +601,7 @@ export async function createJoinRequest(input: {
           const secs = Math.ceil(cooldownMs / 1000);
           throw new Error(`Please wait ${formatCooldown(secs)} before resubmitting this request.`);
         }
-        const { data: retryData, error: retryErr } = await supabase
+        const { error: retryErr } = await supabase
           .from("join_requests")
           .update({
             status: "pending",
@@ -590,21 +609,30 @@ export async function createJoinRequest(input: {
             // reviewer_notes / reviewed_at are cleared by the trigger.
           } as never)
           .eq("id", prev.id)
-          .eq("status", "rejected")
-          .select("*")
-          .single();
+          .eq("status", "rejected");
         if (retryErr) {
           // Trigger raises P0001 with a human-readable message for cap/cooldown.
           throw new Error(retryErr.message);
         }
-        void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", prev.id));
+        const { data: retryData, error: reReadErr } = await supabase
+          .from(JOIN_REQUESTS_READ)
+          .select("*")
+          .eq("id", prev.id)
+          .maybeSingle();
+        if (reReadErr) throw reReadErr;
+        if (!retryData || (retryData as JoinRequest).status !== "pending") {
+          throw new Error("Couldn't resubmit this request. Please try again.");
+        }
+        void import("@/lib/guardian-push.functions").then((m) =>
+          m.pingGuardians("join_request", prev.id),
+        );
         return retryData as JoinRequest;
       }
       return prev;
     }
   }
 
-  throw error;
+  throw error ?? new Error("Couldn't send the request. Please try again.");
 }
 
 function formatCooldown(secs: number): string {
@@ -689,7 +717,7 @@ export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | nu
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data, error } = await supabase
-    .from("join_requests")
+    .from(JOIN_REQUESTS_READ)
     .select("*")
     .eq("game_id", gameId)
     .eq("player_id", u.user.id)
@@ -705,10 +733,11 @@ export async function listHostJoinRequests(
 ): Promise<JoinRequest[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
+  // SEC-5: "requests for my games" is the view's viewer_is_host, not a filter on host_id.
   let q = supabase
-    .from("join_requests")
+    .from(JOIN_REQUESTS_READ)
     .select("*")
-    .eq("host_id", u.user.id)
+    .eq("viewer_is_host", true)
     .order("created_at", { ascending: false });
   if (status) q = q.eq("status", status);
   const { data, error } = await q;
@@ -722,7 +751,7 @@ export async function listMyJoinRequests(
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
   let q = supabase
-    .from("join_requests")
+    .from(JOIN_REQUESTS_READ)
     .select("*")
     .eq("player_id", u.user.id)
     .order("created_at", { ascending: false });
