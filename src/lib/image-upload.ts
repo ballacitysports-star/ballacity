@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildMediaRef } from "@/lib/media-refs";
 import { warmImageVariants } from "@/lib/image-variants";
-import { finalizeImageUpload } from "@/lib/image-uploads.functions";
+import { finalizeImageUpload, promoteStagedImageUpload } from "@/lib/image-uploads.functions";
+import { IMAGE_STAGING_BUCKET, isMissingBucketError } from "@/lib/image-staging";
 import { refreshBlockedImages } from "@/lib/blocked-images";
 import {
   MAX_IMAGE_BYTES,
@@ -63,19 +64,53 @@ export async function uploadDataUrlToBucket(
   const { blob, mime, ext } = decodeDataUrl(dataUrl);
   const path = `${ownerId}/${crypto.randomUUID()}.${ext}`;
 
-  const { error } = await supabase.storage.from(bucket).upload(path, blob, {
-    contentType: mime,
-    upsert: false,
-    cacheControl: "31536000",
-  });
-  if (error) throw new Error(error.message);
+  // Preferred: stage privately, let the server clean, scan and publish. The destination bucket never holds the original.
+  // Falls back to the direct upload only when the staging bucket does not exist yet (database not migrated) or the folder is not the
+  // caller's own (organization folders), so every existing flow keeps working during the rollout.
+  const { data: auth } = await supabase.auth.getUser();
+  const stagingFolderIsOwn = !!auth.user && ownerId === auth.user.id;
+  let staged = false;
+  if (stagingFolderIsOwn) {
+    const stagingPath = `${ownerId}/${crypto.randomUUID()}.${ext}`;
+    const { error: stageErr } = await supabase.storage
+      .from(IMAGE_STAGING_BUCKET)
+      .upload(stagingPath, blob, {
+        contentType: mime,
+        upsert: false,
+      });
+    if (!stageErr) {
+      const check = await promoteStagedImageUpload({
+        data: { bucket, stagingPath, targetPath: path },
+      });
+      if (check?.quarantined) {
+        void refreshBlockedImages();
+        throw new Error(
+          "This image was flagged by our automated safety check and is pending review.",
+        );
+      }
+      staged = true;
+    } else if (!isMissingBucketError(stageErr.message)) {
+      throw new Error(stageErr.message);
+    }
+  }
 
-  // Server-side re-validation + automated safety scan. Anything unsafe is
-  // quarantined (hidden app-wide) and never handed back as a usable URL.
-  const check = await finalizeImageUpload({ data: { bucket, path } });
-  if (check?.quarantined) {
-    void refreshBlockedImages();
-    throw new Error("This image was flagged by our automated safety check and is pending review.");
+  if (!staged) {
+    const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+      contentType: mime,
+      upsert: false,
+      cacheControl: "31536000",
+    });
+    if (error) throw new Error(error.message);
+
+    // Server-side re-validation + automated safety scan. Anything unsafe is
+    // quarantined (hidden app-wide) and never handed back as a usable URL.
+    const check = await finalizeImageUpload({ data: { bucket, path } });
+    if (check?.quarantined) {
+      void refreshBlockedImages();
+      throw new Error(
+        "This image was flagged by our automated safety check and is pending review.",
+      );
+    }
   }
 
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {
