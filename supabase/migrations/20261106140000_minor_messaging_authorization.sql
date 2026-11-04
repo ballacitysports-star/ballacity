@@ -258,6 +258,7 @@ BEGIN
     END IF;
   END IF;
   IF _block IS NOT NULL THEN
+    IF _block LIKE '%:other' THEN _block := 'not_permitted:other'; END IF;   -- final review N1: no reason about the other person
     RAISE EXCEPTION 'MINOR_MESSAGING_BLOCKED:%', _block USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
@@ -716,3 +717,122 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.guardian_decide_link_request(uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.guardian_decide_link_request(uuid, boolean) TO authenticated, service_role;
+
+-- ---------------------------------------------------------------------------------------------------------------------------------
+-- Final independent review (7d154333):
+-- N1: create_direct_conversation told any caller WHY a minor could not be messaged (age band, guardian link, guardian controls),
+--     which SEC-2 hides everywhere else; a reason about the other person is now one fixed code.
+-- N2: host_cancel_game sent the host's free text to every participant, minors included, outside can_notify and guardian controls.
+CREATE OR REPLACE FUNCTION public.create_direct_conversation(_other_user uuid, _game_id text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _me uuid := auth.uid();
+  _existing uuid;
+  _new_id uuid;
+  _mode text;
+  _block text;
+BEGIN
+  IF _me IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '28000';
+  END IF;
+  IF _me = _other_user THEN
+    RAISE EXCEPTION 'Cannot message yourself';
+  END IF;
+
+  _block := public.minor_messaging_block(_me, _other_user);
+  IF _block IS NOT NULL THEN
+    -- Final review N1: a reason about the OTHER person (their age band, guardian link or controls) is not told to the caller;
+    -- the app shows its generic line for this code. A reason about the caller's own account (:self) is still explained.
+    IF _block LIKE '%:other' THEN _block := 'not_permitted:other'; END IF;
+    RAISE EXCEPTION 'MINOR_MESSAGING_BLOCKED:%', _block;
+  END IF;
+
+  SELECT cp1.conversation_id INTO _existing
+  FROM public.conversation_participants cp1
+  JOIN public.conversation_participants cp2
+    ON cp1.conversation_id = cp2.conversation_id
+  WHERE cp1.user_id = _me AND cp2.user_id = _other_user
+  LIMIT 1;
+
+  IF _existing IS NOT NULL THEN
+    RETURN _existing;
+  END IF;
+
+  _mode := COALESCE(public.privacy_text(_other_user, 'allow_messages'), 'everyone');
+  IF _mode = 'nobody' THEN
+    RAISE EXCEPTION 'This player is not accepting new messages.';
+  ELSIF _mode = 'shared' AND NOT public.shares_game_or_chat(_me, _other_user) THEN
+    RAISE EXCEPTION 'This player only accepts messages from people they share a game or chat with.';
+  END IF;
+
+  INSERT INTO public.conversations (created_by, game_id)
+  VALUES (_me, _game_id)
+  RETURNING id INTO _new_id;
+
+  INSERT INTO public.conversation_participants (conversation_id, user_id)
+  VALUES (_new_id, _me), (_new_id, _other_user);
+
+  RETURN _new_id;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.host_cancel_game(_game_id text, _reason text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  g record;
+  p record;
+BEGIN
+  SELECT id, host_id, title, cancelled_at INTO g
+  FROM public.hosted_games WHERE id = _game_id;
+
+  IF g IS NULL THEN
+    RAISE EXCEPTION 'Game not found.' USING ERRCODE = 'P0001';
+  END IF;
+  IF g.host_id <> auth.uid() AND NOT public.is_moderator(auth.uid()) THEN
+    RAISE EXCEPTION 'Only the host can cancel this game.' USING ERRCODE = 'P0001';
+  END IF;
+  IF g.cancelled_at IS NOT NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.hosted_games
+    SET status = 'cancelled',
+        cancelled_at = now(),
+        cancellation_reason = NULLIF(btrim(COALESCE(_reason, '')), ''),
+        joins_closed = true,
+        updated_at = now()
+  WHERE id = _game_id;
+
+  FOR p IN
+    SELECT user_id FROM public.game_participants
+    WHERE game_id = _game_id AND user_id <> g.host_id
+  LOOP
+    -- Final review N2: the host's free-text reason reaches only confirmed adults; anyone else gets the fixed wording
+    -- (their guardian sees the reason on the game page).
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (
+      p.user_id, 'game_cancelled',
+      g.title || ' was cancelled',
+      CASE WHEN public.age_cohort_of(p.user_id) = 'adult'
+           THEN COALESCE(NULLIF(btrim(COALESCE(_reason, '')), ''), 'The host cancelled this game.')
+           ELSE 'The host cancelled this game.' END,
+      '/games/' || _game_id
+    );
+  END LOOP;
+END $function$
+;
+
+-- N6: SEC-2 (#273) containment: this migration redefines wrapped helpers (minor_messaging_block, can_notify) in public; re-wrap
+-- here so the release is safe even if no later migration re-wraps.
+DO $rewrap$ BEGIN
+  IF to_regprocedure('private_sec.wrap_oracle_helpers()') IS NOT NULL THEN PERFORM private_sec.wrap_oracle_helpers(); END IF;
+END $rewrap$;

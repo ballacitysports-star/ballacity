@@ -35,9 +35,9 @@ SELECT t.reset();
 SELECT t.as_user(t.id('adult'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kid')), 'MINOR_MESSAGING_BLOCKED', 'adult stranger to an under-13: refused');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen14')), 'MINOR_MESSAGING_BLOCKED', 'adult stranger to a linked 13-15: refused');
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:guardian_only', 'adult stranger to a linked 16-17: refused (guardian-only default)');
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen14')), 'MINOR_MESSAGING_BLOCKED:needs_guardian_link:other', 'adult stranger to an unlinked 13-15: refused (the child needs a linked guardian first)');
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'MINOR_MESSAGING_BLOCKED:needs_guardian_link:other', 'E1 closed: adult stranger to an unlinked 16-17 is refused');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'adult stranger to a linked 16-17: refused (guardian-only default)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen14')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'adult stranger to an unlinked 13-15: refused (the child needs a linked guardian first)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('selfteen')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'E1 closed: adult stranger to an unlinked 16-17 is refused');
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('adulttwo')), 'adult to adult: allowed');
 SELECT t.reset();
 SELECT t.as_user(t.id('selfteenb'));
@@ -47,7 +47,7 @@ SELECT t.reset();
 -- ---- a guardian who opens messaging to peers lets an adult stranger reach a 16-17 (existing test 120 asserts this)
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('teen17');
 SELECT t.as_user(t.id('shared'));
-SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:needs_connection:other', 'E3 closed: "peers" chosen by the guardian does not authorize an adult stranger');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teen17')), 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'E3 closed: "peers" chosen by the guardian does not authorize an adult stranger');
 SELECT t.reset();
 
 -- ---- blocks
