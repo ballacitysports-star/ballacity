@@ -72,6 +72,7 @@ describe("scan counts", () => {
       hasXmp: false,
       hasOther: false,
       orientation: 6,
+      animated: false,
     } as const;
     const clean = {
       format: "png",
@@ -80,6 +81,7 @@ describe("scan counts", () => {
       hasXmp: false,
       hasOther: false,
       orientation: null,
+      animated: false,
     } as const;
     expect(addToScanCounts(c, "avatars", gps)).toBe(true);
     expect(addToScanCounts(c, "avatars", clean)).toBe(false);

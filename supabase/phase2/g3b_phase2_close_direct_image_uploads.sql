@@ -51,20 +51,46 @@ CREATE POLICY "phase2 org admins read org images" ON storage.objects FOR SELECT 
 DROP POLICY IF EXISTS "phase2 org admins delete org images" ON storage.objects;
 CREATE POLICY "phase2 org admins delete org images" ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id IN ('org-avatars', 'org-covers') AND public.is_trainer_org_admin(((storage.foldername(name))[1])::uuid, auth.uid()));
+
+-- Entity images promoted into the uploader's own folder (`{uid}/...` in the org, team and trainer buckets) had a DELETE policy but no
+-- SELECT policy, so the owner could not delete them (Storage deletes with RETURNING). Read-back of the own folder fixes that. It is
+-- added only here, never before phase 2: while "Users write entity images in own folder (update)" exists, a SELECT policy would also
+-- enable in-place overwrites of promoted (already moderated) images, which the unmoderated-object sweep cannot see.
+DROP POLICY IF EXISTS "phase2 owners read own entity images" ON storage.objects;
+CREATE POLICY "phase2 owners read own entity images" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id IN ('org-avatars', 'org-covers', 'trainer-avatars', 'team-avatars', 'team-covers')
+         AND (storage.foldername(name))[1] = (auth.uid())::text);
 -- Kept unchanged: "Users write entity images in own folder (delete)", "Users can delete their own game covers",
 -- "Authenticated read game covers", every staging, payment-proof, message-attachment and highlight-video policy.
 
--- 3. Postcondition: no INSERT/UPDATE/ALL policy for an API role still names a public image bucket or game covers.
-DO $post$
-DECLARE _bad text;
+-- 3. Postcondition, by allow-list rather than by deny-list: every PERMISSIVE INSERT/UPDATE/ALL policy for an API role (anon,
+--    authenticated, public) must be pinned to one of the non-image buckets that keep a browser upload path. Conservatively, the
+--    deparsed expression must be exactly `(bucket_id = '<allowed>'::text)` or an AND whose FIRST operand is that comparison
+--    (`((bucket_id = '<allowed>'::text) AND ...)`); an OR at the top, an IN/ANY list, a missing USING or WITH CHECK, or a policy
+--    that does not mention the bucket at all fails. For UPDATE/ALL both USING and WITH CHECK (when present) must pass.
+--    RESTRICTIVE policies only narrow access and are not checked. Policies granted to other roles are out of scope.
+--    The check lives in a session-temporary function so the test can run it again against injected policies.
+CREATE OR REPLACE FUNCTION pg_temp.g3b_phase2_open_write_policies() RETURNS text LANGUAGE sql STABLE AS $fn$
+  WITH allowed(re) AS (
+    SELECT '^(\(bucket_id = ''(payment-proofs|highlight-videos|message-attachments|image-staging)''::text\)'
+           '|\(\(bucket_id = ''(payment-proofs|highlight-videos|message-attachments|image-staging)''::text\) AND .*\))$'
+  )
+  SELECT string_agg(format('%s (%s)', p.policyname, p.cmd), ', ' ORDER BY p.policyname)
+    FROM pg_policies p, allowed a
+   WHERE p.schemaname = 'storage' AND p.tablename = 'objects' AND p.permissive = 'PERMISSIVE'
+     AND p.cmd IN ('INSERT', 'UPDATE', 'ALL')
+     AND p.roles && ARRAY['authenticated', 'anon', 'public']::name[]
+     AND NOT CASE p.cmd
+           WHEN 'INSERT' THEN coalesce(p.with_check, '') ~ a.re
+           ELSE coalesce(p.qual, '') ~ a.re AND (p.with_check IS NULL OR p.with_check ~ a.re)
+         END
+$fn$;
+CREATE OR REPLACE FUNCTION pg_temp.g3b_phase2_assert_closed() RETURNS void LANGUAGE plpgsql AS $fn$
+DECLARE _bad text := pg_temp.g3b_phase2_open_write_policies();
 BEGIN
-  SELECT string_agg(policyname, ', ') INTO _bad
-    FROM pg_policies
-   WHERE schemaname = 'storage' AND tablename = 'objects' AND cmd IN ('INSERT', 'UPDATE', 'ALL')
-     AND roles && ARRAY['authenticated', 'anon', 'public']::name[]
-     AND coalesce(qual, '') || coalesce(with_check, '') ~ '(''(avatars|covers|org-avatars|org-covers|trainer-avatars|team-avatars|team-covers|game-covers)'')';
   IF _bad IS NOT NULL THEN
-    RAISE EXCEPTION 'G3b phase 2: write policies still open on image buckets: % (names differ from this script; re-read the target)', _bad;
+    RAISE EXCEPTION 'G3b phase 2: write policies still open outside the allowed non-image buckets: % (names differ from this script, or a new policy appeared; re-read the target)', _bad;
   END IF;
 END
-$post$;
+$fn$;
+SELECT pg_temp.g3b_phase2_assert_closed();

@@ -10,6 +10,14 @@
  * animation chunks) and the EXIF Orientation tag alone, because without it a phone photo displays sideways. What is
  * removed: EXIF (GPS, camera, timestamps, thumbnails), XMP, IPTC/Photoshop blocks, comments and text chunks, the PNG
  * modification time, and unknown ancillary data. Pure functions, no Node or browser APIs, so it runs on the server and in tests.
+ *
+ * Structured segments are checked against their spec length: a fixed-size segment or chunk (JPEG SOF/SOS/DRI/DNL, PNG pHYs,
+ * sRGB, gAMA, cHRM, bKGD, sBIT, tRNS, IEND, ..., WEBP VP8X/ANIM) is copied at exactly its spec length (extra bytes, which can
+ * carry anything, are cut and reported as hasOther) or refused/dropped when too short; JPEG Huffman and quantisation tables must
+ * fill their segment exactly. A file with no image data (no JPEG scan, no PNG IDAT, no WEBP VP8/VP8L) is refused.
+ * RESIDUAL (documented in docs/privacy/g3b-image-staging.md): the ICC profile is kept byte for byte (its description and
+ * copyright text and any private tags survive; rewriting it would change every real phone photo), and pixel/table data itself
+ * can of course encode anything a picture can.
  */
 import { sniffImageMime } from "@/lib/image-validation";
 
@@ -20,6 +28,8 @@ export type MetadataReport = {
   hasXmp: boolean;
   hasOther: boolean;
   orientation: number | null;
+  /** APNG (a valid acTL) or animated WEBP (ANIM/ANMF or the VP8X animation flag). A single-frame scan does not see every frame. */
+  animated: boolean;
 };
 
 export type StripResult = { bytes: Uint8Array; changed: boolean; report: MetadataReport };
@@ -31,6 +41,7 @@ const EMPTY: MetadataReport = {
   hasXmp: false,
   hasOther: false,
   orientation: null,
+  animated: false,
 };
 
 const u16 = (b: Uint8Array, o: number, le: boolean) =>
@@ -116,6 +127,51 @@ function concat(parts: Uint8Array[]): Uint8Array {
 /** Segments needed to decode: SOFn (C0-CF except C4 DHT, C8 reserved, CC DAC — those two tables are kept too), DQT, DNL, DRI. */
 const JPEG_KEEP = (m: number) =>
   (m >= 0xc0 && m <= 0xcf && m !== 0xc8) || m === 0xdb || m === 0xdc || m === 0xdd;
+const JPEG_SOF = (m: number) => m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
+
+/** The payload length a kept JPEG segment must have (null: variable, validated by walking it). Throws when it cannot be valid. */
+function jpegSpecLength(m: number, payload: Uint8Array): number | null {
+  if (JPEG_SOF(m)) {
+    // P, Y, X, Nf, then 3 bytes per component
+    if (payload.length < 6 || payload[5] < 1) throw new Error("Malformed JPEG frame header");
+    return 6 + 3 * payload[5];
+  }
+  if (m === 0xdd || m === 0xdc) return 2; // DRI (Ri), DNL (NL)
+  if (m === 0xdb) {
+    // DQT: one or more tables of Pq/Tq + 64 (8-bit) or 128 (16-bit) bytes, filling the segment exactly
+    let j = 0;
+    while (j < payload.length) {
+      const pq = payload[j] >> 4;
+      if (pq > 1 || (payload[j] & 0x0f) > 3) throw new Error("Malformed JPEG quantisation table");
+      j += 1 + (pq ? 128 : 64);
+    }
+    if (j !== payload.length || j === 0) throw new Error("Malformed JPEG quantisation table");
+    return null;
+  }
+  if (m === 0xc4) {
+    // DHT: one or more tables of Tc/Th + 16 code counts + that many symbols, filling the segment exactly
+    let j = 0;
+    while (j < payload.length) {
+      if (payload[j] >> 4 > 1 || (payload[j] & 0x0f) > 3 || j + 17 > payload.length)
+        throw new Error("Malformed JPEG Huffman table");
+      let n = 0;
+      for (let k = 1; k <= 16; k++) n += payload[j + k];
+      if (n > 256) throw new Error("Malformed JPEG Huffman table");
+      j += 17 + n;
+    }
+    if (j !== payload.length || j === 0) throw new Error("Malformed JPEG Huffman table");
+    return null;
+  }
+  if (m === 0xcc) {
+    if (payload.length === 0 || payload.length % 2) throw new Error("Malformed JPEG DAC segment");
+    return null;
+  }
+  return null;
+}
+
+/** A segment rewritten with only its first `n` payload bytes. */
+const jpegSegment = (m: number, payload: Uint8Array, n: number) =>
+  concat([Uint8Array.from([0xff, m, (n + 2) >> 8, (n + 2) & 0xff]), payload.subarray(0, n)]);
 
 function stripJpeg(b: Uint8Array): StripResult {
   const report: MetadataReport = { ...EMPTY, format: "jpeg" };
@@ -125,6 +181,8 @@ function stripJpeg(b: Uint8Array): StripResult {
   let changed = false;
   let keepOrientation: number | null = null;
   let sawEoi = false;
+  let sawFrame = false;
+  let sawScan = false;
   while (i < b.length) {
     if (b[i] !== 0xff) throw new Error("Malformed JPEG");
     let m = b[i + 1];
@@ -142,6 +200,19 @@ function stripJpeg(b: Uint8Array): StripResult {
       if (i + 4 > b.length) throw new Error("Truncated JPEG");
       const slen = (b[i + 2] << 8) | b[i + 3];
       if (slen < 2 || i + 2 + slen > b.length) throw new Error("Malformed JPEG segment");
+      // The scan header has a spec length of 4 + 2 * Ns payload bytes (Ns components, then Ss, Se, Ah/Al); extra bytes are cut.
+      const ns = slen > 2 ? b[i + 4] : 0;
+      if (ns < 1 || ns > 4 || slen - 2 < 4 + 2 * ns || !sawFrame)
+        throw new Error("Malformed JPEG scan header");
+      const header =
+        slen - 2 === 4 + 2 * ns
+          ? b.subarray(i, i + 2 + slen)
+          : jpegSegment(0xda, b.subarray(i + 4, i + 2 + slen), 4 + 2 * ns);
+      if (header.length !== 2 + slen) {
+        changed = true;
+        report.hasOther = true;
+      }
+      sawScan = true;
       let j = i + 2 + slen;
       while (j < b.length) {
         if (b[j] === 0xff) {
@@ -158,11 +229,12 @@ function stripJpeg(b: Uint8Array): StripResult {
         }
         j += 1;
       }
-      out.push(b.subarray(i, j));
+      out.push(header, b.subarray(i + 2 + slen, j));
       i = j;
       continue;
     }
-    if (m === 0x01 || (m >= 0xd0 && m <= 0xd8)) {
+    if (m === 0xd8) throw new Error("Malformed JPEG (a second start of image)");
+    if (m === 0x01 || (m >= 0xd0 && m <= 0xd7)) {
       out.push(b.subarray(i, i + 2));
       i += 2;
       continue;
@@ -218,6 +290,17 @@ function stripJpeg(b: Uint8Array): StripResult {
       // allow-list: anything that is not a frame, table or restart definition (JPGn extensions, reserved markers) is dropped
       drop = true;
       report.hasOther = true;
+    } else {
+      // a kept structural segment: copied at its spec length (extra bytes are cut), refused when too short or malformed
+      const spec = jpegSpecLength(m, payload);
+      if (JPEG_SOF(m)) sawFrame = true;
+      if (spec !== null) {
+        if (payload.length < spec) throw new Error("Malformed JPEG segment (too short)");
+        if (payload.length > spec) {
+          replacement = jpegSegment(m, payload, spec);
+          report.hasOther = true;
+        }
+      }
     }
     if (drop) changed = true;
     else if (replacement) {
@@ -227,6 +310,7 @@ function stripJpeg(b: Uint8Array): StripResult {
     i += 2 + len;
   }
   if (!sawEoi) throw new Error("Truncated JPEG (no end of image)");
+  if (!sawScan) throw new Error("JPEG has no image data");
   report.orientation = keepOrientation;
   if (keepOrientation && keepOrientation !== 1) {
     const tiff = orientationTiff(keepOrientation);
@@ -297,6 +381,34 @@ const PNG_KEEP = new Set([
   "cLLI",
 ]);
 
+/** Fixed payload lengths of kept PNG chunks; tRNS/bKGD/sBIT/hIST depend on the colour type and palette (see pngSpecLength). */
+const PNG_FIXED: Record<string, number> = {
+  IEND: 0,
+  gAMA: 4,
+  cHRM: 32,
+  sRGB: 1,
+  pHYs: 9,
+  acTL: 8,
+  fcTL: 26,
+  cICP: 4,
+  cLLI: 8,
+  mDCV: 24,
+};
+
+/** The spec length of a kept chunk, or -1 for "not allowed here" (dropped), or null for variable-length data. */
+function pngSpecLength(type: string, colorType: number, paletteEntries: number): number | null {
+  if (type in PNG_FIXED) return PNG_FIXED[type];
+  if (type === "bKGD") return colorType === 3 ? 1 : colorType === 0 || colorType === 4 ? 2 : 6;
+  if (type === "sBIT") return [1, -1, 3, 3, 2, -1, 4][colorType] ?? -1;
+  if (type === "hIST") return paletteEntries > 0 ? 2 * paletteEntries : -1;
+  if (type === "tRNS") {
+    if (colorType === 0) return 2;
+    if (colorType === 2) return 6;
+    return -1; // palette tRNS is variable (checked by the caller); colour types with an alpha channel may not have one
+  }
+  return null;
+}
+
 function stripPng(b: Uint8Array): StripResult {
   const report: MetadataReport = { ...EMPTY, format: "png" };
   const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -307,13 +419,47 @@ function stripPng(b: Uint8Array): StripResult {
   let orientation: number | null = null;
   let ihdrEnd = -1;
   let sawIend = false;
+  let colorType = -1;
+  let paletteEntries = 0;
+  let sawIdat = false;
+  let actl = false; // a valid acTL (before the first IDAT) makes this an APNG; without one, fcTL/fdAT are dropped
   while (i + 12 <= b.length) {
     const len = u32(b, i, false);
     const type = ascii(b, i + 4, 4);
     if (i + 12 + len > b.length) throw new Error("Malformed PNG chunk");
     if ((i === 8) !== (type === "IHDR"))
       throw new Error("Malformed PNG (IHDR must come first, once)");
-    const chunk = b.subarray(i, i + 12 + len);
+    let chunk = b.subarray(i, i + 12 + len);
+    const data = b.subarray(i + 8, i + 8 + len);
+    let spec = PNG_KEEP.has(type) ? pngSpecLength(type, colorType, paletteEntries) : null;
+    if (type === "tRNS" && colorType === 3) spec = len >= 1 && len <= paletteEntries ? len : -1;
+    if (type === "IHDR") {
+      if (len !== 13 || ![0, 2, 3, 4, 6].includes(data[9])) throw new Error("Malformed PNG header");
+      colorType = data[9];
+    } else if (type === "PLTE") {
+      if (len === 0 || len % 3 || len > 768 || paletteEntries)
+        throw new Error("Malformed PNG palette");
+      paletteEntries = len / 3;
+    } else if (type === "IDAT") sawIdat = true;
+    if (type === "acTL" && !sawIdat && !actl) {
+      actl = true;
+    } else if (type === "acTL" || ((type === "fcTL" || type === "fdAT") && !actl)) {
+      spec = -1; // a second or late acTL, or frame chunks in a file that is not an APNG: not part of the still image
+    }
+    if (spec !== null && spec !== len && PNG_KEEP.has(type)) {
+      if (type === "IEND") {
+        chunk = pngChunk("IEND", new Uint8Array(0));
+      } else if (spec < 0 || len < spec) {
+        report.hasOther = true; // an ancillary chunk that is not allowed here, or too short to be valid, is dropped
+        changed = true;
+        i += 12 + len;
+        continue;
+      } else {
+        chunk = pngChunk(type, data.subarray(0, spec)); // copied at its spec length; the extra bytes are cut
+      }
+      report.hasOther = true;
+      changed = true;
+    }
     if (type === "eXIf") {
       report.hasExif = true;
       const t = readTiff(b.subarray(i + 8, i + 8 + len));
@@ -342,6 +488,10 @@ function stripPng(b: Uint8Array): StripResult {
     }
   }
   if (!sawIend) throw new Error("Truncated PNG (no IEND)");
+  if (!sawIdat) throw new Error("PNG has no image data");
+  if (colorType === 3 && !paletteEntries)
+    throw new Error("Malformed PNG (palette image without PLTE)");
+  report.animated = actl;
   if (i < b.length) {
     report.hasOther = true; // data appended after IEND is dropped
     changed = true;
@@ -363,12 +513,13 @@ const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ANIM", "ANMF", "ICCP
 const ANMF_KEEP = new Set(["VP8 ", "VP8L", "ALPH"]);
 
 /** Keep only image sub-chunks inside an animation frame (16-byte frame header, then sub-chunks). */
-function filterAnmf(chunk: Uint8Array, size: number): Uint8Array {
+function filterAnmf(chunk: Uint8Array, size: number): { frame: Uint8Array; hasImage: boolean } {
   if (size < 16) throw new Error("Malformed WEBP frame");
   const body = chunk.subarray(8, 8 + size);
   const keep: Uint8Array[] = [body.subarray(0, 16)];
   let j = 16;
   let dropped = false;
+  let hasImage = false;
   while (j + 8 <= body.length) {
     const t = ascii(body, j, 4);
     const sz = u32(body, j + 4, true);
@@ -376,16 +527,31 @@ function filterAnmf(chunk: Uint8Array, size: number): Uint8Array {
     if (end > body.length + 1) throw new Error("Malformed WEBP frame chunk");
     if (ANMF_KEEP.has(t)) keep.push(body.subarray(j, Math.min(end, body.length)));
     else dropped = true;
+    if (t === "VP8 " || t === "VP8L") hasImage = true;
     j = end;
   }
   if (j < body.length) throw new Error("Truncated WEBP frame");
-  if (!dropped) return chunk;
+  if (!dropped) return { frame: chunk, hasImage };
   const inner = concat(keep);
   const hdr = new Uint8Array(8);
   hdr.set(new TextEncoder().encode("ANMF"), 0);
   new DataView(hdr.buffer).setUint32(4, inner.length, true);
-  return concat(inner.length & 1 ? [hdr, inner, new Uint8Array(1)] : [hdr, inner]);
+  return {
+    frame: concat(inner.length & 1 ? [hdr, inner, new Uint8Array(1)] : [hdr, inner]),
+    hasImage,
+  };
 }
+
+/** A WEBP chunk rewritten with only its first `n` payload bytes (n even, so no pad byte). */
+function webpChunk(type: string, data: Uint8Array, n: number): Uint8Array {
+  const out = new Uint8Array(8 + n);
+  out.set(new TextEncoder().encode(type), 0);
+  new DataView(out.buffer).setUint32(4, n, true);
+  out.set(data.subarray(0, n), 8);
+  return out;
+}
+
+const WEBP_FIXED: Record<string, number> = { VP8X: 10, ANIM: 6 };
 
 function stripWebp(b: Uint8Array): StripResult {
   const report: MetadataReport = { ...EMPTY, format: "webp" };
@@ -396,6 +562,8 @@ function stripWebp(b: Uint8Array): StripResult {
   let changed = false;
   let orientation: number | null = null;
   let vp8xAt = -1;
+  let hasImage = false;
+  let animated = false;
   const riffEnd = Math.min(8 + u32(b, 4, true), b.length);
   if (riffEnd < b.length) {
     report.hasOther = true; // data appended after the RIFF container is dropped
@@ -423,13 +591,35 @@ function stripWebp(b: Uint8Array): StripResult {
       report.hasOther = true; // allow-list: unknown chunks are dropped
       changed = true;
     } else {
-      if (type === "VP8X") vp8xAt = parts.length;
-      if (type === "ANMF") {
-        const frame = filterAnmf(chunk, size);
-        if (frame !== chunk) {
+      const spec = WEBP_FIXED[type];
+      if (spec !== undefined && size !== spec) {
+        if (size < spec) throw new Error(`Malformed WEBP ${type} chunk`);
+        chunk = webpChunk(type, b.subarray(i + 8, i + 8 + size), spec); // copied at its spec length; extra bytes are cut
+        report.hasOther = true;
+        changed = true;
+      }
+      if (type === "VP8X") {
+        vp8xAt = parts.length;
+        // only the defined flags (ICC, alpha, EXIF, XMP, animation) and the canvas size; reserved bits and bytes are zeroed
+        if ((chunk[8] & ~0x3e) !== 0 || chunk[9] || chunk[10] || chunk[11]) {
+          chunk = chunk.slice();
+          chunk[8] &= 0x3e;
+          chunk[9] = chunk[10] = chunk[11] = 0;
           report.hasOther = true;
           changed = true;
-          chunk = frame;
+        }
+        if (chunk[8] & 0x02) animated = true;
+      }
+      if (type === "VP8 " || type === "VP8L") hasImage = true;
+      if (type === "ANIM") animated = true;
+      if (type === "ANMF") {
+        animated = true;
+        const f = filterAnmf(chunk, size);
+        if (f.hasImage) hasImage = true;
+        if (f.frame !== chunk) {
+          report.hasOther = true;
+          changed = true;
+          chunk = f.frame;
         }
       }
       parts.push(chunk);
@@ -437,7 +627,9 @@ function stripWebp(b: Uint8Array): StripResult {
     i = end;
   }
   if (i < riffEnd) throw new Error("Truncated WEBP chunk");
+  if (!hasImage) throw new Error("WEBP has no image data");
   report.orientation = orientation;
+  report.animated = animated;
   const keepExif = !!orientation && orientation !== 1 && vp8xAt >= 0;
   if (keepExif) {
     const tiff = orientationTiff(orientation as number);

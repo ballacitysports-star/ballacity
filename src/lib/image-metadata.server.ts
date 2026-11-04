@@ -7,6 +7,8 @@ export type StoredStripOutcome = {
   /** True when the stored object was rewritten. */
   rewritten: boolean;
   report: MetadataReport;
+  /** The storage object id Storage returned for the rewrite (null when nothing was rewritten or Storage did not say). */
+  objectId: string | null;
 };
 
 /**
@@ -23,14 +25,20 @@ export async function stripStoredImage(
   mime: string,
 ): Promise<StoredStripOutcome> {
   const result = stripImageMetadata(current);
-  if (!result.changed) return { bytes: current, rewritten: false, report: result.report };
-  const { error } = await admin.storage.from(bucket).upload(path, result.bytes, {
+  if (!result.changed)
+    return { bytes: current, rewritten: false, report: result.report, objectId: null };
+  const { data, error } = await admin.storage.from(bucket).upload(path, result.bytes, {
     contentType: mime,
     upsert: true,
     cacheControl: "3600",
   });
   if (error) throw new Error(`Could not rewrite the stored image: ${error.message}`);
-  return { bytes: result.bytes, rewritten: true, report: result.report };
+  return {
+    bytes: result.bytes,
+    rewritten: true,
+    report: result.report,
+    objectId: (data as { id?: string } | null)?.id ?? null,
+  };
 }
 
 export type ScanCounts = {

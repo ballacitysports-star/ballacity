@@ -66,7 +66,8 @@ describe("JPEG allow-list", () => {
   it("keeps tables and restart definitions", () => {
     const f = jpeg(
       seg(0xdb, new Uint8Array(65)),
-      seg(0xc4, new Uint8Array(20)),
+      // one DC table with a single 1-bit code (Tc/Th, 16 counts, 1 symbol): a structurally valid DHT
+      seg(0xc4, cat(Uint8Array.from([0x00, 1]), new Uint8Array(15), Uint8Array.from([0]))),
       seg(0xdd, Uint8Array.from([0, 4])),
     );
     expect(stripImageMetadata(f).changed).toBe(false);
