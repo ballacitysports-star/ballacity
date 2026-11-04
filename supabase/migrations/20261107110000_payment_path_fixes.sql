@@ -38,6 +38,7 @@ CREATE OR REPLACE FUNCTION public.can_notify(_caller uuid, _target uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
+  -- R7 final (review round 4, ec0b771e) plus PAY-1's one-way payer -> payee relation, inside the guardian-controls check for minors.
   SELECT
     _caller IS NOT NULL AND _target IS NOT NULL AND (
       _caller = _target
@@ -46,18 +47,23 @@ AS $function$
         (auth.uid() IS NULL OR auth.uid() IN (_caller, _target))
         AND NOT public.blocks_exist_between(_caller, _target)
         AND CASE
-          -- a person who is not a confirmed adult is involved: an authorized context that the guardian's controls allow, or a host dealing
+          -- a person who is not a confirmed adult is involved: the guardian's controls first, then an authorized context, or a host dealing
           -- with a live join request (pending or approved, last 90 days); a rejected or old request is not a relationship
           WHEN COALESCE(public.age_cohort_of(_caller), 'unknown') <> 'adult' OR COALESCE(public.age_cohort_of(_target), 'unknown') <> 'adult' THEN
-            ((private_sec.messaging_connection(_caller, _target))
-              AND private_sec.messaging_controls_block(_caller, _target) IS NULL)
-            -- PAY-1: a payer may notify the adult who holds (or now manages) their payment; never the reverse
-            OR private_sec.payer_to_payee(_caller, _target)
-            -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed adult
-            OR EXISTS (SELECT 1 FROM public.join_requests jr
-                        WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
-                          AND ((jr.host_id = _caller AND jr.player_id = _target)
-                               OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult')))
+            private_sec.messaging_controls_block(_caller, _target) IS NULL
+            AND (
+              private_sec.messaging_connection(_caller, _target)
+              -- PAY-1: a payer may notify the adult who holds (or now manages) their payment; never the reverse
+              OR private_sec.payer_to_payee(_caller, _target)
+              -- a host dealing with a live join request: host to player only; a player may notify a host only when that host is a confirmed
+              -- adult; an under-13 player's request counts only once a verified guardian approved it (under-13 contact stays guardian-mediated)
+              OR EXISTS (SELECT 1 FROM public.join_requests jr
+                          WHERE jr.status IN ('pending', 'approved') AND jr.created_at > now() - interval '90 days'
+                            AND ((jr.host_id = _caller AND jr.player_id = _target)
+                                 OR (jr.host_id = _target AND jr.player_id = _caller AND public.age_cohort_of(_target) = 'adult'))
+                            AND (COALESCE(public.age_cohort_of(jr.player_id), 'unknown') <> 'child_under_13'
+                                 OR (jr.guardian_approved_at IS NOT NULL AND public.is_guardian_of(jr.guardian_approved_by, jr.player_id))))
+            )
           ELSE
             private_sec.payer_to_payee(_caller, _target)
             OR EXISTS (SELECT 1 FROM public.conversation_participants a
