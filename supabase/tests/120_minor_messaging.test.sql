@@ -17,7 +17,7 @@ SELECT t.eq((SELECT messaging FROM public.child_controls WHERE child_user_id = t
   'a linked child defaults to guardian-only messaging');
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'MINOR_MESSAGING_BLOCKED:guardian_only', 'so a stranger cannot reach even a 16-17 until the guardian opens it up');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'so a stranger cannot reach even a 16-17 until the guardian opens it up');
 SELECT t.reset();
 
 -- The age rules below apply once a guardian has opened messaging to peers.
@@ -26,11 +26,11 @@ UPDATE public.child_controls SET messaging = 'peers';
 -- ---- adults and the youngest ------------------------------------------------
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kidone')),
-  'MINOR_MESSAGING_BLOCKED:child_needs_guardian', 'an adult who is not the guardian cannot message an under-13');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'an adult who is not the guardian cannot message an under-13');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teenone')),
-  'MINOR_MESSAGING_BLOCKED:teen_needs_shared_game', 'an adult cannot message a 13-15 without a shared game');
-SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'an adult may message a 16-17 once messaging is open to peers');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'an adult cannot message a 13-15 without an authorized context (a shared public game is not one)');
+SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'a guardian''s peers setting never authorizes an unrelated adult to message a 16-17');
 SELECT t.reset();
 
 -- The refusal holds from the minor's side too.
@@ -39,7 +39,7 @@ SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('hos
   'MINOR_MESSAGING_BLOCKED', 'an under-13 cannot start a conversation with an adult stranger');
 SELECT t.as_user(t.id('teenone'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('host')),
-  'MINOR_MESSAGING_BLOCKED:teen_needs_shared_game', 'a 13-15 cannot start one either');
+  'MINOR_MESSAGING_BLOCKED:needs_connection', 'a 13-15 cannot start one either');
 SELECT t.reset();
 
 -- ---- a guardian reaches their own child, and only their own -----------------
@@ -49,14 +49,14 @@ SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('kido
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teenone')),
   'and their other child');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('kidtwo')),
-  'MINOR_MESSAGING_BLOCKED:child_needs_guardian', 'but not another family''s under-13');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'but not another family''s under-13');
 SELECT t.reset();
 
 -- ---- guardian-set controls --------------------------------------------------
 UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('teentwo');
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'MINOR_MESSAGING_BLOCKED:messaging_off', 'messaging switched off blocks an adult who could otherwise reach a 16-17');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'messaging switched off blocks an adult who could otherwise reach a 16-17');
 SELECT t.reset();
 SELECT t.as_user(t.id('teentwo'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('host')),
@@ -66,10 +66,10 @@ SELECT t.reset();
 UPDATE public.child_controls SET messaging = 'guardian_only' WHERE child_user_id = t.id('teentwo');
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'MINOR_MESSAGING_BLOCKED:guardian_only', 'guardian-only blocks a stranger');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'guardian-only blocks a stranger');
 SELECT t.as_user(t.id('parentone'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'MINOR_MESSAGING_BLOCKED:guardian_only', 'and another family''s guardian');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'and another family''s guardian');
 SELECT t.as_user(t.id('parenttwo'));
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
   'but their own guardian can');
@@ -78,10 +78,10 @@ SELECT t.reset();
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('teentwo');
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
-  'MINOR_MESSAGING_BLOCKED:teammates_only', 'teammates-only blocks a non-teammate');
+  'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'teammates-only blocks a non-teammate');
 SELECT t.reset();
 SELECT t.team('squad', 'host');
-SELECT t.member('squad', 'teentwo');
+SELECT t.invited_member('squad', 'teentwo', 'parenttwo');   -- a guardian-approved membership
 SELECT t.as_user(t.id('host'));
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teentwo')),
   'and admits a teammate');

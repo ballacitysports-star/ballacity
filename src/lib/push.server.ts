@@ -15,6 +15,8 @@ export type PushInput = {
   title: string;
   body?: string | null;
   url?: string | null;
+  /** Notification type; for a recipient who is not a confirmed adult it selects the fixed wording. */
+  type?: string | null;
 };
 
 /**

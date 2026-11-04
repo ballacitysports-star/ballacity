@@ -1,3 +1,4 @@
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { pageHead } from "@/lib/seo";
@@ -1690,7 +1691,7 @@ function ContactDialog({
             : "You already have a pending request to this player.",
         );
         setRefreshKey((k) => k + 1);
-      } else toast.error(msg || "Couldn't send request");
+      } else toast.error(describeMessagingError(e, "Couldn't send request", "player"));
     } finally {
       setSaving(false);
     }

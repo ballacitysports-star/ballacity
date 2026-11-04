@@ -6,6 +6,9 @@ BEGIN;
 SELECT t.person('guardian', 41), t.person('teen', 16), t.person('adult', 35), t.person('blocker', 30), t.person('annoyer', 30);
 SELECT t.guardian('guardian', 'teen');
 UPDATE public.child_controls SET messaging = 'peers' WHERE child_user_id = t.id('teen');
+-- an authorized context for the open thread: the adult coaches the teen's team
+SELECT t.team('squad', 'adult');
+SELECT t.invited_member('squad', 'teen', 'guardian');   -- a guardian-approved membership
 
 INSERT INTO public.conversations (id, created_by) VALUES (t.id('thread'), t.id('adult')), (t.id('blockthread'), t.id('annoyer'));
 INSERT INTO public.conversation_participants (conversation_id, user_id) VALUES

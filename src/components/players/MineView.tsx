@@ -185,7 +185,9 @@ export function MineView({
               <li key={r.id} className="rounded-2xl border border-border bg-surface p-3 text-sm">
                 {r.message && <p>{r.message}</p>}
                 <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                  {r.status}
+                  {r.status === "awaiting_guardian"
+                    ? "Waiting for your parent or guardian"
+                    : r.status}
                 </span>
               </li>
             ))}

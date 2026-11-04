@@ -9,6 +9,9 @@ SELECT t.team('squad', 'mgr');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator'), (t.id('adminone'), 'admin');
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.team_members (team_id, user_id) VALUES ('squad', t.id('teen17')), ('squad', t.id('mate'));
+-- both joined through accepted invitations, the teen's approved by their guardian (R7: what counts as a messaging context)
+INSERT INTO public.team_invites (team_id, invitee_id, invited_by, status, guardian_approved_at, guardian_approved_by) VALUES
+  ('squad', t.id('teen17'), t.id('mgr'), 'accepted', now(), t.id('guardian')), ('squad', t.id('mate'), t.id('mgr'), 'accepted', NULL, NULL);
 INSERT INTO public.follows (follower_id, followee_id) VALUES (t.id('follower'), t.id('teen17'));
 UPDATE public.profiles SET age_cohort = 'unknown' WHERE id = t.id('unk');
 INSERT INTO public.player_availabilities (id, user_id, sports, skill_level, recurring_days, city, travel_radius_km, note, status, time_slots, lat, lng, formatted_address, place_id) VALUES
@@ -86,7 +89,7 @@ SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id
 SELECT t.as_user(t.id('teen15'));
 SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teen15'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'MINOR_MESSAGING_BLOCKED', 'a 15-year-old cannot contact an adult stranger (existing shared-context rule now applies to requests)');
 SELECT t.as_user(t.id('mate'));
-SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('mate'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'practice?')$q$, 'guardian_only', 'a teammate is still stopped by the guardian''s "guardian only" control');
+SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('mate'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'practice?')$q$, 'MINOR_MESSAGING_BLOCKED:not_permitted:other', 'a teammate is still stopped by the guardian''s "guardian only" control');
 SELECT t.reset();
 UPDATE public.child_controls SET messaging = 'teammates' WHERE child_user_id = t.id('teen17');
 SELECT t.as_user(t.id('mate'));
@@ -96,7 +99,7 @@ SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_i
 SELECT t.as_user(t.id('guardian'));
 SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('guardian'), t.id('teen17'), '00000000-0000-0000-0000-0000000000a2', 'contact', 'dinner?')$q$, 'a guardian can contact their own child');
 SELECT t.as_user(t.id('teenfree'));
-SELECT t.lives($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teenfree'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'a 17-year-old without guardian controls can still contact an adult through the adult''s post (unchanged; see the R7 note)');
+SELECT t.throws($q$INSERT INTO public.availability_contact_requests (from_user_id, to_user_id, availability_id, kind, message) VALUES (t.id('teenfree'), t.id('adultpost'), '00000000-0000-0000-0000-0000000000a1', 'contact', 'hi')$q$, 'needs_guardian_link', 'a 17-year-old with no linked guardian cannot contact an adult through a post (R7: link a guardian first)');
 SELECT t.reset();
 -- ================= 4. legacy data procedure (defined, never run by the migration)
 SET LOCAL session_replication_role = replica;
