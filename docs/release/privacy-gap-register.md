@@ -1,6 +1,6 @@
 # Privacy gap register (youth safety release)
 
-Status date: 2026-11-04. Audited on `main` (`153f6009` or later) combined with the open pull requests #245, #247, #248, #249 and #256 (#253 merged on 2026-11-04), using code reading, a replayed combined database and read-only production catalog queries. Nothing here was changed. The release is **not complete while any "Open" row remains** unless the owner records an explicit acceptance.
+Status date: 2026-11-04 (revision 2). Audited on `main` (`a453f2a0`, which includes #251 to #255 and #257) combined with the open pull requests #245, #247, #248, #249, #256 and the gap-closing pull requests #258 to #263, using code reading, a replayed combined database and read-only production catalog queries. **Nothing has been applied to production and no privacy pull request is merged.** "Implemented" below means: written, tested locally, reviewable. It does not mean live. The release is **not complete** until the pull requests are merged in order, applied through the runbook, rehearsed in a verified sandbox, and the remaining open items in the last section are closed or accepted in writing by the owner.
 
 Policy this register enforces (owner, 2026-11-04):
 
@@ -9,62 +9,41 @@ Policy this register enforces (owner, 2026-11-04):
 - Precise youth-game locations never enter general-purpose client caches; legacy caches are purged on update, account switch and logout. Rollback never restores exact locations into public columns. Residual copies (backups, offline devices) are documented with retention and mitigations.
 - Invitations hold only coarse location. Eligibility, approval, revocation and payment rules are verified.
 
-## Closed by open pull requests (pending staging rehearsal)
+## Gap status (revision 2)
 
-| Path                                                                                                             | Closed by                               | Evidence                                                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `hosted_games` exact location/coordinates readable by any signed-in account                                      | #247 (+ coarsening step in the runbook) | test 320 (98 assertions); coarsening not yet rehearsed in a real project                                                       |
-| Invitations (contact request, message, notification) carrying the exact venue                                    | #256                                    | test 360 (76 assertions) including pending, rejected, approved, revoked, unpaid, payment-pending, verified and refunded states |
-| Address or venue typed into a youth game's title, description, neighborhood, rules, equipment, cancellation text | #256                                    | test 360; moderator scan function; heuristic limits below                                                                      |
-| Local cache `openrun.hostedGames.v1`/`v2`, avatar cache `v1`/`v2`                                                | #249                                    | unit tests: v1 deleted on first load, v2 coarse only, reset on sign-out and user switch                                        |
-| Reminders, passport, guardian activity, MCP output                                                               | #249                                    | unit tests                                                                                                                     |
-| Minor host's name via `visible_avatars`; neutral host snapshot                                                   | #248                                    | test 335 (62 assertions)                                                                                                       |
+| Gap                                                                | Severity (before) | Pull request                | Status                               | Local evidence                                                                                                                                                                                                | Still open after this PR                                                                                                                                                                               |
+| ------------------------------------------------------------------ | ----------------- | --------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| G1 team-post exact venue visible to anonymous visitors             | High              | #259 (base: PRIV-2D branch) | Implemented, not merged, not applied | test 370 (78 assertions): anonymous, stranger, member, guardian, manager, moderator, administrator; notifications and search read coarse columns; text guard on title/body/location                           | Production rows stay exact until the guarded coarsening step; tryouts at a verified public venue stay public only through the moderator-verified policy; the heuristic limits of G6 apply to free text |
+| G2 youth team facility details readable by every signed-in account | High              | #260                        | Implemented, not merged, not applied | test 380 (61): stranger, member, guardian, manager, moderator, administrator; explicit clear function; verified public facilities                                                                             | Existing rows stay exact until guarded coarsening; teams count as youth when `age_groups` contains `youth` (owner to confirm the rule)                                                                 |
+| G3 EXIF/GPS metadata kept in stored images                         | Medium            | #258 (base: main)           | Implemented, not merged              | unit tests with GPS-EXIF fixtures; uploads re-encoded before scan and fail closed; message attachments stripped regardless of size; superadmin assessment function                                            | Images already stored are not rewritten; an assessment/rewrite of existing media needs a separate approved run in the sandbox first                                                                    |
+| G4 minor host identity, `host_id` public                           | Medium            | #263                        | Implemented, not merged, not applied | test 400 (36): anonymous, stranger, roster member, guardian, other guardian, organization admin, moderator, host, administrator, plus a teen host and a 15-year-old stranger; `get_game_organizer` restricted | `host_id` remains in public rows (opaque reference deferred, needs a data-model decision); minor availability posts visible to strangers (residual)                                                    |
+| G5 client caches                                                   | Medium            | #261                        | Implemented, not merged              | client-storage manifest test (7) plus a repository scan that fails when a new storage key is not registered; original-image cache purged on logout, profile switch and application update                     | Devices that never open the new build keep old data; push notifications/history already delivered; browser backups                                                                                     |
+| G6 free-text detector is a heuristic                               | Medium            | #262                        | Implemented, not merged, not applied | test 390 (37): two independent reports remove the text without keeping a copy, moderator tools, team-post scan, grants                                                                                        | Team posts are not user-reportable yet; the detector is still not a complete boundary and is documented as such                                                                                        |
 
-## Open: gaps requiring implementation
+### Paths closed by the earlier privacy pull requests (unchanged, still unmerged)
 
-Severity: **High** = an unauthorized account can read a private location or identity today. **Medium** = needs work before the release counts as complete. **Low** = defence in depth or documentation.
+| Path                                                                          | Closed by                               | Evidence                                                                 |
+| ----------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------ |
+| `hosted_games` exact location/coordinates readable by any signed-in account   | #247 (+ coarsening step in the runbook) | test 320 (98 assertions); coarsening not yet rehearsed in a real project |
+| Invitations (contact request, message, notification) carrying the exact venue | #256                                    | test 360 (76 assertions)                                                 |
+| Address or venue typed into a youth game's text                               | #256                                    | test 360; moderator scan function; heuristic limits                      |
+| Local cache `openrun.hostedGames.v1`/`v2`, avatar cache `v1`/`v2`             | #249                                    | unit tests                                                               |
+| Minor host's name via `visible_avatars`; neutral host snapshot                | #248                                    | test 335 (62 assertions)                                                 |
+| Reviews and reputation about minors                                           | #245                                    | test 340 and PRIV-1 tests                                                |
 
-### G1 (High). Team posts expose exact venues to anonymous visitors
+### Combined result (local, integration branch `staging/priv-rehearsal`, 2026-11-04)
 
-- Fact: policy `team_posts_public_read` is granted to `public` (anonymous included) and `anon` has table-level SELECT on `team_posts`. Every non-hidden post of a non-hidden team exposes `location`, `formatted_address`, `lat`, `lng` and `place_id`. `teams.age_groups` can be `youth`, and the anonymous-read test asserts that a youth team's tryouts are deliberately public. There is no per-post visibility, no coarse form, no private table, no public-venue policy, and no text guard on title, body or location.
-- Required policy: private youth activities show no exact location; a verified public venue may be shown under an explicit policy.
-- Proposed implementation (a new migration + small app change, to be reviewed before any production use):
-  1. `team_posts.location_visibility` (`'private'` | `'public_venue'`), default `'private'` for teams whose `age_groups` include `youth` or that have any minor member; `'public_venue'` is set only through a moderator/owner-approved function that records who verified the venue and when (`venue_verified_by`, `venue_verified_at`) and refuses unless the post is for a recognized public facility (organization listing or verified venue).
-  2. A private table `team_post_private` (exact location, coordinates, place id) with RLS for the author, team managers, team members and verified guardians of members; a BEFORE trigger writes the exact copy and stores the coarse form (city/area, 2-decimal coordinates) in the public columns for `'private'` posts.
-  3. Reuse `private_sec.text_discloses_location` for title, body and location of `'private'` posts.
-  4. Tests for anonymous, signed-in stranger, member, guardian of a member, manager, moderator and administrator; event notifications and tryout alerts built from the coarse form; sitemap and search read only public columns.
-- Open decision for the owner: whether youth-team tryouts keep their precise venue public as a deliberate product choice (then each needs the explicit policy and verification above) or default to private.
+Merging main, #245, #249 (with #247/#248 inside its stack base), #256 and #258 to #263 in that order gave no conflicts and unique migration versions beyond the four historical duplicates. Results: **SQL suite 1514 passed, 0 failed**; unit tests 3079 passed, 22 skipped, 0 failed; `tsc --noEmit` clean; production build succeeds (needs `NODE_OPTIONS=--max-old-space-size=6144` on a small machine). One real interaction was found and fixed on the G6 branch: its fixture inserted an address into a youth team post, which G1's new guard rightly refuses; the fixture now seeds a legacy row without triggers. One formatting warning exists in `docs/youth-privacy-permission-matrix.md` (from the PRIV-2C branch; docs are not covered by the lint check). The branch is local only and is not a deployment source.
 
-### G2 (High). Youth teams' facility addresses are readable by every signed-in account
+## Remaining open items (owner decisions or later work)
 
-- Fact: `teams.home_court`, `venues`, `venue_addresses`, `primary_venue`, `venue_geo` and `availability_slots` have column privileges for `authenticated` (not `anon`); the signed-in read policy shows any non-hidden team. For a youth team these are practice venues.
-- Proposed implementation: revoke those columns from `authenticated` and expose them through a function that returns them only to managers, members, verified guardians of members and (for verified public facilities) everyone; keep a coarse `city` public. Tests as in G1.
-- Decision needed: which teams count as "youth" (`age_groups` contains `youth`, or any minor member).
-
-### G3 (Medium). Image metadata (EXIF/GPS) is not stripped on the server
-
-- Fact: uploads to `game-covers`, avatars, covers and team/org images go through `finalizeImageUpload`, which re-validates type/size and safety-scans but does not re-encode or strip metadata. The only re-encoding is the message-attachment compressor, which touches JPEG/PNG over 300 KB; smaller files are sent unchanged. Child reel clips have a separate client-side location-removal step. The `ballacity-originals` IndexedDB cache keeps original images on the device.
-- Proposed implementation: re-encode in `finalizeImageUpload` (drop all metadata) for every bucket, and strip on the message path regardless of size; tests with GPS-EXIF fixtures (`scripts/generate-exif-fixtures.py` exists); document the device cache and clear it on sign-out.
-
-### G4 (Medium). No restricted organizer-information path for minor hosts; `host_id` is public
-
-- Fact: `hosted_games.host_id` (the account id of the host) is readable by any signed-in account for youth games. #248 neutralizes the host snapshot and hides the name via `visible_avatars`, but there is no function that gives a participant, guardian or moderator the permitted organizer information, and the id itself identifies the account.
-- Proposed implementation: the per-game `host_ref` design (option B in the earlier proposal): a stable opaque reference replaces `host_id` in public reads for non-adult hosts; `get_game_organizer(game_id)` (restricted, definer) returns the permitted details to the host, roster members with settled participation, their verified guardians, organization admins and moderators; everyone else gets the neutral snapshot.
-- Test coverage today: test 335 covers anonymous, signed-in stranger, teen mate, payer, guardian, other guardian, organization admin, host and an administrator. **Not covered: a moderator role and a roster participant for the identity rules.** Add both, and re-run the identity tests through the API in staging.
-
-### G5 (Medium). Client caches: residual and structural gaps
-
-- Closed by #249: hosted-games and avatar caches (v1 deleted, v2 coarse), reset on sign-out and user switch.
-- Gaps: (a) no generic "cache epoch" that purges unknown legacy keys on application update (each new version must remember to list the old key); (b) the `ballacity-originals` IndexedDB cache is not in the reset list; (c) push notifications and browser history already delivered before the update cannot be recalled.
-- Proposed implementation: a versioned client-storage manifest that deletes every key not in the current manifest on update, sign-out and user switch; add the originals cache to the reset; unit tests; staging check on a device holding the old build's data.
-
-### G6 (Medium). Free-text detection is a heuristic
-
-- The detector (#256) refuses addresses, map links, coordinates, units and the venue name; it cannot see paraphrases. Mitigation in place: `list_youth_games_with_location_text()` for moderators, existing hide tools. Needed: a user-facing report path on game pages for "this reveals a location", a moderation runbook, and a periodic scan (V6 in the runbook).
-
-### G7 (Low). Messages between users
-
-- A person telling another a place is a conversation, governed by the messaging rules. Recorded as accepted by design; the owner confirms.
+- **R1 (Medium)** `host_id` stays in public rows of youth games; an opaque reference needs a data-model change and owner decision. Recorded as an accepted open risk until then.
+- **R2 (Medium)** Minor availability posts remain visible to strangers (G4 residual).
+- **R3 (Medium)** Existing stored images keep their metadata; assessment first, then an approved rewrite run in the sandbox.
+- **R4 (Medium)** Team posts cannot be reported by users; free-text detection stays a heuristic.
+- **R5 (Medium)** Guarded coarsening of existing production rows (games, team posts, team facilities) is a separate approved step after the adoption window.
+- **R6 (Process)** The Supabase sandbox is not verified; no remote end-to-end run has happened (`sandbox-verification.md`). Playwright must not become a required check before then.
+- **R7 (Low)** Messages between users (previous G7): accepted by design, owner confirms.
 
 ## Residual data and retention (documented, not removable)
 

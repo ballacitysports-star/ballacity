@@ -340,3 +340,26 @@ Nothing below touches production. It starts only after the owner has verified th
 | S11  | Re-run the fingerprint and the section 12b queries; record durations and counts                                                                                                                                               | identical to S9 expectations                                                                                                                         |
 
 Gate to a production plan: S0 to S11 recorded and reviewed, every "Open" row of the gap register closed or accepted in writing, a separate final release plan approved by the owner. Each production step then needs its own written approval.
+
+## 16. Gap-closing pull requests G1 to G6 (revision 5, 2026-11-04)
+
+None of these is merged or applied. They extend sections 2, 13 and 15; where this section and an earlier one differ, this section is current.
+
+**Additional migrations, applied after step 9 of section 2, one file at a time (switch still OFF):**
+
+| #   | File                                                  | Needs                          | Effect                                                                                                        |
+| --- | ----------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| 10  | `20261105100000_team_post_location_privacy.sql` (G1)  | 4, 7 (shared switch, detector) | `team_post_private`, venue policy, text guard, batch coarsening function; switch guard extended               |
+| 11  | `20261105110000_team_facility_privacy.sql` (G2)       | 4                              | `team_facility_private`, clear function, moderator verification of public facilities, second activation guard |
+| 12  | `20261105130000_location_disclosure_reports.sql` (G6) | 7, 8, `is_moderator`           | report reason, two-report automatic removal (no copy kept), team-post scan and scrub                          |
+| 13  | `20261105140000_minor_host_identity.sql` (G4)         | 5, 6                           | `get_game_organizer`, service-only helper                                                                     |
+
+G3 (#258) and G5 (#261) have no migration. The migration number 20261105120000 is unused on purpose.
+
+**Pull request order.** Existing order first (#247 -> #248 -> #245 -> #249 retargeted to `main` -> #256 retargeted). Then, each retargeted to `main` after #256 and re-run on the merge result: #259 (G1), #260 (G2), #262 (G6), #263 (G4), #261 (G5). #258 (G3) is independent and may merge at any point after the owner approves it. G1 and G2 are independent: each adds its own guard trigger on the shared switch, and both define `private_sec.team_is_youth` with an identical body, so either order works (checked by diffing the two definitions). Nothing here is merged without separate written authorization.
+
+**Rehearsal.** `staging/priv-rehearsal` is rebuilt (never pushed to a deployment source) by merging main, #245, #249, #256, #259, #260, #258, #263, #261, #262. Local result: SQL 1514/0, unit 3079/0, tsc clean, build OK. In the verified sandbox, S1 gains migrations 10 to 13, S5 uses the G3 fixtures, and S9 repeats for the three batch functions (`coarsen_existing_youth_games`, `coarsen_existing_youth_team_posts`, `coarsen_existing_youth_team_facilities`), each run to 0 only after the adoption window and with the adoption flag set.
+
+**Compatibility.** Every G migration is additive with the switch OFF. An older app keeps working; the text guards refuse new addresses in youth team posts with an explanation, and cancellations or unrelated edits are not blocked. Image re-encoding (G3) is application-side: an old build keeps writing unstripped files until replaced.
+
+**Recovery.** No procedure restores exact data to a public column. A wrong private copy is corrected by the service role; a guard false positive is fixed forward in a new migration that edits the detector only; an app rollback is allowed only to a build that keeps the v2 caches and the client-storage manifest (the PRIV-2C build or later) once activation has happened.
