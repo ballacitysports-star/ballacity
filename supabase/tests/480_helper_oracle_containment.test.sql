@@ -4,6 +4,9 @@ SELECT t.person('teen', 16), t.person('kid', 11), t.person('guardian', 40), t.pe
 SELECT t.person('other', 30), t.person('newbie', 31);
 SELECT t.guardian('guardian', 'teen');
 SELECT t.team('squad', 'coach');
+-- the teen joined through an invitation their guardian approved (R7: a direct roster add is not a messaging context)
+INSERT INTO public.team_invites (team_id, invitee_id, invited_by, role, status, responded_at, guardian_approved_at, guardian_approved_by)
+VALUES ('squad', t.id('teen'), t.id('coach'), 'player', 'accepted', now(), now(), t.id('guardian'));
 SELECT t.member('squad', 'teen');
 INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modone'), 'moderator');
 SET LOCAL session_replication_role = replica;
