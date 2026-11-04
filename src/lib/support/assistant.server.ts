@@ -46,6 +46,7 @@ import {
   softEscalation,
   type TicketCategory,
 } from "./triage";
+import { GAMES_READ } from "@/lib/organizer-access";
 
 export type SupportHistoryItem = { role: "user" | "assistant"; content: string };
 
@@ -109,7 +110,8 @@ export async function resolveSupportViewer(supabase: any, userId: string): Promi
         .eq("user_id", userId)
         .in("role", ["owner", "manager", "coach"]),
     ),
-    count(supabase.from("hosted_games").select("id", head).eq("host_id", userId)),
+    // SEC-5: "games I host" is viewer_is_host on the view (the caller's own session), not a filter on host_id.
+    count(supabase.from(GAMES_READ).select("id", head).eq("viewer_is_host", true)),
   ]);
   if (parent > 0) roles.add("parent");
   if (coach > 0) roles.add("coach");

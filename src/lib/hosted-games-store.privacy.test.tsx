@@ -194,7 +194,7 @@ describe("what is cached on the device", () => {
     await waitFor(() =>
       expect(result.current.games.find((x) => x.id === "youth")?.locationPrecision).toBe("exact"),
     );
-    const stored = JSON.parse(localStorage.getItem("openrun.hostedGames.v2") ?? "[]") as {
+    const stored = JSON.parse(localStorage.getItem("openrun.hostedGames.v3") ?? "[]") as {
       id: string;
       location: string;
       lat: number | null;
@@ -219,7 +219,7 @@ describe("what is cached on the device", () => {
 
   it("re-coarsens anything found in the new cache", async () => {
     localStorage.setItem(
-      "openrun.hostedGames.v2",
+      "openrun.hostedGames.v3",
       JSON.stringify([
         {
           id: "stale",

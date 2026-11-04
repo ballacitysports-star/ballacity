@@ -107,7 +107,8 @@ export function LeaveFlowButton({
     let alive = true;
     void supabase
       .from("hosted_games")
-      .select("*")
+      // Only what the warning needs (SEC-5: never select("*") on the table; host_id is not for every viewer).
+      .select("date, cancel_cutoff_min")
       .eq("id", gameId)
       .maybeSingle()
       .then(({ data }) => {

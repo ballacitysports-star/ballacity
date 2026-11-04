@@ -16,6 +16,7 @@ export const PER_USER_STORAGE_KEYS = [
   "openrun.joinedGameIds.v1",
   "openrun.hostedGames.v1",
   "openrun.hostedGames.v2",
+  "openrun.hostedGames.v3",
   "ballacity.avatarCache.v1",
   "ballacity.avatarCache.v2",
   "openrun:pending-dob",

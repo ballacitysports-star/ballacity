@@ -55,6 +55,11 @@ export const CLIENT_STORAGE_MANIFEST: readonly StorageEntry[] = [
   { key: "openrun:play-view", cls: "device" },
   { key: "openrun:loc-prompt-hidden", cls: "device" },
   { key: "openrun:boot-retry-at", cls: "device" },
+  {
+    key: "ballacity.clientGenerationReload",
+    cls: "device",
+    note: "reload loop guard (client-generation.ts)",
+  },
   { key: "openrun:last-visited", cls: "device" },
   { key: "ballacity:pwa-dismissed-at", cls: "device" },
   { key: "openrun:debug-mode", cls: "device" },
@@ -76,10 +81,10 @@ export const CLIENT_STORAGE_MANIFEST: readonly StorageEntry[] = [
     note: "ids of games the person joined",
   },
   {
-    key: "openrun.hostedGames.v2",
+    key: "openrun.hostedGames.v3",
     cls: "per-user",
     sensitive: true,
-    note: "coarse locations only; exact venues live in memory",
+    note: "coarse locations only; exact venues live in memory; read through hosted_games_public, so no masked host id (SEC-5)",
   },
   {
     key: "ballacity.avatarCache.v2",
@@ -129,6 +134,12 @@ export const CLIENT_STORAGE_MANIFEST: readonly StorageEntry[] = [
   { key: "openrun:draft:create-org", cls: "own-draft" },
   { key: "openrun.trainer-wizard.draft.v1", cls: "own-draft" },
   // ---- legacy
+  {
+    key: "openrun.hostedGames.v2",
+    cls: "legacy",
+    sensitive: true,
+    note: "held every host account id read straight from hosted_games; removed by SEC-5",
+  },
   {
     key: "openrun.hostedGames.v1",
     cls: "legacy",

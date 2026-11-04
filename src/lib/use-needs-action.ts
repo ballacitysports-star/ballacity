@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { listMyConversations } from "@/lib/messages";
 import { buildNeedsAction, type NeedsActionItem, type TodayGame } from "@/lib/needs-action";
+import { GAMES_READ, JOIN_REQUESTS_READ } from "@/lib/organizer-access";
 
 const STALE_MS = 60_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,9 +48,9 @@ export function useNeedsAction(): { items: NeedsActionItem[]; isLoading: boolean
     retry: false,
     queryFn: async () => {
       const { data } = await supabase
-        .from("join_requests")
+        .from(JOIN_REQUESTS_READ)
         .select("game_id, created_at")
-        .eq("host_id", uid!)
+        .eq("viewer_is_host", true)
         .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(100);
@@ -103,9 +104,9 @@ export function useNeedsAction(): { items: NeedsActionItem[]; isLoading: boolean
       const to = new Date(Date.now() + DAY_MS).toISOString();
       const [{ data: hosted }, { data: joined }] = await Promise.all([
         supabase
-          .from("hosted_games")
+          .from(GAMES_READ)
           .select("id")
-          .eq("host_id", uid!)
+          .eq("viewer_is_host", true)
           .gte("date", from)
           .lte("date", to),
         supabase.from("game_participants").select("game_id").eq("user_id", uid!),

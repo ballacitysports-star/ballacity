@@ -196,7 +196,8 @@ import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
-import { createNotification } from "@/lib/notifications";
+import { createNotification, notifyGameHostOf, notifyHostOfGame } from "@/lib/notifications";
+import { inviteMatchesHost } from "@/lib/organizer-access";
 import { supabase } from "@/integrations/supabase/client";
 import { MediaImage } from "@/components/MediaImage";
 import { isAllowedImageMime, MAX_IMAGE_BYTES } from "@/lib/image-validation";
@@ -1039,15 +1040,10 @@ function GameDetail() {
         toast("You left the game.");
         // Notify host in real time that a player left. A late leave gets its
         // own "cancelled late" notice from the database instead.
-        if (
-          gameHostId &&
-          user &&
-          gameHostId !== user.id &&
-          !isLateCancel(game.date, game.cancelCutoffMin)
-        ) {
+        if (user && gameHostId !== user.id && !isLateCancel(game.date, game.cancelCutoffMin)) {
           const who = myProfile?.name || emailLocalPart(user.email) || "A player";
-          void createNotification({
-            user_id: gameHostId,
+          // SEC-5: the host may be unknown to this viewer; the server then names them.
+          void notifyGameHostOf(game.id, gameHostId, {
             type: "participant_left",
             title: `${who} left ${game.title}`,
             body: "Their spot is open again.",
@@ -1107,15 +1103,13 @@ function GameDetail() {
     if (requiresApproval && !isApproved) {
       // The settings row is optional: hosts who never opened game settings
       // still get request-to-join, so fall back to the game's host id.
+      // SEC-5: the host may be unknown to this viewer (a host who is not a confirmed adult, seen by someone unrelated).
+      // The database names the host on the request itself, so a request never needs it.
       const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
-      if (!requestHostId) {
-        toast.error("This host can't take requests yet.");
-        return;
-      }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
-      // and must match the actual host. Otherwise the link is missing context or
-      // has been tampered with — refuse to send the request.
-      if (isInvite && (!inviteFrom || inviteFrom !== requestHostId)) {
+      // and must match the actual host when this viewer may know it. Otherwise the
+      // link is missing context or has been tampered with — refuse to send the request.
+      if (isInvite && !inviteMatchesHost(inviteFrom, requestHostId)) {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
@@ -1152,13 +1146,13 @@ function GameDetail() {
       setMyReq(optimistic);
       try {
         const wasRejected = prevReq?.status === "rejected";
-        const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
+        const created = await createJoinRequest({ game_id: game.id });
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
         const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
-        void createNotification({
-          user_id: requestHostId,
+        void notifyHostOfGame({
+          game_id: game.id,
           type: isResubmit ? "join_resubmitted" : "join_request",
           title: isResubmit
             ? `Resubmitted request: ${game.title}`
@@ -1211,10 +1205,9 @@ function GameDetail() {
     trackEvent("join_game", { game_id: game.id, kind: "instant" });
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
-    if (gameHostId && user && gameHostId !== user.id) {
+    if (user && gameHostId !== user.id) {
       const who = myProfile?.name || emailLocalPart(user.email) || "A player";
-      void createNotification({
-        user_id: gameHostId,
+      void notifyGameHostOf(game.id, gameHostId, {
         type: "participant_joined",
         title: `${who} joined ${game.title}`,
         body: `${effectiveJoined + 1}/${game.maxPlayers} players confirmed.`,
@@ -1342,8 +1335,6 @@ function GameDetail() {
     })),
   ];
 
-  const reportedHostId = settings?.host_id ?? game.hostUserId ?? null;
-
   return (
     <div className="pb-32">
       <RiskAcknowledgmentDialog
@@ -1369,16 +1360,15 @@ function GameDetail() {
         />
       )}
 
-      {reportedHostId && (
-        <ReportDialog
-          open={reportGameOpen}
-          onOpenChange={setReportGameOpen}
-          subjectType="game"
-          reportedId={reportedHostId}
-          subjectLabel={game.title}
-          gameId={game.id}
-        />
-      )}
+      {/* A game report is filed against the game; the database names its host (SEC-5), so anyone
+          who can see the game can report it, even when the host is not shown to them. */}
+      <ReportDialog
+        open={reportGameOpen}
+        onOpenChange={setReportGameOpen}
+        subjectType="game"
+        subjectLabel={game.title}
+        gameId={game.id}
+      />
       {/* Cancel game dialog (host) */}
       <Dialog
         open={cancelOpen}
@@ -1481,7 +1471,7 @@ function GameDetail() {
                 <Share2 className="h-4 w-4" />
               </button>
             )}
-            {!isHost && reportedHostId && (
+            {!isHost && (
               <button
                 onClick={() => setReportGameOpen(true)}
                 aria-label="Report game"
@@ -2161,7 +2151,7 @@ function GameDetail() {
               >
                 Safety Center
               </Link>
-              {!isHost && reportedHostId && (
+              {!isHost && (
                 <button
                   type="button"
                   onClick={() => setReportGameOpen(true)}
@@ -2347,11 +2337,10 @@ function GameDetail() {
                             await joinWaitlist(game.id, name);
                             toast.success(`You're on the ${name} waitlist.`);
                             const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
-                            if (gameHostId && user && gameHostId !== user.id) {
+                            if (user && gameHostId !== user.id) {
                               const who =
                                 myProfile?.name || emailLocalPart(user.email) || "A player";
-                              void createNotification({
-                                user_id: gameHostId,
+                              void notifyGameHostOf(game.id, gameHostId, {
                                 type: "waitlist_join",
                                 title: `${who} joined the ${name} waitlist`,
                                 body: `${game.title}`,
