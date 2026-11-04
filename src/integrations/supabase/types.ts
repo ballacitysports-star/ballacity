@@ -5055,6 +5055,8 @@ export type Database = {
           message_id: string | null
           reason: string
           reel_id: string | null
+          team_post_id: string | null
+          comment_id: string | null
           reported_id: string
           reporter_id: string
           resolution_notes: string | null
@@ -5073,6 +5075,8 @@ export type Database = {
           message_id?: string | null
           reason: string
           reel_id?: string | null
+          team_post_id?: string | null
+          comment_id?: string | null
           reported_id: string
           reporter_id: string
           resolution_notes?: string | null
@@ -5091,6 +5095,8 @@ export type Database = {
           message_id?: string | null
           reason?: string
           reel_id?: string | null
+          team_post_id?: string | null
+          comment_id?: string | null
           reported_id?: string
           reporter_id?: string
           resolution_notes?: string | null

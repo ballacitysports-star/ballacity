@@ -1,6 +1,6 @@
 # MOD-1: reporting team posts, comments and attached media
 
-Status: **implemented locally (database, client helpers, tests), open in a pull request. Not merged, not applied to production, not verified in production.** The report buttons on the post and comment screens are **not** wired yet (see "Not included").
+Status: **implemented locally (database, client, moderator and author screens, tests), open in a pull request. Not merged, not applied to production, not verified in production.**
 
 ## What it reuses
 
@@ -27,10 +27,28 @@ Additive: two columns, two tables, triggers and functions. Existing report types
 
 ## Tests
 
-`supabase/tests/450_team_content_reports.test.sql` (67 assertions): reporting by members, strangers, anonymous, blocked accounts and authors; spoofed reported account; held and unknown ids; duplicates; rate limit; report privacy for author, other reporters and moderators; thresholds for adult and under-18 authors; child-safety escalation; comment holds; visibility of held items for stranger, author and manager; moderator decisions, audit, media quarantine, non-moderator refusal; appeals by author, guardian and stranger; reviewer independence and administrator override; restoration; retention rules and grants. Unit: `src/lib/team-content-reports.test.ts`.
+`supabase/tests/450_team_content_reports.test.sql` (81 assertions): reporting by members, strangers, anonymous, blocked accounts and authors; spoofed reported account; held and unknown ids; duplicates; rate limit; report privacy for author, other reporters and moderators; thresholds for adult and under-18 authors; child-safety escalation; comment holds; visibility of held items for stranger, author and manager; moderator decisions, audit, media quarantine, non-moderator refusal; appeals by author, guardian and stranger; reviewer independence and administrator override; restoration; retention rules and grants. Unit: `src/lib/team-content-reports.test.ts` and `src/components/moderation/moderation-ui.test.tsx` (11 component tests: who sees the Report action, which ids it sends, who sees the review card and which function it calls, the appeal flow).
+
+## User interface (completed in this pass)
+
+| Who                                        | Where                                                           | What                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Any signed-in reader who is not the author | the team post detail dialog; every comment under any post       | a **Report** action opening the existing report dialog (reasons for team content). Hidden for the author, signed-out viewers and items with no known author. The database still decides: an item the reader cannot read cannot be reported, and the reported account comes from the item.                                                                  |
+| The author                                 | Inbox, Alerts tab                                               | "Your posts under review" with **Ask for a review** (500-character note). Backed by `my_content_holds()`; the appeal function re-checks authorship.                                                                                                                                                                                                        |
+| A verified guardian of a minor author      | Guardian dashboard                                              | "Your children's posts under review" with the same action, backed by `guardian_content_holds()`; the appeal function re-checks the guardian link.                                                                                                                                                                                                          |
+| Moderators                                 | Moderation, Reports (new subject filters Team post and Comment) | the reported text, whether it is held or hidden, whether it has an image, and **Hide**, **Remove image and hide**, **Restore**, **Dismiss**, **Investigating**, **Escalate**. Decisions run as the signed-in moderator through `moderator_decide_content_report`, so the role check, the audit actor and the escalation rule are enforced in the database. |
+| Moderators                                 | Moderation, new Appeals tab                                     | open appeals with the content and the author's note; **Restore the content** or **Keep the decision**; the reviewer must differ from the original decider unless an administrator.                                                                                                                                                                         |
+
+## Youth-safety escalations cannot be silently discarded
+
+Reports with reason `minor_safety`, `threats` or `illegal` start as `escalated`. An escalated report can be closed as dismissed or resolved only by an administrator, with a written note of at least 10 characters, and every such closure is written to the audit log. The rule is a trigger on `user_reports`, so it also covers the existing Moderation tab (service role, acting moderator taken from `reviewed_by`) and direct updates, for every subject type, not only team content. **Behaviour change:** moderators who are not administrators can no longer dismiss or resolve an escalated report of any kind; they can still hide content or take protective action, which closes it as actioned without discarding it. The child-safety hold on first report, the audit trail and the unpurgeable escalated state remain.
+
+## Retention
+
+Unchanged and still disabled: the purge function exists but is **not scheduled and not run**; it never touches escalated reports or open appeals; the 24-month window needs legal review. Running it needs separate approval.
 
 ## Not included (follow-ups)
 
-- Report buttons and the author's "ask for review" action on the team post and comment screens, and a queue filter for the new subject types in the moderation tab. The client helpers (`submitReport` fields, `describeReportError`, `appealContentDecision`) and `ReportDialog` props are in place.
 - Reporting of the attached image on its own (it is covered through the post).
-- Scheduling the retention purge.
+- Report buttons on other team surfaces that render posts without the detail dialog (cards link to the dialog today).
+- Scheduling the retention purge (intentionally off).

@@ -18,6 +18,7 @@ import { GuardianVideoUploadDialog } from "@/components/child/GuardianVideoUploa
 import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ContentUnderReview } from "@/components/moderation/ContentUnderReview";
 
 export const Route = createFileRoute("/guardian")({
   head: () => ({
@@ -308,6 +309,11 @@ function GuardianDashboard() {
           <GuardianHostingApprovals viewerId={(user as { id: string }).id} />
           <ChildTryoutsSection kids={shown} multi={multi} />
           <ParentPortalSections kids={shown} multi={multi} onSigned={() => q.refetch()} />
+          <ContentUnderReview
+            scope="children"
+            viewerId={(user as { id: string }).id}
+            childNames={Object.fromEntries(kids.map((k) => [k.childUserId, k.name]))}
+          />
 
           <section className="mt-6">
             <h2 className="font-display text-sm font-bold">Recent games</h2>

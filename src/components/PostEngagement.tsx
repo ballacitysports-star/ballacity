@@ -23,6 +23,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { supabase } from "@/integrations/supabase/client";
 import { formatWhen } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ReportContentButton } from "@/components/moderation/ReportContentButton";
 
 type Props = {
   subjectType: EngagementSubjectType;
@@ -281,6 +282,16 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
                     <span className="text-[10px] text-muted-foreground">
                       {formatWhen(c.createdAt)}
                     </span>
+                    {!isMine && !isDeleted && (
+                      <span className="ml-auto">
+                        <ReportContentButton
+                          kind="comment"
+                          contentId={c.id}
+                          authorId={c.authorId}
+                          label={c.body.slice(0, 60)}
+                        />
+                      </span>
+                    )}
                     {isMine && !isDeleted && editingId !== c.id && (
                       <div className="ml-auto flex items-center gap-0.5">
                         <button

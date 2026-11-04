@@ -149,6 +149,39 @@ SELECT t.lives(format($q$SELECT public.moderator_decide_content_report(%L, 'rest
 SELECT t.reset();
 SELECT t.eq((SELECT moderation_status FROM public.post_comments WHERE id = '00000000-0000-0000-0000-00000000c001'), 'approved', 'the comment is back');
 
+-- ---- escalations are never silently discarded
+SELECT t.as_user(t.id('modone'));
+SELECT t.throws(format($q$SELECT public.moderator_decide_content_report(%L, 'dismiss', 'looks fine to me, no problem here')$q$, (SELECT id FROM public.user_reports WHERE reporter_id = t.id('rep4') AND team_post_id = '00000000-0000-0000-0000-00000000f004')), 'ESCALATION_ADMIN_REQUIRED', 'a moderator cannot dismiss an escalated child-safety report');
+SELECT t.as_user(t.id('adminone'));
+SELECT t.throws(format($q$SELECT public.moderator_decide_content_report(%L, 'dismiss', 'ok')$q$, (SELECT id FROM public.user_reports WHERE reporter_id = t.id('rep4') AND team_post_id = '00000000-0000-0000-0000-00000000f004')), 'ESCALATION_NOTE_REQUIRED', 'an administrator needs a written note');
+SELECT t.lives(format($q$SELECT public.moderator_decide_content_report(%L, 'dismiss', 'Reviewed the post and its context; nothing unsafe.')$q$, (SELECT id FROM public.user_reports WHERE reporter_id = t.id('rep4') AND team_post_id = '00000000-0000-0000-0000-00000000f004')), 'an administrator with a note can close it');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE action = 'escalated_report_closed' AND actor_id = t.id('adminone')), 1, 'and the closure is audited');
+-- the existing Moderation tab writes with the service role (no auth.uid()) and sets reviewed_by
+INSERT INTO public.user_reports (reporter_id, reported_id, subject_type, reason, status) VALUES (t.id('rep1'), t.id('author'), 'user', 'minor_safety', 'escalated');
+SELECT t.throws(format($q$UPDATE public.user_reports SET status = 'dismissed', reviewed_by = %L, resolution_notes = 'long enough note here' WHERE reporter_id = t.id('rep1') AND subject_type = 'user'$q$, t.id('modone')), 'ESCALATION_ADMIN_REQUIRED', 'the service-role path is covered too (moderator as reviewer)');
+SELECT t.throws($q$UPDATE public.user_reports SET status = 'dismissed' WHERE reporter_id = t.id('rep1') AND subject_type = 'user'$q$, 'ESCALATION_ADMIN_REQUIRED', 'and an update with no reviewer at all');
+SELECT t.lives(format($q$UPDATE public.user_reports SET status = 'actioned', reviewed_by = %L WHERE reporter_id = t.id('rep1') AND subject_type = 'user'$q$, t.id('modone')), 'a moderator can still take protective action on it');
+
+-- ---- guardian entry point for appeals
+SELECT t.as_user(t.id('guardian'));
+SELECT t.eq((SELECT count(*)::int FROM public.guardian_content_holds() WHERE child_user_id = t.id('teenauthor')), 1, 'the guardian of a minor author sees the held post (held since two people reported it)');
+SELECT t.ok((SELECT has_open_appeal IS FALSE FROM public.guardian_content_holds() LIMIT 1), 'and whether an appeal is already open');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq((SELECT count(*)::int FROM public.guardian_content_holds()), 0, 'a stranger sees nothing');
+SELECT t.as_anon();
+SELECT t.throws($q$SELECT * FROM public.guardian_content_holds()$q$, 'permission denied', 'anonymous cannot call it');
+SELECT t.reset();
+
+-- ---- the author's own entry point
+SELECT t.as_user(t.id('teenauthor'));
+SELECT t.eq((SELECT count(*)::int FROM public.my_content_holds()), 1, 'an author sees their own held post');
+SELECT t.as_user(t.id('author'));
+SELECT t.eq((SELECT count(*)::int FROM public.my_content_holds() WHERE content_id = '00000000-0000-0000-0000-00000000f002'), 0, 'and not anyone else''s');
+SELECT t.as_anon();
+SELECT t.throws($q$SELECT * FROM public.my_content_holds()$q$, 'permission denied', 'anonymous cannot call it');
+SELECT t.reset();
+
 -- ---- rate limit
 INSERT INTO public.team_posts (id, team_id, author_id, kind, title, moderation_status)
   SELECT ('00000000-0000-0000-0000-0000000a' || lpad(g::text, 4, '0'))::uuid, 'squad', t.id('author'), 'announcement', 'bulk', 'approved' FROM generate_series(1, 21) g;
@@ -165,6 +198,7 @@ SELECT t.reset();
 -- ---- retention
 SELECT t.throws($q$SELECT private_sec.purge_closed_content_reports(interval '1 month')$q$, 'shorter than 12 months', 'retention cannot be shortened below a year');
 UPDATE public.user_reports SET reviewed_at = now() - interval '30 months' WHERE status IN ('actioned', 'resolved') AND team_post_id = '00000000-0000-0000-0000-00000000f001';
+INSERT INTO public.user_reports (reporter_id, reported_id, subject_type, reason, team_post_id, status, reviewed_at) VALUES (t.id('rep3'), t.id('author'), 'team_post', 'minor_safety', '00000000-0000-0000-0000-00000000f004', 'escalated', now() - interval '30 months');
 SELECT t.ok(private_sec.purge_closed_content_reports() >= 3, 'closed reports older than 24 months are purged');
 SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE team_post_id = '00000000-0000-0000-0000-00000000f004' AND status = 'escalated'), 1, 'an escalated report is never purged');
 SELECT t.eq(has_function_privilege('authenticated', 'private_sec.purge_closed_content_reports(interval)', 'EXECUTE'), false, 'clients cannot run the purge');

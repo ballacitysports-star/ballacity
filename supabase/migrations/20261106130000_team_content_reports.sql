@@ -311,3 +311,68 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION private_sec.purge_closed_content_reports(interval) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private_sec.purge_closed_content_reports(interval) TO service_role;
+
+-- ------------------------------------------------------------------------------------------- escalations are never silently discarded
+-- An escalated report (child safety, threats, illegal content, or escalated by a moderator) can be closed as dismissed or resolved only by an
+-- administrator, with a written note of at least 10 characters, and the closure is audited. This holds for every route that writes the status:
+-- the moderator RPC above, the existing Moderation tab (service role; the acting moderator is taken from reviewed_by) and direct updates.
+-- A moderator can still take protective action (hide, remove media), which closes the report as 'actioned' without discarding it.
+CREATE OR REPLACE FUNCTION public.guard_escalated_report_closure()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $$
+DECLARE _actor uuid;
+BEGIN
+  IF OLD.status = 'escalated' AND NEW.status IN ('dismissed', 'resolved') THEN
+    _actor := COALESCE(auth.uid(), NEW.reviewed_by);
+    IF _actor IS NULL OR NOT (public.has_role(_actor, 'admin') OR public.has_role(_actor, 'superadmin')) THEN
+      RAISE EXCEPTION 'ESCALATION_ADMIN_REQUIRED: an escalated report can only be dismissed or resolved by an administrator. Hide the content or ask an administrator.'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF length(btrim(COALESCE(NEW.resolution_notes, ''))) < 10 THEN
+      RAISE EXCEPTION 'ESCALATION_NOTE_REQUIRED: closing an escalated report needs a written note (at least 10 characters).'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, reason, metadata)
+    VALUES (_actor, 'escalated_report_closed', 'report', NEW.id::text, NEW.resolution_notes,
+            jsonb_build_object('status', NEW.status, 'reason', NEW.reason, 'subject_type', NEW.subject_type));
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.guard_escalated_report_closure() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.guard_escalated_report_closure() TO service_role;
+DROP TRIGGER IF EXISTS a1_guard_escalated_report_closure_trg ON public.user_reports;
+CREATE TRIGGER a1_guard_escalated_report_closure_trg BEFORE UPDATE OF status ON public.user_reports
+  FOR EACH ROW EXECUTE FUNCTION public.guard_escalated_report_closure();
+
+-- ------------------------------------------------------------------------------------------------------ guardian entry point for appeals
+CREATE OR REPLACE FUNCTION public.guardian_content_holds()
+RETURNS TABLE (content_type text, content_id uuid, child_user_id uuid, label text, level text, held_at timestamptz, has_open_appeal boolean)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT h.content_type, h.content_id, private_sec.content_author(h.content_type, h.content_id),
+         CASE WHEN h.content_type = 'team_post'
+              THEN left((SELECT p.title FROM public.team_posts p WHERE p.id = h.content_id), 80)
+              ELSE left((SELECT c.body FROM public.post_comments c WHERE c.id = h.content_id), 80) END,
+         h.level, h.created_at,
+         EXISTS (SELECT 1 FROM public.moderation_appeals a WHERE a.content_type = h.content_type AND a.content_id = h.content_id AND a.status = 'open')
+    FROM public.content_report_holds h
+   WHERE auth.uid() IS NOT NULL AND h.released_at IS NULL
+     AND public.is_guardian_of(auth.uid(), private_sec.content_author(h.content_type, h.content_id))
+$$;
+REVOKE ALL ON FUNCTION public.guardian_content_holds() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.guardian_content_holds() TO authenticated, service_role;
+
+-- The author's own entry point: what of theirs is under review and whether they already asked for a second look.
+CREATE OR REPLACE FUNCTION public.my_content_holds()
+RETURNS TABLE (content_type text, content_id uuid, label text, level text, held_at timestamptz, has_open_appeal boolean)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' AS $$
+  SELECT h.content_type, h.content_id,
+         CASE WHEN h.content_type = 'team_post'
+              THEN left((SELECT p.title FROM public.team_posts p WHERE p.id = h.content_id), 80)
+              ELSE left((SELECT c.body FROM public.post_comments c WHERE c.id = h.content_id), 80) END,
+         h.level, h.created_at,
+         EXISTS (SELECT 1 FROM public.moderation_appeals a WHERE a.content_type = h.content_type AND a.content_id = h.content_id AND a.status = 'open')
+    FROM public.content_report_holds h
+   WHERE auth.uid() IS NOT NULL AND h.released_at IS NULL
+     AND private_sec.content_author(h.content_type, h.content_id) = auth.uid()
+$$;
+REVOKE ALL ON FUNCTION public.my_content_holds() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.my_content_holds() TO authenticated, service_role;
