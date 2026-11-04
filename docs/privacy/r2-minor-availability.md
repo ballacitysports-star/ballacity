@@ -25,7 +25,7 @@ A teen or child's open post is no longer discoverable by unrelated adults or oth
 
 ## Tests
 
-`supabase/tests/420_minor_availability_privacy.test.sql` (37 assertions): anonymous; adult stranger; teen stranger; another minor; unknown age; the author; guardian; teammate; manager; accepted follower; moderator; administrator; closed posts; one read policy; grants; write-side stripping and note refusal for a teen; adult unaffected; contact requests from a stranger, a minor, a teammate (with and without the guardian's teammates setting), a guardian, and adult to adult. Run against the schema without the migration it fails (12 failures before the run aborts), so the assertions are not vacuous.
+`supabase/tests/420_minor_availability_privacy.test.sql` (55 assertions): anonymous; adult stranger; teen stranger; another minor; unknown age; the author; guardian; teammate; manager; accepted follower; moderator; administrator; closed posts; one read policy; grants; write-side stripping and note refusal for a teen; adult unaffected; contact requests from a stranger, a minor, a teammate (with and without the guardian's teammates setting), a guardian, and adult to adult. Run against the schema without the migration it fails (12 failures before the run aborts), so the assertions are not vacuous.
 
 ## Rollout, compatibility, recovery
 
@@ -48,3 +48,7 @@ select polname from pg_policy where polrelid = 'public.player_availabilities'::r
 ## Residual
 
 Old rows by minors keep their stored coordinates until a separately approved blanking step; they are unreadable to unrelated accounts but remain in backups. A minor can still contact an adult through the adult's own post (for 16 and 17, unless a guardian restricts it). See the R7 audit.
+
+## Legacy data procedure (defined, not run)
+
+`private_sec.blank_minor_availability_location(limit)` (service role only) removes the stored coordinates, street address and place id from posts of non-adult or unknown-age authors in batches and returns the rows changed, until it returns 0. It keeps the city, copies nothing anywhere, writes an audit row with counts only, and is idempotent. A precise value can never return to such a row (the write trigger drops it), and the trigger checks the note only when the note changes, so an old note naming a place never blocks the blanking or an unrelated edit. Moderators get `list_minor_availability_notes_with_location_text()` (post ids and a reason, never the text) and `moderator_scrub_availability_note(post, reason)` (removes the note, audited, no copy). Run order, preconditions and verification are in `docs/release/legacy-data-procedures.md`. Production counts (read-only) are taken with the query in the verification section above before any run.
