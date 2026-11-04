@@ -35,9 +35,10 @@ release owner, even though it writes nothing. Approval to run it is not approval
 
 Protected functions and policies are compared by md5 of `pg_get_functiondef` and of the `pg_policies` expressions.
 Those are deparsed text and can differ between Postgres majors (for example `BEGIN ATOMIC` bodies and policy
-expressions), so a hash is only ever compared on the major it was generated on:
+expressions), and default ACLs differ too (Postgres 17 adds the `MAINTAIN` table privilege), so a recorded state is
+only ever compared on the major it was generated on:
 
-- Every hash in the manifest is keyed by major: `expect_before: { "16": md5, "17": md5 }`, likewise `expect_steps`
+- Every recorded state in the manifest is keyed by major: `expect_before: { "16": state, "17": state }`, likewise `expect_steps`
   and `expect_after`; `generated.majors` lists the majors present.
 - If the target's major is not in `generated.majors`, both the default run and `--verify-after` **fail**. They do not
   warn and do not fall back to another major.
@@ -49,7 +50,24 @@ expressions), so a hash is only ever compared on the major it was generated on:
 
 ## Fail-closed rules
 
-Anything the preflight does not recognize is a failure that names the object or row. Nothing unrecognized is a warning.
+Every check below fails (exit 1) and names the object or row; none of them is downgraded to a warning. The checks
+cover exactly the ledger rows, files and protected objects listed here. Objects the release does not touch (other
+functions, tables, roles, extensions, column grants, buckets the release does not create) are **not** checked.
+
+**Protected objects and what is compared.** The manifest lists, per Postgres major, the state of:
+
+| Kind      | Which objects                                                                                                                                                                    | State compared                                                                                                                                                                                                   |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Functions | every function a release file creates, alters or grants/revokes on, and every function whose state any release file changes in the replay                                        | md5 of `pg_get_functiondef`, owner role name, `prosecdef`, the `search_path` in `proconfig`, and the ACL as sorted `grantee:PRIVILEGE` pairs from `aclexplode` (grantor dropped, `NULL` expanded to the default) |
+| Policies  | every policy a release file creates or alters                                                                                                                                    | md5 of `qual`, of `with_check`, and of `cmd`, `permissive` and `roles` together (from `pg_policies`)                                                                                                             |
+| Tables    | every table a release file creates, alters, grants/revokes on, or puts a trigger or policy on; every table whose state a release file changes; every table of a protected policy | `relrowsecurity`, `relforcerowsecurity`, the normalized ACL, every non-internal trigger (name, function, `tgtype`, `tgenabled`), and the **full** set of policy names, so an extra policy fails                  |
+| Buckets   | every `storage.buckets` row a release file creates or changes                                                                                                                    | `public`                                                                                                                                                                                                         |
+
+The replay runs as role `postgres` (the role production's migrations are applied as), so owners and ACLs in the
+manifest name `postgres`. Platform objects the release only touches (for example `storage.objects`, which gets
+release policies) are recorded as the Supabase stub (`supabase/tests/support/supabase-stub.sql`) creates them. If a
+real project's owner or grants on such an object differ, the first run fails and names the field; resolve it by a
+reviewed manifest or stub change, never by hand at release time.
 
 | Rule                 | Fails when                                                                                                                                                                                            |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,11 +75,12 @@ Anything the preflight does not recognize is a failure that names the object or 
 | Hash major           | the manifest has no hashes for the target's major (default run and `--verify-after`)                                                                                                                  |
 | Manifest             | a release file changed (sha256), is missing, unlisted, duplicated or out of order; manifest format is not 2                                                                                           |
 | Ledger gaps          | a later release migration is applied while an earlier one is not                                                                                                                                      |
+| Ledger content       | a release-range row's `name` is not the file stem (or the part after the version, the Lovable stem rule), its `statements` is empty or NULL, or `sha256(statements[1])` is not the manifest sha256    |
 | Unknown ledger rows  | any row, before or in the release range, whose version matches no file in `supabase/migrations` or the drizzle journal, and is not a Lovable row (see below) or in `known_ledger_rows_without_file`   |
 | Unknown drizzle rows | a `drizzle.__drizzle_migrations` row matching no journal file (hash or `created_at`) and not in `known_drizzle_rows_without_file`                                                                     |
 | Unledgered history   | a file before the release range has no ledger row and is not in `known_unledgered` (the 71 files of runbook section 1, with their reviewed sha256); a drizzle journal file with no drizzle ledger row |
 | Regression           | a pending release migration would redefine an object whose later definition is already applied                                                                                                        |
-| Protection state     | a protected function or policy is not in the state the ledger implies (below)                                                                                                                         |
+| Protection state     | a protected function, policy, table or bucket (table above) is not in the state the ledger implies (below)                                                                                            |
 | Dependencies         | a pending migration's required function, table, schema or earlier migration is neither in the target nor provided by an earlier pending migration                                                     |
 
 **Recognized protection states.** The replay records each protected object before the release range
@@ -75,11 +94,16 @@ Anything the preflight does not recognize is a failure that names the object or 
 
 One explicit exception: `drift_captures` (runbook section 1a) are release migrations that write down a hand fix
 production already has. While a capture is the next pending definer, the target may already hold the captured
-definition. The md5 the replay records for `enforce_gym_review()` after `20261103101000` is `1c776a86…`, the
-production md5 in runbook 1a.
+definition. The `def` md5 the replay records for `enforce_gym_review()` after `20261103101000` is `1c776a86…`, the
+production md5 in runbook 1a; its owner and ACL must match too (`postgres`, EXECUTE for `postgres` and `service_role`).
 
-**Ledger matching.** Release migrations are matched by version (each gets its own ledger row at release). Historical
-Lovable rows carry a version one or two seconds after the file's timestamp and the file stem as `name`
+**Ledger matching.** Release migrations are matched by version (each gets its own ledger row at release), and the row
+must be the one the runbook writes (section 2; the per-file template in `docs/release/r4-staging-rehearsal.md`
+section 4): `name` = the file stem and `statements` = `ARRAY[<file content>]`. The preflight hashes `statements[1]`
+and accepts it when it equals the manifest sha256 of the file, either byte for byte or after adding back the one
+trailing newline that psql's backquote expansion (`` \set content `cat <file>` ``) removes. Release rows are never
+written without statements, so an empty or NULL `statements` fails. Historical Lovable rows carry a version one or two
+seconds after the file's timestamp and the file stem as `name`
 (`docs/migration-history-reconciliation.md` section 1); a row is matched to such a file only by its stem and only within
 10 seconds. The two ledger rows whose files Lovable removed (`20260708185350`, `20260725025124`) and drizzle ledger row
 22 are listed by version and name or by hash and `created_at`, with their evidence.
@@ -91,8 +115,8 @@ review them. Change the manifest's allow-lists or matching only through a review
 ## PG17 manifest from CI
 
 The workflow **Release preflight (PG17)** (`.github/workflows/release-preflight.yml`, job "Release preflight on
-Postgres 17") runs on pull requests that touch `scripts/release-preflight*`, the manifest, `supabase/migrations/**` or
-the workflow, and on manual dispatch. It is not a required check. On a `postgres:17` service it:
+Postgres 17") runs on pull requests that touch `scripts/release-preflight*`, the manifest, `supabase/migrations/**`,
+`drizzle/migrations/**`, `docs/migration-evidence/**` or the workflow, and on manual dispatch. It is not a required check. On a `postgres:17` service it:
 
 1. runs `bun run preflight:test`;
 2. regenerates the manifest (`--write-manifest --from <release_range.from> --manifest /tmp/m17.json`) and checks it

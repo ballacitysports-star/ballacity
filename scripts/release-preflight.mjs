@@ -42,14 +42,16 @@ Options
                      Defaults to PREFLIGHT_DATABASE_URL. Ambient PG* variables are ignored, so the tool
                      only ever connects to the database you name. The URL and password are never printed.
   --verify-after     after the release: every manifest migration must be applied, and every protected
-                     function/policy must match the md5 recorded from a full replay (expect_after).
+                     function, policy, table and bucket must equal the state recorded from a full
+                     replay (expect_after).
   --offline          skip the database; check the manifest against the checkout only.
   --json             print the full report as JSON instead of the human summary.
   --manifest <path>  manifest to use or write (default ${DEFAULT_MANIFEST}).
   --root <dir>       repository checkout to read migrations from (default: this checkout).
   --write-manifest   regenerate the manifest from the checkout; needs --from <version>. Replays the
                      migrations into a throwaway database on the LOCAL Postgres used by bun run test:db
-                     (PGHOST must be a unix socket or localhost) and drops it afterwards. Refuses --db-url.
+                     (PGHOST must be a unix socket or localhost, PGHOSTADDR a loopback address; PGSERVICE
+                     and PGSERVICEFILE are ignored) as role postgres, and drops it afterwards. Refuses --db-url.
                      The hashes are recorded for the local server's major only.
   --merge-hashes <p> copy the per-major hashes of manifest <p> (e.g. the PG17 CI artifact) into --manifest.
                      Refused unless both list exactly the same migrations, sha256s, protections and allow-lists.
@@ -61,14 +63,24 @@ What it checks (each failure exits 1 with a message)
   2. Dependencies: each migration's declared requires (functions as regprocedure signatures, tables,
      schemas, earlier migrations) must exist in the target or be provided by an earlier pending entry.
   3. Ledger: reads ${LEDGER} (and ${DRIZZLE_LEDGER} for drizzle files) and prints the
-     exact pending list. Applied versions must be a prefix of the manifest order (no gaps). Every ledger
+     exact pending list. Applied versions must be a prefix of the manifest order (no gaps). A release-range
+     row must carry name = the file stem and statements[1] = the file content (sha256 equal to the manifest,
+     allowing the one trailing newline psql's backquote expansion drops); empty statements fail. Every ledger
      row, in or before the release range, must match a file in supabase/migrations or the drizzle journal
      (or the manifest's known_ledger_rows_without_file); every file before the range must have a ledger
      row unless the manifest lists it in known_unledgered.
-  4. Protections: a pending migration that would overwrite a function or policy whose later definition
-     is already applied fails. Every protected function and policy must be in a recognized state:
-     absent or expect_before when all its defining migrations are pending, the recorded snapshot after the
-     last applied definer when some are, expect_after when all are. Anything else is drift and fails.
+  4. Protections: a pending migration that would overwrite a protected object whose later definition
+     is already applied fails. Protected objects and the state compared for each:
+       functions the release defines, alters or grants on: md5(pg_get_functiondef), owner, SECURITY DEFINER,
+         proconfig search_path, normalized ACL;
+       policies the release defines: md5 of qual, with_check and cmd|permissive|roles;
+       tables the release creates, alters, grants on or puts a trigger or policy on (and every table of a
+         protected policy): RLS and FORCE RLS flags, normalized ACL, every non-internal trigger (name,
+         function, tgtype, tgenabled) and the full set of policy names (an extra policy fails);
+       storage buckets the release creates: public.
+     Each must be in a recognized state: absent or expect_before when all its defining migrations are
+     pending, the recorded snapshot after the last applied definer when some are, expect_after when all are.
+     Any other state of these objects fails. Objects outside these lists are not checked.
      --verify-after requires every protection to equal expect_after.
   5. Server: the target must run Postgres ${SUPPORTED_MAJORS.join(" or ")} and have the ${LEDGER_SCHEMA}
      schema, and the manifest must carry hashes generated on the target's major. A missing major fails;
@@ -130,11 +142,16 @@ function stripComments(text) {
 const ident = String.raw`(?:"[^"]+"|[A-Za-z_][\w$]*)`;
 const unquote = (s) => (s.startsWith('"') ? s.slice(1, -1) : s.toLowerCase());
 
-/** Functions (schema.name) and policies (schema|table|name) a migration file creates or alters. */
+/**
+ * Functions (schema.name), policies (schema|table|name) and tables (schema.table) a migration file
+ * creates, alters, grants on or attaches triggers/policies to. Over-matching only adds a definer.
+ */
 export function definitionsIn(text) {
   const body = stripComments(text);
   const functions = new Set();
   const policies = new Set();
+  const tables = new Set();
+  const qualified = (a, b) => (b ? `${unquote(a)}.${unquote(b)}` : `public.${unquote(a)}`);
   const fnRe = new RegExp(
     String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+(${ident})(?:\s*\.\s*(${ident}))?\s*\(`,
     "gi",
@@ -158,8 +175,43 @@ export function definitionsIn(text) {
   for (const m of body.matchAll(polRe)) {
     const [schema, table] = m[3] ? [unquote(m[2]), unquote(m[3])] : ["public", unquote(m[2])];
     policies.add(`${schema}|${table}|${unquote(m[1])}`);
+    tables.add(`${schema}.${table}`);
   }
-  return { functions, policies };
+  const tableRe = new RegExp(
+    String.raw`\b(?:CREATE\s+(?:UNLOGGED\s+)?TABLE(?:\s+IF\s+NOT\s+EXISTS)?|ALTER\s+TABLE(?:\s+IF\s+EXISTS)?(?:\s+ONLY)?|DROP\s+POLICY(?:\s+IF\s+EXISTS)?\s+${ident}\s+ON|DROP\s+TRIGGER(?:\s+IF\s+EXISTS)?\s+${ident}\s+ON)\s+(${ident})(?:\s*\.\s*(${ident}))?`,
+    "gi",
+  );
+  for (const m of body.matchAll(tableRe)) tables.add(qualified(m[1], m[2]));
+  const trgRe = new RegExp(
+    String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\s+${ident}[^;]*?\bON\s+(${ident})(?:\s*\.\s*(${ident}))?`,
+    "gi",
+  );
+  for (const m of body.matchAll(trgRe)) tables.add(qualified(m[1], m[2]));
+  // GRANT/REVOKE ... ON [TABLE] a, b / ON FUNCTION f(args), g(args) ... TO/FROM
+  const grantRe = /\b(?:GRANT|REVOKE)\b[^;]*?\bON\s+([^;]*?)\s(?:TO|FROM)\b/gi;
+  const objRe = new RegExp(String.raw`(${ident})(?:\s*\.\s*(${ident}))?`, "g");
+  for (const m of body.matchAll(grantRe)) {
+    const target = m[1].trim();
+    const kw =
+      /^(FUNCTIONS?|PROCEDURES?|ROUTINES?|TABLE|SCHEMA|SEQUENCES?|ALL|DATABASE|TYPE|DOMAIN|LANGUAGE|LARGE|FOREIGN|TABLESPACE|PARAMETER)\b/i
+        .exec(target)?.[1]
+        ?.toUpperCase();
+    if (kw && /^(FUNCTION|PROCEDURE|ROUTINE)/.test(kw)) {
+      const list = target.slice(kw.length);
+      const fnObj = new RegExp(String.raw`(${ident})(?:\s*\.\s*(${ident}))?\s*\(`, "g");
+      for (const f of list.matchAll(fnObj)) {
+        const [schema, name] = f[2] ? [unquote(f[1]), unquote(f[2])] : ["public", unquote(f[1])];
+        functions.add(`${schema}.${name}`);
+      }
+    } else if (!kw || kw === "TABLE") {
+      const list = kw ? target.slice(kw.length) : target;
+      for (const o of list.split(",")) {
+        const t = new RegExp(String.raw`^\s*(${ident})(?:\s*\.\s*(${ident}))?\s*$`).exec(o);
+        if (t) tables.add(qualified(t[1], t[2]));
+      }
+    }
+  }
+  return { functions, policies, tables };
 }
 
 /** Literal arguments of to_regprocedure/to_regclass/to_regnamespace in a file's guard blocks. */
@@ -286,6 +338,9 @@ export function checkManifest(manifest, root = ROOT) {
     byFn.set(k, [...(byFn.get(k) ?? []), p]);
   }
   for (const p of manifest.protections?.policies ?? []) byPol.set(policyKey(p), p);
+  const byTbl = new Map(
+    (manifest.protections?.tables ?? []).map((p) => [`${p.schema}.${p.table}`, p]),
+  );
   for (const e of entries) {
     if (!e.path || !existsSync(join(root, e.path))) continue;
     const defs = definitionsIn(readFileSync(join(root, e.path), "utf8"));
@@ -302,7 +357,20 @@ export function checkManifest(manifest, root = ROOT) {
           `protection policy ${key}: ${e.path} defines it but is not in its defined_by; regenerate the manifest`,
         );
     }
+    for (const key of defs.tables) {
+      const p = byTbl.get(key);
+      if (p && !(p.defined_by ?? []).includes(e.version))
+        errors.push(
+          `protection table ${key}: ${e.path} creates, alters or grants on it but is not in its defined_by; regenerate the manifest`,
+        );
+    }
   }
+  // Every table a protected policy is on must itself be protected (its full policy set is checked there).
+  for (const p of manifest.protections?.policies ?? [])
+    if (!byTbl.has(`${p.schema}.${p.table}`))
+      errors.push(
+        `protection policy ${policyKey(p)}: its table ${p.schema}.${p.table} is not in protections.tables, so an extra policy on it would go unnoticed; regenerate the manifest`,
+      );
 
   // Format 2: per-major hashes with before/step/after states, and explicit allow-lists.
   if (manifest.format !== MANIFEST_FORMAT)
@@ -366,14 +434,41 @@ export function checkManifest(manifest, root = ROOT) {
   return { errors, warnings };
 }
 
+/** Protection kinds: manifest list name, kind, key into the target/snapshot state, label. */
+export const PROTECTION_KINDS = [
+  { list: "functions", kind: "function", key: (p) => p.signature, label: (p) => p.signature },
+  {
+    list: "policies",
+    kind: "policy",
+    key: policyKey,
+    label: (p) => `policy ${p.policy} on ${p.schema}.${p.table}`,
+  },
+  {
+    list: "tables",
+    kind: "table",
+    key: (p) => `${p.schema}.${p.table}`,
+    label: (p) => `table ${p.schema}.${p.table}`,
+  },
+  {
+    list: "buckets",
+    kind: "bucket",
+    key: (p) => p.bucket,
+    label: (p) => `storage bucket ${p.bucket}`,
+  },
+];
+const KIND = Object.fromEntries(PROTECTION_KINDS.map((k) => [k.kind, k]));
+
 function allProtections(manifest) {
-  return [
-    ...(manifest.protections?.functions ?? []).map((p) => ({ ...p, kind: "function" })),
-    ...(manifest.protections?.policies ?? []).map((p) => ({ ...p, kind: "policy" })),
-  ];
+  return PROTECTION_KINDS.flatMap((k) =>
+    (manifest.protections?.[k.list] ?? []).map((p) => ({ ...p, kind: k.kind })),
+  );
 }
 function protectionLabel(p) {
-  return p.kind === "function" ? p.signature : `policy ${p.policy} on ${p.schema}.${p.table}`;
+  return KIND[p.kind].label(p);
+}
+/** The target's state of a protection (null = absent). */
+function targetState(target, p) {
+  return target[KIND[p.kind].list]?.[KIND[p.kind].key(p)] ?? null;
 }
 
 // ------------------------------------------------------------------------------------ connection
@@ -436,6 +531,25 @@ export const sqlLiteral = (s) => {
 };
 const lit = sqlLiteral;
 
+// ------------------------------------------------------------------------------- state fragments
+// One definition of each protected object's state, used both by the replay snapshot
+// (release-preflight-scratch.mjs SNAPSHOT_SQL) and by the read of the target, under search_path ''.
+
+/** Normalized ACL: sorted "grantee:PRIVILEGE" ("*" when grantable); NULL ACLs expand to the default; grantors dropped. */
+export const aclSql = (aclExpr) =>
+  `(SELECT coalesce(json_agg(x ORDER BY x COLLATE "C"), '[]') FROM (SELECT DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END || ':' || a.privilege_type || CASE WHEN a.is_grantable THEN '*' ELSE '' END AS x FROM aclexplode(${aclExpr}) a) acl_s)`;
+/** Function state: md5 of pg_get_functiondef, owner, SECURITY DEFINER, proconfig search_path and the ACL. */
+export const functionStateSql = (p) =>
+  `json_build_object('def', md5(pg_get_functiondef(${p}.oid)), 'owner', pg_get_userbyid(${p}.proowner)::text, 'secdef', ${p}.prosecdef, 'search_path', (SELECT substr(cfg, 13) FROM unnest(${p}.proconfig) cfg WHERE cfg LIKE 'search_path=%' LIMIT 1), 'acl', ${aclSql(`coalesce(${p}.proacl, acldefault('f', ${p}.proowner))`)})`;
+/** Table state: RLS flags, ACL, every non-internal trigger (name|function|tgtype|tgenabled) and the full policy name set. */
+export const tableStateSql = (c) =>
+  `json_build_object('rls', ${c}.relrowsecurity, 'force_rls', ${c}.relforcerowsecurity, 'acl', ${aclSql(`coalesce(${c}.relacl, acldefault('r', ${c}.relowner))`)}, 'triggers', (SELECT coalesce(json_agg(t.tgname::text || '|' || t.tgfoid::regprocedure::text || '|' || t.tgtype::text || '|' || t.tgenabled::text ORDER BY t.tgname COLLATE "C"), '[]') FROM pg_trigger t WHERE t.tgrelid = ${c}.oid AND NOT t.tgisinternal), 'policies', (SELECT coalesce(json_agg(pol.polname::text ORDER BY pol.polname COLLATE "C"), '[]') FROM pg_policy pol WHERE pol.polrelid = ${c}.oid))`;
+/** Policy state: md5 of qual, with_check and cmd|permissive|roles (pg_policies). */
+export const policyStateSql = (pp) =>
+  `json_build_object('qual', md5(${pp}.qual), 'with_check', md5(${pp}.with_check), 'shape', md5(${pp}.cmd || '|' || ${pp}.permissive || '|' || ${pp}.roles::text))`;
+/** Storage bucket state. */
+export const bucketStateSql = (b) => `json_build_object('public', ${b}.public)`;
+
 /** Runs one SELECT returning a single JSON value, inside a read-only transaction. */
 export function readOnlyQuery(env, select) {
   const script = `SET SESSION default_transaction_read_only = on;
@@ -471,6 +585,20 @@ function requirementKey(kind, name) {
   return `${kind}:${name}`;
 }
 
+/**
+ * For release-range ledger rows: how many statements, and the sha256 of statements[1] as stored and
+ * with one trailing newline added back (psql's backquote expansion in the runbook template drops it).
+ * to_jsonb(s) keeps the query valid when a column is missing (it then counts as empty).
+ */
+const LEDGER_CONTENT_SQL = (from) => {
+  const st = `(to_jsonb(s)->'statements')`;
+  const first = `(${st}->>0)`;
+  const inRange = `s.version::text >= ${from}`;
+  return `'statements', CASE WHEN ${inRange} THEN CASE WHEN jsonb_typeof(${st}) = 'array' THEN jsonb_array_length(${st}) ELSE 0 END END,
+          'statement_sha256', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first}, 'UTF8')), 'hex') END,
+          'statement_sha256_nl', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first} || E'\\n', 'UTF8')), 'hex') END`;
+};
+
 /** Collects everything the checks need from the target in two read-only round trips. */
 export function readTarget(env, manifest) {
   const head = readOnlyQuery(
@@ -479,7 +607,8 @@ export function readTarget(env, manifest) {
        'server_version_num', current_setting('server_version_num')::int,
        'ledger_schema', to_regnamespace('${LEDGER_SCHEMA}') IS NOT NULL,
        'ledger', to_regclass('${LEDGER}') IS NOT NULL,
-       'drizzle', to_regclass('${DRIZZLE_LEDGER}') IS NOT NULL)`,
+       'drizzle', to_regclass('${DRIZZLE_LEDGER}') IS NOT NULL,
+       'buckets_table', to_regclass('storage.buckets') IS NOT NULL)`,
   );
   const reqs = new Map();
   for (const e of manifest.migrations) {
@@ -495,27 +624,45 @@ export function readTarget(env, manifest) {
     : `'{}'::json`;
   const fns = manifest.protections?.functions ?? [];
   const fnSql = fns.length
-    ? `(SELECT json_object_agg(sig, md5(pg_get_functiondef(to_regprocedure(sig)))) FROM (VALUES ${fns.map((p) => `(${lit(p.signature)})`).join(", ")}) v(sig))`
+    ? `(SELECT json_object_agg(v.sig, CASE WHEN p.oid IS NULL THEN NULL ELSE ${functionStateSql("p")} END)
+        FROM (VALUES ${fns.map((p) => `(${lit(p.signature)})`).join(", ")}) v(sig)
+        LEFT JOIN pg_proc p ON p.oid = to_regprocedure(v.sig))`
     : `'{}'::json`;
   const pols = manifest.protections?.policies ?? [];
   const polSql = pols.length
     ? `(SELECT json_object_agg(v.s || '|' || v.t || '|' || v.p,
-          CASE WHEN pp.policyname IS NULL THEN NULL ELSE json_build_object('qual', md5(pp.qual), 'with_check', md5(pp.with_check),
-               'shape', md5(pp.cmd || '|' || pp.permissive || '|' || pp.roles::text)) END)
+          CASE WHEN pp.policyname IS NULL THEN NULL ELSE ${policyStateSql("pp")} END)
         FROM (VALUES ${pols.map((p) => `(${lit(p.schema)}, ${lit(p.table)}, ${lit(p.policy)})`).join(", ")}) v(s, t, p)
         LEFT JOIN pg_policies pp ON pp.schemaname = v.s AND pp.tablename = v.t AND pp.policyname = v.p)`
     : `'{}'::json`;
+  const tbls = manifest.protections?.tables ?? [];
+  const tblSql = tbls.length
+    ? `(SELECT json_object_agg(v.s || '.' || v.t, CASE WHEN c.oid IS NULL THEN NULL ELSE ${tableStateSql("c")} END)
+        FROM (VALUES ${tbls.map((p) => `(${lit(p.schema)}, ${lit(p.table)})`).join(", ")}) v(s, t)
+        LEFT JOIN pg_namespace n ON n.nspname = v.s
+        LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = v.t AND c.relkind IN ('r', 'p'))`
+    : `'{}'::json`;
+  const bks = manifest.protections?.buckets ?? [];
+  const bkSql = !bks.length
+    ? `'{}'::json`
+    : head.buckets_table
+      ? `(SELECT json_object_agg(v.id, CASE WHEN b.id IS NULL THEN NULL ELSE ${bucketStateSql("b")} END)
+          FROM (VALUES ${bks.map((p) => `(${lit(p.bucket)})`).join(", ")}) v(id)
+          LEFT JOIN storage.buckets b ON b.id = v.id)`
+      : `'{}'::json`;
+  const from = manifest.release_range.from;
   const body = readOnlyQuery(
     env,
     `SELECT json_build_object(
        'ledger_rows', ${head.ledger ? `(SELECT count(*) FROM ${LEDGER})` : "NULL"},
-       'ledger_all', ${head.ledger ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name') ORDER BY s.version::text), '[]') FROM ${LEDGER} s)` : "'[]'::json"},
+       'ledger_all', ${head.ledger ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name', ${LEDGER_CONTENT_SQL(lit(from))}) ORDER BY s.version::text), '[]') FROM ${LEDGER} s)` : "'[]'::json"},
        'drizzle_rows', ${head.drizzle ? `(SELECT coalesce(json_agg(json_build_object('hash', hash, 'created_at', created_at::text)), '[]') FROM ${DRIZZLE_LEDGER})` : "'[]'::json"},
        'requirements', ${reqSql},
        'functions', ${fnSql},
-       'policies', ${polSql})`,
+       'policies', ${polSql},
+       'tables', ${tblSql},
+       'buckets', ${bkSql})`,
   );
-  const from = manifest.release_range.from;
   return {
     ...head,
     ...body,
@@ -523,19 +670,58 @@ export function readTarget(env, manifest) {
   };
 }
 
-/** Same state: both absent, or equal md5 (function) / equal qual, with_check and shape (policy). */
+/** Canonical JSON: object keys sorted, string arrays sorted (ACLs, triggers and policy names are sets). */
+export function canonical(v) {
+  if (Array.isArray(v)) {
+    const items = v.map(canonical);
+    return `[${(v.every((x) => typeof x === "string") ? items.sort() : items).join(",")}]`;
+  }
+  if (v && typeof v === "object")
+    return `{${Object.keys(v)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`)
+      .join(",")}}`;
+  return JSON.stringify(v ?? null);
+}
+
+/** Same state: both absent, or every field equal (function, policy, table and bucket states alike). */
 export function sameState(a, b) {
   if (a === null || a === undefined || b === null || b === undefined)
     return (a ?? null) === (b ?? null);
-  if (typeof a === "string" || typeof b === "string") return a === b;
-  return a.qual === b.qual && a.with_check === b.with_check && a.shape === b.shape;
+  return canonical(a) === canonical(b);
 }
-const showState = (s) =>
-  s === null || s === undefined
-    ? "absent"
-    : typeof s === "string"
-      ? `md5 ${s.slice(0, 12)}`
-      : `qual ${String(s.qual).slice(0, 8)} with_check ${String(s.with_check).slice(0, 8)} shape ${String(s.shape).slice(0, 8)}`;
+const short = (v) => (typeof v === "string" && /^[0-9a-f]{32}$/.test(v) ? v.slice(0, 12) : v);
+const showState = (s) => {
+  if (s === null || s === undefined) return "absent";
+  if (typeof s === "string") return `md5 ${s.slice(0, 12)}`;
+  if ("def" in s)
+    return `md5 ${String(s.def).slice(0, 12)} (owner ${s.owner}, secdef ${s.secdef}, search_path ${s.search_path ?? "unset"}, acl [${(s.acl ?? []).join(" ")}])`;
+  if ("qual" in s)
+    return `qual ${String(s.qual).slice(0, 8)} with_check ${String(s.with_check).slice(0, 8)} shape ${String(s.shape).slice(0, 8)}`;
+  return Object.entries(s)
+    .map(([k, v]) => `${k} ${Array.isArray(v) ? `[${v.join(" ")}]` : short(v)}`)
+    .join(", ");
+};
+/** Field-by-field difference of two present states, for error messages. */
+export function stateDiff(actual, expected) {
+  if (!actual || !expected || typeof actual !== "object" || typeof expected !== "object") return "";
+  const out = [];
+  for (const k of [...new Set([...Object.keys(expected), ...Object.keys(actual)])]) {
+    const a = actual[k];
+    const e = expected[k];
+    if (canonical(a) === canonical(e)) continue;
+    if (Array.isArray(a) || Array.isArray(e)) {
+      const as = new Set(a ?? []);
+      const es = new Set(e ?? []);
+      const extra = [...as].filter((x) => !es.has(x));
+      const missing = [...es].filter((x) => !as.has(x));
+      out.push(
+        `${k}${extra.length ? ` unexpected [${extra.join(" ")}]` : ""}${missing.length ? ` missing [${missing.join(" ")}]` : ""}`,
+      );
+    } else out.push(`${k} ${short(a)} (expected ${short(e)})`);
+  }
+  return out.length ? `; differs in ${out.join("; ")}` : "";
+}
 
 /** Ledger rows and files that the checks treat as known, built from the checkout and the manifest. */
 function ledgerKnowledge(manifest, root) {
@@ -563,6 +749,34 @@ function ledgerKnowledge(manifest, root) {
     drizzleVersions: new Set(drizzle.map((f) => f.version)),
     unledgered: new Set((manifest.known_unledgered ?? []).map((k) => k.path)),
   };
+}
+
+/**
+ * A release-range ledger row must be the one the runbook writes (section 2, and the per-file template in
+ * docs/release/r4-staging-rehearsal.md section 4): name = the file stem (or, by the Lovable stem rule, the
+ * part after the version), statements = ARRAY[file content]. statements[1] must hash to the manifest
+ * sha256, either byte for byte or with the one trailing newline psql's backquote expansion drops. Rows are
+ * never written without statements at release, so an empty statements array fails.
+ */
+export function releaseRowErrors(row, entry) {
+  const errors = [];
+  const stem = fileStem(entry.path);
+  const name =
+    row.name === null || row.name === undefined ? null : String(row.name).replace(/\.sql$/, "");
+  if (name !== stem && name !== stem.slice(15))
+    errors.push(
+      `ledger row ${row.version}: name ${JSON.stringify(row.name ?? null)} is not the file stem ${stem} of ${entry.path}; the row does not record this file`,
+    );
+  if (row.statements === undefined) return errors; // not read (pure evaluation without ledger content)
+  if (!row.statements)
+    errors.push(
+      `ledger row ${row.version} (${entry.path}): statements is empty; release rows are written with the file content as statements[1] (runbook section 2), so this row does not prove the reviewed file was applied`,
+    );
+  else if (row.statement_sha256 !== entry.sha256 && row.statement_sha256_nl !== entry.sha256)
+    errors.push(
+      `ledger row ${row.version} (${entry.path}): sha256(statements[1]) is ${String(row.statement_sha256).slice(0, 12)}..., the manifest's file sha256 is ${String(entry.sha256).slice(0, 12)}...; a different text was applied under this version`,
+    );
+  return errors;
 }
 
 /** Pure evaluation of the checks against data read from the target. */
@@ -598,6 +812,9 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
 
   // 3. ledger rows the manifest and the checkout do not know about, in and before the release range
   const known = new Set(entries.filter((e) => e.source !== "drizzle").map((e) => e.version));
+  const byVersionSupabase = new Map(
+    entries.filter((e) => e.source !== "drizzle").map((e) => [e.version, e]),
+  );
   const kn = ledgerKnowledge(manifest, root);
   const knownRowsWithoutFile = manifest.known_ledger_rows_without_file ?? [];
   if (target.ledger) {
@@ -608,6 +825,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
           errors.push(
             `ledger row ${v} is in the release range (>= ${from}) but not in the manifest: production has a migration this release does not know`,
           );
+        else errors.push(...releaseRowErrors(row, byVersionSupabase.get(v)));
         continue;
       }
       const recognized =
@@ -721,10 +939,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     const label = protectionLabel(p);
     const defs = p.defined_by ?? [];
     const defEntries = defs.map((v) => entries[order.get(v)]).filter(Boolean);
-    const actual =
-      p.kind === "function"
-        ? (target.functions?.[p.signature] ?? null)
-        : (target.policies?.[policyKey(p)] ?? null);
+    const actual = targetState(target, p);
     const allApplied = defEntries.every(isApplied);
 
     defEntries.forEach((d, k) => {
@@ -788,11 +1003,11 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     if (verifyAfter) {
       if (!row.matches)
         errors.push(
-          `protection ${label} ${actual === null ? "is missing from the target" : `differs from expect_after (target ${showState(actual)}, expected ${showState(expectedAfter)})`}${allApplied ? `; every migration that defines it (${defs.join(", ")}) is applied, so the target has drifted or was regressed` : ""}`,
+          `protection ${label} ${actual === null ? "is missing from the target" : expectedAfter === null ? `is present in the target but expect_after is absent (target ${showState(actual)})` : `differs from expect_after (target ${showState(actual)}, expected ${showState(expectedAfter)})${stateDiff(actual, expectedAfter)}`}${allApplied ? `; every migration that defines it (${defs.join(", ")}) is applied, so the target has drifted or was regressed` : ""}`,
         );
     } else if (!row.recognized)
       errors.push(
-        `unrecognized state: protection ${label} is ${showState(actual)} in the target, but the ledger says it must be ${allowed.map((a) => `${a.why} [${showState(a.state)}]`).join(" or ")}; the target has drifted or was regressed`,
+        `unrecognized state: protection ${label} is ${showState(actual)} in the target, but the ledger says it must be ${allowed.map((a) => `${a.why} [${showState(a.state)}]`).join(" or ")}${stateDiff(actual, allowed[0].state)}; the target has drifted or was regressed`,
       );
   }
   if (verifyAfter && pending.length)
@@ -894,6 +1109,10 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
     const fnByName = new Map();
     const polByKey = new Map();
     const polChanged = new Map();
+    const tblChanged = new Map();
+    const tblByKey = new Map();
+    const bucketChanged = new Map();
+    const addTo = (map, key, v) => map.set(key, [...(map.get(key) ?? []), v]);
     for (const m of range) {
       const text = readFileSync(join(root, m.path), "utf8");
       // requires: guard-block literals plus the runbook's Needs, resolved against the state before this file
@@ -945,12 +1164,18 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
         tables: next.relations.filter((r) => !prev.relations.includes(r)).sort(),
         schemas: next.schemas.filter((s) => !prev.schemas.includes(s)).sort(),
       };
-      for (const [sig, md5] of Object.entries(next.functions))
-        if (prev.functions[sig] !== md5)
-          fnChanged.set(sig, [...(fnChanged.get(sig) ?? []), m.version]);
+      // Changed states (definition, owner, SECURITY DEFINER, search_path or ACL for functions; RLS, ACL,
+      // triggers or policy set for tables; public for buckets) make the file a definer.
+      for (const [sig, st] of Object.entries(next.functions))
+        if (!sameState(prev.functions[sig], st)) addTo(fnChanged, sig, m.version);
       for (const [key, v] of Object.entries(next.policies))
-        if (JSON.stringify(prev.policies[key]) !== JSON.stringify(v))
-          polChanged.set(key, [...(polChanged.get(key) ?? []), m.version]);
+        if (!sameState(prev.policies[key], v)) addTo(polChanged, key, m.version);
+      for (const [key, v] of Object.entries(next.tables))
+        if (!sameState(prev.tables[key], v)) addTo(tblChanged, key, m.version);
+      for (const key of Object.keys(prev.tables))
+        if (!(key in next.tables)) addTo(tblChanged, key, m.version);
+      for (const [key, v] of Object.entries(next.buckets))
+        if (!sameState(prev.buckets[key], v)) addTo(bucketChanged, key, m.version);
       // A file that textually (re)defines a name counts as a definer of every overload of it, even
       // one it later drops or replaces with a different signature (e.g. the two-argument approval
       // functions): replaying it would bring the old definition back.
@@ -959,6 +1184,7 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
         fnByName.set(name, [...(fnByName.get(name) ?? []), m.version]);
       for (const key of textual.policies)
         polByKey.set(key, [...(polByKey.get(key) ?? []), m.version]);
+      for (const key of textual.tables) addTo(tblByKey, key, m.version);
 
       const entry = {
         version: m.version,
@@ -980,6 +1206,9 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
     for (const key of Object.keys(finalState.policies))
       if (polByKey.has(key))
         polChanged.set(key, [...(polChanged.get(key) ?? []), ...polByKey.get(key)]);
+    for (const key of Object.keys(finalState.tables))
+      if (tblByKey.has(key))
+        tblChanged.set(key, [...(tblChanged.get(key) ?? []), ...tblByKey.get(key)]);
     const major = String(majorOf(serverVersion));
     // Per-major states: before the range, after each defining migration, and after the whole range.
     const states = (kind, key, defined_by) => {
@@ -1007,6 +1236,32 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
         return { schema, table, policy, defined_by, ...states("policies", key, defined_by) };
       })
       .sort((a, b) => policyKey(a).localeCompare(policyKey(b)));
+    // Tables: every table a release file creates, alters, grants on, or puts a trigger or policy on, and every
+    // table of a protected policy, so its full policy set, triggers, RLS flags and ACL are checked.
+    for (const p of policies) {
+      const key = `${p.schema}.${p.table}`;
+      if (!tblChanged.has(key)) tblChanged.set(key, [...p.defined_by]);
+    }
+    const tables = [...tblChanged]
+      .filter(([key]) => key in finalState.tables)
+      .map(([key, defs]) => {
+        const defined_by = inOrder(defs);
+        const dot = key.indexOf(".");
+        return {
+          schema: key.slice(0, dot),
+          table: key.slice(dot + 1),
+          defined_by,
+          ...states("tables", key, defined_by),
+        };
+      })
+      .sort((a, b) => `${a.schema}.${a.table}`.localeCompare(`${b.schema}.${b.table}`));
+    const buckets = [...bucketChanged]
+      .filter(([key]) => key in finalState.buckets)
+      .map(([bucket, defs]) => {
+        const defined_by = inOrder(defs);
+        return { bucket, defined_by, ...states("buckets", bucket, defined_by) };
+      })
+      .sort((a, b) => a.bucket.localeCompare(b.bucket));
     const known_unledgered = knownUnledgered(root, from);
     const manifest = {
       format: MANIFEST_FORMAT,
@@ -1022,7 +1277,7 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
         majors: { [major]: { server_version_num: serverVersion } },
         search_path: "",
         method:
-          "full local replay (stub + every earlier migration), catalog snapshot before the range and after each release file; states are md5(pg_get_functiondef) and md5 of pg_policies qual/with_check/cmd+permissive+roles, keyed by Postgres major (null = absent). expect_before = before the range, expect_steps[v] = after defining migration v, expect_after = after the whole range. Hashes are never compared across majors; add another major with --merge-hashes.",
+          "full local replay as role postgres (stub + every earlier migration), catalog snapshot before the range and after each release file. States, keyed by Postgres major (null = absent): functions = md5(pg_get_functiondef), owner, prosecdef, proconfig search_path and the normalized ACL (aclexplode grantee:privilege); policies = md5 of pg_policies qual/with_check/cmd+permissive+roles; tables = relrowsecurity, relforcerowsecurity, normalized ACL, every non-internal trigger (name|function|tgtype|tgenabled) and the full set of policy names; buckets = storage.buckets.public. expect_before = before the range, expect_steps[v] = after defining migration v, expect_after = after the whole range. States are never compared across majors; add another major with --merge-hashes.",
       },
       known_unledgered_basis:
         "Runbook section 1 / docs/migration-history-reconciliation.md section 3: these historical files are in production by catalog evidence (docs/migration-evidence/ledger-evidence.csv) but have no ledger row. Only they may lack one; the sha256 is the reviewed file.",
@@ -1031,11 +1286,11 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       known_drizzle_rows_without_file: KNOWN_DRIZZLE_ROWS_WITHOUT_FILE,
       drift_captures: DRIFT_CAPTURES.filter((c) => entries.some((e) => e.version === c.version)),
       migrations: entries.map((e, i) => ({ order: i + 1, ...e })),
-      protections: { functions, policies },
+      protections: { functions, policies, tables, buckets },
     };
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     log(
-      `Wrote ${relative(process.cwd(), manifestPath)}: ${entries.length} migrations, ${functions.length} protected functions, ${policies.length} protected policies.`,
+      `Wrote ${relative(process.cwd(), manifestPath)}: ${entries.length} migrations, ${functions.length} protected functions, ${policies.length} policies, ${tables.length} tables, ${buckets.length} buckets.`,
     );
     return manifest;
   } finally {
@@ -1116,7 +1371,7 @@ export function mergeHashes(baseManifestPath, otherManifestPath) {
     const c = structuredClone(m);
     delete c.generated?.majors;
     delete c.description;
-    for (const p of [...(c.protections?.functions ?? []), ...(c.protections?.policies ?? [])]) {
+    for (const p of PROTECTION_KINDS.flatMap((k) => c.protections?.[k.list] ?? [])) {
       delete p.expect_before;
       delete p.expect_after;
       delete p.expect_steps;
@@ -1129,13 +1384,14 @@ export function mergeHashes(baseManifestPath, otherManifestPath) {
     throw new Error(
       "the manifests differ in more than their hashes (migrations, sha256s, requires/provides, protections, defined_by or allow-lists); regenerate both from the same checkout",
     );
-  const key = (p) => (p.signature ? `f:${p.signature}` : `p:${policyKey(p)}`);
-  const otherBy = new Map(
-    [...other.protections.functions, ...other.protections.policies].map((p) => [key(p), p]),
-  );
+  const all = (m) =>
+    PROTECTION_KINDS.flatMap((k) =>
+      (m.protections?.[k.list] ?? []).map((p) => [`${k.kind}:${k.key(p)}`, p]),
+    );
+  const otherBy = new Map(all(other));
   const added = manifestMajors(other);
-  for (const p of [...base.protections.functions, ...base.protections.policies]) {
-    const o = otherBy.get(key(p));
+  for (const [k, p] of all(base)) {
+    const o = otherBy.get(k);
     for (const mj of added) {
       p.expect_before[mj] = o.expect_before[mj];
       p.expect_steps[mj] = o.expect_steps[mj];

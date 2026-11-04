@@ -13,6 +13,8 @@ on:
       - "scripts/release-preflight*"
       - "docs/release/release-manifest.json"
       - "supabase/migrations/**"
+      - "drizzle/migrations/**"
+      - "docs/migration-evidence/**"
       - ".github/workflows/release-preflight.yml"
   workflow_dispatch:
 

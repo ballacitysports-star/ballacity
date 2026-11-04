@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import {
+  definitionsIn,
   guardRequirements,
   DEFAULT_MANIFEST,
   LEDGER,
@@ -75,14 +76,29 @@ function shiftVersion(v, seconds) {
 const LOVABLE_NAME = /^\d{14}_[0-9a-f]{8}-/;
 const q = (s) => `'${String(s).replaceAll("'", "''")}'`;
 
-function ledgerRow(db, entry) {
+const stemOf = (entry) =>
+  entry.path
+    .split("/")
+    .pop()
+    .replace(/\.sql$/, "");
+/** Dollar-quoted literal of a file's text (the tag never occurs in a migration). */
+function dollar(text) {
+  assert.ok(!text.includes("$rpf_stmt$"));
+  return `$rpf_stmt$${text}$rpf_stmt$`;
+}
+/**
+ * The ledger row the runbook template writes: name = file stem, statements = ARRAY[content], where psql's
+ * backquote expansion (\set content `cat file`) drops one trailing newline. exact: keep the bytes as they are.
+ */
+function ledgerRow(db, entry, { name = stemOf(entry), statements, exact = false } = {}) {
+  let stmts = statements;
+  if (stmts === undefined) {
+    const text = readFileSync(join(ROOT, entry.path), "utf8");
+    stmts = `ARRAY[${dollar(exact ? text : text.replace(/\n$/, ""))}]`;
+  }
   scratch.sql(
     db,
-    `INSERT INTO ${LEDGER} (version, name, statements)
-     VALUES ('${entry.version}', '${entry.path
-       .split("/")
-       .pop()
-       .replace(/\.sql$/, "")}', ARRAY[]::text[]);`,
+    `INSERT INTO ${LEDGER} (version, name, statements) VALUES ('${entry.version}', ${name === null ? "NULL" : q(name)}, ${stmts});`,
   );
 }
 
@@ -145,6 +161,8 @@ const editManifest = (dir, fn) => {
   writeFileSync(path, JSON.stringify(m, null, 2));
 };
 const byVersion = (v) => manifest.migrations.find((e) => e.version === v);
+const allProt = (m) =>
+  ["functions", "policies", "tables", "buckets"].flatMap((k) => m.protections[k] ?? []);
 
 before(async () => {
   const version = scratch.serverVersionNum();
@@ -258,7 +276,7 @@ describe("happy paths", () => {
     const strip = (m) => {
       const c = structuredClone(m);
       delete c.generated.majors;
-      for (const p of [...c.protections.functions, ...c.protections.policies]) {
+      for (const p of allProt(c)) {
         delete p.expect_before;
         delete p.expect_steps;
         delete p.expect_after;
@@ -267,11 +285,14 @@ describe("happy paths", () => {
     };
     assert.deepEqual(strip(checkedIn), strip(manifest), "regenerate the checked-in manifest");
     if (!(MAJOR in checkedIn.generated.majors)) return; // e.g. CI on 17 before PG17 hashes are merged
-    const all = (m) => [...m.protections.functions, ...m.protections.policies];
-    all(manifest).forEach((p, i) => {
-      const c = all(checkedIn)[i];
+    allProt(manifest).forEach((p, i) => {
+      const c = allProt(checkedIn)[i];
       for (const k of ["expect_before", "expect_steps", "expect_after"])
-        assert.deepEqual(c[k][MAJOR], p[k][MAJOR], `${k} of ${p.signature ?? p.policy}`);
+        assert.deepEqual(
+          c[k][MAJOR],
+          p[k][MAJOR],
+          `${k} of ${p.signature ?? p.policy ?? p.table ?? p.bucket}`,
+        );
     });
   });
 });
@@ -497,7 +518,7 @@ describe("fail closed: Postgres major and manifest hashes (rule a)", () => {
     const m = structuredClone(manifest);
     const move = (o) => ({ [OTHER()]: o[MAJOR] });
     m.generated.majors = { [OTHER()]: { server_version_num: Number(OTHER()) * 10000 } };
-    for (const p of [...m.protections.functions, ...m.protections.policies]) {
+    for (const p of allProt(m)) {
       p.expect_before = move(p.expect_before);
       p.expect_steps = move(p.expect_steps);
       p.expect_after = move(p.expect_after);
@@ -808,4 +829,226 @@ test("policy names with apostrophes are quoted, not refused; unsafe characters s
   assert.equal(sqlLiteral("x'; drop table y"), "'x''; drop table y'");
   assert.throws(() => sqlLiteral("a\nb"), /unsafe/);
   assert.throws(() => sqlLiteral("a\\b"), /unsafe/);
+});
+
+describe("fail closed: grants, RLS, triggers, extra policies and buckets (independent review)", () => {
+  // The reviewer's tampering, on the objects of this release: an internal function granted to the API roles,
+  // RLS disabled plus write grants on a release table, an extra open policy, a private bucket made public,
+  // and a release trigger dropped. None of these changes a function definition or an existing policy.
+  const TAMPER = `
+    GRANT EXECUTE ON FUNCTION private_sec.apply_content_hold() TO anon, authenticated;
+    ALTER TABLE public.minor_hosting_approvals DISABLE ROW LEVEL SECURITY;
+    GRANT INSERT, UPDATE, DELETE ON public.minor_hosting_approvals TO anon, authenticated;
+    CREATE POLICY rvpre_open ON public.hosted_game_private FOR ALL USING (true);
+    UPDATE storage.buckets SET public = true WHERE id = 'image-staging';
+    DROP TRIGGER a1_sync_hosted_game_private_trg ON public.hosted_games;`;
+  const NAMED = [
+    [
+      /protection private_sec\.apply_content_hold\(\) .*acl unexpected \[anon:EXECUTE authenticated:EXECUTE\]/,
+      "function ACL",
+    ],
+    [/protection table public\.minor_hosting_approvals .*rls false \(expected true\)/, "RLS"],
+    [
+      /protection table public\.minor_hosting_approvals .*acl unexpected \[anon:DELETE anon:INSERT anon:UPDATE authenticated:DELETE authenticated:INSERT authenticated:UPDATE\]/,
+      "table ACL",
+    ],
+    [
+      /protection table public\.hosted_game_private .*policies unexpected \[rvpre_open\]/,
+      "extra policy",
+    ],
+    [/protection storage bucket image-staging .*public true \(expected false\)/, "bucket"],
+    [
+      /protection table public\.hosted_games .*triggers missing \[a1_sync_hosted_game_private_trg\|public\.sync_hosted_game_private\(\)\|23\|O\]/,
+      "trigger",
+    ],
+  ];
+
+  test("the manifest protects these objects", () => {
+    const tables = new Set(manifest.protections.tables.map((t) => `${t.schema}.${t.table}`));
+    for (const t of [
+      "public.minor_hosting_approvals",
+      "public.hosted_game_private",
+      "public.hosted_games",
+    ])
+      assert.ok(tables.has(t), t);
+    assert.ok(manifest.protections.buckets.some((b) => b.bucket === "image-staging"));
+    assert.ok(
+      manifest.protections.functions.some(
+        (f) => f.signature === "private_sec.apply_content_hold()",
+      ),
+    );
+    // every table of a protected policy is protected too (its full policy set)
+    for (const p of manifest.protections.policies) assert.ok(tables.has(`${p.schema}.${p.table}`));
+  });
+
+  test("the reviewer's tampering on a released copy fails --verify-after and the default run, naming each object", () => {
+    const db = newDb(FULL);
+    scratch.sql(db, TAMPER);
+    for (const args of [["--verify-after"], []]) {
+      const { code, text } = preflight(db, args);
+      assert.equal(code, 1, `${args.join(" ") || "default run"} passed a tampered database`);
+      for (const [re, what] of NAMED)
+        assert.match(text, re, `${what} (${args.join(" ") || "default"})`);
+    }
+  });
+
+  test("each tampering alone fails --verify-after", () => {
+    const stmts = TAMPER.split(";")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const pairs = [
+      [stmts[0], NAMED[0][0]],
+      [stmts[1], NAMED[1][0]],
+      [stmts[2], NAMED[2][0]],
+      [stmts[3], NAMED[3][0]],
+      [stmts[4], NAMED[4][0]],
+      [stmts[5], NAMED[5][0]],
+      [
+        "ALTER FUNCTION private_sec.apply_content_hold() OWNER TO service_role",
+        /protection private_sec\.apply_content_hold\(\) .*owner service_role \(expected postgres\)/,
+      ],
+      [
+        "ALTER TABLE public.hosted_games DISABLE TRIGGER a1_sync_hosted_game_private_trg",
+        /protection table public\.hosted_games .*triggers unexpected \[a1_sync_hosted_game_private_trg\|public\.sync_hosted_game_private\(\)\|23\|D\]/,
+      ],
+    ];
+    for (const [stmt, re] of pairs) {
+      const tmp = newDb(FULL);
+      scratch.sql(tmp, `${stmt};`);
+      const { code, text } = preflight(tmp, ["--verify-after"]);
+      assert.equal(code, 1, stmt);
+      assert.match(text, re, stmt);
+      scratch.dropDb(tmp);
+      created.delete(tmp);
+    }
+  });
+
+  test("a pre-release target with an extra policy on a protected table fails the default run", () => {
+    const db = newDb(PRE);
+    scratch.sql(db, "CREATE POLICY rvpre_open ON public.reviews FOR SELECT USING (true);");
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /unrecognized state: protection table public\.reviews .*policies unexpected \[rvpre_open\]/,
+    );
+  });
+
+  test("textual table touches: CREATE/ALTER TABLE, triggers, policies and grants", () => {
+    const d = definitionsIn(`CREATE TABLE IF NOT EXISTS public.a (x int);
+      ALTER TABLE ONLY b ENABLE ROW LEVEL SECURITY;
+      CREATE TRIGGER t BEFORE UPDATE OF x, y ON private_sec.c FOR EACH ROW EXECUTE FUNCTION f();
+      GRANT SELECT ON TABLE public.d, e TO anon; GRANT USAGE ON SCHEMA s TO anon;
+      REVOKE ALL ON FUNCTION private_sec.g(uuid, text) FROM PUBLIC;
+      DROP POLICY IF EXISTS "p" ON storage.objects;`);
+    assert.deepEqual([...d.tables].sort(), [
+      "private_sec.c",
+      "public.a",
+      "public.b",
+      "public.d",
+      "public.e",
+      "storage.objects",
+    ]);
+    assert.ok(d.functions.has("private_sec.g"));
+  });
+});
+
+describe("ledger rows in the release range: name and content (independent review)", () => {
+  const k = () => manifest.migrations.findIndex((e) => e.version === "20261103140000") + 1;
+
+  test("rows written byte for byte, or with the trailing newline psql drops, both pass", () => {
+    const db = newDb(PRE);
+    const list = manifest.migrations.slice(0, k());
+    list.forEach((e, i) => ledgerRow(db, e, { exact: i % 2 === 0 }));
+    for (const e of list) scratch.applyMigration(db, join(ROOT, e.path), stripMaintain);
+    const r = preflight(db);
+    assert.equal(r.code, 0, r.text);
+  });
+
+  test("the Lovable stem rule: a name without the version prefix (or with .sql) is accepted", () => {
+    const db = newDb(PRE);
+    const [first, second] = manifest.migrations;
+    for (const e of [first, second]) scratch.applyMigration(db, join(ROOT, e.path), stripMaintain);
+    ledgerRow(db, first, { name: stemOf(first).slice(15) });
+    ledgerRow(db, second, { name: `${stemOf(second)}.sql` });
+    const r = preflight(db);
+    assert.equal(r.code, 0, r.text);
+  });
+
+  function withRow(opts) {
+    const db = newDb(PRE);
+    const list = manifest.migrations.slice(0, k());
+    for (const e of list) scratch.applyMigration(db, join(ROOT, e.path), stripMaintain);
+    list.forEach((e, i) => ledgerRow(db, e, i === list.length - 1 ? opts : {}));
+    return preflight(db);
+  }
+
+  test("a wrong name fails", () => {
+    const { code, text } = withRow({ name: "20261103140000_something_else" });
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /ledger row 20261103140000: name "20261103140000_something_else" is not the file stem 20261103140000_payment_settings_host_guard/,
+    );
+  });
+
+  test("a missing name fails", () => {
+    const { code, text } = withRow({ name: null });
+    assert.equal(code, 1);
+    assert.match(text, /ledger row 20261103140000: name null is not the file stem/);
+  });
+
+  test("empty or NULL statements fail", () => {
+    for (const statements of ["ARRAY[]::text[]", "NULL"]) {
+      const { code, text } = withRow({ statements });
+      assert.equal(code, 1, statements);
+      assert.match(text, /ledger row 20261103140000 .*statements is empty/);
+    }
+  });
+
+  test("statements holding a different text fails", () => {
+    const { code, text } = withRow({ statements: `ARRAY[${q("SELECT 1;")}]` });
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /ledger row 20261103140000 .*sha256\(statements\[1\]\) is .* a different text was applied/,
+    );
+  });
+});
+
+describe("scratch databases are local only (independent review)", () => {
+  test("a non-loopback PGHOSTADDR is refused; loopback is accepted", () => {
+    assert.throws(
+      () => scratch.localEnv({ PGHOST: "localhost", PGHOSTADDR: "10.1.2.3" }),
+      /Refusing to use PGHOSTADDR=10\.1\.2\.3/,
+    );
+    assert.throws(() => scratch.localEnv({ PGHOSTADDR: "2001:db8::1" }), /PGHOSTADDR/);
+    assert.throws(() => scratch.localEnv({ PGHOST: "localhost,db.example.com" }), /PGHOST=/);
+    assert.throws(() => scratch.localEnv({ PGHOST: "db.example.com" }), /PGHOST=/);
+    for (const a of ["127.0.0.1", "127.1.2.3", "::1"])
+      assert.equal(scratch.localEnv({ PGHOSTADDR: a }).PGHOSTADDR, a);
+  });
+
+  test("PGSERVICE and PGSERVICEFILE are removed from the environment", () => {
+    const env = scratch.localEnv({
+      PGSERVICE: "prod",
+      PGSERVICEFILE: "/tmp/pg_service.conf",
+      PGHOST: "",
+    });
+    assert.equal(env.PGSERVICE, undefined);
+    assert.equal(env.PGSERVICEFILE, undefined);
+  });
+
+  test("--write-manifest refuses a remote PGHOSTADDR before connecting", () => {
+    const r = spawnSync(
+      process.execPath,
+      [TOOL, "--write-manifest", "--from", FROM, "--manifest", join(GEN_DIR, "never.json")],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PGHOSTADDR: "192.0.2.10", PREFLIGHT_DATABASE_URL: "" },
+      },
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Refusing to use PGHOSTADDR=192\.0\.2\.10/);
+  });
 });
