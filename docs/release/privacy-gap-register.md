@@ -1,6 +1,6 @@
 # Privacy gap register (youth safety release)
 
-Status date: 2026-11-04. Audited on `main` (`153f6009` or later) combined with the open pull requests #245, #247, #248, #249, #253 and #256, using code reading, a replayed combined database and read-only production catalog queries. Nothing here was changed. The release is **not complete while any "Open" row remains** unless the owner records an explicit acceptance.
+Status date: 2026-11-04. Audited on `main` (`153f6009` or later) combined with the open pull requests #245, #247, #248, #249 and #256 (#253 merged on 2026-11-04), using code reading, a replayed combined database and read-only production catalog queries. Nothing here was changed. The release is **not complete while any "Open" row remains** unless the owner records an explicit acceptance.
 
 Policy this register enforces (owner, 2026-11-04):
 

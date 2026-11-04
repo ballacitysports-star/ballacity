@@ -320,7 +320,7 @@ Checks (sandbox, then production where read-only): unrelated viewers get no name
 
 Nothing below touches production. It starts only after the owner has verified the sandbox (`docs/release/sandbox-verification.md`) and set `E2E_SANDBOX_PROJECT_REF`.
 
-**Pull request order (unchanged dependencies, current state).** Merged: #254, #251, #252. Next, repository-only: #255 (docs), then #253 once approved. Privacy stack stays open until the rehearsal passes: #247 -> #248 -> #245 -> #249 (retargeted to `main`) -> #256. Gap-closing work (`privacy-gap-register.md` G1 to G5) lands as further stacked pull requests before the stack merges.
+**Pull request order (unchanged dependencies, current state).** Merged: #254, #251, #252, #255, #253 (all repository-only; none applied to production). Privacy stack stays open until the rehearsal passes: #247 -> #248 -> #245 -> #249 (retargeted to `main`) -> #256. Gap-closing work (`privacy-gap-register.md` G1 to G5) lands as further stacked pull requests before the stack merges.
 
 **Rehearsal branch.** Build a throwaway integration branch `staging/priv-rehearsal` (never merged, never deployed to production) by merging, in order: `main`, #253, #247, #248, #245, #249, #256 and the gap fixes. Its migration list is exactly runbook section 2. Deploy it only to the sandbox build.
 
