@@ -196,7 +196,8 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("paypal_orders")
         .update({ status: "failed" })
-        .eq("order_id", data.orderId);
+        .eq("order_id", data.orderId)
+        .in("status", ["created", "approved"]);
       throw new Error(
         "This PayPal payment doesn't match the host's current checkout. You weren't charged — please start again.",
       );
@@ -209,14 +210,22 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("paypal_orders")
         .update({ status: "failed" })
-        .eq("order_id", data.orderId);
+        .eq("order_id", data.orderId)
+        .in("status", ["created", "approved"]);
       throw new Error(`${blocked} You weren't charged.`);
     }
 
-    // Claim the order: of concurrent or repeated calls exactly one moves it to 'capturing' and captures.
+    // Claim the order: of concurrent or repeated calls exactly one moves it to 'capturing' and captures. The claim
+    // token makes every later write of this call conditional on still holding the claim (paypal-capture.server.ts).
+    const { newCaptureClaim, recordCaptureOutcome } = await import("./paypal-capture.server");
+    const claim = newCaptureClaim();
     const { data: claimed } = await supabaseAdmin
       .from("paypal_orders")
-      .update({ status: "capturing" } as never)
+      .update({
+        status: "capturing",
+        capture_claim: claim,
+        capture_claimed_at: new Date().toISOString(),
+      } as never)
       .eq("order_id", data.orderId)
       .in("status", ["created", "approved"])
       .select("order_id");
@@ -236,15 +245,16 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       );
     }
 
-    const { recordCaptureOutcome } = await import("./paypal-capture.server");
     const outcome = await recordCaptureOutcome(
       supabaseAdmin,
       order,
       result,
       expected,
       refundCapture,
+      claim,
     );
-    if (outcome.kind === "pending") return { ok: false as const, pending: true as const };
+    if (outcome.kind === "pending" || outcome.kind === "superseded")
+      return { ok: false as const, pending: true as const };
     if (outcome.kind === "refunded") {
       throw new Error(
         outcome.reason === "unrecorded"

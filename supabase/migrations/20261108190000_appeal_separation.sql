@@ -7,6 +7,11 @@
 -- decision record (admin_audit_log 'content_report_*', append-only), named as reviewer on a report about the content,
 -- the creator of a hold on it, or a reporter of it. Admins and superadmins keep their existing override. Otherwise
 -- unchanged.
+--
+-- Independent review of d604958c (2026-11-05): reviewed_by keeps only the latest moderator, so a moderator who changed
+-- a report about the content earlier (directly through the API, audited as 'report_updated_directly' by #287's guard,
+-- or through the app's status screen, audited with target type 'report') vanished from the check once another
+-- moderator changed it again. Any audit row of the caller's about a report on the content now makes them a party too.
 
 DO $$ BEGIN
   IF to_regprocedure('public.moderator_review_appeal(uuid,boolean,text)') IS NULL OR to_regclass('public.content_report_holds') IS NULL
@@ -23,7 +28,8 @@ BEGIN
   SELECT * INTO _a FROM public.moderation_appeals WHERE id = _appeal AND status = 'open';
   IF NOT FOUND THEN RAISE EXCEPTION 'Appeal not found or already reviewed'; END IF;
   -- A party to the decision never reviews its appeal: whoever decided (the immutable decision record in admin_audit_log,
-  -- and any reviewer named on a report about the content), placed a hold on it, or reported it.
+  -- and any reviewer named on a report about the content), placed a hold on it, reported it, or changed a report about it
+  -- (the audit trail of direct and app changes, which outlives reviewed_by).
   IF (EXISTS (SELECT 1 FROM public.user_reports r
                WHERE r.subject_type = _a.content_type AND COALESCE(r.team_post_id, r.comment_id) = _a.content_id
                  AND (r.reviewed_by = auth.uid() OR r.reporter_id = auth.uid()))
@@ -31,7 +37,11 @@ BEGIN
                   WHERE h.content_type = _a.content_type AND h.content_id = _a.content_id AND h.created_by = auth.uid())
       OR EXISTS (SELECT 1 FROM public.admin_audit_log l
                   WHERE l.actor_id = auth.uid() AND l.target_type = _a.content_type AND l.target_id = _a.content_id::text
-                    AND l.action LIKE 'content\_report\_%'))
+                    AND l.action LIKE 'content\_report\_%')
+      OR EXISTS (SELECT 1 FROM public.admin_audit_log l
+                   JOIN public.user_reports r ON l.target_id = r.id::text
+                  WHERE l.actor_id = auth.uid() AND l.target_type IN ('user_report', 'report')
+                    AND r.subject_type = _a.content_type AND COALESCE(r.team_post_id, r.comment_id) = _a.content_id))
      AND NOT (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'superadmin')) THEN
     RAISE EXCEPTION 'A different moderator must review this appeal' USING ERRCODE = 'insufficient_privilege';
   END IF;
