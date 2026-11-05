@@ -381,7 +381,7 @@
       "version": "20261031120000",
       "path": "supabase/migrations/20261031120000_close_live_write_holes.sql",
       "sha256": "843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1",
-      "basis": "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release, with the release ledger template (statements = the file text)."
+      "basis": "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release with its exact text: through Lovable's migration tool (drizzle ledger hash) or with the release ledger template (statements = the file text)."
     }
   ],
   "known_ledger_rows_without_file": [
