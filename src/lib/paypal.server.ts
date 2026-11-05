@@ -116,13 +116,64 @@ export async function getOrder(orderId: string): Promise<OrderDetails> {
   };
 }
 
+/**
+ * The outcome of a capture, read from the CAPTURE, never from the order. PayPal can report an order as
+ * COMPLETED while its capture is still PENDING (for example an eCheck or a payment under review); only a capture
+ * whose own status is COMPLETED means the money has settled.
+ *   status         the capture's status (COMPLETED, PENDING, DECLINED, FAILED, ...), "MISSING" when there is no
+ *                  capture, "AMBIGUOUS" when there is more than one
+ *   orderStatus    the order-level status, kept for the record only
+ */
 export type CaptureResult = {
   status: string;
+  orderStatus: string;
   captureId: string | null;
   amountValue: string | null;
   currency: string | null;
   payeeMerchantId: string | null;
+  statusReason: string | null;
 };
+
+type PayPalCapture = {
+  id?: string;
+  status?: string;
+  amount?: { value?: string; currency_code?: string };
+  payee?: { merchant_id?: string };
+  status_details?: { reason?: string };
+};
+type PayPalUnit = { payee?: { merchant_id?: string }; payments?: { captures?: PayPalCapture[] } };
+type PayPalOrderJson = { status?: string; purchase_units?: PayPalUnit[] };
+
+/** Pure: maps a PayPal capture (or order lookup) response to a CaptureResult. */
+export function parseCaptureResponse(raw: unknown): CaptureResult {
+  const json = (raw ?? {}) as PayPalOrderJson;
+  const units = Array.isArray(json.purchase_units) ? json.purchase_units : [];
+  const captures = units.flatMap((u) =>
+    (Array.isArray(u?.payments?.captures) ? u.payments.captures : []).map((c) => ({ c, u })),
+  );
+  const orderStatus = String(json.status ?? "");
+  if (captures.length !== 1) {
+    return {
+      status: captures.length === 0 ? "MISSING" : "AMBIGUOUS",
+      orderStatus,
+      captureId: null,
+      amountValue: null,
+      currency: null,
+      payeeMerchantId: null,
+      statusReason: null,
+    };
+  }
+  const { c, u } = captures[0];
+  return {
+    status: String(c?.status ?? "MISSING"),
+    orderStatus,
+    captureId: typeof c?.id === "string" && c.id ? c.id : null,
+    amountValue: c?.amount?.value ?? null,
+    currency: c?.amount?.currency_code ?? null,
+    payeeMerchantId: c?.payee?.merchant_id ?? u?.payee?.merchant_id ?? null,
+    statusReason: c?.status_details?.reason ?? null,
+  };
+}
 
 export async function captureOrder(orderId: string): Promise<CaptureResult> {
   const token = await getAccessToken();
@@ -130,20 +181,28 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     `${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        // PayPal treats a repeated request with the same id as the same capture, so a retry never captures twice.
+        "PayPal-Request-Id": `capture-${orderId}`,
+      },
     },
   );
-  const json = (await res.json().catch(() => ({}))) as any;
+  const json = (await res.json().catch(() => ({}))) as { message?: string };
   if (!res.ok) throw new Error(json?.message || `PayPal capture failed (${res.status}).`);
-  const unit = json?.purchase_units?.[0];
-  const capture = unit?.payments?.captures?.[0];
-  return {
-    status: String(json?.status ?? ""),
-    captureId: capture?.id ?? null,
-    amountValue: capture?.amount?.value ?? null,
-    currency: capture?.amount?.currency_code ?? null,
-    payeeMerchantId: unit?.payee?.merchant_id ?? null,
-  };
+  return parseCaptureResponse(json);
+}
+
+/** Re-reads an order's capture state from PayPal (used to settle a capture that was pending or unknown). */
+export async function getOrderCapture(orderId: string): Promise<CaptureResult> {
+  const token = await getAccessToken();
+  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = (await res.json().catch(() => ({}))) as { message?: string };
+  if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
+  return parseCaptureResponse(json);
 }
 
 /**
