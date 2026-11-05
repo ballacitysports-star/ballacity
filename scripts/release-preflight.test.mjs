@@ -481,6 +481,61 @@ describe("pinned history: a hotfix dated before the range (independent pre-revie
     );
   });
 
+  // Lovable's tool may also write the hotfix it applied into drizzle/migrations, dated when it applied it: inside the
+  // release range's span (PR #287: 0032_hotfix_close_write_paths, 2026-11-05 17:14:51 UTC). That copy is the same
+  // migration, so it is left out of the replay order and is never a release migration.
+  const LOVABLE_WHEN = Date.UTC(2026, 10, 5, 17, 14, 51);
+  const addDrizzleFile = (dir, tag, body) => {
+    writeFileSync(join(dir, "drizzle/migrations", `${tag}.sql`), body);
+    const journalPath = join(dir, "drizzle/migrations/meta/_journal.json");
+    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+    journal.entries.push({
+      idx: journal.entries.length,
+      version: "7",
+      when: LOVABLE_WHEN,
+      tag,
+      breakpoints: true,
+    });
+    writeFileSync(journalPath, JSON.stringify(journal, null, 2));
+  };
+
+  test("Lovable's drizzle copy of the hotfix is the same migration: not replayed again, not a release migration", () => {
+    const dir = tempRoot();
+    const bytes = readFileSync(join(ROOT, pinned().path));
+    addDrizzleFile(dir, "0099_hotfix_copy", bytes.subarray(0, -1)); // as Lovable wrote it: no final newline
+    assert.ok(!migrationOrder(dir).some((m) => m.path.endsWith("0099_hotfix_copy.sql")));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 0, text);
+  });
+
+  test("a drizzle file that differs from the hotfix in anything else is replayed and must be in the manifest", () => {
+    const dir = tempRoot();
+    addDrizzleFile(
+      dir,
+      "0099_edited_copy",
+      `${readFileSync(join(ROOT, pinned().path), "utf8")}-- edited\n`,
+    );
+    assert.ok(migrationOrder(dir).some((m) => m.path.endsWith("0099_edited_copy.sql")));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /unlisted migration in the release range: drizzle\/migrations\/0099_edited_copy\.sql/,
+    );
+  });
+
+  test("Lovable's copies of other migrations are still replayed at their drizzle date (they were applied then)", () => {
+    const order = migrationOrder(ROOT).map((m) => m.path);
+    assert.ok(
+      order.includes("drizzle/migrations/0021_freeze_payment_claim_metadata_on_dispute.sql"),
+    );
+    assert.ok(
+      order.includes(
+        "supabase/migrations/20260915214000_freeze_payment_claim_metadata_on_dispute.sql",
+      ),
+    );
+  });
+
   test("with neither a ledger row nor a drizzle row, the hotfix counts as unapplied", () => {
     const db = newDb(PRE);
     scratch.sql(db, `DELETE FROM ${LEDGER} WHERE version = ${q(PIN)};`);

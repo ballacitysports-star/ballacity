@@ -131,6 +131,19 @@ basis; generated from `PINNED_HISTORY` in the script):
   An older version, a ledger row written without the text, or a drizzle row for any other text fails. That drizzle row
   is reported as unknown, and the hotfix as unrecognized history.
 
+**Lovable's copy of a pinned hotfix.** Lovable's tool may also write the hotfix it applied into
+`drizzle/migrations`, dated when it applied it. For PR #287 that is `0032_hotfix_close_write_paths`, 2026-11-05
+17:14 UTC. That date falls among the release migrations' versions, but production applies every release migration
+after the hotfix.
+
+So the shared replay order (`scripts/migration-order.mjs`, used by `scripts/db-test.mjs` and by this tool) leaves out
+any drizzle file that is byte for byte the pinned file, or one trailing newline apart. Production ran the hotfix once,
+and the pinned file's own version already puts it in the right place: after the reviewed history and before the range.
+
+A drizzle file with any other text is replayed as usual. In the range, it fails as an unlisted migration.
+Lovable's copies of other migrations are replayed at their drizzle date as before, because that is when production
+applied them.
+
 So apply the hotfix either with the release ledger template (runbook section 2: name = the file stem,
 `statements = ARRAY[file content]`), or through Lovable with the file's exact text, unchanged
 (`docs/release/hotfix-286-287-runbook.md`, PR #287). If a hotfix is changed before it ships, regenerate the manifest; once it is
