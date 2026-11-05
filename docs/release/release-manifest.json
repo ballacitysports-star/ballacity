@@ -1565,7 +1565,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "df6810838bbea2c38a967608e87d9d386bb1aeec7d7a9bbab78ddfe7447b8710",
+      "sha256": "72a4e37478338bd4b25fdc200c270bb8c9e5b505933643afdf5e81239b462245",
       "requires": {
         "functions": [],
         "tables": [
@@ -1577,7 +1577,8 @@
       },
       "provides": {
         "functions": [
-          "public.enforce_paypal_checkout_payment()"
+          "public.enforce_paypal_checkout_payment()",
+          "public.guard_paypal_order_settled()"
         ],
         "tables": [],
         "schemas": []
@@ -1613,7 +1614,7 @@
       "version": "20261108190000",
       "source": "supabase",
       "path": "supabase/migrations/20261108190000_appeal_separation.sql",
-      "sha256": "e6dbe8cbdb6f4d7603765a92f22a1bb8dc42e8b3ea2c2f9b715e304b4e2b2e78",
+      "sha256": "17d075cfb2717aac15271f26f55cfa50c99b22b52ec855ca634272e4ce55e9f0",
       "requires": {
         "functions": [
           "public.moderator_review_appeal(uuid,boolean,text)"
@@ -14586,6 +14587,64 @@
         }
       },
       {
+        "signature": "public.guard_paypal_order_settled()",
+        "defined_by": [
+          "20261108170000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108170000": {
+              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108170000": {
+              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.guard_profile_created_at()",
         "defined_by": [
           "20261107100000"
@@ -18267,7 +18326,7 @@
               ]
             },
             "20261108190000": {
-              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "def": "d825fc86a0ac96ea0674bd976b700c08",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -18291,7 +18350,7 @@
               ]
             },
             "20261108190000": {
-              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "def": "d825fc86a0ac96ea0674bd976b700c08",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -18305,7 +18364,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+            "def": "d825fc86a0ac96ea0674bd976b700c08",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -18316,7 +18375,7 @@
             ]
           },
           "17": {
-            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+            "def": "d825fc86a0ac96ea0674bd976b700c08",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -46297,7 +46356,9 @@
                 "service_role:TRUNCATE",
                 "service_role:UPDATE"
               ],
-              "triggers": [],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
@@ -46381,7 +46442,9 @@
                 "service_role:TRUNCATE",
                 "service_role:UPDATE"
               ],
-              "triggers": [],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
@@ -46421,7 +46484,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]
@@ -46462,7 +46527,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]

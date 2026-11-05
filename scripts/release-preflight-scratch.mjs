@@ -5,8 +5,21 @@
 // Everything here talks to the LOCAL Postgres that `bun run test:db` uses (libpq settings PGHOST,
 // PGHOSTADDR, PGPORT, PGUSER, PGPASSWORD) and refuses any other host. It creates and drops its own
 // databases and never touches a release target. The preflight itself never imports the write paths below.
+//
+// It is held to the same rules as scripts/db-test.mjs (scripts/db-test-target.mjs): the libpq settings are checked
+// before any connection; before the first write the server must attest that it is a local scratch Postgres (not a
+// Supabase-managed cluster, not a forwarded port to a populated server); every database it creates carries the scratch
+// marker, and it drops, reuses or writes to no database without that marker (independent review of d604958c).
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import {
+  DATABASE_LIST_SQL,
+  SCRATCH_MARKER,
+  SERVER_PROBE_SQL,
+  existingDatabaseProblems,
+  serverProblemsFromProbe,
+  targetProblems,
+} from "./db-test-target.mjs";
 import {
   bucketStateSql,
   functionStateSql,
@@ -38,6 +51,13 @@ export function localEnv(source = process.env) {
         `Refusing to use PGHOSTADDR=${source.PGHOSTADDR} for scratch databases: only a loopback address (127.0.0.0/8, ::1) is allowed.`,
       );
   }
+  // Then db-test's client-side rules (scripts/db-test-target.mjs): services and a connection-string PGDATABASE are
+  // refused, not silently dropped. The database name is checked per call (scratchName).
+  const problems = targetProblems(source, "scratch_name_checked_separately");
+  if (problems.length)
+    throw new Error(
+      `Refusing to use this libpq environment for scratch databases:\n  - ${problems.join("\n  - ")}`,
+    );
   const env = { ...source };
   delete env.PGDATABASE;
   delete env.PGSERVICE;
@@ -63,7 +83,8 @@ function must(r, what) {
 }
 
 export function scratchName(name) {
-  if (!/^[a-z0-9_]+$/.test(name)) throw new Error(`bad scratch database name ${name}`);
+  if (!/^[a-z0-9_]+$/.test(name) || ["postgres", "template0", "template1"].includes(name))
+    throw new Error(`bad scratch database name ${name}`);
   return name;
 }
 
@@ -76,20 +97,81 @@ export function serverVersionNum() {
   );
 }
 
+let serverVerified = false;
+/** Before the first write: the server attests that it is a local scratch Postgres, as db-test requires. */
+export function verifyServer() {
+  if (serverVerified) return;
+  const probe = must(
+    psqlLocal("postgres", ["-At", "-F", "|", "-c", SERVER_PROBE_SQL]),
+    "Could not identify the local Postgres",
+  );
+  const databases = must(
+    psqlLocal("postgres", ["-At", "-F", "\t", "-c", DATABASE_LIST_SQL]),
+    "Could not list the local Postgres databases",
+  );
+  const problems = serverProblemsFromProbe(probe, databases);
+  if (problems.length)
+    throw new Error(
+      `Refusing to write scratch databases: the server is not a verified local scratch Postgres.\n  - ${problems.join("\n  - ")}`,
+    );
+  serverVerified = true;
+}
+
+/** Whether a database exists and its comment (the scratch marker, for one a harness created). */
+function databaseState(name) {
+  const out = must(
+    psqlLocal("postgres", [
+      "-At",
+      "-c",
+      `SELECT 1, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '${scratchName(name)}'`,
+    ]),
+    `Could not look up ${name}`,
+  ).trim();
+  return out
+    ? { exists: true, comment: out.split("|").slice(1).join("|") }
+    : { exists: false, comment: "" };
+}
+
+const created = new Set();
+/** Throws unless the database carries the scratch marker (it was created by db-test or by this module). */
+function requireScratch(name) {
+  verifyServer();
+  if (created.has(name)) return;
+  const state = databaseState(name);
+  if (!state.exists || state.comment !== SCRATCH_MARKER)
+    throw new Error(
+      `Refusing to write to ${name}: it is not a scratch database created by db-test or the preflight helpers (no scratch marker).`,
+    );
+}
+
 export function dropDb(name) {
+  verifyServer();
+  const problems = existingDatabaseProblems(databaseState(name));
+  if (problems.length) throw new Error(`Refusing to drop ${name}: ${problems.join(" ")}`);
   psqlLocal("postgres", ["-c", `DROP DATABASE IF EXISTS "${scratchName(name)}"`]);
+  created.delete(name);
 }
 
 export function createDb(name, template) {
   dropDb(name);
+  if (template) requireScratch(template);
   const tpl = template ? ` TEMPLATE "${scratchName(template)}"` : "";
   must(
     psqlLocal("postgres", ["-c", `CREATE DATABASE "${scratchName(name)}"${tpl}`]),
     `Could not create ${name}`,
   );
+  must(
+    psqlLocal("postgres", [
+      "-c",
+      `COMMENT ON DATABASE "${scratchName(name)}" IS '${SCRATCH_MARKER}'`,
+    ]),
+    `Could not mark ${name} as a scratch database`,
+  );
+  created.add(name);
 }
 
 export function sql(db, text) {
+  requireScratch(db);
   return must(psqlLocal(db, ["-At"], text), `SQL failed on ${db}`);
 }
 
@@ -97,6 +179,7 @@ const asMigrator = `SET ROLE ${MIGRATOR_ROLE};\n`;
 
 /** Loads the platform stub as the migrator role, so its default privileges apply to that role's objects. */
 export function loadStub(db, root) {
+  requireScratch(db);
   must(
     psqlLocal(
       db,
@@ -109,6 +192,7 @@ export function loadStub(db, root) {
 
 /** Applies one migration file in its own transaction as the migrator role, as db-test.mjs does. */
 export function applyMigration(db, absPath, stripMaintain) {
+  requireScratch(db);
   let text = readFileSync(absPath, "utf8");
   if (stripMaintain) text = text.replace(/,\s*MAINTAIN\b/gi, "");
   must(psqlLocal(db, ["-1"], asMigrator + text), `Migration failed to apply: ${absPath}`);

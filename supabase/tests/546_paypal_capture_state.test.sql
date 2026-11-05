@@ -80,4 +80,31 @@ SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, gam
 SELECT t.lives(format('UPDATE public.payment_submissions SET notes = %L WHERE id = %L', 'checked', t.id('sub1')),
   'pre-review F04: a verified payment can still be annotated');
 SELECT t.reset();
+
+-- independent review of d604958c: a delayed PENDING from a superseded settlement never overwrites a completed order
+-- (ORD-1 is captured, with a verified payment)
+SELECT t.as_service();
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'capture_pending', capture_status = 'PENDING' WHERE order_id = 'ORD-1'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04 race: a late PENDING cannot move a captured order back to pending');
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'failed' WHERE order_id = 'ORD-1'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04 race: nor fail it');
+SELECT t.throws($q$UPDATE public.paypal_orders SET capture_status = 'PENDING' WHERE order_id = 'ORD-1'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04 race: nor rewrite its capture');
+SELECT t.eq((SELECT status FROM public.paypal_orders WHERE order_id = 'ORD-1'), 'captured', 'F04 race: the order stays captured');
+-- the claim: each claimant writes a fresh token, and writes its outcome only while it still holds it
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, currency, status, capture_claim, capture_claimed_at)
+VALUES ('ORD-C', 'pp-g', t.id('other'), t.id('host'), 1000, 'USD', 'capturing', '00000000-0000-0000-0000-00000000c0c0', now() - interval '1 hour');
+UPDATE public.paypal_orders SET capture_claim = '00000000-0000-0000-0000-00000000aaaa', capture_claimed_at = now()
+ WHERE order_id = 'ORD-C' AND status = 'capturing' AND capture_claim = '00000000-0000-0000-0000-00000000c0c0';
+UPDATE public.paypal_orders SET capture_claim = '00000000-0000-0000-0000-00000000bbbb', capture_claimed_at = now()
+ WHERE order_id = 'ORD-C' AND status = 'capturing' AND capture_claim = '00000000-0000-0000-0000-00000000c0c0';
+SELECT t.eq((SELECT capture_claim::text FROM public.paypal_orders WHERE order_id = 'ORD-C'), '00000000-0000-0000-0000-00000000aaaa',
+  'F04 race: of two settlements that read the same claim, only the first takes the order');
+UPDATE public.paypal_orders SET status = 'capture_pending', capture_status = 'PENDING'
+ WHERE order_id = 'ORD-C' AND status = 'capturing' AND capture_claim = '00000000-0000-0000-0000-00000000c0c0';
+SELECT t.eq((SELECT status FROM public.paypal_orders WHERE order_id = 'ORD-C'), 'capturing',
+  'F04 race: the superseded caller''s outcome write changes nothing');
+SELECT t.lives($q$UPDATE public.paypal_orders SET status = 'refunded' WHERE order_id = 'ORD-1'$q$,
+  'F04 race: a captured order can still be refunded');
+SELECT t.reset();
 ROLLBACK;
