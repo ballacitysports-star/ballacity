@@ -1565,7 +1565,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "72a4e37478338bd4b25fdc200c270bb8c9e5b505933643afdf5e81239b462245",
+      "sha256": "d1cb16b3c322d5cd9910ba283ff891b6d76d251356b4acf5bfcb978f00519758",
       "requires": {
         "functions": [],
         "tables": [
@@ -14598,7 +14598,7 @@
         "expect_steps": {
           "16": {
             "20261108170000": {
-              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
               "owner": "postgres",
               "secdef": false,
               "search_path": "\"\"",
@@ -14610,7 +14610,7 @@
           },
           "17": {
             "20261108170000": {
-              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
               "owner": "postgres",
               "secdef": false,
               "search_path": "\"\"",
@@ -14623,7 +14623,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
             "owner": "postgres",
             "secdef": false,
             "search_path": "\"\"",
@@ -14633,7 +14633,7 @@
             ]
           },
           "17": {
-            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
             "owner": "postgres",
             "secdef": false,
             "search_path": "\"\"",

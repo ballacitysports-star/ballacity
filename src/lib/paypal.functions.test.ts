@@ -30,6 +30,10 @@ const db = {
   insertError: null as { message: string; code?: string } | null,
   claimRows: [{ order_id: "ORDER-1" }] as unknown[],
   orderRow: null as Record<string, unknown> | null,
+  /** errors returned by successive conditional writes (null: none) */
+  writeErrors: [] as ({ message: string } | null)[],
+  /** a payment already recorded for the order (re-read after an insert error) */
+  recordedPayment: null as Record<string, unknown> | null,
   inserts: [] as { table: string; row: any }[],
   updates: [] as { table: string; patch: any }[],
   rpcCalls: [] as { fn: string; args: any }[],
@@ -46,6 +50,9 @@ function adminFrom(table: string) {
         return { data: { title: "Run", price: 10, host_id: "payee-1" } };
       if (table === "game_payment_settings") return { data: { entry_fee: 10 } };
       if (table === "host_paypal_accounts") return { data: { merchant_id: "MERCH" } };
+      // the claim re-read before a refund: still held by this call
+      if (table === "paypal_orders") return { data: { order_id: "ORDER-1" }, error: null };
+      if (table === "payment_submissions") return { data: db.recordedPayment, error: null };
       return { data: null };
     },
     insert: async (row: any) => {
@@ -58,7 +65,10 @@ function adminFrom(table: string) {
       const u: any = {
         eq: () => u,
         in: () => u,
-        select: async () => ({ data: db.claimRows, error: null }),
+        select: async () => {
+          const error = db.writeErrors.length ? db.writeErrors.shift() : null;
+          return error ? { data: null, error } : { data: db.claimRows, error: null };
+        },
         then: (resolve: (v: unknown) => void) => resolve({ error: null }),
       };
       return u;
@@ -152,6 +162,8 @@ beforeEach(() => {
   db.insertError = null;
   db.claimRows = [{ order_id: "ORDER-1" }];
   db.orderRow = null;
+  db.writeErrors = [];
+  db.recordedPayment = null;
   db.inserts = [];
   db.updates = [];
   db.rpcCalls = [];
@@ -243,6 +255,21 @@ describe("captureGamePayPalOrder", () => {
       .map((u) => u.patch.status);
     expect(statuses).toContain("refunded");
     expect(statuses).not.toContain("captured");
+  });
+
+  // Independent review of 8b8cc27b.
+  it("does not refund when the insert error hid a payment that was recorded", async () => {
+    db.insertError = { message: "fetch failed" };
+    db.recordedPayment = { id: "pay-1" };
+    await expect(capture()).resolves.toEqual({ ok: true, already: true });
+    expect(paypal.refundCapture).not.toHaveBeenCalled();
+  });
+
+  it("reports pending, not a refund or success, when the order cannot be written", async () => {
+    db.writeErrors = [null, { message: "connection reset" }]; // the claim succeeds; storing the capture fails
+    await expect(capture()).resolves.toEqual({ ok: false, pending: true });
+    expect(paypal.refundCapture).not.toHaveBeenCalled();
+    expect(db.inserts.some((i) => i.table === "payment_submissions")).toBe(false);
   });
 
   it("marks the order unrecorded when the refund also fails, and still does not report success", async () => {
