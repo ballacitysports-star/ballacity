@@ -16,6 +16,7 @@ import {
   type CloudflareReencodeOptions,
 } from "./cloudflare-images.server";
 import { pngChunkTypes } from "./png-codec";
+import { reencodeResultProblem } from "./reencode-contract";
 import {
   FakeImagesError,
   createDocumentedImagesFake,
@@ -365,27 +366,57 @@ describe("cloudflare-images PoC: colour hidden under transparency (finding 1)", 
     },
   );
 
-  it("partial transparency: published colour is premultiplied and quantised, and the alpha-removed scan rendition exists", async () => {
+  const renditionBytes = (r: string) => u8(Buffer.from(r.split(",")[1], "base64"));
+
+  it("partial transparency: published colour is premultiplied and quantised, and all three scan renditions exist (contract v2)", async () => {
     const input = await alphaPng();
     const out = await re(input, createDocumentedImagesFake());
     const a = await sharp(input).raw().toBuffer();
     quantiseHiddenColour(a, 4);
     expect(sameBytes(a, await sharp(out.bytes).raw().toBuffer())).toBe(true);
-    expect(out.alphaRemovedScanTarget).toMatch(/^data:image\/jpeg;base64,/);
-    const rendition = u8(Buffer.from(out.alphaRemovedScanTarget!.split(",")[1], "base64"));
-    const m = await sharp(rendition).metadata();
-    expect([m.format, m.width, m.height, m.hasAlpha]).toEqual(["jpeg", 96, 80, false]);
+    expect(out.transparency).toBe("partial");
+    expect(out.scanRenditions).toHaveLength(3);
+    for (const r of out.scanRenditions) {
+      const m = await sharp(renditionBytes(r)).metadata();
+      expect([m.format, m.width, m.height, m.hasAlpha]).toEqual(["jpeg", 96, 80, false]);
+    }
+    expect(reencodeResultProblem(out)).toBeNull();
   });
 
-  it("fully opaque or fully binary alpha: no rendition (nothing is hidden at partial alpha)", async () => {
-    expect(
-      (await re(await hiddenAlphaImage(0, "png"), createDocumentedImagesFake()))
-        .alphaRemovedScanTarget,
-    ).toBeNull();
-    expect(
-      (await re(u8(await solid(80, 64, "#abcdef").png().toBuffer()), createDocumentedImagesFake()))
-        .alphaRemovedScanTarget,
-    ).toBeNull();
+  it("binary alpha: flattened on white and on black (2 renditions); fully opaque: none", async () => {
+    const binary = await re(await hiddenAlphaImage(0, "png"), createDocumentedImagesFake());
+    expect([binary.transparency, binary.scanRenditions.length]).toEqual(["binary", 2]);
+    expect(reencodeResultProblem(binary)).toBeNull();
+    const opaque = await re(
+      u8(await solid(80, 64, "#abcdef").png().toBuffer()),
+      createDocumentedImagesFake(),
+    );
+    expect([opaque.transparency, opaque.scanRenditions]).toEqual(["none", []]);
+    expect(reencodeResultProblem(opaque)).toBeNull();
+  });
+
+  it("F09: a picture drawn in the alpha channel alone is plain to see in one of the flattened renditions", async () => {
+    // RGB all 0; a solid square only in alpha. On black it vanishes; on white it is a black square.
+    const W = 64;
+    const px = Buffer.alloc(W * W * 4);
+    for (let y = 0; y < W; y++)
+      for (let x = 0; x < W; x++)
+        px[(y * W + x) * 4 + 3] = x >= 16 && x < 48 && y >= 16 && y < 48 ? 255 : 0;
+    const input = u8(
+      await sharp(px, { raw: { width: W, height: W, channels: 4 } })
+        .png()
+        .toBuffer(),
+    );
+    const out = await re(input, createDocumentedImagesFake());
+    expect(out.transparency).toBe("binary");
+    const [white, black] = await Promise.all(
+      out.scanRenditions.map((r) => sharp(renditionBytes(r)).greyscale().raw().toBuffer()),
+    );
+    const at = (b: Buffer, x: number, y: number) => b[y * W + x];
+    expect(at(white, 4, 4)).toBeGreaterThan(240); // background: white
+    expect(at(white, 32, 32)).toBeLessThan(16); // the square: visible
+    expect(at(black, 4, 4)).toBeLessThan(16);
+    expect(at(black, 32, 32)).toBeLessThan(16); // invisible on black: why both are required
   });
 
   it("opt-in pixelSource 'rgba' (type definitions only) gives the same pixels on the doc fake and is refused by local mode", async () => {
@@ -578,7 +609,7 @@ describe("cloudflare-images PoC: determinism", () => {
       const a = await re(input, make());
       const b = await re(input, make());
       expect(sameBytes(a.bytes, b.bytes)).toBe(true);
-      expect(a.alphaRemovedScanTarget).toBe(b.alphaRemovedScanTarget);
+      expect(a.scanRenditions).toEqual(b.scanRenditions);
     }
   });
 

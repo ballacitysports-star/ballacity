@@ -177,7 +177,7 @@ const deps = (w: ReturnType<typeof world>, verdict: any = safe) => ({
   escalate: vi.fn(async () => {
     w.log.push("escalate");
   }),
-  reencode: undefined as any,
+  reencode: (b: Uint8Array) => reencodeImage(b),
 });
 const input = { userId: USER, bucket: "avatars", path: PATH };
 
@@ -382,6 +382,7 @@ describe("finalizeDirectImageUpload (legacy direct uploads)", () => {
       inputReport: { hasExif: false, hasGps: false, hasXmp: false, hasOther: false } as any,
       // flattened on white, flattened on black (R5 39ae9545 finding 2): the second one carries the picture
       scanRenditions: ["data:image/jpeg;base64,WWWW", "data:image/jpeg;base64,AAAA"],
+      transparency: "binary" as const,
     });
     const w = world({ [KEY]: jpeg() });
     const d = deps(w);

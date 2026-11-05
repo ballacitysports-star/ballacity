@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   NonceCache,
   SIGNATURE_HEADERS,
+  bodyMatches,
   canonicalResponse,
   hmacHex,
   safeEqualHex,
   signRequest,
   verifyRequest,
+  verifyRequestHeaders,
 } from "./hmac";
 
 const SECRET = "s".repeat(40);
@@ -144,5 +146,53 @@ describe("image processor HMAC: responses", () => {
       { nonce: "n1", status: 200, bodySha256: "g" },
     ])
       expect(safeEqualHex(a, await hmacHex(SECRET, canonicalResponse(other)))).toBe(false);
+  });
+});
+
+describe("header-only verification (audit F14: authenticate before reading the body)", () => {
+  const check = (headers: Record<string, string>, nonces = new NonceCache(120_000), now = T) =>
+    verifyRequestHeaders(SECRET, {
+      method: "POST",
+      path: "/v1/reencode",
+      headers: (n) => headers[n],
+      now,
+      nonces,
+    });
+
+  it("accepts a signed request without its body, returns the signed body hash, and claims the nonce", async () => {
+    const h = await signRequest(SECRET, { method: "POST", path: "/v1/reencode", body, now: T });
+    const nonces = new NonceCache(120_000);
+    const r = await check(h, nonces);
+    expect(r).toMatchObject({ ok: true, bodySha256: h[SIGNATURE_HEADERS.bodySha256] });
+    expect(nonces.size).toBe(1);
+    expect(await check(h, nonces)).toEqual({ ok: false, reason: "replay" });
+    expect(await bodyMatches(body, h[SIGNATURE_HEADERS.bodySha256])).toBe(true);
+    expect(
+      await bodyMatches(new TextEncoder().encode("other"), h[SIGNATURE_HEADERS.bodySha256]),
+    ).toBe(false);
+  });
+
+  it("refuses missing, malformed, stale, forged or re-pointed headers without touching the nonce cache", async () => {
+    const h = await signRequest(SECRET, { method: "POST", path: "/v1/reencode", body, now: T });
+    const nonces = new NonceCache(120_000);
+    expect((await check({}, nonces)).ok).toBe(false);
+    expect(await check({ ...h, [SIGNATURE_HEADERS.bodySha256]: "zz" }, nonces)).toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+    expect(await check(h, nonces, T + 5 * 60_000)).toEqual({ ok: false, reason: "skew" });
+    // another body hash under the same signature: the signature covers it
+    expect(await check({ ...h, [SIGNATURE_HEADERS.bodySha256]: "0".repeat(64) }, nonces)).toEqual({
+      ok: false,
+      reason: "signature",
+    });
+    const forged = await signRequest("f".repeat(40), {
+      method: "POST",
+      path: "/v1/reencode",
+      body,
+      now: T,
+    });
+    expect(await check(forged, nonces)).toEqual({ ok: false, reason: "signature" });
+    expect(nonces.size).toBe(0);
   });
 });

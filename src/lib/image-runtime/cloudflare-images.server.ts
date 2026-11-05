@@ -18,8 +18,9 @@
  *   4. PNG, and WEBP that can carry alpha ("pixel path"): the binding returns a PNG (decoded, sRGB, oriented); the Worker decodes
  *      it (src/lib/image-runtime/png-codec.ts), quantises the colour under transparent pixels with the SAME function the sharp path
  *      uses (quantiseHiddenColour), and writes a new PNG whose container is entirely its own (IHDR, IDAT, IEND). A PNG upload
- *      publishes that file; a WEBP upload is re-encoded from it by the binding. When partial alpha remains, the alpha-removed scan
- *      rendition is made from the same quantised pixels. The pixel path holds one RGBA frame in the isolate (128 MB limit), so it
+ *      publishes that file; a WEBP upload is re-encoded from it by the binding. When any pixel is transparent, the scan renditions
+ *      (contract v2: flattened on white and on black, plus alpha dropped when some alpha is partial) are made from the same
+ *      quantised pixels. The pixel path holds one RGBA frame in the isolate (128 MB limit), so it
  *      is capped at PIXEL_PATH_MAX_PIXELS (too_large above it), lower than the 30 MP cap of the sharp path.
  *   5. Verify the output inside the Worker: same type and expected oriented size (header and `.info()`), nothing the byte inspector
  *      would strip, and an allow-list of container structure (JPEG: tables, frame, scans, optional plain JFIF APP0; PNG: IHDR, IDAT,
@@ -36,6 +37,7 @@ import {
   ImageReencodeError,
   SCAN_RENDITION_MAX_SIDE,
   quantiseHiddenColour,
+  type ImageTransparency,
   type ReencodeResult,
 } from "@/lib/image-reencode.server";
 import {
@@ -358,6 +360,18 @@ function hasPartialAlpha(data: Uint8Array): boolean {
   return false;
 }
 
+/** RGBA `src` composited over an opaque grey level `background` (0 black, 255 white), written to `out` with alpha 255. */
+export function flattenInto(out: Uint8Array, src: Uint8Array, background: number): void {
+  for (let i = 0; i < src.length; i += 4) {
+    const a = src[i + 3];
+    const under = background * (255 - a);
+    out[i] = Math.round((src[i] * a + under) / 255);
+    out[i + 1] = Math.round((src[i + 1] * a + under) / 255);
+    out[i + 2] = Math.round((src[i + 2] * a + under) / 255);
+    out[i + 3] = 255;
+  }
+}
+
 function hasAnyAlpha(data: Uint8Array): boolean {
   for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return true;
   return false;
@@ -432,7 +446,8 @@ export async function reencodeImageWithCloudflareImages(
   const outputCap = MAX_IMAGE_BYTES;
   let bytes: Uint8Array;
   let hasAlpha = false;
-  let alphaRemovedScanTarget: string | null = null;
+  let transparency: ImageTransparency = "none";
+  const scanRenditions: string[] = [];
 
   if (!pixelPath) {
     // 3. Direct path (JPEG, opaque WEBP).
@@ -497,19 +512,34 @@ export async function reencodeImageWithCloudflareImages(
         timeoutMs,
         outputCap,
       );
-    if (hasPartialAlpha(image.data)) {
-      const rgb = await encodePngFromRgba(image, 3);
-      const rendition = await run(
-        images,
-        rgb,
-        [{ width: SCAN_RENDITION_MAX_SIDE, height: SCAN_RENDITION_MAX_SIDE, fit: "scale-down" }],
-        CLOUDFLARE_OUTPUT.rendition,
-        timeoutMs,
-        outputCap,
-      );
-      if (sniffImageMime(rendition) !== "image/jpeg")
-        throw new ImageReencodeError("unreadable", "scan rendition type");
-      alphaRemovedScanTarget = `data:image/jpeg;base64,${toBase64(rendition)}`;
+    if (hasAlpha) {
+      // Scan renditions of the quantised pixels (what is published), the same set the sharp path makes (contract v2,
+      // src/lib/image-runtime/reencode-contract.ts): flattened on white and on black, plus the colour with the alpha dropped
+      // when some alpha is partial. Flattening is done here, not by the binding, so it is exactly these pixels.
+      transparency = hasPartialAlpha(image.data) ? "partial" : "binary";
+      const toRendition = async (rgb: RgbaImage) => {
+        const jpeg = await run(
+          images,
+          await encodePngFromRgba(rgb, 3),
+          [{ width: SCAN_RENDITION_MAX_SIDE, height: SCAN_RENDITION_MAX_SIDE, fit: "scale-down" }],
+          CLOUDFLARE_OUTPUT.rendition,
+          timeoutMs,
+          outputCap,
+        );
+        if (sniffImageMime(jpeg) !== "image/jpeg")
+          throw new ImageReencodeError("unreadable", "scan rendition type");
+        return `data:image/jpeg;base64,${toBase64(jpeg)}`;
+      };
+      const scratch: RgbaImage = {
+        width: image.width,
+        height: image.height,
+        data: new Uint8Array(image.data.length),
+      };
+      for (const background of [255, 0]) {
+        flattenInto(scratch.data, image.data, background);
+        scanRenditions.push(await toRendition(scratch));
+      }
+      if (transparency === "partial") scanRenditions.push(await toRendition(image));
     }
   }
 
@@ -556,6 +586,7 @@ export async function reencodeImageWithCloudflareImages(
     convertedFromIcc: hasIccProfile(toSend, mime),
     lossless,
     inputReport: structural.report,
-    alphaRemovedScanTarget,
+    scanRenditions,
+    transparency,
   };
 }
