@@ -35,8 +35,8 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
     const { data: blob, error: dlErr } = await supabaseAdmin.storage.from(bucket).download(path);
     if (dlErr || !blob) throw new Error("Uploaded file could not be read");
 
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const bytes = buffer.byteLength;
+    let buffer: Uint8Array = new Uint8Array(await blob.arrayBuffer());
+    let bytes = buffer.byteLength;
     const sniffed = sniffImageMime(buffer);
     const dimensions = readImageDimensions(buffer);
 
@@ -62,6 +62,50 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
         { onConflict: "bucket,path" },
       );
       throw new Error(failure);
+    }
+
+    // Remove GPS, camera, time and every other personal tag from the stored bytes before anything reads, scans,
+    // resizes or publishes them. The picture and its orientation are unchanged. If the file cannot be cleaned, it is
+    // removed and the upload refused: the original is never published.
+    let metadata: { stripped: boolean; hadGps: boolean; hadExif: boolean; hadXmp: boolean } = {
+      stripped: false,
+      hadGps: false,
+      hadExif: false,
+      hadXmp: false,
+    };
+    try {
+      const { stripStoredImage } = await import("@/lib/image-metadata.server");
+      const outcome = await stripStoredImage(
+        supabaseAdmin,
+        bucket,
+        path,
+        buffer,
+        sniffed as string,
+      );
+      buffer = outcome.bytes;
+      bytes = buffer.byteLength;
+      metadata = {
+        stripped: outcome.rewritten,
+        hadGps: outcome.report.hasGps,
+        hadExif: outcome.report.hasExif,
+        hadXmp: outcome.report.hasXmp,
+      };
+    } catch {
+      await supabaseAdmin.storage.from(bucket).remove([path]);
+      await supabaseAdmin.from("image_moderation").upsert(
+        {
+          bucket,
+          path,
+          owner_id: context.userId,
+          status: "removed",
+          reason: "The image could not be cleaned of location data",
+          mime: sniffed,
+          bytes,
+          scan: { stage: "metadata" } as never,
+        },
+        { onConflict: "bucket,path" },
+      );
+      throw new Error("This image could not be processed. Please try a different photo.");
     }
 
     // Small enough to inline: keeps private-bucket scans off signed URLs.
@@ -106,7 +150,7 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         quarantined_at: quarantined ? new Date().toISOString() : null,
-        scan: verdict as never,
+        scan: { ...verdict, metadata } as never,
       },
       { onConflict: "bucket,path" },
     );
@@ -130,5 +174,6 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
       height: dimensions?.height ?? null,
       bytes,
       mime: sniffed,
+      metadataStripped: metadata.stripped,
     };
   });
