@@ -1,8 +1,8 @@
 # Audit F01–F16 remediation: independent review brief and remaining staging checklist
 
-Branch `claude/audit-review-snapshot`. Its code is the parent of the commit that adds this file
-(`811d05d4`), whose tree is byte-identical to `claude/release-integration` at `3dcd4770`. This file is the only
-addition. Nothing in it is merged to `main`, deployed, or applied to any Supabase project.
+Branch `claude/audit-review-snapshot`: the audit-fix PR stack after an independent pre-review round (2026-11-05),
+plus the staging verification tools that Part B uses. `claude/release-integration` has the same tree. Nothing here is
+merged to `main`, deployed, or applied to any Supabase project.
 
 ## Part A: brief for the independent (Codex) security review
 
@@ -10,22 +10,45 @@ addition. Nothing in it is merged to `main`, deployed, or applied to any Supabas
 
 The fixes for the independent audit of 2026-11-04 (findings F01–F16), on top of the privacy-release stack.
 
-| Finding            | PR                                           | Commits (review diff)                          | Files to read first                                                                                                  |
-| ------------------ | -------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| F01 seroval        | #286 → `main`                                | `ab974b45`                                     | `package.json` overrides, `bun.lock`, `src/lib/server-fn-deserialization.test.ts`                                    |
-| F02, F11, F12, F13 | #287 → `main`                                | `72357fbd`                                     | `supabase/migrations/20261031120000_close_live_write_holes.sql`, `src/lib/reviews.functions.ts`, tests 440, 310, 442 |
-| F16                | #288 → `main`                                | `27b0dc48`                                     | `scripts/db-test-target.mjs`, `scripts/db-test.mjs`                                                                  |
-| F15                | #289 → `main`                                | `b7d2f72d`                                     | `scripts/migration-versions.test.mjs`, `docs/migration-history-reconciliation.md` §9                                 |
-| F03                | #290 → `claude/audit-fix-base`               | `f67ca881` + manifest                          | `supabase/migrations/20261108160000_guardian_approval_validity.sql`, test 545                                        |
-| F04                | #291 → #290                                  | `4fdb9f3f`, `04d9eb01` + manifest              | `src/lib/paypal*.ts`, `supabase/migrations/20261108170000_paypal_capture_state.sql`, test 546                        |
-| F05, F06           | #292 → #291                                  | `fdc93991` + manifest                          | `src/lib/image-animation.ts`, `supabase/migrations/20261108180000_image_direct_upload_closure.sql`, test 547         |
-| F09, F14           | #293 → `claude/audit-fix-base-image-runtime` | `21ef55e4`                                     | `src/lib/image-runtime/*`, `services/image-processor/src/server.ts`, `src/lib/image-uploads.functions.ts`            |
-| F10                | (manifest commits)                           | `b04dca94`, `9e493ff1`, `d0b25d9f`, `e6e8f85d` | `docs/release/release-manifest.json`, `scripts/release-preflight.mjs`                                                |
+| Finding                   | PR                                           | Read first                                                                                                               |
+| ------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| F01 seroval               | #286 → `main`                                | `package.json` overrides, `bun.lock`, `src/lib/server-fn-deserialization.test.ts`                                        |
+| F02, F11, F12, F13        | #287 → `main`                                | `supabase/migrations/20261031120000_close_live_write_holes.sql`, `src/lib/reviews.functions.ts`, tests 440, 310, 442     |
+| F16                       | #288 → `main`                                | `scripts/db-test-target.mjs`, `scripts/db-test.mjs`                                                                      |
+| F15                       | #289 → `main`                                | `scripts/migration-versions.test.mjs`, `docs/migration-history-reconciliation.md` §9                                     |
+| F03                       | #290 → `claude/audit-fix-base`               | `supabase/migrations/20261108160000_guardian_approval_validity.sql`, test 545                                            |
+| F04                       | #291 → #290                                  | `src/lib/paypal*.ts`, `supabase/migrations/20261108170000_paypal_capture_state.sql`, test 546                            |
+| F05, F06                  | #292 → #291                                  | `src/lib/image-animation.ts`, `supabase/migrations/20261108180000_image_direct_upload_closure.sql`, test 547             |
+| F13 appeals, F10 pinning  | #294 → #292                                  | `supabase/migrations/20261108190000_appeal_separation.sql`, test 548, `scripts/release-preflight.mjs` (`pinned_history`) |
+| F09, F14                  | #293 → `claude/audit-fix-base-image-runtime` | `src/lib/image-runtime/*`, `services/image-processor/src/server.ts`, `src/lib/image-uploads.functions.ts`                |
+| F10 manifest              | manifest commits on each PR                  | `docs/release/release-manifest.json` (38 migrations, PG16 and PG17 hashes, `pinned_history`)                             |
+| Staging tools (not a fix) | branch `claude/staging-verification-tools`   | `scripts/staging/cutover-probe.ts`, `services/image-processor/scripts/smoke.ts`                                          |
 
-Dependency order: `claude/audit-fix-base` (`b04dca94`) is the integration state before the audit fixes (`3004f6f2`:
-the stack #277–#285 plus the final heads of #286–#289), plus test 442 and a PG16/PG17 manifest. #290 → #291 → #292
-are stacked in migration-version order, so each tree carries a manifest listing exactly its migrations.
-`claude/audit-fix-base-image-runtime` (`ccfb30de`) is that base plus #284. #293 is on top of it.
+Dependency order:
+
+- `claude/audit-fix-base` is the integration state before the audit fixes. It contains the stack #277–#285, the final
+  heads of #286–#289, test 442, a PG16/PG17 manifest, and one merge resolution: the stack's later redefinition of
+  "Reviewees view their private reviews" keeps #287's `flagged = false`.
+- #290 → #291 → #292 → #294 are stacked in migration-version order, so each tree carries a manifest listing exactly its
+  migrations.
+- `claude/audit-fix-base-image-runtime` is the same base plus #284, and #293 sits on top of it.
+
+**Pre-review round (2026-11-05).** A fresh-context reviewer found nine issues; all were confirmed by probes. Eight are
+fixed in the PR that owns the code, each with tests that fail on the previous version:
+
+| Issue                                            | PR   |
+| ------------------------------------------------ | ---- |
+| F12: held private review readable by its subject | #287 |
+| F12: moderator self-release of a held review     | #287 |
+| F13: reviewer attribution of report notes        | #287 |
+| F03: approver account eligibility                | #290 |
+| F04: order status and payee                      | #291 |
+| F06: guarded switch, fail closed                 | #292 |
+| F13: appeal separation                           | #294 |
+| F10: pinned pre-range hotfix                     | #294 |
+
+The ninth (F16 loopback tunnel) is listed under known limits. Re-running the reviewer's own probes on this tree: every
+weakness assertion now fails, except "the switch ships open", which is the intended state until the F06 cutover.
 
 ### Questions the review should answer
 
@@ -67,12 +90,12 @@ Use local, disposable databases only. Never point these at a hosted project.
 ```sh
 bun install
 npx tsc --noEmit -p .
-npx vitest run                                   # 3606 passed, 22 skipped
-node scripts/db-test.mjs                         # local Postgres 16 socket: 3420 passed, 0 failed
+npx vitest run                                   # 3619 passed, 22 skipped
+node scripts/db-test.mjs                         # local Postgres 16 socket: 3467 passed, 0 failed
 docker run -d --name pg17 -e POSTGRES_PASSWORD=postgres -p 127.0.0.1:5433:5432 postgres:17
-PGHOST=127.0.0.1 PGPORT=5433 PGUSER=postgres PGPASSWORD=postgres node scripts/db-test.mjs   # 3420 passed, 0 failed
-node scripts/release-preflight.mjs --offline     # PASS: 37 migrations, hashes for majors 16 and 17
-bun run preflight:test                           # 60 passed (needs the local Postgres)
+PGHOST=127.0.0.1 PGPORT=5433 PGUSER=postgres PGPASSWORD=postgres node scripts/db-test.mjs   # 3467 passed, 0 failed
+node scripts/release-preflight.mjs --offline     # PASS: 38 migrations, majors 16 and 17, one pinned hotfix
+bun run preflight:test                           # 66 passed (needs the local Postgres)
 ```
 
 Every test that pins a fix ships with a negative control; the PR descriptions list them.
@@ -86,7 +109,17 @@ Every test that pins a fix ships with a negative control; the PR descriptions li
     mean decoding up to 30 MP in the Worker. This is the same residual as a compromised service returning
     different pixels.
   - `cloudflare-images` is never wired, so it fails closed.
-- **F04:** payments are disabled. `settlePendingPayPalOrder` is not wired to anything.
+- **F04:** payments are disabled. `settlePendingPayPalOrder` is not wired to anything. Its claim of an order stuck in
+  `capturing` counts the grace period from the order's creation, not from the claim. A settlement could overlap a
+  capture call still in flight. That can cause a refund, never a verified payment without a capture (pre-review
+  suspicion, not reproduced; settle before wiring).
+- **F13:** admins and superadmins keep the existing override and may review an appeal of a decision they took part in.
+- **F16:** `db-test` treats any loopback or socket server as local. An `ssh -L` tunnel that ends on a remote,
+  non-Supabase Postgres looks the same. Supabase clusters (production included) are still refused by the
+  managed-roles check. Requiring a disposable cluster on loopback would refuse every developer's local Postgres that
+  holds other databases.
+- **#287 in production:** apply it with the release ledger template (`statements = ARRAY[file content]`), or the release
+  preflight refuses (`pinned_history`).
 - **Dependency advisories:** `bun audit` still reports dev and build-tool advisories (vite, undici in miniflare,
   shell-quote, brace-expansion, source-map-js). None of them reach `.output/server`.
 
