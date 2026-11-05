@@ -560,7 +560,7 @@
       "version": "20261103120000",
       "source": "supabase",
       "path": "supabase/migrations/20261103120000_minor_review_privacy.sql",
-      "sha256": "67320ad16218b1cc31a8c4bf9cc94a66f53f6a1a8c3e9de083c7b373a84fa2cc",
+      "sha256": "d78b51a3a19af10aa59122f3a1e4b19a5d8e672c8f8a9ad7882d8e7429315363",
       "requires": {
         "functions": [],
         "tables": [],
@@ -1530,7 +1530,7 @@
       "version": "20261108160000",
       "source": "supabase",
       "path": "supabase/migrations/20261108160000_guardian_approval_validity.sql",
-      "sha256": "ac9555cd5fe0d6e66690f3d709cb4f8362a1ffb0f93753fee873f13a9d640536",
+      "sha256": "2be6968f22ba22fe5c728fcdfcf9510661192d20eaf01148442e8f0df9be5f14",
       "requires": {
         "functions": [
           "private_sec.guardian_eligible(uuid)",
@@ -1557,7 +1557,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "13160b78a785bcc446d7c5409c6dcba96d8b2c82c4ced1bcceaef4b3fde8e2d0",
+      "sha256": "df6810838bbea2c38a967608e87d9d386bb1aeec7d7a9bbab78ddfe7447b8710",
       "requires": {
         "functions": [],
         "tables": [
@@ -3695,7 +3695,7 @@
         "expect_steps": {
           "16": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3706,7 +3706,7 @@
           },
           "17": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3718,7 +3718,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3727,7 +3727,7 @@
             ]
           },
           "17": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -12617,7 +12617,7 @@
         "expect_steps": {
           "16": {
             "20261108170000": {
-              "def": "eed9b9a2562cfd711028136991c75ec2",
+              "def": "b3f8db2853a451a9002f3b7651abf955",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -12629,7 +12629,7 @@
           },
           "17": {
             "20261108170000": {
-              "def": "eed9b9a2562cfd711028136991c75ec2",
+              "def": "b3f8db2853a451a9002f3b7651abf955",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -12642,7 +12642,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "eed9b9a2562cfd711028136991c75ec2",
+            "def": "b3f8db2853a451a9002f3b7651abf955",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -12652,7 +12652,7 @@
             ]
           },
           "17": {
-            "def": "eed9b9a2562cfd711028136991c75ec2",
+            "def": "b3f8db2853a451a9002f3b7651abf955",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -15034,7 +15034,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -15058,7 +15058,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -15072,7 +15072,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -15083,7 +15083,7 @@
             ]
           },
           "17": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -27323,12 +27323,12 @@
         ],
         "expect_before": {
           "16": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }
@@ -27336,14 +27336,14 @@
         "expect_steps": {
           "16": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
           },
           "17": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
@@ -27351,12 +27351,12 @@
         },
         "expect_after": {
           "16": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }

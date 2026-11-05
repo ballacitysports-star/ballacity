@@ -164,4 +164,56 @@ SELECT t.eq((SELECT reviewed_by FROM public.user_reports WHERE id = t.id('rep'))
 SELECT t.eq((SELECT details FROM public.user_reports WHERE id = t.id('rep')), 'original', 'B-F4: the report text is unchanged');
 SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE target_type = 'user_report' AND target_id = t.id('rep')::text
               AND actor_id = t.id('modone') AND action = 'report_updated_directly'), 1, 'B-F4: and the change is audited');
+-- ============================================================ independent pre-review follow-ups (2026-11-05)
+-- F12: a private review held for screening is not shown to its subject until the server releases it
+INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES
+  ('rev-p', t.id('subject'), 'basketball', 'Private past run', now() - interval '3 days');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('rev-p', t.id('author'));
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('author'));
+SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, is_private, game_id)
+                         VALUES (%L, %L, 'player', 'host', %L, 'Subject', 1, 'UNSCREENED private text', true, 'rev-p')$q$,
+                      t.id('rp'), t.id('author'), t.id('subject')::text),
+  'pre-review setup: a private review inserted directly (held)');
+SELECT t.reset();
+SELECT t.as_user(t.id('subject'));
+SELECT t.eq((SELECT count(*)::int FROM public.reviews WHERE id = t.id('rp')), 0, 'F12: the subject does not see a held private review');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT t.ok((SELECT public.release_review_screening(t.id('rp'), NULL, 'UNSCREENED private text')), 'pre-review setup: the server releases it after screening');
+SELECT t.reset();
+SELECT t.as_user(t.id('subject'));
+SELECT t.eq((SELECT count(*)::int FROM public.reviews WHERE id = t.id('rp')), 1, 'F12: once released, the subject sees it');
+SELECT t.reset();
+
+-- F12: a moderator who writes a review cannot release their own hold
+SELECT t.person('modauthor', 37), t.person('modtwo', 39);
+INSERT INTO public.user_roles (user_id, role) VALUES (t.id('modauthor'), 'moderator'), (t.id('modtwo'), 'moderator');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES
+  ('rev-m', t.id('subject'), 'basketball', 'Moderator past run', now() - interval '1 day');
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('rev-m', t.id('modauthor'));
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('modauthor'));
+SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
+                         VALUES (%L, %L, 'player', 'host', %L, 'Subject', 1, 'UNSCREENED moderator text', 'rev-m')$q$,
+                      t.id('rm'), t.id('modauthor'), t.id('subject')::text),
+  'pre-review setup: a moderator writes a review directly (held)');
+SELECT t.throws(format('UPDATE public.reviews SET flagged = false WHERE id = %L', t.id('rm')),
+  'REVIEW_HELD_FOR_SCREENING', 'F12: a moderator cannot clear the hold on their own review');
+SELECT t.reset();
+SELECT t.as_anon();
+SELECT t.eq((SELECT count(*)::int FROM public.reviews WHERE id = t.id('rm')), 0, 'F12: and it stays hidden');
+SELECT t.reset();
+
+-- F13: a change of the notes alone is attributed to the moderator who made it, at the time it was made
+SELECT t.as_user(t.id('modtwo'));
+SELECT t.lives(format($q$UPDATE public.user_reports SET resolution_notes = 'rewritten by modtwo', reviewed_at = now() - interval '30 days' WHERE id = %L$q$,
+                      t.id('rep')), 'pre-review setup: a second moderator edits only the notes and backdates the review time');
+SELECT t.reset();
+SELECT t.eq((SELECT reviewed_by FROM public.user_reports WHERE id = t.id('rep')), t.id('modtwo'),
+  'F13: the notes are attributed to the moderator who wrote them');
+SELECT t.ok((SELECT reviewed_at > now() - interval '1 minute' FROM public.user_reports WHERE id = t.id('rep')),
+  'F13: and the review time cannot be backdated');
 ROLLBACK;

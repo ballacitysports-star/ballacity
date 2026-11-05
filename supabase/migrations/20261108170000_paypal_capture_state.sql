@@ -64,6 +64,14 @@ BEGIN
     RETURN NEW;
   END IF;
   SELECT * INTO _o FROM public.paypal_orders WHERE order_id = NEW.paypal_order_id;
+  -- At the moment a checkout payment becomes verified, its order must be in a successful capture (claimed or recorded)
+  -- with a payee on record; a refunded, failed, unrecorded or cancelled order never verifies a payment (pre-review
+  -- 2026-11-05). Later updates of an already verified row (refund bookkeeping) are not held to the order's status.
+  IF FOUND AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'verified' OR OLD.paypal_order_id IS DISTINCT FROM NEW.paypal_order_id)
+     AND (_o.status NOT IN ('capturing', 'captured') OR _o.capture_payee_merchant_id IS NULL) THEN
+    RAISE EXCEPTION 'PAYPAL_CAPTURE_NOT_COMPLETED: a PayPal payment is verified only from its completed capture.'
+      USING ERRCODE = '42501';
+  END IF;
   IF NOT FOUND
      OR _o.capture_status IS DISTINCT FROM 'COMPLETED'
      OR _o.capture_id IS NULL
