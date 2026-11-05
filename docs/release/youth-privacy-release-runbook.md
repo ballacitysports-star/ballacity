@@ -103,7 +103,7 @@ Before step 1, capture these from production and store them with the release rec
    only. Prove: ref ≠ `cpqihhcqeivbgxqbzatv` (production), keys do not authenticate against production (a single read of a public
    endpoint returns 401), and the E2E secrets in GitHub's `e2e-sandbox` environment belong to it. The owner confirms in writing.
    Only then set `E2E_SANDBOX_PROJECT_REF`. (Candidates seen: Lovable project `ballacity-staging`; repo file `supabase/config.e2e.toml`
-   names `olrbulvwexrkjcxddjxq`. **Neither is verified.**)
+   names `qkukefvzwlyusvspablz`, the Supabase project behind `ballacity-staging`.)
 2. Rebuild the sandbox to production's current state: restore a **schema-only** dump of production (no user data) or replay the 359
    source files + drizzle; compare to production's catalog (functions, policies, grants) with the section 3 queries. Resolve drift first.
 3. Load synthetic fixtures only (no production data): one adult host; adult organizer; adult payment manager; 16-17 host; 16-17 player;

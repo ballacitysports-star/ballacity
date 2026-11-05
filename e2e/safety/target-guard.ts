@@ -28,11 +28,12 @@ export const PRODUCTION_PROJECT_REFS: readonly string[] = ["cpqihhcqeivbgxqbzatv
 
 /**
  * Projects designated for E2E. Must never overlap PRODUCTION_PROJECT_REFS.
- * `olrbulvwexrkjcxddjxq` is the E2E sandbox named in supabase/config.e2e.toml and
+ * `qkukefvzwlyusvspablz` is the E2E sandbox: the Supabase project behind the Lovable project
+ * `ballacity-staging`, named in supabase/config.e2e.toml and
  * docs/supabase-cli.md. Add a ref here only after confirming the project is not
  * production, and review that change like a security change.
  */
-export const NON_PRODUCTION_E2E_PROJECT_REFS: readonly string[] = ["olrbulvwexrkjcxddjxq"];
+export const NON_PRODUCTION_E2E_PROJECT_REFS: readonly string[] = ["qkukefvzwlyusvspablz"];
 
 /** Hosts the app under test may be served from. Everything else is refused. */
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
