@@ -16,12 +16,12 @@ has settled. Running the pre-fix mapper on that response reproduces it.
   as `MISSING`, and more than one as `AMBIGUOUS`.
 - **Recording.** `recordCaptureOutcome` (`src/lib/paypal-capture.server.ts`) is shared by checkout and settlement:
 
-  | Capture                                          | Result                                                                         |
-  | ------------------------------------------------ | ------------------------------------------------------------------------------ |
-  | `COMPLETED`, exact amount, currency and payee    | the capture is stored on the order, then exactly one verified payment          |
-  | `PENDING` (matching)                             | order `capture_pending`; nothing granted; the client says PayPal is processing |
-  | `DECLINED`, `FAILED`, missing, ambiguous         | order `failed`; nothing recorded                                               |
-  | `COMPLETED` but wrong amount, currency or payee  | refunded (`refunded`, or `unrecorded` if the refund fails); never verified     |
+  | Capture                                         | Result                                                                         |
+  | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+  | `COMPLETED`, exact amount, currency and payee   | the capture is stored on the order, then exactly one verified payment          |
+  | `PENDING` (matching)                            | order `capture_pending`; nothing granted; the client says PayPal is processing |
+  | `DECLINED`, `FAILED`, missing, ambiguous        | order `failed`; nothing recorded                                               |
+  | `COMPLETED` but wrong amount, currency or payee | refunded (`refunded`, or `unrecorded` if the refund fails); never verified     |
 
 - **Retries and concurrency.**
   - Checkout first claims the order (`created`/`approved` to `capturing`, conditionally). Of concurrent or duplicate

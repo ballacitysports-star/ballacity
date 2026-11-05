@@ -134,13 +134,24 @@ export type CaptureResult = {
   statusReason: string | null;
 };
 
+type PayPalCapture = {
+  id?: string;
+  status?: string;
+  amount?: { value?: string; currency_code?: string };
+  payee?: { merchant_id?: string };
+  status_details?: { reason?: string };
+};
+type PayPalUnit = { payee?: { merchant_id?: string }; payments?: { captures?: PayPalCapture[] } };
+type PayPalOrderJson = { status?: string; purchase_units?: PayPalUnit[] };
+
 /** Pure: maps a PayPal capture (or order lookup) response to a CaptureResult. */
-export function parseCaptureResponse(json: any): CaptureResult {
-  const units: any[] = Array.isArray(json?.purchase_units) ? json.purchase_units : [];
-  const captures = units.flatMap((u: any) =>
-    (Array.isArray(u?.payments?.captures) ? u.payments.captures : []).map((c: any) => ({ c, u })),
+export function parseCaptureResponse(raw: unknown): CaptureResult {
+  const json = (raw ?? {}) as PayPalOrderJson;
+  const units = Array.isArray(json.purchase_units) ? json.purchase_units : [];
+  const captures = units.flatMap((u) =>
+    (Array.isArray(u?.payments?.captures) ? u.payments.captures : []).map((c) => ({ c, u })),
   );
-  const orderStatus = String(json?.status ?? "");
+  const orderStatus = String(json.status ?? "");
   if (captures.length !== 1) {
     return {
       status: captures.length === 0 ? "MISSING" : "AMBIGUOUS",
@@ -178,7 +189,7 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
       },
     },
   );
-  const json = (await res.json().catch(() => ({}))) as any;
+  const json = (await res.json().catch(() => ({}))) as { message?: string };
   if (!res.ok) throw new Error(json?.message || `PayPal capture failed (${res.status}).`);
   return parseCaptureResponse(json);
 }
@@ -189,7 +200,7 @@ export async function getOrderCapture(orderId: string): Promise<CaptureResult> {
   const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const json = (await res.json().catch(() => ({}))) as any;
+  const json = (await res.json().catch(() => ({}))) as { message?: string };
   if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
   return parseCaptureResponse(json);
 }
