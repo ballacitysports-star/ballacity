@@ -97,6 +97,23 @@ should have caught it.
 
 ## Part B: remaining staging checklist
 
+Every database change below ships as its own reviewed migration file (AGENTS.md: never a hand-run statement). It is
+applied to staging first, then to production with owner approval and a backup.
+
+Two scripts automate the checks below. Neither prints keys, tokens, account ids or row values.
+
+- `bun run staging:cutover-probe` (`scripts/staging/cutover-probe.ts`) checks F06, F07 and F08 from outside the
+  database, through the REST and Storage APIs, as an anonymous visitor and as an uninvolved signed-in test account
+  (`PROBE_SUPABASE_URL`, `PROBE_SUPABASE_PUBLISHABLE_KEY`, `PROBE_USER_JWT`, optionally `PROBE_HIDDEN_HOST_ID`).
+  - It reads only by default, so it may run against any project, production included.
+  - `--allow-writes` adds the F06 upload attempt. It is refused unless the target is a local Supabase or the
+    designated sandbox with a recorded isolation; production is never written.
+  - Before a cutover, EXPOSED is the expected baseline for that finding; after it, every check must PASS.
+- `bun run staging:image-smoke` (`services/image-processor/scripts/smoke.ts`; `IMAGE_PROCESSOR_URL`,
+  `IMAGE_PROCESSOR_SECRET`) exercises a deployed image service exactly as the Worker does: refusal before admission,
+  the body deadline, metadata removal, scan renditions, and the animated and bomb refusals. Against the pre-fix #284
+  server it fails the F14 checks, as the audit described.
+
 Every item needs owner approval, and nothing here touches production until the last step of each section.
 
 ### B1. #285: E2E sandbox isolation (`qkukefvzwlyusvspablz`, `ballacity-staging`)
@@ -138,7 +155,8 @@ Every item needs owner approval, and nothing here touches production until the l
    For each published file, the scanner must be called once for the file plus once per rendition.
 
 5. Stop the service: uploads are held (`reencode_unavailable`). Restart it: a retry publishes.
-6. From outside the private network the service must be unreachable. Inside it, unsigned or slow requests get
+6. Run `bun run staging:image-smoke` from inside the private network: all 12 checks PASS. From outside it, the
+   service must be unreachable (connection refused or timeout). Inside it, unsigned or slow requests get
    401 or 408 in under 1 s.
 7. Measure memory and time for a 30 MP JPEG and an 8 MB PNG within the container limits.
 8. Rehearse secret rotation.
@@ -150,18 +168,19 @@ Every item needs owner approval, and nothing here touches production until the l
    the old build's cache lifetime plus one week.
 2. Run the read-only sweep in `docs/privacy/g3b-image-staging.md` weekly. Public-bucket objects with no moderation
    record must trend to zero.
-3. On staging, as the service role:
+3. Write a migration that closes the switch, and apply it on staging:
 
    ```sql
-   update public.app_settings set value = '{"closed": true}' where key = 'image_direct_uploads';
+   UPDATE public.app_settings SET value = '{"closed": true}' WHERE key = 'image_direct_uploads';
    ```
 
-   Check that:
+   Then check:
+   - `bun run staging:cutover-probe --only F06 --allow-writes` reports PASS (refused by the closed switch);
    - an old-build upload and a signed URL minted before the switch both fail with `DIRECT_IMAGE_UPLOAD_CLOSED`;
    - a new-build upload publishes;
    - a client cannot reopen the switch.
 
-4. With owner approval and a backup, run the same statement in production. F06 is closed from this moment.
+4. With owner approval and a backup, apply the same migration in production. F06 is closed from this moment.
 5. Run phase 2: copy `supabase/phase2/g3b_phase2_close_direct_image_uploads.sql` into a new timestamped migration,
    rehearse it on staging, then apply it with approval. Retire `finalizeImageUpload` in the same release.
 
@@ -169,12 +188,16 @@ Every item needs owner approval, and nothing here touches production until the l
 
 1. Confirm the application that reads exact venues from `hosted_game_private` is live and verified, on staging
    then in production.
-2. On staging:
-   - set `"app_adoption_confirmed": "2c-verified"`;
-   - in the same session, `SET app.confirm_activate_youth_coarsening = 'yes'` and set `"coarsen": true`;
-   - the guard refuses unless every youth-inclusive game has its private copy.
-3. Run `coarsen_existing_youth_games(200)` (service role) in batches until it returns 0.
-4. Direct unauthorized-read check: as `anon` and as an unrelated signed-in user, over REST, `select` the public
+2. Write the activation migration and apply it on staging. In one transaction it:
+   - sets `SET LOCAL app.confirm_activate_youth_coarsening = 'yes'`;
+   - updates `youth_location_privacy` to carry `"app_adoption_confirmed": "2c-verified"` and `"coarsen": true`.
+
+   The guard refuses unless every youth-inclusive game has its private copy.
+
+3. Then backfill: call `coarsen_existing_youth_games(200)` in a loop until it returns 0. This can be the same
+   migration or the next one.
+4. Direct unauthorized-read check (`bun run staging:cutover-probe --only F07`, before activation for the baseline
+   and after): as `anon` and as an unrelated signed-in user, over REST, `select` the public
    location columns of youth games. They must hold coarsened values only. Repeat for realtime payloads.
 5. Production: the same steps with owner approval and a backup. The switch cannot be turned off once on (by
    design), so recovery is fix-forward only.
@@ -187,8 +210,12 @@ Every item needs owner approval, and nothing here touches production until the l
 2. On staging, copy `supabase/phase2/sec5_phase2_close_host_id_columns.sql` into a timestamped migration with a
    `lock_timeout`, and apply it.
    - Verify that direct REST reads of `hosted_games.host_id`, `image` and `host_snapshot`,
-     `join_requests.host_id` and `game_payment_settings.host_id` are refused for `anon` and `authenticated`.
-   - Verify that realtime payloads drop these columns.
+     `join_requests.host_id` and `game_payment_settings.host_id` are refused for `anon` and `authenticated`:
+     `bun run staging:cutover-probe --only F08`, with `PROBE_HIDDEN_HOST_ID` set to a staging host who is not a
+     confirmed adult and has a custom cover. The probe also checks that the app's read views still work.
+   - Verify that realtime payloads drop these columns. This is a manual check: the probe does not open a realtime
+     channel.
    - Verify that storage listing and signing of custom covers do not reveal the host id.
    - Rehearse `sec5_phase2_rollback.sql`.
-3. Production: with owner approval and a backup, apply the same migration, then repeat the direct-read checks.
+3. Production: with owner approval and a backup, apply the same migration, then repeat the direct-read checks
+   (`bun run staging:cutover-probe --only F08` against production reads only).

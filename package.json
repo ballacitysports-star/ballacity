@@ -15,6 +15,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:db": "node scripts/db-test.mjs",
+    "staging:cutover-probe": "bun scripts/staging/cutover-probe.ts",
+    "staging:image-smoke": "bun services/image-processor/scripts/smoke.ts",
     "preflight": "node scripts/release-preflight.mjs",
     "preflight:test": "node --test --test-concurrency=1 scripts/release-preflight.test.mjs",
     "rehearsal:guard": "node scripts/rehearsal-guard.mjs",
