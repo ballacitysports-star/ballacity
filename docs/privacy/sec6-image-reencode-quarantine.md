@@ -158,6 +158,8 @@ SQL cannot sign a Storage URL (the signing key is not in the database), hence th
 2. A WASM build of libvips (`@img/sharp-wasm32`) inside the Worker: check bundle size limits and memory (a 30 MP RGBA frame is 120 MB raw) first.
 3. Cloudflare Images (decode/re-encode at the edge): a third-party processor of user images; needs its own privacy review.
 
+Evaluation of options 1 and 3, with a proof of concept of each (not wired in, nothing deployed) and a recommendation pending the owner's decision: [image-runtime-evaluation.md](image-runtime-evaluation.md).
+
 `sharp` must then be added to the runtime's `dependencies` (not done here: the lockfile is Lovable-managed). Memory: the raw round trip holds one decoded frame (worst case 30 MP × 4 bytes = 120 MB) plus the encoder's buffers; measure on the target runtime.
 
 ## Deploy order
