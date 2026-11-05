@@ -112,6 +112,22 @@ seconds after the file's timestamp and the file stem as `name`
 stores them differently, the run fails and names every row it cannot match. Read those rows, and have the owner
 review them. Change the manifest's allow-lists or matching only through a reviewed commit, never by hand at release time.
 
+## Pinned history: hotfixes dated before the release range
+
+A hotfix that ships to production ahead of the release is dated before `release_range.from` (today:
+`20261031120000_close_live_write_holes.sql`, PR #287). The ledger only proves that _a_ row exists for a historical
+version, not which text was applied, so the manifest pins these files in `pinned_history` (version, path, sha256,
+basis; generated from `PINNED_HISTORY` in the script):
+
+- **Offline:** the file must still have the pinned sha256, and any migration dated after the newest `known_unledgered`
+  file and before the range must be pinned. A new backdated file fails as "unpinned history".
+- **Online:** the target's ledger row for that version must record exactly the pinned text: `statements[1]` hashes to the
+  pinned sha256, with the same rule as release-range rows. An older version, or a row written without the text, fails.
+
+So apply the hotfix with the release ledger template (runbook section 2: name = the file stem, `statements = ARRAY[file
+content]`). If a hotfix is changed before it ships, regenerate the manifest; once it is applied, its file must not
+change.
+
 ## PG17 manifest from CI
 
 The workflow **Release preflight (PG17)** (`.github/workflows/release-preflight.yml`, job "Release preflight on

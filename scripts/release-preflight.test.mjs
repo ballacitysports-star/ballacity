@@ -215,6 +215,12 @@ before(async () => {
      CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);
      INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ${drizzleRows.join(", ")};`,
   );
+  // A pinned hotfix (manifest.pinned_history) is applied with the release ledger template: statements = its file text.
+  for (const k of manifest.pinned_history ?? [])
+    scratch.sql(
+      PRE,
+      `UPDATE ${LEDGER} SET statements = ARRAY[${dollar(readFileSync(join(ROOT, k.path), "utf8").replace(/\n$/, ""))}] WHERE version = ${q(k.version)};`,
+    );
   // Fully released target: every manifest migration applied with its ledger row.
   scratch.createDb(FULL, PRE);
   created.add(FULL);
@@ -373,6 +379,66 @@ describe("manifest integrity (hard failures)", () => {
     const { code, text } = preflight(null, ["--offline"], { root: dir });
     assert.equal(code, 1);
     assert.match(text, /20261104110000.*out of order/);
+  });
+});
+
+describe("pinned history: a hotfix dated before the range (independent pre-review 2026-11-05)", () => {
+  const PIN = "20261031120000";
+  const pinned = () => manifest.pinned_history.find((k) => k.version === PIN);
+
+  test("the manifest pins the hotfix with the sha256 of its file", () => {
+    assert.ok(pinned(), "20261031120000 is in pinned_history");
+    assert.equal(pinned().sha256, sha256File(join(ROOT, pinned().path)));
+  });
+
+  test("an edited hotfix file fails offline", () => {
+    const dir = tempRoot();
+    const path = join(dir, pinned().path);
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\nDROP TRIGGER IF EXISTS a00_payment_refund_fields_locked ON public.payment_submissions;\n`,
+    );
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /pinned_history .*20261031120000.*sha256 differs/);
+  });
+
+  test("a deleted hotfix file fails offline", () => {
+    const dir = tempRoot();
+    rmSync(join(dir, pinned().path));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /pinned_history .*20261031120000.*no such migration file/);
+  });
+
+  test("a new migration dated between the reviewed history and the range fails offline", () => {
+    const dir = tempRoot();
+    writeFileSync(join(dir, "supabase/migrations/20261101000000_backdated.sql"), "SELECT 1;\n");
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /unpinned history: supabase\/migrations\/20261101000000_backdated\.sql/);
+  });
+
+  test("a target that applied another text under the hotfix's version fails", () => {
+    const db = newDb(PRE);
+    scratch.sql(
+      db,
+      `UPDATE ${LEDGER} SET statements = ARRAY['-- an older version of the hotfix'] WHERE version = ${q(PIN)};`,
+    );
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /ledger row 20261031120000 .*a different text was applied under this version/,
+    );
+  });
+
+  test("a target whose hotfix row records no text fails (not applied with the release template)", () => {
+    const db = newDb(PRE);
+    scratch.sql(db, `UPDATE ${LEDGER} SET statements = ARRAY[]::text[] WHERE version = ${q(PIN)};`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(text, /ledger row 20261031120000 .*statements is empty/);
   });
 });
 

@@ -414,6 +414,39 @@ export function checkManifest(manifest, root = ROOT) {
         `${where}: sha256 differs from the file (the allow-list covers the reviewed bytes only)`,
       );
   }
+  const seenPinned = new Set();
+  for (const k of manifest.pinned_history ?? []) {
+    const where = `pinned_history ${k.path}`;
+    if (seenPinned.has(k.version)) errors.push(`${where}: listed twice`);
+    seenPinned.add(k.version);
+    if (!filePaths.has(k.path) || !existsSync(join(root, k.path))) {
+      errors.push(`${where}: no such migration file`);
+      continue;
+    }
+    if (from && k.version >= from)
+      errors.push(`${where}: is in the release range; pin only files dated before it`);
+    if (sha256File(join(root, k.path)) !== k.sha256)
+      errors.push(
+        `${where}: sha256 differs from the file (the pinned text is what production must have applied)`,
+      );
+  }
+  // A migration dated after the newest reviewed historical file and before the range is neither known history nor part
+  // of the release: it must be pinned, or the preflight could not tell which text production applied (or whether at all).
+  const lastKnown = (manifest.known_unledgered ?? []).reduce(
+    (a, k) => (k.version > a ? k.version : a),
+    "",
+  );
+  if (lastKnown && from)
+    for (const f of allFiles)
+      if (
+        f.source !== "drizzle" &&
+        f.version > lastKnown &&
+        f.version < from &&
+        !seenPinned.has(f.version)
+      )
+        errors.push(
+          `unpinned history: ${f.path} is dated after the reviewed history (${lastKnown}) and before the release range; list it in pinned_history (regenerate the manifest) or move it into the range`,
+        );
   for (const k of manifest.known_ledger_rows_without_file ?? []) {
     const where = `known_ledger_rows_without_file ${k.version}`;
     if (!/^\d{14}$/.test(k.version ?? "") || typeof k.name !== "string")
@@ -590,10 +623,12 @@ function requirementKey(kind, name) {
  * with one trailing newline added back (psql's backquote expansion in the runbook template drops it).
  * to_jsonb(s) keeps the query valid when a column is missing (it then counts as empty).
  */
-const LEDGER_CONTENT_SQL = (from) => {
+const LEDGER_CONTENT_SQL = (from, pinned = []) => {
   const st = `(to_jsonb(s)->'statements')`;
   const first = `(${st}->>0)`;
-  const inRange = `s.version::text >= ${from}`;
+  const inRange = pinned.length
+    ? `(s.version::text >= ${from} OR s.version::text IN (${pinned.join(", ")}))`
+    : `s.version::text >= ${from}`;
   return `'statements', CASE WHEN ${inRange} THEN CASE WHEN jsonb_typeof(${st}) = 'array' THEN jsonb_array_length(${st}) ELSE 0 END END,
           'statement_sha256', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first}, 'UTF8')), 'hex') END,
           'statement_sha256_nl', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first} || E'\\n', 'UTF8')), 'hex') END`;
@@ -655,7 +690,14 @@ export function readTarget(env, manifest) {
     env,
     `SELECT json_build_object(
        'ledger_rows', ${head.ledger ? `(SELECT count(*) FROM ${LEDGER})` : "NULL"},
-       'ledger_all', ${head.ledger ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name', ${LEDGER_CONTENT_SQL(lit(from))}) ORDER BY s.version::text), '[]') FROM ${LEDGER} s)` : "'[]'::json"},
+       'ledger_all', ${
+         head.ledger
+           ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name', ${LEDGER_CONTENT_SQL(
+               lit(from),
+               (manifest.pinned_history ?? []).map((k) => lit(k.version)),
+             )}) ORDER BY s.version::text), '[]') FROM ${LEDGER} s)`
+           : "'[]'::json"
+       },
        'drizzle_rows', ${head.drizzle ? `(SELECT coalesce(json_agg(json_build_object('hash', hash, 'created_at', created_at::text)), '[]') FROM ${DRIZZLE_LEDGER})` : "'[]'::json"},
        'requirements', ${reqSql},
        'functions', ${fnSql},
@@ -818,9 +860,11 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
   );
   const kn = ledgerKnowledge(manifest, root);
   const knownRowsWithoutFile = manifest.known_ledger_rows_without_file ?? [];
+  const pinnedByVersion = new Map((manifest.pinned_history ?? []).map((k) => [k.version, k]));
   if (target.ledger) {
     for (const row of ledgerAll) {
       const v = row.version;
+      if (pinnedByVersion.has(v)) errors.push(...releaseRowErrors(row, pinnedByVersion.get(v)));
       if (v >= from) {
         if (!known.has(v))
           errors.push(
@@ -1284,6 +1328,7 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       known_unledgered_basis:
         "Runbook section 1 / docs/migration-history-reconciliation.md section 3: these historical files are in production by catalog evidence (docs/migration-evidence/ledger-evidence.csv) but have no ledger row. Only they may lack one; the sha256 is the reviewed file.",
       known_unledgered,
+      pinned_history: pinnedHistory(root, from),
       known_ledger_rows_without_file: KNOWN_LEDGER_ROWS_WITHOUT_FILE,
       known_drizzle_rows_without_file: KNOWN_DRIZZLE_ROWS_WITHOUT_FILE,
       drift_captures: DRIFT_CAPTURES.filter((c) => entries.some((e) => e.version === c.version)),
@@ -1298,6 +1343,32 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
   } finally {
     scratch.dropDb(db);
   }
+}
+
+// Hotfixes dated before the release range that ship to production ahead of it. Their exact text is pinned: offline the
+// file must still match, online the target's ledger row must record that text (statements[1], as for release-range rows),
+// so an older or edited version applied in production is caught. Every migration dated after the newest known-unledgered
+// historical file and before the range must be listed here (checkManifest).
+const PINNED_HISTORY = [
+  {
+    version: "20261031120000",
+    basis:
+      "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release, with the release ledger template (statements = the file text).",
+  },
+];
+
+/** PINNED_HISTORY with each file's path and sha256, for the manifest. */
+function pinnedHistory(root, from) {
+  return PINNED_HISTORY.map((p) => {
+    const file = readdirSync(join(root, "supabase/migrations")).find((n) =>
+      n.startsWith(`${p.version}_`),
+    );
+    if (!file) throw new Error(`pinned history ${p.version}: no such migration file`);
+    if (p.version >= from)
+      throw new Error(`pinned history ${p.version} is inside the release range ${from}`);
+    const path = `supabase/migrations/${file}`;
+    return { version: p.version, path, sha256: sha256File(join(root, path)), basis: p.basis };
+  });
 }
 
 // Explicit allow-lists, each from the reconciliation record. Anything not listed here fails closed.
