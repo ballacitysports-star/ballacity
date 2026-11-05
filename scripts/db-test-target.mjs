@@ -1,0 +1,97 @@
+// Fail-closed target guard for scripts/db-test.mjs.
+//
+// db-test DROPs and CREATEs a database, replays every migration into it and runs tests that write rows, grant
+// privileges and alter cluster-wide roles (supabase/tests/support/supabase-stub.sql). That is only safe on a
+// throwaway local Postgres. Everything that decides where libpq connects is checked here, before any connection:
+//
+//   - PGHOST: unset (the default local socket), an absolute socket directory, or a loopback name/address. Several
+//     hosts (a comma list) are refused: libpq would try each in turn.
+//   - PGHOSTADDR: unset or loopback. PGSERVICE / PGSERVICEFILE: refused (a service can point anywhere).
+//   - The database name: a plain identifier (never a conninfo string or a URI, which psql -d would honour), not a
+//     reserved database, at most 63 characters.
+// After connecting, the server must report a socket or loopback address and must not be a Supabase-managed
+// cluster (role supabase_admin or authenticator), and an existing database is only dropped or reused when the
+// harness created it (it carries the scratch marker comment).
+//
+// There is no override flag. To use a different local database, pass --db <name>.
+
+export const SCRATCH_MARKER = "ballacity db-test scratch database (safe to drop)";
+
+const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const RESERVED_DATABASES = new Set(["postgres", "template0", "template1"]);
+const DB_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
+
+function isLoopbackAddress(a) {
+  const v = String(a)
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  if (v === "::1" || v === "0:0:0:0:0:0:0:1") return true;
+  const m = /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v);
+  return !!m && Number(m[1]) === 127 && [m[2], m[3], m[4]].every((x) => Number(x) <= 255);
+}
+
+/** Pure check of the environment and database name. Returns a list of reasons; empty means acceptable. */
+export function targetProblems(env, dbName) {
+  const problems = [];
+  const set = (k) => typeof env[k] === "string" && env[k].trim() !== "";
+
+  if (set("PGSERVICE") || set("PGSERVICEFILE"))
+    problems.push(
+      "PGSERVICE/PGSERVICEFILE is set: a libpq service can point at any server. Unset it.",
+    );
+  if (set("PGHOST")) {
+    const hosts = env.PGHOST.split(",").map((h) => h.trim());
+    if (hosts.length > 1) problems.push("PGHOST lists several hosts; use exactly one local host.");
+    for (const h of hosts) {
+      if (!(h.startsWith("/") || LOOPBACK_NAMES.has(h.toLowerCase()) || isLoopbackAddress(h)))
+        problems.push(`PGHOST is not a local socket directory or loopback host.`);
+    }
+  }
+  if (set("PGHOSTADDR")) {
+    const addrs = env.PGHOSTADDR.split(",").map((h) => h.trim());
+    if (addrs.length > 1 || !addrs.every(isLoopbackAddress))
+      problems.push("PGHOSTADDR is not a single loopback address.");
+  }
+  if (set("PGDATABASE") && /[=\s/:@]/.test(env.PGDATABASE))
+    problems.push("PGDATABASE looks like a connection string; unset it.");
+
+  const name = String(dbName ?? "");
+  if (!DB_NAME.test(name))
+    problems.push(
+      "The database name must be a plain lower-case identifier (letters, digits, underscore; at most 63 characters), never a connection string.",
+    );
+  else if (RESERVED_DATABASES.has(name))
+    problems.push(`"${name}" is a reserved database and is never dropped or reused.`);
+  return problems;
+}
+
+/** Pure check of what the server reported after connecting. */
+export function serverProblems({ serverAddr, managedRoles }) {
+  const problems = [];
+  if (serverAddr && !isLoopbackAddress(serverAddr))
+    problems.push("The server is not reached over a local socket or loopback address.");
+  if (managedRoles && managedRoles.length > 0)
+    problems.push(
+      "The server looks like a Supabase-managed cluster (it has supabase_admin/authenticator). db-test runs only on a plain scratch Postgres.",
+    );
+  return problems;
+}
+
+/** An existing database may be dropped or reused only when this harness created it. */
+export function existingDatabaseProblems({ exists, comment }) {
+  if (!exists) return [];
+  if (comment === SCRATCH_MARKER) return [];
+  return [
+    "A database with this name already exists and was not created by db-test (no scratch marker). It is never dropped or reused; pass another --db name, or drop it yourself if it really is disposable.",
+  ];
+}
+
+/** The environment psql is run with: service settings removed, so nothing but the checked variables decides the target. */
+export function scrubbedEnv(env) {
+  const out = { ...env };
+  delete out.PGSERVICE;
+  delete out.PGSERVICEFILE;
+  delete out.PGDATABASE;
+  return out;
+}
