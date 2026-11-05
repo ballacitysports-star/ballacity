@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { PINNED_HISTORY, migrationOrder as sharedMigrationOrder } from "./migration-order.mjs";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_MANIFEST = "docs/release/release-manifest.json";
@@ -96,36 +97,9 @@ Exit codes: 0 all checks passed, 1 a check failed, 2 usage or connection error.`
 
 // --------------------------------------------------------------------------------------------- files
 
-/** All migrations in replay order, exactly as scripts/db-test.mjs orders them. */
+/** All migrations in replay order; the same function orders scripts/db-test.mjs's replay (scripts/migration-order.mjs). */
 export function migrationOrder(root = ROOT) {
-  const rows = [];
-  for (const file of readdirSync(join(root, "supabase/migrations"))) {
-    if (!file.endsWith(".sql")) continue;
-    const version = file.slice(0, 14);
-    rows.push({
-      key: `${version}a${file}`,
-      version,
-      source: "supabase",
-      path: `supabase/migrations/${file}`,
-      name: file.replace(/\.sql$/, ""),
-    });
-  }
-  const journalPath = join(root, "drizzle/migrations/meta/_journal.json");
-  if (existsSync(journalPath)) {
-    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
-    for (const entry of journal.entries) {
-      const version = new Date(entry.when).toISOString().replace(/\D/g, "").slice(0, 14);
-      rows.push({
-        key: `${version}b${entry.tag}`,
-        version,
-        source: "drizzle",
-        path: `drizzle/migrations/${entry.tag}.sql`,
-        name: entry.tag,
-        when: entry.when,
-      });
-    }
-  }
-  return rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return sharedMigrationOrder(root);
 }
 
 export const sortKey = (e) =>
@@ -1382,18 +1356,11 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
   }
 }
 
-// Hotfixes dated before the release range that ship to production ahead of it. Their exact text is pinned: offline the
-// file must still match; online the target must record that text, either as its ledger row's statements[1] (the release
-// template, as for release-range rows) or as a drizzle ledger hash (Lovable's migration tool; pinnedDrizzleHashes), so an
-// older or edited version applied in production is caught. Every migration dated after the newest known-unledgered
-// historical file and before the range must be listed here (checkManifest).
-const PINNED_HISTORY = [
-  {
-    version: "20261031120000",
-    basis:
-      "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release with its exact text: through Lovable's migration tool (drizzle ledger hash) or with the release ledger template (statements = the file text).",
-  },
-];
+// PINNED_HISTORY (scripts/migration-order.mjs): hotfixes dated before the release range that ship to production ahead of
+// it. Their exact text is pinned: offline the file must still match; online the target must record that text, either as
+// its ledger row's statements[1] (the release template, as for release-range rows) or as a drizzle ledger hash (Lovable's
+// migration tool; pinnedDrizzleHashes), so an older or edited version applied in production is caught. A drizzle copy of
+// one is the same migration and is left out of the replay order (pinnedDrizzleCopies).
 
 /** PINNED_HISTORY with each file's path and sha256, for the manifest. */
 function pinnedHistory(root, from) {
