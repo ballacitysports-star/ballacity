@@ -1,0 +1,19 @@
+{
+  "name": "ballacity-image-processor",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Stateless sharp re-encoder for the BallaCity Worker (design/PoC, not deployed). See docs/privacy/image-runtime-evaluation.md.",
+  "engines": {
+    "node": ">=22.12 <23"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --external:sharp --tsconfig=../../tsconfig.json --outfile=dist/main.mjs"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

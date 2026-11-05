@@ -20,9 +20,11 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
     const { imageObjectUrl } = await import("@/lib/image-moderation.server");
     const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
     const { finalizeDirectImageUpload } = await import("@/lib/image-finalize-direct.server");
+    const { imageReencoderFromProcessEnv } = await import("@/lib/image-runtime/select.server");
     return finalizeDirectImageUpload(
       {
         admin: supabaseAdmin,
+        reencode: imageReencoderFromProcessEnv().reencode,
         scan: (target, userId) => scanImageForSafety(target, { userId }) as never,
         objectUrl: (bucket, path) => imageObjectUrl(supabaseAdmin, bucket, path),
         escalate: async (bucket, path, categories) => {
@@ -58,9 +60,12 @@ export const promoteStagedImageUpload = createServerFn({ method: "POST" })
     const { scanImageForSafety } = await import("@/lib/image-safety.server");
     const { escalateImageForChildSafety } = await import("@/lib/ai/moderation.server");
     const { promoteStagedImage } = await import("@/lib/image-promotion.server");
+    const { imageReencoderFromProcessEnv } = await import("@/lib/image-runtime/select.server");
     return promoteStagedImage(
       {
         admin: supabaseAdmin,
+        // The configured image runtime (IMAGE_RUNTIME; disabled unless set): audit F09.
+        reencode: imageReencoderFromProcessEnv().reencode,
         scan: (target, userId) => scanImageForSafety(target, { userId }) as never,
         escalate: async (bucket, path, categories) => {
           await escalateImageForChildSafety(supabaseAdmin, {
