@@ -22,6 +22,7 @@ import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
+import { useReviewSubjectIsAdult } from "@/lib/review-subject";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -136,6 +137,8 @@ function ProfileRoute() {
 function PlayerProfile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
+  // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
+  const reputationVisible = useReviewSubjectIsAdult("me", "player") === true;
   const { user, loading } = useAuth();
   const { isParentMode } = useParentMode();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
@@ -468,9 +471,11 @@ function PlayerProfile() {
             <Link to="/profile/edit" className={channelPillClass("primary")}>
               Edit profile
             </Link>
-            <ChannelPill onClick={() => setReviewsOpen(true)}>
-              <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
-            </ChannelPill>
+            {reputationVisible && (
+              <ChannelPill onClick={() => setReviewsOpen(true)}>
+                <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+              </ChannelPill>
+            )}
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
             <Link to="/settings" className={channelPillClass()}>
               Settings
@@ -518,9 +523,11 @@ function PlayerProfile() {
             <ProfileLinksList links={me.links} />
           </AboutBlock>
         )}
-        <AboutBlock label="Reputation">
-          <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
-        </AboutBlock>
+        {reputationVisible && (
+          <AboutBlock label="Reputation">
+            <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
+          </AboutBlock>
+        )}
       </ProfileAboutSheet>
 
       <div className="px-4">
@@ -533,7 +540,7 @@ function PlayerProfile() {
             { k: "games" as const, label: "Games" },
             { k: "hosting" as const, label: "Hosting" },
             { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
-            { k: "reviews" as const, label: "Reviews" },
+            ...(reputationVisible ? [{ k: "reviews" as const, label: "Reviews" }] : []),
             {
               k: "archive" as const,
               label: "Archive",
