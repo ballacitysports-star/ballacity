@@ -38,10 +38,23 @@ BEGIN
       OR EXISTS (SELECT 1 FROM public.admin_audit_log l
                   WHERE l.actor_id = auth.uid() AND l.target_type = _a.content_type AND l.target_id = _a.content_id::text
                     AND l.action LIKE 'content\_report\_%')
+      -- a report about the content, changed through the app's status screen or directly (target id compared without
+      -- regard to case: the app stores the id as sent), or used to warn, suspend, ban or restore its author (the report
+      -- travels in `before`)
       OR EXISTS (SELECT 1 FROM public.admin_audit_log l
-                   JOIN public.user_reports r ON l.target_id = r.id::text
-                  WHERE l.actor_id = auth.uid() AND l.target_type IN ('user_report', 'report')
-                    AND r.subject_type = _a.content_type AND COALESCE(r.team_post_id, r.comment_id) = _a.content_id))
+                   JOIN public.user_reports r
+                     ON (l.target_type IN ('user_report', 'report') AND lower(l.target_id) = r.id::text)
+                     OR lower(l.before ->> 'reportId') = r.id::text
+                  WHERE l.actor_id = auth.uid()
+                    AND r.subject_type = _a.content_type AND COALESCE(r.team_post_id, r.comment_id) = _a.content_id)
+      -- the same, by the content recorded on the audit row itself, which outlives the report (a reporter's account
+      -- deletion or the purge of closed reports removes the row): the app records it as metadata, the direct-update
+      -- guard as the report row after the change
+      OR EXISTS (SELECT 1 FROM public.admin_audit_log l
+                  WHERE l.actor_id = auth.uid()
+                    AND ((l.metadata ->> 'content_type' = _a.content_type AND l.metadata ->> 'content_id' = _a.content_id::text)
+                         OR (l.after ->> 'subject_type' = _a.content_type
+                             AND COALESCE(l.after ->> 'team_post_id', l.after ->> 'comment_id') = _a.content_id::text))))
      AND NOT (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'superadmin')) THEN
     RAISE EXCEPTION 'A different moderator must review this appeal' USING ERRCODE = 'insufficient_privilege';
   END IF;

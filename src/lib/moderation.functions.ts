@@ -27,6 +27,26 @@ const REPORT_STATUS_AUDIT_ACTION: Record<string, AuditAction> = {
   escalated: "report.status",
 };
 
+/**
+ * The content a report is about, recorded on the audit row of every change made through a report, so the appeal check
+ * (moderator_review_appeal) still sees who touched the decision after the report row is gone.
+ */
+function reportContentMetadata(
+  r:
+    | { subject_type?: string | null; team_post_id?: string | null; comment_id?: string | null }
+    | null
+    | undefined,
+): Record<string, unknown> {
+  if (!r) return {};
+  const id =
+    r.subject_type === "team_post"
+      ? r.team_post_id
+      : r.subject_type === "comment"
+        ? r.comment_id
+        : null;
+  return id ? { content_type: r.subject_type, content_id: id } : {};
+}
+
 async function audit(
   admin: any,
   actorId: string,
@@ -297,7 +317,10 @@ export const setReportStatus = createServerFn({ method: "POST" })
   .inputValidator((d: { reportId: string; status: string; notes?: string }) =>
     z
       .object({
-        reportId: z.string().uuid(),
+        reportId: z
+          .string()
+          .uuid()
+          .transform((v) => v.toLowerCase()),
         status: STATUS,
         notes: z.string().max(1000).optional(),
       })
@@ -308,7 +331,9 @@ export const setReportStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin
       .from("user_reports")
-      .select("id, status, resolution_notes, reason, game_id")
+      .select(
+        "id, status, resolution_notes, reason, game_id, subject_type, team_post_id, comment_id",
+      )
       .eq("id", data.reportId)
       .maybeSingle();
     await assertNoOpenHold(supabaseAdmin, before as any, { status: data.status });
@@ -325,7 +350,7 @@ export const setReportStatus = createServerFn({ method: "POST" })
     await audit(supabaseAdmin, context.userId, {
       action: REPORT_STATUS_AUDIT_ACTION[data.status] ?? "report.status",
       targetType: "report",
-      metadata: { status: data.status },
+      metadata: { status: data.status, ...reportContentMetadata(before) },
       targetId: data.reportId,
       reason: data.notes?.trim() || null,
       before: before ? { status: before.status } : null,
@@ -342,7 +367,10 @@ export const applyModerationAction = createServerFn({ method: "POST" })
   .inputValidator((d: { reportId: string; action: string; reason?: string }) =>
     z
       .object({
-        reportId: z.string().uuid(),
+        reportId: z
+          .string()
+          .uuid()
+          .transform((v) => v.toLowerCase()),
         action: ACTION,
         reason: z.string().max(1000).optional(),
       })
@@ -353,7 +381,9 @@ export const applyModerationAction = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: report, error: rErr } = await supabaseAdmin
       .from("user_reports")
-      .select("id, reported_id, subject_type, game_id, message_id, reel_id, reason")
+      .select(
+        "id, reported_id, subject_type, game_id, message_id, reel_id, reason, team_post_id, comment_id",
+      )
       .eq("id", data.reportId)
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
@@ -460,6 +490,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       reason,
       before: { reportId: report.id, reportReason: report.reason },
       after: { summary, reportedUserId: report.reported_id },
+      metadata: { reportId: report.id, ...reportContentMetadata(report) },
     });
 
     return { ok: true, summary };
