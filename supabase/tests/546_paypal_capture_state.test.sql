@@ -68,10 +68,13 @@ SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, gam
                           VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-R', 10, 'verified', 'ORD-R')$q$, t.id('other'), t.id('host')),
   'PAYPAL_CAPTURE_NOT_COMPLETED', 'pre-review F04: a refunded order (wrong payee) never verifies a payment, even from the server');
 SELECT t.reset();
-UPDATE public.paypal_orders SET status = 'failed' WHERE order_id = 'ORD-R';
+-- (a refunded order is final, so the failed case is its own order)
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, currency, status, capture_id, capture_status,
+                                  capture_amount_cents, capture_currency, capture_payee_merchant_id, paypal_order_status)
+VALUES ('ORD-F', 'pp-g', t.id('other'), t.id('host'), 1000, 'USD', 'failed', 'CAP-F', 'COMPLETED', 1000, 'USD', 'MERCHANT-1', 'COMPLETED');
 SELECT t.as_service();
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
-                          VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-R', 10, 'verified', 'ORD-R')$q$, t.id('other'), t.id('host')),
+                          VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-F', 10, 'verified', 'ORD-F')$q$, t.id('other'), t.id('host')),
   'PAYPAL_CAPTURE_NOT_COMPLETED', 'pre-review F04: nor a failed one');
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
                           VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-N', 10, 'verified', 'ORD-N')$q$, t.id('other'), t.id('host')),
@@ -106,5 +109,31 @@ SELECT t.eq((SELECT status FROM public.paypal_orders WHERE order_id = 'ORD-C'), 
   'F04 race: the superseded caller''s outcome write changes nothing');
 SELECT t.lives($q$UPDATE public.paypal_orders SET status = 'refunded' WHERE order_id = 'ORD-1'$q$,
   'F04 race: a captured order can still be refunded');
+SELECT t.reset();
+
+-- independent review of 8b8cc27b: a refund is final, and a settled order keeps who paid, for what and how much
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'ORD-1'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04: a refunded order cannot be marked captured again');
+SELECT t.throws($q$UPDATE public.paypal_orders SET amount_cents = 1 WHERE order_id = 'ORD-1'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04: a settled order keeps its amount');
+SELECT t.throws(format($q$UPDATE public.paypal_orders SET player_id = %L WHERE order_id = 'ORD-1'$q$, t.id('other')),
+  'PAYPAL_ORDER_SETTLED', 'F04: and its player');
+SELECT t.lives($q$UPDATE public.paypal_orders SET status = 'refunded' WHERE order_id = 'ORD-1'$q$,
+  'F04: writing the same refunded status again is harmless');
+-- an order still 'capturing' whose payment is already recorded (between the insert and the captured write)
+SELECT t.person('third', 33);
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, currency, status,
+                                  capture_id, capture_status, capture_amount_cents, capture_currency, capture_payee_merchant_id)
+VALUES ('ORD-V', 'pp-g', t.id('third'), t.id('host'), 1000, 'USD', 'capturing', 'CAP-V', 'COMPLETED', 1000, 'USD', 'MERCHANT-1');
+SELECT t.as_service();
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
+                         VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-V', 10, 'verified', 'ORD-V')$q$, t.id('third'), t.id('host')),
+  'F04: the capture is recorded as a verified payment');
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'failed' WHERE order_id = 'ORD-V'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04: an order with a verified payment cannot then be failed');
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'capture_pending' WHERE order_id = 'ORD-V'$q$,
+  'PAYPAL_ORDER_SETTLED', 'F04: or parked as pending');
+SELECT t.lives($q$UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'ORD-V'$q$,
+  'F04: it becomes captured');
 SELECT t.reset();
 ROLLBACK;
