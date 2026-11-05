@@ -41,7 +41,7 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, revi
 -- a review written through the API is held until the server screens it (hotfix 20261031120000); release it as submitReview does
 SELECT t.reset();
 SELECT t.as_service();
-SELECT public.release_review_screening(t.id('new-adult'));
+SELECT public.release_review_screening(r.id, r.title, r.body) FROM public.reviews r WHERE r.id = t.id('new-adult');
 SELECT t.reset();
 SELECT t.as_user(t.id('adultrev'));
 SELECT t.throws(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
@@ -234,7 +234,7 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee
   'an adult can still review another adult');
 SELECT t.reset();
 SELECT t.as_service();
-SELECT public.release_review_screening(r.id) FROM public.reviews r WHERE r.reviewer_id = t.id('adultrev') AND r.reviewee_id = t.id('adultpeer')::text;
+SELECT public.release_review_screening(r.id, r.title, r.body) FROM public.reviews r WHERE r.reviewer_id = t.id('adultrev') AND r.reviewee_id = t.id('adultpeer')::text;
 SELECT t.reset();
 SELECT t.eq((SELECT is_private FROM public.reviews WHERE reviewer_id = t.id('adultrev') AND reviewee_id = t.id('adultpeer')::text), false,
   'and that review is created normally (verified by the trigger, public)');
@@ -267,7 +267,7 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee
   'an adult who played in a game can review its adult host');
 SELECT t.reset();
 SELECT t.as_service();
-SELECT public.release_review_screening(r.id) FROM public.reviews r
+SELECT public.release_review_screening(r.id, r.title, r.body) FROM public.reviews r
  WHERE r.reviewer_id = t.id('adultpeer') AND r.reviewee_kind = 'host' AND r.reviewee_id = t.id('adultrev')::text;
 SELECT t.reset();
 SELECT t.as_user(t.id('stranger'));

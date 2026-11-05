@@ -165,6 +165,9 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!order || order.player_id !== context.userId) throw new Error("Order not found.");
     if (order.status === "captured") return { ok: true as const, already: true as const };
+    if (order.status === "capturing" || order.status === "capture_pending") {
+      return { ok: false as const, pending: true as const };
+    }
     if (order.status !== "created" && order.status !== "approved") {
       throw new Error("This PayPal order can't be completed. Please start again.");
     }
@@ -210,68 +213,54 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       throw new Error(`${blocked} You weren't charged.`);
     }
 
-    const result = await captureOrder(data.orderId);
-
-    if (!paypalPaymentMatches(result, { ...expected, status: "COMPLETED" })) {
-      await supabaseAdmin
-        .from("paypal_orders")
-        .update({ status: "failed" })
-        .eq("order_id", data.orderId);
-      throw new Error("PayPal payment could not be verified. No charge was recorded by us.");
+    // Claim the order: of concurrent or repeated calls exactly one moves it to 'capturing' and captures.
+    const { data: claimed } = await supabaseAdmin
+      .from("paypal_orders")
+      .update({ status: "capturing" } as never)
+      .eq("order_id", data.orderId)
+      .in("status", ["created", "approved"])
+      .select("order_id");
+    if (!claimed || (claimed as unknown[]).length === 0) {
+      return { ok: false as const, pending: true as const };
     }
 
-    // Verified payment submission — the game page's realtime listener adds
-    // the player to the roster, same as a host-verified proof. The database
-    // re-applies the approval and guardian rules to this row; if it refuses,
-    // the money goes back and the player is not told it worked.
-    const { error: insertError } = await supabaseAdmin.from("payment_submissions").insert({
-      game_id: order.game_id,
-      host_id: order.host_id,
-      player_id: order.player_id,
-      payment_method_id: null,
-      payment_type: "paypal",
-      screenshot_path: null,
-      transaction_reference: result.captureId ?? data.orderId,
-      paid_amount: order.amount_cents / 100,
-      paid_at: new Date().toISOString(),
-      notes: "Paid with PayPal checkout",
-      status: "verified",
-      reviewed_at: new Date().toISOString(),
-    });
-    if (insertError) {
-      console.error("[paypal] captured payment could not be recorded", insertError.message);
-      let refunded = false;
-      if (result.captureId) {
-        refunded = await refundCapture(result.captureId)
-          .then(() => true)
-          .catch((e) => {
-            console.error("[paypal] refund after unrecorded capture failed", e);
-            return false;
-          });
-      }
-      await supabaseAdmin
-        .from("paypal_orders")
-        .update({
-          status: refunded ? "refunded" : "unrecorded",
-          capture_id: result.captureId,
-          captured_at: new Date().toISOString(),
-        } as never)
-        .eq("order_id", data.orderId);
+    let result: Awaited<ReturnType<typeof captureOrder>>;
+    try {
+      result = await captureOrder(data.orderId);
+    } catch (e) {
+      // The capture's outcome is unknown (network or PayPal error). The order stays 'capturing' and grants
+      // nothing; settlePendingPayPalOrder() reads the real state from PayPal later.
+      console.error("[paypal] capture call failed; left for settlement", e);
       throw new Error(
-        refunded
-          ? "Your payment couldn't be recorded, so PayPal is refunding it."
-          : "Your payment couldn't be recorded. Please contact support so we can refund it.",
+        "We couldn't confirm your PayPal payment yet. You haven't been added; we'll check with PayPal.",
       );
     }
 
-    await supabaseAdmin
-      .from("paypal_orders")
-      .update({
-        status: "captured",
-        capture_id: result.captureId,
-        captured_at: new Date().toISOString(),
-      })
-      .eq("order_id", data.orderId);
+    const { recordCaptureOutcome } = await import("./paypal-capture.server");
+    const outcome = await recordCaptureOutcome(
+      supabaseAdmin,
+      order,
+      result,
+      expected,
+      refundCapture,
+    );
+    if (outcome.kind === "pending") return { ok: false as const, pending: true as const };
+    if (outcome.kind === "refunded") {
+      throw new Error(
+        outcome.reason === "unrecorded"
+          ? "Your payment couldn't be recorded, so PayPal is refunding it."
+          : "PayPal payment could not be verified, so it is being refunded.",
+      );
+    }
+    if (outcome.kind === "unrecorded") {
+      throw new Error(
+        "Your payment couldn't be recorded. Please contact support so we can refund it.",
+      );
+    }
+    if (outcome.kind === "failed") {
+      throw new Error("PayPal payment could not be verified. No charge was recorded by us.");
+    }
+    if (outcome.kind === "already_recorded") return { ok: true as const, already: true as const };
 
     {
       const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");

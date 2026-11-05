@@ -37,9 +37,10 @@ SELECT t.eq(t.try_join('noage','g-open'), 'ok', 'no limit set: unknown age is no
 
 -- ---- the roster trigger itself, with an APPROVED request present (the old override)
 SET LOCAL session_replication_role = replica;
-INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status, guardian_approved_at) VALUES
- ('g-18', t.id('teen17'), t.id('host'), 'k1', 'approved', now()),
- ('g-18', t.id('adult19'), t.id('host'), 'k1b', 'approved', NULL);
+-- the guardian's approval names the guardian who gave it, as guardian_approve_join_request records it (F03)
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status, guardian_approved_at, guardian_approved_by) VALUES
+ ('g-18', t.id('teen17'), t.id('host'), 'k1', 'approved', now(), t.id('guardian17')),
+ ('g-18', t.id('adult19'), t.id('host'), 'k1b', 'approved', NULL, NULL);
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('teen17'));
 SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'g-18', t.id('teen17')),
