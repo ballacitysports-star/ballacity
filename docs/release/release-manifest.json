@@ -1574,6 +1574,30 @@
         "tables": [],
         "schemas": []
       }
+    },
+    {
+      "order": 37,
+      "version": "20261108180000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108180000_image_direct_upload_closure.sql",
+      "sha256": "5e35a19b87e33ec1beb1da6d1b93ddc4f7932e20b1182c04f0a95ed032cf83d4",
+      "requires": {
+        "functions": [
+          "private_sec.published_image_refuse_user_write()",
+          "private_sec.storage_write_is_trusted(uuid,text)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.direct_image_uploads_closed()",
+          "private_sec.refuse_direct_public_image_write()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
     }
   ],
   "protections": {
@@ -2922,6 +2946,72 @@
               "authenticated:EXECUTE",
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.direct_image_uploads_closed()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "17e3e4e389127934304697706570296e",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108180000": {
+              "def": "17e3e4e389127934304697706570296e",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "17e3e4e389127934304697706570296e",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "17e3e4e389127934304697706570296e",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
             ]
           }
         }
@@ -8015,6 +8105,76 @@
               "authenticated:EXECUTE",
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.refuse_direct_public_image_write()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "552d5cac5cfdf573486b84691bcb3164",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108180000": {
+              "def": "552d5cac5cfdf573486b84691bcb3164",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "552d5cac5cfdf573486b84691bcb3164",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "552d5cac5cfdf573486b84691bcb3164",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
             ]
           }
         }
@@ -55249,7 +55409,8 @@
           "20261106120000",
           "20261106120500",
           "20261108110000",
-          "20261108120000"
+          "20261108120000",
+          "20261108180000"
         ],
         "expect_before": {
           "16": {
@@ -55524,6 +55685,59 @@
                 "msg_attach_read_participants",
                 "quarantined highlight media is unreadable"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE"
+              ],
+              "triggers": [
+                "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
+                "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
+                "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
+                "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
+                "message_attachment_checked_is_final|private_sec.message_attachment_refuse_rewrite()|23|O",
+                "published_image_refuse_user_write|private_sec.published_image_refuse_user_write()|23|O"
+              ],
+              "policies": [
+                "Authenticated read game covers",
+                "Hosts read payment proofs for their games",
+                "Org admins write org images",
+                "Players delete own payment proofs",
+                "Players read own payment proofs",
+                "Players update own payment proofs",
+                "Players upload own payment proofs",
+                "Team owners write team images",
+                "Users can delete their own game covers",
+                "Users can update their own game covers",
+                "Users can upload their own game covers",
+                "Users delete own highlight videos",
+                "Users read own highlight videos",
+                "Users update own highlight videos",
+                "Users upload own highlight videos",
+                "Users write entity images in own folder (delete)",
+                "Users write entity images in own folder (insert)",
+                "Users write entity images in own folder (update)",
+                "Users write own avatar",
+                "image_quarantine_no_api_access",
+                "image_staging_insert_own_folder",
+                "image_staging_no_api_delete",
+                "image_staging_no_api_update",
+                "image_staging_no_insert_flagged",
+                "image_staging_select_own_folder",
+                "msg_attach_checked_path_is_final",
+                "msg_attach_delete_sender",
+                "msg_attach_insert_sender",
+                "msg_attach_read_participants",
+                "quarantined highlight media is unreadable"
+              ]
             }
           },
           "17": {
@@ -55721,6 +55935,60 @@
                 "msg_attach_read_participants",
                 "quarantined highlight media is unreadable"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:MAINTAIN",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE"
+              ],
+              "triggers": [
+                "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
+                "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
+                "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
+                "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
+                "message_attachment_checked_is_final|private_sec.message_attachment_refuse_rewrite()|23|O",
+                "published_image_refuse_user_write|private_sec.published_image_refuse_user_write()|23|O"
+              ],
+              "policies": [
+                "Authenticated read game covers",
+                "Hosts read payment proofs for their games",
+                "Org admins write org images",
+                "Players delete own payment proofs",
+                "Players read own payment proofs",
+                "Players update own payment proofs",
+                "Players upload own payment proofs",
+                "Team owners write team images",
+                "Users can delete their own game covers",
+                "Users can update their own game covers",
+                "Users can upload their own game covers",
+                "Users delete own highlight videos",
+                "Users read own highlight videos",
+                "Users update own highlight videos",
+                "Users upload own highlight videos",
+                "Users write entity images in own folder (delete)",
+                "Users write entity images in own folder (insert)",
+                "Users write entity images in own folder (update)",
+                "Users write own avatar",
+                "image_quarantine_no_api_access",
+                "image_staging_insert_own_folder",
+                "image_staging_no_api_delete",
+                "image_staging_no_api_update",
+                "image_staging_no_insert_flagged",
+                "image_staging_select_own_folder",
+                "msg_attach_checked_path_is_final",
+                "msg_attach_delete_sender",
+                "msg_attach_insert_sender",
+                "msg_attach_read_participants",
+                "quarantined highlight media is unreadable"
+              ]
             }
           }
         },
@@ -55738,6 +56006,7 @@
               "postgres:UPDATE"
             ],
             "triggers": [
+              "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
               "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
               "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
               "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
@@ -55791,6 +56060,7 @@
               "postgres:UPDATE"
             ],
             "triggers": [
+              "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
               "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
               "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
               "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
