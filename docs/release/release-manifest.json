@@ -26129,6 +26129,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
               "enforce_approval_before_payment_trg|public.enforce_approval_before_payment()|7|O",
               "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
               "no_payment_credentials|public.reject_payment_credentials()|23|O",
@@ -26178,6 +26179,7 @@
                 "service_role:UPDATE"
               ],
               "triggers": [
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
                 "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
                 "enforce_approval_before_payment_trg|public.enforce_approval_before_payment()|7|O",
                 "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
@@ -26225,6 +26227,7 @@
                 "service_role:UPDATE"
               ],
               "triggers": [
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
                 "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
                 "enforce_approval_before_payment_trg|public.enforce_approval_before_payment()|7|O",
                 "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
@@ -26273,6 +26276,7 @@
               ],
               "triggers": [
                 "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
                 "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
                 "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
                 "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
@@ -26325,6 +26329,7 @@
             ],
             "triggers": [
               "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
+              "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
               "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
               "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
               "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
@@ -27711,7 +27716,8 @@
             ],
             "triggers": [
               "enforce_gym_review_trg|public.enforce_gym_review()|23|O",
-              "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O"
+              "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O",
+              "zz_reviews_hold_for_screening|public.hold_review_for_screening()|23|O"
             ],
             "policies": [
               "Authors delete their own reviews",
@@ -27755,7 +27761,8 @@
               ],
               "triggers": [
                 "enforce_gym_review_trg|public.enforce_gym_review()|23|O",
-                "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O"
+                "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O",
+                "zz_reviews_hold_for_screening|public.hold_review_for_screening()|23|O"
               ],
               "policies": [
                 "Authors delete their own reviews",
@@ -27798,7 +27805,8 @@
                 "aa_enforce_review_age_rules_trg|public.enforce_review_age_rules()|7|O",
                 "aa_review_minor_protected_trg|public.set_review_minor_protected()|23|O",
                 "enforce_gym_review_trg|public.enforce_gym_review()|23|O",
-                "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O"
+                "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O",
+                "zz_reviews_hold_for_screening|public.hold_review_for_screening()|23|O"
               ],
               "policies": [
                 "Authors delete their own reviews",
@@ -27844,7 +27852,8 @@
               "aa_enforce_review_age_rules_trg|public.enforce_review_age_rules()|7|O",
               "aa_review_minor_protected_trg|public.set_review_minor_protected()|23|O",
               "enforce_gym_review_trg|public.enforce_gym_review()|23|O",
-              "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O"
+              "enforce_review_integrity_trg|public.enforce_review_integrity()|23|O",
+              "zz_reviews_hold_for_screening|public.hold_review_for_screening()|23|O"
             ],
             "policies": [
               "Authors delete their own reviews",
@@ -28791,6 +28800,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a0_team_members_identity_locked|public.lock_member_row_identity()|19|O",
               "guard_team_member_role_change_trg|public.guard_team_member_role_change()|19|O",
               "team_members_updated_at|public.touch_updated_at()|19|O"
             ],
@@ -28839,6 +28849,7 @@
                 "service_role:UPDATE"
               ],
               "triggers": [
+                "a0_team_members_identity_locked|public.lock_member_row_identity()|19|O",
                 "guard_team_member_role_change_trg|public.guard_team_member_role_change()|19|O",
                 "team_members_updated_at|public.touch_updated_at()|19|O"
               ],
@@ -28887,6 +28898,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a0_team_members_identity_locked|public.lock_member_row_identity()|19|O",
               "guard_team_member_role_change_trg|public.guard_team_member_role_change()|19|O",
               "team_members_updated_at|public.touch_updated_at()|19|O"
             ],
@@ -30731,7 +30743,8 @@
             ],
             "triggers": [
               "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
-              "user_reports_touch_updated_at|public.touch_updated_at()|19|O"
+              "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
+              "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
             ],
             "policies": [
               "Moderators read all reports",
@@ -30772,7 +30785,8 @@
               "triggers": [
                 "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
                 "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
-                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O"
+                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O",
+                "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
               ],
               "policies": [
                 "Moderators read all reports",
@@ -30813,7 +30827,8 @@
                 "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
                 "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
                 "zz_handle_content_report_trg|public.handle_content_report()|5|O",
-                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O"
+                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O",
+                "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
               ],
               "policies": [
                 "Moderators read all reports",
@@ -30855,7 +30870,8 @@
                 "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
                 "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
                 "zz_handle_content_report_trg|public.handle_content_report()|5|O",
-                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O"
+                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O",
+                "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
               ],
               "policies": [
                 "Moderators read all reports",
@@ -30897,7 +30913,8 @@
                 "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
                 "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
                 "zz_handle_content_report_trg|public.handle_content_report()|5|O",
-                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O"
+                "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O",
+                "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
               ],
               "policies": [
                 "Moderators read all reports",
@@ -30942,7 +30959,8 @@
               "user_reports_start_as_new|public.user_reports_start_as_new()|7|O",
               "user_reports_touch_updated_at|public.touch_updated_at()|19|O",
               "zz_handle_content_report_trg|public.handle_content_report()|5|O",
-              "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O"
+              "zz_location_disclosure_report_trg|public.handle_location_disclosure_report()|5|O",
+              "zz_user_reports_moderation_guard|public.guard_report_moderation_update()|19|O"
             ],
             "policies": [
               "Moderators read all reports",
