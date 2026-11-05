@@ -1,8 +1,23 @@
 # Audit F01–F16 remediation: independent review brief and remaining staging checklist
 
 Branch `claude/audit-review-snapshot`: the audit-fix PR stack after an independent pre-review round (2026-11-05),
-plus the staging verification tools that Part B uses. `claude/release-integration` has the same tree. Nothing here is
-merged to `main`, deployed, or applied to any Supabase project.
+plus the staging verification tools that Part B uses. `claude/release-integration` has the same tree. Except #286
+(merged to `main` on 2026-11-05, not yet published), nothing here is merged to `main`, deployed, or applied to any
+Supabase project.
+
+**Added on 2026-11-05, after the pre-review; please review these too.**
+- #287's production procedure (`docs/release/hotfix-286-287-runbook.md`): the owner runs production SQL only through
+  Lovable. The migration is applied by Lovable's migration tool, which records the sha256 of the exact text in
+  `drizzle.__drizzle_migrations`. Its read-only checks are:
+  - `docs/release/hotfix-287-precheck.sql`;
+  - `docs/release/hotfix-287-verify.sql`;
+  - `docs/release/hotfix-287-held-reviews.sql`.
+
+  The rollback has one statement per part (`docs/rollbacks/20261031120000_lovable/`), plus the psql variant.
+- #294 commit `c6a8ae50`: the release preflight's `pinned_history` also recognizes a hotfix by that drizzle hash. The
+  tests are four new self-tests in `scripts/release-preflight.test.mjs`.
+- GitHub Actions assigned no runners from 2026-11-05 14:26 UTC onward. The required checks were run locally on every
+  affected head; the results are in the runbook, section 8.
 
 ## Part A: brief for the independent (Codex) security review
 
