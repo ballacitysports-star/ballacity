@@ -376,6 +376,14 @@
       "sha256": "be6be45747778e8d633c7279c6478118c138a4d83533fda067fce9767d6a51a5"
     }
   ],
+  "pinned_history": [
+    {
+      "version": "20261031120000",
+      "path": "supabase/migrations/20261031120000_close_live_write_holes.sql",
+      "sha256": "843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1",
+      "basis": "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release, with the release ledger template (statements = the file text)."
+    }
+  ],
   "known_ledger_rows_without_file": [
     {
       "version": "20260708185350",
@@ -1596,6 +1604,29 @@
           "private_sec.guard_direct_image_upload_switch()",
           "private_sec.refuse_direct_public_image_write()"
         ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 38,
+      "version": "20261108190000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108190000_appeal_separation.sql",
+      "sha256": "e6dbe8cbdb6f4d7603765a92f22a1bb8dc42e8b3ea2c2f9b715e304b4e2b2e78",
+      "requires": {
+        "functions": [
+          "public.moderator_review_appeal(uuid,boolean,text)"
+        ],
+        "tables": [
+          "public.admin_audit_log",
+          "public.content_report_holds"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
         "tables": [],
         "schemas": []
       }
@@ -18215,7 +18246,8 @@
       {
         "signature": "public.moderator_review_appeal(uuid,boolean,text)",
         "defined_by": [
-          "20261106130000"
+          "20261106130000",
+          "20261108190000"
         ],
         "expect_before": {
           "16": null,
@@ -18233,6 +18265,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -18246,12 +18289,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -18262,7 +18316,7 @@
             ]
           },
           "17": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
