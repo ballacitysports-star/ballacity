@@ -51,11 +51,30 @@ SELECT t.lives(format('UPDATE public.payment_submissions SET refund_status = ''o
   'B-F1: the service role (refund engine) still writes refund fields');
 SELECT t.reset();
 
+-- F11: the trusted settlement paths still write refund fields when an API caller triggers them
+SET LOCAL session_replication_role = replica;                                            -- setup: verified, nothing owed yet
+UPDATE public.payment_submissions SET status = 'verified', refund_status = NULL, refund_amount = NULL, refund_pct = NULL,
+       refund_reason = NULL WHERE id = t.id('claimq');
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('host'));
+SELECT t.throws(format('UPDATE public.payment_submissions SET refund_status = ''owed'', refund_amount = 10 WHERE id = %L', t.id('claimq')),
+  'PAYMENT_FIELD_FORBIDDEN', 'F11: the host cannot write refund fields directly either');
+SELECT t.lives($q$UPDATE public.hosted_games SET cancelled_at = now() WHERE id = 'pay-q'$q$, 'F11 setup: the host cancels the paid game');
+SELECT t.reset();
+SELECT t.eq((SELECT refund_status FROM public.payment_submissions WHERE id = t.id('claimq')), 'owed',
+  'F11: the settlement trigger (definer) still records the refund owed');
+SELECT t.as_user(t.id('host'));
+SELECT t.lives(format('SELECT public.mark_refund_sent(%L)', t.id('claimq')), 'F11: the host marks it sent through the RPC');
+SELECT t.reset();
+SELECT t.ok((SELECT refunded_at IS NOT NULL FROM public.payment_submissions WHERE id = t.id('claimq')), 'F11: and the refund is recorded as sent');
+
 -- ============================================================ B-F3: reviews written through the API are held until screened
 -- a past game both played in, so the author may review the subject
-INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES ('rev-q', t.id('subject'), 'basketball', 'Past run', now() - interval '1 day');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES
+  ('rev-q', t.id('subject'), 'basketball', 'Past run', now() - interval '1 day'),
+  ('rev-q2', t.id('subject'), 'basketball', 'Another past run', now() - interval '2 days');
 SET LOCAL session_replication_role = replica;
-INSERT INTO public.game_participants (game_id, user_id) VALUES ('rev-q', t.id('author'));
+INSERT INTO public.game_participants (game_id, user_id) VALUES ('rev-q', t.id('author')), ('rev-q2', t.id('author'));
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('author'));
 SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
@@ -68,29 +87,48 @@ SELECT t.as_anon();
 SELECT t.eq((SELECT count(*)::int FROM public.reviews WHERE id = t.id('rq')), 0, 'B-F3: anonymous readers do not see it');
 SELECT t.reset();
 SELECT t.as_user(t.id('author'));
-SELECT t.throws(format('SELECT public.release_review_screening(%L)', t.id('rq')), 'permission denied', 'B-F3: the author cannot release their own hold');
+SELECT t.throws(format($q$SELECT public.release_review_screening(%L, NULL, 'UNSCREENED text inserted directly')$q$, t.id('rq')),
+  'permission denied', 'F12: the author cannot release their own hold');
 SELECT t.reset();
 SELECT t.as_service();
-SELECT t.eq(public.release_review_screening(t.id('rq')), true, 'B-F3: the server releases it after screening');
+SELECT t.eq(public.release_review_screening(t.id('rq'), NULL, 'something else that was screened'), false,
+  'F12: a release for text other than what is stored keeps the review held');
+SELECT t.eq(public.release_review_screening(t.id('rq'), NULL, 'UNSCREENED text inserted directly'), true,
+  'F12: the server releases it after screening exactly this text');
 SELECT t.reset();
-SELECT t.ok(NOT (SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'B-F3: and it is visible');
+SELECT t.ok(NOT (SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'F12: and it is visible');
 SELECT t.as_user(t.id('author'));
 SELECT t.lives(format('UPDATE public.reviews SET body = ''EDITED after screening, never checked'' WHERE id = %L', t.id('rq')),
-  'B-F3 setup: the author edits the text afterwards');
+  'F12 setup: the author edits the text afterwards');
 SELECT t.reset();
-SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'B-F3: an edit hides the review until screened again');
--- a review the integrity rules flagged stays flagged after the screening release
+SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'F12: an edit hides the review until screened again');
+SELECT t.as_anon();
+SELECT t.eq((SELECT count(*)::int FROM public.reviews WHERE id = t.id('rq')), 0, 'F12: anonymous readers do not see the edited text');
+SELECT t.reset();
+-- the race: the server screened text A, the author edits to B before the server releases
+SELECT t.as_user(t.id('author'));
+SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, title, body, game_id)
+                         VALUES (%L, %L, 'player', 'host', %L, 'Subject', 4, 'Fine', 'Screened text A, polite and on topic', 'rev-q2')$q$,
+                      t.id('rrace'), t.id('author'), t.id('subject')::text),
+  'F12 race setup: a review is inserted (as submitReview does) and held');
+SELECT t.lives(format($q$UPDATE public.reviews SET body = 'Swapped text B, never screened' WHERE id = %L$q$, t.id('rrace')),
+  'F12 race setup: the author swaps the text before the server releases it');
+SELECT t.reset();
 SELECT t.as_service();
-SELECT public.release_review_screening(t.id('rq'));
+SELECT t.eq(public.release_review_screening(t.id('rrace'), 'Fine', 'Screened text A, polite and on topic'), false,
+  'F12: the release for the screened text A does not publish text B');
 SELECT t.reset();
+SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rrace')), 'F12: text B stays held');
+-- a review flagged by a moderator (or the integrity rules) stays flagged after a screening release
 UPDATE public.reviews SET flagged = true WHERE id = t.id('rq');                 -- e.g. reported and held by a moderator
 SELECT t.as_user(t.id('author'));
-SELECT t.lives(format('UPDATE public.reviews SET body = ''Another edit of the text'' WHERE id = %L', t.id('rq')), 'B-F3 setup: edit a flagged review');
+SELECT t.lives(format('UPDATE public.reviews SET body = ''Another edit of the text'' WHERE id = %L', t.id('rq')), 'F12 setup: edit a flagged review');
 SELECT t.reset();
 SELECT t.as_service();
-SELECT t.eq(public.release_review_screening(t.id('rq')), false, 'B-F3: releasing the screening hold does not clear an earlier flag');
+SELECT t.eq(public.release_review_screening(t.id('rq'), NULL, 'Another edit of the text'), false,
+  'F12: releasing the screening hold does not clear an earlier flag');
 SELECT t.reset();
-SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'B-F3: the earlier flag stands');
+SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'F12: the earlier flag stands');
 
 -- gym reviews keep their direct path (they are not AI-screened) and are not held
 SELECT t.as_user(t.id('orgowner'));
@@ -114,6 +152,10 @@ SELECT t.throws(format($q$UPDATE public.user_reports SET details = 'rewritten' W
   'REPORT_FIELDS_FIXED', 'B-F4: a moderator cannot rewrite what was reported');
 SELECT t.throws(format($q$UPDATE public.user_reports SET reporter_id = %L WHERE id = %L$q$, t.id('modone'), t.id('rep')),
   'REPORT_FIELDS_FIXED', 'B-F4: nor who reported it');
+SELECT t.throws(format($q$UPDATE public.user_reports SET reported_id = %L WHERE id = %L$q$, t.id('mgr'), t.id('rep')),
+  'REPORT_FIELDS_FIXED', 'F13: nor who it is about');
+SELECT t.throws(format($q$UPDATE public.user_reports SET reason = 'spam' WHERE id = %L$q$, t.id('rep')),
+  'REPORT_FIELDS_FIXED', 'F13: nor the reason given');
 SELECT t.lives(format($q$UPDATE public.user_reports SET status = 'dismissed', reviewed_by = %L, resolution_notes = 'n/a' WHERE id = %L$q$,
                       t.id('reporter'), t.id('rep')), 'B-F4: a moderator can still decide a report directly');
 SELECT t.reset();
