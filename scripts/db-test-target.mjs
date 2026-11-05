@@ -85,16 +85,36 @@ function isPrivateAddress(a) {
 
 /**
  * Pure check of what the server reported after connecting. The client side already allows only a socket or a
- * loopback host; a server that reports a public (routable) address for that connection is behind a tunnel or
- * proxy to somewhere else and is refused. Loopback and private container addresses (Docker, CI service
- * containers) are accepted.
+ * loopback host.
+ *  - Socket or loopback server address: a Postgres on this machine. Accepted.
+ *  - Private address (a Docker or CI service container behind a loopback port mapping, which is how CI runs):
+ *    accepted ONLY if the cluster is visibly disposable, because an SSH tunnel to a remote database on a private
+ *    network looks the same from here. Disposable means: no database other than postgres/template0/template1 and
+ *    scratch databases db-test itself created (scratch marker), and no tables of its own in the postgres database.
+ *  - Public address: the loopback port is forwarded somewhere else. Refused.
+ * A Supabase-managed cluster (supabase_admin / authenticator roles) is refused whatever its address.
  */
-export function serverProblems({ serverAddr, managedRoles }) {
+export function serverProblems({
+  serverAddr,
+  managedRoles,
+  databases = [],
+  postgresUserTables = 0,
+}) {
   const problems = [];
-  if (serverAddr && !isLoopbackAddress(serverAddr) && !isPrivateAddress(serverAddr))
+  const local = !serverAddr || isLoopbackAddress(serverAddr);
+  if (!local && !isPrivateAddress(serverAddr))
     problems.push(
       "The server reports a public network address: the loopback connection is forwarded somewhere else.",
     );
+  if (!local && isPrivateAddress(serverAddr)) {
+    const foreign = databases.filter(
+      (d) => !RESERVED_DATABASES.has(d.name) && d.comment !== SCRATCH_MARKER,
+    );
+    if (foreign.length > 0 || postgresUserTables > 0)
+      problems.push(
+        "The server is reached through a forwarded port and holds databases or tables db-test did not create. Only an empty, disposable container is accepted this way (a tunnel to a remote server looks the same).",
+      );
+  }
   if (managedRoles && managedRoles.length > 0)
     problems.push(
       "The server looks like a Supabase-managed cluster (it has supabase_admin/authenticator). db-test runs only on a plain scratch Postgres.",
