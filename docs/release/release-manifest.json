@@ -560,7 +560,7 @@
       "version": "20261103120000",
       "source": "supabase",
       "path": "supabase/migrations/20261103120000_minor_review_privacy.sql",
-      "sha256": "67320ad16218b1cc31a8c4bf9cc94a66f53f6a1a8c3e9de083c7b373a84fa2cc",
+      "sha256": "d78b51a3a19af10aa59122f3a1e4b19a5d8e672c8f8a9ad7882d8e7429315363",
       "requires": {
         "functions": [],
         "tables": [],
@@ -26731,12 +26731,12 @@
         ],
         "expect_before": {
           "16": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }
@@ -26744,14 +26744,14 @@
         "expect_steps": {
           "16": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
           },
           "17": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
@@ -26759,12 +26759,12 @@
         },
         "expect_after": {
           "16": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }
