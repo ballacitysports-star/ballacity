@@ -282,7 +282,9 @@ describe("happy paths", () => {
     const { code, text } = preflight(PRE, ["--verify-after"]);
     assert.equal(code, 1);
     assert.match(text, /not applied yet/);
-    assert.match(text, /protection private_sec\.game_payee\(text\) is missing/);
+    // the pinned hotfix #295 already defines game_payee before the range (its release definition comes later)
+    assert.match(text, /protection private_sec\.game_payee\(text\) differs from expect_after/);
+    assert.match(text, /protection public\.game_payee_id\(text\) is missing/);
   });
 
   test("checked-in manifest is consistent with the checkout (offline)", () => {
@@ -532,6 +534,53 @@ describe("pinned history: a hotfix dated before the range (independent pre-revie
     );
   });
 
+  // A second pinned hotfix (PR #295, 20261102100000, applied through Lovable on 2026-11-05): both pins are listed, and
+  // the two real Lovable copies in the tree (0032 for #287, 0033 for #295) are recognized by their hash and left out of
+  // the replay order, so the offline check passes with them present.
+  test("every pinned hotfix is listed with the sha256 of its file (#287 and #295)", () => {
+    for (const version of ["20261031120000", "20261102100000"]) {
+      const k = manifest.pinned_history.find((x) => x.version === version);
+      assert.ok(k, `${version} is in pinned_history`);
+      assert.equal(k.sha256, sha256File(join(ROOT, k.path)));
+    }
+  });
+
+  test("the Lovable copies of both pinned hotfixes in the tree are left out of the replay order", () => {
+    const order = migrationOrder(ROOT).map((m) => m.path);
+    for (const copy of [
+      "drizzle/migrations/0032_hotfix_close_write_paths.sql",
+      "drizzle/migrations/0033_hotfix_payment_settings_host_guard.sql",
+    ]) {
+      assert.ok(
+        order.every((p) => !p.endsWith(copy.slice("drizzle/migrations/".length))),
+        `${copy} is skipped`,
+      );
+    }
+    assert.ok(
+      order.includes("supabase/migrations/20261102100000_hotfix_payment_settings_writes.sql"),
+    );
+    const { code, text } = preflight(null, ["--offline"]);
+    assert.equal(code, 0, text);
+  });
+
+  test("the pinned hotfix's definitions are the state expected before the range (recognized on the target)", () => {
+    const fn = (sig) => manifest.protections.functions.find((p) => p.signature === sig);
+    // md5(pg_get_functiondef) of the hotfix's two helpers, the same on Postgres 16 and 17 (hotfix rehearsal)
+    assert.equal(
+      fn("private_sec.game_payee(text)").expect_before[MAJOR].def,
+      "883af9b3905190368f4ea6efa29b088e",
+    );
+    assert.equal(
+      fn("private_sec.can_manage_game_payment_settings(text)").expect_before[MAJOR].def,
+      "5a61f1454e986888987775c3a5f5e9f1",
+    );
+    // and 20261103140000 re-creates game_payee unchanged
+    assert.equal(
+      fn("private_sec.game_payee(text)").expect_steps[MAJOR]["20261103140000"].def,
+      "883af9b3905190368f4ea6efa29b088e",
+    );
+  });
+
   test("Lovable's copies of other migrations are still replayed at their drizzle date (they were applied then)", () => {
     const order = migrationOrder(ROOT).map((m) => m.path);
     assert.ok(
@@ -646,7 +695,7 @@ describe("dependencies, ledger and protections against a target", () => {
     assert.equal(code, 1);
     assert.match(
       text,
-      /missing dependency: 20261104120000 .* requires function private_sec\.game_payee\(text\)/,
+      /missing dependency: 20261108140000 .* requires function public\.game_payee_id\(text\)/,
     );
   });
 
@@ -913,8 +962,10 @@ describe("fail closed: recognized protection states (rule b)", () => {
     assert.equal(bad.code, 1);
     assert.match(
       bad.text,
-      /unrecognized state: protection private_sec\.game_payee\(text\) is md5 .* must be absent/,
+      /unrecognized state: protection public\.game_payee_id\(text\) is md5 .* must be absent/,
     );
+    // game_payee itself is not flagged: 20261103140000 defines it exactly as the pinned hotfix #295 already did
+    assert.doesNotMatch(bad.text, /unrecognized state: protection private_sec\.game_payee\(text\)/);
   });
 
   test("partially applied definers: the target must equal the snapshot after the last applied one", () => {

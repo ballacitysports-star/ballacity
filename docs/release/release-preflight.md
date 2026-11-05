@@ -131,6 +131,9 @@ basis; generated from `PINNED_HISTORY` in the script):
   An older version, a ledger row written without the text, or a drizzle row for any other text fails. That drizzle row
   is reported as unknown, and the hotfix as unrecognized history.
 
+Pinned today: `20261031120000` (#287) and `20261102100000` (#295, the payment-settings write hotfix), both applied to
+production through Lovable's migration tool ahead of the release.
+
 **Lovable's copy of a pinned hotfix.** Lovable's tool may also write the hotfix it applied into
 `drizzle/migrations`, dated when it applied it. For PR #287 that is `0032_hotfix_close_write_paths`, 2026-11-05
 17:14 UTC. That date falls among the release migrations' versions, but production applies every release migration
