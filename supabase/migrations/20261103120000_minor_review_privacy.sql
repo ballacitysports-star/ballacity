@@ -198,11 +198,14 @@ CREATE POLICY "Public reviews are viewable by everyone" ON public.reviews
 
 -- Private reviews are only ever about adults now; a historical private review about someone
 -- under 18 is not shown to them either, until a private-feedback workflow exists.
+-- flagged = false: a review held for screening or flagged is not shown to its subject (kept from hotfix 20261031120000,
+-- which this definition replaces).
 DROP POLICY IF EXISTS "Reviewees view their private reviews" ON public.reviews;
 CREATE POLICY "Reviewees view their private reviews" ON public.reviews
   FOR SELECT TO authenticated
   USING (
     is_private = true
+    AND flagged = false
     AND reviewee_id = (auth.uid())::text
     AND reviewee_kind <> ALL (ARRAY['gym'::text, 'team'::text, 'org'::text, 'trainer_org'::text])
     AND private_sec.review_is_publishable(id)
