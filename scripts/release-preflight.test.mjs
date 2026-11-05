@@ -48,10 +48,18 @@ let counter = 0;
 function localUrl(db) {
   const host =
     process.env.PGHOST ||
-    scratch.sql("postgres", "SHOW unix_socket_directories").trim().split(",")[0].trim();
+    scratch
+      .psqlLocal("postgres", ["-At", "-c", "SHOW unix_socket_directories"])
+      .stdout.trim()
+      .split(",")[0]
+      .trim();
   const params = new URLSearchParams({ host });
   if (process.env.PGPORT) params.set("port", process.env.PGPORT);
-  params.set("user", process.env.PGUSER || scratch.sql("postgres", "SELECT current_user").trim());
+  params.set(
+    "user",
+    process.env.PGUSER ||
+      scratch.psqlLocal("postgres", ["-At", "-c", "SELECT current_user"]).stdout.trim(),
+  );
   if (process.env.PGPASSWORD) params.set("password", process.env.PGPASSWORD);
   return `postgresql:///${db}?${params}`;
 }
@@ -545,6 +553,41 @@ describe("pinned history: a hotfix dated before the range (independent pre-revie
       text,
       /unrecognized history: supabase\/migrations\/20261031120000_close_live_write_holes\.sql/,
     );
+  });
+});
+
+describe("scratch helpers: the same protections as db-test (independent review of d604958c)", () => {
+  test("they write to and drop only databases a harness created (scratch marker)", () => {
+    const foreign = `rpf_${process.pid}_unmarked`;
+    scratch.psqlLocal("postgres", ["-c", `CREATE DATABASE "${foreign}"`]);
+    try {
+      assert.throws(() => scratch.sql(foreign, "SELECT 1"), /not a scratch database/);
+      assert.throws(() => scratch.loadStub(foreign, ROOT), /not a scratch database/);
+      assert.throws(() => scratch.dropDb(foreign), /Refusing to drop/);
+      assert.throws(
+        () => scratch.createDb(`rpf_${process.pid}_from_foreign`, foreign),
+        /not a scratch database/,
+      );
+    } finally {
+      scratch.psqlLocal("postgres", ["-c", `DROP DATABASE IF EXISTS "${foreign}"`]);
+    }
+  });
+
+  test("a database they create carries the marker, so db-test's guard recognizes it", () => {
+    const db = newDb();
+    const comment = scratch
+      .psqlLocal("postgres", [
+        "-At",
+        "-c",
+        `SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = '${db}'`,
+      ])
+      .stdout.trim();
+    assert.equal(comment, "ballacity db-test scratch database (safe to drop)");
+  });
+
+  test("they refuse the reserved databases", () => {
+    for (const name of ["postgres", "template0", "template1"])
+      assert.throws(() => scratch.createDb(name), /bad scratch database name/);
   });
 });
 
@@ -1226,14 +1269,9 @@ describe("scratch databases are local only (independent review)", () => {
       assert.equal(scratch.localEnv({ PGHOSTADDR: a }).PGHOSTADDR, a);
   });
 
-  test("PGSERVICE and PGSERVICEFILE are removed from the environment", () => {
-    const env = scratch.localEnv({
-      PGSERVICE: "prod",
-      PGSERVICEFILE: "/tmp/pg_service.conf",
-      PGHOST: "",
-    });
-    assert.equal(env.PGSERVICE, undefined);
-    assert.equal(env.PGSERVICEFILE, undefined);
+  test("PGSERVICE and PGSERVICEFILE are refused, as db-test refuses them (independent review of d604958c)", () => {
+    assert.throws(() => scratch.localEnv({ PGSERVICE: "prod", PGHOST: "" }), /PGSERVICE/);
+    assert.throws(() => scratch.localEnv({ PGSERVICEFILE: "/tmp/pg_service.conf" }), /PGSERVICE/);
   });
 
   test("--write-manifest refuses a remote PGHOSTADDR before connecting", () => {

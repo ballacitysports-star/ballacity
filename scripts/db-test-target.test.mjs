@@ -7,8 +7,10 @@ import {
   existingDatabaseProblems,
   scrubbedEnv,
   serverProblems,
+  serverProblemsFromProbe,
   targetProblems,
 } from "./db-test-target.mjs";
+import { localEnv } from "./release-preflight-scratch.mjs";
 
 const ok = (env, db = "ballacity_dbtest") => expect(targetProblems(env, db)).toEqual([]);
 const refused = (env, db = "ballacity_dbtest") =>
@@ -175,5 +177,35 @@ describe("db-test refuses before connecting", () => {
 
   it("exits 2 for a service file", () => {
     expect(run({ PGSERVICE: "prod" }).status).toBe(2);
+  });
+});
+
+// Independent review of d604958c: the release preflight's scratch helpers write databases too, so they share these
+// checks (scripts/release-preflight-scratch.mjs).
+describe("shared server attestation (db-test and the preflight scratch helpers)", () => {
+  const list = (...rows) => rows.map(([n, c]) => `${n}\t${c}`).join("\n");
+  it("accepts a local server and refuses a managed or forwarded one from the raw probe output", () => {
+    expect(serverProblemsFromProbe("|||0", list(["postgres", ""]))).toEqual([]);
+    expect(serverProblemsFromProbe("127.0.0.1||0", list(["postgres", ""]))).toEqual([]);
+    expect(serverProblemsFromProbe("|supabase_admin,authenticator|0", "")).toHaveLength(1);
+    expect(serverProblemsFromProbe("203.0.113.9||0", "")).toHaveLength(1);
+  });
+  it("accepts a container only while it holds nothing but scratch databases", () => {
+    expect(
+      serverProblemsFromProbe("172.17.0.2||0", list(["postgres", ""], ["x", SCRATCH_MARKER])),
+    ).toEqual([]);
+    expect(
+      serverProblemsFromProbe("172.17.0.2||0", list(["postgres", ""], ["prod_copy", ""])),
+    ).toHaveLength(1);
+    expect(serverProblemsFromProbe("172.17.0.2||3", list(["postgres", ""]))).toHaveLength(1);
+  });
+  it("the scratch helpers refuse the libpq settings db-test refuses, before any connection", () => {
+    expect(() => localEnv({ PGHOST: "db.example.com" })).toThrow(/scratch databases/);
+    expect(() => localEnv({ PGHOST: "localhost,db.example.com" })).toThrow(/scratch databases/);
+    expect(() => localEnv({ PGSERVICE: "prod" })).toThrow(/scratch databases/);
+    expect(() => localEnv({ PGDATABASE: "postgresql://u@db.example.com/p" })).toThrow(
+      /scratch databases/,
+    );
+    expect(() => localEnv({ PGHOST: "/var/run/postgresql" })).not.toThrow();
   });
 });

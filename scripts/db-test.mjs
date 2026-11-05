@@ -29,10 +29,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  DATABASE_LIST_SQL,
   SCRATCH_MARKER,
+  SERVER_PROBE_SQL,
   existingDatabaseProblems,
   scrubbedEnv,
-  serverProblems,
+  serverProblemsFromProbe,
   targetProblems,
 } from "./db-test-target.mjs";
 import { migrationOrder as sharedMigrationOrder } from "./migration-order.mjs";
@@ -92,38 +94,13 @@ if (r.status !== 0)
 const serverVersion = Number(r.stdout.trim());
 
 // What the server says about itself: local, or a disposable container behind a loopback port; never Supabase-managed.
+// The same attestation guards release-preflight-scratch.mjs (scripts/db-test-target.mjs).
 {
-  const probe = psql("postgres", [
-    "-At",
-    "-F",
-    "|",
-    "-c",
-    "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')",
-  ]);
+  const probe = psql("postgres", ["-At", "-F", "|", "-c", SERVER_PROBE_SQL]);
   if (probe.status !== 0) fail("Could not identify the server.", probe.stderr);
-  const [serverAddr, roles, postgresUserTables] = probe.stdout.trim().split("|");
-  const dbList = psql("postgres", [
-    "-At",
-    "-F",
-    "\t",
-    "-c",
-    "SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database",
-  ]);
+  const dbList = psql("postgres", ["-At", "-F", "\t", "-c", DATABASE_LIST_SQL]);
   if (dbList.status !== 0) fail("Could not list the server's databases.", dbList.stderr);
-  const databases = dbList.stdout
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [name, ...comment] = line.split("\t");
-      return { name, comment: comment.join("\t") };
-    });
-  const problems = serverProblems({
-    serverAddr: serverAddr || null,
-    managedRoles: roles ? roles.split(",") : [],
-    databases,
-    postgresUserTables: Number(postgresUserTables) || 0,
-  });
+  const problems = serverProblemsFromProbe(probe.stdout, dbList.stdout);
   if (problems.length) {
     console.error("\ndb-test refused: the server is not a verified local scratch Postgres.");
     for (const p of problems) console.error(`  - ${p}`);

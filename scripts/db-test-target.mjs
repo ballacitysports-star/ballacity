@@ -122,6 +122,35 @@ export function serverProblems({
   return problems;
 }
 
+/**
+ * The two read-only queries that attest the server, run against its postgres database by every script that writes
+ * scratch databases (db-test.mjs and release-preflight-scratch.mjs), and their parser. psql -At -F '|' for the first,
+ * -At -F '\t' for the second.
+ */
+export const SERVER_PROBE_SQL =
+  "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')";
+export const DATABASE_LIST_SQL =
+  "SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database";
+
+/** serverProblems() for the raw output of SERVER_PROBE_SQL and DATABASE_LIST_SQL. */
+export function serverProblemsFromProbe(probeOut, databaseListOut) {
+  const [serverAddr, roles, postgresUserTables] = String(probeOut).trim().split("|");
+  const databases = String(databaseListOut)
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name, ...comment] = line.split("\t");
+      return { name, comment: comment.join("\t") };
+    });
+  return serverProblems({
+    serverAddr: serverAddr || null,
+    managedRoles: roles ? roles.split(",") : [],
+    databases,
+    postgresUserTables: Number(postgresUserTables) || 0,
+  });
+}
+
 /** An existing database may be dropped or reused only when this harness created it. */
 export function existingDatabaseProblems({ exists, comment }) {
   if (!exists) return [];
