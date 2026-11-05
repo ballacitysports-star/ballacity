@@ -1,15 +1,18 @@
--- Hotfix: close four write paths that are live in production (audit 2026-11-04, findings A-F1/A-F2, B-F1, B-F3, B-F4).
+-- Hotfix: close four write paths that are live in production (audit 2026-11-04, findings A-F1, B-F1, B-F3, B-F4).
 --
---   1. A team manager (or a facility admin) could UPDATE a member row's user_id/team_id (org_id/trainer_id) and so put any
---      person, including a minor, on their roster without an invitation. That made shares_team true, which opens the
---      minor's real name and content to the manager. API roles may no longer change who or which team a row is about.
+--   1. A team manager could UPDATE a member row's user_id/team_id and so put any person, including a minor, on their
+--      roster without an invitation. That made shares_team true, which opens the minor's real name and content to the
+--      manager. API roles may no longer change who or which team a row is about. (Facility memberships were already
+--      protected by trg_guard_trainer_org_member_identity.)
 --   2. A player could write refund_status / refund_amount / refund_* on their own payment claim (insert or pending update)
 --      and so have the host told "refund owed $9999". Only the refund engine (definer functions, service role) writes them.
 --   3. A review written or edited directly through the API skipped the AI screening in submitReview. Such a write is now
 --      held (flagged) until the server releases it after screening (public.release_review_screening, service role only).
 --      A flag the integrity rules set is never cleared by the release. Gym reviews are unchanged (they are not screened).
---   4. A moderator could rewrite a report (details, reviewed_by) directly, with no audit row. The app updates reports only
---      through the server (service role, which writes the audit), so the client UPDATE policy is removed.
+--   4. A moderator could rewrite a report directly (details, reporter, and reviewed_by set to another moderator), with no
+--      audit row. A direct moderator update may now change only the review fields; reviewed_by is always the moderator
+--      making the change, and every such change is written to admin_audit_log. (The app's server path, service role,
+--      writes its own audit and is unaffected.)
 --
 -- Versioned before the privacy release range (20261103100000) so it can ship to production on its own. The checks use
 -- current_user, which is the API role for a direct statement and the owner inside SECURITY DEFINER code.
@@ -42,9 +45,7 @@ DROP TRIGGER IF EXISTS a0_team_members_identity_locked ON public.team_members;
 CREATE TRIGGER a0_team_members_identity_locked BEFORE UPDATE ON public.team_members
   FOR EACH ROW EXECUTE FUNCTION public.lock_member_row_identity('user_id', 'team_id');
 
-DROP TRIGGER IF EXISTS a0_trainer_org_members_identity_locked ON public.trainer_org_members;
-CREATE TRIGGER a0_trainer_org_members_identity_locked BEFORE UPDATE ON public.trainer_org_members
-  FOR EACH ROW EXECUTE FUNCTION public.lock_member_row_identity('user_id', 'org_id', 'trainer_id');
+-- trainer_org_members already has this protection (trg_guard_trainer_org_member_identity, 20261027160000).
 
 -- ------------------------------------------------------------------------------------------------- 2. refund fields
 CREATE OR REPLACE FUNCTION public.lock_payment_refund_fields()
@@ -170,4 +171,44 @@ REVOKE ALL ON FUNCTION public.release_review_screening(uuid) FROM PUBLIC, anon, 
 GRANT EXECUTE ON FUNCTION public.release_review_screening(uuid) TO service_role;
 
 -- ------------------------------------------------------------------------------------------------- 4. report rewrites
-DROP POLICY IF EXISTS "Moderators update reports" ON public.user_reports;
+CREATE OR REPLACE FUNCTION private_sec.audit_report_change(_before jsonb, _after jsonb)
+ RETURNS void
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, before, after)
+  VALUES (auth.uid(), 'report_updated_directly', 'user_report', _after ->> 'id', _before, _after);
+$function$;
+REVOKE ALL ON FUNCTION private_sec.audit_report_change(jsonb, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private_sec.audit_report_change(jsonb, jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.guard_report_moderation_update()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY INVOKER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  _review constant text[] := ARRAY['status', 'resolution_notes', 'reviewed_by', 'reviewed_at', 'updated_at'];
+BEGIN
+  IF current_user NOT IN ('anon', 'authenticated') THEN
+    RETURN NEW;
+  END IF;
+  -- what was reported, by whom and about whom never changes through the API
+  IF (to_jsonb(NEW) - _review) IS DISTINCT FROM (to_jsonb(OLD) - _review) THEN
+    RAISE EXCEPTION 'REPORT_FIELDS_FIXED: only the review status and notes of a report can be changed.' USING ERRCODE = '42501';
+  END IF;
+  -- the reviewer is whoever makes the change
+  IF NEW.reviewed_by IS DISTINCT FROM OLD.reviewed_by OR NEW.status IS DISTINCT FROM OLD.status THEN
+    NEW.reviewed_by := auth.uid();
+  END IF;
+  PERFORM private_sec.audit_report_change(to_jsonb(OLD), to_jsonb(NEW));
+  RETURN NEW;
+END $function$;
+REVOKE ALL ON FUNCTION public.guard_report_moderation_update() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.guard_report_moderation_update() TO anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS zz_user_reports_moderation_guard ON public.user_reports;
+CREATE TRIGGER zz_user_reports_moderation_guard BEFORE UPDATE ON public.user_reports
+  FOR EACH ROW EXECUTE FUNCTION public.guard_report_moderation_update();

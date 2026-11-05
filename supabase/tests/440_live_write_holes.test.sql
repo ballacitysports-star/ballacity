@@ -22,23 +22,6 @@ SELECT t.reset();
 SELECT t.ok(NOT public.shares_team(t.id('mgr'), t.id('kid')), 'A-F1: the manager does not share a team with the minor');
 SELECT t.eq((SELECT jersey_number::int FROM public.team_members WHERE team_id = 'qteam' AND user_id = t.id('teammate')), 7, 'A-F1: the edit landed');
 
--- ============================================================ A-F2: facility membership rows likewise
-INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES
-  ('coach-orgowner', t.id('orgowner'), 'coach', 'Owner Coach', 'ownercoach'),
-  ('coach-x', t.id('coachx'), 'coach', 'Coach X', 'coachx');
-SELECT t.as_user(t.id('orgowner'));
-INSERT INTO public.trainer_orgs (id, owner_id, name, handle) VALUES (t.id('org'), t.id('orgowner'), 'Gym', 'gymq');
-SELECT t.reset();
-INSERT INTO public.trainer_org_members (org_id, trainer_id, user_id, role)
-  VALUES (t.id('org'), 'coach-orgowner', t.id('orgowner'), 'owner') ON CONFLICT DO NOTHING;
-SELECT t.eq((SELECT count(*)::int FROM public.trainer_org_members WHERE org_id = t.id('org')), 1, 'A-F2 setup: the owner is a member');
-SELECT t.as_user(t.id('orgowner'));
-SELECT t.throws(format('UPDATE public.trainer_org_members SET user_id = %L WHERE org_id = %L', t.id('kid'), t.id('org')),
-  'MEMBER_IDENTITY_FIXED', 'A-F2: a facility owner cannot re-point a membership at a minor');
-SELECT t.throws(format('UPDATE public.trainer_org_members SET trainer_id = ''coach-x'' WHERE org_id = %L', t.id('org')),
-  'MEMBER_IDENTITY_FIXED', 'A-F2: nor at another trainer profile');
-SELECT t.reset();
-
 -- ============================================================ B-F1: refund fields are not the player's to write
 INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES ('pay-q', t.id('host'), 'basketball', 'Paid run', now() + interval '2 days');
 SELECT t.as_user(t.id('payer'));
@@ -102,26 +85,33 @@ SELECT t.reset();
 SELECT t.ok((SELECT flagged FROM public.reviews WHERE id = t.id('rq')), 'B-F3: the earlier flag stands');
 
 -- gym reviews keep their direct path (they are not AI-screened) and are not held
+SELECT t.as_user(t.id('orgowner'));
+INSERT INTO public.trainer_orgs (id, owner_id, name, handle) VALUES (t.id('somegym'), t.id('orgowner'), 'Gym', 'gymq');
+SELECT t.reset();
 SELECT t.as_user(t.id('author'));
 SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
                          VALUES (%L, %L, 'player', 'gym', %L, 'Gym', 4, 'Clean courts and friendly staff')$q$,
-                      t.id('gymrev'), t.id('author'), t.id('org')::text),
+                      t.id('gymrev'), t.id('author'), t.id('somegym')::text),
   'B-F3: a gym review still posts directly');
 SELECT t.reset();
 SELECT t.ok(NOT (SELECT flagged FROM public.reviews WHERE id = t.id('gymrev')), 'B-F3: and is not held');
 
--- ============================================================ B-F4: moderators change reports only through the server
+-- ============================================================ B-F4: direct report changes are limited, attributed and audited
 SELECT t.as_user(t.id('reporter'));
-SELECT t.lives(format($q$INSERT INTO public.user_reports (id, reporter_id, reported_id, reason) VALUES (%L, %L, %L, 'harassment')$q$,
+SELECT t.lives(format($q$INSERT INTO public.user_reports (id, reporter_id, reported_id, reason, details) VALUES (%L, %L, %L, 'harassment', 'original')$q$,
                       t.id('rep'), t.id('reporter'), t.id('subject')), 'B-F4 setup: a report is filed');
 SELECT t.reset();
 SELECT t.as_user(t.id('modone'));
-SELECT t.eq(t.changed(format($q$UPDATE public.user_reports SET status = 'dismissed', details = 'rewritten', reviewed_by = %L WHERE id = %L$q$,
-                             t.id('reporter'), t.id('rep'))), 0,
-  'B-F4: a moderator cannot rewrite a report directly');
+SELECT t.throws(format($q$UPDATE public.user_reports SET details = 'rewritten' WHERE id = %L$q$, t.id('rep')),
+  'REPORT_FIELDS_FIXED', 'B-F4: a moderator cannot rewrite what was reported');
+SELECT t.throws(format($q$UPDATE public.user_reports SET reporter_id = %L WHERE id = %L$q$, t.id('modone'), t.id('rep')),
+  'REPORT_FIELDS_FIXED', 'B-F4: nor who reported it');
+SELECT t.lives(format($q$UPDATE public.user_reports SET status = 'dismissed', reviewed_by = %L, resolution_notes = 'n/a' WHERE id = %L$q$,
+                      t.id('reporter'), t.id('rep')), 'B-F4: a moderator can still decide a report directly');
 SELECT t.reset();
-SELECT t.eq((SELECT status FROM public.user_reports WHERE id = t.id('rep')), 'new', 'B-F4: the report is unchanged');
-SELECT t.ok(NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_reports' AND cmd IN ('UPDATE', 'ALL')
-                         AND 'authenticated' = ANY (roles)),
-  'B-F4: no client UPDATE policy on user_reports');
+SELECT t.eq((SELECT reviewed_by FROM public.user_reports WHERE id = t.id('rep')), t.id('modone'),
+  'B-F4: reviewed_by is the moderator who acted, not the name they supplied');
+SELECT t.eq((SELECT details FROM public.user_reports WHERE id = t.id('rep')), 'original', 'B-F4: the report text is unchanged');
+SELECT t.eq((SELECT count(*)::int FROM public.admin_audit_log WHERE target_type = 'user_report' AND target_id = t.id('rep')::text
+              AND actor_id = t.id('modone') AND action = 'report_updated_directly'), 1, 'B-F4: and the change is audited');
 ROLLBACK;
