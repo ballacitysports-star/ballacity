@@ -1,9 +1,13 @@
--- Read-only verification of hotfix 20261031120000 (PR #287) on a Postgres 17 target. Catalog and ledger only: no row of
--- application data is read or returned. One row per check; every `ok` must be true.
---   psql "$DB" -X -v ON_ERROR_STOP=1 -f docs/release/hotfix-287-verify.sql
+-- Read-only verification of hotfix 20261031120000 (PR #287) on a Postgres 17 target. Catalog and ledgers only: no row
+-- of application data is read or returned. One row per check; every `ok` must be true.
+--   psql -X -v ON_ERROR_STOP=1 -f docs/release/hotfix-287-verify.sql
+-- The statement between BEGIN and ROLLBACK is a single SELECT that does not depend on search_path, so it can also be
+-- run on its own through Lovable's database tool (runbook, section 4).
 -- Expected definition hashes are md5(pg_get_functiondef) / policy expressions from a replay of main + this migration on
 -- postgres:17 (server_version_num 170011). Before the migration (or after its rollback) the definition checks report
 -- missing; after an edited or older version, they report a different hash.
+-- The text is recorded either way it can be applied: as the ledger row's statements[1] (release template, psql), or as
+-- a drizzle ledger hash of the exact file text, with or without its final newline (Lovable's migration tool).
 BEGIN READ ONLY;
 SET LOCAL search_path = '';
 WITH expected_fn(sig, md5) AS (VALUES
@@ -37,8 +41,9 @@ checks(check_name, expected, actual) AS (
   UNION ALL
   SELECT 'trigger ' || e.rel || ' / ' || e.name, 'enabled, calls ' || e.fn,
          coalesce((SELECT CASE WHEN t.tgenabled = 'O' THEN 'enabled' ELSE 'state ' || t.tgenabled::text END
-                          || ', calls ' || t.tgfoid::regprocedure::text
-                     FROM pg_trigger t WHERE NOT t.tgisinternal AND t.tgname = e.name AND t.tgrelid = to_regclass(e.rel)), 'missing')
+                          || ', calls ' || n.nspname || '.' || p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')'
+                     FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid JOIN pg_namespace n ON n.oid = p.pronamespace
+                    WHERE NOT t.tgisinternal AND t.tgname = e.name AND t.tgrelid = to_regclass(e.rel)), 'missing')
     FROM expected_trg e
   UNION ALL
   SELECT 'release_review_screening callable by ' || r.role, r.expect::text,
@@ -49,13 +54,28 @@ checks(check_name, expected, actual) AS (
          coalesce(has_table_privilege(r.role, to_regclass('private_sec.review_screening_holds'), 'SELECT')::text, 'missing')
     FROM (VALUES ('authenticated'), ('anon')) r(role)
   UNION ALL
-  SELECT 'ledger row 20261031120000 records the reviewed file',
+  SELECT 'the reviewed text is recorded (' || CASE
+           WHEN EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000')
+             THEN 'ledger row, release template)'
+           WHEN EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations d WHERE d.hash IN (
+                  '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1',
+                  'ef17f8dd6b530f1a04a5dc700299e9759d50da930abdbe9609afcd1e5f971089'))
+             THEN 'drizzle ledger, Lovable)'
+           ELSE 'no record)' END,
          '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1',
-         coalesce((SELECT CASE
-                     WHEN encode(sha256(convert_to(s.statements[1], 'UTF8')), 'hex') = '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
-                       OR encode(sha256(convert_to(s.statements[1] || E'\n', 'UTF8')), 'hex') = '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
-                     THEN '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
-                     ELSE 'different or empty statements (name ' || coalesce(s.name, 'null') || ')' END
-                     FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000'), 'no ledger row'))
+         CASE
+           WHEN EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000') THEN
+             (SELECT CASE
+                       WHEN encode(sha256(convert_to(s.statements[1], 'UTF8')), 'hex') = '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
+                         OR encode(sha256(convert_to(s.statements[1] || E'\n', 'UTF8')), 'hex') = '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
+                       THEN '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
+                       ELSE 'ledger row with a different or empty text (name ' || coalesce(s.name, 'null') || ')' END
+                FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000')
+           WHEN EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations d WHERE d.hash IN (
+                  '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1',
+                  'ef17f8dd6b530f1a04a5dc700299e9759d50da930abdbe9609afcd1e5f971089'))
+             THEN '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1'
+           ELSE 'no ledger row and no drizzle row with the file hash'
+         END)
 SELECT check_name, expected, actual, (expected = actual) AS ok FROM checks ORDER BY ok, check_name;
 ROLLBACK;

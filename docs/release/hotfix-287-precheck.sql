@@ -1,7 +1,10 @@
--- Read-only pre-check before hotfix 20261031120000 (PR #287) is applied to a Postgres 17 target. Catalog and ledger
+-- Read-only pre-check before hotfix 20261031120000 (PR #287) is applied to a Postgres 17 target. Catalog and ledgers
 -- only: no row of application data is read or returned. One row per check; every `ok` must be true before applying.
 --   psql -X -v ON_ERROR_STOP=1 -f docs/release/hotfix-287-precheck.sql
--- It confirms that the target holds none of the hotfix's objects and no ledger row for it, and that it holds exactly
+-- The statement between BEGIN and ROLLBACK is a single SELECT that does not depend on search_path, so it can also be
+-- run on its own through Lovable's database tool (runbook, section 4).
+-- It confirms that the target holds none of the hotfix's objects and no record of it in either ledger (a ledger row,
+-- or a drizzle row with the file's hash as Lovable's migration tool writes it), and that it holds exactly
 -- what `main` defines for what the hotfix touches: the two review policies it replaces (so the rollback restores this
 -- very state) and the triggers on the four tables (the new triggers rely on their name order). Expected values are
 -- from a replay of `main` on postgres:17 (server_version_num 170011).
@@ -62,8 +65,13 @@ checks(check_name, expected, actual) AS (
   SELECT 'prerequisite: ' || p.label, 'present', CASE WHEN p.ok THEN 'present' ELSE 'missing' END
     FROM prereq p
   UNION ALL
-  SELECT 'no ledger row 20261031120000 yet', 'no ledger row',
-         coalesce((SELECT 'ledger row exists (name ' || coalesce(s.name, 'null') || ')'
-                     FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000'), 'no ledger row'))
+  SELECT 'not yet recorded: no ledger row, no drizzle row with the file hash', 'none',
+         coalesce(nullif(concat_ws(', ',
+           (SELECT 'ledger row (name ' || coalesce(s.name, 'null') || ')'
+              FROM supabase_migrations.schema_migrations s WHERE s.version = '20261031120000'),
+           (SELECT count(*) || ' drizzle row(s) with the file hash' FROM drizzle.__drizzle_migrations d
+             WHERE d.hash IN ('843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1',
+                              'ef17f8dd6b530f1a04a5dc700299e9759d50da930abdbe9609afcd1e5f971089')
+            HAVING count(*) > 0)), ''), 'none'))
 SELECT check_name, expected, actual, (expected = actual) AS ok FROM checks ORDER BY ok, check_name;
 ROLLBACK;
