@@ -105,20 +105,38 @@ if (r.status !== 0)
   fail("Cannot connect to Postgres with psql (check PGHOST/PGUSER/PGPASSWORD).", r.stderr);
 const serverVersion = Number(r.stdout.trim());
 
-// What the server says about itself: reached over a socket or loopback, and not a Supabase-managed cluster.
+// What the server says about itself: local, or a disposable container behind a loopback port; never Supabase-managed.
 {
   const probe = psql("postgres", [
     "-At",
     "-F",
     "|",
     "-c",
-    "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), '')",
+    "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')",
   ]);
   if (probe.status !== 0) fail("Could not identify the server.", probe.stderr);
-  const [serverAddr, roles] = probe.stdout.trim().split("|");
+  const [serverAddr, roles, postgresUserTables] = probe.stdout.trim().split("|");
+  const dbList = psql("postgres", [
+    "-At",
+    "-F",
+    "\t",
+    "-c",
+    "SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database",
+  ]);
+  if (dbList.status !== 0) fail("Could not list the server's databases.", dbList.stderr);
+  const databases = dbList.stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name, ...comment] = line.split("\t");
+      return { name, comment: comment.join("\t") };
+    });
   const problems = serverProblems({
     serverAddr: serverAddr || null,
     managedRoles: roles ? roles.split(",") : [],
+    databases,
+    postgresUserTables: Number(postgresUserTables) || 0,
   });
   if (problems.length) {
     console.error("\ndb-test refused: the server is not a verified local scratch Postgres.");

@@ -242,3 +242,29 @@ procedure **(counsel: retention for a deleted child account)**.
 - Handling custody disputes, court orders and law-enforcement requests **(counsel)**.
 - Notification duties after a compromised guardian account **(counsel)**.
 - Whether the case reference should be hidden from the parties in the audit trail **(counsel)**.
+
+## Approval validity (audit F03, with A-F3 and A-F4)
+
+A guardian's approval of a game, a payment or a team invite counts only **while the guardian who gave it still has
+authority**: an active, verified link to the child and no open authority hold
+(`private_sec.guardian_approval_valid(child, approver)`, migration `20261108160000`).
+
+- **Payments and game joins.** `payment_guardian_missing` and `enforce_child_game_participation` accept a join request's
+  `guardian_approved_at` only if its `guardian_approved_by` is still a valid guardian. Suspension, staff revocation,
+  account recovery (the old account is revoked) and replacement all void earlier approvals: the current guardian must
+  approve again. `guardian_approve_join_request` now replaces an approver who is no longer valid instead of keeping them.
+- **Team invites.** `team_respond_invite` applies the same rule. A guardian's approval of an invite accepts it
+  directly. After that guardian loses authority, the membership no longer authorizes team contact
+  (`team_membership_authorizes`), and a new guardian must re-approve (`guardian_reapprove_team_membership`).
+- **Who needs approval.** A child with an active or **suspended** guardian link (`guardian_approval_required`). A
+  suspension (security review) therefore keeps every gate closed and the guardian's controls (for example game
+  participation off) applying; it never opens them (A-F3). Once every link is revoked, the child is treated like any
+  child without a guardian (the existing product rule), and no old approval counts for anything.
+- **Holds.** A guardian under an open authority hold cannot create a managed child (A-F4). Lifting a hold with the
+  outcome "revoke" also revokes any link the guardian gained while held.
+- **Staff note.** After revoking or replacing a guardian, tell the family that pending game, payment and team approvals
+  must be given again by the current guardian.
+
+Tests: `supabase/tests/545_guardian_approval_validity.test.sql` (41 assertions). Without the migration, 11 fail: payment
+after revocation, suspension and recovery while another guardian remains; joining after suspension and replacement;
+the kept stale approver; controls during suspension; a held guardian creating a managed child.
