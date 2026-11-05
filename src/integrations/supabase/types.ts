@@ -5879,6 +5879,14 @@ export type Database = {
         Args: { _game_id?: string }
         Returns: number
       }
+      release_review_screening: {
+        Args: {
+          _review_id: string
+          _screened_body: string
+          _screened_title: string
+        }
+        Returns: boolean
+      }
       remove_follower: {
         Args: { _follower: string; _target: string }
         Returns: boolean
