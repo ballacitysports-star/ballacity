@@ -1521,6 +1521,80 @@
         "tables": [],
         "schemas": []
       }
+    },
+    {
+      "order": 35,
+      "version": "20261108160000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108160000_guardian_approval_validity.sql",
+      "sha256": "ac9555cd5fe0d6e66690f3d709cb4f8362a1ffb0f93753fee873f13a9d640536",
+      "requires": {
+        "functions": [
+          "private_sec.guardian_eligible(uuid)",
+          "private_sec.is_guardian_of(uuid,uuid)",
+          "private_sec.payment_guardian_missing(text,uuid)"
+        ],
+        "tables": [
+          "public.guardian_authority_holds"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.guardian_approval_required(uuid)",
+          "private_sec.guardian_approval_valid(uuid,uuid)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 36,
+      "version": "20261108170000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
+      "sha256": "13160b78a785bcc446d7c5409c6dcba96d8b2c82c4ced1bcceaef4b3fde8e2d0",
+      "requires": {
+        "functions": [],
+        "tables": [
+          "public.payment_submissions",
+          "public.paypal_orders"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "public.enforce_paypal_checkout_payment()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 37,
+      "version": "20261108180000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108180000_image_direct_upload_closure.sql",
+      "sha256": "5e35a19b87e33ec1beb1da6d1b93ddc4f7932e20b1182c04f0a95ed032cf83d4",
+      "requires": {
+        "functions": [
+          "private_sec.published_image_refuse_user_write()",
+          "private_sec.storage_write_is_trusted(uuid,text)"
+        ],
+        "tables": [],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.direct_image_uploads_closed()",
+          "private_sec.refuse_direct_public_image_write()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
     }
   ],
   "protections": {
@@ -2123,7 +2197,8 @@
         "signature": "private_sec.child_game_participation_allowed(uuid)",
         "defined_by": [
           "20261103150000",
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null
@@ -2151,12 +2226,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "74757bce26eaa5ab614cf49b6d98f706",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "fe828338cdd714226dedb90bc46c318d",
+            "def": "74757bce26eaa5ab614cf49b6d98f706",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -2306,6 +2392,45 @@
               "authenticated:EXECUTE",
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.direct_image_uploads_closed()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "17e3e4e389127934304697706570296e",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "17e3e4e389127934304697706570296e",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
             ]
           }
         }
@@ -2673,6 +2798,72 @@
             "acl": [
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.guardian_approval_required(uuid)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "43e7b982538e3c540b78442e9a81dc5c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "43e7b982538e3c540b78442e9a81dc5c",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.guardian_approval_valid(uuid,uuid)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
             ]
           }
         }
@@ -4932,7 +5123,8 @@
       {
         "signature": "private_sec.payment_guardian_missing(text,uuid)",
         "defined_by": [
-          "20261108140000"
+          "20261108140000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null
@@ -4948,12 +5140,22 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "cb6c892efe0d92f966af4ec993036d8c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "d081eca3a86a0fe9004937fdba1b8c6d",
+            "def": "cb6c892efe0d92f966af4ec993036d8c",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -5272,6 +5474,47 @@
               "authenticated:EXECUTE",
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.refuse_direct_public_image_write()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "552d5cac5cfdf573486b84691bcb3164",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE",
+                "supabase_storage_admin:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "552d5cac5cfdf573486b84691bcb3164",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE",
+              "supabase_storage_admin:EXECUTE"
             ]
           }
         }
@@ -7221,7 +7464,8 @@
       {
         "signature": "public.enforce_child_game_participation()",
         "defined_by": [
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -7246,12 +7490,22 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "903f9fddd28da7dd392f2d3cdda2368b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "c389069076b87d005cc86752a53428d2",
+            "def": "903f9fddd28da7dd392f2d3cdda2368b",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -7857,6 +8111,41 @@
         "expect_after": {
           "16": {
             "def": "e1fd49e482dab3e32355a08008d99dcd",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "public.enforce_paypal_checkout_payment()",
+        "defined_by": [
+          "20261108170000"
+        ],
+        "expect_before": {
+          "16": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108170000": {
+              "def": "eed9b9a2562cfd711028136991c75ec2",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "eed9b9a2562cfd711028136991c75ec2",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -9237,7 +9526,8 @@
       {
         "signature": "public.guardian_approve_join_request(uuid,boolean)",
         "defined_by": [
-          "20261106140000"
+          "20261106140000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -9264,12 +9554,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "021460251c66708394f514e10c745a90",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "7c20a3443139b8c5175068d82d3ee605",
+            "def": "021460251c66708394f514e10c745a90",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -11857,6 +12158,53 @@
         }
       },
       {
+        "signature": "public.provision_managed_child(uuid,date,text,text,text,jsonb,boolean)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": {
+            "def": "525e073677ac824ee5284789d6e075cd",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.publishable_review_ids(uuid[])",
         "defined_by": [
           "20261103120000"
@@ -12942,7 +13290,8 @@
       {
         "signature": "public.staff_lift_guardian_suspension(uuid,boolean,text,text)",
         "defined_by": [
-          "20261108100000"
+          "20261108100000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null
@@ -12959,12 +13308,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "e7194200386cf235bc6bc186445413af",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "b055097a34a012e64fd10071086f60ab",
+            "def": "e7194200386cf235bc6bc186445413af",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -13409,7 +13769,8 @@
       {
         "signature": "public.team_respond_invite(uuid,boolean)",
         "defined_by": [
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -13436,12 +13797,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "7ec2ec489e1dde59335ffa72b69783b0",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "154892d8d5625a9420112b7aace9595a",
+            "def": "7ec2ec489e1dde59335ffa72b69783b0",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -26099,7 +26471,8 @@
         "defined_by": [
           "20261103140000",
           "20261107110000",
-          "20261108140000"
+          "20261108140000",
+          "20261108170000"
         ],
         "expect_before": {
           "16": {
@@ -26297,6 +26670,57 @@
                 "Players update own pending submissions",
                 "Players withdraw own submissions"
               ]
+            },
+            "20261108170000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
+                "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
+                "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+                "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
+                "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
+                "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
+                "no_payment_credentials|public.reject_payment_credentials()|23|O",
+                "payment_submissions_guardian_first|public.enforce_guardian_before_payment()|7|O",
+                "payment_submissions_keep_verified|public.keep_verified_payment_on_delete()|11|O",
+                "payment_submissions_state_guard|public.payment_submissions_state_guard()|23|O",
+                "trg_guard_payment_player_fields|public.guard_payment_player_fields()|19|O",
+                "trg_log_payment_verification_event|public.log_payment_verification_event()|21|O"
+              ],
+              "policies": [
+                "Hosts see submissions for their games",
+                "Hosts update submissions for their games",
+                "Players cancel or dispute own submissions",
+                "Players create own submissions",
+                "Players see own submissions",
+                "Players update own pending submissions",
+                "Players withdraw own submissions"
+              ]
             }
           }
         },
@@ -26332,6 +26756,7 @@
               "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
               "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
               "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+              "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
               "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
               "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
               "no_payment_credentials|public.reject_payment_credentials()|23|O",
@@ -26357,7 +26782,8 @@
         "schema": "public",
         "table": "paypal_orders",
         "defined_by": [
-          "20261108140000"
+          "20261108140000",
+          "20261108170000"
         ],
         "expect_before": {
           "16": {
@@ -26401,6 +26827,43 @@
         "expect_steps": {
           "16": {
             "20261108140000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:DELETE",
+                "anon:INSERT",
+                "anon:REFERENCES",
+                "anon:SELECT",
+                "anon:TRIGGER",
+                "anon:TRUNCATE",
+                "anon:UPDATE",
+                "authenticated:DELETE",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [],
+              "policies": [
+                "players see own orders, hosts see theirs"
+              ]
+            },
+            "20261108170000": {
               "rls": true,
               "force_rls": false,
               "acl": [
@@ -31089,7 +31552,8 @@
           "20261106120000",
           "20261106120500",
           "20261108110000",
-          "20261108120000"
+          "20261108120000",
+          "20261108180000"
         ],
         "expect_before": {
           "16": {
@@ -31324,6 +31788,59 @@
                 "msg_attach_read_participants",
                 "quarantined highlight media is unreadable"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE"
+              ],
+              "triggers": [
+                "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
+                "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
+                "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
+                "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
+                "message_attachment_checked_is_final|private_sec.message_attachment_refuse_rewrite()|23|O",
+                "published_image_refuse_user_write|private_sec.published_image_refuse_user_write()|23|O"
+              ],
+              "policies": [
+                "Authenticated read game covers",
+                "Hosts read payment proofs for their games",
+                "Org admins write org images",
+                "Players delete own payment proofs",
+                "Players read own payment proofs",
+                "Players update own payment proofs",
+                "Players upload own payment proofs",
+                "Team owners write team images",
+                "Users can delete their own game covers",
+                "Users can update their own game covers",
+                "Users can upload their own game covers",
+                "Users delete own highlight videos",
+                "Users read own highlight videos",
+                "Users update own highlight videos",
+                "Users upload own highlight videos",
+                "Users write entity images in own folder (delete)",
+                "Users write entity images in own folder (insert)",
+                "Users write entity images in own folder (update)",
+                "Users write own avatar",
+                "image_quarantine_no_api_access",
+                "image_staging_insert_own_folder",
+                "image_staging_no_api_delete",
+                "image_staging_no_api_update",
+                "image_staging_no_insert_flagged",
+                "image_staging_select_own_folder",
+                "msg_attach_checked_path_is_final",
+                "msg_attach_delete_sender",
+                "msg_attach_insert_sender",
+                "msg_attach_read_participants",
+                "quarantined highlight media is unreadable"
+              ]
             }
           }
         },
@@ -31341,6 +31858,7 @@
               "postgres:UPDATE"
             ],
             "triggers": [
+              "a_refuse_direct_public_image_write|private_sec.refuse_direct_public_image_write()|23|O",
               "image_quarantine_guard|private_sec.image_quarantine_guard()|31|O",
               "image_staging_refuse_flagged_insert|private_sec.image_staging_refuse_flagged_insert()|7|O",
               "image_staging_refuse_overwrite|private_sec.image_staging_refuse_overwrite()|19|O",
