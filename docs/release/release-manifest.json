@@ -1530,7 +1530,7 @@
       "version": "20261108160000",
       "source": "supabase",
       "path": "supabase/migrations/20261108160000_guardian_approval_validity.sql",
-      "sha256": "ac9555cd5fe0d6e66690f3d709cb4f8362a1ffb0f93753fee873f13a9d640536",
+      "sha256": "2be6968f22ba22fe5c728fcdfcf9510661192d20eaf01148442e8f0df9be5f14",
       "requires": {
         "functions": [
           "private_sec.guardian_eligible(uuid)",
@@ -3582,7 +3582,7 @@
         "expect_steps": {
           "16": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3593,7 +3593,7 @@
           },
           "17": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3605,7 +3605,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3614,7 +3614,7 @@
             ]
           },
           "17": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -14793,7 +14793,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -14817,7 +14817,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -14831,7 +14831,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -14842,7 +14842,7 @@
             ]
           },
           "17": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
