@@ -113,7 +113,9 @@ returns 26 rows, and every `ok` must be true. It confirms:
 - neither ledger records it yet (no ledger row, no drizzle row with either hash);
 - the two review policies the hotfix replaces are exactly `main`'s, so the rollback restores this state;
 - the triggers on `team_members`, `payment_submissions`, `reviews` and `user_reports` are `main`'s; the new triggers
-  rely on their name order;
+  rely on their name order. `payment_submissions` may lack `aa_payment_destination_trg`: it comes with release
+  migration `20261103140000` (#250), merged but not yet applied in production. The new `a00_` trigger sorts first
+  either way;
 - the prerequisites exist: `private_sec`, `auth.uid()`, the API roles and the `admin_audit_log` columns.
 
 If any row is false, stop. The rows hold catalog data only, so they can be shared.

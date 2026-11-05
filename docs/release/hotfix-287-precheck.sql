@@ -57,10 +57,17 @@ checks(check_name, expected, actual) AS (
                      FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reviews' AND policyname = e.name), 'missing')
     FROM main_pol e
   UNION ALL
-  SELECT 'triggers on ' || e.rel || ' (as on main)', e.names,
-         coalesce((SELECT string_agg(t.tgname, ', ' ORDER BY t.tgname)
-                     FROM pg_trigger t WHERE NOT t.tgisinternal AND t.tgrelid = to_regclass(e.rel)), 'none')
+  -- payment_submissions: main also has aa_payment_destination_trg, from release migration 20261103140000 (#250), which
+  -- is merged but not yet applied in production; either state is expected (the new a00_ trigger sorts first in both).
+  SELECT 'triggers on ' || e.rel || ' (as on main' ||
+           CASE WHEN e.rel = 'public.payment_submissions' THEN ', with or without release migration 20261103140000)' ELSE ')' END,
+         e.names,
+         CASE WHEN e.rel = 'public.payment_submissions' AND x.names = replace(e.names, 'aa_payment_destination_trg, ', '')
+              THEN e.names ELSE x.names END
     FROM main_trg e
+    CROSS JOIN LATERAL (SELECT coalesce((SELECT string_agg(t.tgname, ', ' ORDER BY t.tgname)
+                                           FROM pg_trigger t WHERE NOT t.tgisinternal AND t.tgrelid = to_regclass(e.rel)), 'none')
+                                 AS names) x
   UNION ALL
   SELECT 'prerequisite: ' || p.label, 'present', CASE WHEN p.ok THEN 'present' ELSE 'missing' END
     FROM prereq p
