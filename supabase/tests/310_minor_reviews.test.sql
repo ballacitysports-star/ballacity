@@ -38,6 +38,12 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (id, reviewer_id, kind, revi
   VALUES (%L, %L, 'player', 'player', %L, 'Adult', 4, 'Good teammate, communicated well.', 'g-rv')$q$,
   t.id('new-adult'), t.id('adultrev'), t.id('adultsubj')::text),
   'an adult can review an adult they played with');
+-- a review written through the API is held until the server screens it (hotfix 20261031120000); release it as submitReview does
+SELECT t.reset();
+SELECT t.as_service();
+SELECT public.release_review_screening(t.id('new-adult'));
+SELECT t.reset();
+SELECT t.as_user(t.id('adultrev'));
 SELECT t.throws(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
   VALUES (%L, 'player', 'player', %L, 'Kid', 2, 'Not a great teammate today.', 'g-rv')$q$, t.id('adultrev'), t.id('child8')::text),
   'not available for this person', 'under 13: nobody can review them');
@@ -227,6 +233,9 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee
   VALUES (%L, 'player', 'player', %L, 'Adult peer', 4, 'Good teammate, communicated well.', 'g-rv')$q$, t.id('adultrev'), t.id('adultpeer')::text),
   'an adult can still review another adult');
 SELECT t.reset();
+SELECT t.as_service();
+SELECT public.release_review_screening(r.id) FROM public.reviews r WHERE r.reviewer_id = t.id('adultrev') AND r.reviewee_id = t.id('adultpeer')::text;
+SELECT t.reset();
 SELECT t.eq((SELECT is_private FROM public.reviews WHERE reviewer_id = t.id('adultrev') AND reviewee_id = t.id('adultpeer')::text), false,
   'and that review is created normally (verified by the trigger, public)');
 SELECT t.as_anon();
@@ -256,6 +265,11 @@ SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee
 SELECT t.lives(format($q$INSERT INTO public.reviews (reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body, game_id)
   VALUES (%L, 'player', 'host', %L, 'Host', 4, 'Well organised and started on time.', 'g-rv')$q$, t.id('adultpeer'), t.id('adultrev')::text),
   'an adult who played in a game can review its adult host');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT public.release_review_screening(r.id) FROM public.reviews r
+ WHERE r.reviewer_id = t.id('adultpeer') AND r.reviewee_kind = 'host' AND r.reviewee_id = t.id('adultrev')::text;
+SELECT t.reset();
 SELECT t.as_user(t.id('stranger'));
 SELECT t.lives(format('SELECT public.report_review(%L)', t.id('r-adult-pub')), 'any adult member can still report a public review');
 SELECT t.as_anon();
