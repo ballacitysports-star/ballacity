@@ -232,6 +232,13 @@
       "when": 1793898885406,
       "tag": "0032_hotfix_close_write_paths",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793916920228,
+      "tag": "0033_hotfix_payment_settings_host_guard",
+      "breakpoints": true
     }
   ]
 }
