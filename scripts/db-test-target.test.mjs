@@ -82,8 +82,14 @@ describe("db-test target: what the server reports", () => {
     expect(serverProblems({ serverAddr: "::1", managedRoles: [] })).toEqual([]);
   });
 
-  it("refuses a non-loopback server address (for example a tunnel to a remote server bound elsewhere)", () => {
-    expect(serverProblems({ serverAddr: "10.0.0.5", managedRoles: [] }).length).toBe(1);
+  it("accepts the private address a Docker or CI service container reports behind a loopback port mapping", () => {
+    for (const a of ["172.18.0.2", "10.0.0.5", "192.168.65.2", "fd00::2"])
+      expect(serverProblems({ serverAddr: a, managedRoles: [] })).toEqual([]);
+  });
+
+  it("refuses a public server address (the loopback port is a tunnel to a remote server)", () => {
+    for (const a of ["203.0.113.9", "52.1.2.3", "2600:1f18::1"])
+      expect(serverProblems({ serverAddr: a, managedRoles: [] }).length).toBe(1);
   });
 
   it("refuses a Supabase-managed cluster even when reached locally", () => {

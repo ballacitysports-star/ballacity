@@ -9,7 +9,7 @@
 //   - PGHOSTADDR: unset or loopback. PGSERVICE / PGSERVICEFILE: refused (a service can point anywhere).
 //   - The database name: a plain identifier (never a conninfo string or a URI, which psql -d would honour), not a
 //     reserved database, at most 63 characters.
-// After connecting, the server must report a socket or loopback address and must not be a Supabase-managed
+// After connecting, the server must not report a public address (a tunnel elsewhere) and must not be a Supabase-managed
 // cluster (role supabase_admin or authenticator), and an existing database is only dropped or reused when the
 // harness created it (it carries the scratch marker comment).
 //
@@ -66,11 +66,35 @@ export function targetProblems(env, dbName) {
   return problems;
 }
 
-/** Pure check of what the server reported after connecting. */
+/**
+ * A container or private-network address: what a local Docker or CI service container reports for itself when
+ * the client reached it through a loopback port mapping (the client side is already loopback-only).
+ */
+function isPrivateAddress(a) {
+  const v = String(a)
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  const m = /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(v);
+  if (m) {
+    const [a1, a2] = [Number(m[1]), Number(m[2])];
+    return a1 === 10 || (a1 === 172 && a2 >= 16 && a2 <= 31) || (a1 === 192 && a2 === 168);
+  }
+  return /^f[cd][0-9a-f]{2}:/.test(v) || /^fe80:/.test(v);
+}
+
+/**
+ * Pure check of what the server reported after connecting. The client side already allows only a socket or a
+ * loopback host; a server that reports a public (routable) address for that connection is behind a tunnel or
+ * proxy to somewhere else and is refused. Loopback and private container addresses (Docker, CI service
+ * containers) are accepted.
+ */
 export function serverProblems({ serverAddr, managedRoles }) {
   const problems = [];
-  if (serverAddr && !isLoopbackAddress(serverAddr))
-    problems.push("The server is not reached over a local socket or loopback address.");
+  if (serverAddr && !isLoopbackAddress(serverAddr) && !isPrivateAddress(serverAddr))
+    problems.push(
+      "The server reports a public network address: the loopback connection is forwarded somewhere else.",
+    );
   if (managedRoles && managedRoles.length > 0)
     problems.push(
       "The server looks like a Supabase-managed cluster (it has supabase_admin/authenticator). db-test runs only on a plain scratch Postgres.",
