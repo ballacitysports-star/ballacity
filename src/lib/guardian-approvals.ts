@@ -36,6 +36,7 @@ export type GuardianJoinRequest = {
 
 const ERRORS: Record<string, string> = {
   NOT_GUARDIAN: "You're not linked as this child's guardian.",
+  GUARDIAN_NOT_ELIGIBLE: "Your account can't approve for your child right now. Contact support.",
   INVITE_NOT_PENDING: "This invite was already answered.",
   REQUEST_NOT_PENDING: "This request was already answered.",
   ALREADY_ON_ROSTER: "They're already in this game. Open the game to cancel their spot instead.",
