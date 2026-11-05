@@ -19,19 +19,25 @@
 // Why two migration folders: supabase/migrations holds ours, drizzle/migrations
 // holds the ones Lovable writes and applies itself. The live schema is both
 // together, so they are replayed together in timestamp order (a drizzle entry's
-// time is `when` in its journal; at the same instant ours goes first).
+// time is `when` in its journal; at the same instant ours goes first). The order
+// comes from scripts/migration-order.mjs, which the release preflight uses too; it
+// leaves out Lovable's drizzle copy of a pinned hotfix, which production ran once,
+// ahead of the release, where the hotfix's own version already places it.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  DATABASE_LIST_SQL,
   SCRATCH_MARKER,
+  SERVER_PROBE_SQL,
   existingDatabaseProblems,
   scrubbedEnv,
-  serverProblems,
+  serverProblemsFromProbe,
   targetProblems,
 } from "./db-test-target.mjs";
+import { migrationOrder as sharedMigrationOrder } from "./migration-order.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -75,28 +81,10 @@ function fail(message, detail) {
 }
 
 function migrationOrder() {
-  const rows = [];
-  for (const file of readdirSync(join(root, "supabase/migrations"))) {
-    if (file.endsWith(".sql")) {
-      rows.push({
-        key: `${file.slice(0, 14)}a${file}`,
-        path: join(root, "supabase/migrations", file),
-        name: file,
-      });
-    }
-  }
-  const journal = JSON.parse(
-    readFileSync(join(root, "drizzle/migrations/meta/_journal.json"), "utf8"),
-  );
-  for (const entry of journal.entries) {
-    const stamp = new Date(entry.when).toISOString().replace(/\D/g, "").slice(0, 14);
-    rows.push({
-      key: `${stamp}b${entry.tag}`,
-      path: join(root, "drizzle/migrations", `${entry.tag}.sql`),
-      name: `${entry.tag}.sql`,
-    });
-  }
-  return rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return sharedMigrationOrder(root).map((m) => ({
+    path: join(root, m.path),
+    name: m.path.split("/").pop(),
+  }));
 }
 
 // -- scratch database -------------------------------------------------------
@@ -106,38 +94,13 @@ if (r.status !== 0)
 const serverVersion = Number(r.stdout.trim());
 
 // What the server says about itself: local, or a disposable container behind a loopback port; never Supabase-managed.
+// The same attestation guards release-preflight-scratch.mjs (scripts/db-test-target.mjs).
 {
-  const probe = psql("postgres", [
-    "-At",
-    "-F",
-    "|",
-    "-c",
-    "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')",
-  ]);
+  const probe = psql("postgres", ["-At", "-F", "|", "-c", SERVER_PROBE_SQL]);
   if (probe.status !== 0) fail("Could not identify the server.", probe.stderr);
-  const [serverAddr, roles, postgresUserTables] = probe.stdout.trim().split("|");
-  const dbList = psql("postgres", [
-    "-At",
-    "-F",
-    "\t",
-    "-c",
-    "SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database",
-  ]);
+  const dbList = psql("postgres", ["-At", "-F", "\t", "-c", DATABASE_LIST_SQL]);
   if (dbList.status !== 0) fail("Could not list the server's databases.", dbList.stderr);
-  const databases = dbList.stdout
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [name, ...comment] = line.split("\t");
-      return { name, comment: comment.join("\t") };
-    });
-  const problems = serverProblems({
-    serverAddr: serverAddr || null,
-    managedRoles: roles ? roles.split(",") : [],
-    databases,
-    postgresUserTables: Number(postgresUserTables) || 0,
-  });
+  const problems = serverProblemsFromProbe(probe.stdout, dbList.stdout);
   if (problems.length) {
     console.error("\ndb-test refused: the server is not a verified local scratch Postgres.");
     for (const p of problems) console.error(`  - ${p}`);

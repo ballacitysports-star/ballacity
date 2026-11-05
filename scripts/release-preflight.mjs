@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { PINNED_HISTORY, migrationOrder as sharedMigrationOrder } from "./migration-order.mjs";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_MANIFEST = "docs/release/release-manifest.json";
@@ -96,36 +97,9 @@ Exit codes: 0 all checks passed, 1 a check failed, 2 usage or connection error.`
 
 // --------------------------------------------------------------------------------------------- files
 
-/** All migrations in replay order, exactly as scripts/db-test.mjs orders them. */
+/** All migrations in replay order; the same function orders scripts/db-test.mjs's replay (scripts/migration-order.mjs). */
 export function migrationOrder(root = ROOT) {
-  const rows = [];
-  for (const file of readdirSync(join(root, "supabase/migrations"))) {
-    if (!file.endsWith(".sql")) continue;
-    const version = file.slice(0, 14);
-    rows.push({
-      key: `${version}a${file}`,
-      version,
-      source: "supabase",
-      path: `supabase/migrations/${file}`,
-      name: file.replace(/\.sql$/, ""),
-    });
-  }
-  const journalPath = join(root, "drizzle/migrations/meta/_journal.json");
-  if (existsSync(journalPath)) {
-    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
-    for (const entry of journal.entries) {
-      const version = new Date(entry.when).toISOString().replace(/\D/g, "").slice(0, 14);
-      rows.push({
-        key: `${version}b${entry.tag}`,
-        version,
-        source: "drizzle",
-        path: `drizzle/migrations/${entry.tag}.sql`,
-        name: entry.tag,
-        when: entry.when,
-      });
-    }
-  }
-  return rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return sharedMigrationOrder(root);
 }
 
 export const sortKey = (e) =>
@@ -414,6 +388,39 @@ export function checkManifest(manifest, root = ROOT) {
         `${where}: sha256 differs from the file (the allow-list covers the reviewed bytes only)`,
       );
   }
+  const seenPinned = new Set();
+  for (const k of manifest.pinned_history ?? []) {
+    const where = `pinned_history ${k.path}`;
+    if (seenPinned.has(k.version)) errors.push(`${where}: listed twice`);
+    seenPinned.add(k.version);
+    if (!filePaths.has(k.path) || !existsSync(join(root, k.path))) {
+      errors.push(`${where}: no such migration file`);
+      continue;
+    }
+    if (from && k.version >= from)
+      errors.push(`${where}: is in the release range; pin only files dated before it`);
+    if (sha256File(join(root, k.path)) !== k.sha256)
+      errors.push(
+        `${where}: sha256 differs from the file (the pinned text is what production must have applied)`,
+      );
+  }
+  // A migration dated after the newest reviewed historical file and before the range is neither known history nor part
+  // of the release: it must be pinned, or the preflight could not tell which text production applied (or whether at all).
+  const lastKnown = (manifest.known_unledgered ?? []).reduce(
+    (a, k) => (k.version > a ? k.version : a),
+    "",
+  );
+  if (lastKnown && from)
+    for (const f of allFiles)
+      if (
+        f.source !== "drizzle" &&
+        f.version > lastKnown &&
+        f.version < from &&
+        !seenPinned.has(f.version)
+      )
+        errors.push(
+          `unpinned history: ${f.path} is dated after the reviewed history (${lastKnown}) and before the release range; list it in pinned_history (regenerate the manifest) or move it into the range`,
+        );
   for (const k of manifest.known_ledger_rows_without_file ?? []) {
     const where = `known_ledger_rows_without_file ${k.version}`;
     if (!/^\d{14}$/.test(k.version ?? "") || typeof k.name !== "string")
@@ -590,10 +597,12 @@ function requirementKey(kind, name) {
  * with one trailing newline added back (psql's backquote expansion in the runbook template drops it).
  * to_jsonb(s) keeps the query valid when a column is missing (it then counts as empty).
  */
-const LEDGER_CONTENT_SQL = (from) => {
+const LEDGER_CONTENT_SQL = (from, pinned = []) => {
   const st = `(to_jsonb(s)->'statements')`;
   const first = `(${st}->>0)`;
-  const inRange = `s.version::text >= ${from}`;
+  const inRange = pinned.length
+    ? `(s.version::text >= ${from} OR s.version::text IN (${pinned.join(", ")}))`
+    : `s.version::text >= ${from}`;
   return `'statements', CASE WHEN ${inRange} THEN CASE WHEN jsonb_typeof(${st}) = 'array' THEN jsonb_array_length(${st}) ELSE 0 END END,
           'statement_sha256', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first}, 'UTF8')), 'hex') END,
           'statement_sha256_nl', CASE WHEN ${inRange} AND ${first} IS NOT NULL THEN encode(sha256(convert_to(${first} || E'\\n', 'UTF8')), 'hex') END`;
@@ -655,7 +664,14 @@ export function readTarget(env, manifest) {
     env,
     `SELECT json_build_object(
        'ledger_rows', ${head.ledger ? `(SELECT count(*) FROM ${LEDGER})` : "NULL"},
-       'ledger_all', ${head.ledger ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name', ${LEDGER_CONTENT_SQL(lit(from))}) ORDER BY s.version::text), '[]') FROM ${LEDGER} s)` : "'[]'::json"},
+       'ledger_all', ${
+         head.ledger
+           ? `(SELECT coalesce(json_agg(json_build_object('version', s.version::text, 'name', to_jsonb(s)->>'name', ${LEDGER_CONTENT_SQL(
+               lit(from),
+               (manifest.pinned_history ?? []).map((k) => lit(k.version)),
+             )}) ORDER BY s.version::text), '[]') FROM ${LEDGER} s)`
+           : "'[]'::json"
+       },
        'drizzle_rows', ${head.drizzle ? `(SELECT coalesce(json_agg(json_build_object('hash', hash, 'created_at', created_at::text)), '[]') FROM ${DRIZZLE_LEDGER})` : "'[]'::json"},
        'requirements', ${reqSql},
        'functions', ${fnSql},
@@ -780,6 +796,29 @@ export function releaseRowErrors(row, entry) {
   return errors;
 }
 
+/**
+ * The drizzle-ledger hashes that prove a pinned hotfix was applied through Lovable's migration tool, which records
+ * only the sha256 of the exact SQL text it ran (docs/supabase-cli.md): the pinned file sha256 and, when the file on
+ * disk is that text, its sha256 without the one trailing newline a pasted block can lose (the same tolerance as for
+ * statements[1] of the release template). Maps hash -> pinned version.
+ */
+export function pinnedDrizzleHashes(manifest, root = ROOT) {
+  const out = new Map();
+  for (const k of manifest.pinned_history ?? []) {
+    out.set(k.sha256, k.version);
+    let bytes;
+    try {
+      bytes = readFileSync(join(root, k.path));
+    } catch {
+      continue; // a missing file fails the offline check
+    }
+    if (createHash("sha256").update(bytes).digest("hex") !== k.sha256) continue; // so does an edited one
+    if (bytes.length && bytes[bytes.length - 1] === 0x0a)
+      out.set(createHash("sha256").update(bytes.subarray(0, -1)).digest("hex"), k.version);
+  }
+  return out;
+}
+
 /** Pure evaluation of the checks against data read from the target. */
 export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } = {}) {
   const errors = [];
@@ -818,9 +857,17 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
   );
   const kn = ledgerKnowledge(manifest, root);
   const knownRowsWithoutFile = manifest.known_ledger_rows_without_file ?? [];
+  const pinnedByVersion = new Map((manifest.pinned_history ?? []).map((k) => [k.version, k]));
+  const pinnedByDrizzleHash = pinnedDrizzleHashes(manifest, root);
+  const pinnedViaDrizzle = new Set(
+    (target.drizzle_rows ?? [])
+      .filter((r) => pinnedByDrizzleHash.has(r.hash))
+      .map((r) => pinnedByDrizzleHash.get(r.hash)),
+  );
   if (target.ledger) {
     for (const row of ledgerAll) {
       const v = row.version;
+      if (pinnedByVersion.has(v)) errors.push(...releaseRowErrors(row, pinnedByVersion.get(v)));
       if (v >= from) {
         if (!known.has(v))
           errors.push(
@@ -843,7 +890,9 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     // every historical file must be ledgered unless the manifest names it as known-unledgered
     for (const f of kn.supabase) {
       if (f.version >= from) continue;
-      const covered = ledgerAll.some((r) => r.version === f.version || kn.nameMatch(r, f));
+      const covered =
+        ledgerAll.some((r) => r.version === f.version || kn.nameMatch(r, f)) ||
+        pinnedViaDrizzle.has(f.version);
       if (!covered && !kn.unledgered.has(f.path))
         errors.push(
           `unrecognized history: ${f.path} (before the release range) has no ledger row and is not in the manifest's known_unledgered list; the target is missing it or applied it unrecorded`,
@@ -869,6 +918,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     const ok =
       journalHashes.has(r.hash) ||
       journalWhen.has(String(r.created_at)) ||
+      pinnedByDrizzleHash.has(r.hash) ||
       (manifest.known_drizzle_rows_without_file ?? []).some(
         (k) => k.hash === r.hash && String(k.created_at) === String(r.created_at),
       );
@@ -877,6 +927,11 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
         `unknown ${DRIZZLE_LEDGER} row (created_at ${r.created_at}, hash ${String(r.hash).slice(0, 16)}...): matches no drizzle journal file and is not in known_drizzle_rows_without_file`,
       );
   }
+  for (const v of pinnedViaDrizzle)
+    if (!ledgerAll.some((r) => r.version === v))
+      warnings.push(
+        `pinned history ${v}: recognized by its ${DRIZZLE_LEDGER} row, the sha256 of the exact file text (applied through Lovable's migration tool); it has no ${LEDGER} row`,
+      );
 
   // 3. gaps: the applied set must be a prefix of the manifest order
   const firstPending = entries.findIndex((e) => !isApplied(e));
@@ -1284,6 +1339,7 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
       known_unledgered_basis:
         "Runbook section 1 / docs/migration-history-reconciliation.md section 3: these historical files are in production by catalog evidence (docs/migration-evidence/ledger-evidence.csv) but have no ledger row. Only they may lack one; the sha256 is the reviewed file.",
       known_unledgered,
+      pinned_history: pinnedHistory(root, from),
       known_ledger_rows_without_file: KNOWN_LEDGER_ROWS_WITHOUT_FILE,
       known_drizzle_rows_without_file: KNOWN_DRIZZLE_ROWS_WITHOUT_FILE,
       drift_captures: DRIFT_CAPTURES.filter((c) => entries.some((e) => e.version === c.version)),
@@ -1298,6 +1354,26 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
   } finally {
     scratch.dropDb(db);
   }
+}
+
+// PINNED_HISTORY (scripts/migration-order.mjs): hotfixes dated before the release range that ship to production ahead of
+// it. Their exact text is pinned: offline the file must still match; online the target must record that text, either as
+// its ledger row's statements[1] (the release template, as for release-range rows) or as a drizzle ledger hash (Lovable's
+// migration tool; pinnedDrizzleHashes), so an older or edited version applied in production is caught. A drizzle copy of
+// one is the same migration and is left out of the replay order (pinnedDrizzleCopies).
+
+/** PINNED_HISTORY with each file's path and sha256, for the manifest. */
+function pinnedHistory(root, from) {
+  return PINNED_HISTORY.map((p) => {
+    const file = readdirSync(join(root, "supabase/migrations")).find((n) =>
+      n.startsWith(`${p.version}_`),
+    );
+    if (!file) throw new Error(`pinned history ${p.version}: no such migration file`);
+    if (p.version >= from)
+      throw new Error(`pinned history ${p.version} is inside the release range ${from}`);
+    const path = `supabase/migrations/${file}`;
+    return { version: p.version, path, sha256: sha256File(join(root, path)), basis: p.basis };
+  });
 }
 
 // Explicit allow-lists, each from the reconciliation record. Anything not listed here fails closed.

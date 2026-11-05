@@ -10,6 +10,7 @@
 // manifest is only checked offline and structurally.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -47,10 +48,18 @@ let counter = 0;
 function localUrl(db) {
   const host =
     process.env.PGHOST ||
-    scratch.sql("postgres", "SHOW unix_socket_directories").trim().split(",")[0].trim();
+    scratch
+      .psqlLocal("postgres", ["-At", "-c", "SHOW unix_socket_directories"])
+      .stdout.trim()
+      .split(",")[0]
+      .trim();
   const params = new URLSearchParams({ host });
   if (process.env.PGPORT) params.set("port", process.env.PGPORT);
-  params.set("user", process.env.PGUSER || scratch.sql("postgres", "SELECT current_user").trim());
+  params.set(
+    "user",
+    process.env.PGUSER ||
+      scratch.psqlLocal("postgres", ["-At", "-c", "SELECT current_user"]).stdout.trim(),
+  );
   if (process.env.PGPASSWORD) params.set("password", process.env.PGPASSWORD);
   return `postgresql:///${db}?${params}`;
 }
@@ -215,6 +224,12 @@ before(async () => {
      CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);
      INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ${drizzleRows.join(", ")};`,
   );
+  // A pinned hotfix (manifest.pinned_history) is applied with the release ledger template: statements = its file text.
+  for (const k of manifest.pinned_history ?? [])
+    scratch.sql(
+      PRE,
+      `UPDATE ${LEDGER} SET statements = ARRAY[${dollar(readFileSync(join(ROOT, k.path), "utf8").replace(/\n$/, ""))}] WHERE version = ${q(k.version)};`,
+    );
   // Fully released target: every manifest migration applied with its ledger row.
   scratch.createDb(FULL, PRE);
   created.add(FULL);
@@ -267,7 +282,9 @@ describe("happy paths", () => {
     const { code, text } = preflight(PRE, ["--verify-after"]);
     assert.equal(code, 1);
     assert.match(text, /not applied yet/);
-    assert.match(text, /protection private_sec\.game_payee\(text\) is missing/);
+    // the pinned hotfix #295 already defines game_payee before the range (its release definition comes later)
+    assert.match(text, /protection private_sec\.game_payee\(text\) differs from expect_after/);
+    assert.match(text, /protection public\.game_payee_id\(text\) is missing/);
   });
 
   test("checked-in manifest is consistent with the checkout (offline)", () => {
@@ -376,6 +393,283 @@ describe("manifest integrity (hard failures)", () => {
   });
 });
 
+describe("pinned history: a hotfix dated before the range (independent pre-review 2026-11-05)", () => {
+  const PIN = "20261031120000";
+  const pinned = () => manifest.pinned_history.find((k) => k.version === PIN);
+
+  test("the manifest pins the hotfix with the sha256 of its file", () => {
+    assert.ok(pinned(), "20261031120000 is in pinned_history");
+    assert.equal(pinned().sha256, sha256File(join(ROOT, pinned().path)));
+  });
+
+  test("an edited hotfix file fails offline", () => {
+    const dir = tempRoot();
+    const path = join(dir, pinned().path);
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\nDROP TRIGGER IF EXISTS a00_payment_refund_fields_locked ON public.payment_submissions;\n`,
+    );
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /pinned_history .*20261031120000.*sha256 differs/);
+  });
+
+  test("a deleted hotfix file fails offline", () => {
+    const dir = tempRoot();
+    rmSync(join(dir, pinned().path));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /pinned_history .*20261031120000.*no such migration file/);
+  });
+
+  test("a new migration dated between the reviewed history and the range fails offline", () => {
+    const dir = tempRoot();
+    writeFileSync(join(dir, "supabase/migrations/20261101000000_backdated.sql"), "SELECT 1;\n");
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(text, /unpinned history: supabase\/migrations\/20261101000000_backdated\.sql/);
+  });
+
+  test("a target that applied another text under the hotfix's version fails", () => {
+    const db = newDb(PRE);
+    scratch.sql(
+      db,
+      `UPDATE ${LEDGER} SET statements = ARRAY['-- an older version of the hotfix'] WHERE version = ${q(PIN)};`,
+    );
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /ledger row 20261031120000 .*a different text was applied under this version/,
+    );
+  });
+
+  test("a target whose hotfix row records no text fails (not applied with the release template)", () => {
+    const db = newDb(PRE);
+    scratch.sql(db, `UPDATE ${LEDGER} SET statements = ARRAY[]::text[] WHERE version = ${q(PIN)};`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(text, /ledger row 20261031120000 .*statements is empty/);
+  });
+
+  // Applied through Lovable's migration tool instead: no ledger row, a drizzle row with the sha256 of the text it ran.
+  const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const lovableApplied = (hash) => {
+    const db = newDb(PRE);
+    scratch.sql(
+      db,
+      `DELETE FROM ${LEDGER} WHERE version = ${q(PIN)};
+       INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES (${q(hash)}, 1793900000000);`,
+    );
+    return db;
+  };
+
+  test("a hotfix applied through Lovable is recognized by the drizzle hash of its exact text", () => {
+    const { code, report } = preflight(lovableApplied(pinned().sha256));
+    assert.equal(code, 0, report.errors?.join("\n"));
+    assert.ok(
+      report.warnings.some((w) => w.includes(`pinned history ${PIN}: recognized by its drizzle`)),
+      report.warnings.join("\n"),
+    );
+  });
+
+  test("also when the pasted text lost the file's trailing newline", () => {
+    const bytes = readFileSync(join(ROOT, pinned().path));
+    assert.equal(bytes[bytes.length - 1], 0x0a);
+    const { code, report } = preflight(lovableApplied(sha256(bytes.subarray(0, -1))));
+    assert.equal(code, 0, report.errors?.join("\n"));
+  });
+
+  test("a drizzle row for any other text is unknown, and the hotfix counts as unapplied", () => {
+    const edited = `${readFileSync(join(ROOT, pinned().path), "utf8")}-- edited\n`;
+    const { code, text } = preflight(lovableApplied(sha256(edited)));
+    assert.equal(code, 1);
+    assert.match(text, /unknown drizzle\.__drizzle_migrations row/);
+    assert.match(
+      text,
+      /unrecognized history: supabase\/migrations\/20261031120000_close_live_write_holes\.sql/,
+    );
+  });
+
+  // Lovable's tool may also write the hotfix it applied into drizzle/migrations, dated when it applied it: inside the
+  // release range's span (PR #287: 0032_hotfix_close_write_paths, 2026-11-05 17:14:51 UTC). That copy is the same
+  // migration, so it is left out of the replay order and is never a release migration.
+  const LOVABLE_WHEN = Date.UTC(2026, 10, 5, 17, 14, 51);
+  const addDrizzleFile = (dir, tag, body) => {
+    writeFileSync(join(dir, "drizzle/migrations", `${tag}.sql`), body);
+    const journalPath = join(dir, "drizzle/migrations/meta/_journal.json");
+    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+    journal.entries.push({
+      idx: journal.entries.length,
+      version: "7",
+      when: LOVABLE_WHEN,
+      tag,
+      breakpoints: true,
+    });
+    writeFileSync(journalPath, JSON.stringify(journal, null, 2));
+  };
+
+  test("Lovable's drizzle copy of the hotfix is the same migration: not replayed again, not a release migration", () => {
+    const dir = tempRoot();
+    const bytes = readFileSync(join(ROOT, pinned().path));
+    addDrizzleFile(dir, "0099_hotfix_copy", bytes.subarray(0, -1)); // as Lovable wrote it: no final newline
+    assert.ok(!migrationOrder(dir).some((m) => m.path.endsWith("0099_hotfix_copy.sql")));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 0, text);
+  });
+
+  test("a drizzle file that differs from the hotfix in anything else is replayed and must be in the manifest", () => {
+    const dir = tempRoot();
+    addDrizzleFile(
+      dir,
+      "0099_edited_copy",
+      `${readFileSync(join(ROOT, pinned().path), "utf8")}-- edited\n`,
+    );
+    assert.ok(migrationOrder(dir).some((m) => m.path.endsWith("0099_edited_copy.sql")));
+    const { code, text } = preflight(null, ["--offline"], { root: dir });
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /unlisted migration in the release range: drizzle\/migrations\/0099_edited_copy\.sql/,
+    );
+  });
+
+  // A second pinned hotfix (PR #295, 20261102100000, applied through Lovable on 2026-11-05): both pins are listed, and
+  // the two real Lovable copies in the tree (0032 for #287, 0033 for #295) are recognized by their hash and left out of
+  // the replay order, so the offline check passes with them present.
+  test("every pinned hotfix is listed with the sha256 of its file (#287 and #295)", () => {
+    for (const version of ["20261031120000", "20261102100000"]) {
+      const k = manifest.pinned_history.find((x) => x.version === version);
+      assert.ok(k, `${version} is in pinned_history`);
+      assert.equal(k.sha256, sha256File(join(ROOT, k.path)));
+    }
+  });
+
+  test("the Lovable copies of both pinned hotfixes in the tree are left out of the replay order", () => {
+    const order = migrationOrder(ROOT).map((m) => m.path);
+    for (const copy of [
+      "drizzle/migrations/0032_hotfix_close_write_paths.sql",
+      "drizzle/migrations/0033_hotfix_payment_settings_host_guard.sql",
+    ]) {
+      assert.ok(
+        order.every((p) => !p.endsWith(copy.slice("drizzle/migrations/".length))),
+        `${copy} is skipped`,
+      );
+    }
+    assert.ok(
+      order.includes("supabase/migrations/20261102100000_hotfix_payment_settings_writes.sql"),
+    );
+    const { code, text } = preflight(null, ["--offline"]);
+    assert.equal(code, 0, text);
+  });
+
+  test("the pinned hotfix's definitions are the state expected before the range (recognized on the target)", () => {
+    const fn = (sig) => manifest.protections.functions.find((p) => p.signature === sig);
+    // md5(pg_get_functiondef) of the hotfix's two helpers, the same on Postgres 16 and 17 (hotfix rehearsal)
+    assert.equal(
+      fn("private_sec.game_payee(text)").expect_before[MAJOR].def,
+      "883af9b3905190368f4ea6efa29b088e",
+    );
+    assert.equal(
+      fn("private_sec.can_manage_game_payment_settings(text)").expect_before[MAJOR].def,
+      "5a61f1454e986888987775c3a5f5e9f1",
+    );
+    // and 20261103140000 re-creates game_payee unchanged
+    assert.equal(
+      fn("private_sec.game_payee(text)").expect_steps[MAJOR]["20261103140000"].def,
+      "883af9b3905190368f4ea6efa29b088e",
+    );
+  });
+
+  test("Lovable's copies of other migrations are still replayed at their drizzle date (they were applied then)", () => {
+    const order = migrationOrder(ROOT).map((m) => m.path);
+    assert.ok(
+      order.includes("drizzle/migrations/0021_freeze_payment_claim_metadata_on_dispute.sql"),
+    );
+    assert.ok(
+      order.includes(
+        "supabase/migrations/20260915214000_freeze_payment_claim_metadata_on_dispute.sql",
+      ),
+    );
+  });
+
+  test("with neither a ledger row nor a drizzle row, the hotfix counts as unapplied", () => {
+    const db = newDb(PRE);
+    scratch.sql(db, `DELETE FROM ${LEDGER} WHERE version = ${q(PIN)};`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /unrecognized history: supabase\/migrations\/20261031120000_close_live_write_holes\.sql/,
+    );
+  });
+});
+
+describe("scratch helpers: the same protections as db-test (independent review of d604958c)", () => {
+  test("they write to and drop only databases a harness created (scratch marker)", () => {
+    const foreign = `rpf_${process.pid}_unmarked`;
+    scratch.withUnmarkedDatabase(foreign, () => {
+      assert.throws(() => scratch.sql(foreign, "SELECT 1"), /not a scratch database/);
+      assert.throws(() => scratch.loadStub(foreign, ROOT), /not a scratch database/);
+      assert.throws(() => scratch.dropDb(foreign), /Refusing to drop/);
+      assert.throws(
+        () => scratch.createDb(`rpf_${process.pid}_from_foreign`, foreign),
+        /not a scratch database/,
+      );
+    });
+    const left = scratch
+      .psqlLocal("postgres", [
+        "-At",
+        "-c",
+        `SELECT count(*) FROM pg_database WHERE datname = '${foreign}'`,
+      ])
+      .stdout.trim();
+    assert.equal(left, "0", "the self-test's unmarked database is dropped again");
+  });
+
+  // independent review of 7155a4fe: the exported psql was a write path with no attestation, and -d honours a
+  // connection string
+  test("the exported psql reads only, and takes only a plain database name", () => {
+    const r = scratch.psqlLocal("postgres", [
+      "-c",
+      `CREATE DATABASE "rpf_${process.pid}_via_read_psql"`,
+    ]);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /read-only transaction/);
+    const r2 = scratch.psqlLocal("postgres", ["-c", "CREATE TABLE public.rpf_scribble (x int)"]);
+    assert.notEqual(r2.status, 0);
+    assert.match(r2.stderr, /read-only transaction/);
+    for (const bad of [
+      "host=db.example.com dbname=prod",
+      "postgresql://u@db.example.com/prod",
+      "Prod",
+      "",
+    ])
+      assert.throws(() => scratch.psqlLocal(bad, ["-c", "SELECT 1"]), /plain identifier/);
+    assert.throws(
+      () => scratch.withUnmarkedDatabase("not_a_self_test_name", () => {}),
+      /self-test/,
+    );
+  });
+
+  test("a database they create carries the marker, so db-test's guard recognizes it", () => {
+    const db = newDb();
+    const comment = scratch
+      .psqlLocal("postgres", [
+        "-At",
+        "-c",
+        `SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = '${db}'`,
+      ])
+      .stdout.trim();
+    assert.equal(comment, "ballacity db-test scratch database (safe to drop)");
+  });
+
+  test("they refuse the reserved databases", () => {
+    for (const name of ["postgres", "template0", "template1"])
+      assert.throws(() => scratch.createDb(name), /bad scratch database name/);
+  });
+});
+
 describe("dependencies, ledger and protections against a target", () => {
   test("missing dependency: a required table and function absent from the target", () => {
     const db = newDb(PRE);
@@ -401,7 +695,7 @@ describe("dependencies, ledger and protections against a target", () => {
     assert.equal(code, 1);
     assert.match(
       text,
-      /missing dependency: 20261104120000 .* requires function private_sec\.game_payee\(text\)/,
+      /missing dependency: 20261108140000 .* requires function public\.game_payee_id\(text\)/,
     );
   });
 
@@ -668,8 +962,10 @@ describe("fail closed: recognized protection states (rule b)", () => {
     assert.equal(bad.code, 1);
     assert.match(
       bad.text,
-      /unrecognized state: protection private_sec\.game_payee\(text\) is md5 .* must be absent/,
+      /unrecognized state: protection public\.game_payee_id\(text\) is md5 .* must be absent/,
     );
+    // game_payee itself is not flagged: 20261103140000 defines it exactly as the pinned hotfix #295 already did
+    assert.doesNotMatch(bad.text, /unrecognized state: protection private_sec\.game_payee\(text\)/);
   });
 
   test("partially applied definers: the target must equal the snapshot after the last applied one", () => {
@@ -1054,14 +1350,9 @@ describe("scratch databases are local only (independent review)", () => {
       assert.equal(scratch.localEnv({ PGHOSTADDR: a }).PGHOSTADDR, a);
   });
 
-  test("PGSERVICE and PGSERVICEFILE are removed from the environment", () => {
-    const env = scratch.localEnv({
-      PGSERVICE: "prod",
-      PGSERVICEFILE: "/tmp/pg_service.conf",
-      PGHOST: "",
-    });
-    assert.equal(env.PGSERVICE, undefined);
-    assert.equal(env.PGSERVICEFILE, undefined);
+  test("PGSERVICE and PGSERVICEFILE are refused, as db-test refuses them (independent review of d604958c)", () => {
+    assert.throws(() => scratch.localEnv({ PGSERVICE: "prod", PGHOST: "" }), /PGSERVICE/);
+    assert.throws(() => scratch.localEnv({ PGSERVICEFILE: "/tmp/pg_service.conf" }), /PGSERVICE/);
   });
 
   test("--write-manifest refuses a remote PGHOSTADDR before connecting", () => {

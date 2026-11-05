@@ -112,6 +112,46 @@ seconds after the file's timestamp and the file stem as `name`
 stores them differently, the run fails and names every row it cannot match. Read those rows, and have the owner
 review them. Change the manifest's allow-lists or matching only through a reviewed commit, never by hand at release time.
 
+## Pinned history: hotfixes dated before the release range
+
+A hotfix that ships to production ahead of the release is dated before `release_range.from` (today:
+`20261031120000_close_live_write_holes.sql`, PR #287). The ledger only proves that _a_ row exists for a historical
+version, not which text was applied, so the manifest pins these files in `pinned_history` (version, path, sha256,
+basis; generated from `PINNED_HISTORY` in the script):
+
+- **Offline:** the file must still have the pinned sha256, and any migration dated after the newest `known_unledgered`
+  file and before the range must be pinned. A new backdated file fails as "unpinned history".
+- **Online:** the target must record exactly the pinned text, in either ledger:
+  - its ledger row for that version: `statements[1]` hashes to the pinned sha256, with the same rule as release-range
+    rows (the release template, applied with psql);
+  - or a `drizzle.__drizzle_migrations` row whose hash is the pinned sha256, or the sha256 of the file without its one
+    trailing newline. Lovable's migration tool stores the sha256 of the exact SQL it ran (`docs/supabase-cli.md`). The
+    report then carries a warning saying the hotfix was recognized this way.
+
+  An older version, a ledger row written without the text, or a drizzle row for any other text fails. That drizzle row
+  is reported as unknown, and the hotfix as unrecognized history.
+
+Pinned today: `20261031120000` (#287) and `20261102100000` (#295, the payment-settings write hotfix), both applied to
+production through Lovable's migration tool ahead of the release.
+
+**Lovable's copy of a pinned hotfix.** Lovable's tool may also write the hotfix it applied into
+`drizzle/migrations`, dated when it applied it. For PR #287 that is `0032_hotfix_close_write_paths`, 2026-11-05
+17:14 UTC. That date falls among the release migrations' versions, but production applies every release migration
+after the hotfix.
+
+So the shared replay order (`scripts/migration-order.mjs`, used by `scripts/db-test.mjs` and by this tool) leaves out
+any drizzle file that is byte for byte the pinned file, or one trailing newline apart. Production ran the hotfix once,
+and the pinned file's own version already puts it in the right place: after the reviewed history and before the range.
+
+A drizzle file with any other text is replayed as usual. In the range, it fails as an unlisted migration.
+Lovable's copies of other migrations are replayed at their drizzle date as before, because that is when production
+applied them.
+
+So apply the hotfix either with the release ledger template (runbook section 2: name = the file stem,
+`statements = ARRAY[file content]`), or through Lovable with the file's exact text, unchanged
+(`docs/release/hotfix-286-287-runbook.md`, PR #287). If a hotfix is changed before it ships, regenerate the manifest; once it is
+applied, its file must not change.
+
 ## PG17 manifest from CI
 
 The workflow **Release preflight (PG17)** (`.github/workflows/release-preflight.yml`, job "Release preflight on

@@ -376,6 +376,20 @@
       "sha256": "be6be45747778e8d633c7279c6478118c138a4d83533fda067fce9767d6a51a5"
     }
   ],
+  "pinned_history": [
+    {
+      "version": "20261031120000",
+      "path": "supabase/migrations/20261031120000_close_live_write_holes.sql",
+      "sha256": "843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1",
+      "basis": "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release with its exact text: through Lovable's migration tool (drizzle ledger hash) or with the release ledger template (statements = the file text)."
+    },
+    {
+      "version": "20261102100000",
+      "path": "supabase/migrations/20261102100000_hotfix_payment_settings_writes.sql",
+      "sha256": "8f98b616625055b84f614d4bd9ee749196a2b7708ecb7143388398474d89fc8c",
+      "basis": "PR #295: only a game's host may write its payment settings (the write half of #250, closing a live join-approval bypass). Applied to production on 2026-11-05 through Lovable's migration tool with its exact text (drizzle ledger hash; Lovable's copy is drizzle/migrations/0033_hotfix_payment_settings_host_guard.sql)."
+    }
+  ],
   "known_ledger_rows_without_file": [
     {
       "version": "20260708185350",
@@ -626,9 +640,7 @@
       },
       "provides": {
         "functions": [
-          "private_sec.can_manage_game_payment_settings(text)",
           "private_sec.can_read_game_payment_settings(text,uuid)",
-          "private_sec.game_payee(text)",
           "public.enforce_payment_destination()",
           "public.game_payee_id(text)"
         ],
@@ -1600,6 +1612,29 @@
         "tables": [],
         "schemas": []
       }
+    },
+    {
+      "order": 38,
+      "version": "20261108190000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108190000_appeal_separation.sql",
+      "sha256": "b07e8ef7682e613e9150c3d1f0e42c114eda5e440199565fc248d13a67c0ddae",
+      "requires": {
+        "functions": [
+          "public.moderator_review_appeal(uuid,boolean,text)"
+        ],
+        "tables": [
+          "public.admin_audit_log",
+          "public.content_report_holds"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
+        "tables": [],
+        "schemas": []
+      }
     }
   ],
   "protections": {
@@ -2036,8 +2071,28 @@
           "20261103140000"
         ],
         "expect_before": {
-          "16": null,
-          "17": null
+          "16": {
+            "def": "5a61f1454e986888987775c3a5f5e9f1",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "5a61f1454e986888987775c3a5f5e9f1",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
         },
         "expect_steps": {
           "16": {
@@ -3327,8 +3382,26 @@
           "20261104120000"
         ],
         "expect_before": {
-          "16": null,
-          "17": null
+          "16": {
+            "def": "883af9b3905190368f4ea6efa29b088e",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "883af9b3905190368f4ea6efa29b088e",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
         },
         "expect_steps": {
           "16": {
@@ -18274,7 +18347,8 @@
       {
         "signature": "public.moderator_review_appeal(uuid,boolean,text)",
         "defined_by": [
-          "20261106130000"
+          "20261106130000",
+          "20261108190000"
         ],
         "expect_before": {
           "16": null,
@@ -18292,6 +18366,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "cb76b3625737e821d51b309b5d4f2df1",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -18305,12 +18390,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "cb76b3625737e821d51b309b5d4f2df1",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "cb76b3625737e821d51b309b5d4f2df1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -18321,7 +18417,7 @@
             ]
           },
           "17": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "cb76b3625737e821d51b309b5d4f2df1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -24451,12 +24547,12 @@
         "expect_before": {
           "16": {
             "qual": null,
-            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
             "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
           },
           "17": {
             "qual": null,
-            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
             "shape": "256cd4cbbb89d9b7fa9922d2777d93ef"
           }
         },
@@ -24510,12 +24606,12 @@
         "expect_before": {
           "16": {
             "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
-            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
             "shape": "7ec094e1068502b6675cfec62ed75864"
           },
           "17": {
             "qual": "ecd500a09fcc0402fe09ce06f985c1b1",
-            "with_check": "ecd500a09fcc0402fe09ce06f985c1b1",
+            "with_check": "85ab5fb92a0c0ef10e1abc65578a26ce",
             "shape": "7ec094e1068502b6675cfec62ed75864"
           }
         },
