@@ -9,9 +9,12 @@
 --   3. A review written or edited directly through the API skipped the AI screening in submitReview. Such a write is now
 --      held (flagged) until the server releases it after screening (public.release_review_screening, service role only).
 --      A flag the integrity rules set is never cleared by the release. Gym reviews are unchanged (they are not screened).
+--      A held review is not shown to its subject either (private reviews), and its author cannot clear the hold
+--      themselves, even with moderator rights (independent pre-review, 2026-11-05).
 --   4. A moderator could rewrite a report directly (details, reporter, and reviewed_by set to another moderator), with no
---      audit row. A direct moderator update may now change only the review fields; reviewed_by is always the moderator
---      making the change, and every such change is written to admin_audit_log. (The app's server path, service role,
+--      audit row. A direct moderator update may now change only the review fields; reviewed_by and reviewed_at always
+--      record the moderator making the change and when (any review-field change, notes included), and every such change
+--      is written to admin_audit_log. (The app's server path, service role,
 --      writes its own audit and is unaffected.)
 --
 -- Versioned before the privacy release range (20261103100000) so it can ship to production on its own. The checks use
@@ -114,6 +117,11 @@ BEGIN
   IF current_user NOT IN ('anon', 'authenticated') OR NEW.reviewee_kind = 'gym' THEN
     RETURN NEW;
   END IF;
+  -- Moderators pass the integrity trigger's author lock, so without this a moderator could hold-release their own review.
+  IF TG_OP = 'UPDATE' AND OLD.flagged AND NOT NEW.flagged AND NEW.reviewer_id = auth.uid()
+     AND private_sec.review_is_held(NEW.id) THEN
+    RAISE EXCEPTION 'REVIEW_HELD_FOR_SCREENING: your review is published after screening.' USING ERRCODE = '42501';
+  END IF;
   IF TG_OP = 'INSERT' THEN
     PERFORM private_sec.record_review_hold(NEW.id, COALESCE(NEW.flagged, false));
     NEW.flagged := true;
@@ -147,6 +155,17 @@ GRANT EXECUTE ON FUNCTION private_sec.review_is_held(uuid) TO authenticated;
 DROP POLICY IF EXISTS "Users can write reviews as themselves" ON public.reviews;
 CREATE POLICY "Users can write reviews as themselves" ON public.reviews FOR INSERT TO authenticated
   WITH CHECK (reviewer_id = auth.uid() AND (flagged = false OR private_sec.review_is_held(id)));
+
+-- The subject of a private review sees it only once it is visible (not flagged, so not held for screening either). The
+-- policy is otherwise unchanged (20260915225632).
+DROP POLICY IF EXISTS "Reviewees view their private reviews" ON public.reviews;
+CREATE POLICY "Reviewees view their private reviews" ON public.reviews FOR SELECT TO authenticated
+  USING (
+    is_private = true
+    AND flagged = false
+    AND reviewee_id = (auth.uid())::text
+    AND reviewee_kind NOT IN ('gym', 'team', 'org', 'trainer_org')
+  );
 
 -- The server calls this after the AI screening cleared the text, passing the exact title and body it screened. The
 -- review becomes visible only if its stored text is still exactly that: an edit made between screening and release
@@ -209,9 +228,10 @@ BEGIN
   IF (to_jsonb(NEW) - _review) IS DISTINCT FROM (to_jsonb(OLD) - _review) THEN
     RAISE EXCEPTION 'REPORT_FIELDS_FIXED: only the review status and notes of a report can be changed.' USING ERRCODE = '42501';
   END IF;
-  -- the reviewer is whoever makes the change
-  IF NEW.reviewed_by IS DISTINCT FROM OLD.reviewed_by OR NEW.status IS DISTINCT FROM OLD.status THEN
+  -- the reviewer is whoever makes the change, and it happens now: any change of the review fields (notes included)
+  IF (to_jsonb(NEW) - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'updated_at') THEN
     NEW.reviewed_by := auth.uid();
+    NEW.reviewed_at := now();
   END IF;
   PERFORM private_sec.audit_report_change(to_jsonb(OLD), to_jsonb(NEW));
   RETURN NEW;

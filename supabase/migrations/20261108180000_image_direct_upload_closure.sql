@@ -35,7 +35,8 @@ CREATE OR REPLACE FUNCTION private_sec.direct_image_uploads_closed()
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  SELECT COALESCE((SELECT (value ->> 'closed')::boolean FROM public.app_settings WHERE key = 'image_direct_uploads'), false)
+  -- a missing row reads as CLOSED (fail closed); the row cannot be deleted (guard below)
+  SELECT COALESCE((SELECT (value ->> 'closed')::boolean FROM public.app_settings WHERE key = 'image_direct_uploads'), true)
 $function$;
 REVOKE ALL ON FUNCTION private_sec.direct_image_uploads_closed() FROM PUBLIC;
 -- Not anon: the trigger below never reads the switch for an anonymous write (row-level security refuses those).
@@ -81,6 +82,46 @@ DO $grant$ BEGIN
     GRANT EXECUTE ON FUNCTION private_sec.refuse_direct_public_image_write() TO supabase_storage_admin;
   END IF;
 END $grant$;
+
+-- The switch row is guarded (independent pre-review, 2026-11-05). Without this, anyone holding the service key, including
+-- the generic superadmin settings screen (superadminSetSetting), could reopen it, publish it or delete it (a missing row
+-- used to read as open). Now:
+--   * it cannot be deleted, made public, or set to anything but {"closed": <boolean>};
+--   * closing is always allowed;
+--   * re-opening (closed -> open) needs the session to say so on purpose: SET LOCAL app.confirm_reopen_direct_image_uploads
+--     = 'yes', in a reviewed migration (AGENTS.md), so a settings screen or a stray console statement cannot do it.
+CREATE OR REPLACE FUNCTION private_sec.guard_direct_image_upload_switch()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF (CASE WHEN TG_OP = 'DELETE' THEN OLD.key ELSE NEW.key END) IS DISTINCT FROM 'image_direct_uploads'
+     AND (TG_OP <> 'UPDATE' OR OLD.key IS DISTINCT FROM 'image_direct_uploads') THEN
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;   -- every other setting is untouched
+  END IF;
+  IF TG_OP = 'DELETE' OR (TG_OP = 'UPDATE' AND NEW.key IS DISTINCT FROM OLD.key) THEN
+    RAISE EXCEPTION 'DIRECT_UPLOAD_SWITCH_GUARDED: the image_direct_uploads setting cannot be removed or renamed.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF NEW.is_public OR jsonb_typeof(NEW.value) IS DISTINCT FROM 'object' OR jsonb_typeof(NEW.value -> 'closed') IS DISTINCT FROM 'boolean'
+     OR (NEW.value - 'closed') <> '{}'::jsonb THEN
+    RAISE EXCEPTION 'DIRECT_UPLOAD_SWITCH_GUARDED: image_direct_uploads must be a private {"closed": <boolean>} setting.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF TG_OP = 'UPDATE' AND COALESCE((OLD.value ->> 'closed')::boolean, true) AND NOT (NEW.value ->> 'closed')::boolean
+     AND COALESCE(current_setting('app.confirm_reopen_direct_image_uploads', true), '') <> 'yes' THEN
+    RAISE EXCEPTION 'DIRECT_UPLOAD_SWITCH_GUARDED: re-opening direct image uploads needs app.confirm_reopen_direct_image_uploads = yes (a reviewed migration).'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END
+$function$;
+REVOKE ALL ON FUNCTION private_sec.guard_direct_image_upload_switch() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.guard_direct_image_upload_switch() TO anon, authenticated, service_role;
+DROP TRIGGER IF EXISTS a_guard_direct_image_upload_switch ON public.app_settings;
+CREATE TRIGGER a_guard_direct_image_upload_switch BEFORE INSERT OR UPDATE OR DELETE ON public.app_settings
+  FOR EACH ROW EXECUTE FUNCTION private_sec.guard_direct_image_upload_switch();
 
 DROP TRIGGER IF EXISTS a_refuse_direct_public_image_write ON storage.objects;
 CREATE TRIGGER a_refuse_direct_public_image_write BEFORE INSERT OR UPDATE ON storage.objects
