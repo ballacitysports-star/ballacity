@@ -82,8 +82,56 @@ describe("db-test target: what the server reports", () => {
     expect(serverProblems({ serverAddr: "::1", managedRoles: [] })).toEqual([]);
   });
 
-  it("refuses a non-loopback server address (for example a tunnel to a remote server bound elsewhere)", () => {
-    expect(serverProblems({ serverAddr: "10.0.0.5", managedRoles: [] }).length).toBe(1);
+  const fresh = [
+    { name: "postgres", comment: "" },
+    { name: "template0", comment: "" },
+    { name: "template1", comment: "" },
+  ];
+
+  it("accepts a fresh Docker or CI service container behind a loopback port mapping", () => {
+    for (const a of ["172.18.0.2", "10.0.0.5", "192.168.65.2", "fd00::2"])
+      expect(serverProblems({ serverAddr: a, managedRoles: [], databases: fresh })).toEqual([]);
+    const withScratch = [...fresh, { name: "ballacity_dbtest", comment: SCRATCH_MARKER }];
+    expect(
+      serverProblems({ serverAddr: "172.18.0.2", managedRoles: [], databases: withScratch }),
+    ).toEqual([]);
+  });
+
+  it("refuses a private address that holds data db-test did not create (a tunnel to a remote private server)", () => {
+    const remote = [...fresh, { name: "app_production", comment: "" }];
+    expect(
+      serverProblems({ serverAddr: "10.0.0.5", managedRoles: [], databases: remote }).length,
+    ).toBe(1);
+    expect(
+      serverProblems({
+        serverAddr: "172.18.0.2",
+        managedRoles: [],
+        databases: fresh,
+        postgresUserTables: 3,
+      }).length,
+    ).toBe(1);
+  });
+
+  it("does not require an empty cluster for a server on this machine (socket or loopback)", () => {
+    const busy = [...fresh, { name: "my_local_app", comment: "" }];
+    expect(
+      serverProblems({
+        serverAddr: null,
+        managedRoles: [],
+        databases: busy,
+        postgresUserTables: 9,
+      }),
+    ).toEqual([]);
+    expect(serverProblems({ serverAddr: "127.0.0.1", managedRoles: [], databases: busy })).toEqual(
+      [],
+    );
+  });
+
+  it("refuses a public server address (the loopback port is a tunnel to a remote server)", () => {
+    for (const a of ["203.0.113.9", "52.1.2.3", "2600:1f18::1"])
+      expect(
+        serverProblems({ serverAddr: a, managedRoles: [], databases: fresh }).length,
+      ).toBeGreaterThan(0);
   });
 
   it("refuses a Supabase-managed cluster even when reached locally", () => {
