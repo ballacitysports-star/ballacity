@@ -9,7 +9,6 @@ import {
 import {
   ImageReencodeError,
   REENCODE_MESSAGES,
-  reencodeImage,
   type ReencodeResult,
 } from "@/lib/image-reencode.server";
 import {
@@ -36,8 +35,11 @@ export type PromotionDeps = {
   scan: (target: string, userId: string) => Promise<ScanVerdict>;
   /** Escalate a child-safety hit. Called with the quarantine copy (or, if that copy failed, the staged original). */
   escalate: (bucket: string, path: string, categories: string[]) => Promise<void>;
-  /** Test seam: the canonical re-encoder (src/lib/image-reencode.server.ts). */
-  reencode?: (bytes: Uint8Array) => Promise<ReencodeResult>;
+  /**
+   * The re-encoder, from the configured runtime (imageReencoderFromProcessEnv in src/lib/image-runtime/select.server.ts).
+   * Required: there is no default, so no caller can fall back to in-process sharp on a host where it cannot run (audit F09).
+   */
+  reencode: (bytes: Uint8Array) => Promise<ReencodeResult>;
 };
 
 export type PromotionResult = {
@@ -161,7 +163,7 @@ export async function promoteStagedImage(
   // metadata. Only these bytes are scanned and only these bytes are published; nothing of the uploaded container survives.
   let encoded: ReencodeResult;
   try {
-    encoded = await (deps.reencode ?? reencodeImage)(original);
+    encoded = await deps.reencode(original);
   } catch (e) {
     const code = e instanceof ImageReencodeError ? e.code : "unreadable";
     if (code === "unavailable") {

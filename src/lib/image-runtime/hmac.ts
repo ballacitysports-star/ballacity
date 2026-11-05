@@ -131,6 +131,51 @@ export class NonceCache {
 
 export type VerifyFailure = "missing" | "malformed" | "skew" | "body" | "signature" | "replay";
 
+/**
+ * Authenticate a request from its headers alone, before any of its body is read (audit F14): the signature covers the
+ * claimed body hash, so a valid signature proves the sender holds the secret without buffering anything. The nonce is
+ * claimed here, after the signature check, so a replayed request is refused before it can take a processing slot.
+ * The caller must then read the body and check it against `bodySha256` (bodyMatches).
+ */
+export async function verifyRequestHeaders(
+  secret: string,
+  p: {
+    method: string;
+    path: string;
+    headers: (name: string) => string | null | undefined;
+    now: number;
+    nonces: NonceCache;
+    skewMs?: number;
+  },
+): Promise<{ ok: true; nonce: string; bodySha256: string } | { ok: false; reason: VerifyFailure }> {
+  const timestamp = p.headers(SIGNATURE_HEADERS.timestamp);
+  const nonce = p.headers(SIGNATURE_HEADERS.nonce);
+  const claimedHash = p.headers(SIGNATURE_HEADERS.bodySha256);
+  const signature = p.headers(SIGNATURE_HEADERS.signature);
+  if (!timestamp || !nonce || !claimedHash || !signature) return { ok: false, reason: "missing" };
+  if (
+    !/^\d{1,16}$/.test(timestamp) ||
+    !/^[0-9a-f]{32}$/.test(nonce) ||
+    !/^[0-9a-f]{64}$/.test(claimedHash) ||
+    !/^[0-9a-f]{64}$/.test(signature)
+  )
+    return { ok: false, reason: "malformed" };
+  if (Math.abs(p.now - Number(timestamp)) > (p.skewMs ?? DEFAULT_SKEW_MS))
+    return { ok: false, reason: "skew" };
+  const expected = await hmacHex(
+    secret,
+    canonicalRequest({ method: p.method, path: p.path, timestamp, nonce, bodySha256: claimedHash }),
+  );
+  if (!safeEqualHex(expected, signature)) return { ok: false, reason: "signature" };
+  if (!p.nonces.claim(nonce, p.now)) return { ok: false, reason: "replay" };
+  return { ok: true, nonce, bodySha256: claimedHash };
+}
+
+/** The body a header-authenticated request actually carried is the one it signed. */
+export async function bodyMatches(body: Uint8Array, bodySha256: string): Promise<boolean> {
+  return safeEqualHex(await sha256Hex(body), bodySha256);
+}
+
 export async function verifyRequest(
   secret: string,
   p: {

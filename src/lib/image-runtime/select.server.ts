@@ -1,15 +1,25 @@
 /**
- * Feature-flagged seam for the image-processing runtime. NOT WIRED INTO THE APP: promoteStagedImage and finalizeDirectImageUpload
- * still use their default (`reencodeImage`, sharp loaded lazily, "unavailable" in Workers). Wiring is one line per call site,
- * `reencode: selectImageReencoder(env).reencode`, and is the owner's decision (docs/privacy/image-runtime-evaluation.md, "Wiring").
+ * The image-processing runtime, chosen by configuration (audit F09). Wired into both upload paths: promoteStagedImageUpload and
+ * the legacy finalizeImageUpload (src/lib/image-uploads.functions.ts) pass `reencode: imageReencoderFromProcessEnv().reencode`.
  *
- *   IMAGE_RUNTIME=disabled           (default, also for any unknown value) every call fails closed with "unavailable": promotion
- *                                    holds the upload, nothing is published.
+ *   IMAGE_RUNTIME unset, "disabled", or any unknown value (the default)
+ *                                    every call fails closed with "unavailable": promotion holds the upload, nothing is published.
  *   IMAGE_RUNTIME=sharp-node         the Node sharp service, via IMAGE_PROCESSOR_URL and IMAGE_PROCESSOR_SECRET; misconfigured
- *                                    means "unavailable".
- *   IMAGE_RUNTIME=cloudflare-images  the Images binding (env.IMAGES); missing binding means "unavailable".
+ *                                    means "unavailable". The recommended runtime (docs/privacy/image-runtime-evaluation.md).
+ *   IMAGE_RUNTIME=sharp-in-process   reencodeImage in this process. Only where native sharp loads (a Node host: local
+ *                                    development, tests); on Workers sharp cannot load and every call is "unavailable".
+ *   IMAGE_RUNTIME=cloudflare-images  the Images binding (env.IMAGES). Not plumbed from the Worker env yet, so through
+ *                                    imageReencoderFromProcessEnv it is always "unavailable" (fail closed).
+ *
+ * Every runtime's result is checked against the one result contract (reencode-contract.ts, version 2) before the caller sees
+ * it; a runtime that breaks it is "unavailable" (held), never a published picture with part of it unscanned. There is no
+ * fallback from one runtime to another.
  */
-import { ImageReencodeError, type ReencodeResult } from "@/lib/image-reencode.server";
+import {
+  ImageReencodeError,
+  reencodeImage,
+  type ReencodeResult,
+} from "@/lib/image-reencode.server";
 import { reencodeImageWithCloudflareImages } from "@/lib/image-runtime/cloudflare-images.server";
 import type { ImagesBinding } from "@/lib/image-runtime/images-binding";
 import { MIN_SECRET_BYTES } from "@/lib/image-runtime/hmac";
@@ -17,8 +27,14 @@ import {
   createImageProcessorReencoder,
   isAllowedProcessorUrl,
 } from "@/lib/image-runtime/node-service-client";
+import { reencodeResultProblem } from "@/lib/image-runtime/reencode-contract";
 
-export const IMAGE_RUNTIMES = ["sharp-node", "cloudflare-images", "disabled"] as const;
+export const IMAGE_RUNTIMES = [
+  "sharp-node",
+  "sharp-in-process",
+  "cloudflare-images",
+  "disabled",
+] as const;
 export type ImageRuntime = (typeof IMAGE_RUNTIMES)[number];
 
 export type ImageRuntimeEnv = {
@@ -41,7 +57,29 @@ const failClosed =
     throw new ImageReencodeError("unavailable", detail);
   };
 
-export function selectImageReencoder(env: ImageRuntimeEnv): {
+/** The runtime's result, or "unavailable" when it breaks the result contract. */
+export function checkedReencoder(runtime: ImageRuntime, inner: ImageReencoder): ImageReencoder {
+  return async (bytes) => {
+    const result = await inner(bytes);
+    const problem = reencodeResultProblem(result);
+    if (problem)
+      throw new ImageReencodeError(
+        "unavailable",
+        `${runtime} broke the result contract: ${problem}`,
+      );
+    return result;
+  };
+}
+
+export type SelectOptions = {
+  /** Test seam for IMAGE_RUNTIME=sharp-in-process. */
+  inProcess?: ImageReencoder;
+};
+
+export function selectImageReencoder(
+  env: ImageRuntimeEnv,
+  options: SelectOptions = {},
+): {
   runtime: ImageRuntime;
   reencode: ImageReencoder;
 } {
@@ -51,7 +89,7 @@ export function selectImageReencoder(env: ImageRuntimeEnv): {
     return {
       runtime,
       reencode: images
-        ? (bytes) => reencodeImageWithCloudflareImages(bytes, { images })
+        ? checkedReencoder(runtime, (bytes) => reencodeImageWithCloudflareImages(bytes, { images }))
         : failClosed("IMAGE_RUNTIME=cloudflare-images without an IMAGES binding"),
     };
   }
@@ -63,9 +101,29 @@ export function selectImageReencoder(env: ImageRuntimeEnv): {
     return {
       runtime,
       reencode: ok
-        ? createImageProcessorReencoder({ url, secret })
+        ? checkedReencoder(runtime, createImageProcessorReencoder({ url, secret }))
         : failClosed("IMAGE_RUNTIME=sharp-node without a valid IMAGE_PROCESSOR_URL/SECRET"),
     };
   }
+  if (runtime === "sharp-in-process") {
+    return {
+      runtime,
+      reencode: checkedReencoder(runtime, options.inProcess ?? ((bytes) => reencodeImage(bytes))),
+    };
+  }
   return { runtime: "disabled", reencode: failClosed("IMAGE_RUNTIME=disabled") };
+}
+
+/**
+ * The runtime the server functions use, from the process environment (on Workers, nodejs_compat fills process.env from the
+ * Worker's vars and secrets, as for the app's other secrets). The Images binding is not read here: see the header.
+ */
+export function imageReencoderFromProcessEnv(
+  env: Record<string, string | undefined> = process.env,
+): ReturnType<typeof selectImageReencoder> {
+  return selectImageReencoder({
+    IMAGE_RUNTIME: env.IMAGE_RUNTIME,
+    IMAGE_PROCESSOR_URL: env.IMAGE_PROCESSOR_URL,
+    IMAGE_PROCESSOR_SECRET: env.IMAGE_PROCESSOR_SECRET,
+  });
 }

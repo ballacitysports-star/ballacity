@@ -176,6 +176,7 @@ const deps = (
   verdict: any = safe,
 ): PromotionDeps & { scan: any; escalate: any } => ({
   admin: w.admin,
+  reencode: (b: Uint8Array) => reencodeImage(b),
   scan: vi.fn().mockResolvedValue(verdict),
   escalate: vi.fn(async () => {
     w.log.push("escalate");
@@ -714,6 +715,7 @@ describe("promoteStagedImage: still images only, and the cleaned bytes are valid
           animated: false,
         },
         scanRenditions: [],
+        transparency: "none",
       });
       await expect(promoteStagedImage(d, input)).rejects.toThrow(/could not be processed/);
       expect(d.scan).not.toHaveBeenCalled();

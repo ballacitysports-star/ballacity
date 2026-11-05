@@ -1,6 +1,7 @@
 /**
- * PROOF OF CONCEPT, NOT WIRED INTO THE APP. Worker-side client for the Node sharp image processor (services/image-processor).
- * Same contract as reencodeImage: resolves a ReencodeResult or throws ImageReencodeError.
+ * Worker-side client for the Node sharp image processor (services/image-processor), selected with IMAGE_RUNTIME=sharp-node
+ * (src/lib/image-runtime/select.server.ts). Same contract as reencodeImage (version 2, reencode-contract.ts): resolves a
+ * ReencodeResult or throws ImageReencodeError.
  *
  * Fail closed: a network error, a timeout (AbortController), a non-200/422 status, a missing or wrong response signature, a
  * malformed body, or an output that does not pass the Worker's own checks all throw. Transport and service problems are
@@ -29,6 +30,7 @@ import {
   RESULT_CONTENT_TYPE,
   decodeResult,
 } from "@/lib/image-runtime/processor-protocol";
+import { reencodeResultProblem } from "@/lib/image-runtime/reencode-contract";
 
 export type ImageProcessorClientConfig = {
   /** Base URL of the service, e.g. https://image-processor.internal.example. HTTPS required except for loopback (tests). */
@@ -42,8 +44,8 @@ export type ImageProcessorClientConfig = {
 };
 
 const DEFAULT_TIMEOUT_MS = 25_000;
-/** Largest response accepted: the image (at most MAX_IMAGE_BYTES) plus metadata and the scan rendition data URL. */
-const MAX_RESPONSE_BYTES = MAX_IMAGE_BYTES + 8 * 1024 * 1024;
+/** Largest response accepted: the image (at most MAX_IMAGE_BYTES) plus metadata and up to three scan rendition data URLs. */
+const MAX_RESPONSE_BYTES = MAX_IMAGE_BYTES + 16 * 1024 * 1024;
 
 export function isAllowedProcessorUrl(url: string): boolean {
   try {
@@ -150,15 +152,19 @@ export function createImageProcessorReencoder(config: ImageProcessorClientConfig
       throw unavailable("image processor refusal without a known code");
     }
 
+    // A service on another contract version (or a v1 PoC build) answers with another content type: held, not misread.
     if (contentType !== RESULT_CONTENT_TYPE) throw unavailable("response content type");
     const decoded = decodeResult(body);
     if (!decoded) throw unavailable("response body");
     const { meta, bytes } = decoded;
+    // Shape and scan renditions (every one the declared transparency requires): a broken contract is the service's
+    // problem, not the picture's, so the upload is held.
+    const contractProblem = reencodeResultProblem({ ...meta, bytes });
+    if (contractProblem) throw unavailable(`result contract: ${contractProblem}`);
 
     // Verify independently of the service: same type, the size it claims, nothing the byte inspector would strip.
     const dims = readImageDimensions(bytes);
     const report = inspectImageMetadata(bytes);
-    const rendition = meta.alphaRemovedScanTarget;
     const problem =
       sniffImageMime(bytes) !== mime || meta.mime !== mime
         ? "output type changed"
@@ -171,10 +177,7 @@ export function createImageProcessorReencoder(config: ImageProcessorClientConfig
               report.hasOther ||
               report.orientation
             ? "output carries metadata"
-            : rendition !== null &&
-                (typeof rendition !== "string" || !rendition.startsWith("data:image/jpeg;base64,"))
-              ? "scan rendition"
-              : validateImageMeta({ mime, bytes: bytes.byteLength, dimensions: dims });
+            : validateImageMeta({ mime, bytes: bytes.byteLength, dimensions: dims });
     if (problem) throw new ImageReencodeError("unreadable", problem);
     return { ...meta, bytes, mime, width: dims!.width, height: dims!.height };
   };

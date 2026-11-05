@@ -19,7 +19,7 @@ sharp is native (libvips) and does not load in the Cloudflare Worker that serves
 | **types**      | In the official binding type definitions (workerd 1.20260908.1, the same definitions as `@cloudflare/workers-types`) but not in the prose docs.                                                                                            |
 | **local**      | Observed on the **real Wrangler 4.130.0 local ("low-fidelity") mode** in this sandbox, and/or read in its source (miniflare 5.20260908.0-alpha, `src/plugins/images/fetcher.ts`). Local mode is sharp, not Cloudflare's production engine. |
 | **fake**       | A vitest result against a fake binding built on sharp (`src/lib/image-runtime/test-support/fake-images-binding.ts`). Proves the PoC's own logic, **not** platform behaviour.                                                               |
-| **real sharp** | A vitest result with the real sharp/libvips 0.35.4 in Node, the code that the Node service would run.                                                                                                                                      |
+| **real sharp** | A vitest result with the real sharp 0.35.5 (libvips 8.18.7) in Node, the code that the Node service would run.                                                                                                                             |
 | **none**       | **No result in this document comes from the real Cloudflare Images platform.** There is no account.                                                                                                                                        |
 
 ## Part A: Cloudflare Images binding
@@ -86,11 +86,11 @@ The local-mode fake in the tests is a port of that source. Running the PoC again
 
 ### Code (not deployed, no container built)
 
-- `services/image-processor/src/server.ts`: `node:http` server, one route `POST /v1/reencode` (+ unauthenticated `GET /healthz` that reveals nothing). Body = image bytes only (`application/octet-stream`; no user id, path or name). Runs **the existing `reencodeImage` imported from `src/lib/image-reencode.server.ts`** (not copied: the two runtimes cannot drift). Limits: body 8 MB (declared and streamed, checked **before** authentication so an oversized body is never buffered), 30 MP (sharp `limitInputPixels`, inside `reencodeImage`), per-request timeout 20 s (→ 503 `unavailable`; the concurrency slot stays held until the decode really ends), 2 concurrent re-encodes per instance (→ 503), header/request timeouts. Limits can be lowered by environment, never raised above the app's. Refuses to start without a ≥32-byte secret or **with any storage/cloud credential in its environment** (`SUPABASE*`, `SERVICE_ROLE`, `DATABASE_URL`, `PG*`, `AWS_*` keys, `GOOGLE_APPLICATION_CREDENTIALS`, `R2_*`, `CLOUDFLARE_API*`, `*STORAGE*`). No `fetch` or other outbound call anywhere; nothing written to disk; only state is the in-memory nonce cache.
+- `services/image-processor/src/server.ts`: `node:http` server, one route `POST /v1/reencode` (+ unauthenticated `GET /healthz` that reveals nothing). Body = image bytes only (`application/octet-stream`; no user id, path or name). Runs **the existing `reencodeImage` imported from `src/lib/image-reencode.server.ts`** (not copied: the two runtimes cannot drift). Order of checks (audit F14): route, content type and declared size (8 MB, before anything else); then the request signature, verified **from the headers alone** (it covers the claimed body hash) with the nonce claimed; only then a processing slot; then the body, read under a 10 s deadline (408) and checked against the signed hash. An unsigned, forged or replayed request never takes a slot and none of its body is read. Limits: body 8 MB (streamed too), 30 MP (sharp `limitInputPixels`, inside `reencodeImage`), per-request timeout 20 s (→ 503 `unavailable`; the concurrency slot stays held until the decode really ends), 2 concurrent re-encodes per instance (→ 503), header/request timeouts. Limits can be lowered by environment, never raised above the app's. Refuses to start without a ≥32-byte secret or **with any storage/cloud credential in its environment** (`SUPABASE*`, `SERVICE_ROLE`, `DATABASE_URL`, `PG*`, `AWS_*` keys, `GOOGLE_APPLICATION_CREDENTIALS`, `R2_*`, `CLOUDFLARE_API*`, `*STORAGE*`). No `fetch` or other outbound call anywhere; nothing written to disk; only state is the in-memory nonce cache.
 - `src/lib/image-runtime/hmac.ts` (shared, WebCrypto): request HMAC-SHA256 over method, path, millisecond timestamp, 128-bit nonce and body SHA-256; ±60 s skew; nonce single use for 2× the window, recorded **after** the signature check; bounded cache that refuses when full of live nonces. Responses signed over (request nonce, status, body SHA-256).
 - `src/lib/image-runtime/node-service-client.ts`: Worker-side client. HTTPS only (loopback HTTP for tests), no redirects, `AbortController` timeout (25 s), response size cap, response signature verified, refusal codes passed through, and the output re-verified in the Worker (type, size, byte inspector). Every transport or service failure → `unavailable` (held).
 - `src/lib/image-runtime/processor-protocol.ts`: the wire format (u32 length + JSON metadata + bytes).
-- `services/image-processor/Dockerfile`: two stages, **base image digests are placeholders that fail the build until pinned** (`node:22.23.4-bookworm-slim@sha256:…`, `gcr.io/distroless/nodejs22-debian12:nonroot@sha256:…`), `npm ci` from a committed `package-lock.json` (sharp 0.35.4 exact, esbuild 0.25.12 exact), esbuild bundle (verified locally: 37.5 kB, starts, `/healthz` 200, unsigned request 401), non-root UID 65532, distroless (no shell), run with `--read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges` and an internal-only network (documented in the file).
+- `services/image-processor/Dockerfile`: two stages, **base image digests are placeholders that fail the build until pinned** (`node:22.23.4-bookworm-slim@sha256:…`, `gcr.io/distroless/nodejs22-debian12:nonroot@sha256:…`), `npm ci` from a committed `package-lock.json` (sharp 0.35.5 exact, matching the app's `bun.lock` integrity; esbuild 0.25.12 exact), esbuild bundle (verified locally 2026-11-05: 39.3 kB, starts, `/healthz` 200; three slow unsigned bodies and a slow forged one 401 in under 10 ms; signed request 200 with a contract v2 answer and 3 renditions for a partially transparent PNG; signed body that stops arriving 408 at the deadline), non-root UID 65532, distroless (no shell), run with `--read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges` and an internal-only network (documented in the file).
 
 ### Tests (real sharp, in process)
 
@@ -122,7 +122,7 @@ For comparison, Cloudflare Images: $0.50 per 1,000 unique transformations above 
 
 Service down, cold, overloaded or slow → client `unavailable` → promotion holds the upload (nothing published; retry later; legacy direct path refuses). Secret mismatch after rotation → `unavailable` until both sides match (rotate by deploying the service with old+new accepted first: not implemented, an open item). Clock skew > 60 s → 401 → `unavailable`. A compromised service could return a different but clean-looking picture: the Worker re-checks container and metadata but cannot verify the pixels; the scan runs on the returned bytes, so a swapped picture is still scanned (the residual is a service that substitutes pictures, mitigated by isolation: no credentials, no egress, no inbound except from the Worker). Multi-instance replay: the nonce cache is per instance, so a captured request could be replayed to another instance within 60 s; the effect is one extra re-encode of the same bytes, returning the same answer to the attacker, who already had the bytes (no side effects, no storage access).
 
-## Wiring design (not done)
+## Wiring design (superseded: wired for audit F09, see the last section)
 
 Promotion (`promoteStagedImage`) already takes `deps.reencode`; the legacy path (`finalizeDirectImageUpload`) too. The seam is `selectImageReencoder(env)` in `src/lib/image-runtime/select.server.ts`:
 
@@ -222,3 +222,53 @@ Node service (on a sandbox project of the chosen host):
 4. If Cloudflare Images were chosen: is refusing transparent images above 12 MP acceptable, and is "same picture, possibly different bytes on retry" acceptable?
 5. Secret rotation: is a two-secret overlap window needed (not implemented)?
 6. Should chat attachments (still not re-encoded, per #282) use the same runtime once it exists?
+
+## Audit F09 and F14 remediation (2026-11-05)
+
+**F09: the runtime was not wired and the PoC contract did not match the re-encoder.** Reproduced: nine TypeScript errors
+(`alphaRemovedScanTarget` against the re-encoder's `scanRenditions`), and real re-encoder output through a correctly signed
+service answer was refused by the #284 client as `unreadable`. Changes:
+
+- **One versioned contract** (`src/lib/image-runtime/reencode-contract.ts`, version 2). `ReencodeResult` gains
+  `transparency` (`none`, `binary`, `partial`), and `scanRenditions` must carry exactly the renditions it requires
+  (0; white and black; white, black and alpha dropped), each a JPEG data URL of at most 2048 px per side. The wire format
+  is versioned too (`application/vnd.ballacity.reencode.v2`, `contractVersion: 2` in the metadata); a v1 answer, a v1 shape
+  relabelled v2, a dropped rendition or an inconsistent declaration is held as `unavailable`.
+- **All required renditions in every runtime.** The Cloudflare PoC now makes the white and black flattenings (in the
+  Worker, from the quantised pixels) as well as the alpha-dropped one. A test shows why: a square drawn only in the alpha
+  channel is invisible on black and plain on white.
+- **Wired.** Both upload paths (`promoteStagedImageUpload`, the legacy `finalizeImageUpload`) take
+  `reencode: imageReencoderFromProcessEnv().reencode`; `reencode` is now required in the promotion and legacy-finalize
+  deps, so nothing falls back to in-process sharp by default. `IMAGE_RUNTIME` unset or unknown is `disabled`: uploads are
+  held, nothing is published. `sharp-node` is the recommended runtime; `sharp-in-process` exists for Node hosts (local
+  development, tests) and is `unavailable` on Workers; `cloudflare-images` stays closed until its binding is plumbed from
+  the Worker env (not done: it is not the recommended runtime and its platform behaviour is unverified). Every runtime's
+  output is checked against the contract before promotion sees it. No fallback between runtimes.
+- Limit: the check is on what a runtime declares. A service that understates its own output's transparency is consistent
+  and passes (detecting it means decoding up to 30 MP in the Worker); this is the compromised-service residual above.
+
+**F14: slow unsigned bodies could exhaust the processing slots before authentication.** Reproduced against the #284
+server: stalled unsigned bodies hold both slots and the Worker's request gets 503. The service now authenticates from the
+headers before admission (`verifyRequestHeaders` in `hmac.ts`; the signature already covered the claimed body hash),
+reads the body under a deadline (`IMAGE_PROCESSOR_BODY_TIMEOUT_MS`, 10 s, lowerable only) and checks it against the signed
+hash. sharp is 0.35.5 in the service lockfile, the same release as the app.
+
+Tests: `select.server.test.ts` (contract enforcement for every runtime, rendition parity between sharp and the Cloudflare
+fake, the wiring), `cloudflare-images.server.test.ts` (white/black/alpha-dropped renditions), `services/image-processor/test/server.test.ts`
+(v2 end to end with the real re-encoder; v1 and broken answers held; F14 slow unsigned, forged and slow signed bodies).
+Negative controls: with the #284 server the two F14 tests fail (the Worker's request is stalled); with the #284 client and
+protocol the v2 end-to-end test fails with `unreadable`, the audit's observation.
+
+### Staging validation before release (not done; needs owner approval and a staging host)
+
+1. Build the image with both base digests pinned; deploy the service on the chosen host (recommended: Cloudflare
+   Containers with `enableInternet = false`, or Cloud Run with egress denied), reachable only from the staging Worker.
+2. Set on the **staging** Worker only: `IMAGE_RUNTIME=sharp-node`, `IMAGE_PROCESSOR_URL`, `IMAGE_PROCESSOR_SECRET` (a new
+   random value, also given to the service). Production keeps `IMAGE_RUNTIME` unset (held).
+3. On staging: upload a phone JPEG (EXIF orientation and GPS), a partially transparent PNG, a PNG drawn only in alpha, an
+   animated WEBP (refused), a 49 MP bomb (refused); confirm the published bytes carry no metadata and that the scanner was
+   called once per published file plus once per rendition (3 for the partial PNG).
+4. Stop the service: uploads are held (`reencode_unavailable`), nothing is published; restart: a retry publishes.
+5. From outside the private network: the service is unreachable; from inside, unsigned and slow requests get 401/408.
+6. Everything in "Must be validated on a real account or sandbox before release" above (Node service list).
+   Only after these pass, with owner approval, is `IMAGE_RUNTIME=sharp-node` set in production.

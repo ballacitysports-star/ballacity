@@ -11,7 +11,7 @@
     "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --external:sharp --tsconfig=../../tsconfig.json --outfile=dist/main.mjs"
   },
   "dependencies": {
-    "sharp": "0.35.4"
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "esbuild": "0.25.12"
