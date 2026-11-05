@@ -11,6 +11,11 @@
  *   - The capture id, status, amount, currency, payee and PayPal order status are stored on the order first. The
  *     database then refuses a verified PayPal payment unless that order records a COMPLETED capture with the same
  *     id for the same player and game, and allows one payment per capture id (migration 20261108170000).
+ *   - Only the call holding the order's current claim records anything (independent review of d604958c): each claim
+ *     writes a fresh token (capture_claim), and every write here requires that token and status `capturing`. A
+ *     delayed call whose claim was superseded (a settlement re-claimed a stale order, or a second settlement raced
+ *     the first) writes nothing, so a late PENDING can never overwrite a completed capture. The database also keeps a
+ *     captured order captured (only a refund follows).
  */
 import type { CaptureResult } from "./paypal.server";
 
@@ -37,7 +42,8 @@ export type CaptureOutcome =
   | { kind: "pending" }
   | { kind: "refunded"; reason: string }
   | { kind: "unrecorded"; reason: string }
-  | { kind: "failed"; reason: string };
+  | { kind: "failed"; reason: string }
+  | { kind: "superseded" };
 
 function cents(v: string | null) {
   return v ? Math.round(Number(v) * 100) : NaN;
@@ -66,16 +72,31 @@ function captureFields(result: CaptureResult) {
   };
 }
 
-async function setOrder(admin: AdminClient, orderId: string, patch: Record<string, unknown>) {
-  await admin
+/** A fresh claim token: written with the claim, required by every later write of that claimant. */
+export function newCaptureClaim() {
+  return crypto.randomUUID();
+}
+
+/** Writes the order only while `claim` still holds it in `capturing`. Returns whether a row was written. */
+async function setOrder(
+  admin: AdminClient,
+  orderId: string,
+  claim: string,
+  patch: Record<string, unknown>,
+) {
+  const { data } = await admin
     .from("paypal_orders")
     .update(patch as never)
-    .eq("order_id", orderId);
+    .eq("order_id", orderId)
+    .eq("status", "capturing")
+    .eq("capture_claim" as never, claim as never)
+    .select("order_id");
+  return !!data && (data as unknown[]).length > 0;
 }
 
 /**
- * Applies a capture result to an order the caller has claimed (status `capturing` or `capture_pending`).
- * `refund` is injected so tests (and the settlement job) control the PayPal call.
+ * Applies a capture result to an order the caller has claimed: status `capturing` with the caller's `claim` token
+ * (newCaptureClaim). `refund` is injected so tests (and the settlement job) control the PayPal call.
  */
 export async function recordCaptureOutcome(
   admin: AdminClient,
@@ -83,39 +104,49 @@ export async function recordCaptureOutcome(
   result: CaptureResult,
   expected: Expected,
   refund: (captureId: string) => Promise<unknown>,
+  claim: string,
 ): Promise<CaptureOutcome> {
   const fields = captureFields(result);
   const matches = captureMatches(result, expected);
 
   if (result.status === "PENDING" && matches) {
-    await setOrder(admin, order.order_id, { status: "capture_pending", ...fields });
-    return { kind: "pending" };
+    return (await setOrder(admin, order.order_id, claim, { status: "capture_pending", ...fields }))
+      ? { kind: "pending" }
+      : { kind: "superseded" };
   }
 
   if (result.status !== "COMPLETED" || !matches) {
     // Money that did move but cannot be verified goes back.
     if (result.status === "COMPLETED" && result.captureId) {
+      // Record the capture under this claim first: a superseded call leaves the refund to the claim holder.
+      if (!(await setOrder(admin, order.order_id, claim, fields))) return { kind: "superseded" };
       const refunded = await refund(result.captureId)
         .then(() => true)
         .catch((e) => {
           console.error("[paypal] refund of an unverifiable capture failed", e);
           return false;
         });
-      await setOrder(admin, order.order_id, {
+      await setOrder(admin, order.order_id, claim, {
         status: refunded ? "refunded" : "unrecorded",
-        ...fields,
         captured_at: new Date().toISOString(),
       });
       return refunded
         ? { kind: "refunded", reason: "mismatch" }
         : { kind: "unrecorded", reason: "mismatch" };
     }
-    await setOrder(admin, order.order_id, { status: "failed", ...fields });
-    return { kind: "failed", reason: result.status };
+    return (await setOrder(admin, order.order_id, claim, { status: "failed", ...fields }))
+      ? { kind: "failed", reason: result.status }
+      : { kind: "superseded" };
   }
 
   // COMPLETED and matching. Store the capture on the order first: the database checks the payment against it.
-  await setOrder(admin, order.order_id, { ...fields, captured_at: new Date().toISOString() });
+  if (
+    !(await setOrder(admin, order.order_id, claim, {
+      ...fields,
+      captured_at: new Date().toISOString(),
+    }))
+  )
+    return { kind: "superseded" };
   // paypal_order_id is newer than the generated types (migration 20261108170000).
   const payment = {
     game_id: order.game_id,
@@ -136,7 +167,7 @@ export async function recordCaptureOutcome(
   if (insertError) {
     // A retry or a duplicate callback for a capture that is already recorded: one payment per capture.
     if ((insertError as { code?: string }).code === "23505") {
-      await setOrder(admin, order.order_id, { status: "captured" });
+      await setOrder(admin, order.order_id, claim, { status: "captured" });
       return { kind: "already_recorded" };
     }
     console.error("[paypal] captured payment could not be recorded", insertError.message);
@@ -146,11 +177,11 @@ export async function recordCaptureOutcome(
         console.error("[paypal] refund after unrecorded capture failed", e);
         return false;
       });
-    await setOrder(admin, order.order_id, { status: refunded ? "refunded" : "unrecorded" });
+    await setOrder(admin, order.order_id, claim, { status: refunded ? "refunded" : "unrecorded" });
     return refunded
       ? { kind: "refunded", reason: "unrecorded" }
       : { kind: "unrecorded", reason: "unrecorded" };
   }
-  await setOrder(admin, order.order_id, { status: "captured" });
+  await setOrder(admin, order.order_id, claim, { status: "captured" });
   return { kind: "verified" };
 }

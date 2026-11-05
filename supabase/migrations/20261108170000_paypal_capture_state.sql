@@ -11,6 +11,11 @@
 --   3. A checkout payment (payment_submissions.paypal_order_id set) can only be verified when that order records a
 --      COMPLETED capture with the same id, for the same player and game and the same amount. API roles can never
 --      set paypal_order_id: only the server records checkout payments.
+--   4. Independent review of d604958c: two settlement attempts could claim the same order (both "claimed" a stale
+--      'capturing' row), and a delayed PENDING result then overwrote a completed order whose payment stayed verified.
+--      Each claim now writes a fresh token (capture_claim, capture_claimed_at) and the server writes an outcome only
+--      while it holds that token (src/lib/paypal-capture.server.ts). Here, the database keeps a captured order
+--      captured: its status only becomes 'refunded', and its recorded capture never changes.
 -- Payments stay disabled; nothing here enables them.
 
 DO $$ BEGIN
@@ -25,7 +30,9 @@ ALTER TABLE public.paypal_orders
   ADD COLUMN IF NOT EXISTS capture_amount_cents integer,
   ADD COLUMN IF NOT EXISTS capture_currency text,
   ADD COLUMN IF NOT EXISTS capture_payee_merchant_id text,
-  ADD COLUMN IF NOT EXISTS paypal_order_status text;
+  ADD COLUMN IF NOT EXISTS paypal_order_status text,
+  ADD COLUMN IF NOT EXISTS capture_claim uuid,
+  ADD COLUMN IF NOT EXISTS capture_claimed_at timestamptz;
 
 ALTER TABLE public.paypal_orders DROP CONSTRAINT IF EXISTS paypal_orders_status_check;
 ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_status_check
@@ -35,6 +42,30 @@ ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_status_check
 ALTER TABLE public.paypal_orders DROP CONSTRAINT IF EXISTS paypal_orders_captured_is_completed;
 ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_captured_is_completed
   CHECK (status <> 'captured' OR (capture_id IS NOT NULL AND capture_status = 'COMPLETED'));
+
+-- a captured order stays captured (a refund is the only way on), and its capture is never rewritten
+CREATE OR REPLACE FUNCTION public.guard_paypal_order_settled()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY INVOKER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF OLD.status = 'captured'
+     AND (NEW.status NOT IN ('captured', 'refunded')
+          OR (NEW.capture_id, NEW.capture_status, NEW.capture_amount_cents, NEW.capture_currency, NEW.capture_payee_merchant_id)
+             IS DISTINCT FROM
+             (OLD.capture_id, OLD.capture_status, OLD.capture_amount_cents, OLD.capture_currency, OLD.capture_payee_merchant_id)) THEN
+    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a captured PayPal order keeps its capture; only a refund follows.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $function$;
+REVOKE ALL ON FUNCTION public.guard_paypal_order_settled() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS a01_paypal_order_settled ON public.paypal_orders;
+CREATE TRIGGER a01_paypal_order_settled BEFORE UPDATE ON public.paypal_orders
+  FOR EACH ROW EXECUTE FUNCTION public.guard_paypal_order_settled();
 
 -- ------------------------------------------------------------------------------------------- 2. one payment per capture
 CREATE UNIQUE INDEX IF NOT EXISTS paypal_orders_capture_id_key ON public.paypal_orders (capture_id) WHERE capture_id IS NOT NULL;
