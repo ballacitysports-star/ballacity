@@ -8,10 +8,10 @@
 # file is documentation-as-configuration: to work against the E2E project,
 # link the CLI explicitly instead of editing config.toml:
 #
-#   supabase link --project-ref olrbulvwexrkjcxddjxq
+#   supabase link --project-ref qkukefvzwlyusvspablz
 #
 # CI never reads this file. The E2E workflow (.github/workflows/e2e.yml) gets
 # its target project from repository secrets (E2E_SUPABASE_URL,
 # E2E_SUPABASE_PROJECT_ID, E2E_SUPABASE_PUBLISHABLE_KEY,
 # E2E_SUPABASE_SERVICE_ROLE_KEY) and does not use the Supabase CLI at all.
-project_id = "olrbulvwexrkjcxddjxq"
+project_id = "qkukefvzwlyusvspablz"
