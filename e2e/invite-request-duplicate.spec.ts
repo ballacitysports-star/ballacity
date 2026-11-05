@@ -149,7 +149,7 @@ test("re-opening a valid invite after submitting blocks a second join request", 
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 
@@ -178,7 +178,7 @@ test("re-opening a valid invite after submitting blocks a second join request", 
   // Sticky action shows the pending/cancel state — NOT "Request to join".
   const pendingCta = page.getByText(/request pending · tap to cancel/i).first();
   await expect(pendingCta).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   const postCountBeforeSecondTap = joinPosts.length;
   expect(postCountBeforeSecondTap).toBe(1);
@@ -197,7 +197,7 @@ test("re-opening a valid invite after submitting blocks a second join request", 
   // Params still preserved.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 

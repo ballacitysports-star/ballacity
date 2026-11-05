@@ -24,7 +24,8 @@ const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const LOADER_TEXTS = ["Signing you in", "Loading your account"];
 
 // Bottom-nav tabs, addressed by their aria-labels, in click order.
-const TAB_HOPS = ["Available Players", "Activity", "Profile", "Home", "Available Players"] as const;
+// Bottom-nav tab labels (src/lib/navigation-gestures.ts): Home, Discover, Reels, Inbox, Me.
+const TAB_HOPS = ["Discover", "Inbox", "Me", "Home", "Discover"] as const;
 
 declare global {
   interface Window {

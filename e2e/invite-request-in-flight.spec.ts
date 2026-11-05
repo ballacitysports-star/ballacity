@@ -148,7 +148,7 @@ test("double-tapping Request to join while the first POST is in flight blocks th
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // Fire two rapid clicks — the second one happens while the first POST
@@ -186,7 +186,7 @@ test("double-tapping Request to join while the first POST is in flight blocks th
   );
 
   // And "Request to join" CTA is gone.
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   await ctx.close();
 });

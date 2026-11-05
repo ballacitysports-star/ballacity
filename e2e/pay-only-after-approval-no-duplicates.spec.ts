@@ -75,9 +75,11 @@ test("pay is blocked while pending; after approval exactly one submission is cre
   );
 
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -194,7 +196,7 @@ test("pay is blocked while pending; after approval exactly one submission is cre
   // Approval gate is up, picker is not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /i have paid/i })).toHaveCount(0);
 
   // "Clicking Pay" while pending: there's no picker button to click, so
@@ -235,7 +237,9 @@ test("pay is blocked while pending; after approval exactly one submission is cre
 
   // Gate flips to picker.
   await expect(gate).toHaveCount(0, { timeout: 20_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({
+    timeout: 20_000,
+  });
 
   // Pick the method → open the instructions/proof form.
   await page

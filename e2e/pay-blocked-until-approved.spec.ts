@@ -77,9 +77,11 @@ test("payment submission is blocked while join request is unapproved", async ({ 
   );
 
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -164,7 +166,7 @@ test("payment submission is blocked while join request is unapproved", async ({ 
   await expect(gate).toContainText(/waiting on host approval/i);
 
   // 2. Payment picker + submit surfaces are NOT rendered.
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /i have paid/i })).toHaveCount(0);
   await expect(page.getByText(/@testhost/i)).toHaveCount(0);
 

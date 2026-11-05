@@ -146,6 +146,11 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // "Database error creating new user" — which is what blocked CI seeding.
         // Naming it here is also just more honest about what these fixtures are.
         account_type: "player",
+        // Specs that exercise the guardian onboarding path flip this flag on the
+        // shared fixture, and it used to stick across runs because this metadata
+        // is merged over what exists. A guardian fixture is in Parent Mode, which
+        // hides every join and pay control on a game page, so reset it each run.
+        is_guardian: false,
       };
       try {
         const { data: list, error: listErr } = await admin.auth.admin.listUsers({
@@ -285,6 +290,28 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         if (writable.length > 0) {
           const { error } = await admin.from("hosted_games").upsert(writable, { onConflict: "id" });
           if (error) throw new Error(error.message);
+        }
+
+        // The game page derives "requires approval" from game_payment_settings,
+        // and FAILS CLOSED: with no settings row, `requiresApproval` defaults to
+        // true (src/routes/games.$gameId.index.tsx), so the join CTA reads
+        // "Request Spot" instead of "Join Run". The join-free specs on g1
+        // (join-cross-device-*, join-realtime-*, roster-*) expect a free,
+        // no-approval game, so seed a settings row that says so. g2 keeps the
+        // default (approval-gated), which the invite/request specs rely on, and
+        // the pay-* specs mock their own settings, so only g1 needs a row.
+        const g1Writable = writable.some((r) => r.id === "g1");
+        if (g1Writable) {
+          const { error: psErr } = await admin.from("game_payment_settings").upsert(
+            { game_id: "g1", host_id: gamesHostId, entry_fee: 0, requires_approval: false },
+            { onConflict: "game_id,host_id" },
+          );
+          if (psErr) {
+            console.warn(
+              `[e2e global-setup] Could not seed g1 payment settings (free, no approval): ${psErr.message}. ` +
+                "join-free specs on g1 will see the approval-gated CTA and fail.",
+            );
+          }
         }
       } catch (err) {
         console.warn(

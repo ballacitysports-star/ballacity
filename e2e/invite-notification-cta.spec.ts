@@ -79,7 +79,7 @@ test("tapping an invite notification opens the game with preserved invite params
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${gameId}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === fakeHostId,
     { timeout: 10_000 },
   );

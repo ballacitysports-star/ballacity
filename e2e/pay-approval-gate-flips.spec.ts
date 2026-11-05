@@ -79,9 +79,11 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
 
   // One enabled Venmo method for the host so the picker has a row to show.
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -149,7 +151,7 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
   await expect(gate).toContainText(/waiting on host approval/i);
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
 
   const getsBeforeApproval = joinGets;
 
@@ -163,7 +165,9 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
 
   // Gate disappears, picker appears — automatically, no reload.
   await expect(gate).toHaveCount(0, { timeout: 20_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({
+    timeout: 20_000,
+  });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
 
   // A refetch definitely happened after approval.

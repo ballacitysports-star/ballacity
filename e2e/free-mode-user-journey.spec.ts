@@ -101,10 +101,13 @@ test.describe("minor member, free platform", () => {
     await stubChildStatus(page, childStatus("child_under_13", "approved"));
 
     await page.goto("/create", { waitUntil: "domcontentloaded" });
+    // The page shows "Loading…" until the child-status answer lands; wait for
+    // the decision rather than reading the body on first paint.
+    await expect(
+      page.locator("body"),
+      "hosting must stay blocked for an under-13 account",
+    ).toContainText(/isn't available|not available/i, { timeout: 20_000 });
     const body = await page.locator("body").innerText();
-    expect(body, "hosting must stay blocked for an under-13 account").toMatch(
-      /isn't available|not available/i,
-    );
     // And the block must not be explained as a payment problem.
     expect(body).not.toMatch(/subscri|upgrade|premium/i);
   });
