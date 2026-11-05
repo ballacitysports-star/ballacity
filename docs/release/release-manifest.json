@@ -1551,6 +1551,30 @@
         "tables": [],
         "schemas": []
       }
+    },
+    {
+      "order": 36,
+      "version": "20261108170000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
+      "sha256": "d1cb16b3c322d5cd9910ba283ff891b6d76d251356b4acf5bfcb978f00519758",
+      "requires": {
+        "functions": [],
+        "tables": [
+          "public.payment_submissions",
+          "public.paypal_orders"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "public.enforce_paypal_checkout_payment()",
+          "public.guard_paypal_order_settled()"
+        ],
+        "tables": [],
+        "schemas": []
+      }
     }
   ],
   "protections": {
@@ -12423,6 +12447,64 @@
         }
       },
       {
+        "signature": "public.enforce_paypal_checkout_payment()",
+        "defined_by": [
+          "20261108170000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108170000": {
+              "def": "b3f8db2853a451a9002f3b7651abf955",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108170000": {
+              "def": "b3f8db2853a451a9002f3b7651abf955",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "b3f8db2853a451a9002f3b7651abf955",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "b3f8db2853a451a9002f3b7651abf955",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.enforce_review_age_rules()",
         "defined_by": [
           "20261103120000"
@@ -14238,6 +14320,64 @@
             "def": "1e32774c53ff16db6ce6e290dde21d94",
             "owner": "postgres",
             "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "public.guard_paypal_order_settled()",
+        "defined_by": [
+          "20261108170000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108170000": {
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108170000": {
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
+            "owner": "postgres",
+            "secdef": false,
             "search_path": "\"\"",
             "acl": [
               "postgres:EXECUTE",
@@ -45062,7 +45202,8 @@
         "defined_by": [
           "20261103140000",
           "20261107110000",
-          "20261108140000"
+          "20261108140000",
+          "20261108170000"
         ],
         "expect_before": {
           "16": {
@@ -45311,6 +45452,57 @@
                 "Players update own pending submissions",
                 "Players withdraw own submissions"
               ]
+            },
+            "20261108170000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
+                "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
+                "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+                "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
+                "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
+                "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
+                "no_payment_credentials|public.reject_payment_credentials()|23|O",
+                "payment_submissions_guardian_first|public.enforce_guardian_before_payment()|7|O",
+                "payment_submissions_keep_verified|public.keep_verified_payment_on_delete()|11|O",
+                "payment_submissions_state_guard|public.payment_submissions_state_guard()|23|O",
+                "trg_guard_payment_player_fields|public.guard_payment_player_fields()|19|O",
+                "trg_log_payment_verification_event|public.log_payment_verification_event()|21|O"
+              ],
+              "policies": [
+                "Hosts see submissions for their games",
+                "Hosts update submissions for their games",
+                "Players cancel or dispute own submissions",
+                "Players create own submissions",
+                "Players see own submissions",
+                "Players update own pending submissions",
+                "Players withdraw own submissions"
+              ]
             }
           },
           "17": {
@@ -45471,6 +45663,61 @@
                 "Players update own pending submissions",
                 "Players withdraw own submissions"
               ]
+            },
+            "20261108170000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:MAINTAIN",
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:MAINTAIN",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:MAINTAIN",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:MAINTAIN",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a00_payment_keys_locked|public.lock_payment_submission_keys()|19|O",
+                "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
+                "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
+                "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+                "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
+                "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
+                "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
+                "no_payment_credentials|public.reject_payment_credentials()|23|O",
+                "payment_submissions_guardian_first|public.enforce_guardian_before_payment()|7|O",
+                "payment_submissions_keep_verified|public.keep_verified_payment_on_delete()|11|O",
+                "payment_submissions_state_guard|public.payment_submissions_state_guard()|23|O",
+                "trg_guard_payment_player_fields|public.guard_payment_player_fields()|19|O",
+                "trg_log_payment_verification_event|public.log_payment_verification_event()|21|O"
+              ],
+              "policies": [
+                "Hosts see submissions for their games",
+                "Hosts update submissions for their games",
+                "Players cancel or dispute own submissions",
+                "Players create own submissions",
+                "Players see own submissions",
+                "Players update own pending submissions",
+                "Players withdraw own submissions"
+              ]
             }
           }
         },
@@ -45506,6 +45753,7 @@
               "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
               "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
               "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+              "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
               "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
               "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
               "no_payment_credentials|public.reject_payment_credentials()|23|O",
@@ -45560,6 +45808,7 @@
               "a00_payment_refund_fields_locked|public.lock_payment_refund_fields()|23|O",
               "a00_payment_self_only|public.enforce_payment_self_only()|7|O",
               "a01_payment_approval_trg|public.enforce_approval_before_payment()|7|O",
+              "a02_paypal_checkout_payment|public.enforce_paypal_checkout_payment()|23|O",
               "aa_payment_destination_trg|public.enforce_payment_destination()|23|O",
               "enforce_game_payment_cohort|public.enforce_game_payment_cohort()|23|O",
               "no_payment_credentials|public.reject_payment_credentials()|23|O",
@@ -45585,7 +45834,8 @@
         "schema": "public",
         "table": "paypal_orders",
         "defined_by": [
-          "20261108140000"
+          "20261108140000",
+          "20261108170000"
         ],
         "expect_before": {
           "16": {
@@ -45705,6 +45955,45 @@
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
+            },
+            "20261108170000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:DELETE",
+                "anon:INSERT",
+                "anon:REFERENCES",
+                "anon:SELECT",
+                "anon:TRIGGER",
+                "anon:TRUNCATE",
+                "anon:UPDATE",
+                "authenticated:DELETE",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
+              "policies": [
+                "players see own orders, hosts see theirs"
+              ]
             }
           },
           "17": {
@@ -45748,6 +46037,49 @@
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
+            },
+            "20261108170000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:DELETE",
+                "anon:INSERT",
+                "anon:MAINTAIN",
+                "anon:REFERENCES",
+                "anon:SELECT",
+                "anon:TRIGGER",
+                "anon:TRUNCATE",
+                "anon:UPDATE",
+                "authenticated:DELETE",
+                "authenticated:MAINTAIN",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:MAINTAIN",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:MAINTAIN",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
+              "policies": [
+                "players see own orders, hosts see theirs"
+              ]
             }
           }
         },
@@ -45784,7 +46116,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]
@@ -45825,7 +46159,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]

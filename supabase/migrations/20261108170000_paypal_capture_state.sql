@@ -1,0 +1,135 @@
+-- Audit F04: a PayPal payment is verified only from a capture that PayPal reports as COMPLETED.
+--
+-- The server read the ORDER's status, so an order reported COMPLETED with its capture still PENDING became a verified
+-- payment (src/lib/paypal.server.ts, paypal.functions.ts). The server now reads the capture itself; this migration
+-- makes the database hold it to that:
+--   1. paypal_orders records the capture: id, status, amount, currency, payee and the order-level status, plus two
+--      states: 'capturing' (one call has claimed the order and is capturing it) and 'capture_pending' (PayPal
+--      accepted the capture but has not settled it; nothing is granted).
+--   2. One payment per capture and per order: unique capture id on paypal_orders, unique order and capture
+--      reference on checkout payments.
+--   3. A checkout payment (payment_submissions.paypal_order_id set) can only be verified when that order records a
+--      COMPLETED capture with the same id, for the same player and game and the same amount. API roles can never
+--      set paypal_order_id: only the server records checkout payments.
+--   4. Independent review of d604958c: two settlement attempts could claim the same order (both "claimed" a stale
+--      'capturing' row), and a delayed PENDING result then overwrote a completed order whose payment stayed verified.
+--      Each claim now writes a fresh token (capture_claim, capture_claimed_at) and the server writes an outcome only
+--      while it holds that token (src/lib/paypal-capture.server.ts). Here, the database keeps a captured order
+--      captured: its status only becomes 'refunded', and its recorded capture never changes.
+-- Payments stay disabled; nothing here enables them.
+
+DO $$ BEGIN
+  IF to_regclass('public.paypal_orders') IS NULL OR to_regclass('public.payment_submissions') IS NULL THEN
+    RAISE EXCEPTION 'paypal capture state: paypal_orders and payment_submissions must exist';
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------------------- 1. the capture on the order
+ALTER TABLE public.paypal_orders
+  ADD COLUMN IF NOT EXISTS capture_status text,
+  ADD COLUMN IF NOT EXISTS capture_amount_cents integer,
+  ADD COLUMN IF NOT EXISTS capture_currency text,
+  ADD COLUMN IF NOT EXISTS capture_payee_merchant_id text,
+  ADD COLUMN IF NOT EXISTS paypal_order_status text,
+  ADD COLUMN IF NOT EXISTS capture_claim uuid,
+  ADD COLUMN IF NOT EXISTS capture_claimed_at timestamptz;
+
+ALTER TABLE public.paypal_orders DROP CONSTRAINT IF EXISTS paypal_orders_status_check;
+ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_status_check
+  CHECK (status = ANY (ARRAY['created', 'approved', 'capturing', 'capture_pending', 'captured', 'failed', 'cancelled',
+                             'refunded', 'unrecorded']));
+-- 'captured' means a COMPLETED capture was recorded
+ALTER TABLE public.paypal_orders DROP CONSTRAINT IF EXISTS paypal_orders_captured_is_completed;
+ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_captured_is_completed
+  CHECK (status <> 'captured' OR (capture_id IS NOT NULL AND capture_status = 'COMPLETED'));
+
+-- a captured order stays captured (a refund is the only way on), a refunded order stays refunded, and neither ever
+-- has its capture or its player, game, payee or amount rewritten. An order still being captured cannot be moved back
+-- or failed once a verified payment points at it (the moment between recording the payment and marking it captured).
+CREATE OR REPLACE FUNCTION public.guard_paypal_order_settled()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY INVOKER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF OLD.status IN ('captured', 'refunded')
+     AND (NEW.status NOT IN ('captured', 'refunded')
+          OR (OLD.status = 'refunded' AND NEW.status <> 'refunded')
+          OR (NEW.capture_id, NEW.capture_status, NEW.capture_amount_cents, NEW.capture_currency, NEW.capture_payee_merchant_id,
+              NEW.player_id, NEW.game_id, NEW.host_id, NEW.amount_cents, NEW.currency)
+             IS DISTINCT FROM
+             (OLD.capture_id, OLD.capture_status, OLD.capture_amount_cents, OLD.capture_currency, OLD.capture_payee_merchant_id,
+              OLD.player_id, OLD.game_id, OLD.host_id, OLD.amount_cents, OLD.currency)) THEN
+    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a captured PayPal order keeps its capture; only a refund follows, and a refund is final.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF OLD.status = 'capturing' AND NEW.status NOT IN ('capturing', 'captured', 'refunded')
+     AND EXISTS (SELECT 1 FROM public.payment_submissions ps
+                  WHERE ps.paypal_order_id = OLD.order_id AND ps.status = 'verified') THEN
+    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a verified payment records this capture; the order can only become captured or refunded.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $function$;
+REVOKE ALL ON FUNCTION public.guard_paypal_order_settled() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS a01_paypal_order_settled ON public.paypal_orders;
+CREATE TRIGGER a01_paypal_order_settled BEFORE UPDATE ON public.paypal_orders
+  FOR EACH ROW EXECUTE FUNCTION public.guard_paypal_order_settled();
+
+-- ------------------------------------------------------------------------------------------- 2. one payment per capture
+CREATE UNIQUE INDEX IF NOT EXISTS paypal_orders_capture_id_key ON public.paypal_orders (capture_id) WHERE capture_id IS NOT NULL;
+
+ALTER TABLE public.payment_submissions ADD COLUMN IF NOT EXISTS paypal_order_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS payment_submissions_paypal_order_key
+  ON public.payment_submissions (paypal_order_id) WHERE paypal_order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS payment_submissions_paypal_capture_key
+  ON public.payment_submissions (transaction_reference) WHERE paypal_order_id IS NOT NULL;
+
+-- ------------------------------------------------------------------------------------------- 3. verified only from a COMPLETED capture
+CREATE OR REPLACE FUNCTION public.enforce_paypal_checkout_payment()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  _o public.paypal_orders;
+BEGIN
+  -- API roles never mark a payment as a PayPal checkout payment, or change that mark.
+  IF COALESCE(auth.role(), '') IN ('anon', 'authenticated')
+     AND NEW.paypal_order_id IS DISTINCT FROM (CASE WHEN TG_OP = 'UPDATE' THEN OLD.paypal_order_id END) THEN
+    RAISE EXCEPTION 'PAYMENT_FIELD_FORBIDDEN: only BallaCity records PayPal checkout payments.' USING ERRCODE = '42501';
+  END IF;
+  IF NEW.paypal_order_id IS NULL OR NEW.status <> 'verified' THEN
+    RETURN NEW;
+  END IF;
+  SELECT * INTO _o FROM public.paypal_orders WHERE order_id = NEW.paypal_order_id;
+  -- At the moment a checkout payment becomes verified, its order must be in a successful capture (claimed or recorded)
+  -- with a payee on record; a refunded, failed, unrecorded or cancelled order never verifies a payment (pre-review
+  -- 2026-11-05). Later updates of an already verified row (refund bookkeeping) are not held to the order's status.
+  IF FOUND AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'verified' OR OLD.paypal_order_id IS DISTINCT FROM NEW.paypal_order_id)
+     AND (_o.status NOT IN ('capturing', 'captured') OR _o.capture_payee_merchant_id IS NULL) THEN
+    RAISE EXCEPTION 'PAYPAL_CAPTURE_NOT_COMPLETED: a PayPal payment is verified only from its completed capture.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF NOT FOUND
+     OR _o.capture_status IS DISTINCT FROM 'COMPLETED'
+     OR _o.capture_id IS NULL
+     OR NEW.transaction_reference IS DISTINCT FROM _o.capture_id
+     OR NEW.player_id IS DISTINCT FROM _o.player_id
+     OR NEW.game_id IS DISTINCT FROM _o.game_id
+     OR _o.capture_amount_cents IS DISTINCT FROM _o.amount_cents
+     OR round(COALESCE(NEW.paid_amount, 0) * 100)::integer IS DISTINCT FROM _o.amount_cents
+     OR _o.capture_currency IS DISTINCT FROM _o.currency THEN
+    RAISE EXCEPTION 'PAYPAL_CAPTURE_NOT_COMPLETED: a PayPal payment is verified only from its completed capture.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $function$;
+REVOKE ALL ON FUNCTION public.enforce_paypal_checkout_payment() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS a02_paypal_checkout_payment ON public.payment_submissions;
+CREATE TRIGGER a02_paypal_checkout_payment BEFORE INSERT OR UPDATE ON public.payment_submissions
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_paypal_checkout_payment();

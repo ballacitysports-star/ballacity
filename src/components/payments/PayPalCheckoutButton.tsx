@@ -56,7 +56,14 @@ export function PayPalCheckoutButton(props: {
             },
             onApprove: async (data: { orderID: string }) => {
               try {
-                await captureGamePayPalOrder({ data: { orderId: data.orderID } });
+                const res = await captureGamePayPalOrder({ data: { orderId: data.orderID } });
+                if (!res.ok) {
+                  // PayPal has not settled the payment yet: nothing is granted until it does.
+                  toast.info(
+                    "PayPal is still processing this payment. You'll be added once it completes.",
+                  );
+                  return;
+                }
                 toast.success("Payment confirmed — you're in!");
                 props.onPaid();
               } catch (e: any) {
@@ -88,10 +95,13 @@ export function PayPalCheckoutButton(props: {
         </span>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
-        No PayPal account? Tap <span className="font-semibold text-foreground">Debit or Credit Card</span> below.
+        No PayPal account? Tap{" "}
+        <span className="font-semibold text-foreground">Debit or Credit Card</span> below.
       </p>
       <div ref={ref} aria-label="Pay with PayPal or card" />
-      {!ready && <div className="py-3 text-center text-xs text-muted-foreground">Loading checkout…</div>}
+      {!ready && (
+        <div className="py-3 text-center text-xs text-muted-foreground">Loading checkout…</div>
+      )}
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
         Goes straight to the host — no proof upload needed.
       </p>
