@@ -67,13 +67,37 @@ export function localEnv(source = process.env) {
   return env;
 }
 
+/** psql's -d takes a conninfo string or a URI as well as a name; only a plain name is ever passed. */
+function databaseArg(database) {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(String(database)))
+    throw new Error(
+      `bad database name ${JSON.stringify(database)}: a plain identifier, never a connection string`,
+    );
+  return database;
+}
+
+function psqlRun(database, extraArgs, input, readOnly) {
+  const env = localEnv();
+  // The server refuses CREATE/DROP DATABASE and every write inside a read-only transaction.
+  if (readOnly) env.PGOPTIONS = `${env.PGOPTIONS} -c default_transaction_read_only=on`;
+  return spawnSync(
+    "psql",
+    ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", databaseArg(database), ...extraArgs],
+    { input, encoding: "utf8", maxBuffer: 256 * 1024 * 1024, env },
+  );
+}
+
+/**
+ * psql against the local server for reads: every statement runs in a read-only transaction, so the caller cannot
+ * create, drop or write anything with it (independent review: the one exported psql was a write path with no check).
+ */
 export function psqlLocal(database, extraArgs, input) {
-  return spawnSync("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", database, ...extraArgs], {
-    input,
-    encoding: "utf8",
-    maxBuffer: 256 * 1024 * 1024,
-    env: localEnv(),
-  });
+  return psqlRun(database, extraArgs, input, true);
+}
+
+/** The writing psql, for the helpers below only, after their checks. */
+function psqlWrite(database, extraArgs, input) {
+  return psqlRun(database, extraArgs, input, false);
 }
 
 function must(r, what) {
@@ -97,10 +121,22 @@ export function serverVersionNum() {
   );
 }
 
-let serverVerified = false;
-/** Before the first write: the server attests that it is a local scratch Postgres, as db-test requires. */
+/** What decides which server libpq reaches; the attestation is remembered for exactly this. */
+function serverKey(env = process.env) {
+  return JSON.stringify(
+    ["PGHOST", "PGHOSTADDR", "PGPORT", "PGUSER", "PGSERVICE", "PGSERVICEFILE"].map(
+      (k) => env[k] ?? null,
+    ),
+  );
+}
+
+let serverVerifiedFor = null;
+/**
+ * Before the first write: the server attests that it is a local scratch Postgres, as db-test requires. Remembered per
+ * libpq environment: a change to PGHOST/PGPORT/... after the check means a server that was never checked.
+ */
 export function verifyServer() {
-  if (serverVerified) return;
+  if (serverVerifiedFor === serverKey()) return;
   const probe = must(
     psqlLocal("postgres", ["-At", "-F", "|", "-c", SERVER_PROBE_SQL]),
     "Could not identify the local Postgres",
@@ -114,7 +150,7 @@ export function verifyServer() {
     throw new Error(
       `Refusing to write scratch databases: the server is not a verified local scratch Postgres.\n  - ${problems.join("\n  - ")}`,
     );
-  serverVerified = true;
+  serverVerifiedFor = serverKey();
 }
 
 /** Whether a database exists and its comment (the scratch marker, for one a harness created). */
@@ -148,8 +184,28 @@ export function dropDb(name) {
   verifyServer();
   const problems = existingDatabaseProblems(databaseState(name));
   if (problems.length) throw new Error(`Refusing to drop ${name}: ${problems.join(" ")}`);
-  psqlLocal("postgres", ["-c", `DROP DATABASE IF EXISTS "${scratchName(name)}"`]);
+  psqlWrite("postgres", ["-c", `DROP DATABASE IF EXISTS "${scratchName(name)}"`]);
   created.delete(name);
+}
+
+/**
+ * For the self-test only: a database WITHOUT the scratch marker, to prove that every helper refuses it. The server is
+ * attested first, the name must be a self-test name, and the database is dropped again whatever `fn` does. This is
+ * the only way this module touches an unmarked database.
+ */
+export function withUnmarkedDatabase(name, fn) {
+  verifyServer();
+  if (!/^rpf_[a-z0-9_]+$/.test(name)) throw new Error(`not a self-test database name: ${name}`);
+  if (databaseState(name).exists) throw new Error(`${name} already exists`);
+  must(
+    psqlWrite("postgres", ["-c", `CREATE DATABASE "${scratchName(name)}"`]),
+    `Could not create ${name}`,
+  );
+  try {
+    return fn();
+  } finally {
+    psqlWrite("postgres", ["-c", `DROP DATABASE IF EXISTS "${scratchName(name)}"`]);
+  }
 }
 
 export function createDb(name, template) {
@@ -157,11 +213,11 @@ export function createDb(name, template) {
   if (template) requireScratch(template);
   const tpl = template ? ` TEMPLATE "${scratchName(template)}"` : "";
   must(
-    psqlLocal("postgres", ["-c", `CREATE DATABASE "${scratchName(name)}"${tpl}`]),
+    psqlWrite("postgres", ["-c", `CREATE DATABASE "${scratchName(name)}"${tpl}`]),
     `Could not create ${name}`,
   );
   must(
-    psqlLocal("postgres", [
+    psqlWrite("postgres", [
       "-c",
       `COMMENT ON DATABASE "${scratchName(name)}" IS '${SCRATCH_MARKER}'`,
     ]),
@@ -172,7 +228,7 @@ export function createDb(name, template) {
 
 export function sql(db, text) {
   requireScratch(db);
-  return must(psqlLocal(db, ["-At"], text), `SQL failed on ${db}`);
+  return must(psqlWrite(db, ["-At"], text), `SQL failed on ${db}`);
 }
 
 const asMigrator = `SET ROLE ${MIGRATOR_ROLE};\n`;
@@ -181,7 +237,7 @@ const asMigrator = `SET ROLE ${MIGRATOR_ROLE};\n`;
 export function loadStub(db, root) {
   requireScratch(db);
   must(
-    psqlLocal(
+    psqlWrite(
       db,
       [],
       asMigrator + readFileSync(`${root}/supabase/tests/support/supabase-stub.sql`, "utf8"),
@@ -195,7 +251,7 @@ export function applyMigration(db, absPath, stripMaintain) {
   requireScratch(db);
   let text = readFileSync(absPath, "utf8");
   if (stripMaintain) text = text.replace(/,\s*MAINTAIN\b/gi, "");
-  must(psqlLocal(db, ["-1"], asMigrator + text), `Migration failed to apply: ${absPath}`);
+  must(psqlWrite(db, ["-1"], asMigrator + text), `Migration failed to apply: ${absPath}`);
 }
 
 /**

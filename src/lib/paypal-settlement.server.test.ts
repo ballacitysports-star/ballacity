@@ -11,14 +11,28 @@ const state = {
   updates: [] as any[],
   inserts: [] as any[],
   insertError: null as any,
+  /** errors returned by successive conditional writes (null: none) */
+  writeErrors: [] as any[],
+  /** a payment already recorded for the order, and an error reading it */
+  recordedPayment: null as any,
+  paymentReadError: null as any,
+  /** whether the claim is still held when re-read */
+  claimHeld: true,
 };
 
 const admin: any = {
   from(table: string) {
+    let cols = "*";
     const chain: any = {
-      select: () => chain,
+      select: (c?: string) => ((cols = c ?? "*"), chain),
       eq: () => chain,
-      maybeSingle: async () => ({ data: table === "paypal_orders" ? state.order : null }),
+      maybeSingle: async () => {
+        if (table === "payment_submissions")
+          return { data: state.recordedPayment, error: state.paymentReadError };
+        if (table === "paypal_orders" && cols === "order_id")
+          return { data: state.claimHeld ? { order_id: "ORDER-1" } : null, error: null };
+        return { data: table === "paypal_orders" ? state.order : null };
+      },
       update: (patch: any) => {
         const entry = { table, patch, filters: [] as any[] };
         state.updates.push(entry);
@@ -26,9 +40,11 @@ const admin: any = {
           eq: (col: string, val: unknown) => (entry.filters.push(["eq", col, val]), u),
           in: (col: string, val: unknown) => (entry.filters.push(["in", col, val]), u),
           is: (col: string, val: unknown) => (entry.filters.push(["is", col, val]), u),
-          select: async () => ({
-            data: state.writeRows.length ? state.writeRows.shift() : state.claimRows,
-          }),
+          select: async () => {
+            const error = state.writeErrors.length ? state.writeErrors.shift() : null;
+            const data = state.writeRows.length ? state.writeRows.shift() : state.claimRows;
+            return error ? { data: null, error } : { data, error: null };
+          },
           then: (resolve: (v: unknown) => void) => resolve({ error: null }),
         };
         return u;
@@ -83,6 +99,10 @@ beforeEach(() => {
   state.updates = [];
   state.inserts = [];
   state.insertError = null;
+  state.writeErrors = [];
+  state.recordedPayment = null;
+  state.paymentReadError = null;
+  state.claimHeld = true;
 });
 
 describe("settlePendingPayPalOrder (F04 later settlement)", () => {
@@ -199,5 +219,78 @@ describe("settlePendingPayPalOrder (F04 later settlement)", () => {
     const d = deps("COMPLETED");
     await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({ kind: "in_flight" });
     expect(d.getOrderCapture).not.toHaveBeenCalled();
+  });
+  // Independent review of 8b8cc27b: a failed write must not be read as a lost claim, and an insert error must not
+  // refund a payment that was in fact recorded.
+  const wrongPayee = (d: ReturnType<typeof deps>) => ({ ...d, merchantIdFor: async () => "OTHER" });
+
+  it("a failed write while recording a capture that must be refunded is retried, not dropped as superseded", async () => {
+    state.order = order("capture_pending");
+    state.writeErrors = [null, { message: "connection reset" }]; // the claim succeeds; storing the capture fails
+    const d = wrongPayee(deps("COMPLETED"));
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({ kind: "retry" });
+    expect(d.refundCapture).not.toHaveBeenCalled();
+    expect(state.inserts).toHaveLength(0);
+  });
+
+  it("a mismatched COMPLETED capture is refunded when the writes succeed", async () => {
+    state.order = order("capture_pending");
+    const d = wrongPayee(deps("COMPLETED"));
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({
+      kind: "refunded",
+      reason: "mismatch",
+    });
+    expect(d.refundCapture).toHaveBeenCalledWith("CAP-1");
+  });
+
+  it("a failed write of a matching capture is retried and grants nothing", async () => {
+    state.order = order("capture_pending");
+    state.writeErrors = [null, { message: "timeout" }];
+    const d = deps("COMPLETED");
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({ kind: "retry" });
+    expect(state.inserts).toHaveLength(0);
+    expect(d.refundCapture).not.toHaveBeenCalled();
+  });
+
+  it("an insert error that hid a committed payment is not refunded", async () => {
+    state.order = order("capture_pending");
+    state.insertError = { message: "fetch failed" }; // no code: a transport error
+    state.recordedPayment = { id: "pay-1" };
+    const d = deps("COMPLETED");
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({
+      kind: "already_recorded",
+    });
+    expect(d.refundCapture).not.toHaveBeenCalled();
+    const last = state.updates.filter((u) => u.table === "paypal_orders").at(-1);
+    expect(last.patch).toEqual({ status: "captured" });
+  });
+
+  it("an insert error is not refunded when the payment cannot be re-read", async () => {
+    state.order = order("capture_pending");
+    state.insertError = { message: "fetch failed" };
+    state.paymentReadError = { message: "fetch failed" };
+    const d = deps("COMPLETED");
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({ kind: "retry" });
+    expect(d.refundCapture).not.toHaveBeenCalled();
+  });
+
+  it("an insert error is not refunded by a call that no longer holds the order", async () => {
+    state.order = order("capture_pending");
+    state.insertError = { message: "check violation", code: "23514" };
+    state.claimHeld = false;
+    const d = deps("COMPLETED");
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({ kind: "superseded" });
+    expect(d.refundCapture).not.toHaveBeenCalled();
+  });
+
+  it("an insert error with no payment recorded, by the claim holder, is refunded", async () => {
+    state.order = order("capture_pending");
+    state.insertError = { message: "check violation", code: "23514" };
+    const d = deps("COMPLETED");
+    await expect(settlePendingPayPalOrder("ORDER-1", d)).resolves.toEqual({
+      kind: "refunded",
+      reason: "unrecorded",
+    });
+    expect(d.refundCapture).toHaveBeenCalledWith("CAP-1");
   });
 });

@@ -15,7 +15,10 @@
  *     writes a fresh token (capture_claim), and every write here requires that token and status `capturing`. A
  *     delayed call whose claim was superseded (a settlement re-claimed a stale order, or a second settlement raced
  *     the first) writes nothing, so a late PENDING can never overwrite a completed capture. The database also keeps a
- *     captured order captured (only a refund follows).
+ *     captured order captured (only a refund follows, and a refund is final).
+ *   - A failed database read or write is not a lost claim: the outcome is `retry`, the order stays claimed in
+ *     `capturing`, and the settlement re-reads the capture from PayPal after the grace period. An insert error is
+ *     refunded only after re-reading that no payment was recorded for the order and that the claim is still held.
  */
 import type { CaptureResult } from "./paypal.server";
 
@@ -43,7 +46,16 @@ export type CaptureOutcome =
   | { kind: "refunded"; reason: string }
   | { kind: "unrecorded"; reason: string }
   | { kind: "failed"; reason: string }
-  | { kind: "superseded" };
+  | { kind: "superseded" }
+  /**
+   * A read or write of the order or payment failed (database or network error). Nothing more is done: the order stays
+   * claimed in `capturing`, and the settlement re-reads the capture from PayPal once the claim is older than the
+   * grace period. Never reported as `superseded`, which means another call holds the order.
+   */
+  | { kind: "retry" };
+
+/** A failed database read or write while recording an outcome (not "no row matched", which is a lost claim). */
+class OrderStateError extends Error {}
 
 function cents(v: string | null) {
   return v ? Math.round(Number(v) * 100) : NaN;
@@ -77,21 +89,50 @@ export function newCaptureClaim() {
   return crypto.randomUUID();
 }
 
-/** Writes the order only while `claim` still holds it in `capturing`. Returns whether a row was written. */
+/**
+ * Writes the order only while `claim` still holds it in `capturing`. Returns whether a row was written: false means
+ * another call holds the order. A failed write throws OrderStateError (independent review: an error must not look like
+ * a lost claim, or a capture that has to be refunded would be left as "superseded" with no one refunding it).
+ */
 async function setOrder(
   admin: AdminClient,
   orderId: string,
   claim: string,
   patch: Record<string, unknown>,
 ) {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("paypal_orders")
     .update(patch as never)
     .eq("order_id", orderId)
     .eq("status", "capturing")
     .eq("capture_claim" as never, claim as never)
     .select("order_id");
+  if (error) throw new OrderStateError(`paypal_orders update failed: ${error.message}`);
   return !!data && (data as unknown[]).length > 0;
+}
+
+/** Whether `claim` still holds the order in `capturing`. */
+async function stillClaimed(admin: AdminClient, orderId: string, claim: string) {
+  const { data, error } = await admin
+    .from("paypal_orders")
+    .select("order_id")
+    .eq("order_id", orderId)
+    .eq("status", "capturing")
+    .eq("capture_claim" as never, claim as never)
+    .maybeSingle();
+  if (error) throw new OrderStateError(`paypal_orders read failed: ${error.message}`);
+  return !!data;
+}
+
+/** Whether a payment is already recorded for the order (at most one: paypal_order_id is unique). */
+async function paymentRecorded(admin: AdminClient, orderId: string) {
+  const { data, error } = await admin
+    .from("payment_submissions")
+    .select("id")
+    .eq("paypal_order_id" as never, orderId as never)
+    .maybeSingle();
+  if (error) throw new OrderStateError(`payment_submissions read failed: ${error.message}`);
+  return !!data;
 }
 
 /**
@@ -99,6 +140,27 @@ async function setOrder(
  * (newCaptureClaim). `refund` is injected so tests (and the settlement job) control the PayPal call.
  */
 export async function recordCaptureOutcome(
+  admin: AdminClient,
+  order: PayPalOrderRow,
+  result: CaptureResult,
+  expected: Expected,
+  refund: (captureId: string) => Promise<unknown>,
+  claim: string,
+): Promise<CaptureOutcome> {
+  try {
+    return await applyCaptureOutcome(admin, order, result, expected, refund, claim);
+  } catch (e) {
+    if (!(e instanceof OrderStateError)) throw e;
+    console.error(
+      "[paypal] could not record the capture outcome; the settlement will retry",
+      order.order_id,
+      e.message,
+    );
+    return { kind: "retry" };
+  }
+}
+
+async function applyCaptureOutcome(
   admin: AdminClient,
   order: PayPalOrderRow,
   result: CaptureResult,
@@ -171,6 +233,14 @@ export async function recordCaptureOutcome(
       return { kind: "already_recorded" };
     }
     console.error("[paypal] captured payment could not be recorded", insertError.message);
+    // The error may hide an insert that did commit (a dropped connection or a timeout), or another call may have
+    // recorded it meanwhile: refund only when no payment exists for the order and this call still holds it
+    // (independent review). Otherwise the player would be refunded and still hold a verified payment.
+    if (await paymentRecorded(admin, order.order_id)) {
+      await setOrder(admin, order.order_id, claim, { status: "captured" });
+      return { kind: "already_recorded" };
+    }
+    if (!(await stillClaimed(admin, order.order_id, claim))) return { kind: "superseded" };
     const refunded = await refund(result.captureId as string)
       .then(() => true)
       .catch((e) => {

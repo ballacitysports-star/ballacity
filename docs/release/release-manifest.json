@@ -1565,7 +1565,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "72a4e37478338bd4b25fdc200c270bb8c9e5b505933643afdf5e81239b462245",
+      "sha256": "d1cb16b3c322d5cd9910ba283ff891b6d76d251356b4acf5bfcb978f00519758",
       "requires": {
         "functions": [],
         "tables": [
@@ -1614,7 +1614,7 @@
       "version": "20261108190000",
       "source": "supabase",
       "path": "supabase/migrations/20261108190000_appeal_separation.sql",
-      "sha256": "17d075cfb2717aac15271f26f55cfa50c99b22b52ec855ca634272e4ce55e9f0",
+      "sha256": "b07e8ef7682e613e9150c3d1f0e42c114eda5e440199565fc248d13a67c0ddae",
       "requires": {
         "functions": [
           "public.moderator_review_appeal(uuid,boolean,text)"
@@ -14598,7 +14598,7 @@
         "expect_steps": {
           "16": {
             "20261108170000": {
-              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
               "owner": "postgres",
               "secdef": false,
               "search_path": "\"\"",
@@ -14610,7 +14610,7 @@
           },
           "17": {
             "20261108170000": {
-              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
               "owner": "postgres",
               "secdef": false,
               "search_path": "\"\"",
@@ -14623,7 +14623,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
             "owner": "postgres",
             "secdef": false,
             "search_path": "\"\"",
@@ -14633,7 +14633,7 @@
             ]
           },
           "17": {
-            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "def": "e0e534d8a8b4d86cf6c885b8ebd4ccc9",
             "owner": "postgres",
             "secdef": false,
             "search_path": "\"\"",
@@ -18326,7 +18326,7 @@
               ]
             },
             "20261108190000": {
-              "def": "d825fc86a0ac96ea0674bd976b700c08",
+              "def": "cb76b3625737e821d51b309b5d4f2df1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -18350,7 +18350,7 @@
               ]
             },
             "20261108190000": {
-              "def": "d825fc86a0ac96ea0674bd976b700c08",
+              "def": "cb76b3625737e821d51b309b5d4f2df1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -18364,7 +18364,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "d825fc86a0ac96ea0674bd976b700c08",
+            "def": "cb76b3625737e821d51b309b5d4f2df1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -18375,7 +18375,7 @@
             ]
           },
           "17": {
-            "def": "d825fc86a0ac96ea0674bd976b700c08",
+            "def": "cb76b3625737e821d51b309b5d4f2df1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
