@@ -14,8 +14,10 @@
 --   guardian_approval_required(child): the child has an active OR SUSPENDED guardian link. A suspension (a security
 --     review) therefore keeps the gate closed instead of opening it (A-F3). Once every link is revoked the child is
 --     treated like any child without a guardian (the existing product rule, tests 3xx), and no old approval matters.
---   guardian_approval_valid(child, approver): the approver currently has an active, verified link to the child and
---     no open authority hold.
+--   guardian_approval_valid(child, approver): the approver currently has an active, verified link to the child, no open
+--     authority hold, and is still eligible to act as a guardian (private_sec.guardian_eligible: an adult account that is
+--     not suspended, not under age review and not a managed child). An approval given before a ban or an age review
+--     stops counting (independent pre-review, 2026-11-05), and such an account cannot give a new one.
 
 DO $$ BEGIN
   IF to_regclass('public.guardian_authority_holds') IS NULL OR to_regprocedure('private_sec.is_guardian_of(uuid,uuid)') IS NULL
@@ -44,6 +46,7 @@ AS $function$
   SELECT _approver IS NOT NULL
      AND private_sec.is_guardian_of(_approver, _child)
      AND NOT EXISTS (SELECT 1 FROM public.guardian_authority_holds h WHERE h.guardian_user_id = _approver AND h.lifted_at IS NULL)
+     AND private_sec.guardian_eligible(_approver)
 $function$;
 REVOKE ALL ON FUNCTION private_sec.guardian_approval_valid(uuid, uuid) FROM PUBLIC, anon, authenticated;
 
@@ -232,6 +235,9 @@ BEGIN
   SELECT * INTO _row FROM public.join_requests WHERE id = _request FOR UPDATE;
   IF _row.id IS NULL THEN RAISE EXCEPTION 'REQUEST_NOT_FOUND'; END IF;
   IF NOT public.is_guardian_of(_me, _row.player_id) THEN RAISE EXCEPTION 'NOT_GUARDIAN'; END IF;
+  IF _approve AND NOT private_sec.guardian_approval_valid(_row.player_id, _me) THEN
+    RAISE EXCEPTION 'GUARDIAN_NOT_ELIGIBLE: this account cannot approve for a child right now.' USING ERRCODE = '42501';
+  END IF;
   IF _row.status NOT IN ('pending', 'approved') THEN RAISE EXCEPTION 'REQUEST_NOT_PENDING'; END IF;
   IF EXISTS (SELECT 1 FROM public.game_participants gp
               WHERE gp.game_id = _row.game_id AND gp.user_id = _row.player_id) THEN
