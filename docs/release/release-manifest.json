@@ -1580,7 +1580,7 @@
       "version": "20261108180000",
       "source": "supabase",
       "path": "supabase/migrations/20261108180000_image_direct_upload_closure.sql",
-      "sha256": "5e35a19b87e33ec1beb1da6d1b93ddc4f7932e20b1182c04f0a95ed032cf83d4",
+      "sha256": "bbd0c5eaf8520daf357b4bf9a60aa6306a127de68d91d7b3b32632a2479afe9e",
       "requires": {
         "functions": [
           "private_sec.published_image_refuse_user_write()",
@@ -1593,6 +1593,7 @@
       "provides": {
         "functions": [
           "private_sec.direct_image_uploads_closed()",
+          "private_sec.guard_direct_image_upload_switch()",
           "private_sec.refuse_direct_public_image_write()"
         ],
         "tables": [],
@@ -2962,7 +2963,7 @@
         "expect_steps": {
           "16": {
             "20261108180000": {
-              "def": "17e3e4e389127934304697706570296e",
+              "def": "49933f94a08f2f052e4097044dc98130",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2976,7 +2977,7 @@
           },
           "17": {
             "20261108180000": {
-              "def": "17e3e4e389127934304697706570296e",
+              "def": "49933f94a08f2f052e4097044dc98130",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2991,7 +2992,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "17e3e4e389127934304697706570296e",
+            "def": "49933f94a08f2f052e4097044dc98130",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3003,7 +3004,7 @@
             ]
           },
           "17": {
-            "def": "17e3e4e389127934304697706570296e",
+            "def": "49933f94a08f2f052e4097044dc98130",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3511,6 +3512,72 @@
             "secdef": true,
             "search_path": "\"\"",
             "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.guard_direct_image_upload_switch()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108180000": {
+              "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
               "postgres:EXECUTE",
               "service_role:EXECUTE"
             ]
@@ -31051,7 +31118,8 @@
         "defined_by": [
           "20261104100000",
           "20261105110000",
-          "20261107100000"
+          "20261107100000",
+          "20261108180000"
         ],
         "expect_before": {
           "16": {
@@ -31242,6 +31310,46 @@
                 "Public flags are readable",
                 "Superadmins read all settings"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:SELECT",
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
+                "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
+                "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
+                "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
+                "guard_youth_switch_truncate_trg|public.guard_youth_switch_tamper()|34|O",
+                "trg_app_settings_touch|public.touch_updated_at()|19|O"
+              ],
+              "policies": [
+                "Public flags are readable",
+                "Superadmins read all settings"
+              ]
             }
           },
           "17": {
@@ -31368,6 +31476,50 @@
                 "Public flags are readable",
                 "Superadmins read all settings"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:MAINTAIN",
+                "anon:SELECT",
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:MAINTAIN",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:MAINTAIN",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:MAINTAIN",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
+                "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
+                "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
+                "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
+                "guard_youth_switch_truncate_trg|public.guard_youth_switch_tamper()|34|O",
+                "trg_app_settings_touch|public.touch_updated_at()|19|O"
+              ],
+              "policies": [
+                "Public flags are readable",
+                "Superadmins read all settings"
+              ]
             }
           }
         },
@@ -31400,6 +31552,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
               "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
               "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
               "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
@@ -31443,6 +31596,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
               "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
               "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
               "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
