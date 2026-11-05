@@ -229,3 +229,10 @@ The release manifest (`docs/release/release-manifest.json`) was not regenerated:
 - Counsel review of every **(counsel)** item above.
 - The EXIF fixture generator bug (above).
 - Phase 2 (closing legacy direct uploads) is unchanged and still separately approved.
+
+## Fresh paths and animated attachments (audit F05/F06, 2026-11-05)
+
+The trigger above guards only paths that already have a moderation record. A fresh path in a user's own folder is
+closed by the `image_direct_uploads` switch (`20261108180000_image_direct_upload_closure.sql`), which is open until the
+release cutover described in `g3b-image-staging.md` ("Independent audit F05 and F06"). Animated message attachments are
+refused before scanning (`src/lib/image-animation.ts`).
