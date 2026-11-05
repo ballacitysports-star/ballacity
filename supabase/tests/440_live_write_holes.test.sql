@@ -24,6 +24,14 @@ SELECT t.eq((SELECT jersey_number::int FROM public.team_members WHERE team_id = 
 
 -- ============================================================ B-F1: refund fields are not the player's to write
 INSERT INTO public.hosted_games (id, host_id, sport, title, date) VALUES ('pay-q', t.id('host'), 'basketball', 'Paid run', now() + interval '2 days');
+-- an adult host's paid game that does not ask for approval first (the privacy release requires a settings row saying so)
+INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee) VALUES ('pay-q', t.id('host'), 10);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'game_payment_settings'
+              AND column_name = 'requires_approval') THEN
+    EXECUTE 'UPDATE public.game_payment_settings SET requires_approval = false WHERE game_id = ''pay-q''';
+  END IF;
+END $$;
 SELECT t.as_user(t.id('payer'));
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, refund_status, refund_amount, refund_pct, refund_reason)
                           VALUES (%L, 'pay-q', %L, 'venmo', 'owed', 4999, 100, 'game_cancelled')$q$, t.id('payer'), t.id('host')),
