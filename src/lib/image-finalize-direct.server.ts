@@ -16,7 +16,6 @@ import {
 import {
   ImageReencodeError,
   REENCODE_MESSAGES,
-  reencodeImage,
   type ReencodeResult,
 } from "@/lib/image-reencode.server";
 import {
@@ -45,8 +44,8 @@ export type DirectFinalizeDeps = {
   /** A URL the scanner can fetch for an image too large to inline. */
   objectUrl: (bucket: string, path: string) => Promise<string | null>;
   escalate: (bucket: string, path: string, categories: string[]) => Promise<void>;
-  /** Test seam: the canonical re-encoder. */
-  reencode?: (bytes: Uint8Array) => Promise<ReencodeResult>;
+  /** The re-encoder from the configured runtime (select.server.ts). Required: no in-process default (audit F09). */
+  reencode: (bytes: Uint8Array) => Promise<ReencodeResult>;
 };
 
 export const FLAGGED_REFUSAL =
@@ -149,7 +148,7 @@ export async function finalizeDirectImageUpload(
   const original = buffer;
   let encoded: ReencodeResult;
   try {
-    encoded = await (deps.reencode ?? reencodeImage)(original);
+    encoded = await deps.reencode(original);
     // Remove, then insert without upsert (final review 780eaf8f, finding 3). The object was written by the uploader, so its row
     // carries them as owner; an upsert keeps that owner and published_image_refuse_user_write (the path is claimed above) would
     // refuse the server's own rewrite. A fresh insert by the service key has no owner. The claim keeps the uploader from

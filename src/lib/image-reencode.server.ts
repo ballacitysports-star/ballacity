@@ -103,6 +103,10 @@ export class ImageReencodeError extends Error {
   }
 }
 
+/** What the published pixels hold: no transparent pixel, only fully transparent ones, or some partly transparent ones. */
+export type ImageTransparency = "none" | "binary" | "partial";
+
+/** The contract every runtime returns: src/lib/image-runtime/reencode-contract.ts (version 2) checks it. */
 export type ReencodeResult = {
   /** The new file. Scan these bytes and publish these bytes; nothing else. */
   bytes: Uint8Array;
@@ -129,6 +133,8 @@ export type ReencodeResult = {
    * Callers scan `bytes` AND every rendition, and treat a flag (or a failed scan) on any of them as a flag on the image.
    */
   scanRenditions: string[];
+  /** Decides how many renditions there must be: none 0, binary 2 (white, black), partial 3 (white, black, alpha dropped). */
+  transparency: ImageTransparency;
 };
 
 /** Longest side of a scan rendition (scanners downscale far below this). */
@@ -265,6 +271,7 @@ export async function reencodeImage(
   const lossless = format === "png" || (format === "webp" && isLosslessWebp(decodable));
   let out: Buffer;
   const scanRenditions: string[] = [];
+  let transparency: ImageTransparency = "none";
   try {
     // Decode to raw 8-bit sRGB pixels: autoOrient() applies the orientation, toColourspace('srgb') converts through the embedded
     // profile (when there is one). The new file is then encoded from those pixels alone, so NOTHING else from the upload can reach
@@ -289,6 +296,7 @@ export async function reencodeImage(
         .webp(lossless ? { ...REENCODE_SETTINGS.webpLossless } : { ...REENCODE_SETTINGS.webpLossy })
         .toBuffer();
     if (hasTransparency(decoded.data, channels)) {
+      transparency = hasPartialAlpha(decoded.data, channels) ? "partial" : "binary";
       // Scan renditions of the quantised pixels (what is published); see ReencodeResult.scanRenditions.
       const raw = { width, height, channels: channels as 1 | 2 | 3 | 4 };
       const rendition = async (shape: (s: Sharp) => Sharp) => {
@@ -303,7 +311,7 @@ export async function reencodeImage(
       };
       scanRenditions.push(await rendition((s) => s.flatten({ background: "#ffffff" })));
       scanRenditions.push(await rendition((s) => s.flatten({ background: "#000000" })));
-      if (hasPartialAlpha(decoded.data, channels)) {
+      if (transparency === "partial") {
         // What a viewer sees after removing transparency.
         scanRenditions.push(await rendition((s) => s.removeAlpha()));
       }
@@ -354,5 +362,6 @@ export async function reencodeImage(
     lossless,
     inputReport: structural.report,
     scanRenditions,
+    transparency,
   };
 }
