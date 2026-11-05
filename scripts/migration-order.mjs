@@ -19,6 +19,11 @@ export const PINNED_HISTORY = [
     basis:
       "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release with its exact text: through Lovable's migration tool (drizzle ledger hash) or with the release ledger template (statements = the file text).",
   },
+  {
+    version: "20261102100000",
+    basis:
+      "PR #295: only a game's host may write its payment settings (the write half of #250, closing a live join-approval bypass). Applied to production on 2026-11-05 through Lovable's migration tool with its exact text (drizzle ledger hash; Lovable's copy is drizzle/migrations/0033_hotfix_payment_settings_host_guard.sql).",
+  },
 ];
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
