@@ -173,3 +173,43 @@ Still open after the final review:
 - **L1 (Low, open):** account purge and data export do not cover `image-staging` (a user's staged and quarantined originals are neither exported nor purged; quarantined ones need a retention rule that respects evidence holds).
 - **Needs the verified sandbox (Storage API behaviour this branch relies on):** that signed-upload-URL writes run as `service_role` with the signer stamped in `owner`/`owner_id`, so the trust test refuses them (if Storage ever writes them with no owner, or as a superuser, the H1 triggers would let them through); that service-key uploads carry no owner; that `postgres` may create triggers on `storage.objects` in the hosted project; `info()` returning `id` and `version`; that an upsert keeps the id and changes the version; the five-minute SELECT window against Storage's `INSERT ... RETURNING` and signed-URL creation; plus the items listed under round 4 (CDN behaviour, sweeper pagination, the phase 2 rehearsal).
 - Unchanged from round 4: animated chat attachments; in-place overwrite of legacy avatars/covers until phase 2; a reviewer screen for flagged staging originals.
+
+## Independent audit F05 and F06 (2026-11-05)
+
+**F05: animated attachments were stored with every frame after one scan.** `finalizeMessageAttachment` scanned one frame
+of an animated PNG (APNG) or animated WebP and then kept the original bytes, so frames the scan never saw were stored
+and served. Reproduced on the base tree: both were accepted with a single scan. Message attachments now refuse any
+animated picture before scanning or recording anything (`src/lib/image-animation.ts`, `attachmentProblem` in
+`src/lib/message-attachment-validation.ts`): APNG (`acTL`, `fcTL` or `fdAT` before `IEND`, or a malformed chunk length),
+animated WebP (the `VP8X` animation flag, or an `ANIM`/`ANMF` chunk) and GIF with more than one frame. The upload is
+removed and the person sees "Animated pictures can't be sent. Send a still photo instead." Still PNG and WebP are
+unchanged. The profile-image re-encoder already refused animation (`code: "animated"`). Tests:
+`src/lib/message-attachment-animation.test.ts`; 3 of them fail with the validation change removed.
+
+**F06: a fresh path in a user's own folder skipped processing.** The SEC-6 trigger only protects paths that already
+have an `image_moderation` row, and the legacy browser write policies still allow a new path, so an old or hostile
+client could upload straight into a public image bucket and never call finalization. Migration
+`20261108180000_image_direct_upload_closure.sql` makes the phase-2 closure a switch enforced by the database:
+
+- `app_settings` `image_direct_uploads` is seeded `{"closed": false}`: today's behaviour, so the old app keeps working.
+- While it is `{"closed": true}`, a `BEFORE INSERT OR UPDATE` trigger on `storage.objects` refuses every write into
+  `avatars`, `covers`, the org, team and trainer image buckets and `game-covers` unless it is a trusted server write with
+  no end-user owner (`private_sec.storage_write_is_trusted`). That covers a browser insert or rewrite (fresh or processed
+  path) and the write Storage performs for a signed upload URL minted for a user, including URLs minted before the
+  switch closed. The staging, scan, strip and promote path is unaffected.
+- Only the service role can change `app_settings`; a client cannot reopen the switch.
+
+Tests: `supabase/tests/547_image_direct_upload_closure.test.sql` (12 assertions; 7 fail without the migration).
+
+The switch is a release cutover, not a deploy step. It is closed only after phase 1 of the transition plan above is
+clean, in this order:
+
+1. Owner approval, then on staging: `update public.app_settings set value = '{"closed": true}' where key = 'image_direct_uploads';`
+   as the service role. Confirm an old-build upload is refused with `DIRECT_IMAGE_UPLOAD_CLOSED` and a new-build upload
+   still publishes.
+2. The same statement in production, with owner approval.
+3. Phase 2 (`supabase/phase2/g3b_phase2_close_direct_image_uploads.sql`) then removes the browser policies themselves.
+   The trigger stays as a second lock.
+
+Until step 2 runs, F06 remains open in production: a direct upload into a fresh path is still possible while the switch
+is open.
