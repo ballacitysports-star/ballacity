@@ -302,10 +302,12 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // the pay-* specs mock their own settings, so only g1 needs a row.
         const g1Writable = writable.some((r) => r.id === "g1");
         if (g1Writable) {
-          const { error: psErr } = await admin.from("game_payment_settings").upsert(
-            { game_id: "g1", host_id: gamesHostId, entry_fee: 0, requires_approval: false },
-            { onConflict: "game_id,host_id" },
-          );
+          const { error: psErr } = await admin
+            .from("game_payment_settings")
+            .upsert(
+              { game_id: "g1", host_id: gamesHostId, entry_fee: 0, requires_approval: false },
+              { onConflict: "game_id,host_id" },
+            );
           if (psErr) {
             console.warn(
               `[e2e global-setup] Could not seed g1 payment settings (free, no approval): ${psErr.message}. ` +
