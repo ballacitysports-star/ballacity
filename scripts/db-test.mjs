@@ -12,6 +12,10 @@
 // settings (PGHOST, PGPORT, PGUSER, PGPASSWORD). It creates and drops its own
 // database, so it never touches anything else on that server.
 //
+// Local and disposable only (scripts/db-test-target.mjs): the server must be a
+// local socket or loopback host, never a Supabase-managed cluster, and a database
+// is dropped or reused only if this script created it. There is no override.
+//
 // Why two migration folders: supabase/migrations holds ours, drizzle/migrations
 // holds the ones Lovable writes and applies itself. The live schema is both
 // together, so they are replayed together in timestamp order (a drizzle entry's
@@ -21,6 +25,13 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  SCRATCH_MARKER,
+  existingDatabaseProblems,
+  scrubbedEnv,
+  serverProblems,
+  targetProblems,
+} from "./db-test-target.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -33,12 +44,23 @@ const option = (name) => {
 const dbName = option("--db") ?? "ballacity_dbtest";
 const only = option("--only");
 
+// Refuse before any connection unless the target is a local, plain database name.
+{
+  const problems = targetProblems(process.env, dbName);
+  if (problems.length) {
+    console.error("\ndb-test refused: the target is not a verified local, disposable database.");
+    for (const p of problems) console.error(`  - ${p}`);
+    process.exit(2);
+  }
+}
+const psqlEnv = { ...scrubbedEnv(process.env), PGOPTIONS: "-c search_path=public,extensions" };
+
 function psql(database, extraArgs, input) {
   return spawnSync("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", database, ...extraArgs], {
     input,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, PGOPTIONS: "-c search_path=public,extensions" },
+    env: psqlEnv,
   });
 }
 
@@ -82,6 +104,62 @@ let r = psql("postgres", ["-At", "-c", "SHOW server_version_num"]);
 if (r.status !== 0)
   fail("Cannot connect to Postgres with psql (check PGHOST/PGUSER/PGPASSWORD).", r.stderr);
 const serverVersion = Number(r.stdout.trim());
+
+// What the server says about itself: local, or a disposable container behind a loopback port; never Supabase-managed.
+{
+  const probe = psql("postgres", [
+    "-At",
+    "-F",
+    "|",
+    "-c",
+    "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')",
+  ]);
+  if (probe.status !== 0) fail("Could not identify the server.", probe.stderr);
+  const [serverAddr, roles, postgresUserTables] = probe.stdout.trim().split("|");
+  const dbList = psql("postgres", [
+    "-At",
+    "-F",
+    "\t",
+    "-c",
+    "SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database",
+  ]);
+  if (dbList.status !== 0) fail("Could not list the server's databases.", dbList.stderr);
+  const databases = dbList.stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name, ...comment] = line.split("\t");
+      return { name, comment: comment.join("\t") };
+    });
+  const problems = serverProblems({
+    serverAddr: serverAddr || null,
+    managedRoles: roles ? roles.split(",") : [],
+    databases,
+    postgresUserTables: Number(postgresUserTables) || 0,
+  });
+  if (problems.length) {
+    console.error("\ndb-test refused: the server is not a verified local scratch Postgres.");
+    for (const p of problems) console.error(`  - ${p}`);
+    process.exit(2);
+  }
+}
+// The name is a checked plain identifier, so it is safe to interpolate.
+const existing = psql("postgres", [
+  "-At",
+  "-c",
+  `SELECT 1, coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '${dbName}'`,
+]);
+if (existing.status !== 0) fail("Could not look up the scratch database.", existing.stderr);
+{
+  const [found, ...comment] = existing.stdout.trim().split("|");
+  const problems = existingDatabaseProblems({ exists: found === "1", comment: comment.join("|") });
+  if (problems.length) {
+    console.error("\ndb-test refused:");
+    for (const p of problems) console.error(`  - ${p}`);
+    process.exit(2);
+  }
+}
 // Supabase runs Postgres 17, which has a MAINTAIN table privilege that 16 lacks.
 const stripMaintain = serverVersion < 170000;
 
@@ -100,6 +178,8 @@ if (!reuse) {
   if (r.status !== 0) fail(`Could not drop ${dbName}.`, r.stderr);
   r = psql("postgres", ["-c", `CREATE DATABASE "${dbName}"`]);
   if (r.status !== 0) fail(`Could not create ${dbName}.`, r.stderr);
+  r = psql("postgres", ["-c", `COMMENT ON DATABASE "${dbName}" IS '${SCRATCH_MARKER}'`]);
+  if (r.status !== 0) fail(`Could not mark ${dbName} as a scratch database.`, r.stderr);
 }
 
 // -- races ------------------------------------------------------------------
@@ -108,7 +188,7 @@ if (!reuse) {
 function session(script) {
   return new Promise((resolve) => {
     const child = spawn("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-d", dbName], {
-      env: { ...process.env, PGOPTIONS: "-c search_path=public,extensions" },
+      env: psqlEnv,
     });
     let out = "";
     child.stdout.on("data", (d) => (out += d));
