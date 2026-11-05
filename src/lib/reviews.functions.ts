@@ -91,11 +91,23 @@ export const submitReview = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    // Moderator couldn't clear it (or was unavailable): hold it for human review.
-    let held = false;
-    if (mod.verdict === "review") {
-      await supabaseAdmin.from("reviews").update({ flagged: true }).eq("id", row.id);
-      held = true;
+    // The database holds every review written through the API (flagged) until it is screened, so text
+    // that skipped this function is never published. Screening cleared it: release the hold. A flag the
+    // integrity rules set stays. Moderator couldn't clear it (or was unavailable): it stays held for
+    // human review.
+    let held = true;
+    if (mod.verdict !== "review") {
+      const { data: released, error: relErr } = await supabaseAdmin.rpc(
+        "release_review_screening" as never,
+        // the exact text that was screened: an edit in between keeps the review held
+        {
+          _review_id: row.id,
+          _screened_title: data.title ?? null,
+          _screened_body: data.body,
+        } as never,
+      );
+      if (relErr) throw new Error("Your review was saved but could not be published yet.");
+      held = released !== true;
     }
     return { id: row.id as string, held };
   });
