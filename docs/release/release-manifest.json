@@ -1565,7 +1565,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "df6810838bbea2c38a967608e87d9d386bb1aeec7d7a9bbab78ddfe7447b8710",
+      "sha256": "72a4e37478338bd4b25fdc200c270bb8c9e5b505933643afdf5e81239b462245",
       "requires": {
         "functions": [],
         "tables": [
@@ -1577,7 +1577,8 @@
       },
       "provides": {
         "functions": [
-          "public.enforce_paypal_checkout_payment()"
+          "public.enforce_paypal_checkout_payment()",
+          "public.guard_paypal_order_settled()"
         ],
         "tables": [],
         "schemas": []
@@ -14577,6 +14578,64 @@
             "def": "1e32774c53ff16db6ce6e290dde21d94",
             "owner": "postgres",
             "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "public.guard_paypal_order_settled()",
+        "defined_by": [
+          "20261108170000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108170000": {
+              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108170000": {
+              "def": "188d591e61538feccbe6ff837c0ebfae",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "188d591e61538feccbe6ff837c0ebfae",
+            "owner": "postgres",
+            "secdef": false,
             "search_path": "\"\"",
             "acl": [
               "postgres:EXECUTE",
@@ -46297,7 +46356,9 @@
                 "service_role:TRUNCATE",
                 "service_role:UPDATE"
               ],
-              "triggers": [],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
@@ -46381,7 +46442,9 @@
                 "service_role:TRUNCATE",
                 "service_role:UPDATE"
               ],
-              "triggers": [],
+              "triggers": [
+                "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+              ],
               "policies": [
                 "players see own orders, hosts see theirs"
               ]
@@ -46421,7 +46484,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]
@@ -46462,7 +46527,9 @@
               "service_role:TRUNCATE",
               "service_role:UPDATE"
             ],
-            "triggers": [],
+            "triggers": [
+              "a01_paypal_order_settled|public.guard_paypal_order_settled()|19|O"
+            ],
             "policies": [
               "players see own orders, hosts see theirs"
             ]
