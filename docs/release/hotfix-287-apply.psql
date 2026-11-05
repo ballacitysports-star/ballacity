@@ -1,0 +1,29 @@
+-- Applies hotfix 20261031120000 (PR #287) together with its ledger row, in one transaction. Run it from the repository
+-- root at the reviewed commit, connected as the target's postgres role (docs/release/hotfix-286-287-runbook.md, step B3):
+--   psql -X -f docs/release/hotfix-287-apply.psql
+-- Nothing is applied if the migration file is not the reviewed text (sha256 below), if the ledger already has the
+-- version (primary key), if a lock is not granted within 5 s, or on any other error.
+-- The ledger row follows the release template (version; name = the file stem; statements = ARRAY[file text]), which
+-- is what the release preflight's pinned_history check (PR #294) expects for this version.
+\set ON_ERROR_STOP on
+\set content `cat supabase/migrations/20261031120000_close_live_write_holes.sql`
+-- psql's backquote expansion drops the file's one trailing newline; add it back to compare with the file's sha256.
+SELECT encode(sha256(convert_to(:'content' || E'\n', 'UTF8')), 'hex')
+       = '843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1' AS hotfix_287_file_reviewed \gset
+\if :hotfix_287_file_reviewed
+\else
+  DO $refuse$ BEGIN
+    RAISE EXCEPTION 'Refusing: supabase/migrations/20261031120000_close_live_write_holes.sql is not the reviewed text (sha256 843e356b...). Check out the reviewed commit; nothing was applied.';
+  END $refuse$;
+\endif
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '15min';
+SET LOCAL idle_in_transaction_session_timeout = '20min';
+\i supabase/migrations/20261031120000_close_live_write_holes.sql
+INSERT INTO supabase_migrations.schema_migrations (version, name, statements)
+VALUES ('20261031120000', '20261031120000_close_live_write_holes', ARRAY[:'content']);
+-- Delivered at COMMIT: the API (PostgREST) reloads its schema cache, so the new release_review_screening RPC is
+-- callable before the #287 app build is published. Harmless when nothing listens.
+NOTIFY pgrst, 'reload schema';
+COMMIT;
