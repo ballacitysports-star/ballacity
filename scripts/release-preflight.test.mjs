@@ -10,6 +10,7 @@
 // manifest is only checked offline and structurally.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -439,6 +440,56 @@ describe("pinned history: a hotfix dated before the range (independent pre-revie
     const { code, text } = preflight(db);
     assert.equal(code, 1);
     assert.match(text, /ledger row 20261031120000 .*statements is empty/);
+  });
+
+  // Applied through Lovable's migration tool instead: no ledger row, a drizzle row with the sha256 of the text it ran.
+  const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const lovableApplied = (hash) => {
+    const db = newDb(PRE);
+    scratch.sql(
+      db,
+      `DELETE FROM ${LEDGER} WHERE version = ${q(PIN)};
+       INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES (${q(hash)}, 1793900000000);`,
+    );
+    return db;
+  };
+
+  test("a hotfix applied through Lovable is recognized by the drizzle hash of its exact text", () => {
+    const { code, report } = preflight(lovableApplied(pinned().sha256));
+    assert.equal(code, 0, report.errors?.join("\n"));
+    assert.ok(
+      report.warnings.some((w) => w.includes(`pinned history ${PIN}: recognized by its drizzle`)),
+      report.warnings.join("\n"),
+    );
+  });
+
+  test("also when the pasted text lost the file's trailing newline", () => {
+    const bytes = readFileSync(join(ROOT, pinned().path));
+    assert.equal(bytes[bytes.length - 1], 0x0a);
+    const { code, report } = preflight(lovableApplied(sha256(bytes.subarray(0, -1))));
+    assert.equal(code, 0, report.errors?.join("\n"));
+  });
+
+  test("a drizzle row for any other text is unknown, and the hotfix counts as unapplied", () => {
+    const edited = `${readFileSync(join(ROOT, pinned().path), "utf8")}-- edited\n`;
+    const { code, text } = preflight(lovableApplied(sha256(edited)));
+    assert.equal(code, 1);
+    assert.match(text, /unknown drizzle\.__drizzle_migrations row/);
+    assert.match(
+      text,
+      /unrecognized history: supabase\/migrations\/20261031120000_close_live_write_holes\.sql/,
+    );
+  });
+
+  test("with neither a ledger row nor a drizzle row, the hotfix counts as unapplied", () => {
+    const db = newDb(PRE);
+    scratch.sql(db, `DELETE FROM ${LEDGER} WHERE version = ${q(PIN)};`);
+    const { code, text } = preflight(db);
+    assert.equal(code, 1);
+    assert.match(
+      text,
+      /unrecognized history: supabase\/migrations\/20261031120000_close_live_write_holes\.sql/,
+    );
   });
 });
 

@@ -822,6 +822,29 @@ export function releaseRowErrors(row, entry) {
   return errors;
 }
 
+/**
+ * The drizzle-ledger hashes that prove a pinned hotfix was applied through Lovable's migration tool, which records
+ * only the sha256 of the exact SQL text it ran (docs/supabase-cli.md): the pinned file sha256 and, when the file on
+ * disk is that text, its sha256 without the one trailing newline a pasted block can lose (the same tolerance as for
+ * statements[1] of the release template). Maps hash -> pinned version.
+ */
+export function pinnedDrizzleHashes(manifest, root = ROOT) {
+  const out = new Map();
+  for (const k of manifest.pinned_history ?? []) {
+    out.set(k.sha256, k.version);
+    let bytes;
+    try {
+      bytes = readFileSync(join(root, k.path));
+    } catch {
+      continue; // a missing file fails the offline check
+    }
+    if (createHash("sha256").update(bytes).digest("hex") !== k.sha256) continue; // so does an edited one
+    if (bytes.length && bytes[bytes.length - 1] === 0x0a)
+      out.set(createHash("sha256").update(bytes.subarray(0, -1)).digest("hex"), k.version);
+  }
+  return out;
+}
+
 /** Pure evaluation of the checks against data read from the target. */
 export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } = {}) {
   const errors = [];
@@ -861,6 +884,12 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
   const kn = ledgerKnowledge(manifest, root);
   const knownRowsWithoutFile = manifest.known_ledger_rows_without_file ?? [];
   const pinnedByVersion = new Map((manifest.pinned_history ?? []).map((k) => [k.version, k]));
+  const pinnedByDrizzleHash = pinnedDrizzleHashes(manifest, root);
+  const pinnedViaDrizzle = new Set(
+    (target.drizzle_rows ?? [])
+      .filter((r) => pinnedByDrizzleHash.has(r.hash))
+      .map((r) => pinnedByDrizzleHash.get(r.hash)),
+  );
   if (target.ledger) {
     for (const row of ledgerAll) {
       const v = row.version;
@@ -887,7 +916,9 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     // every historical file must be ledgered unless the manifest names it as known-unledgered
     for (const f of kn.supabase) {
       if (f.version >= from) continue;
-      const covered = ledgerAll.some((r) => r.version === f.version || kn.nameMatch(r, f));
+      const covered =
+        ledgerAll.some((r) => r.version === f.version || kn.nameMatch(r, f)) ||
+        pinnedViaDrizzle.has(f.version);
       if (!covered && !kn.unledgered.has(f.path))
         errors.push(
           `unrecognized history: ${f.path} (before the release range) has no ledger row and is not in the manifest's known_unledgered list; the target is missing it or applied it unrecorded`,
@@ -913,6 +944,7 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
     const ok =
       journalHashes.has(r.hash) ||
       journalWhen.has(String(r.created_at)) ||
+      pinnedByDrizzleHash.has(r.hash) ||
       (manifest.known_drizzle_rows_without_file ?? []).some(
         (k) => k.hash === r.hash && String(k.created_at) === String(r.created_at),
       );
@@ -921,6 +953,11 @@ export function evaluate(manifest, target, { verifyAfter = false, root = ROOT } 
         `unknown ${DRIZZLE_LEDGER} row (created_at ${r.created_at}, hash ${String(r.hash).slice(0, 16)}...): matches no drizzle journal file and is not in known_drizzle_rows_without_file`,
       );
   }
+  for (const v of pinnedViaDrizzle)
+    if (!ledgerAll.some((r) => r.version === v))
+      warnings.push(
+        `pinned history ${v}: recognized by its ${DRIZZLE_LEDGER} row, the sha256 of the exact file text (applied through Lovable's migration tool); it has no ${LEDGER} row`,
+      );
 
   // 3. gaps: the applied set must be a prefix of the manifest order
   const firstPending = entries.findIndex((e) => !isApplied(e));
@@ -1346,14 +1383,15 @@ export async function writeManifest({ from, root = ROOT, manifestPath, log = con
 }
 
 // Hotfixes dated before the release range that ship to production ahead of it. Their exact text is pinned: offline the
-// file must still match, online the target's ledger row must record that text (statements[1], as for release-range rows),
-// so an older or edited version applied in production is caught. Every migration dated after the newest known-unledgered
+// file must still match; online the target must record that text, either as its ledger row's statements[1] (the release
+// template, as for release-range rows) or as a drizzle ledger hash (Lovable's migration tool; pinnedDrizzleHashes), so an
+// older or edited version applied in production is caught. Every migration dated after the newest known-unledgered
 // historical file and before the range must be listed here (checkManifest).
 const PINNED_HISTORY = [
   {
     version: "20261031120000",
     basis:
-      "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release, with the release ledger template (statements = the file text).",
+      "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release with its exact text: through Lovable's migration tool (drizzle ledger hash) or with the release ledger template (statements = the file text).",
   },
 ];
 

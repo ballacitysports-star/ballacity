@@ -121,12 +121,20 @@ basis; generated from `PINNED_HISTORY` in the script):
 
 - **Offline:** the file must still have the pinned sha256, and any migration dated after the newest `known_unledgered`
   file and before the range must be pinned. A new backdated file fails as "unpinned history".
-- **Online:** the target's ledger row for that version must record exactly the pinned text: `statements[1]` hashes to the
-  pinned sha256, with the same rule as release-range rows. An older version, or a row written without the text, fails.
+- **Online:** the target must record exactly the pinned text, in either ledger:
+  - its ledger row for that version: `statements[1]` hashes to the pinned sha256, with the same rule as release-range
+    rows (the release template, applied with psql);
+  - or a `drizzle.__drizzle_migrations` row whose hash is the pinned sha256, or the sha256 of the file without its one
+    trailing newline. Lovable's migration tool stores the sha256 of the exact SQL it ran (`docs/supabase-cli.md`). The
+    report then carries a warning saying the hotfix was recognized this way.
 
-So apply the hotfix with the release ledger template (runbook section 2: name = the file stem, `statements = ARRAY[file
-content]`). If a hotfix is changed before it ships, regenerate the manifest; once it is applied, its file must not
-change.
+  An older version, a ledger row written without the text, or a drizzle row for any other text fails. That drizzle row
+  is reported as unknown, and the hotfix as unrecognized history.
+
+So apply the hotfix either with the release ledger template (runbook section 2: name = the file stem,
+`statements = ARRAY[file content]`), or through Lovable with the file's exact text, unchanged
+(`docs/release/hotfix-286-287-runbook.md`, PR #287). If a hotfix is changed before it ships, regenerate the manifest; once it is
+applied, its file must not change.
 
 ## PG17 manifest from CI
 
