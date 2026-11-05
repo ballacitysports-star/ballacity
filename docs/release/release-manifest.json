@@ -376,6 +376,14 @@
       "sha256": "be6be45747778e8d633c7279c6478118c138a4d83533fda067fce9767d6a51a5"
     }
   ],
+  "pinned_history": [
+    {
+      "version": "20261031120000",
+      "path": "supabase/migrations/20261031120000_close_live_write_holes.sql",
+      "sha256": "843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1",
+      "basis": "PR #287: live write-path hotfix (audit F02, F11-F13). Applied to production ahead of the privacy release, with the release ledger template (statements = the file text)."
+    }
+  ],
   "known_ledger_rows_without_file": [
     {
       "version": "20260708185350",
@@ -560,7 +568,7 @@
       "version": "20261103120000",
       "source": "supabase",
       "path": "supabase/migrations/20261103120000_minor_review_privacy.sql",
-      "sha256": "67320ad16218b1cc31a8c4bf9cc94a66f53f6a1a8c3e9de083c7b373a84fa2cc",
+      "sha256": "d78b51a3a19af10aa59122f3a1e4b19a5d8e672c8f8a9ad7882d8e7429315363",
       "requires": {
         "functions": [],
         "tables": [],
@@ -1530,7 +1538,7 @@
       "version": "20261108160000",
       "source": "supabase",
       "path": "supabase/migrations/20261108160000_guardian_approval_validity.sql",
-      "sha256": "ac9555cd5fe0d6e66690f3d709cb4f8362a1ffb0f93753fee873f13a9d640536",
+      "sha256": "2be6968f22ba22fe5c728fcdfcf9510661192d20eaf01148442e8f0df9be5f14",
       "requires": {
         "functions": [
           "private_sec.guardian_eligible(uuid)",
@@ -1557,7 +1565,7 @@
       "version": "20261108170000",
       "source": "supabase",
       "path": "supabase/migrations/20261108170000_paypal_capture_state.sql",
-      "sha256": "13160b78a785bcc446d7c5409c6dcba96d8b2c82c4ced1bcceaef4b3fde8e2d0",
+      "sha256": "df6810838bbea2c38a967608e87d9d386bb1aeec7d7a9bbab78ddfe7447b8710",
       "requires": {
         "functions": [],
         "tables": [
@@ -1580,7 +1588,7 @@
       "version": "20261108180000",
       "source": "supabase",
       "path": "supabase/migrations/20261108180000_image_direct_upload_closure.sql",
-      "sha256": "5e35a19b87e33ec1beb1da6d1b93ddc4f7932e20b1182c04f0a95ed032cf83d4",
+      "sha256": "bbd0c5eaf8520daf357b4bf9a60aa6306a127de68d91d7b3b32632a2479afe9e",
       "requires": {
         "functions": [
           "private_sec.published_image_refuse_user_write()",
@@ -1593,8 +1601,32 @@
       "provides": {
         "functions": [
           "private_sec.direct_image_uploads_closed()",
+          "private_sec.guard_direct_image_upload_switch()",
           "private_sec.refuse_direct_public_image_write()"
         ],
+        "tables": [],
+        "schemas": []
+      }
+    },
+    {
+      "order": 38,
+      "version": "20261108190000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108190000_appeal_separation.sql",
+      "sha256": "e6dbe8cbdb6f4d7603765a92f22a1bb8dc42e8b3ea2c2f9b715e304b4e2b2e78",
+      "requires": {
+        "functions": [
+          "public.moderator_review_appeal(uuid,boolean,text)"
+        ],
+        "tables": [
+          "public.admin_audit_log",
+          "public.content_report_holds"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [],
         "tables": [],
         "schemas": []
       }
@@ -2962,7 +2994,7 @@
         "expect_steps": {
           "16": {
             "20261108180000": {
-              "def": "17e3e4e389127934304697706570296e",
+              "def": "49933f94a08f2f052e4097044dc98130",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2976,7 +3008,7 @@
           },
           "17": {
             "20261108180000": {
-              "def": "17e3e4e389127934304697706570296e",
+              "def": "49933f94a08f2f052e4097044dc98130",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -2991,7 +3023,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "17e3e4e389127934304697706570296e",
+            "def": "49933f94a08f2f052e4097044dc98130",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3003,7 +3035,7 @@
             ]
           },
           "17": {
-            "def": "17e3e4e389127934304697706570296e",
+            "def": "49933f94a08f2f052e4097044dc98130",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3518,6 +3550,72 @@
         }
       },
       {
+        "signature": "private_sec.guard_direct_image_upload_switch()",
+        "defined_by": [
+          "20261108180000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108180000": {
+              "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108180000": {
+              "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+              "owner": "postgres",
+              "secdef": false,
+              "search_path": "\"\"",
+              "acl": [
+                "anon:EXECUTE",
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "b50d1ab85d0c657c5b0f88ced9e3121c",
+            "owner": "postgres",
+            "secdef": false,
+            "search_path": "\"\"",
+            "acl": [
+              "anon:EXECUTE",
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "private_sec.guardian_activate(public.guardian_link_requests,uuid,text,text,text,jsonb)",
         "defined_by": [
           "20261108100000"
@@ -3695,7 +3793,7 @@
         "expect_steps": {
           "16": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3706,7 +3804,7 @@
           },
           "17": {
             "20261108160000": {
-              "def": "e5563a179d600f7efe5b71fdbefba088",
+              "def": "c60b26d662b3b5b03d69da51c45de708",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -3718,7 +3816,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -3727,7 +3825,7 @@
             ]
           },
           "17": {
-            "def": "e5563a179d600f7efe5b71fdbefba088",
+            "def": "c60b26d662b3b5b03d69da51c45de708",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -12617,7 +12715,7 @@
         "expect_steps": {
           "16": {
             "20261108170000": {
-              "def": "eed9b9a2562cfd711028136991c75ec2",
+              "def": "b3f8db2853a451a9002f3b7651abf955",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -12629,7 +12727,7 @@
           },
           "17": {
             "20261108170000": {
-              "def": "eed9b9a2562cfd711028136991c75ec2",
+              "def": "b3f8db2853a451a9002f3b7651abf955",
               "owner": "postgres",
               "secdef": true,
               "search_path": "\"\"",
@@ -12642,7 +12740,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "eed9b9a2562cfd711028136991c75ec2",
+            "def": "b3f8db2853a451a9002f3b7651abf955",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -12652,7 +12750,7 @@
             ]
           },
           "17": {
-            "def": "eed9b9a2562cfd711028136991c75ec2",
+            "def": "b3f8db2853a451a9002f3b7651abf955",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -15034,7 +15132,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -15058,7 +15156,7 @@
               ]
             },
             "20261108160000": {
-              "def": "021460251c66708394f514e10c745a90",
+              "def": "57cfc6679292cc11810d1407c843dfc1",
               "owner": "postgres",
               "secdef": true,
               "search_path": "public",
@@ -15072,7 +15170,7 @@
         },
         "expect_after": {
           "16": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -15083,7 +15181,7 @@
             ]
           },
           "17": {
-            "def": "021460251c66708394f514e10c745a90",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -18148,7 +18246,8 @@
       {
         "signature": "public.moderator_review_appeal(uuid,boolean,text)",
         "defined_by": [
-          "20261106130000"
+          "20261106130000",
+          "20261108190000"
         ],
         "expect_before": {
           "16": null,
@@ -18166,6 +18265,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -18179,12 +18289,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108190000": {
+              "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -18195,7 +18316,7 @@
             ]
           },
           "17": {
-            "def": "eebf7cda9d0c9be1e6bc6387cb76b3ce",
+            "def": "bb2a6b03c3bcc5c53ca8f7b1c37e5cdb",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -27323,12 +27444,12 @@
         ],
         "expect_before": {
           "16": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "917ab91b9218ee4293300ba38f5d1a7a",
+            "qual": "f8370c4c88054096b8225031a9b44a29",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }
@@ -27336,14 +27457,14 @@
         "expect_steps": {
           "16": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
           },
           "17": {
             "20261103120000": {
-              "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+              "qual": "c5d33b1d356cc84ea04decab29b6add7",
               "with_check": null,
               "shape": "39541017f712a94460453c4925e65a3f"
             }
@@ -27351,12 +27472,12 @@
         },
         "expect_after": {
           "16": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           },
           "17": {
-            "qual": "1651800bf3c03d96d0c8a7c8edba3985",
+            "qual": "c5d33b1d356cc84ea04decab29b6add7",
             "with_check": null,
             "shape": "39541017f712a94460453c4925e65a3f"
           }
@@ -31051,7 +31172,8 @@
         "defined_by": [
           "20261104100000",
           "20261105110000",
-          "20261107100000"
+          "20261107100000",
+          "20261108180000"
         ],
         "expect_before": {
           "16": {
@@ -31242,6 +31364,46 @@
                 "Public flags are readable",
                 "Superadmins read all settings"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:SELECT",
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
+                "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
+                "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
+                "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
+                "guard_youth_switch_truncate_trg|public.guard_youth_switch_tamper()|34|O",
+                "trg_app_settings_touch|public.touch_updated_at()|19|O"
+              ],
+              "policies": [
+                "Public flags are readable",
+                "Superadmins read all settings"
+              ]
             }
           },
           "17": {
@@ -31368,6 +31530,50 @@
                 "Public flags are readable",
                 "Superadmins read all settings"
               ]
+            },
+            "20261108180000": {
+              "rls": true,
+              "force_rls": false,
+              "acl": [
+                "anon:MAINTAIN",
+                "anon:SELECT",
+                "authenticated:DELETE",
+                "authenticated:INSERT",
+                "authenticated:MAINTAIN",
+                "authenticated:REFERENCES",
+                "authenticated:SELECT",
+                "authenticated:TRIGGER",
+                "authenticated:TRUNCATE",
+                "authenticated:UPDATE",
+                "postgres:DELETE",
+                "postgres:INSERT",
+                "postgres:MAINTAIN",
+                "postgres:REFERENCES",
+                "postgres:SELECT",
+                "postgres:TRIGGER",
+                "postgres:TRUNCATE",
+                "postgres:UPDATE",
+                "service_role:DELETE",
+                "service_role:INSERT",
+                "service_role:MAINTAIN",
+                "service_role:REFERENCES",
+                "service_role:SELECT",
+                "service_role:TRIGGER",
+                "service_role:TRUNCATE",
+                "service_role:UPDATE"
+              ],
+              "triggers": [
+                "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
+                "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
+                "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
+                "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
+                "guard_youth_switch_truncate_trg|public.guard_youth_switch_tamper()|34|O",
+                "trg_app_settings_touch|public.touch_updated_at()|19|O"
+              ],
+              "policies": [
+                "Public flags are readable",
+                "Superadmins read all settings"
+              ]
             }
           }
         },
@@ -31400,6 +31606,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
               "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
               "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
               "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",
@@ -31443,6 +31650,7 @@
               "service_role:UPDATE"
             ],
             "triggers": [
+              "a_guard_direct_image_upload_switch|private_sec.guard_direct_image_upload_switch()|31|O",
               "guard_youth_location_switch_team_facilities_trg|public.guard_youth_location_switch_team_facilities()|23|O",
               "guard_youth_location_switch_trg|public.guard_youth_location_switch()|31|O",
               "guard_youth_switch_tamper_trg|public.guard_youth_switch_tamper()|19|O",

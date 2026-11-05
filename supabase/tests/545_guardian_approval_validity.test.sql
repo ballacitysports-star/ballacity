@@ -153,4 +153,35 @@ SELECT t.ok(NOT private_sec.team_membership_authorizes('fteam', t.id('teen8')),
 SELECT t.guardian('ga8b', 'teen8');
 SELECT t.ok(NOT private_sec.team_membership_authorizes('fteam', t.id('teen8')),
   'F03 roster access: a new guardian does not inherit the old approval (re-approval needed)');
+-- ============================================================ independent pre-review (2026-11-05): the approver's account must stay eligible
+SELECT t.person('teenx', 16), t.person('gx', 44), t.person('gy', 45);
+SELECT t.guardian('gx', 'teenx'), t.guardian('gy', 'teenx');
+INSERT INTO public.hosted_games (id, host_id, sport, title, date, price) VALUES ('g-x', t.id('host'), 'basketball', 'Paid youth', now() + interval '3 days', 10);
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.join_requests (game_id, player_id, host_id, idempotency_key, status, reviewed_at)
+VALUES ('g-x', t.id('teenx'), t.id('host'), 'k-x', 'approved', now());
+SET LOCAL session_replication_role = origin;
+CREATE FUNCTION t.jr_x() RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $f$ SELECT id FROM public.join_requests WHERE game_id = 'g-x' $f$;
+GRANT EXECUTE ON FUNCTION t.jr_x() TO authenticated;
+SELECT t.as_user(t.id('gx'));
+SELECT t.lives($q$SELECT public.guardian_approve_join_request(t.jr_x(), true)$q$, 'pre-review setup: gx approves');
+SELECT t.reset();
+SELECT t.ok(NOT private_sec.payment_guardian_missing('g-x', t.id('teenx')), 'pre-review: an eligible approver''s approval allows payment');
+UPDATE public.profiles SET suspended_at = now(), suspended_reason = 'ban' WHERE id = t.id('gx');
+SELECT t.ok(private_sec.payment_guardian_missing('g-x', t.id('teenx')),
+  'pre-review F03: once the approver''s account is suspended, the earlier approval no longer allows payment');
+SELECT t.as_user(t.id('gx'));
+SELECT t.throws($q$SELECT public.guardian_approve_join_request(t.jr_x(), true)$q$, 'GUARDIAN_NOT_ELIGIBLE',
+  'pre-review F03: and the suspended account cannot approve again');
+SELECT t.reset();
+UPDATE public.profiles SET suspended_at = NULL, suspended_reason = NULL, age_review_required = true WHERE id = t.id('gx');
+SELECT t.ok(private_sec.payment_guardian_missing('g-x', t.id('teenx')),
+  'pre-review F03: nor while the approver''s own age is under review');
+SELECT t.as_user(t.id('gy'));
+SELECT t.lives($q$SELECT public.guardian_approve_join_request(t.jr_x(), true)$q$, 'pre-review: the other, eligible guardian approves');
+SELECT t.reset();
+SELECT t.ok(NOT private_sec.payment_guardian_missing('g-x', t.id('teenx')), 'pre-review F03: and that approval counts');
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE game_id = 'g-x'), t.id('gy'), 'pre-review F03: and names gy');
+UPDATE public.profiles SET age_review_required = false WHERE id = t.id('gx');
+SELECT t.ok(private_sec.guardian_approval_valid(t.id('teenx'), t.id('gx')), 'pre-review: when the age review clears, gx counts again');
 ROLLBACK;

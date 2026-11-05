@@ -4,6 +4,7 @@
     "src/**/*.tsx",
     "build/**/*.ts",
     "services/**/*.ts",
+    "scripts/staging/**/*.ts",
     "vite.config.ts",
     "eslint.config.js"
   ],

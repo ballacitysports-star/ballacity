@@ -74,4 +74,34 @@ SELECT t.as_user(t.id('alice'));
 SELECT t.eq(t.changed($q$UPDATE public.app_settings SET value = '{"closed": false}'::jsonb WHERE key = 'image_direct_uploads'$q$), 0,
   'F06: a client cannot reopen the switch');
 SELECT t.reset();
+-- ================= independent pre-review (2026-11-05): the switch row is guarded
+SELECT t.reset();
+SELECT t.eq((SELECT value ->> 'closed' FROM public.app_settings WHERE key = 'image_direct_uploads'), 'true', 'pre-review setup: the switch is closed');
+SELECT t.as_service();
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"closed": false}'::jsonb WHERE key = 'image_direct_uploads'$q$,
+  'DIRECT_UPLOAD_SWITCH_GUARDED', 'pre-review F06: the service key (superadminSetSetting) cannot reopen it');
+SELECT t.throws($q$UPDATE public.app_settings SET is_public = true WHERE key = 'image_direct_uploads'$q$,
+  'DIRECT_UPLOAD_SWITCH_GUARDED', 'pre-review F06: nor make it public');
+SELECT t.throws($q$UPDATE public.app_settings SET value = '{"closed": true, "note": "x"}'::jsonb WHERE key = 'image_direct_uploads'$q$,
+  'DIRECT_UPLOAD_SWITCH_GUARDED', 'pre-review F06: nor store anything but {"closed": <boolean>}');
+SELECT t.throws($q$DELETE FROM public.app_settings WHERE key = 'image_direct_uploads'$q$,
+  'DIRECT_UPLOAD_SWITCH_GUARDED', 'pre-review F06: nor delete it');
+SELECT t.throws($q$UPDATE public.app_settings SET key = 'image_direct_uploads_old' WHERE key = 'image_direct_uploads'$q$,
+  'DIRECT_UPLOAD_SWITCH_GUARDED', 'pre-review F06: nor rename it');
+SELECT t.reset();
+SELECT t.eq((SELECT value ->> 'closed' FROM public.app_settings WHERE key = 'image_direct_uploads'), 'true', 'pre-review F06: it is still closed');
+-- a missing row reads as closed
+SET LOCAL session_replication_role = replica;
+DELETE FROM public.app_settings WHERE key = 'image_direct_uploads';
+SET LOCAL session_replication_role = origin;
+SELECT t.ok(private_sec.direct_image_uploads_closed(), 'pre-review F06: a missing row reads as closed (fail closed)');
+INSERT INTO public.app_settings (key, value, is_public) VALUES ('image_direct_uploads', '{"closed": true}'::jsonb, false);
+-- re-opening is possible only on purpose, in a reviewed migration
+SELECT set_config('app.confirm_reopen_direct_image_uploads', 'yes', true);
+SELECT t.lives($q$UPDATE public.app_settings SET value = '{"closed": false}'::jsonb WHERE key = 'image_direct_uploads'$q$,
+  'pre-review F06: a migration that confirms on purpose can reopen it');
+SELECT set_config('app.confirm_reopen_direct_image_uploads', '', true);
+SELECT t.lives($q$UPDATE public.app_settings SET value = '{"closed": true}'::jsonb WHERE key = 'image_direct_uploads'$q$,
+  'pre-review F06: closing never needs a confirmation');
+SELECT t.lives($q$UPDATE public.app_settings SET value = value WHERE key = 'age_policy'$q$, 'pre-review F06: other settings are untouched');
 ROLLBACK;

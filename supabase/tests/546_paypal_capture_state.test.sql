@@ -25,7 +25,7 @@ SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'captured' WHERE ord
   'paypal_orders_captured_is_completed', 'F04: an order cannot be marked captured while its capture is pending');
 
 -- settled: COMPLETED
-UPDATE public.paypal_orders SET capture_status = 'COMPLETED', status = 'capturing' WHERE order_id = 'ORD-1';
+UPDATE public.paypal_orders SET capture_status = 'COMPLETED', capture_payee_merchant_id = 'MERCHANT-1', status = 'capturing' WHERE order_id = 'ORD-1';
 SELECT t.as_service();
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
                           VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-OTHER', 10, 'verified', 'ORD-1')$q$, t.id('payer'), t.id('host')),
@@ -57,5 +57,27 @@ SELECT t.lives(format($q$INSERT INTO public.payment_submissions (id, player_id, 
   'F04: a manual PayPal proof (no checkout order) still works');
 SELECT t.throws(format($q$UPDATE public.payment_submissions SET paypal_order_id = 'ORD-2' WHERE id = %L$q$, t.id('manual')),
   'PAYMENT_FIELD_FORBIDDEN', 'F04: nor relabel one afterwards');
+SELECT t.reset();
+-- independent pre-review (2026-11-05): the order itself must be in a successful capture, with a payee on record
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, currency, status, capture_id, capture_status,
+                                  capture_amount_cents, capture_currency, capture_payee_merchant_id, paypal_order_status)
+VALUES ('ORD-R', 'pp-g', t.id('other'), t.id('host'), 1000, 'USD', 'refunded', 'CAP-R', 'COMPLETED', 1000, 'USD', 'WRONG-MERCHANT', 'COMPLETED'),
+       ('ORD-N', 'pp-g', t.id('other'), t.id('host'), 1000, 'USD', 'capturing', 'CAP-N', 'COMPLETED', 1000, 'USD', NULL, 'COMPLETED');
+SELECT t.as_service();
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
+                          VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-R', 10, 'verified', 'ORD-R')$q$, t.id('other'), t.id('host')),
+  'PAYPAL_CAPTURE_NOT_COMPLETED', 'pre-review F04: a refunded order (wrong payee) never verifies a payment, even from the server');
+SELECT t.reset();
+UPDATE public.paypal_orders SET status = 'failed' WHERE order_id = 'ORD-R';
+SELECT t.as_service();
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
+                          VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-R', 10, 'verified', 'ORD-R')$q$, t.id('other'), t.id('host')),
+  'PAYPAL_CAPTURE_NOT_COMPLETED', 'pre-review F04: nor a failed one');
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id, payment_type, transaction_reference, paid_amount, status, paypal_order_id)
+                          VALUES (%L, 'pp-g', %L, 'paypal', 'CAP-N', 10, 'verified', 'ORD-N')$q$, t.id('other'), t.id('host')),
+  'PAYPAL_CAPTURE_NOT_COMPLETED', 'pre-review F04: nor a capture with no payee on record');
+-- bookkeeping on an already verified payment is not held to the order's later status
+SELECT t.lives(format('UPDATE public.payment_submissions SET notes = %L WHERE id = %L', 'checked', t.id('sub1')),
+  'pre-review F04: a verified payment can still be annotated');
 SELECT t.reset();
 ROLLBACK;
