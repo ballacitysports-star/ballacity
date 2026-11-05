@@ -1524,6 +1524,33 @@
         "tables": [],
         "schemas": []
       }
+    },
+    {
+      "order": 35,
+      "version": "20261108160000",
+      "source": "supabase",
+      "path": "supabase/migrations/20261108160000_guardian_approval_validity.sql",
+      "sha256": "2be6968f22ba22fe5c728fcdfcf9510661192d20eaf01148442e8f0df9be5f14",
+      "requires": {
+        "functions": [
+          "private_sec.guardian_eligible(uuid)",
+          "private_sec.is_guardian_of(uuid,uuid)",
+          "private_sec.payment_guardian_missing(text,uuid)"
+        ],
+        "tables": [
+          "public.guardian_authority_holds"
+        ],
+        "schemas": [],
+        "migrations": []
+      },
+      "provides": {
+        "functions": [
+          "private_sec.guardian_approval_required(uuid)",
+          "private_sec.guardian_approval_valid(uuid,uuid)"
+        ],
+        "tables": [],
+        "schemas": []
+      }
     }
   ],
   "protections": {
@@ -2536,7 +2563,8 @@
         "signature": "private_sec.child_game_participation_allowed(uuid)",
         "defined_by": [
           "20261103150000",
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null,
@@ -2565,6 +2593,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "74757bce26eaa5ab614cf49b6d98f706",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -2589,12 +2628,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "74757bce26eaa5ab614cf49b6d98f706",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "fe828338cdd714226dedb90bc46c318d",
+            "def": "74757bce26eaa5ab614cf49b6d98f706",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -2605,7 +2655,7 @@
             ]
           },
           "17": {
-            "def": "fe828338cdd714226dedb90bc46c318d",
+            "def": "74757bce26eaa5ab614cf49b6d98f706",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -3462,6 +3512,114 @@
             "acl": [
               "postgres:EXECUTE",
               "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.guardian_approval_required(uuid)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "43e7b982538e3c540b78442e9a81dc5c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108160000": {
+              "def": "43e7b982538e3c540b78442e9a81dc5c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "43e7b982538e3c540b78442e9a81dc5c",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "43e7b982538e3c540b78442e9a81dc5c",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
+        "signature": "private_sec.guardian_approval_valid(uuid,uuid)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": null,
+          "17": null
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "c60b26d662b3b5b03d69da51c45de708",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108160000": {
+              "def": "c60b26d662b3b5b03d69da51c45de708",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "c60b26d662b3b5b03d69da51c45de708",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "c60b26d662b3b5b03d69da51c45de708",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "\"\"",
+            "acl": [
+              "postgres:EXECUTE"
             ]
           }
         }
@@ -7234,7 +7392,8 @@
       {
         "signature": "private_sec.payment_guardian_missing(text,uuid)",
         "defined_by": [
-          "20261108140000"
+          "20261108140000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null,
@@ -7251,6 +7410,16 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "cb6c892efe0d92f966af4ec993036d8c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -7263,12 +7432,22 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "cb6c892efe0d92f966af4ec993036d8c",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "d081eca3a86a0fe9004937fdba1b8c6d",
+            "def": "cb6c892efe0d92f966af4ec993036d8c",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -7278,7 +7457,7 @@
             ]
           },
           "17": {
-            "def": "d081eca3a86a0fe9004937fdba1b8c6d",
+            "def": "cb6c892efe0d92f966af4ec993036d8c",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -11121,7 +11300,8 @@
       {
         "signature": "public.enforce_child_game_participation()",
         "defined_by": [
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -11156,6 +11336,16 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "903f9fddd28da7dd392f2d3cdda2368b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -11168,12 +11358,22 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "903f9fddd28da7dd392f2d3cdda2368b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "c389069076b87d005cc86752a53428d2",
+            "def": "903f9fddd28da7dd392f2d3cdda2368b",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -11183,7 +11383,7 @@
             ]
           },
           "17": {
-            "def": "c389069076b87d005cc86752a53428d2",
+            "def": "903f9fddd28da7dd392f2d3cdda2368b",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -14552,7 +14752,8 @@
       {
         "signature": "public.guardian_approve_join_request(uuid,boolean)",
         "defined_by": [
-          "20261106140000"
+          "20261106140000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -14590,6 +14791,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "57cfc6679292cc11810d1407c843dfc1",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -14603,12 +14815,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "57cfc6679292cc11810d1407c843dfc1",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "7c20a3443139b8c5175068d82d3ee605",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -14619,7 +14842,7 @@
             ]
           },
           "17": {
-            "def": "7c20a3443139b8c5175068d82d3ee605",
+            "def": "57cfc6679292cc11810d1407c843dfc1",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -19053,6 +19276,88 @@
         }
       },
       {
+        "signature": "public.provision_managed_child(uuid,date,text,text,text,jsonb,boolean)",
+        "defined_by": [
+          "20261108160000"
+        ],
+        "expect_before": {
+          "16": {
+            "def": "525e073677ac824ee5284789d6e075cd",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "525e073677ac824ee5284789d6e075cd",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        },
+        "expect_steps": {
+          "16": {
+            "20261108160000": {
+              "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          },
+          "17": {
+            "20261108160000": {
+              "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
+            }
+          }
+        },
+        "expect_after": {
+          "16": {
+            "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          },
+          "17": {
+            "def": "71367e2ca2ddd081181b7ec38cf02e7b",
+            "owner": "postgres",
+            "secdef": true,
+            "search_path": "public",
+            "acl": [
+              "authenticated:EXECUTE",
+              "postgres:EXECUTE",
+              "service_role:EXECUTE"
+            ]
+          }
+        }
+      },
+      {
         "signature": "public.publishable_review_ids(uuid[])",
         "defined_by": [
           "20261103120000"
@@ -20906,7 +21211,8 @@
       {
         "signature": "public.staff_lift_guardian_suspension(uuid,boolean,text,text)",
         "defined_by": [
-          "20261108100000"
+          "20261108100000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": null,
@@ -20924,6 +21230,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "e7194200386cf235bc6bc186445413af",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -20937,12 +21254,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "e7194200386cf235bc6bc186445413af",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "\"\"",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "b055097a34a012e64fd10071086f60ab",
+            "def": "e7194200386cf235bc6bc186445413af",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -20953,7 +21281,7 @@
             ]
           },
           "17": {
-            "def": "b055097a34a012e64fd10071086f60ab",
+            "def": "e7194200386cf235bc6bc186445413af",
             "owner": "postgres",
             "secdef": true,
             "search_path": "\"\"",
@@ -21703,7 +22031,8 @@
       {
         "signature": "public.team_respond_invite(uuid,boolean)",
         "defined_by": [
-          "20261108130000"
+          "20261108130000",
+          "20261108160000"
         ],
         "expect_before": {
           "16": {
@@ -21741,6 +22070,17 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "7ec2ec489e1dde59335ffa72b69783b0",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           },
           "17": {
@@ -21754,12 +22094,23 @@
                 "postgres:EXECUTE",
                 "service_role:EXECUTE"
               ]
+            },
+            "20261108160000": {
+              "def": "7ec2ec489e1dde59335ffa72b69783b0",
+              "owner": "postgres",
+              "secdef": true,
+              "search_path": "public",
+              "acl": [
+                "authenticated:EXECUTE",
+                "postgres:EXECUTE",
+                "service_role:EXECUTE"
+              ]
             }
           }
         },
         "expect_after": {
           "16": {
-            "def": "154892d8d5625a9420112b7aace9595a",
+            "def": "7ec2ec489e1dde59335ffa72b69783b0",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
@@ -21770,7 +22121,7 @@
             ]
           },
           "17": {
-            "def": "154892d8d5625a9420112b7aace9595a",
+            "def": "7ec2ec489e1dde59335ffa72b69783b0",
             "owner": "postgres",
             "secdef": true,
             "search_path": "public",
