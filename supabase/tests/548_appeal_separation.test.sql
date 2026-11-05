@@ -2,11 +2,13 @@
 -- report was touched afterwards (20261108190000).
 BEGIN;
 SELECT t.person('author', 35), t.person('rep1', 30), t.person('modone', 39), t.person('modtwo', 40), t.person('modthree', 41),
-       t.person('mgr', 38), t.person('modfour', 42), t.person('modfive', 43);
+       t.person('mgr', 38), t.person('modfour', 42), t.person('modfive', 43),
+       t.person('modsix', 44), t.person('modseven', 45), t.person('modeight', 46), t.person('modnine', 47);
 SELECT t.team('squad', 'mgr');
 INSERT INTO public.user_roles (user_id, role) VALUES
   (t.id('modone'), 'moderator'), (t.id('modtwo'), 'moderator'), (t.id('modthree'), 'moderator'),
-  (t.id('modfour'), 'moderator'), (t.id('modfive'), 'moderator');
+  (t.id('modfour'), 'moderator'), (t.id('modfive'), 'moderator'),
+  (t.id('modsix'), 'moderator'), (t.id('modseven'), 'moderator'), (t.id('modeight'), 'moderator'), (t.id('modnine'), 'moderator');
 SET LOCAL session_replication_role = replica;
 INSERT INTO public.team_members (team_id, user_id) VALUES ('squad', t.id('author'));
 INSERT INTO public.team_posts (id, team_id, author_id, kind, title, body, moderation_status) VALUES
@@ -95,9 +97,24 @@ SELECT t.lives($q$UPDATE public.user_reports SET resolution_notes = 'and again' 
 SELECT t.reset();
 SELECT t.eq((SELECT reviewed_by FROM public.user_reports WHERE id = t.s_report3()), t.id('modtwo'),
   'setup: the report now names only modtwo');
--- the app's status screen (service role) audits with target type 'report'
+-- the app's status screen (service role) audits with target type 'report' (setReportStatus: action report.resolve)
+INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, metadata)
+VALUES (t.id('modfour'), 'report.resolve', 'report', t.s_report3()::text, '{"status": "resolved"}');
+-- independent review of 76a895d7: the id as the app used to send it (upper case is a valid uuid and matched the row)
 INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id)
-VALUES (t.id('modfour'), 'report.resolved', 'report', t.s_report3()::text);
+VALUES (t.id('modsix'), 'report.dismiss', 'report', upper(t.s_report3()::text));
+-- the author warned through the report (applyModerationAction: the target is the user, the report travels in before)
+INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, before, after)
+VALUES (t.id('modseven'), 'user.warn', 'team_post', t.id('author')::text,
+        jsonb_build_object('reportId', t.s_report3(), 'reportReason', 'spam'), '{"summary": "User warned"}');
+-- rows that name the content itself: the app's metadata (both functions now record it), and the direct-update
+-- guard's copy of the report row
+INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, metadata)
+VALUES (t.id('modeight'), 'report.status', 'report', t.s_report3()::text,
+        jsonb_build_object('status', 'investigating', 'content_type', 'team_post', 'content_id', '00000000-0000-0000-0000-0000000cc003'));
+INSERT INTO public.admin_audit_log (actor_id, action, target_type, target_id, after)
+VALUES (t.id('modnine'), 'report_updated_directly', 'user_report', t.s_report3()::text,
+        jsonb_build_object('id', t.s_report3(), 'subject_type', 'team_post', 'team_post_id', '00000000-0000-0000-0000-0000000cc003', 'comment_id', NULL));
 SELECT t.as_user(t.id('modthree'));
 SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
   'different moderator', 'F13: a moderator who changed the report earlier stays a party after another one changes it');
@@ -105,6 +122,28 @@ SELECT t.reset();
 SELECT t.as_user(t.id('modfour'));
 SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
   'different moderator', 'F13: so does one who changed it through the app');
+SELECT t.reset();
+SELECT t.as_user(t.id('modsix'));
+SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
+  'different moderator', 'review: an upper-case report id in the audit row still names the same report');
+SELECT t.reset();
+SELECT t.as_user(t.id('modseven'));
+SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
+  'different moderator', 'review: a moderator who warned the author through the report is a party');
+SELECT t.reset();
+-- the reporter's account is deleted: the report cascades away, the audit rows stay
+SET LOCAL session_replication_role = replica;
+DELETE FROM public.user_reports WHERE id = t.s_report3();
+SET LOCAL session_replication_role = origin;
+SELECT t.eq((SELECT count(*)::int FROM public.user_reports WHERE team_post_id = '00000000-0000-0000-0000-0000000cc003'), 0,
+  'setup: the report is gone');
+SELECT t.as_user(t.id('modeight'));
+SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
+  'different moderator', 'review: an app change recorded with the content stays a party after the report is deleted');
+SELECT t.reset();
+SELECT t.as_user(t.id('modnine'));
+SELECT t.throws($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restore')$q$,
+  'different moderator', 'review: so does a direct change (the guard keeps the report row on the audit entry)');
 SELECT t.reset();
 SELECT t.as_user(t.id('modfive'));
 SELECT t.lives($q$SELECT public.moderator_review_appeal(t.s_appeal('00000000-0000-0000-0000-0000000cc003'), true, 'restored')$q$,

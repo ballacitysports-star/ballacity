@@ -43,7 +43,9 @@ ALTER TABLE public.paypal_orders DROP CONSTRAINT IF EXISTS paypal_orders_capture
 ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_captured_is_completed
   CHECK (status <> 'captured' OR (capture_id IS NOT NULL AND capture_status = 'COMPLETED'));
 
--- a captured order stays captured (a refund is the only way on), and its capture is never rewritten
+-- a captured order stays captured (a refund is the only way on), a refunded order stays refunded, and neither ever
+-- has its capture or its player, game, payee or amount rewritten. An order still being captured cannot be moved back
+-- or failed once a verified payment points at it (the moment between recording the payment and marking it captured).
 CREATE OR REPLACE FUNCTION public.guard_paypal_order_settled()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -51,12 +53,21 @@ CREATE OR REPLACE FUNCTION public.guard_paypal_order_settled()
  SET search_path TO ''
 AS $function$
 BEGIN
-  IF OLD.status = 'captured'
+  IF OLD.status IN ('captured', 'refunded')
      AND (NEW.status NOT IN ('captured', 'refunded')
-          OR (NEW.capture_id, NEW.capture_status, NEW.capture_amount_cents, NEW.capture_currency, NEW.capture_payee_merchant_id)
+          OR (OLD.status = 'refunded' AND NEW.status <> 'refunded')
+          OR (NEW.capture_id, NEW.capture_status, NEW.capture_amount_cents, NEW.capture_currency, NEW.capture_payee_merchant_id,
+              NEW.player_id, NEW.game_id, NEW.host_id, NEW.amount_cents, NEW.currency)
              IS DISTINCT FROM
-             (OLD.capture_id, OLD.capture_status, OLD.capture_amount_cents, OLD.capture_currency, OLD.capture_payee_merchant_id)) THEN
-    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a captured PayPal order keeps its capture; only a refund follows.'
+             (OLD.capture_id, OLD.capture_status, OLD.capture_amount_cents, OLD.capture_currency, OLD.capture_payee_merchant_id,
+              OLD.player_id, OLD.game_id, OLD.host_id, OLD.amount_cents, OLD.currency)) THEN
+    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a captured PayPal order keeps its capture; only a refund follows, and a refund is final.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF OLD.status = 'capturing' AND NEW.status NOT IN ('capturing', 'captured', 'refunded')
+     AND EXISTS (SELECT 1 FROM public.payment_submissions ps
+                  WHERE ps.paypal_order_id = OLD.order_id AND ps.status = 'verified') THEN
+    RAISE EXCEPTION 'PAYPAL_ORDER_SETTLED: a verified payment records this capture; the order can only become captured or refunded.'
       USING ERRCODE = '42501';
   END IF;
   RETURN NEW;

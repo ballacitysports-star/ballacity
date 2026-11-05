@@ -253,7 +253,7 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       refundCapture,
       claim,
     );
-    if (outcome.kind === "pending" || outcome.kind === "superseded")
+    if (outcome.kind === "pending" || outcome.kind === "superseded" || outcome.kind === "retry")
       return { ok: false as const, pending: true as const };
     if (outcome.kind === "refunded") {
       throw new Error(

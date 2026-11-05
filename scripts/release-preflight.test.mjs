@@ -559,8 +559,7 @@ describe("pinned history: a hotfix dated before the range (independent pre-revie
 describe("scratch helpers: the same protections as db-test (independent review of d604958c)", () => {
   test("they write to and drop only databases a harness created (scratch marker)", () => {
     const foreign = `rpf_${process.pid}_unmarked`;
-    scratch.psqlLocal("postgres", ["-c", `CREATE DATABASE "${foreign}"`]);
-    try {
+    scratch.withUnmarkedDatabase(foreign, () => {
       assert.throws(() => scratch.sql(foreign, "SELECT 1"), /not a scratch database/);
       assert.throws(() => scratch.loadStub(foreign, ROOT), /not a scratch database/);
       assert.throws(() => scratch.dropDb(foreign), /Refusing to drop/);
@@ -568,9 +567,40 @@ describe("scratch helpers: the same protections as db-test (independent review o
         () => scratch.createDb(`rpf_${process.pid}_from_foreign`, foreign),
         /not a scratch database/,
       );
-    } finally {
-      scratch.psqlLocal("postgres", ["-c", `DROP DATABASE IF EXISTS "${foreign}"`]);
-    }
+    });
+    const left = scratch
+      .psqlLocal("postgres", [
+        "-At",
+        "-c",
+        `SELECT count(*) FROM pg_database WHERE datname = '${foreign}'`,
+      ])
+      .stdout.trim();
+    assert.equal(left, "0", "the self-test's unmarked database is dropped again");
+  });
+
+  // independent review of 7155a4fe: the exported psql was a write path with no attestation, and -d honours a
+  // connection string
+  test("the exported psql reads only, and takes only a plain database name", () => {
+    const r = scratch.psqlLocal("postgres", [
+      "-c",
+      `CREATE DATABASE "rpf_${process.pid}_via_read_psql"`,
+    ]);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /read-only transaction/);
+    const r2 = scratch.psqlLocal("postgres", ["-c", "CREATE TABLE public.rpf_scribble (x int)"]);
+    assert.notEqual(r2.status, 0);
+    assert.match(r2.stderr, /read-only transaction/);
+    for (const bad of [
+      "host=db.example.com dbname=prod",
+      "postgresql://u@db.example.com/prod",
+      "Prod",
+      "",
+    ])
+      assert.throws(() => scratch.psqlLocal(bad, ["-c", "SELECT 1"]), /plain identifier/);
+    assert.throws(
+      () => scratch.withUnmarkedDatabase("not_a_self_test_name", () => {}),
+      /self-test/,
+    );
   });
 
   test("a database they create carries the marker, so db-test's guard recognizes it", () => {
