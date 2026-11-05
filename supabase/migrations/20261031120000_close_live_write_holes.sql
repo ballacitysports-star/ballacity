@@ -148,8 +148,11 @@ DROP POLICY IF EXISTS "Users can write reviews as themselves" ON public.reviews;
 CREATE POLICY "Users can write reviews as themselves" ON public.reviews FOR INSERT TO authenticated
   WITH CHECK (reviewer_id = auth.uid() AND (flagged = false OR private_sec.review_is_held(id)));
 
--- The server calls this after the AI screening cleared the text. Returns true when the review became visible.
-CREATE OR REPLACE FUNCTION public.release_review_screening(_review_id uuid)
+-- The server calls this after the AI screening cleared the text, passing the exact title and body it screened. The
+-- review becomes visible only if its stored text is still exactly that: an edit made between screening and release
+-- (or any other text) keeps it held. Returns true when the review became visible.
+DROP FUNCTION IF EXISTS public.release_review_screening(uuid);
+CREATE OR REPLACE FUNCTION public.release_review_screening(_review_id uuid, _screened_title text, _screened_body text)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -157,7 +160,14 @@ CREATE OR REPLACE FUNCTION public.release_review_screening(_review_id uuid)
 AS $function$
 DECLARE
   _keep boolean;
+  _r public.reviews;
 BEGIN
+  SELECT * INTO _r FROM public.reviews WHERE id = _review_id FOR UPDATE;
+  IF NOT FOUND
+     OR _r.title IS DISTINCT FROM _screened_title
+     OR _r.body IS DISTINCT FROM _screened_body THEN
+    RETURN false;                                   -- not what was screened: stays held
+  END IF;
   DELETE FROM private_sec.review_screening_holds WHERE review_id = _review_id RETURNING keep_flagged INTO _keep;
   IF NOT FOUND OR _keep THEN
     RETURN false;
@@ -167,8 +177,8 @@ BEGIN
   PERFORM set_config('app.review_system', '', true);
   RETURN FOUND;
 END $function$;
-REVOKE ALL ON FUNCTION public.release_review_screening(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.release_review_screening(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.release_review_screening(uuid, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.release_review_screening(uuid, text, text) TO service_role;
 
 -- ------------------------------------------------------------------------------------------------- 4. report rewrites
 CREATE OR REPLACE FUNCTION private_sec.audit_report_change(_before jsonb, _after jsonb)

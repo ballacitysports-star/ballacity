@@ -99,7 +99,12 @@ export const submitReview = createServerFn({ method: "POST" })
     if (mod.verdict !== "review") {
       const { data: released, error: relErr } = await supabaseAdmin.rpc(
         "release_review_screening" as never,
-        { _review_id: row.id } as never,
+        // the exact text that was screened: an edit in between keeps the review held
+        {
+          _review_id: row.id,
+          _screened_title: data.title ?? null,
+          _screened_body: data.body,
+        } as never,
       );
       if (relErr) throw new Error("Your review was saved but could not be published yet.");
       held = released !== true;
