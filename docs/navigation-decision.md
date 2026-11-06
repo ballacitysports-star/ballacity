@@ -75,9 +75,10 @@ Whatever is chosen is implemented once:
 - update `navigation-gestures.test.ts` and the swipe order;
 - rollback is reverting `TABS`.
 
-## Owner decisions needed
+## Owner decisions (recorded 2026-11-06)
 
-- Pick the analytics vendor and set the measurement id (P0-8). Until then these events send
-  nothing.
-- Accept or adjust the decision rule above.
-- Or decide now without data. In that case this memo is the record of what was weighed.
+- **Analytics vendor (P0-8): GA4.** The measurement id still has to be created in Google Analytics
+  and set as `VITE_GA_MEASUREMENT_ID` for the production build. Until then these events send
+  nothing, and the four-week clock below has not started.
+- **Decision rule: accepted as written above.** No tab change is made before it is met.
+- Retention windows for analytics data are left to the owner's counsel, with the other legal items.
