@@ -4,7 +4,8 @@
 --   psql -X -v ON_ERROR_STOP=1 -f docs/release/p0-1-verify.sql
 -- The statement between BEGIN and ROLLBACK is a single SELECT that does not depend on search_path, so it can also be
 -- run on its own through Lovable's database tool (runbook, section 3).
--- Expected md5s are md5(pg_get_functiondef) / policy expressions / trigger definitions from a replay of main on
+-- Expected md5s are md5(pg_get_functiondef) / policy expressions / trigger definitions (schema prefix removed, so the value
+-- does not depend on search_path) from a replay of main on
 -- postgres:16 (2026-11-06) after the seven files; they are the texts in the repository, so they hold on 17 too
 -- (the 2026-11-05 hotfix rehearsal found the same values on 16 and 17). The ledger check accepts, per file, a
 -- supabase ledger row (psql path) or a drizzle row with the file's sha256 with or without its final newline (Lovable).
@@ -35,9 +36,9 @@ expected_pol(name, md5) AS (VALUES
     ('Hosts manage own game payment settings (delete)', '5cf8024614c94bf797fa49201f6a36dd'),
     ('Host and linked players read payment settings', 'fc599566945daf0d6af7afb3f63b8061')),
 expected_trg(rel, name, md5) AS (VALUES
-    ('public.review_helpfuls', 'trg_review_helpfuls_count', 'a9f1c43d94a1d4c482b1ff180c06bea9'),
-    ('public.profiles', 'aa_guard_profile_insert_trg', '16b99bd51a2ee5f3eebd5ebf42495fca'),
-    ('public.payment_submissions', 'aa_payment_destination_trg', '5c59b75c55b7384182e10c8d162ba929')),
+    ('public.review_helpfuls', 'trg_review_helpfuls_count', 'aea08d1715ed8199488c43f83fad23f0'),
+    ('public.profiles', 'aa_guard_profile_insert_trg', '6ecf4dea36ca2f7bd82200121aecbdec'),
+    ('public.payment_submissions', 'aa_payment_destination_trg', '6796c3c0659acc4e5f777ba3302d1050')),
 files(version, h1, h2) AS (VALUES
     ('20261103100000', 'c7040ea0de8b971da3b294c8489f4bb64f01b246a3daadab346ed5ae7e8fbf70', '7f1d3e836e98fddf4405f6485b815a7a26d90ab433ce0c75032e4ecad79f164f'),
     ('20261103101000', '553ced7669d0b1b914bf33a934d3c0dde24d53d98e7e31c992c604bcc7b1768b', 'd799c8edfbfe121ebc62ad6e1bd7ae8a4060df007cc3413fede78bd0aae0e1b3'),
@@ -47,7 +48,7 @@ files(version, h1, h2) AS (VALUES
     ('20261103130000', '2194cbdc6229ef5332e47129208ffed23f58d462d6a26ec297bf474caedf8b8f', 'e441cfb8d70b7471ccf5cf28e91a2e3b569296b5478482df096bef4857cc5131'),
     ('20261103140000', '5c74b31e9ca99617b731b4361758acf8fb7b5e164c0008143e19b1d7006eb678', '3e0877265ada0373145900a5a3d9750a389f10f60cb8323ee4eb46cccee6caed')),
 pol_md5 AS (
-  SELECT policyname AS name, md5(cmd || ':' || array_to_string(roles, '|') || ':' || coalesce(qual, '') || ':' || coalesce(with_check, '')) AS md5
+  SELECT policyname AS name, md5(regexp_replace(cmd || ':' || array_to_string(roles, '|') || ':' || coalesce(qual, '') || ':' || coalesce(with_check, ''), '\mpublic\.', '', 'g')) AS md5
     FROM pg_policies WHERE schemaname = 'public' AND tablename = 'game_payment_settings'),
 checks(check_name, expected, actual) AS (
   SELECT 'server major', '17', (current_setting('server_version_num')::int / 10000)::text
@@ -66,7 +67,7 @@ checks(check_name, expected, actual) AS (
   SELECT 'policy count on game_payment_settings', '4', (SELECT count(*)::text FROM pol_md5)
   UNION ALL
   SELECT 'trigger ' || e.rel || '.' || e.name, e.md5,
-         coalesce((SELECT md5(pg_get_triggerdef(t.oid)) FROM pg_trigger t WHERE t.tgrelid = to_regclass(e.rel) AND t.tgname = e.name), 'missing')
+         coalesce((SELECT md5(regexp_replace(pg_get_triggerdef(t.oid), '\mpublic\.', '', 'g')) FROM pg_trigger t WHERE t.tgrelid = to_regclass(e.rel) AND t.tgname = e.name), 'missing')
     FROM expected_trg e
   UNION ALL
   SELECT 'trigger review_helpfuls.bump_helpful_count_trg absent', 'absent',

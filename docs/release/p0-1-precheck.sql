@@ -15,7 +15,9 @@
 --   * no settings row and no payment claim names a payee other than the game's host (the full fix adds a trigger that
 --     would refuse new ones; an existing one means the hole was used and must be reviewed first);
 --   * none of the seven is recorded in either ledger yet.
--- Function md5s are md5(pg_get_functiondef(...)) from a replay of main on postgres:16 (2026-11-06); the capture files'
+-- Function md5s are md5(pg_get_functiondef(...)) from a replay of main on postgres:16 (2026-11-06); trigger md5s are of
+-- pg_get_triggerdef with the schema prefix removed, so they do not depend on the session's search_path (Lovable's tool and the
+-- Management API run the bare SELECT); the capture files'
 -- headers state the same values as read from production on 2026-11-03. Function bodies that Lovable may have applied
 -- comment-stripped are checked for presence only.
 BEGIN READ ONLY;
@@ -32,7 +34,7 @@ before_pol(name, md5) AS (VALUES
     ('Hosts manage own game payment settings (insert)', 'b68a6ffdc2c35755cd8614f061606cde'),
     ('Hosts manage own game payment settings (update)', 'b70856e55ed2d30e771e780685afcb34'),
     ('Hosts manage own game payment settings (delete)', '5cf8024614c94bf797fa49201f6a36dd'),
-    ('Host and linked players read payment settings', 'c09d436732fe50efa1c1fa2a80f204ff')),
+    ('Host and linked players read payment settings', 'a1645286b9978be327bf19a5a1b4ac94')),
 not_yet_fn(sig) AS (VALUES
     ('public.guard_profile_insert()'), ('public.game_payee_id(text)'),
     ('private_sec.can_read_game_payment_settings(text,uuid)'), ('public.enforce_payment_destination()')),
@@ -52,7 +54,7 @@ drizzle_hashes(h) AS (VALUES
     ('2194cbdc6229ef5332e47129208ffed23f58d462d6a26ec297bf474caedf8b8f'), ('e441cfb8d70b7471ccf5cf28e91a2e3b569296b5478482df096bef4857cc5131'),
     ('5c74b31e9ca99617b731b4361758acf8fb7b5e164c0008143e19b1d7006eb678'), ('3e0877265ada0373145900a5a3d9750a389f10f60cb8323ee4eb46cccee6caed')),
 pol_md5 AS (
-  SELECT policyname AS name, md5(cmd || ':' || array_to_string(roles, '|') || ':' || coalesce(qual, '') || ':' || coalesce(with_check, '')) AS md5
+  SELECT policyname AS name, md5(regexp_replace(cmd || ':' || array_to_string(roles, '|') || ':' || coalesce(qual, '') || ':' || coalesce(with_check, ''), '\mpublic\.', '', 'g')) AS md5
     FROM pg_policies WHERE schemaname = 'public' AND tablename = 'game_payment_settings'),
 checks(check_name, expected, actual) AS (
   SELECT 'server major', '17', (current_setting('server_version_num')::int / 10000)::text
@@ -69,8 +71,8 @@ checks(check_name, expected, actual) AS (
   SELECT 'capture already in place: trigger review_helpfuls.bump_helpful_count_trg absent', 'absent',
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = to_regclass('public.review_helpfuls') AND t.tgname = 'bump_helpful_count_trg') THEN 'present' ELSE 'absent' END
   UNION ALL
-  SELECT 'capture already in place: trigger review_helpfuls.trg_review_helpfuls_count', 'a9f1c43d94a1d4c482b1ff180c06bea9',
-         coalesce((SELECT md5(pg_get_triggerdef(t.oid)) FROM pg_trigger t WHERE t.tgrelid = to_regclass('public.review_helpfuls') AND t.tgname = 'trg_review_helpfuls_count'), 'missing')
+  SELECT 'capture already in place: trigger review_helpfuls.trg_review_helpfuls_count', 'aea08d1715ed8199488c43f83fad23f0',
+         coalesce((SELECT md5(regexp_replace(pg_get_triggerdef(t.oid), '\mpublic\.', '', 'g')) FROM pg_trigger t WHERE t.tgrelid = to_regclass('public.review_helpfuls') AND t.tgname = 'trg_review_helpfuls_count'), 'missing')
   UNION ALL
   SELECT 'hotfix 20261102100000 present: ' || e.sig, e.md5, coalesce(md5(pg_get_functiondef(to_regprocedure(e.sig))), 'missing') FROM hotfix_fn e
   UNION ALL

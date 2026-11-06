@@ -164,8 +164,10 @@ a production change with its own approval, which is what sections A to C do.
 
 ## 5. What was rehearsed (local, 2026-11-06, Postgres 16.15)
 
-Postgres 17 was not available in the session; the hashes are of the repository's own texts, which the 2026-11-05 hotfix
-rehearsal found identical on 16 and 17. The one expected difference on 16 is the `server major` row.
+Postgres 17 was not available locally; the hashes are of the repository's own texts. The E2E sandbox (Postgres 17.11) then
+served as the Postgres 17 rehearsal: after the same files were applied there, `p0-1-verify.sql` passed all 52 checks. Policy
+and trigger hashes are computed with the `public.` schema prefix removed, so they do not depend on the session's
+`search_path` (Lovable's tool and the Management API run the bare `SELECT`; psql with the file sets `search_path = ''`).
 
 | Model                                                       | Built from                                                                   | Pre-check            | Verify               |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------- | -------------------- |
@@ -173,6 +175,7 @@ rehearsal found identical on 16 and 17. The one expected difference on 16 is the
 | `prodlike2` (after step B)                                  | `prodlike` plus files 6 and 7, ledger rows seeded in both forms              | 10 not ok (negative control) | 51/52 ok (server major only) |
 | full replay of `main`                                       | `node scripts/db-test.mjs` (401 files, 999 SQL assertions)                   | fingerprints of every object the seven files touch equal `prodlike2`'s | |
 | ledger script                                               | applied twice to a copy of `prodlike2`                                       | 52 rows inserted, then 0 (idempotent) | |
+| **E2E sandbox `qkukefvzwlyusvspablz` (Postgres 17.11, live)** | the same nine files (plus the two hotfixes it also lacked) applied through the Management API as one transaction, 2026-11-06 | pre-state matched (captures present, fixes absent, counts 0) | **52/52 ok**, including `server major` |
 
 The capture files' headers state the production md5s read on 2026-11-03 (`enforce_gym_review` `1c776a86…`,
 `review_ring_suspects` `f41ec9f3…`); the pre-check expects exactly those, so a production that drifted again since fails
