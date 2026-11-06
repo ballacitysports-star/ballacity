@@ -169,3 +169,10 @@ jobs:
             echo "The production project reference is in the build output; see the files above."
             exit 1
           fi
+
+      # P3-4 bundle budget: entry and total client JS may not grow more than 5 percent
+      # over build/bundle-baseline.json, no other chunk may pass 150 kB gzip and the total
+      # may not pass 1.5 MB. The plan's 250 kB entry target is reported until it is met.
+      - name: Bundle budget
+        if: ${{ !cancelled() }}
+        run: node scripts/bundle-budget.mjs .output/public/assets
