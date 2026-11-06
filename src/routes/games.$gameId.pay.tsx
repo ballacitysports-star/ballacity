@@ -239,7 +239,7 @@ function PayPage() {
   }, [loading, userId, nav]);
 
   useEffect(() => {
-    if (isParentMode) nav({ to: "/guardian", replace: true });
+    if (isParentMode) nav({ to: "/parent", hash: "activity", replace: true });
   }, [isParentMode, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
