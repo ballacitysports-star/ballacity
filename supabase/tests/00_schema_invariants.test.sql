@@ -34,6 +34,7 @@ SELECT t.eq(
     WHERE sig NOT IN (
       -- private_sec is not exposed by the API; row level security policies call these.
       'private_sec.can_comment_on_minor_content(_commenter uuid, _content_owner uuid)',
+      'private_sec.can_view_post(_author uuid, _posted_as text, _team text, _org uuid, _audience text, _viewer uuid)',
       'private_sec.comment_subject_owner(_subject_type text, _subject_id text)',
       'private_sec.guardian_public_profile(_user uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
