@@ -53,6 +53,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `160_team_members_direct_add.test.sql`     | A coach cannot put a minor on a roster by writing the row; the invite their guardian approves is the way in                                                            |
 | `170_waitlist_notified_on_leave.test.sql`  | When a seat opens the player who has waited longest is told once; no one is told about a closed or started game                                                        |
 | `180_trainer_org_affiliation.test.sql`     | Only a trainer can put their profile on a facility: no direct add, no forged invite, no repointing a member row                                                        |
+| `540_team_announcement_notifications.test.sql` | An approved team announcement notifies every member once, except the author and anyone with a block either way; pending, held, hidden and non-announcement posts notify nobody |
 
 ## Races
 
