@@ -9,6 +9,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { MotionConfig } from "framer-motion";
+import { MainContentTarget, SkipLink } from "@/components/a11y/SkipLink";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
@@ -1062,38 +1064,43 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClientOnly
-        fallback={
-          <div className="grid min-h-dvh place-items-center bg-background px-4">
-            <div
-              className="flex max-w-sm flex-col items-center text-center"
-              role="status"
-              aria-live="polite"
-            >
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-              <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+      {/* P3-5: every framer-motion animation follows the system "reduce motion" setting. */}
+      <MotionConfig reducedMotion="user">
+        <ClientOnly
+          fallback={
+            <div className="grid min-h-dvh place-items-center bg-background px-4">
+              <div
+                className="flex max-w-sm flex-col items-center text-center"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+                <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <GlobalErrorBoundary scope="root">
-          <AuthGate>
-            <StaffBar />
-            <MaintenanceGate>
-              <SwipeNavigator>
-                <Outlet />
-              </SwipeNavigator>
-            </MaintenanceGate>
-          </AuthGate>
-        </GlobalErrorBoundary>
-      </ClientOnly>
-      <Toaster position="top-center" richColors />
-      <ClientOnly fallback={null}>
-        <SessionHeartbeat />
-        <AnalyticsHost />
-        <SupportAssistantHost />
-        <DebugModeToggle />
-      </ClientOnly>
+          }
+        >
+          <SkipLink />
+          <GlobalErrorBoundary scope="root">
+            <AuthGate>
+              <StaffBar />
+              <MaintenanceGate>
+                <MainContentTarget />
+                <SwipeNavigator>
+                  <Outlet />
+                </SwipeNavigator>
+              </MaintenanceGate>
+            </AuthGate>
+          </GlobalErrorBoundary>
+        </ClientOnly>
+        <Toaster position="top-center" richColors />
+        <ClientOnly fallback={null}>
+          <SessionHeartbeat />
+          <AnalyticsHost />
+          <SupportAssistantHost />
+          <DebugModeToggle />
+        </ClientOnly>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }
