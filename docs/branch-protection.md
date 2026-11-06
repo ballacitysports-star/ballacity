@@ -18,6 +18,7 @@ Create one ruleset on the default branch (Settings, Rules, Rulesets, New branch 
 - [ ] **Required reviews:** while there is one account, 0 approvals but "Require conversation resolution" and "Dismiss stale approvals" on (GitHub does not count an author's own approval, so 1 would block every change). The day a second reviewer exists: 1 approval, "Require review from Code Owners", "Require approval of the most recent reviewable push".
 - [ ] **Require status checks to pass:** `Unit tests`, `Lint`, `Typecheck & build`, `Replay migrations and run SQL tests` (source: GitHub Actions). Require branches to be up to date before merging.
 - [ ] **Not required:** `Playwright`. It stays optional until the sandbox is verified, `E2E_SANDBOX_PROJECT_REF` is configured by you, and it has passed repeatedly; and the `e2e-sandbox` Environment has required reviewers.
+- [ ] **Not required yet:** `E2E smoke` (P0-9, the 26-test smoke subset of the same run). Require it after three consecutive green runs; preconditions and costs are in `docs/e2e-smoke.md`.
 - [ ] Restrict deletions; block force pushes; merge commits only while the stacked privacy branches exist.
 - [ ] **Bypass list: empty.** No standing bypass for anyone, including you and Lovable (see section 2 for the operating procedure).
 - [ ] Settings, General, "Automatically delete head branches": off until the privacy stack is merged.
