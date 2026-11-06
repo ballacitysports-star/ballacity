@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * A brand-new user signing in with Google or Apple (i.e. `profiles.account_type`
@@ -25,6 +26,9 @@ const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-e2e";
 
 async function stubNullAccountType(page: Page) {
+  // The root gate asks the server first (getOnboardingStatus reads the profile
+  // server-side), so the table stub below only covers its client fallback.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null));
   await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -60,7 +64,15 @@ async function primeStorage(page: Page, provider?: "google" | "apple") {
       window.sessionStorage.setItem(nextKey!, nextPath!);
       if (providerId) window.sessionStorage.setItem(providerKey!, providerId);
     },
-    [STORAGE_KEY!, SESSION_JSON!, PENDING_KEY, NEXT_KEY, NEXT_PATH, PROVIDER_KEY, provider ?? null] as const,
+    [
+      STORAGE_KEY!,
+      SESSION_JSON!,
+      PENDING_KEY,
+      NEXT_KEY,
+      NEXT_PATH,
+      PROVIDER_KEY,
+      provider ?? null,
+    ] as const,
   );
 }
 

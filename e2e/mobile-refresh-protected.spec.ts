@@ -20,7 +20,9 @@ test.skip(
 );
 
 // Only routes that render themselves (no app-level redirect) belong here.
-const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
+// Alerts live in the Inbox now (`/notifications` redirects to
+// `/messages?tab=alerts`), so the inbox is the route that must survive a refresh.
+const PROTECTED_ROUTES = ["/feed", "/profile", "/messages"] as const;
 
 const MOBILE_DEVICES = [
   { label: "iOS Safari (iPhone 13)", descriptor: devices["iPhone 13"] },

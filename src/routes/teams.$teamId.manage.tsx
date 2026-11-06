@@ -1,5 +1,5 @@
 import { withRequireAuth } from "@/components/RequireAuth";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Shield } from "lucide-react";
 import { pageHead } from "@/lib/seo";
@@ -14,6 +14,7 @@ import { SettingsTab } from "@/components/team/manage/SettingsTab";
 import { WaiverTab } from "@/components/team/manage/WaiverTab";
 import { RsvpsTab } from "@/components/team/manage/RsvpsTab";
 import { TeamAnalyticsPanel } from "@/components/teams/TeamAnalyticsPanel";
+import { DEFAULT_MANAGE_TAB, isManageTab, validateManageSearch } from "@/lib/team-manage-tabs";
 
 export const Route = createFileRoute("/teams/$teamId/manage")({
   head: () =>
@@ -23,11 +24,14 @@ export const Route = createFileRoute("/teams/$teamId/manage")({
       noindex: true,
     }),
   ssr: false,
+  validateSearch: validateManageSearch,
   component: withRequireAuth(ManageTeam),
 });
 
 function ManageTeam() {
   const { teamId } = Route.useParams();
+  const { tab = DEFAULT_MANAGE_TAB } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const roster = useTeamRoster(teamId);
   const perms = useTeamPermissions(teamId);
 
@@ -95,23 +99,18 @@ function ManageTeam() {
         >
           Tryouts &amp; camps
         </Link>
-        <Link
-          to="/teams/$teamId/invites"
-          params={{ teamId }}
-          className="ml-2 mt-3 inline-flex rounded-full border border-border px-4 py-2 text-xs font-bold"
-        >
-          Roster invites
-        </Link>
-        <Link
-          to="/teams/$teamId/waiver"
-          params={{ teamId }}
-          className="ml-2 mt-3 inline-flex rounded-full border border-border px-4 py-2 text-xs font-bold"
-        >
-          Waiver
-        </Link>
       </header>
 
-      <Tabs defaultValue="dashboard">
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          if (!isManageTab(next)) return;
+          void navigate({
+            search: next === DEFAULT_MANAGE_TAB ? {} : { tab: next },
+            replace: true,
+          });
+        }}
+      >
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="roster">Roster</TabsTrigger>
@@ -132,7 +131,9 @@ function ManageTeam() {
         </TabsContent>
         <TabsContent value="invites" className="pt-4">
           <InvitesTab teamId={teamId} teamName={teamName} />
-          <div className="pt-6"><InviteTracker teamId={teamId} /></div>
+          <div className="pt-6">
+            <InviteTracker teamId={teamId} />
+          </div>
         </TabsContent>
         <TabsContent value="waiver" className="pt-4">
           <WaiverTab teamId={teamId} teamName={teamName} />

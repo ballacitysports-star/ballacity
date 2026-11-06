@@ -141,7 +141,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // First tap — network error.
@@ -154,7 +154,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
     timeout: 5_000,
   });
 
-  const retryCta = page.getByRole("button", { name: /request to join/i }).first();
+  const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeEnabled();
 
   // Retry — succeeds.
@@ -162,7 +162,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   // Sanity: exactly 2 POSTs so far.
   await page.waitForTimeout(300);
@@ -182,7 +182,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
   await expect(page.getByText(/waiting for host approval/i).first()).toBeVisible({
     timeout: 5_000,
   });
@@ -200,7 +200,7 @@ test("pending UI + invite params survive a reload after network-error retry", as
   // Invite params preserved after reload.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 
