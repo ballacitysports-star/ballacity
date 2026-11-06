@@ -35,6 +35,7 @@ SELECT t.eq(
       -- private_sec is not exposed by the API; row level security policies call these.
       'private_sec.can_comment_on_minor_content(_commenter uuid, _content_owner uuid)',
       'private_sec.comment_subject_owner(_subject_type text, _subject_id text)',
+      'private_sec.event_is_listed(_event uuid)',
       'private_sec.guardian_public_profile(_user uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
       'private_sec.reel_game_readable(_game_id text, _owner uuid)',
@@ -46,6 +47,9 @@ SELECT t.eq(
       -- game's refund terms before the visitor signs in, and the game page needs the
       -- join policy (requires_approval) so an open game shows one-tap join, not
       -- request-to-join, to a visitor who can't read the full settings row.
+      -- get_event_location returns the venue of an adult-only event to anyone (D0);
+      -- for any other event it returns nothing unless the caller may see it.
+      'public.get_event_location(_event uuid)',
       'public.get_game_host_paypal(_game_id text)',
       'public.get_game_join_policy(_game_id text)',
       'public.get_game_refund_terms(_game_id text)')),
