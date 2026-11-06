@@ -18,6 +18,13 @@ SELECT t.team('rec', 'coachadult');
 SELECT t.member('rec', 'adultmember', 'player');
 SELECT t.team('fresh', 'newcoach');
 UPDATE public.teams SET age_groups = ARRAY['youth'] WHERE id = 'fresh';
+-- Not known to be adult-only yet: only its adult owner, no age groups.
+SELECT t.person('soloowner', 31);
+SELECT t.team('solo', 'soloowner');
+-- Known adult-only by listing: an adult coach listed for adults, no players yet.
+SELECT t.person('adultcoachx', 41);
+SELECT t.team('adultclinic', 'adultcoachx');
+UPDATE public.teams SET age_groups = ARRAY['adult'] WHERE id = 'adultclinic';
 
 CREATE FUNCTION pg_temp.post(_team text, _author text, _title text) RETURNS uuid LANGUAGE plpgsql AS $$
 DECLARE _id uuid;
@@ -33,7 +40,9 @@ END $$;
 CREATE TEMP TABLE ids AS
 SELECT pg_temp.post('ufalcons', 'coachyouth', 'U12 tryout') AS youth,
        pg_temp.post('rec', 'coachadult', 'Rec league tryout') AS adult,
-       pg_temp.post('fresh', 'newcoach', 'New youth team tryout') AS fresh;
+       pg_temp.post('fresh', 'newcoach', 'New youth team tryout') AS fresh,
+       pg_temp.post('solo', 'soloowner', 'New team tryout') AS solo,
+       pg_temp.post('adultclinic', 'adultcoachx', 'Adult clinic') AS adultlisted;
 GRANT SELECT ON ids TO anon, authenticated;
 
 -- A 15-year-old registered by their parent for the youth tryout.
@@ -54,11 +63,13 @@ SELECT t.as_anon();
 SELECT t.throws('SELECT location FROM public.team_posts', 'permission denied', 'a signed-out visitor cannot select location');
 SELECT t.throws('SELECT lat, lng FROM public.team_posts', 'permission denied', 'or coordinates');
 SELECT t.throws('SELECT * FROM public.team_posts', 'permission denied', 'or select every column');
-SELECT t.eq(t.count('SELECT id, title, event_date, price, spots_max FROM public.team_posts'), 3,
-  'but still sees all three posts and their details');
+SELECT t.eq(t.count('SELECT id, title, event_date, price, spots_max FROM public.team_posts'), 5,
+  'but still sees all five posts and their details');
 SELECT t.eq(pg_temp.sees('youth'), 0, 'signed out: no venue for the youth team''s tryout');
 SELECT t.eq(pg_temp.sees('fresh'), 0, 'signed out: no venue for a team listed for youth');
 SELECT t.eq(pg_temp.sees('adult'), 1, 'signed out: the adult team''s venue stays public');
+SELECT t.eq(pg_temp.sees('solo'), 0, 'signed out: a new team with only its owner is private until known adult-only');
+SELECT t.eq(pg_temp.sees('adultlisted'), 1, 'signed out: a team listed for adults is public');
 SELECT t.reset();
 
 SELECT t.as_user(t.id('stranger'));
@@ -88,6 +99,12 @@ SELECT t.eq(pg_temp.sees('youth'), 1, 'an admin sees it');
 SELECT t.reset();
 SELECT t.as_user(t.id('newcoach'));
 SELECT t.eq(pg_temp.sees('fresh'), 1, 'the new youth team''s own coach sees its venue');
+SELECT t.reset();
+
+-- The new team becomes known adult-only once an adult player joins.
+SELECT t.member('solo', 'adultmember', 'player');
+SELECT t.as_anon();
+SELECT t.eq(pg_temp.sees('solo'), 1, 'once an adult player joins, the new team''s venue is public');
 SELECT t.reset();
 
 -- A cancelled registration no longer unlocks it.

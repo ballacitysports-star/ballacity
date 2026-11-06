@@ -5,8 +5,12 @@
 -- address and coordinates were public. Hosted games already hide youth games from
 -- anonymous visitors (20261029150000_hosted_games_anon_minors_guard.sql).
 --
--- Rule: a team is a youth team when any member is not a confirmed adult (minor or age
--- unknown), or its age_groups include 'youth' or 'teen'. For a youth team's posts the
+-- Rule: a team's venue is public only when the team is known to be adult-only: every
+-- member is a confirmed adult, its age_groups do not include 'youth' or 'teen', and it
+-- is either listed for adults (age_groups include 'adult') or has at least one adult
+-- player or captain. Anything else (a minor or an unknown-age member, a youth or teen
+-- listing, or a new team with only its owner or staff) counts as a youth team (owner
+-- decision, 2026-11-06: private until known adult-only). For a youth team's posts the
 -- venue is readable only by:
 --   * the team's members (any role, staff included),
 --   * guardians of the team's members,
@@ -27,7 +31,7 @@
 --
 -- Rollback: docs/rollbacks/20261106210000_youth_post_venue_privacy.down.sql.
 
--- 1. Is this a youth team?
+-- 1. Is this a youth team, meaning not known to be adult-only?
 CREATE OR REPLACE FUNCTION private_sec.team_is_youth(_team text)
 RETURNS boolean
 LANGUAGE sql
@@ -35,16 +39,30 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  SELECT
-    EXISTS (
+  SELECT NOT (
+    -- every member is a confirmed adult
+    NOT EXISTS (
       SELECT 1 FROM public.team_members tm
       WHERE tm.team_id = _team
         AND COALESCE(public.age_cohort_of(tm.user_id), 'unknown') <> 'adult'
     )
-    OR EXISTS (
+    -- not listed for youth or teens
+    AND NOT EXISTS (
       SELECT 1 FROM public.teams t
       WHERE t.id = _team AND t.age_groups && ARRAY['youth', 'teen']::text[]
     )
+    -- and known to be for adults: listed for adults, or an adult player or captain
+    AND (
+      EXISTS (
+        SELECT 1 FROM public.teams t
+        WHERE t.id = _team AND t.age_groups @> ARRAY['adult']::text[]
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.team_members tm
+        WHERE tm.team_id = _team AND tm.role IN ('player', 'captain')
+      )
+    )
+  )
 $$;
 
 -- 2. May the caller see this post's venue? (Visibility of the post itself is checked
