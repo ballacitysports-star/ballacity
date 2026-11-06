@@ -1,6 +1,8 @@
 # P2-1 design proposal: one `events` model for tryouts, clinics, camps and tournaments
 
-Status: **proposal, needs the owner's decisions below before any migration.** Nothing is built yet.
+Status: **approved by the owner on 2026-11-06** (decisions recorded at the end). Stage 1 (additive
+tables, no reads yet) is being built and applied to the E2E sandbox only; nothing is applied to
+production.
 P2-1 in `docs/phase0-audit-and-implementation-plan.md` is rated high risk because it moves existing data.
 
 ## Why
@@ -117,18 +119,17 @@ event_availability    -- generalises team_event_availability
 - Unit and E2E: the tryout sign-up and check-in flows on the sandbox, through the flag, once the E2E
   baseline (#298) is green.
 
-## Owner decisions needed
+## Owner decisions (recorded 2026-11-06)
 
-- **D0. Youth venue privacy, now.** Choose one:
-  - keep tryout and clinic venues public, as today;
-  - or, recommended: hide exact address and coordinates from anyone who is not host staff, a
-    registrant or a guardian, for teams with any minor member. Either way this can ship as a small
-    standalone fix before P2-1.
-- **D1.** Is `min_age`/`max_age` required when an event is created? This is how youth status becomes
-  explicit. Today it can only be inferred from the roster.
-- **D2.** Where do waivers live: per team, as today, or per event? The proposal keeps them per team
-  and adds facility waivers later.
-- **D3.** Are trainer sessions in scope for P2-1? The proposal leaves them out; they are bookings,
-  not events.
-- **D4.** Approve the staged plan. Each stage is its own PR, with a SQL test, a negative control and
-  a guarded rollback.
+- **D0. Youth venue privacy: hide, and stricter than proposed.** A team's tryout or clinic venue is
+  hidden from everyone except host staff, registrants and their guardians until the team is known to
+  be adult-only (#330). For events this becomes: the exact location is public only when the event is
+  adult-only (`min_age >= 18`); every other event shows `venue_label` only to the public.
+- **D1. Age range is required.** Every event is created with `min_age` and `max_age`. Youth status
+  is explicit, never inferred from the roster. (Backfilled rows from `team_posts` get the range from
+  the team, and are treated as youth when the team is not known to be adult-only, so stage 2 cannot
+  make a venue public that is private today.)
+- **D2. Waivers stay per team.** Facility waivers come later, as their own item.
+- **D3. Trainer sessions are out of scope** for P2-1. They remain booking requests.
+- **D4. The staged plan is approved.** Each stage is its own PR with a SQL test, a negative control
+  and a guarded rollback. Migrations go to the E2E sandbox only; production waits for the owner.
