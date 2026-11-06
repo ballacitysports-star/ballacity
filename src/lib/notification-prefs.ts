@@ -107,7 +107,8 @@ export const CATEGORY_META: Record<
   },
   social: {
     label: "Followers & highlights",
-    description: "New followers, and comments or reactions on your highlight reels.",
+    description:
+      "New followers, and comments or reactions on your posts, games and highlight reels.",
   },
   general: {
     label: "Other activity",
