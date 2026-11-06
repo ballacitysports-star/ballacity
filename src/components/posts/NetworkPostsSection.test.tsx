@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -25,6 +25,7 @@ vi.mock("@/lib/network-posts", async () => {
     FEED_PAGE_SIZE: 20,
     useNetworkPostsEnabled: () => state.enabled,
     listFeedPosts: vi.fn().mockResolvedValue([]),
+    listFollowingPosts: vi.fn().mockResolvedValue([]),
     deletePost: vi.fn(),
   };
 });
@@ -63,6 +64,20 @@ describe("NetworkPostsSection", () => {
     wrap(<NetworkPostsSection />);
     expect(screen.getByRole("heading", { name: "Posts" })).toBeTruthy();
     expect(await screen.findByText(/No posts yet/)).toBeTruthy();
+  });
+});
+
+describe("Following tab", () => {
+  it("switches the list to posts from people you follow", async () => {
+    const mod = await import("@/lib/network-posts");
+    wrap(<NetworkPostsSection />);
+    await screen.findByText(/No posts yet/);
+    fireEvent.click(screen.getByRole("tab", { name: "Following" }));
+    expect(await screen.findByText("No posts from people you follow yet.")).toBeTruthy();
+    expect(mod.listFollowingPosts).toHaveBeenCalled();
+    expect(screen.getByRole("tab", { name: "Following" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 });
 

@@ -78,7 +78,26 @@ export async function listFeedPosts(before?: string | null): Promise<FeedPost[]>
   if (before) q = q.lt("created_at", before);
   const { data, error } = await q;
   if (error) throw new Error(postErrorMessage(error.message));
-  const rows = (data ?? []) as unknown as PostRow[];
+  return decorate((data ?? []) as unknown as PostRow[]);
+}
+
+/**
+ * Posts from people the viewer follows (P1-3), newest first. The following_feed function
+ * runs as the viewer, so the same row level security applies as for the main list.
+ */
+export async function listFollowingPosts(before?: string | null): Promise<FeedPost[]> {
+  const { data, error } = await (
+    supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>
+  )("following_feed", { _before: before ?? null, _limit: FEED_PAGE_SIZE });
+  if (error) throw new Error(postErrorMessage(error.message));
+  return decorate((data ?? []) as PostRow[]);
+}
+
+/** Attaches display names: a team's or facility's when it posted, otherwise the author's. */
+async function decorate(rows: PostRow[]): Promise<FeedPost[]> {
   if (rows.length === 0) return [];
 
   const ids = (pick: (r: PostRow) => string | null) => [
