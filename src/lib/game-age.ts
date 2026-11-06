@@ -78,7 +78,8 @@ export function requesterAgeLabel(
 ): string | null {
   if (!hasAgeRequirement(req)) return null;
   const label = ageRequirementLabel(req);
-  if (age == null || !Number.isFinite(age)) return "Age not shared";
+  // Also the case for a minor whose age the database does not show to this viewer.
+  if (age == null || !Number.isFinite(age)) return "Age not shown";
   return isAgeEligible(age, req) ? `Age ${age}` : `Age ${age} · outside ${label}`;
 }
 
