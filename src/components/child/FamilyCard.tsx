@@ -74,7 +74,8 @@ export function FamilyCard() {
           Open Parent Center
         </Link>
         <Link
-          to="/guardian"
+          to="/parent"
+          hash="activity"
           className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:border-lime/40"
         >
           Kids' schedule
