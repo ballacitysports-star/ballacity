@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Check, ChevronsUpDown, Plus, Star } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronsUpDown, ClipboardList, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import { isManagedUser } from "@/lib/managed-children";
 import { switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
+import { useCoachedTeams } from "@/lib/coach-identity";
 
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
@@ -61,6 +62,9 @@ export function ProfileSwitcher({ className }: { className?: string }) {
   const { children } = useMyChildren();
   const managedChildren = inChildProfile ? [] : children.filter((c) => c.managed);
   const toChild = useSwitchToManagedChild();
+  // P2-2: the private coach identity. Shown while the person coaches, manages or owns a team.
+  const coached = useCoachedTeams(!inChildProfile);
+  const coachedCount = coached.data?.length ?? 0;
 
   if (loading || !active) return null;
 
@@ -168,6 +172,19 @@ export function ProfileSwitcher({ className }: { className?: string }) {
             </div>
           );
         })}
+        {!inChildProfile && coachedCount > 0 ? (
+          <DropdownMenuItem asChild className="gap-2">
+            <Link to="/coach">
+              <ClipboardList className="h-4 w-4" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">Coach</span>
+                <span className="block text-xs text-muted-foreground">
+                  {coachedCount === 1 ? "1 team" : `${coachedCount} teams`} · only you see this
+                </span>
+              </span>
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         {inChildProfile ? (
           <>
             <DropdownMenuSeparator />
