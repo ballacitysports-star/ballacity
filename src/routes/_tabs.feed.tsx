@@ -49,6 +49,7 @@ import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
+import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -546,6 +547,7 @@ function Feed() {
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
       {tab !== "archive" && <NeedsActionStrip />}
+      {tab !== "archive" && <NetworkPostsSection />}
       {/* Tier 2: where you are + run count on the left (tap to update
           location), one Map/List switch on the right. */}
       <motion.div

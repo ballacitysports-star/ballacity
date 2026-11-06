@@ -14,7 +14,7 @@ import { moderateAiText } from "@/lib/ai/moderation.server";
 
 export { POST_BLOCKED_MESSAGE } from "@/lib/post-moderation";
 
-export type PostTextTable = "team_posts" | "post_comments";
+export type PostTextTable = "team_posts" | "post_comments" | "posts";
 export type PostScreen = "allow" | "hold" | "block";
 export type PostModerationStatus = "approved" | "held";
 
@@ -67,3 +67,5 @@ export const TEAM_POST_CONTEXT =
   "A post on a community sports team page, read by adults and minors.";
 export const COMMENT_CONTEXT =
   "A comment on a team post, game or highlight reel in a community sports app used by adults and minors.";
+export const NETWORK_POST_CONTEXT =
+  "A short update shared by a player, team or facility in a community sports app used by adults and minors.";

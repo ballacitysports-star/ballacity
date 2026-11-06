@@ -11,13 +11,14 @@ import { ConfirmAction } from "./ConfirmAction";
 import { ReviewSignalsPanel } from "./ReviewSignalsPanel";
 
 /** Kinds whose text is AI-screened and can be held for review. */
-const TEXT_REVIEW_KINDS = new Set(["posts", "comments"]);
+const TEXT_REVIEW_KINDS = new Set(["posts", "network_posts", "comments"]);
 
 const KINDS = [
   { key: "games", label: "Games" },
   { key: "teams", label: "Teams" },
   { key: "gyms", label: "Gyms" },
-  { key: "posts", label: "Posts" },
+  { key: "posts", label: "Team posts" },
+  { key: "network_posts", label: "Network posts" },
   { key: "availability", label: "Availability" },
   { key: "comments", label: "Comments" },
   { key: "reviews", label: "Reviews" },
@@ -95,6 +96,8 @@ function summarize(kind: string, row: any) {
       }`;
     case "posts":
       return `${row.title} · ${row.kind}`;
+    case "network_posts":
+      return `${row.posted_as} · ${row.audience} · ${(row.body ?? "").slice(0, 100)}`;
     case "availability":
       return `${(row.sports ?? []).join(", ")} · ${row.skill_level} · ${row.status}`;
     case "comments":
