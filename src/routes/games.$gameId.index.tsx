@@ -146,6 +146,7 @@ import { hostTeamLink, useGameHost } from "@/lib/game-host-team";
 import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
 import { HOST_APPROVE_NOTE, hostBadge, joinWait, playerWaitCopy } from "@/lib/join-guardian-status";
 import { refundTermsDisplay } from "@/lib/refund-policy";
+import { useGameJoinPolicy } from "@/hooks/use-game-join-policy";
 import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import {
   CANCEL_CUTOFF_PRESETS,
@@ -361,6 +362,9 @@ function GameDetail() {
   const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const refundTerms = useGameRefundTerms(gameId, settings);
+  // The full settings row is host-and-linked-only, so a prospective viewer reads
+  // the host's approval setting from the public join-policy RPC instead.
+  const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -914,8 +918,11 @@ function GameDetail() {
   });
   const myHoldLabel = myHoldExpiresAt ? formatHoldRemaining(myHoldExpiresAt.getTime() - now) : null;
   // Host approval is the default. A game whose host hasn't saved settings yet
-  // is treated as request-to-join; hosts can opt out in game settings.
-  const hostRequiresApproval = settings ? !!settings.requires_approval : true;
+  // is treated as request-to-join; hosts can opt out in game settings. A
+  // prospective viewer can't read the settings row, so the public join-policy
+  // RPC supplies the host's actual flag; it's null until that resolves (or when
+  // there is no settings row), and then the default holds.
+  const hostRequiresApproval = publicRequiresApproval ?? true;
   // An age requirement forces the request-to-join flow for anyone outside the
   // range (or who hasn't shared a birthday), even on instant-join games.
   const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };

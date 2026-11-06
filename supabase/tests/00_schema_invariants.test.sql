@@ -43,8 +43,11 @@ SELECT t.eq(
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
       -- Public by design: the checkout page needs the host's PayPal merchant id and a
-      -- game's refund terms before the visitor signs in.
+      -- game's refund terms before the visitor signs in, and the game page needs the
+      -- join policy (requires_approval) so an open game shows one-tap join, not
+      -- request-to-join, to a visitor who can't read the full settings row.
       'public.get_game_host_paypal(_game_id text)',
+      'public.get_game_join_policy(_game_id text)',
       'public.get_game_refund_terms(_game_id text)')),
   '', 'no unlisted SECURITY DEFINER function is callable by anonymous visitors');
 
