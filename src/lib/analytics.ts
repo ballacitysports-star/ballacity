@@ -23,6 +23,8 @@ export const ANALYTICS_EVENTS = [
   "task_error", // an important task failed (task name only, never the message)
   "view_sport_hub", // a public sport hub was opened (sport only)
   "select_primary_sport", // a member chose which sport comes first (sport only)
+  "select_tab", // a bottom-bar tab was chosen: tab, from tab, tap or swipe (P1-9)
+  "open_create", // the Create (host a game) screen was opened (P1-9)
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 
