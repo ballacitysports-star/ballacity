@@ -342,10 +342,34 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     return;
   }
 
+  // Clear is_guardian on the shared player fixture every run, with the session
+  // we just minted (no service key needed). A guardian-onboarding spec can set
+  // this flag on the account; once set it puts the player in Parent Mode, which
+  // hides the join and pay controls and redirects /profile and /games/:id/pay
+  // to /parent and /guardian, breaking every later join/pay spec. The
+  // service-key seed above also resets it, but that branch is skipped without
+  // the key (local runs), so reset it here too. The player is account_type
+  // "player" with no managed children or guardian links, so this sticks.
+  // Refresh afterwards so the session we inject carries the cleared metadata,
+  // not the stale snapshot from sign-in (the app reads is_guardian from it).
+  let session = data.session;
+  if ((session.user.user_metadata as Record<string, unknown>)?.is_guardian === true) {
+    const { error: guardianErr } = await client.auth.updateUser({ data: { is_guardian: false } });
+    if (guardianErr) {
+      console.warn(
+        `[e2e global-setup] Could not clear is_guardian on ${player.email}: ${guardianErr.message}. ` +
+          "If a guardian-onboarding spec set it, later join/pay specs may redirect to Parent Mode.",
+      );
+    } else {
+      const { data: refreshed } = await client.auth.refreshSession();
+      if (refreshed.session) session = refreshed.session;
+    }
+  }
+
   const storageKey = `sb-${SUPABASE_PROJECT_ID}-auth-token`;
   process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY = storageKey;
-  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(data.session);
-  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = data.session.access_token;
+  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(session);
+  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = session.access_token;
   process.env.LOVABLE_BROWSER_AUTH_STATUS = "injected";
 
   console.log(`[e2e global-setup] Signed in ${player.email} for E2E specs.`);

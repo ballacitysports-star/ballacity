@@ -151,7 +151,7 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   // Gate is up, picker is not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
+  await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // Wait for the pay page's realtime channel to be registered.
   await expect
@@ -228,7 +228,7 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   // Gate must flip well before the 15s polling interval → realtime did the work.
   const t0 = Date.now();
   await expect(gate).toHaveCount(0, { timeout: 5_000 });
-  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({
+  await expect(page.getByText(/pay \$\d+ in /i)).toBeVisible({
     timeout: 5_000,
   });
   await expect(page.getByText(/@testhost/i)).toBeVisible();

@@ -155,7 +155,7 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   // Approval gate visible, picker not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toHaveCount(0);
+  await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // Sanity: realtime is truly blocked — no active realtime channel should be
   // in the SUBSCRIBED state (subscribe attempts should fail on the aborted
@@ -177,7 +177,7 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // Wait for the polling path to notice — allow ~2 poll intervals of slack.
   await expect(gate).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByText(/how do you want to pay|or pay another way/i)).toBeVisible({
+  await expect(page.getByText(/pay \$\d+ in /i)).toBeVisible({
     timeout: 5_000,
   });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
