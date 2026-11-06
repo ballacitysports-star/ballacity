@@ -9,10 +9,13 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { MotionConfig } from "framer-motion";
+import { MainContentTarget, SkipLink } from "@/components/a11y/SkipLink";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
-import { isSignedOutPublicPath, showsSignedOutBar } from "@/lib/public-paths";
+import { showsSignedOutBar } from "@/lib/public-paths";
+import { isPublicForViewer } from "@/lib/root-gate";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { SupportAssistantHost } from "@/components/support/SupportAssistantHost";
 import { BottomNav } from "@/components/BottomNav";
@@ -26,7 +29,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
-import { isSportHubPath } from "@/lib/sport-hubs";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import {
@@ -44,6 +46,7 @@ import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
 import { AccountTypeScreen } from "@/components/onboarding/AccountTypeScreen";
 import { logNotFound } from "@/lib/route-doctor";
+import { devToolsEnabled } from "@/lib/dev-tools";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
@@ -52,7 +55,6 @@ import { isChatThreadPath } from "@/lib/chat-layout";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
-import { isPublicReelPath } from "@/lib/social-share";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -93,14 +95,16 @@ function NotFoundComponent() {
             Go home
           </Link>
         </div>
-        <div className="mt-4">
-          <a
-            href={`/dev/route-doctor?path=${encodeURIComponent(path)}`}
-            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            Diagnose this link
-          </a>
-        </div>
+        {devToolsEnabled() && (
+          <div className="mt-4">
+            <a
+              href={`/dev/route-doctor?path=${encodeURIComponent(path)}`}
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Diagnose this link
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -448,45 +452,6 @@ function installStaleServerFnRecovery() {
   };
 }
 
-const PUBLIC_ROUTES = [
-  "/",
-  "/auth",
-  // Staff entry: signed-out visitors see the single sign-in button.
-  "/staff",
-  "/reset-password",
-  "/.lovable/oauth/consent",
-  // Legal documents must be readable before/without signing in.
-  "/terms",
-  "/privacy",
-  "/cookies",
-  "/payment-policy",
-  "/ai-disclosure",
-  "/youth-policy",
-  // Safety Center, Trust Center, and policy pages must be readable without
-  // signing in.
-  "/safety",
-  "/trust-center",
-  "/community-guidelines",
-  "/contact",
-  // Sports guides are public, indexable content.
-  "/guide",
-  // Articles are public, indexable content.
-  "/blog",
-  // City pages list only public games, teams and gyms, read through the
-  // allowlisted public columns (see city-pages.functions.ts), and are indexed.
-  "/cities",
-
-  // Shareable, sign-in-free surface.
-  "/highlights",
-  "/player-card",
-  // A parent's private link to one family clip: opens without signing in, but is
-  // unindexed, expires, and can be revoked.
-  "/family-share",
-  // The reel privacy policy: plain-language, readable without signing in.
-  "/reel-privacy",
-  // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
-  "/tryouts",
-];
 const TAB_PATHS = [
   "/feed",
   "/players",
@@ -581,16 +546,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isPublic =
-    pathname === "/" ||
-    // Only a signed-out visitor gets the public game, team and facility pages. A
-    // signed-in member still goes through the age and account-type steps below.
-    (!user && isSignedOutPublicPath(pathname)) ||
-    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
-    // The public sport hubs: exactly /<sport>, nothing deeper.
-    isSportHubPath(pathname) ||
-    // A shared reel page; an exact match, since a /reels prefix would open the studio tab.
-    isPublicReelPath(pathname);
+  const isPublic = isPublicForViewer(pathname, !!user);
   const isTab = TAB_PATHS.includes(pathname);
   // Second-chance verification: on mobile Safari/Chrome the Supabase session
   // can hydrate one tick after `loading` flips to false. Redirecting to
@@ -1108,38 +1064,43 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClientOnly
-        fallback={
-          <div className="grid min-h-dvh place-items-center bg-background px-4">
-            <div
-              className="flex max-w-sm flex-col items-center text-center"
-              role="status"
-              aria-live="polite"
-            >
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-              <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+      {/* P3-5: every framer-motion animation follows the system "reduce motion" setting. */}
+      <MotionConfig reducedMotion="user">
+        <ClientOnly
+          fallback={
+            <div className="grid min-h-dvh place-items-center bg-background px-4">
+              <div
+                className="flex max-w-sm flex-col items-center text-center"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+                <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <GlobalErrorBoundary scope="root">
-          <AuthGate>
-            <StaffBar />
-            <MaintenanceGate>
-              <SwipeNavigator>
-                <Outlet />
-              </SwipeNavigator>
-            </MaintenanceGate>
-          </AuthGate>
-        </GlobalErrorBoundary>
-      </ClientOnly>
-      <Toaster position="top-center" richColors />
-      <ClientOnly fallback={null}>
-        <SessionHeartbeat />
-        <AnalyticsHost />
-        <SupportAssistantHost />
-        <DebugModeToggle />
-      </ClientOnly>
+          }
+        >
+          <SkipLink />
+          <GlobalErrorBoundary scope="root">
+            <AuthGate>
+              <StaffBar />
+              <MaintenanceGate>
+                <MainContentTarget />
+                <SwipeNavigator>
+                  <Outlet />
+                </SwipeNavigator>
+              </MaintenanceGate>
+            </AuthGate>
+          </GlobalErrorBoundary>
+        </ClientOnly>
+        <Toaster position="top-center" richColors />
+        <ClientOnly fallback={null}>
+          <SessionHeartbeat />
+          <AnalyticsHost />
+          <SupportAssistantHost />
+          <DebugModeToggle />
+        </ClientOnly>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

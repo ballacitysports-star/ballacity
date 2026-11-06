@@ -43,15 +43,13 @@ async function restoreSession(ctx: BrowserContext, page: Page) {
     [STORAGE_KEY!, SESSION_JSON!],
   );
   // Start un-joined for this game so the join action is meaningful.
-  await page.evaluate(() =>
-    window.localStorage.removeItem("openrun.joinedGameIds.v1"),
-  );
+  await page.evaluate(() => window.localStorage.removeItem("openrun.joinedGameIds.v1"));
 }
 
 async function readSpotsFromDetail(page: Page): Promise<string | null> {
   // Roster header on the detail page renders as "Roster (X/Y)".
   const header = page.getByText(/Roster \(\d+\/\d+\)/).first();
-  if (await header.count() === 0) return null;
+  if ((await header.count()) === 0) return null;
   return (await header.textContent())?.trim() ?? null;
 }
 
@@ -101,17 +99,15 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     const beforeFeed = await readFeedCounterFor(aFeed, GAME_ID);
 
     // Ensure device B is on the CTA — if already joined from prior run, leave first.
-    const leaveCta = bDetail
-      .getByRole("button", { name: /you're in · tap to leave/i })
-      .first();
-    if (await leaveCta.count() > 0 && await leaveCta.isVisible().catch(() => false)) {
+    const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
+    if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
       await leaveCta.click();
-      await expect(
-        bDetail.getByRole("button", { name: /join free/i }).first(),
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
 
-    const joinCta = bDetail.getByRole("button", { name: /join free/i }).first();
+    const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
     await joinCta.click();
 
@@ -157,18 +153,18 @@ test("another device joining updates roster + counters on feed, map, detail, pro
 
     // 4. Profile: because both devices are the same user, joining from B
     // also puts the game in this user's upcoming list on A via realtime.
-    await expect(
-      aProfile.locator(`a[href*="/games/${GAME_ID}"]`).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(aProfile.locator(`a[href*="/games/${GAME_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     // --- Reverse: leave from B and confirm Device A tears back down ---
     await bDetail
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()
       .click();
-    await expect(
-      bDetail.getByRole("button", { name: /join free/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     await expect
       .poll(async () => await readSpotsFromDetail(aDetail), {

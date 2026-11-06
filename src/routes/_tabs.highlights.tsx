@@ -172,14 +172,24 @@ function HighlightFeedPage() {
           </Link>
           <h1 className="page-title flex-1 truncate">Highlights</h1>
           {!isParentMode && (
-            <Link
-              to="/reels"
-              search={{ game: "", title: "", upload: "" }}
-              className="shrink-0 text-foreground"
-              aria-label="Post a reel"
-            >
-              <PlusSquare className="h-6 w-6" />
-            </Link>
+            <>
+              {/* P2-9: the Studio by name, not only behind the + icon. */}
+              <Link
+                to="/reels"
+                search={{ game: "", title: "", upload: "" }}
+                className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-bold text-foreground"
+              >
+                Studio
+              </Link>
+              <Link
+                to="/reels"
+                search={{ game: "", title: "", upload: "" }}
+                className="shrink-0 text-foreground"
+                aria-label="Post a reel"
+              >
+                <PlusSquare className="h-6 w-6" />
+              </Link>
+            </>
           )}
           <button
             type="button"

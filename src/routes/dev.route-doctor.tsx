@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { requireDevTools } from "@/lib/dev-tools";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
@@ -12,6 +13,7 @@ import {
 } from "@/lib/route-doctor";
 
 export const Route = createFileRoute("/dev/route-doctor")({
+  beforeLoad: requireDevTools,
   head: () =>
     pageHead({
       path: "/dev/route-doctor",

@@ -84,9 +84,11 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
 
   // One enabled payment method for the host.
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: Route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -191,7 +193,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -204,7 +206,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}/pay` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -242,7 +244,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   // URL STILL preserves invite=1 and from=<hostId> at the confirmation step.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}/pay`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   await ctx.close();

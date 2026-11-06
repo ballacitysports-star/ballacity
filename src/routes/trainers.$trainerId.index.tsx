@@ -194,7 +194,6 @@ function TrainerPage({ org }: { org: Org }) {
 
   const [bookOpen, setBookOpen] = useState(false);
   const [bookPrefill, setBookPrefill] = useState<BookPrefill | null>(null);
-  const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
@@ -270,11 +269,7 @@ function TrainerPage({ org }: { org: Org }) {
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
-        <BackButton
-          fallbackTo="/trainers"
-          variant="overlay"
-          className="absolute top-4 left-4"
-        />
+        <BackButton fallbackTo="/trainers" variant="overlay" className="absolute top-4 left-4" />
         <button
           onClick={() => setShareOpen(true)}
           className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
@@ -357,18 +352,6 @@ function TrainerPage({ org }: { org: Org }) {
                 <Star className="h-3.5 w-3.5" /> Review
               </Link>
             )}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setFollowing((f) => !f)}
-              data-render="ssr-stable"
-              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                following
-                  ? "border border-border bg-surface text-foreground"
-                  : "bg-lime-gradient text-primary-foreground glow-lime"
-              }`}
-            >
-              {following ? "Following ✓" : "Follow"}
-            </motion.button>
           </div>
         </div>
 

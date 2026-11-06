@@ -83,9 +83,11 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   );
 
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -153,7 +155,7 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   // Approval gate visible, picker not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // Sanity: realtime is truly blocked — no active realtime channel should be
   // in the SUBSCRIBED state (subscribe attempts should fail on the aborted
@@ -175,7 +177,9 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // Wait for the polling path to notice — allow ~2 poll intervals of slack.
   await expect(gate).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/pay \$\d+ in /i)).toBeVisible({
+    timeout: 5_000,
+  });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
 
   // A refetch happened after approval, and it returned the approved row.
