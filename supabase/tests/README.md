@@ -54,6 +54,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `170_waitlist_notified_on_leave.test.sql`  | When a seat opens the player who has waited longest is told once; no one is told about a closed or started game                                                        |
 | `180_trainer_org_affiliation.test.sql`     | Only a trainer can put their profile on a facility: no direct add, no forged invite, no repointing a member row                                                        |
 | `560_network_posts.test.sql` | Posts: who may post as a person, team or facility; audience caps by age (no under-13 posts, 13-15 team/family, 16-17 never public); who reads public, followers, team and family posts; moderation hold, blocks, hidden teams, deletes; the flag ships off |
+| `570_following_feed.test.sql` | The Following feed returns only approved posts from accounts you follow that you may see (followers posts yes, family posts no, nothing across a block), newest first, paged; signed-out visitors cannot call it |
 
 ## Races
 
