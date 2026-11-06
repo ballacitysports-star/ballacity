@@ -93,6 +93,7 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
+import { subscribeGamePaymentChanges } from "@/lib/game-payment-channel";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
 import {
@@ -4592,28 +4593,15 @@ function RosterPlayerRow({
       await loadPayment();
     })();
 
-    // Realtime: update paid chip immediately when this player's submission for this game changes.
-    const channel = supabase
-      .channel(`payment_submissions:${req.game_id}:${req.player_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payment_submissions",
-          filter: `player_id=eq.${req.player_id}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as any;
-          if (row?.game_id && row.game_id !== req.game_id) return;
-          loadPayment(true);
-        },
-      )
-      .subscribe();
+    // Realtime: update the paid chip as soon as this player's submission for this game
+    // changes. One channel per game is shared by every roster row (P2-6).
+    const unsubscribe = subscribeGamePaymentChanges(req.game_id, req.player_id, () =>
+      loadPayment(true),
+    );
 
     return () => {
       cancel = true;
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [req.player_id, req.game_id]);
 
