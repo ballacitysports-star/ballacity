@@ -12,7 +12,8 @@ import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
-import { isSignedOutPublicPath, showsSignedOutBar } from "@/lib/public-paths";
+import { showsSignedOutBar } from "@/lib/public-paths";
+import { isPublicForViewer } from "@/lib/root-gate";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { SupportAssistantHost } from "@/components/support/SupportAssistantHost";
 import { BottomNav } from "@/components/BottomNav";
@@ -26,7 +27,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
-import { isSportHubPath } from "@/lib/sport-hubs";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import {
@@ -52,7 +52,6 @@ import { isChatThreadPath } from "@/lib/chat-layout";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
-import { isPublicReelPath } from "@/lib/social-share";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -448,45 +447,6 @@ function installStaleServerFnRecovery() {
   };
 }
 
-const PUBLIC_ROUTES = [
-  "/",
-  "/auth",
-  // Staff entry: signed-out visitors see the single sign-in button.
-  "/staff",
-  "/reset-password",
-  "/.lovable/oauth/consent",
-  // Legal documents must be readable before/without signing in.
-  "/terms",
-  "/privacy",
-  "/cookies",
-  "/payment-policy",
-  "/ai-disclosure",
-  "/youth-policy",
-  // Safety Center, Trust Center, and policy pages must be readable without
-  // signing in.
-  "/safety",
-  "/trust-center",
-  "/community-guidelines",
-  "/contact",
-  // Sports guides are public, indexable content.
-  "/guide",
-  // Articles are public, indexable content.
-  "/blog",
-  // City pages list only public games, teams and gyms, read through the
-  // allowlisted public columns (see city-pages.functions.ts), and are indexed.
-  "/cities",
-
-  // Shareable, sign-in-free surface.
-  "/highlights",
-  "/player-card",
-  // A parent's private link to one family clip: opens without signing in, but is
-  // unindexed, expires, and can be revoked.
-  "/family-share",
-  // The reel privacy policy: plain-language, readable without signing in.
-  "/reel-privacy",
-  // Tryout/camp sign-up pages are shareable; applying still requires sign-in.
-  "/tryouts",
-];
 const TAB_PATHS = [
   "/feed",
   "/players",
@@ -581,16 +541,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isPublic =
-    pathname === "/" ||
-    // Only a signed-out visitor gets the public game, team and facility pages. A
-    // signed-in member still goes through the age and account-type steps below.
-    (!user && isSignedOutPublicPath(pathname)) ||
-    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`))) ||
-    // The public sport hubs: exactly /<sport>, nothing deeper.
-    isSportHubPath(pathname) ||
-    // A shared reel page; an exact match, since a /reels prefix would open the studio tab.
-    isPublicReelPath(pathname);
+  const isPublic = isPublicForViewer(pathname, !!user);
   const isTab = TAB_PATHS.includes(pathname);
   // Second-chance verification: on mobile Safari/Chrome the Supabase session
   // can hydrate one tick after `loading` flips to false. Redirecting to
