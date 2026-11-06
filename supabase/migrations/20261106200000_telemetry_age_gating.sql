@@ -11,8 +11,9 @@
 -- account that is not a confirmed adult (minors and accounts of unknown age):
 -- user_id, user_agent and the free-text field are cleared. The event, reason and
 -- the coarse fields the dashboards count by (browser family, platform, viewport,
--- sport, permission state) stay. Adults' rows are unchanged. Signed-out rows, which
--- name no account, are unchanged too.
+-- sport, permission state) stay. Adults' rows are unchanged. Signed-out rows name no
+-- account, but their age is unknown too, so they keep no full user agent either
+-- (owner decision, 2026-11-06); their other fields are kept.
 --
 -- The trigger applies to every writer, including the service role. Existing rows of
 -- minors and unknown-age accounts are anonymised the same way below.
@@ -40,11 +41,15 @@ AS $$
 DECLARE
   _uid uuid := COALESCE(NEW.user_id, auth.uid());
 BEGIN
-  IF _uid IS NULL OR private_sec.telemetry_subject_is_adult(_uid) THEN
+  IF _uid IS NOT NULL AND private_sec.telemetry_subject_is_adult(_uid) THEN
+    RETURN NEW;
+  END IF;
+  -- Not a confirmed adult, or signed out (age unknown): no full user agent.
+  NEW.user_agent := NULL;
+  IF _uid IS NULL THEN
     RETURN NEW;
   END IF;
   NEW.user_id := NULL;
-  NEW.user_agent := NULL;
   NEW.message := NULL;
   RETURN NEW;
 END
@@ -59,11 +64,15 @@ AS $$
 DECLARE
   _uid uuid := COALESCE(NEW.user_id, auth.uid());
 BEGIN
-  IF _uid IS NULL OR private_sec.telemetry_subject_is_adult(_uid) THEN
+  IF _uid IS NOT NULL AND private_sec.telemetry_subject_is_adult(_uid) THEN
+    RETURN NEW;
+  END IF;
+  -- Not a confirmed adult, or signed out (age unknown): no full user agent.
+  NEW.user_agent := NULL;
+  IF _uid IS NULL THEN
     RETURN NEW;
   END IF;
   NEW.user_id := NULL;
-  NEW.user_agent := NULL;
   NEW.error_message := NULL;
   RETURN NEW;
 END
@@ -90,3 +99,9 @@ WHERE e.user_id IS NOT NULL AND NOT private_sec.telemetry_subject_is_adult(e.use
 UPDATE public.auth_signin_events e
 SET user_id = NULL, user_agent = NULL, error_message = NULL
 WHERE e.user_id IS NOT NULL AND NOT private_sec.telemetry_subject_is_adult(e.user_id);
+
+-- Existing signed-out rows: no full user agent.
+UPDATE public.location_denial_events SET user_agent = NULL
+WHERE user_id IS NULL AND user_agent IS NOT NULL;
+UPDATE public.auth_signin_events SET user_agent = NULL
+WHERE user_id IS NULL AND user_agent IS NOT NULL;

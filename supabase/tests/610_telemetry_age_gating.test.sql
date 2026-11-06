@@ -66,13 +66,21 @@ SELECT t.reset();
 SELECT t.eq((SELECT count(*)::int FROM public.auth_signin_events WHERE user_id = t.id('teenx')), 0,
   'a service-role write naming a minor is anonymised too');
 
--- Signed out: no account named, unchanged (user agent kept for browser breakdowns).
+-- Signed out: age unknown, so no full user agent; everything else is kept.
 SELECT t.as_anon();
-SELECT t.lives($q$INSERT INTO public.location_denial_events (reason, user_agent) VALUES ('denied', 'Mozilla/5.0 SignedOutUA')$q$,
+SELECT t.lives($q$INSERT INTO public.location_denial_events (reason, sport, user_agent) VALUES ('denied', 'tennis', 'Mozilla/5.0 SignedOutUA')$q$,
   'a signed-out visitor can still record a denial');
+SELECT t.lives($q$INSERT INTO public.auth_signin_events (provider, event, user_agent, browser, platform) VALUES ('google', 'attempt', 'Mozilla/5.0 SignedOutUA', 'chrome', 'android')$q$,
+  'and a sign-in attempt');
 SELECT t.reset();
-SELECT t.eq((SELECT count(*)::int FROM public.location_denial_events WHERE user_agent = 'Mozilla/5.0 SignedOutUA'), 1,
-  'a signed-out row is stored as sent');
+SELECT t.eq((SELECT count(*)::int FROM public.location_denial_events WHERE user_agent = 'Mozilla/5.0 SignedOutUA'), 0,
+  'a signed-out denial keeps no full user agent');
+SELECT t.eq((SELECT count(*)::int FROM public.location_denial_events WHERE reason = 'denied' AND sport = 'tennis'), 1,
+  'but keeps its reason and sport');
+SELECT t.eq((SELECT count(*)::int FROM public.auth_signin_events WHERE user_agent = 'Mozilla/5.0 SignedOutUA'), 0,
+  'a signed-out sign-in event keeps no full user agent');
+SELECT t.eq((SELECT count(*)::int FROM public.auth_signin_events WHERE event = 'attempt' AND browser = 'chrome' AND platform = 'android'), 1,
+  'but keeps its event, browser family and platform');
 
 -- A later update cannot put a minor's identity back.
 UPDATE public.auth_signin_events SET user_id = t.id('kidx'), user_agent = 'again'
