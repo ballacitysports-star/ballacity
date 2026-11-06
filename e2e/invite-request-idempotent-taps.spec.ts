@@ -183,7 +183,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // Fire a burst of rapid taps. Even if the client's in-flight guard swallows
@@ -200,7 +200,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   // Give any late in-flight POSTs a moment to settle.
   await page.waitForTimeout(POST_DELAY_MS + 300);

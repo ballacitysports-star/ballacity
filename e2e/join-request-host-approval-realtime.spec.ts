@@ -147,7 +147,7 @@ test("join request → host approval arrives via realtime and status flips live"
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
 
   // Fire the CTA.
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 15_000 });
   await cta.click();
 
@@ -160,7 +160,10 @@ test("join request → host approval arrives via realtime and status flips live"
 
   // Pending UI is up.
   await expect(
-    page.getByRole("status").filter({ hasText: /waiting for host approval/i }).first(),
+    page
+      .getByRole("status")
+      .filter({ hasText: /waiting for host approval/i })
+      .first(),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
@@ -174,9 +177,7 @@ test("join request → host approval arrives via realtime and status flips live"
           const mod = await import("/src/integrations/supabase/client.ts");
           return mod.supabase
             .getChannels()
-            .some(
-              (c: any) => typeof c.topic === "string" && c.topic.includes("join_requests:me:"),
-            );
+            .some((c: any) => typeof c.topic === "string" && c.topic.includes("join_requests:me:"));
         }),
       { timeout: 10_000, message: "player-side join_requests realtime channel never registered" },
     )
@@ -243,10 +244,9 @@ test("join request → host approval arrives via realtime and status flips live"
   });
   await expect(page.getByText(/request pending · tap to cancel/i)).toHaveCount(0);
   const elapsed = Date.now() - t0;
-  expect(
-    elapsed,
-    `UI flip should be fast (realtime, not a poll), took ${elapsed}ms`,
-  ).toBeLessThan(10_000);
+  expect(elapsed, `UI flip should be fast (realtime, not a poll), took ${elapsed}ms`).toBeLessThan(
+    10_000,
+  );
 
   // The realtime handler triggered a refetch (proves handler ran, not just DOM patch).
   expect(joinGets).toBeGreaterThan(getsBeforeApproval);

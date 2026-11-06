@@ -83,9 +83,11 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   );
 
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: Route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -193,7 +195,7 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -206,7 +208,7 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}/pay` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -242,7 +244,7 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   // Invite params still preserved on the game page URL.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   await ctx.close();
