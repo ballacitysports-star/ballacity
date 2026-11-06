@@ -13,6 +13,8 @@
 /.github/e2e-preflight-lib.mjs @ballacitysports-star
 /.github/ci-redact.mjs @ballacitysports-star
 /.github/ci-redact-lib.mjs @ballacitysports-star
+/.github/e2e-smoke-gate.mjs @ballacitysports-star
+/e2e/smoke-set.json        @ballacitysports-star
 /playwright.config.ts      @ballacitysports-star
 /e2e/global-setup.ts       @ballacitysports-star
 /e2e/safety/               @ballacitysports-star
