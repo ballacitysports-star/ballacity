@@ -49,6 +49,11 @@ import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
+import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
+import { kindsForFeedType, parseFeedType, type FeedType } from "@/lib/feed-events";
+import { isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
+import { supabase as feedEventsClient } from "@/integrations/supabase/client";
+import { useQuery as useFeedQuery } from "@tanstack/react-query";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -68,6 +73,8 @@ const feedSearchSchema = z.object({
   free: fallback(z.boolean().optional(), undefined).default(undefined),
   paid: fallback(z.boolean().optional(), undefined).default(undefined),
   tab: fallback(z.string(), "upcoming").default("upcoming"),
+  // Home feed type chips (docs/design/home-feed.md, slice D).
+  type: fallback(z.string(), "all").default("all"),
 });
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -98,6 +105,16 @@ function Feed() {
   const [tab, setTab] = useState<"upcoming" | "archive">(
     search.tab === "archive" ? "archive" : "upcoming",
   );
+  // Slice D: the type chips appear only while events reads are switched on (events_v2).
+  const eventsOn =
+    useFeedQuery({
+      queryKey: ["events-v2-switch"],
+      queryFn: () => isEventsV2Enabled(feedEventsClient as unknown as EventsClient),
+      staleTime: 5 * 60_000,
+    }).data === true;
+  const [feedTypeState, setFeedType] = useState<FeedType>(parseFeedType(search.type));
+  const feedType: FeedType = eventsOn ? feedTypeState : "all";
+  const showGames = feedType === "all" || feedType === "pickup";
 
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
@@ -221,6 +238,7 @@ function Feed() {
     if (positionFilter) next.pos = positionFilter;
     if (viewMode !== "list") next.view = viewMode;
     if (tab !== "upcoming") next.tab = tab;
+    if (feedTypeState !== "all") next.type = feedTypeState;
     for (const [k, defKey, urlKey] of [
       ["showUrgent", "showUrgent", "urgent"],
       ["showForYou", "showForYou", "foryou"],
@@ -245,7 +263,7 @@ function Feed() {
       console.warn("feed url sync skipped", e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, tab, authUser]);
+  }, [q, prefs, positionFilter, viewMode, tab, authUser, feedTypeState]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
@@ -546,251 +564,267 @@ function Feed() {
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
       {tab !== "archive" && <NeedsActionStrip />}
-      {/* Tier 2: where you are + run count on the left (tap to update
-          location), one Map/List switch on the right. */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-3 flex items-center justify-between gap-3"
-      >
-        {tab === "archive" ? (
-          <button
-            type="button"
-            onClick={() => setTab("upcoming")}
-            className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-lime"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to upcoming
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleLocationTap}
-            title={locationExplanation}
-            className="inline-flex min-h-9 min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
-            <span className="truncate">
-              <span className="font-semibold text-foreground">
-                {geoStatus === "prompting"
-                  ? "Locating…"
-                  : profile?.city || (coords ? "Near you" : "Set location")}
-              </span>
-              {" · "}
-              {filtered.length} {filtered.length === 1 ? "run" : "runs"}
-            </span>
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => switchView(viewMode === "map" ? "list" : "map")}
-          aria-label={viewMode === "map" ? "Show list" : "Show map"}
-          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-bold"
-        >
-          {viewMode === "map" ? (
-            <>
-              <List className="h-3.5 w-3.5" /> List
-            </>
-          ) : (
-            <>
-              <MapIcon className="h-3.5 w-3.5" /> Map
-            </>
-          )}
-        </button>
-      </motion.div>
-      <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
-
-      {viewMode === "map" ? (
-        <PlayMapView
-          items={filtered}
-          getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
+      {tab !== "archive" && eventsOn && <FeedTypeChips value={feedType} onChange={setFeedType} />}
+      {tab !== "archive" && eventsOn && feedType !== "pickup" && (
+        <FeedEventsList
+          kinds={kindsForFeedType(feedType)}
+          sports={prefs.preferredSports}
+          limit={feedType === "all" ? 3 : undefined}
+          heading={feedType === "all" ? "Tryouts & clinics" : undefined}
         />
-      ) : (
+      )}
+      {showGames && (
         <>
-          <div className="relative mb-3">
-            <FilterBar
-              q={q}
-              onQChange={setQ}
-              searchPlaceholder="Search pickup runs"
-              activeFilterCount={activeFilterCount + (positionFilter ? 1 : 0)}
-              create={{ to: "/create", label: "Create game" }}
-              sheetTitle="Feed filters"
-              sheet={
-                <div className="space-y-5">
-                  {positionSport && (
-                    <section>
-                      <h3 className="section-eyebrow mb-2 text-muted-foreground">
-                        {positionSport} position
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {[null, ...POSITIONS_BY_SPORT[positionSport]].map((p) => {
-                          const active = positionFilter === p;
-                          return (
-                            <button
-                              key={p ?? "any"}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => setPositionFilter(p)}
-                              className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition-colors ${
-                                active
-                                  ? "border-lime bg-lime text-primary-foreground"
-                                  : "border-border bg-surface text-foreground hover:border-lime/40"
-                              }`}
-                            >
-                              {p ?? "Any position"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  )}
-                  {prefs.savedViews.length > 0 && <FeedViewsRow compact />}
-                  <FeedPreferencesBody />
-                  {tab === "upcoming" && finishedCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setTab("archive")}
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold"
-                    >
-                      View finished games ({finishedCount})
-                    </button>
-                  )}
-                </div>
-              }
-              onReset={() => {
-                setPositionFilter(null);
-                setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
-              }}
-              chips={
-                <SportChips
-                  multi
-                  selected={chipSelected}
-                  onSelect={setChipSport}
-                  prioritize={mySports}
-                />
-              }
-            />
-            {q && suggestions.length > 0 && (
-              <div className="absolute left-0 right-14 top-[2.9rem] z-20 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
-                {suggestions.map((s, idx) => (
-                  <button
-                    key={`${s.label}-${idx}`}
-                    onClick={() => setQ(s.label)}
-                    className="w-full border-b border-border px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-background"
-                  >
-                    <div className="truncate font-semibold">{s.label}</div>
-                    <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {q && (
-            <h2 className="section-eyebrow mb-2 text-muted-foreground">
-              {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-            </h2>
-          )}
-          {loadStatus === "error" && hosted.length > 0 && (
-            <div
-              role="status"
-              className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
-            >
-              <span>
-                {offline
-                  ? "You're offline. Showing the games saved on this device."
-                  : "Couldn't refresh games. Showing what's saved."}
-              </span>
+          {/* Tier 2: where you are + run count on the left (tap to update
+          location), one Map/List switch on the right. */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 flex items-center justify-between gap-3"
+          >
+            {tab === "archive" ? (
               <button
                 type="button"
-                onClick={() => retryHostedGames()}
-                className="shrink-0 font-semibold text-foreground underline"
+                onClick={() => setTab("upcoming")}
+                className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-lime"
               >
-                Try again
+                <ArrowLeft className="h-4 w-4" /> Back to upcoming
               </button>
-            </div>
-          )}
-          <div className={listContainerClass}>
-            {refreshing && filtered.length === 0
-              ? renderSkeletons(3)
-              : visible.map((g, i) => renderGame(g, i))}
-            {hasMore && !refreshing && renderSkeletons(3)}
-            {!refreshing && filtered.length === 0 && emptyKind === "loading" && renderSkeletons(3)}
-            {!refreshing && filtered.length === 0 && emptyKind !== "loading" && (
-              <EmptyState
-                className={emptyColSpan}
-                icon={
-                  emptyKind === "error" ? (
-                    <WifiOff className="h-6 w-6" aria-hidden />
-                  ) : emptyKind === "search" ? (
-                    <Search className="h-6 w-6" aria-hidden />
-                  ) : (
-                    <CalendarSearch className="h-6 w-6" aria-hidden />
-                  )
-                }
-                title={
-                  emptyKind === "error"
-                    ? offline
-                      ? "You're offline"
-                      : "Couldn't load games"
-                    : emptyKind === "search"
-                      ? `No games match "${q}"`
-                      : emptyKind === "none-yet"
-                        ? tab === "archive"
-                          ? "No finished games yet"
-                          : "No games listed yet"
-                        : tab === "archive"
-                          ? "No finished games match your filters"
-                          : "No games match your filters"
-                }
-                description={
-                  emptyKind === "error"
-                    ? offline
-                      ? "Reconnect and your games will load."
-                      : "Check your connection and try again."
-                    : emptyKind === "search"
-                      ? "Try a shorter search, or a different sport or city name."
-                      : emptyKind === "none-yet"
-                        ? "Be the first to host one in your area."
-                        : "Your sport, distance, price, or hosting/joined filters are narrowing this down. Clearing them shows everything nearby."
-                }
-                action={
-                  emptyKind === "error" ? (
-                    <button
-                      onClick={() => retryHostedGames()}
-                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                    >
-                      Try again
-                    </button>
-                  ) : emptyKind === "search" ? (
-                    <button
-                      onClick={() => setQ("")}
-                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                    >
-                      Clear search
-                    </button>
-                  ) : emptyKind === "none-yet" ? (
-                    <Link
-                      to="/create"
-                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                    >
-                      Host a game
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setPositionFilter(null);
-                        setFeedPrefs(DEFAULT_PREFS);
-                      }}
-                      className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                    >
-                      Clear filters
-                    </button>
-                  )
-                }
-              />
+            ) : (
+              <button
+                type="button"
+                onClick={handleLocationTap}
+                title={locationExplanation}
+                className="inline-flex min-h-9 min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
+                <span className="truncate">
+                  <span className="font-semibold text-foreground">
+                    {geoStatus === "prompting"
+                      ? "Locating…"
+                      : profile?.city || (coords ? "Near you" : "Set location")}
+                  </span>
+                  {" · "}
+                  {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+                </span>
+              </button>
             )}
-          </div>
-          <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+            <button
+              type="button"
+              onClick={() => switchView(viewMode === "map" ? "list" : "map")}
+              aria-label={viewMode === "map" ? "Show list" : "Show map"}
+              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-bold"
+            >
+              {viewMode === "map" ? (
+                <>
+                  <List className="h-3.5 w-3.5" /> List
+                </>
+              ) : (
+                <>
+                  <MapIcon className="h-3.5 w-3.5" /> Map
+                </>
+              )}
+            </button>
+          </motion.div>
+          <LocationAccessDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} />
+
+          {viewMode === "map" ? (
+            <PlayMapView
+              items={filtered}
+              getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
+            />
+          ) : (
+            <>
+              <div className="relative mb-3">
+                <FilterBar
+                  q={q}
+                  onQChange={setQ}
+                  searchPlaceholder="Search pickup runs"
+                  activeFilterCount={activeFilterCount + (positionFilter ? 1 : 0)}
+                  create={{ to: "/create", label: "Create game" }}
+                  sheetTitle="Feed filters"
+                  sheet={
+                    <div className="space-y-5">
+                      {positionSport && (
+                        <section>
+                          <h3 className="section-eyebrow mb-2 text-muted-foreground">
+                            {positionSport} position
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {[null, ...POSITIONS_BY_SPORT[positionSport]].map((p) => {
+                              const active = positionFilter === p;
+                              return (
+                                <button
+                                  key={p ?? "any"}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => setPositionFilter(p)}
+                                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                                    active
+                                      ? "border-lime bg-lime text-primary-foreground"
+                                      : "border-border bg-surface text-foreground hover:border-lime/40"
+                                  }`}
+                                >
+                                  {p ?? "Any position"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      )}
+                      {prefs.savedViews.length > 0 && <FeedViewsRow compact />}
+                      <FeedPreferencesBody />
+                      {tab === "upcoming" && finishedCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setTab("archive")}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold"
+                        >
+                          View finished games ({finishedCount})
+                        </button>
+                      )}
+                    </div>
+                  }
+                  onReset={() => {
+                    setPositionFilter(null);
+                    setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null });
+                  }}
+                  chips={
+                    <SportChips
+                      multi
+                      selected={chipSelected}
+                      onSelect={setChipSport}
+                      prioritize={mySports}
+                    />
+                  }
+                />
+                {q && suggestions.length > 0 && (
+                  <div className="absolute left-0 right-14 top-[2.9rem] z-20 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
+                    {suggestions.map((s, idx) => (
+                      <button
+                        key={`${s.label}-${idx}`}
+                        onClick={() => setQ(s.label)}
+                        className="w-full border-b border-border px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-background"
+                      >
+                        <div className="truncate font-semibold">{s.label}</div>
+                        <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {q && (
+                <h2 className="section-eyebrow mb-2 text-muted-foreground">
+                  {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
+                </h2>
+              )}
+              {loadStatus === "error" && hosted.length > 0 && (
+                <div
+                  role="status"
+                  className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
+                >
+                  <span>
+                    {offline
+                      ? "You're offline. Showing the games saved on this device."
+                      : "Couldn't refresh games. Showing what's saved."}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => retryHostedGames()}
+                    className="shrink-0 font-semibold text-foreground underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              <div className={listContainerClass}>
+                {refreshing && filtered.length === 0
+                  ? renderSkeletons(3)
+                  : visible.map((g, i) => renderGame(g, i))}
+                {hasMore && !refreshing && renderSkeletons(3)}
+                {!refreshing &&
+                  filtered.length === 0 &&
+                  emptyKind === "loading" &&
+                  renderSkeletons(3)}
+                {!refreshing && filtered.length === 0 && emptyKind !== "loading" && (
+                  <EmptyState
+                    className={emptyColSpan}
+                    icon={
+                      emptyKind === "error" ? (
+                        <WifiOff className="h-6 w-6" aria-hidden />
+                      ) : emptyKind === "search" ? (
+                        <Search className="h-6 w-6" aria-hidden />
+                      ) : (
+                        <CalendarSearch className="h-6 w-6" aria-hidden />
+                      )
+                    }
+                    title={
+                      emptyKind === "error"
+                        ? offline
+                          ? "You're offline"
+                          : "Couldn't load games"
+                        : emptyKind === "search"
+                          ? `No games match "${q}"`
+                          : emptyKind === "none-yet"
+                            ? tab === "archive"
+                              ? "No finished games yet"
+                              : "No games listed yet"
+                            : tab === "archive"
+                              ? "No finished games match your filters"
+                              : "No games match your filters"
+                    }
+                    description={
+                      emptyKind === "error"
+                        ? offline
+                          ? "Reconnect and your games will load."
+                          : "Check your connection and try again."
+                        : emptyKind === "search"
+                          ? "Try a shorter search, or a different sport or city name."
+                          : emptyKind === "none-yet"
+                            ? "Be the first to host one in your area."
+                            : "Your sport, distance, price, or hosting/joined filters are narrowing this down. Clearing them shows everything nearby."
+                    }
+                    action={
+                      emptyKind === "error" ? (
+                        <button
+                          onClick={() => retryHostedGames()}
+                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                        >
+                          Try again
+                        </button>
+                      ) : emptyKind === "search" ? (
+                        <button
+                          onClick={() => setQ("")}
+                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                        >
+                          Clear search
+                        </button>
+                      ) : emptyKind === "none-yet" ? (
+                        <Link
+                          to="/create"
+                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                        >
+                          Host a game
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setPositionFilter(null);
+                            setFeedPrefs(DEFAULT_PREFS);
+                          }}
+                          className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                        >
+                          Clear filters
+                        </button>
+                      )
+                    }
+                  />
+                )}
+              </div>
+              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+            </>
+          )}
         </>
       )}
     </div>
