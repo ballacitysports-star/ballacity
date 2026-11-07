@@ -22,6 +22,7 @@ import { DraftWithAi } from "@/components/DraftWithAi";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import { withVenues } from "@/lib/post-venues";
+import { isEventsV2Enabled, listTeamEventsFromEvents, type EventsClient } from "@/lib/events-read";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -109,6 +110,16 @@ function TeamEventsPage() {
     queryKey: key,
     refetchInterval: 20_000, // keeps spots/RSVP counts live
     queryFn: async () => {
+      // P2-1 stage 3: read the events copy when the owner has switched it on. Any failure
+      // falls back to the team_posts read below, which is what the page has always done.
+      const eventsClient = supabase as unknown as EventsClient;
+      if (await isEventsV2Enabled(eventsClient)) {
+        try {
+          return (await listTeamEventsFromEvents(eventsClient, teamId)) as unknown as EventRow[];
+        } catch (err) {
+          console.warn("[team-events] events_v2 read failed; using team_posts", err);
+        }
+      }
       const { data, error } = await supabase
         .from("team_posts")
         .select("id,kind,title,body,event_date,price,spots_max,spots_taken")
