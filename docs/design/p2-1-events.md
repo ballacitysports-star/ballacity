@@ -133,3 +133,10 @@ event_availability    -- generalises team_event_availability
 - **D3. Trainer sessions are out of scope** for P2-1. They remain booking requests.
 - **D4. The staged plan is approved.** Each stage is its own PR with a SQL test, a negative control
   and a guarded rollback. Migrations go to the E2E sandbox only; production waits for the owner.
+- **D5. Copied tryouts keep today's sign-up rules** (recorded 2026-11-07, stage 4a). A tryout or
+  clinic copied from a team post signs up exactly as `rsvp_tryout` does: no age check, the post's
+  seat counter, hidden posts refused. The age range (D1) applies to events created as events.
+- **D6. Team posts stay the source for creating and editing tryouts and clinics** (recorded
+  2026-11-07). Moderation, the team feed, venue privacy and AI drafting stay on `team_posts`, and the
+  stage 2 mirror keeps `events` in step. Only new things (camps, tournaments, facility events, stage 5)
+  are created as events. Stage 4 therefore covers sign-ups (4a) and coach evaluations (4c) only.

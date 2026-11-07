@@ -7,7 +7,11 @@ import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { fetchPostVenues } from "@/lib/post-venues";
 import { getTryoutFromEvents, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
-import { cancelThroughEvents, signUpThroughEvents } from "@/lib/events-write";
+import {
+  cancelThroughEvents,
+  saveEvaluationThroughEvents,
+  signUpThroughEvents,
+} from "@/lib/events-write";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
@@ -689,6 +693,32 @@ export const saveTryoutEvaluation = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
+    // P2-1 stage 4c: through events when events_v2_writes is on and the post has a copy.
+    // The RSVP names the player; it must belong to this post and team.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rsvp } = await supabaseAdmin
+      .from("tryout_rsvps")
+      .select("user_id")
+      .eq("id", data.rsvpId)
+      .eq("post_id", data.postId)
+      .eq("team_id", data.teamId)
+      .maybeSingle();
+    if (rsvp?.user_id) {
+      const viaEvents = await saveEvaluationThroughEvents(
+        context.supabase as unknown as EventsClient,
+        data.postId,
+        rsvp.user_id,
+        { attended: data.attended, score: data.score, notes: data.notes || null },
+      );
+      if (viaEvents.handled) {
+        if (viaEvents.error)
+          return {
+            ok: false as const,
+            error: "Couldn't save. Only team managers can score tryouts.",
+          };
+        return { ok: true as const };
+      }
+    }
     const { error } = await context.supabase.from("tryout_evaluations").upsert({
       rsvp_id: data.rsvpId,
       post_id: data.postId,
