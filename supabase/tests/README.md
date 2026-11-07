@@ -65,6 +65,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `580_games_near.test.sql`                      | Server-side game discovery: radius, sport, soonest or nearest, paging; never lists private, hidden, cancelled or past games; a signed-out visitor still sees adult-only games only                                                                                                                            |
 | `690_capture_structured_reviews.test.sql`      | A replay builds exactly production's structured-review schema (columns, recommend check, four functions) and its order of the messages body/attachment check, pinned to production's definitions                                                                                                              |
 | `700_events_stage5_facility_events.test.sql`   | Venue events: venue staff create clinics, camps, tournaments and open gym (never tryouts) with a required age range; strangers, minors and hidden venues are refused; pending until approved; a hidden venue hides its events; staff read sign-ups and the youth venue (D0)                                   |
+| `710_events_stage6_trainer_events.test.sql`    | Trainer group sessions: staff create clinics and camps only, age range required; strangers, minors, hidden trainers refused; pending until approved; sign-ups ask for the trainer's waiver; never on a team page                                                                                              |
 
 ## Races
 

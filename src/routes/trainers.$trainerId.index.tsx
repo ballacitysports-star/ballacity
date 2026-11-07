@@ -48,6 +48,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
 import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { TrainerEventsSection } from "@/components/org/VenueEventsSection";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
@@ -450,6 +451,7 @@ function TrainerPage({ org }: { org: Org }) {
             {canEdit && <ListingVisibilityToggle kind="trainer" id={org.id} />}
             {canEdit && <TrainerProfileChecklist org={org} />}
             {canEdit && <TrainerOrgSection trainerId={org.id} />}
+            <TrainerEventsSection trainerId={org.id} canPost={canEdit} />
             <Section title="Bio">
               <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                 {org.bio}

@@ -7,7 +7,13 @@
  * (listed events; youth events only for signed-in members; staff see their pending ones), the
  * venue address (D0, get_event_locations) and sign-ups (register_for_event: age range, capacity).
  * This file only shapes the form's values and reads what the database allows.
+ *
+ * Slice F (P2-1 stage 6, decisions F4 and D7) reuses it for trainer group sessions: host kind
+ * 'trainer', a trainer's teams.id as host_ref, clinics and camps only, and the trainer's own waiver
+ * at sign-up (get_event_waiver shows it; register_for_event signs it).
  */
+
+export type EventHostKind = "facility" | "trainer";
 
 export type VenueEventKind = "clinic" | "camp" | "tournament" | "open_gym";
 
@@ -17,6 +23,16 @@ export const VENUE_EVENT_KINDS: { id: VenueEventKind; label: string }[] = [
   { id: "tournament", label: "Tournament" },
   { id: "open_gym", label: "Open gym" },
 ];
+
+/** Trainers post group clinics and camps; 1-on-1 sessions stay booking requests (D7). */
+export const TRAINER_EVENT_KINDS: { id: VenueEventKind; label: string }[] = [
+  { id: "clinic", label: "Clinic" },
+  { id: "camp", label: "Camp" },
+];
+
+export function eventKindsFor(host: EventHostKind) {
+  return host === "trainer" ? TRAINER_EVENT_KINDS : VENUE_EVENT_KINDS;
+}
 
 export function venueEventKindLabel(kind: string): string {
   return VENUE_EVENT_KINDS.find((k) => k.id === kind)?.label ?? "Event";
@@ -70,12 +86,13 @@ function wholeNumber(v: string): number | null {
   return Number(t);
 }
 
-/** Checks the form and builds create_facility_event's payload. The database checks again. */
+/** Checks the form and builds create_facility_event's (or create_trainer_event's) payload. The database checks again. */
 export function buildVenueEventPayload(
   d: VenueEventDraft,
   now: Date = new Date(),
+  kinds: { id: VenueEventKind }[] = VENUE_EVENT_KINDS,
 ): { ok: true; payload: VenueEventPayload } | { ok: false; error: string } {
-  if (!VENUE_EVENT_KINDS.some((k) => k.id === d.kind)) return { ok: false, error: "Pick a type." };
+  if (!kinds.some((k) => k.id === d.kind)) return { ok: false, error: "Pick a type." };
   const title = d.title.trim();
   if (title.length < 1 || title.length > 200)
     return { ok: false, error: "Add a title (up to 200 characters)." };
@@ -133,6 +150,9 @@ export function buildVenueEventPayload(
 /** Plain words for the database's refusals. */
 export function venueEventErrorMessage(message: string): string {
   if (/NOT_FACILITY_STAFF/.test(message)) return "Only this venue's owner and admins can do that.";
+  if (/NOT_TRAINER_STAFF/.test(message)) return "Only this trainer's staff can do that.";
+  if (/TRAINER_NOT_FOUND/.test(message)) return "This trainer isn't available right now.";
+  if (/WAIVER_REQUIRED/.test(message)) return "Read and accept the waiver first.";
   if (/ADULT_HOST_REQUIRED/.test(message)) return "Events can only be hosted by adults.";
   if (/FACILITY_NOT_FOUND/.test(message)) return "This venue isn't available right now.";
   if (/KIND_NOT_ALLOWED/.test(message))
@@ -195,11 +215,11 @@ type Row = {
   moderation_status: string;
 };
 
-/** A venue's upcoming events the viewer may read, soonest first. Throws on a read error. */
+/** A venue's (or trainer's) upcoming events the viewer may read, soonest first. Throws on a read error. */
 export async function listVenueEvents(
   client: VenueEventsClient,
-  orgId: string,
-  opts: { userId?: string | null; now?: Date } = {},
+  hostRef: string,
+  opts: { userId?: string | null; now?: Date; hostKind?: EventHostKind } = {},
 ): Promise<VenueEvent[]> {
   const now = (opts.now ?? new Date()).toISOString();
   const res = await client
@@ -207,8 +227,8 @@ export async function listVenueEvents(
     .select(
       "id,kind,title,body,starts_at,ends_at,min_age,max_age,price_cents,capacity,moderation_status",
     )
-    .eq("host_kind", "facility")
-    .eq("host_ref", orgId)
+    .eq("host_kind", opts.hostKind ?? "facility")
+    .eq("host_ref", hostRef)
     .or(`starts_at.gte.${now},starts_at.is.null`)
     .order("starts_at", { ascending: true, nullsFirst: false })
     .limit(50);
@@ -265,4 +285,30 @@ export async function listVenueEvents(
     status: r.moderation_status,
     registered: registered.has(r.id),
   }));
+}
+
+export type EventWaiver = { id: string; title: string; content: string; signed: boolean };
+
+/**
+ * The waiver a sign-up for this event needs (a team's or trainer's), or null when none.
+ * `signer` is a linked child when a guardian signs up for them. Throws on a read error.
+ */
+export async function fetchEventWaiver(
+  client: VenueEventsClient,
+  eventId: string,
+  signer: string | null = null,
+): Promise<EventWaiver | null> {
+  const { data, error } = await client.rpc("get_event_waiver", {
+    _event: eventId,
+    _signer: signer,
+  });
+  if (error) throw new Error(venueEventErrorMessage(error.message));
+  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    title: String(row.title ?? "Waiver"),
+    content: String(row.content ?? ""),
+    signed: row.signed === true,
+  };
 }

@@ -168,6 +168,45 @@ describe("listFeedEvents", () => {
     expect(calls).toContain("from(trainer_orgs)");
   });
 
+  it("names the trainer of a trainer group session, links it to the trainer and filters by the trainer's sports", async () => {
+    const trainerRow = row("t1", {
+      kind: "camp",
+      legacy_post_id: null,
+      host_kind: "trainer",
+      host_ref: "coachsam",
+      team_id: null,
+      teams: null,
+    });
+    const client = fake({ data: [trainerRow], error: null });
+    const withTrainer = (sports: string[]): FeedEventsClient => ({
+      ...client,
+      from: (t: string) => {
+        if (t !== "teams") return client.from(t);
+        const q: Record<string, unknown> = {};
+        for (const m of ["select", "in"]) q[m] = () => q;
+        q.then = (ok: (r: unknown) => unknown) =>
+          Promise.resolve({
+            data: [{ id: "coachsam", name: "Coach Sam", sports }],
+            error: null,
+          }).then(ok);
+        return q as unknown as ReturnType<FeedEventsClient["from"]>;
+      },
+    });
+    const [ev] = await listFeedEvents(withTrainer(["basketball"]), ["camp"], {
+      sports: ["basketball"],
+    });
+    expect([ev.trainerId, ev.hostName, ev.orgId, ev.teamId, ev.sports]).toEqual([
+      "coachsam",
+      "Coach Sam",
+      null,
+      null,
+      ["basketball"],
+    ]);
+    expect(
+      await listFeedEvents(withTrainer(["soccer"]), ["camp"], { sports: ["basketball"] }),
+    ).toEqual([]);
+  });
+
   it("asks nothing for Pickup, and throws on a read error", async () => {
     const calls: string[] = [];
     expect(await listFeedEvents(fake({ data: [], error: null }, {}, calls), [])).toEqual([]);

@@ -71,3 +71,5 @@ export const NETWORK_POST_CONTEXT =
   "A short update shared by a player, team or facility in a community sports app used by adults and minors.";
 export const VENUE_EVENT_CONTEXT =
   "A clinic, camp, tournament or open gym listed by a sports venue in a community sports app used by adults and minors.";
+export const TRAINER_EVENT_CONTEXT =
+  "A group clinic or camp listed by a sports trainer in a community sports app used by adults and minors.";

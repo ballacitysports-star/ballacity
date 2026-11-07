@@ -102,6 +102,12 @@ function EventCard({ ev }: { ev: FeedEvent }) {
         {body}
       </Link>
     );
+  if (ev.trainerId)
+    return (
+      <Link to="/trainers/$trainerId" params={{ trainerId: ev.trainerId }} className="block">
+        {body}
+      </Link>
+    );
   if (ev.orgId)
     return (
       <Link to="/orgs/$orgId" params={{ orgId: ev.orgId }} className="block">

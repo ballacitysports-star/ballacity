@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   EMPTY_VENUE_EVENT_DRAFT,
+  TRAINER_EVENT_KINDS,
   buildVenueEventPayload,
+  fetchEventWaiver,
   listVenueEvents,
   venueEventErrorMessage,
   type VenueEventsClient,
@@ -59,6 +61,16 @@ describe("buildVenueEventPayload", () => {
     expect(buildVenueEventPayload(draft({ startsAt: "" }), NOW).ok).toBe(false);
     expect(buildVenueEventPayload(draft({ startsAt: "2026-11-01T18:00:00Z" }), NOW).ok).toBe(false);
     expect(buildVenueEventPayload(draft({ endsAt: "2026-11-30T18:00:00Z" }), NOW).ok).toBe(false);
+  });
+
+  it("lets a trainer list clinics and camps only (D7)", () => {
+    expect(buildVenueEventPayload(draft({ kind: "camp" }), NOW, TRAINER_EVENT_KINDS).ok).toBe(true);
+    expect(buildVenueEventPayload(draft({ kind: "open_gym" }), NOW, TRAINER_EVENT_KINDS).ok).toBe(
+      false,
+    );
+    expect(buildVenueEventPayload(draft({ kind: "tournament" }), NOW, TRAINER_EVENT_KINDS).ok).toBe(
+      false,
+    );
   });
 
   it("refuses a tryout (a team thing)", () => {
@@ -176,5 +188,65 @@ describe("createVenueEvent", () => {
     expect(settle).toBeGreaterThan(create);
     // The member's own client creates it, so the database's staff and age checks apply.
     expect(src).toMatch(/context\.supabase\.rpc\(\s*"create_facility_event"/);
+  });
+});
+
+describe("fetchEventWaiver", () => {
+  const rpcClient = (r: Result, calls: unknown[] = []): VenueEventsClient => ({
+    from: () => {
+      throw new Error("not used");
+    },
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      calls.push([fn, args]);
+      return Promise.resolve(r);
+    },
+  });
+
+  it("returns the waiver an event needs, with whether it is signed", async () => {
+    const calls: unknown[] = [];
+    const w = await fetchEventWaiver(
+      rpcClient(
+        {
+          data: [
+            {
+              id: "w1",
+              team_id: "coachsam",
+              title: "Coach Sam waiver",
+              content: "Terms",
+              signed: false,
+            },
+          ],
+          error: null,
+        },
+        calls,
+      ),
+      "e1",
+      "kid-1",
+    );
+    expect(w).toEqual({ id: "w1", title: "Coach Sam waiver", content: "Terms", signed: false });
+    expect(calls).toEqual([["get_event_waiver", { _event: "e1", _signer: "kid-1" }]]);
+  });
+
+  it("returns null when there is none, and throws on an error", async () => {
+    expect(await fetchEventWaiver(rpcClient({ data: [], error: null }), "e1")).toBeNull();
+    await expect(
+      fetchEventWaiver(rpcClient({ data: null, error: { message: "AUTH_REQUIRED" } }), "e1"),
+    ).rejects.toThrow("Sign in first.");
+  });
+});
+
+describe("createTrainerEvent", () => {
+  it("screens first, creates through create_trainer_event as the member, then settles moderation", () => {
+    const src = readFileSync("src/lib/venue-events.functions.ts", "utf8");
+    const fn = src.slice(src.indexOf("export const createTrainerEvent"));
+    const screen = fn.indexOf("screenPostText(");
+    const block = fn.indexOf('if (screen === "block")');
+    const create = fn.search(/context\.supabase\.rpc\(\s*"create_trainer_event"/);
+    const settle = fn.indexOf('settlePostModeration(supabaseAdmin, "events"');
+    expect(screen).toBeGreaterThan(0);
+    expect(block).toBeGreaterThan(screen);
+    expect(create).toBeGreaterThan(block);
+    expect(settle).toBeGreaterThan(create);
+    expect(fn).toMatch(/TRAINER_EVENT_CONTEXT/);
   });
 });

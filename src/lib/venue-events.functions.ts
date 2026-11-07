@@ -22,6 +22,12 @@ const Payload = z
   .strict();
 
 const CreateVenueEventInput = z.object({ orgId: z.string().uuid(), event: Payload }).strict();
+const CreateTrainerEventInput = z
+  .object({
+    trainerId: z.string().min(1).max(128),
+    event: Payload.extend({ kind: z.enum(["clinic", "camp"]) }).strict(),
+  })
+  .strict();
 
 /**
  * Creates a venue event. The title and description are screened before anything is stored
@@ -48,6 +54,38 @@ export const createVenueEvent = createServerFn({ method: "POST" })
       "create_facility_event" as never,
       {
         _org: data.orgId,
+        _e: data.event,
+      } as never,
+    );
+    if (error) throw new Error(venueEventErrorMessage(error.message));
+    const eventId = String(id);
+    const status = await mod.settlePostModeration(supabaseAdmin, "events", eventId, screen);
+    return { id: eventId, held: status !== "approved" };
+  });
+
+/**
+ * Creates a trainer group session (slice F): the same order as createVenueEvent. The text is screened
+ * first; create_trainer_event runs as the member (trainer staff, an adult host, a trainer that is not
+ * hidden, clinic or camp, the age range, pending); then the screen's outcome is recorded.
+ */
+export const createTrainerEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => CreateTrainerEventInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mod = await import("@/lib/post-moderation.server");
+    const screen = await mod.screenPostText(supabaseAdmin, {
+      userId: context.userId,
+      table: "events",
+      context: mod.TRAINER_EVENT_CONTEXT,
+      fields: { title: data.event.title, body: data.event.body },
+    });
+    if (screen === "block") throw new Error(mod.POST_BLOCKED_MESSAGE);
+
+    const { data: id, error } = await context.supabase.rpc(
+      "create_trainer_event" as never,
+      {
+        _trainer: data.trainerId,
         _e: data.event,
       } as never,
     );

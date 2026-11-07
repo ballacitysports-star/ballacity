@@ -1,7 +1,8 @@
 /**
  * Home feed slices D and E (docs/design/home-feed.md): upcoming events for the feed's type chips,
  * read from `events` behind the `events_v2` switch. Slice E adds venue (facility) events and the
- * Camps, Tournaments and Open gym chips, behind the `venue_events` switch.
+ * Camps, Tournaments and Open gym chips, behind the `venue_events` switch. Slice F adds trainer
+ * group sessions (host kind 'trainer': clinics and camps), shown with the trainer's name.
  *
  * Rules (F5), all enforced by the database and kept here:
  *   * only events the viewer may read (events RLS: listed, or the viewer's own team's or venue's);
@@ -74,6 +75,8 @@ export type FeedEvent = {
   teamId: string | null;
   /** The hosting venue (trainer_orgs id) of a venue event. */
   orgId: string | null;
+  /** The hosting trainer (teams id, kind 'coach') of a trainer group session. */
+  trainerId: string | null;
   /** The team's or the venue's name. */
   hostName: string;
   /** A verified venue (its badge on the card). */
@@ -133,10 +136,29 @@ export async function listFeedEvents(
   if (res.error) throw new Error(res.error.message);
   let rows = (res.data ?? []) as EventRow[];
   const sports = (opts.sports ?? []).filter(Boolean);
-  // Venues list no sports, so a sport filter keeps venue events (it narrows team events only).
+  // A trainer event carries no team, so its trainer (a teams row) is read separately.
+  const trainerIds = [
+    ...new Set(
+      rows.filter((r) => r.host_kind === "trainer" && r.host_ref).map((r) => String(r.host_ref)),
+    ),
+  ];
+  const trainers = new Map<string, { name: string; sports: string[] }>();
+  if (trainerIds.length > 0) {
+    const t = await client.from("teams").select("id,name,sports").in("id", trainerIds);
+    if (!t.error && Array.isArray(t.data)) {
+      for (const r of t.data as { id: string; name: string | null; sports: string[] | null }[]) {
+        trainers.set(String(r.id), { name: r.name ?? "Trainer", sports: r.sports ?? [] });
+      }
+    }
+  }
+  const sportsOf = (r: EventRow): string[] =>
+    r.host_kind === "trainer"
+      ? (trainers.get(String(r.host_ref))?.sports ?? [])
+      : (r.teams?.sports ?? []);
+  // Venues list no sports, so a sport filter keeps venue events (it narrows team and trainer events).
   if (sports.length > 0) {
     rows = rows.filter(
-      (r) => r.host_kind === "facility" || (r.teams?.sports ?? []).some((s) => sports.includes(s)),
+      (r) => r.host_kind === "facility" || sportsOf(r).some((s) => sports.includes(s)),
     );
   }
   if (rows.length === 0) return [];
@@ -176,7 +198,9 @@ export async function listFeedEvents(
 
   return rows.map((r) => {
     const isVenue = r.host_kind === "facility";
+    const isTrainer = r.host_kind === "trainer";
     const org = isVenue && r.host_ref ? venueNames.get(String(r.host_ref)) : undefined;
+    const trainer = isTrainer && r.host_ref ? trainers.get(String(r.host_ref)) : undefined;
     return {
       id: r.id,
       postId: r.legacy_post_id,
@@ -185,9 +209,14 @@ export async function listFeedEvents(
       startsAt: r.starts_at,
       teamId: r.team_id,
       orgId: isVenue ? (r.host_ref ?? null) : null,
-      hostName: isVenue ? (org?.name ?? "Venue") : (r.teams?.name ?? "Team"),
+      trainerId: isTrainer ? (r.host_ref ?? null) : null,
+      hostName: isVenue
+        ? (org?.name ?? "Venue")
+        : isTrainer
+          ? (trainer?.name ?? "Trainer")
+          : (r.teams?.name ?? "Team"),
       hostVerified: org?.verified ?? false,
-      sports: r.teams?.sports ?? [],
+      sports: sportsOf(r),
       location: venues.get(r.id) ?? null,
       venueHidden: !venues.has(r.id),
       price: r.price_cents == null ? null : r.price_cents / 100,

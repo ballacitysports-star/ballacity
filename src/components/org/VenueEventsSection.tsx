@@ -13,14 +13,25 @@ import { VENUE_HIDDEN_LABEL } from "@/lib/post-venues";
 import { isAppSwitchOn, type EventsClient } from "@/lib/events-read";
 import { VENUE_EVENTS_SETTING_KEY } from "@/lib/feed-events";
 import { blockedMessage } from "@/lib/post-moderation";
-import { createVenueEvent } from "@/lib/venue-events.functions";
+import { createTrainerEvent, createVenueEvent } from "@/lib/venue-events.functions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   EMPTY_VENUE_EVENT_DRAFT,
-  VENUE_EVENT_KINDS,
   buildVenueEventPayload,
+  eventKindsFor,
+  fetchEventWaiver,
   listVenueEvents,
   venueEventErrorMessage,
   venueEventKindLabel,
+  type EventHostKind,
+  type EventWaiver,
   type VenueEvent,
   type VenueEventDraft,
   type VenueEventKind,
@@ -28,6 +39,9 @@ import {
 } from "@/lib/venue-events";
 
 const client = supabase as unknown as VenueEventsClient;
+
+/** Trainer group sessions (slice F) have their own switch, off until released. */
+export const TRAINER_EVENTS_SETTING_KEY = "trainer_events";
 
 function when(iso: string | null): string {
   if (!iso) return "Date to be announced";
@@ -99,16 +113,31 @@ function EventItem({
   );
 }
 
-function CreateForm({ orgId, onDone }: { orgId: string; onDone: () => void }) {
-  const create = useServerFn(createVenueEvent);
+function CreateForm({
+  hostKind,
+  hostId,
+  onDone,
+}: {
+  hostKind: EventHostKind;
+  hostId: string;
+  onDone: () => void;
+}) {
+  const createVenue = useServerFn(createVenueEvent);
+  const createTrainer = useServerFn(createTrainerEvent);
+  const kinds = eventKindsFor(hostKind);
   const [d, setD] = useState<VenueEventDraft>(EMPTY_VENUE_EVENT_DRAFT);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof VenueEventDraft) => (v: string) => setD((p) => ({ ...p, [k]: v }));
   const m = useMutation({
     mutationFn: async () => {
-      const built = buildVenueEventPayload(d);
+      const built = buildVenueEventPayload(d, new Date(), kinds);
       if (!built.ok) throw new Error(built.error);
-      return create({ data: { orgId, event: built.payload } });
+      if (hostKind === "trainer") {
+        const { kind } = built.payload;
+        if (kind !== "clinic" && kind !== "camp") throw new Error("Pick a type.");
+        return createTrainer({ data: { trainerId: hostId, event: { ...built.payload, kind } } });
+      }
+      return createVenue({ data: { orgId: hostId, event: built.payload } });
     },
     onSuccess: (r) => {
       toast.success(
@@ -144,7 +173,7 @@ function CreateForm({ orgId, onDone }: { orgId: string; onDone: () => void }) {
           onChange={(e) => setD((p) => ({ ...p, kind: e.target.value as VenueEventKind }))}
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
-          {VENUE_EVENT_KINDS.map((k) => (
+          {kinds.map((k) => (
             <option key={k.id} value={k.id}>
               {k.label}
             </option>
@@ -189,35 +218,123 @@ function CreateForm({ orgId, onDone }: { orgId: string; onDone: () => void }) {
   );
 }
 
+function WaiverDialog({
+  waiver,
+  onCancel,
+  onAccept,
+  busy,
+}: {
+  waiver: EventWaiver | null;
+  onCancel: () => void;
+  onAccept: () => void;
+  busy: boolean;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <Dialog open={!!waiver} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{waiver?.title ?? "Waiver"}</DialogTitle>
+          <DialogDescription>Read and accept the host&apos;s waiver to sign up.</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md border border-border p-3 text-sm">
+          {waiver?.content}
+        </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-1"
+          />
+          I have read and accept this waiver.
+        </label>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button disabled={!agreed || busy} onClick={onAccept}>
+            Accept and sign up
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * A venue's clinics, camps, tournaments and open gym (events stage 5), behind the venue_events
  * switch. Staff (owner and admins) can list one; members sign up through register_for_event.
  */
 export function VenueEventsSection({ orgId, canPost }: { orgId: string; canPost: boolean }) {
+  return <HostEventsSection hostKind="facility" hostId={orgId} canPost={canPost} />;
+}
+
+/**
+ * A trainer's group clinics and camps (events stage 6, slice F), behind the trainer_events switch.
+ * Sign-ups ask for the trainer's waiver, if it has one.
+ */
+export function TrainerEventsSection({
+  trainerId,
+  canPost,
+}: {
+  trainerId: string;
+  canPost: boolean;
+}) {
+  return <HostEventsSection hostKind="trainer" hostId={trainerId} canPost={canPost} />;
+}
+
+function HostEventsSection({
+  hostKind,
+  hostId,
+  canPost,
+}: {
+  hostKind: EventHostKind;
+  hostId: string;
+  canPost: boolean;
+}) {
   const auth = useAuth();
   const qc = useQueryClient();
   const userId = auth.user?.id ?? null;
   const [creating, setCreating] = useState(false);
+  const [waiverFor, setWaiverFor] = useState<{ eventId: string; waiver: EventWaiver } | null>(null);
+  const switchKey = hostKind === "trainer" ? TRAINER_EVENTS_SETTING_KEY : VENUE_EVENTS_SETTING_KEY;
   const on = useQuery({
-    queryKey: ["venue-events-switch"],
-    queryFn: () => isAppSwitchOn(supabase as unknown as EventsClient, VENUE_EVENTS_SETTING_KEY),
+    queryKey: [`${hostKind}-events-switch`],
+    queryFn: () => isAppSwitchOn(supabase as unknown as EventsClient, switchKey),
     staleTime: 5 * 60_000,
   });
   const q = useQuery({
-    queryKey: ["venue-events", orgId, userId],
-    queryFn: () => listVenueEvents(client, orgId, { userId }),
+    queryKey: ["host-events", hostKind, hostId, userId],
+    queryFn: () => listVenueEvents(client, hostId, { userId, hostKind }),
     enabled: on.data === true,
   });
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["venue-events", orgId] });
+    void qc.invalidateQueries({ queryKey: ["host-events", hostKind, hostId] });
     void qc.invalidateQueries({ queryKey: ["feed-events"] });
   };
+  // A host with a published waiver: show it first; register_for_event signs it with the sign-up.
   const signUp = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await client.rpc("register_for_event", { _event: id });
+    mutationFn: async (v: { id: string; waiverId?: string }): Promise<"done" | "waiver"> => {
+      if (!v.waiverId && hostKind !== "facility") {
+        const waiver = await fetchEventWaiver(client, v.id);
+        if (waiver && !waiver.signed) {
+          setWaiverFor({ eventId: v.id, waiver });
+          return "waiver";
+        }
+      }
+      const { error } = await client.rpc(
+        "register_for_event",
+        v.waiverId
+          ? { _event: v.id, _on_behalf_of: null, _waiver_id: v.waiverId, _attested: true }
+          : { _event: v.id },
+      );
       if (error) throw new Error(venueEventErrorMessage(error.message));
+      return "done";
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
+      if (r === "waiver") return;
+      setWaiverFor(null);
       toast.success("You're signed up.");
       refresh();
     },
@@ -240,10 +357,23 @@ export function VenueEventsSection({ orgId, canPost }: { orgId: string; canPost:
   if (!canPost && !q.isLoading && !q.isError && items.length === 0) return null;
 
   return (
-    <section id="venue-events" className="rounded-2xl border border-border/60 bg-surface p-4">
+    <section
+      id={hostKind === "trainer" ? "trainer-events" : "venue-events"}
+      className="rounded-2xl border border-border/60 bg-surface p-4"
+    >
+      <WaiverDialog
+        key={waiverFor?.eventId ?? "none"}
+        waiver={waiverFor?.waiver ?? null}
+        busy={signUp.isPending}
+        onCancel={() => setWaiverFor(null)}
+        onAccept={() =>
+          waiverFor && signUp.mutate({ id: waiverFor.eventId, waiverId: waiverFor.waiver.id })
+        }
+      />
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="section-title flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-lime" /> Clinics, camps &amp; open gym
+          <CalendarClock className="h-4 w-4 text-lime" />{" "}
+          {hostKind === "trainer" ? "Group clinics & camps" : "Clinics, camps & open gym"}
         </h2>
         {canPost && !creating && (
           <Button size="sm" onClick={() => setCreating(true)}>
@@ -253,7 +383,8 @@ export function VenueEventsSection({ orgId, canPost }: { orgId: string; canPost:
       </div>
       {canPost && creating && (
         <CreateForm
-          orgId={orgId}
+          hostKind={hostKind}
+          hostId={hostId}
           onDone={() => {
             setCreating(false);
             refresh();
@@ -266,7 +397,9 @@ export function VenueEventsSection({ orgId, canPost }: { orgId: string; canPost:
         <p className="text-xs text-muted-foreground">Couldn&apos;t load events.</p>
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          List a clinic, camp, tournament or open gym so players can sign up here.
+          {hostKind === "trainer"
+            ? "List a group clinic or camp so players can sign up here."
+            : "List a clinic, camp, tournament or open gym so players can sign up here."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -276,10 +409,10 @@ export function VenueEventsSection({ orgId, canPost }: { orgId: string; canPost:
               ev={ev}
               signedIn={!!userId}
               busy={
-                (signUp.isPending && signUp.variables === ev.id) ||
+                (signUp.isPending && signUp.variables?.id === ev.id) ||
                 (cancel.isPending && cancel.variables === ev.id)
               }
-              onSignUp={() => signUp.mutate(ev.id)}
+              onSignUp={() => signUp.mutate({ id: ev.id })}
               onCancel={() => cancel.mutate(ev.id)}
             />
           ))}
