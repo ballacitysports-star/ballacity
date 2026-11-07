@@ -51,6 +51,7 @@ describe("categoryFor", () => {
     ["join_request", "gameUpdates"],
     ["join_approved", "gameUpdates"],
     ["game_cancelled", "gameUpdates"],
+    ["team_announcement", "gameUpdates"],
     ["nearby_game", "nearbyGames"],
     ["game_invite", "invitations"],
     ["org_membership", "invitations"],
