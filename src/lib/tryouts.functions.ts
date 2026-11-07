@@ -7,6 +7,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { fetchPostVenues } from "@/lib/post-venues";
 import { getTryoutFromEvents, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
+import { cancelThroughEvents, signUpThroughEvents } from "@/lib/events-write";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
@@ -248,6 +249,11 @@ const ERRORS: Record<string, string> = {
   TRYOUT_PASSED: "This event has already happened.",
   NOT_YOUR_GUARDIAN_LINK: "You can only register your own linked children.",
   TRYOUT_NOT_FOUND: "This event is no longer available.",
+  // The same situations through events (P2-1 stage 4a).
+  EVENT_FULL: "This event is full.",
+  EVENT_STARTED: "This event has already happened.",
+  EVENT_NOT_FOUND: "This event is no longer available.",
+  NOT_ALLOWED: "You can only change your own or your linked children's sign-ups.",
 };
 const friendly = (m: string) =>
   ERRORS[Object.keys(ERRORS).find((k) => m.includes(k)) ?? ""] ??
@@ -266,12 +272,20 @@ export const rsvpTryout = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.rpc("rsvp_tryout", {
-      _post_id: data.postId,
-      _on_behalf_of: data.onBehalfOf as any,
-      _waiver_id: data.waiverId as any,
-      _attested: data.attested,
-    });
+    // P2-1 stage 4a: through events when events_v2_writes is on; otherwise the old RPC.
+    const viaEvents = await signUpThroughEvents(
+      context.supabase as unknown as EventsClient,
+      data.postId,
+      { onBehalfOf: data.onBehalfOf, waiverId: data.waiverId, attested: data.attested },
+    );
+    const { error } = viaEvents.handled
+      ? { error: viaEvents.error ? { message: viaEvents.error } : null }
+      : await context.supabase.rpc("rsvp_tryout", {
+          _post_id: data.postId,
+          _on_behalf_of: data.onBehalfOf as any,
+          _waiver_id: data.waiverId as any,
+          _attested: data.attested,
+        });
     if (error) return { ok: false as const, error: friendly(error.message) };
     const { notifyTryoutSignup } = await import("./tryout-alerts.server");
     await notifyTryoutSignup({
@@ -289,10 +303,18 @@ export const cancelTryoutRsvp = createServerFn({ method: "POST" })
     z.object({ postId: z.string().uuid(), onBehalfOf: z.string().uuid().nullable() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.rpc("cancel_tryout_rsvp", {
-      _post_id: data.postId,
-      _on_behalf_of: data.onBehalfOf as any,
-    });
+    // P2-1 stage 4a: through events when events_v2_writes is on; otherwise the old RPC.
+    const viaEvents = await cancelThroughEvents(
+      context.supabase as unknown as EventsClient,
+      data.postId,
+      data.onBehalfOf,
+    );
+    const { error } = viaEvents.handled
+      ? { error: viaEvents.error ? { message: viaEvents.error } : null }
+      : await context.supabase.rpc("cancel_tryout_rsvp", {
+          _post_id: data.postId,
+          _on_behalf_of: data.onBehalfOf as any,
+        });
     if (error) return { ok: false as const, error: friendly(error.message) };
     const attendeeId = data.onBehalfOf ?? context.userId;
     // The database records a late cancellation on its own; read it back so the
