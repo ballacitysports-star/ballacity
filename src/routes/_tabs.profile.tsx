@@ -62,7 +62,8 @@ import {
 } from "@/lib/reels.functions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
-import { makeBadgeStats } from "@/lib/badges";
+import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+import { ShareBadge } from "@/components/posts/ShareBadge";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { ActiveProfileView } from "@/components/profile/ActiveProfileView";
@@ -433,6 +434,15 @@ function PlayerProfile() {
   }
 
   const age = me.birthday ? ageFrom(me.birthday) : null;
+  // The badge engine's stats, from the database aggregates (never sample data).
+  const badgeStats = makeBadgeStats({
+    gamesPlayed: me.stats.played,
+    hosted: me.stats.hosted ?? 0,
+    showUpRate: (me.stats.reliability ?? 0) / 100,
+    onTimeRate: (me.stats.reliability ?? 0) / 100,
+    sportsmanshipRating: me.stats.sportsmanship ?? 0,
+  });
+  const shareableBadges = new Set(earnedBadgeIds(badgeStats));
 
   return (
     <div className="page-shell-flush">
@@ -942,14 +952,10 @@ function PlayerProfile() {
         <BadgeList
           className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}
           badgeIds={me.badges}
-          stats={makeBadgeStats({
-            gamesPlayed: me.stats.played,
-            hosted: me.stats.hosted ?? 0,
-            showUpRate: (me.stats.reliability ?? 0) / 100,
-            onTimeRate: (me.stats.reliability ?? 0) / 100,
-            sportsmanshipRating: me.stats.sportsmanship ?? 0,
-          })}
+          stats={badgeStats}
           showProgress
+          // P3-8: only badges the engine earned from real activity can be shared.
+          renderAction={(id) => (shareableBadges.has(id) ? <ShareBadge badgeId={id} /> : null)}
         />
 
         {/* Reviews tab — inline */}

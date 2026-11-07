@@ -56,3 +56,26 @@ export const NETWORK_POSTS_SETTING_KEY = "network_posts";
 export function parseNetworkPostsFlag(value: unknown): boolean {
   return !!value && typeof value === "object" && (value as { enabled?: unknown }).enabled === true;
 }
+
+/**
+ * Achievement posts (P3-8): the text of a post that shares an earned badge. The player
+ * chooses to share; nothing is posted automatically.
+ */
+export function achievementPostBody(badge: {
+  emoji: string;
+  label: string;
+  description: string;
+}): string {
+  return `${badge.emoji} Earned the ${badge.label} badge on BallaCity. ${badge.description}`.slice(
+    0,
+    2000,
+  );
+}
+
+/**
+ * Who a badge can be shared with: what this age may post to, without "My team" (a badge is
+ * about the player, and sharing it needs no team picker). Never looser than audiencesForCohort.
+ */
+export function achievementAudiences(cohort: AgeCohort): PostAudience[] {
+  return audiencesForCohort(cohort).filter((a) => a !== "team");
+}
