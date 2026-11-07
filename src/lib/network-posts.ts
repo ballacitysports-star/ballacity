@@ -78,7 +78,74 @@ export async function listFeedPosts(before?: string | null): Promise<FeedPost[]>
   if (before) q = q.lt("created_at", before);
   const { data, error } = await q;
   if (error) throw new Error(postErrorMessage(error.message));
-  const rows = (data ?? []) as unknown as PostRow[];
+  return decorate((data ?? []) as unknown as PostRow[]);
+}
+
+type RpcCall = (
+  fn: string,
+  args: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+type TeamNewsRow = {
+  id: string;
+  team_id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+};
+
+/** Team announcements and recaps as feed items, under the team's name. */
+async function teamNewsAsPosts(rows: TeamNewsRow[]): Promise<FeedPost[]> {
+  if (rows.length === 0) return [];
+  const teamIds = [...new Set(rows.map((r) => r.team_id))];
+  const { data } = await supabase.from("teams").select("id, name, avatar_url").in("id", teamIds);
+  const teams = new Map(
+    ((data ?? []) as { id: string; name: string | null; avatar_url: string | null }[]).map((t) => [
+      t.id,
+      t,
+    ]),
+  );
+  return rows.map((r) => ({
+    id: `news-${r.id}`,
+    authorId: "",
+    postedAs: "team" as PostedAs,
+    teamId: r.team_id,
+    orgId: null,
+    audience: "public" as PostAudience,
+    body: [r.title, r.body].filter(Boolean).join("\n"),
+    moderationStatus: "approved" as const,
+    createdAt: r.created_at,
+    authorName: teams.get(r.team_id)?.name ?? "Team",
+    authorAvatar: teams.get(r.team_id)?.avatar_url ?? null,
+  }));
+}
+
+/**
+ * Following (P1-3, Home feed F2), newest first: posts from people, teams and facilities the
+ * viewer follows (and teams they belong to), merged with announcements and recaps from teams
+ * they follow or belong to. Both functions run as the viewer, so row level security applies.
+ */
+export async function listFollowingPosts(before?: string | null): Promise<FeedPost[]> {
+  const rpc = supabase.rpc as unknown as RpcCall;
+  const args = { _before: before ?? null, _limit: FEED_PAGE_SIZE };
+  const [posts, news] = await Promise.all([
+    rpc("following_feed", args),
+    rpc("following_team_news", args),
+  ]);
+  if (posts.error) throw new Error(postErrorMessage(posts.error.message));
+  const merged = [
+    ...(await decorate((posts.data ?? []) as PostRow[])),
+    // Team news is a bonus: if it fails, the posts still show.
+    ...(news.error ? [] : await teamNewsAsPosts((news.data ?? []) as TeamNewsRow[])),
+  ];
+  return merged
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+    .slice(0, FEED_PAGE_SIZE);
+}
+
+/** Attaches display names: a team's or facility's when it posted, otherwise the author's. */
+async function decorate(rows: PostRow[]): Promise<FeedPost[]> {
   if (rows.length === 0) return [];
 
   const ids = (pick: (r: PostRow) => string | null) => [

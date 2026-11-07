@@ -15,6 +15,7 @@ import {
   audiencesForCohort,
   deletePost,
   listFeedPosts,
+  listFollowingPosts,
   postErrorMessage,
   useNetworkPostsEnabled,
   type FeedPost,
@@ -23,6 +24,8 @@ import {
 import { createNetworkPost } from "@/lib/network-posts.functions";
 
 const FEED_KEY = ["network-posts-feed"];
+
+type FeedView = "all" | "following";
 
 /**
  * Posts on Home (P1-2). Renders nothing unless the network_posts flag is on and someone
@@ -39,7 +42,7 @@ export function NetworkPostsSection() {
         Posts
       </h2>
       <PostComposer />
-      <PostList viewerId={user.id} />
+      <FeedTabs viewerId={user.id} />
     </section>
   );
 }
@@ -158,11 +161,41 @@ export function PostComposer() {
   );
 }
 
-function PostList({ viewerId }: { viewerId: string }) {
+function FeedTabs({ viewerId }: { viewerId: string }) {
+  const [view, setView] = useState<FeedView>("all");
+  const tabs: Array<{ key: FeedView; label: string }> = [
+    { key: "all", label: "All" },
+    { key: "following", label: "Following" },
+  ];
+  return (
+    <div className="space-y-2">
+      <div role="tablist" aria-label="Which posts" className="flex gap-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={view === t.key}
+            onClick={() => setView(t.key)}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+              view === t.key ? "bg-foreground text-background" : "border border-border"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <PostList viewerId={viewerId} view={view} />
+    </div>
+  );
+}
+
+function PostList({ viewerId, view }: { viewerId: string; view: FeedView }) {
   const qc = useQueryClient();
   const feed = useInfiniteQuery({
-    queryKey: FEED_KEY,
-    queryFn: ({ pageParam }) => listFeedPosts(pageParam),
+    queryKey: [...FEED_KEY, view],
+    queryFn: ({ pageParam }) =>
+      view === "following" ? listFollowingPosts(pageParam) : listFeedPosts(pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.length === FEED_PAGE_SIZE ? last[last.length - 1].createdAt : undefined,
@@ -178,7 +211,13 @@ function PostList({ viewerId }: { viewerId: string }) {
     return <Loader2 className="mx-auto h-5 w-5 animate-spin" aria-label="Loading posts" />;
   if (feed.isError) return <p className="text-sm text-muted-foreground">Posts couldn't load.</p>;
   if (posts.length === 0)
-    return <p className="text-sm text-muted-foreground">No posts yet. Share the first one.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {view === "following"
+          ? "Nothing yet from people, teams or venues you follow."
+          : "No posts yet. Share the first one."}
+      </p>
+    );
 
   return (
     <ul className="space-y-2">
