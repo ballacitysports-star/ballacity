@@ -31,9 +31,9 @@ sandbox first and to production only with the owner's approval, as with P2-1.
 | E     | Venue events: `create_event` for facilities (host kind `facility`), venue staff rules, the create form on the venue page                                                                                            | events stage 5   |
 | F     | Trainer group sessions as events (host kind `trainer`); the create form on the trainer page                                                                                                                         | new; replaces D3 |
 
-Status (2026-11-07): A (#363) and C (#365) are on production with `network_posts` on; B (#364) and D (#366) are
-merged. E (venue events) is built on the E2E sandbox behind a new `venue_events` switch (off); production waits for
-the owner's approval. F is not started.
+Status (2026-11-07): A (#363), C (#365) and E (#367) are on production with `network_posts` and `venue_events` on;
+B (#364) and D (#366) are merged. F (trainer group sessions) is built on the E2E sandbox behind a new
+`trainer_events` switch (off); production waits for the owner's approval.
 
 Slice E notes: venues create events from the venue page ("Clinics, camps & open gym"); the text is AI-screened like
 posts, and an event is listed only once approved (held ones go to the superadmin Events queue). The feed shows them
@@ -41,3 +41,9 @@ with the venue's name and badge, and a sport filter keeps them (venues list no s
 
 Order: A → B → C, and D in parallel (it needs no new tables). E and F follow D, so their events already have a place in
 the feed when they can be created.
+
+Slice F notes: a trainer (a `teams` row with kind `coach`) lists group clinics and camps from its page ("Group clinics
+& camps"), stored as events with host kind `trainer` and no team, so they never appear on a team's pages. Screening and
+moderation work as for venue events. Sign-ups ask for the trainer's own published waiver: `get_event_waiver` shows its
+text to a signed-in member, and `register_for_event` signs it with the sign-up. 1-on-1 sessions stay booking requests
+(D7). The feed shows them with the trainer's name, and a sport filter uses the trainer's sports.
