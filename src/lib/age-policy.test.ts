@@ -3,7 +3,6 @@ import {
   ADULT_AGE,
   CONSENT_REQUIRED_MESSAGE,
   CHILD_MAX_AGE,
-  MINIMUM_ACCOUNT_AGE,
   PARENTAL_CONSENT_MAX_AGE,
   ageCategoryFromAge,
   ageCategoryFromBirthday,
@@ -61,8 +60,9 @@ describe("age categories", () => {
 });
 
 describe("birthday validation", () => {
-  it("has no minimum account age — under-13 birthdays are accepted", () => {
-    expect(MINIMUM_ACCOUNT_AGE).toBe(0);
+  // validateAgeMinimum is the profile form's data check, not the minimum-age rule: that is
+  // enforced where a first birthday is stored (checkDobParts and set_my_birthday).
+  it("only rejects impossible dates; the minimum age is enforced elsewhere", () => {
     expect(validateAgeMinimum(birthdayForAge(8))).toBeNull();
     expect(validateAgeMinimum(birthdayForAge(12))).toBeNull();
     expect(validateAgeMinimum(birthdayForAge(30))).toBeNull();
