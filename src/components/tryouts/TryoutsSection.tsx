@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { VENUE_HIDDEN_LABEL } from "@/lib/post-venues";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -8,7 +9,13 @@ import { blockedMessage, heldNotice } from "@/lib/post-moderation";
 import { DraftWithAi } from "@/components/DraftWithAi";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,14 +48,23 @@ const KIND_LABEL = { tryout: "Tryout", clinic: "Camp / Clinic" } as const;
 
 function fmtDate(d: string | null) {
   if (!d) return "Date TBA";
-  return new Date(d).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(d).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 export function TryoutsSection() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const list = useServerFn(listUpcomingTryouts);
-  const { data = [], isLoading } = useQuery({ queryKey: ["tryouts", "upcoming"], queryFn: () => list() });
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["tryouts", "upcoming"],
+    queryFn: () => list(),
+  });
   const [active, setActive] = useState<TryoutListing | null>(null);
   const [posting, setPosting] = useState(false);
   const mine = useMyTryoutRegistrations();
@@ -64,7 +80,8 @@ export function TryoutsSection() {
             Open tryouts &amp; camps
           </h2>
           <p className="mt-2 max-w-xl text-muted-foreground">
-            Teams and coaches post tryouts and camps. Players and parents RSVP and sign the team waiver in one step.
+            Teams and coaches post tryouts and camps. Players and parents RSVP and sign the team
+            waiver in one step.
           </p>
         </div>
         <Button onClick={() => requireAuth(() => setPosting(true))} className="rounded-full">
@@ -77,7 +94,9 @@ export function TryoutsSection() {
       ) : data.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-center">
           <p className="font-semibold">No upcoming tryouts yet.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Run a team? Be the first to post one.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Run a team? Be the first to post one.
+          </p>
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -86,26 +105,61 @@ export function TryoutsSection() {
             return (
               <li key={t.id} className="flex flex-col rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="rounded-full bg-lime/15 px-2 py-0.5 font-semibold text-lime">{KIND_LABEL[t.kind]}</span>
+                  <span className="rounded-full bg-lime/15 px-2 py-0.5 font-semibold text-lime">
+                    {KIND_LABEL[t.kind]}
+                  </span>
                   <span className="text-muted-foreground">{t.price ? `$${t.price}` : "Free"}</span>
                 </div>
                 <h3 className="mt-3 font-display text-lg font-semibold">
-                  <Link to="/tryouts/$postId" params={{ postId: t.id }} className="hover:underline">{t.title}</Link>
+                  <Link to="/tryouts/$postId" params={{ postId: t.id }} className="hover:underline">
+                    {t.title}
+                  </Link>
                 </h3>
-                <Link to="/teams/$teamId" params={{ teamId: t.teamId }} className="text-sm text-muted-foreground hover:underline">
+                <Link
+                  to="/teams/$teamId"
+                  params={{ teamId: t.teamId }}
+                  className="text-sm text-muted-foreground hover:underline"
+                >
                   {t.teamName}
                 </Link>
                 <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                  <p className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />{fmtDate(t.eventDate)}</p>
-                  {t.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{t.location}</p>}
-                  {left != null && <p className="flex items-center gap-2"><Users className="h-4 w-4" />{left === 0 ? "Full" : `${left} spots left`}</p>}
+                  <p className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4" />
+                    {fmtDate(t.eventDate)}
+                  </p>
+                  {t.location ? (
+                    <p className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      {t.location}
+                    </p>
+                  ) : t.venueHidden ? (
+                    <p className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      {VENUE_HIDDEN_LABEL}
+                    </p>
+                  ) : null}
+                  {left != null && (
+                    <p className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      {left === 0 ? "Full" : `${left} spots left`}
+                    </p>
+                  )}
                 </div>
                 {mine.has(t.id) ? (
-                  <Button className="mt-4 rounded-full" variant="outline" onClick={() => requireAuth(() => setActive(t))}>
+                  <Button
+                    className="mt-4 rounded-full"
+                    variant="outline"
+                    onClick={() => requireAuth(() => setActive(t))}
+                  >
                     Registered ✓ · Manage
                   </Button>
                 ) : (
-                  <Button className="mt-4 rounded-full" variant="secondary" disabled={left === 0} onClick={() => requireAuth(() => setActive(t))}>
+                  <Button
+                    className="mt-4 rounded-full"
+                    variant="secondary"
+                    disabled={left === 0}
+                    onClick={() => requireAuth(() => setActive(t))}
+                  >
                     {left === 0 ? "Full" : "RSVP"}
                   </Button>
                 )}
@@ -140,7 +194,10 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
   const rsvp = useServerFn(rsvpTryout);
   const cancel = useServerFn(cancelTryoutRsvp);
   const ctxKey = ["tryouts", "ctx", tryout.id];
-  const { data: ctx } = useQuery({ queryKey: ctxKey, queryFn: () => ctxFn({ data: { postId: tryout.id } }) });
+  const { data: ctx } = useQuery({
+    queryKey: ctxKey,
+    queryFn: () => ctxFn({ data: { postId: tryout.id } }),
+  });
   const [who, setWho] = useState<string>("me");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -161,7 +218,14 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
 
   const submit = async () => {
     setBusy(true);
-    const r = await rsvp({ data: { postId: tryout.id, onBehalfOf: onBehalf, waiverId: ctx?.waiver?.id ?? null, attested: agree } });
+    const r = await rsvp({
+      data: {
+        postId: tryout.id,
+        onBehalfOf: onBehalf,
+        waiverId: ctx?.waiver?.id ?? null,
+        attested: agree,
+      },
+    });
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.success("You're registered!");
@@ -182,19 +246,37 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{tryout.title}</DialogTitle>
-          <DialogDescription>{tryout.teamName} · {fmtDate(tryout.eventDate)}</DialogDescription>
+          <DialogDescription>
+            {tryout.teamName} · {fmtDate(tryout.eventDate)}
+          </DialogDescription>
         </DialogHeader>
-        {tryout.body && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{tryout.body}</p>}
+        {tryout.body && (
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{tryout.body}</p>
+        )}
         {!ctx ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <div className="space-y-4">
             {ctx.children.length > 0 && (
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Who's attending?</label>
-                <select className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" value={who} onChange={(e) => { setWho(e.target.value); setAgree(false); setConfirmingCancel(false); }}>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Who's attending?
+                </label>
+                <select
+                  className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm"
+                  value={who}
+                  onChange={(e) => {
+                    setWho(e.target.value);
+                    setAgree(false);
+                    setConfirmingCancel(false);
+                  }}
+                >
                   <option value="me">Me</option>
-                  {ctx.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {ctx.children.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -204,9 +286,15 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                 {confirmingCancel ? (
                   <div className="space-y-3 rounded-lg border border-coral/40 bg-coral/10 p-3">
                     <p className="text-sm">
-                      Cancel {onBehalf ? `${ctx.children.find((c) => c.id === onBehalf)?.name ?? "your child"}'s` : "your"} spot
-                      at {tryout.title}? {tryout.teamName} will be told and the spot opens up for someone else.
-                      {tryout.price ? " If you already paid the team, ask them about a refund." : ""}
+                      Cancel{" "}
+                      {onBehalf
+                        ? `${ctx.children.find((c) => c.id === onBehalf)?.name ?? "your child"}'s`
+                        : "your"}{" "}
+                      spot at {tryout.title}? {tryout.teamName} will be told and the spot opens up
+                      for someone else.
+                      {tryout.price
+                        ? " If you already paid the team, ask them about a refund."
+                        : ""}
                     </p>
                     {isLateCancel(tryout.eventDate, tryout.cancelCutoffMin) && (
                       <p role="alert" className="text-xs font-semibold text-amber-500">
@@ -214,30 +302,53 @@ export function RsvpDialog({ tryout, onClose }: { tryout: TryoutListing; onClose
                       </p>
                     )}
                     <div className="flex gap-2">
-                      <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(false)}>Keep my spot</Button>
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => setConfirmingCancel(false)}
+                      >
+                        Keep my spot
+                      </Button>
                       <Button variant="destructive" disabled={busy} onClick={doCancel}>
                         {busy ? "Cancelling…" : "Yes, cancel"}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <Button variant="outline" disabled={busy} onClick={() => setConfirmingCancel(true)}>Cancel registration</Button>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => setConfirmingCancel(true)}
+                  >
+                    Cancel registration
+                  </Button>
                 )}
               </div>
             ) : (
               <>
                 {needsWaiver && ctx.waiver && (
                   <div className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-semibold">{ctx.waiver.title} <span className="text-xs text-muted-foreground">v{ctx.waiver.version}</span></p>
-                    <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">{ctx.waiver.content}</div>
+                    <p className="text-sm font-semibold">
+                      {ctx.waiver.title}{" "}
+                      <span className="text-xs text-muted-foreground">v{ctx.waiver.version}</span>
+                    </p>
+                    <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                      {ctx.waiver.content}
+                    </div>
                     <label className="mt-3 flex items-start gap-2 text-sm">
                       <Checkbox checked={agree} onCheckedChange={(v) => setAgree(v === true)} />
-                      <span>{onBehalf ? "I am this child's parent or legal guardian and agree to this waiver on their behalf." : "I have read and agree to this waiver."}</span>
+                      <span>
+                        {onBehalf
+                          ? "I am this child's parent or legal guardian and agree to this waiver on their behalf."
+                          : "I have read and agree to this waiver."}
+                      </span>
                     </label>
                   </div>
                 )}
                 {needsWaiver && !agree && (
-                  <p className="text-xs font-semibold text-coral">Check the waiver box above to continue.</p>
+                  <p className="text-xs font-semibold text-coral">
+                    Check the waiver box above to continue.
+                  </p>
                 )}
                 {paid && (
                   <label className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
@@ -278,18 +389,32 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
   const teamsFn = useServerFn(listMyManagedTeams);
   const create = useServerFn(createTeamPost);
   const { data: teams } = useQuery({ queryKey: ["tryouts", "my-teams"], queryFn: () => teamsFn() });
-  const [f, setF] = useState({ teamId: "", kind: "tryout" as "tryout" | "clinic", title: "", body: "", date: "", location: "", spots: "", price: "", cancelCutoff: String(DEFAULT_CANCEL_CUTOFF_MIN) });
+  const [f, setF] = useState({
+    teamId: "",
+    kind: "tryout" as "tryout" | "clinic",
+    title: "",
+    body: "",
+    date: "",
+    location: "",
+    spots: "",
+    price: "",
+    cancelCutoff: String(DEFAULT_CANCEL_CUTOFF_MIN),
+  });
   const [refund, setRefund] = useState<RefundPolicy>({ rule: DEFAULT_REFUND_RULE, latePct: 0 });
   const [busy, setBusy] = useState(false);
   const teamId = f.teamId || teams?.[0]?.id || "";
 
   const submit = async () => {
-    if (!teamId || !f.title.trim() || !f.date) return toast.error("Team, title and date are required.");
+    if (!teamId || !f.title.trim() || !f.date)
+      return toast.error("Team, title and date are required.");
     setBusy(true);
     try {
       const result = await create({
         data: {
-          teamId, kind: f.kind, title: f.title.trim(), body: f.body,
+          teamId,
+          kind: f.kind,
+          title: f.title.trim(),
+          body: f.body,
           eventDate: new Date(f.date).toISOString(),
           location: f.location || null,
           spotsMax: f.spots ? Number(f.spots) : null,
@@ -317,31 +442,76 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Post a tryout or camp</DialogTitle>
-          <DialogDescription>If your team has a published waiver, attendees sign it when they RSVP.</DialogDescription>
+          <DialogDescription>
+            If your team has a published waiver, attendees sign it when they RSVP.
+          </DialogDescription>
         </DialogHeader>
         {!teams ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : teams.length === 0 ? (
           <div className="space-y-3 text-sm">
             <p>You need to own, manage or coach a team to post tryouts.</p>
-            <Button asChild><Link to="/teams/create">Create a team</Link></Button>
+            <Button asChild>
+              <Link to="/teams/create">Create a team</Link>
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">
-            <select className="w-full rounded-md border border-input bg-background p-2 text-sm" value={teamId} onChange={(e) => setF({ ...f, teamId: e.target.value })}>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <select
+              className="w-full rounded-md border border-input bg-background p-2 text-sm"
+              value={teamId}
+              onChange={(e) => setF({ ...f, teamId: e.target.value })}
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
             </select>
             <div className="flex gap-2">
               {(["tryout", "clinic"] as const).map((k) => (
-                <Button key={k} type="button" size="sm" variant={f.kind === k ? "default" : "outline"} onClick={() => setF({ ...f, kind: k })}>{KIND_LABEL[k]}</Button>
+                <Button
+                  key={k}
+                  type="button"
+                  size="sm"
+                  variant={f.kind === k ? "default" : "outline"}
+                  onClick={() => setF({ ...f, kind: k })}
+                >
+                  {KIND_LABEL[k]}
+                </Button>
               ))}
             </div>
-            <Input placeholder="Title (e.g. U14 fall tryouts)" maxLength={120} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
-            <Input type="datetime-local" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
-            <Input placeholder="Location" value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} />
+            <Input
+              placeholder="Title (e.g. U14 fall tryouts)"
+              maxLength={120}
+              value={f.title}
+              onChange={(e) => setF({ ...f, title: e.target.value })}
+            />
+            <Input
+              type="datetime-local"
+              value={f.date}
+              onChange={(e) => setF({ ...f, date: e.target.value })}
+            />
+            <Input
+              placeholder="Location"
+              value={f.location}
+              onChange={(e) => setF({ ...f, location: e.target.value })}
+            />
             <div className="flex gap-2">
-              <Input type="number" min={1} placeholder="Spots (optional)" value={f.spots} onChange={(e) => setF({ ...f, spots: e.target.value })} />
-              <Input type="number" min={0} placeholder="Fee $ (optional)" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
+              <Input
+                type="number"
+                min={1}
+                placeholder="Spots (optional)"
+                value={f.spots}
+                onChange={(e) => setF({ ...f, spots: e.target.value })}
+              />
+              <Input
+                type="number"
+                min={0}
+                placeholder="Fee $ (optional)"
+                value={f.price}
+                onChange={(e) => setF({ ...f, price: e.target.value })}
+              />
             </div>
             <label className="block text-xs font-semibold text-muted-foreground">
               Cancellation cutoff
@@ -351,10 +521,14 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setF({ ...f, cancelCutoff: e.target.value })}
               >
                 {CANCEL_CUTOFF_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
                 ))}
               </select>
-              <span className="mt-1 block font-normal">Cancelling after this counts as late and lowers the player's reliability.</span>
+              <span className="mt-1 block font-normal">
+                Cancelling after this counts as late and lowers the player's reliability.
+              </span>
             </label>
             {f.price && Number(f.price) > 0 && (
               <RefundPolicyFields
@@ -364,9 +538,20 @@ function PostTryoutDialog({ onClose }: { onClose: () => void }) {
                 cutoffMin={Number(f.cancelCutoff) || 0}
               />
             )}
-            <Textarea placeholder="Details: age groups, what to bring…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
-            <DraftWithAi kind={f.kind} title={f.title} body={f.body} onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))} />
-            <Button className="w-full" disabled={busy} onClick={submit}>Post</Button>
+            <Textarea
+              placeholder="Details: age groups, what to bring…"
+              value={f.body}
+              onChange={(e) => setF({ ...f, body: e.target.value })}
+            />
+            <DraftWithAi
+              kind={f.kind}
+              title={f.title}
+              body={f.body}
+              onApply={(d) => setF((cur) => ({ ...cur, title: d.title, body: d.body }))}
+            />
+            <Button className="w-full" disabled={busy} onClick={submit}>
+              Post
+            </Button>
           </div>
         )}
       </DialogContent>

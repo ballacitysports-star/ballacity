@@ -36,6 +36,9 @@ SELECT t.eq(
       'private_sec.can_comment_on_minor_content(_commenter uuid, _content_owner uuid)',
       'private_sec.comment_subject_owner(_subject_type text, _subject_id text)',
       'private_sec.guardian_public_profile(_user uuid)',
+      -- Called by public.team_post_venues (SECURITY INVOKER); returns a venue only when
+      -- the youth-venue rule allows it (20261106210000_youth_post_venue_privacy).
+      'private_sec.post_venue(_post uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
       'private_sec.reel_game_readable(_game_id text, _owner uuid)',
       'private_sec.reel_publicly_visible(_reel_id uuid)',
