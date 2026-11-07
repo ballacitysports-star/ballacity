@@ -31,8 +31,13 @@ sandbox first and to production only with the owner's approval, as with P2-1.
 | E     | Venue events: `create_event` for facilities (host kind `facility`), venue staff rules, the create form on the venue page                                                                                            | events stage 5   |
 | F     | Trainer group sessions as events (host kind `trainer`); the create form on the trainer page                                                                                                                         | new; replaces D3 |
 
-Status (2026-11-07): A (#363) is on production with the `network_posts` switch off, B (#364) and D (#366) are
-merged, and C is #365. E and F are not started.
+Status (2026-11-07): A (#363) and C (#365) are on production with `network_posts` on; B (#364) and D (#366) are
+merged. E (venue events) is built on the E2E sandbox behind a new `venue_events` switch (off); production waits for
+the owner's approval. F is not started.
+
+Slice E notes: venues create events from the venue page ("Clinics, camps & open gym"); the text is AI-screened like
+posts, and an event is listed only once approved (held ones go to the superadmin Events queue). The feed shows them
+with the venue's name and badge, and a sport filter keeps them (venues list no sports). Waivers stay per team (D2).
 
 Order: A → B → C, and D in parallel (it needs no new tables). E and F follow D, so their events already have a place in
 the feed when they can be created.

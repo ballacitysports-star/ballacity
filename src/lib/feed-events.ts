@@ -1,35 +1,68 @@
 /**
- * Home feed slice D (docs/design/home-feed.md): upcoming tryouts and clinics for the feed's type
- * chips, read from `events` behind the `events_v2` switch.
+ * Home feed slices D and E (docs/design/home-feed.md): upcoming events for the feed's type chips,
+ * read from `events` behind the `events_v2` switch. Slice E adds venue (facility) events and the
+ * Camps, Tournaments and Open gym chips, behind the `venue_events` switch.
  *
  * Rules (F5), all enforced by the database and kept here:
- *   * only events the viewer may read (events RLS: listed, or the viewer's own team's);
+ *   * only events the viewer may read (events RLS: listed, or the viewer's own team's or venue's);
  *   * the venue only where the D0 rule allows (get_event_locations); a failed lookup hides it;
  *   * seats taken are true counts (get_event_registration_counts), never a row count of what
  *     the viewer happens to be allowed to read.
  */
 
-export type FeedEventKind = "tryout" | "clinic";
-export type FeedType = "all" | "pickup" | "tryouts" | "clinics";
+export type FeedEventKind = "tryout" | "clinic" | "camp" | "tournament" | "open_gym";
+export type FeedType =
+  "all" | "pickup" | "tryouts" | "clinics" | "camps" | "tournaments" | "open_gym";
 
-export const FEED_TYPES: { id: FeedType; label: string }[] = [
+export const VENUE_EVENTS_SETTING_KEY = "venue_events";
+
+const BASE_TYPES: { id: FeedType; label: string }[] = [
   { id: "all", label: "All" },
   { id: "pickup", label: "Pickup" },
   { id: "tryouts", label: "Tryouts" },
   { id: "clinics", label: "Clinics" },
 ];
+const VENUE_TYPES: { id: FeedType; label: string }[] = [
+  { id: "camps", label: "Camps" },
+  { id: "tournaments", label: "Tournaments" },
+  { id: "open_gym", label: "Open gym" },
+];
+
+/** The chips: Camps, Tournaments and Open gym only once venue events are on. */
+export function feedTypes(venueEventsOn: boolean): { id: FeedType; label: string }[] {
+  return venueEventsOn ? [...BASE_TYPES, ...VENUE_TYPES] : BASE_TYPES;
+}
+export const FEED_TYPES = BASE_TYPES;
+
+const ALL_FEED_TYPES: FeedType[] = [...BASE_TYPES, ...VENUE_TYPES].map((t) => t.id);
 
 export function parseFeedType(v: unknown): FeedType {
-  return v === "pickup" || v === "tryouts" || v === "clinics" ? v : "all";
+  return typeof v === "string" && (ALL_FEED_TYPES as string[]).includes(v)
+    ? (v as FeedType)
+    : "all";
 }
 
-/** Which event kinds a feed type shows. Pickup shows none; All shows both. */
-export function kindsForFeedType(t: FeedType): FeedEventKind[] {
+/** Which event kinds a feed type shows. Pickup shows none; All shows every kind that is on. */
+export function kindsForFeedType(t: FeedType, venueEventsOn = false): FeedEventKind[] {
   if (t === "tryouts") return ["tryout"];
   if (t === "clinics") return ["clinic"];
-  if (t === "all") return ["tryout", "clinic"];
+  if (t === "camps") return venueEventsOn ? ["camp"] : [];
+  if (t === "tournaments") return venueEventsOn ? ["tournament"] : [];
+  if (t === "open_gym") return venueEventsOn ? ["open_gym"] : [];
+  if (t === "all")
+    return venueEventsOn
+      ? ["tryout", "clinic", "camp", "tournament", "open_gym"]
+      : ["tryout", "clinic"];
   return [];
 }
+
+export const FEED_EVENT_KIND_LABEL: Record<FeedEventKind, string> = {
+  tryout: "Tryout",
+  clinic: "Clinic",
+  camp: "Camp",
+  tournament: "Tournament",
+  open_gym: "Open gym",
+};
 
 export type FeedEvent = {
   id: string;
@@ -39,7 +72,12 @@ export type FeedEvent = {
   title: string;
   startsAt: string | null;
   teamId: string | null;
-  teamName: string;
+  /** The hosting venue (trainer_orgs id) of a venue event. */
+  orgId: string | null;
+  /** The team's or the venue's name. */
+  hostName: string;
+  /** A verified venue (its badge on the card). */
+  hostVerified: boolean;
   sports: string[];
   location: string | null;
   venueHidden: boolean;
@@ -69,6 +107,8 @@ type EventRow = {
   starts_at: string | null;
   price_cents: number | null;
   capacity: number | null;
+  host_kind?: string | null;
+  host_ref?: string | null;
   team_id: string | null;
   teams: { name: string | null; sports: string[] | null } | null;
 };
@@ -84,7 +124,7 @@ export async function listFeedEvents(
   const res = await client
     .from("events")
     .select(
-      "id,legacy_post_id,kind,title,starts_at,price_cents,capacity,team_id,teams(name,sports)",
+      "id,legacy_post_id,kind,title,starts_at,price_cents,capacity,host_kind,host_ref,team_id,teams(name,sports)",
     )
     .in("kind", kinds)
     .or(`starts_at.gte.${now},starts_at.is.null`)
@@ -93,16 +133,33 @@ export async function listFeedEvents(
   if (res.error) throw new Error(res.error.message);
   let rows = (res.data ?? []) as EventRow[];
   const sports = (opts.sports ?? []).filter(Boolean);
+  // Venues list no sports, so a sport filter keeps venue events (it narrows team events only).
   if (sports.length > 0) {
-    rows = rows.filter((r) => (r.teams?.sports ?? []).some((s) => sports.includes(s)));
+    rows = rows.filter(
+      (r) => r.host_kind === "facility" || (r.teams?.sports ?? []).some((s) => sports.includes(s)),
+    );
   }
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id).slice(0, 200);
 
-  const [counts, locs] = await Promise.all([
+  const orgIds = [
+    ...new Set(
+      rows.filter((r) => r.host_kind === "facility" && r.host_ref).map((r) => String(r.host_ref)),
+    ),
+  ];
+  const [counts, locs, orgs] = await Promise.all([
     client.rpc("get_event_registration_counts", { _ids: ids }),
     client.rpc("get_event_locations", { _ids: ids }),
+    orgIds.length > 0
+      ? client.from("trainer_orgs").select("id,name,verified").in("id", orgIds)
+      : Promise.resolve({ data: [], error: null } as Result),
   ]);
+  const venueNames = new Map<string, { name: string; verified: boolean }>();
+  if (!orgs.error && Array.isArray(orgs.data)) {
+    for (const o of orgs.data as { id: string; name: string | null; verified: boolean | null }[]) {
+      venueNames.set(String(o.id), { name: o.name ?? "Venue", verified: o.verified === true });
+    }
+  }
   const seats = new Map<string, number>();
   if (!counts.error && Array.isArray(counts.data)) {
     for (const c of counts.data as { event_id: string; registered: number | null }[]) {
@@ -117,19 +174,25 @@ export async function listFeedEvents(
     }
   }
 
-  return rows.map((r) => ({
-    id: r.id,
-    postId: r.legacy_post_id,
-    kind: r.kind as FeedEventKind,
-    title: r.title,
-    startsAt: r.starts_at,
-    teamId: r.team_id,
-    teamName: r.teams?.name ?? "Team",
-    sports: r.teams?.sports ?? [],
-    location: venues.get(r.id) ?? null,
-    venueHidden: !venues.has(r.id),
-    price: r.price_cents == null ? null : r.price_cents / 100,
-    spotsMax: r.capacity,
-    spotsTaken: seats.get(r.id) ?? 0,
-  }));
+  return rows.map((r) => {
+    const isVenue = r.host_kind === "facility";
+    const org = isVenue && r.host_ref ? venueNames.get(String(r.host_ref)) : undefined;
+    return {
+      id: r.id,
+      postId: r.legacy_post_id,
+      kind: r.kind as FeedEventKind,
+      title: r.title,
+      startsAt: r.starts_at,
+      teamId: r.team_id,
+      orgId: isVenue ? (r.host_ref ?? null) : null,
+      hostName: isVenue ? (org?.name ?? "Venue") : (r.teams?.name ?? "Team"),
+      hostVerified: org?.verified ?? false,
+      sports: r.teams?.sports ?? [],
+      location: venues.get(r.id) ?? null,
+      venueHidden: !venues.has(r.id),
+      price: r.price_cents == null ? null : r.price_cents / 100,
+      spotsMax: r.capacity,
+      spotsTaken: seats.get(r.id) ?? 0,
+    };
+  });
 }

@@ -11,7 +11,7 @@ import { ConfirmAction } from "./ConfirmAction";
 import { ReviewSignalsPanel } from "./ReviewSignalsPanel";
 
 /** Kinds whose text is AI-screened and can be held for review. */
-const TEXT_REVIEW_KINDS = new Set(["posts", "network_posts", "comments"]);
+const TEXT_REVIEW_KINDS = new Set(["posts", "network_posts", "events", "comments"]);
 
 const KINDS = [
   { key: "games", label: "Games" },
@@ -19,6 +19,7 @@ const KINDS = [
   { key: "gyms", label: "Gyms" },
   { key: "posts", label: "Team posts" },
   { key: "network_posts", label: "Network posts" },
+  { key: "events", label: "Events" },
   { key: "availability", label: "Availability" },
   { key: "comments", label: "Comments" },
   { key: "reviews", label: "Reviews" },
@@ -98,6 +99,10 @@ function summarize(kind: string, row: any) {
       return `${row.title} · ${row.kind}`;
     case "network_posts":
       return `${row.posted_as} · ${row.audience} · ${(row.body ?? "").slice(0, 100)}`;
+    case "events":
+      return `${row.kind} · ${row.title} · ${row.host_kind} · ages ${row.min_age}–${row.max_age}${
+        row.starts_at ? ` · ${new Date(row.starts_at).toLocaleString()}` : ""
+      }`;
     case "availability":
       return `${(row.sports ?? []).join(", ")} · ${row.skill_level} · ${row.status}`;
     case "comments":

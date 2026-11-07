@@ -87,6 +87,17 @@ export const CONTENT_KINDS = {
     hideCol: "hidden_at",
     textStatusCol: "moderation_status",
   },
+  events: {
+    table: "events",
+    idCol: "id",
+    label: "Event",
+    select:
+      "id, host_kind, host_ref, team_id, kind, title, body, starts_at, min_age, max_age, author_id, hidden_at, moderation_status, created_at",
+    searchCols: ["title", "body"],
+    orderBy: "created_at",
+    hideCol: "hidden_at",
+    textStatusCol: "moderation_status",
+  },
   availability: {
     table: "player_availabilities",
     idCol: "id",

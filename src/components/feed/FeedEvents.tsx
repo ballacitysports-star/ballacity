@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, MapPin, Users } from "lucide-react";
+import { BadgeCheck, CalendarClock, MapPin, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/ui/empty-state";
 import { VENUE_HIDDEN_LABEL } from "@/lib/post-venues";
 import {
-  FEED_TYPES,
+  FEED_EVENT_KIND_LABEL,
+  feedTypes,
   listFeedEvents,
   type FeedEvent,
   type FeedEventKind,
@@ -13,17 +14,19 @@ import {
   type FeedType,
 } from "@/lib/feed-events";
 
-/** All · Pickup · Tryouts · Clinics. A radio group: one type at a time. */
+/** All · Pickup · Tryouts · Clinics (· Camps · Tournaments · Open gym). A radio group: one type at a time. */
 export function FeedTypeChips({
   value,
   onChange,
+  venueEventsOn = false,
 }: {
   value: FeedType;
   onChange: (t: FeedType) => void;
+  venueEventsOn?: boolean;
 }) {
   return (
     <div role="radiogroup" aria-label="What to show" className="mb-3 flex gap-2 overflow-x-auto">
-      {FEED_TYPES.map((t) => (
+      {feedTypes(venueEventsOn).map((t) => (
         <button
           key={t.id}
           type="button"
@@ -43,6 +46,14 @@ export function FeedTypeChips({
   );
 }
 
+const EMPTY_NOUN: Record<FeedEventKind, string> = {
+  tryout: "tryouts",
+  clinic: "clinics",
+  camp: "camps",
+  tournament: "tournaments",
+  open_gym: "open gym sessions",
+};
+
 function when(iso: string | null): string {
   if (!iso) return "Date to be announced";
   return new Date(iso).toLocaleString(undefined, {
@@ -58,7 +69,13 @@ function EventCard({ ev }: { ev: FeedEvent }) {
   const body = (
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="text-xs font-bold uppercase tracking-wide text-lime">
-        {ev.kind === "tryout" ? "Tryout" : "Clinic"} · {ev.teamName}
+        {FEED_EVENT_KIND_LABEL[ev.kind] ?? "Event"} · {ev.hostName}
+        {ev.orgId && ev.hostVerified && (
+          <BadgeCheck
+            className="ml-1 inline h-3.5 w-3.5 align-[-2px]"
+            aria-label="Verified venue"
+          />
+        )}
       </div>
       <div className="mt-1 font-semibold">{ev.title}</div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -82,6 +99,12 @@ function EventCard({ ev }: { ev: FeedEvent }) {
   if (ev.postId)
     return (
       <Link to="/tryouts/$postId" params={{ postId: ev.postId }} className="block">
+        {body}
+      </Link>
+    );
+  if (ev.orgId)
+    return (
+      <Link to="/orgs/$orgId" params={{ orgId: ev.orgId }} className="block">
         {body}
       </Link>
     );
@@ -127,11 +150,9 @@ export function FeedEventsList({
         <EmptyState
           icon={<CalendarClock className="h-6 w-6" aria-hidden />}
           title={
-            kinds.length === 1 && kinds[0] === "tryout"
-              ? "No upcoming tryouts"
-              : "No upcoming clinics"
+            kinds.length === 1 ? `No upcoming ${EMPTY_NOUN[kinds[0]]}` : "Nothing coming up yet"
           }
-          description="Follow teams to hear about new ones first."
+          description="Follow teams and venues to hear about new ones first."
         />
       ) : (
         <ul className="space-y-2">

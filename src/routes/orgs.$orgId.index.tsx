@@ -26,6 +26,7 @@ import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
 import { buildFacilityJsonLd } from "@/lib/org-seo";
 import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
+import { VenueEventsSection } from "@/components/org/VenueEventsSection";
 import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
@@ -217,6 +218,8 @@ function OrgPage() {
       )}
 
       {isAdmin && <ListingVisibilityToggle kind="gym" id={orgId} />}
+
+      <VenueEventsSection orgId={orgId} canPost={isAdmin} />
 
       <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
 
