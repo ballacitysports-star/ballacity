@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  fetchRegistrationCounts,
+  getTryoutFromEvents,
   isEventsV2Enabled,
   listTeamEventsFromEvents,
   parseEventsV2Setting,
@@ -134,12 +136,15 @@ describe("listTeamEventsFromEvents", () => {
           data: [ev(), ev({ id: "e2", legacy_post_id: "p2", kind: "clinic" })],
           error: null,
         },
-        event_registrations: {
-          data: [{ event_id: "e1" }, { event_id: "e1" }, { event_id: "e2" }],
-          error: null,
-        },
       },
       {
+        get_event_registration_counts: {
+          data: [
+            { event_id: "e1", registered: 2 },
+            { event_id: "e2", registered: 1 },
+          ],
+          error: null,
+        },
         get_event_locations: {
           data: [
             { event_id: "e2", place_id: null, formatted_address: "Gym", lat: null, lng: null },
@@ -156,7 +161,9 @@ describe("listTeamEventsFromEvents", () => {
     ]);
     expect(calls).toContain('events.eq(["team_id","hawks"])');
     expect(calls).toContain('events.not(["legacy_post_id","is",null])');
-    expect(calls).toContain('event_registrations.eq(["status","registered"])');
+    // Seats are counted by the function, never by reading registrations (members see only their own).
+    expect(calls).toContain('rpc.get_event_registration_counts({"_ids":["e1","e2"]})');
+    expect(calls.some((c) => c.startsWith("event_registrations."))).toBe(false);
   });
 
   it("fails closed on venues: a failed lookup hides every venue", async () => {
@@ -186,6 +193,113 @@ describe("listTeamEventsFromEvents", () => {
       ),
     ).toEqual([]);
     expect(calls.some((c) => c.startsWith("rpc."))).toBe(false);
+  });
+});
+
+describe("fetchRegistrationCounts", () => {
+  it("maps counts by event and asks for nothing when there are no ids", async () => {
+    const calls: string[] = [];
+    const client = fakeClient(
+      {},
+      { get_event_registration_counts: { data: [{ event_id: "e1", registered: 3 }], error: null } },
+      calls,
+    );
+    expect(await fetchRegistrationCounts(client, [])).toEqual(new Map());
+    expect(calls).toEqual([]);
+    expect(await fetchRegistrationCounts(client, ["e1", "e2"])).toEqual(new Map([["e1", 3]]));
+  });
+
+  it("throws on error so the caller falls back", async () => {
+    const client = fakeClient(
+      {},
+      { get_event_registration_counts: { data: null, error: { message: "denied" } } },
+    );
+    await expect(fetchRegistrationCounts(client, ["e1"])).rejects.toThrow("denied");
+  });
+});
+
+describe("getTryoutFromEvents", () => {
+  const tryoutRow = {
+    ...ev(),
+    cancel_cutoff_min: 120,
+    refund_rule: null,
+    late_refund_pct: 50,
+    team_id: "hawks",
+    teams: { name: "Hawks", avatar: null, sports: ["soccer"] },
+  };
+
+  it("maps the copy to the page's listing, keyed by the post, with seats and venue from the viewer", async () => {
+    const publicCalls: string[] = [];
+    const viewerCalls: string[] = [];
+    const pub = fakeClient({ events: { data: tryoutRow, error: null } }, {}, publicCalls);
+    const viewer = fakeClient(
+      {},
+      {
+        get_event_registration_counts: { data: [{ event_id: "e1", registered: 4 }], error: null },
+        get_event_location: {
+          data: [{ place_id: null, formatted_address: "City Gym", lat: null, lng: null }],
+          error: null,
+        },
+      },
+      viewerCalls,
+    );
+    const t = await getTryoutFromEvents(pub, viewer, "p1");
+    expect(t).toMatchObject({
+      id: "p1",
+      kind: "tryout",
+      price: 15,
+      spotsMax: 20,
+      spotsTaken: 4,
+      location: "City Gym",
+      venueHidden: false,
+      cancelCutoffMin: 120,
+      refundRule: "until_cutoff",
+      lateRefundPct: 50,
+      teamId: "hawks",
+      teamName: "Hawks",
+      sports: ["soccer"],
+    });
+    expect(publicCalls).toContain('events.eq(["legacy_post_id","p1"])');
+    expect(viewerCalls).toContain('rpc.get_event_location({"_event":"e1"})');
+  });
+
+  it("returns null when there is no visible copy, so the page reads team_posts", async () => {
+    const pub = fakeClient({ events: { data: null, error: null } });
+    expect(await getTryoutFromEvents(pub, fakeClient({}), "p1")).toBeNull();
+  });
+
+  it("hides the venue when the lookup fails or returns nothing", async () => {
+    const pub = fakeClient({ events: { data: tryoutRow, error: null } });
+    for (const loc of [
+      { data: null, error: { message: "nope" } },
+      { data: [], error: null },
+    ]) {
+      const viewer = fakeClient({}, { get_event_location: loc });
+      const t = await getTryoutFromEvents(pub, viewer, "p1");
+      expect(t?.venueHidden).toBe(true);
+      expect(t?.location).toBeNull();
+    }
+  });
+
+  it("throws on a read error", async () => {
+    const pub = fakeClient({ events: { data: null, error: { message: "denied" } } });
+    await expect(getTryoutFromEvents(pub, fakeClient({}), "p1")).rejects.toThrow("denied");
+  });
+});
+
+describe("tryout page", () => {
+  it("reads events only behind the switch, and falls back to team_posts", () => {
+    const src = readFileSync("src/lib/tryouts.functions.ts", "utf8");
+    const fnAt = src.indexOf("export const getTryout = ");
+    const body = src.slice(fnAt, src.indexOf("export const", fnAt + 10));
+    const flagAt = body.indexOf("isEventsV2Enabled(");
+    const v2At = body.indexOf("getTryoutFromEvents(");
+    const legacyAt = body.indexOf('.from("team_posts")');
+    expect(flagAt).toBeGreaterThan(-1);
+    expect(v2At).toBeGreaterThan(flagAt);
+    expect(legacyAt).toBeGreaterThan(v2At);
+    expect(body).toMatch(/if \(v2\) return/);
+    expect(body).toMatch(/catch \(err\)[\s\S]*?using team_posts/);
   });
 });
 

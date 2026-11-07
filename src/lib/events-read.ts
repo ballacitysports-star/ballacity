@@ -106,6 +106,21 @@ export function toTeamEventRow(
   };
 }
 
+/** Registered seats per event, for the events the caller may see. Throws on error. */
+export async function fetchRegistrationCounts(
+  client: EventsClient,
+  ids: readonly string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (ids.length === 0) return counts;
+  const res = await client.rpc("get_event_registration_counts", { _ids: ids.slice(0, 200) });
+  if (res.error) throw new Error(res.error.message);
+  for (const r of (res.data ?? []) as { event_id: string; registered: number | null }[]) {
+    counts.set(String(r.event_id), Number(r.registered ?? 0));
+  }
+  return counts;
+}
+
 /** A team's tryouts and clinics from `events`. Throws on a read error so the caller can fall back. */
 export async function listTeamEventsFromEvents(
   client: EventsClient,
@@ -123,16 +138,9 @@ export async function listTeamEventsFromEvents(
   if (events.length === 0) return [];
   const ids = events.map((e) => e.id);
 
-  const regs = await client
-    .from("event_registrations")
-    .select("event_id")
-    .in("event_id", ids)
-    .eq("status", "registered");
-  if (regs.error) throw new Error(regs.error.message);
-  const counts = new Map<string, number>();
-  for (const r of (regs.data ?? []) as { event_id: string }[]) {
-    counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1);
-  }
+  // Seats come from get_event_registration_counts: a member may read only their own
+  // registrations, so counting rows here would undercount for everyone but staff.
+  const counts = await fetchRegistrationCounts(client, ids);
 
   // Venues fail closed: if the lookup fails, every venue shows as hidden.
   const locs = new Map<string, EventLocation>();
@@ -147,4 +155,86 @@ export async function listTeamEventsFromEvents(
     if (row) rows.push(row);
   }
   return rows;
+}
+
+/** The tryout page's listing, in the shape getTryout returns (see lib/tryouts.functions). */
+export type EventTryoutListing = {
+  id: string;
+  kind: "tryout" | "clinic";
+  title: string;
+  body: string;
+  eventDate: string | null;
+  location: string | null;
+  venueHidden: boolean;
+  price: number | null;
+  spotsMax: number | null;
+  spotsTaken: number;
+  cancelCutoffMin: number | null;
+  refundRule: string;
+  lateRefundPct: number;
+  teamId: string;
+  teamName: string;
+  teamAvatar: string | null;
+  sports: string[];
+};
+
+/**
+ * One tryout or clinic from `events`, found by its original post id, read as the public
+ * would read it (`publicClient`). Returns null when there is no visible copy (for example a
+ * youth event, which anonymous visitors cannot read from `events`): the caller then reads
+ * team_posts as before. The venue and seats are asked with the viewer's own client, so a
+ * registrant or staff member sees what they may. Throws on a read error.
+ */
+export async function getTryoutFromEvents(
+  publicClient: EventsClient,
+  viewerClient: EventsClient,
+  postId: string,
+): Promise<EventTryoutListing | null> {
+  const res = await publicClient
+    .from("events")
+    .select(
+      "id,legacy_post_id,kind,title,body,starts_at,price_cents,capacity,cancel_cutoff_min,refund_rule,late_refund_pct,team_id,teams!inner(name,avatar,sports)",
+    )
+    .eq("legacy_post_id", postId)
+    .in("kind", ["tryout", "clinic"])
+    .maybeSingle();
+  if (res.error) throw new Error(res.error.message);
+  const ev = res.data as
+    | (CopiedEvent & {
+        cancel_cutoff_min: number | null;
+        refund_rule: string | null;
+        late_refund_pct: number | null;
+        team_id: string;
+        teams: { name: string | null; avatar: string | null; sports: string[] | null } | null;
+      })
+    | null;
+  if (!ev || !ev.legacy_post_id || (ev.kind !== "tryout" && ev.kind !== "clinic")) return null;
+
+  const counts = await fetchRegistrationCounts(viewerClient, [ev.id]);
+  // Venues fail closed: an error or no row means the venue is hidden.
+  const loc = await viewerClient.rpc("get_event_location", { _event: ev.id });
+  const venue =
+    !loc.error && Array.isArray(loc.data) && loc.data.length > 0
+      ? (loc.data[0] as { formatted_address: string | null })
+      : null;
+
+  return {
+    id: ev.legacy_post_id,
+    kind: ev.kind,
+    title: ev.title,
+    body: ev.body ?? "",
+    eventDate: ev.starts_at,
+    location: venue?.formatted_address ?? null,
+    venueHidden: !venue,
+    price: ev.price_cents == null ? null : ev.price_cents / 100,
+    spotsMax: ev.capacity,
+    spotsTaken: counts.get(ev.id) ?? 0,
+    cancelCutoffMin: ev.cancel_cutoff_min,
+    refundRule: ev.refund_rule ?? "until_cutoff",
+    lateRefundPct: Number(ev.late_refund_pct ?? 0) || 0,
+    teamId: ev.team_id,
+    teamName: ev.teams?.name ?? "Team",
+    teamAvatar: ev.teams?.avatar ?? null,
+    sports: ev.teams?.sports ?? [],
+  };
 }

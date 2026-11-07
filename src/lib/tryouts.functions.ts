@@ -6,6 +6,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { fetchPostVenues } from "@/lib/post-venues";
+import { getTryoutFromEvents, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
 
 function publicClient() {
@@ -532,6 +533,21 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
 export const getTryout = createServerFn({ method: "GET" })
   .inputValidator((i) => z.object({ postId: z.string().uuid() }).parse(i))
   .handler(async ({ data }): Promise<TryoutListing | null> => {
+    // P2-1 stage 3b: read the events copy when the owner has switched it on. No visible copy,
+    // or any failure, falls back to the team_posts read below, which is what the page has always done.
+    const eventsPublic = publicClient() as unknown as EventsClient;
+    if (await isEventsV2Enabled(eventsPublic)) {
+      try {
+        const v2 = await getTryoutFromEvents(
+          eventsPublic,
+          viewerClient() as unknown as EventsClient,
+          data.postId,
+        );
+        if (v2) return { ...v2, cancelCutoffMin: normalizeCutoff(v2.cancelCutoffMin) };
+      } catch (err) {
+        console.warn("[tryout] events_v2 read failed; using team_posts", err);
+      }
+    }
     const { data: r, error } = await publicClient()
       .from("team_posts")
       .select(

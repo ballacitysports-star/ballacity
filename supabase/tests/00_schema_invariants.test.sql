@@ -53,6 +53,10 @@ SELECT t.eq(
       -- get_event_location returns the venue of an adult-only event to anyone (D0);
       -- for any other event it returns nothing unless the caller may see it.
       'public.get_event_location(_event uuid)',
+      -- get_event_registration_counts returns seat counts only (no names), and to an
+      -- anonymous caller only for listed adult-only events, the only events anon can read
+      -- (20261107160000_events_stage3b_registration_counts; test 660).
+      'public.get_event_registration_counts(_ids uuid[])',
       'public.get_game_host_paypal(_game_id text)',
       'public.get_game_join_policy(_game_id text)',
       'public.get_game_refund_terms(_game_id text)')),
