@@ -1,4 +1,4 @@
--- ROLLBACK for supabase/migrations/20261106200000_comment_reaction_notifications.sql (P1-5).
+-- ROLLBACK for supabase/migrations/20261107230000_comment_reaction_notifications.sql (P1-5).
 -- NOT a migration (outside supabase/migrations). It removes comment and reaction notifications AND reopens two
 -- gaps: any signed-in account can react to a minor's content again, and the comment rule again ignores games
 -- hosted by a minor (their host is not found). It refuses to run unless the session confirms:
