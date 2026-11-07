@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * OAuth returns where `document.referrer` is empty (direct navigation to
@@ -53,8 +54,11 @@ async function primeAuthWithEmptyReferrer(page: Page, options: { stashNext: bool
   expect(referrer).toBe("");
 }
 
-function stubAccountType(page: Page, accountType: string | null) {
-  return page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
+async function stubAccountType(page: Page, accountType: string | null) {
+  // The root gate asks the server first (getOnboardingStatus reads the profile
+  // server-side), so the table stub below only covers its client fallback.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(accountType));
+  await page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -67,8 +71,7 @@ function stubAccountType(page: Page, accountType: string | null) {
 async function emitOAuthSignedIn(page: Page, provider: string) {
   await page.evaluate(async (providerId) => {
     const mod = await import("/src/integrations/supabase/client.ts");
-    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-      .supabase;
+    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     if (!session) throw new Error("no session in test context");

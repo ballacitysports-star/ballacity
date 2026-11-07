@@ -165,7 +165,7 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
@@ -176,10 +176,10 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/Request to join/i);
+  await expect(banner).toContainText(/Request Spot/i);
 
   // CTA button shows "Request to join · N spot(s) left".
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 
@@ -200,13 +200,13 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
   // Invite params must survive the CTA click (no navigation strips them).
   const atRequest = new URL(joinPost!.urlAtRequest);
   expect(atRequest.pathname).toBe(`/games/${GAME_ID}`);
-  expect(atRequest.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(atRequest.searchParams.get("invite"));
   expect(atRequest.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   // And still present after the click settles.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   await ctx.close();

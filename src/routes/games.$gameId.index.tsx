@@ -93,6 +93,7 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
+import { subscribeGamePaymentChanges } from "@/lib/game-payment-channel";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
 import {
@@ -146,6 +147,7 @@ import { hostTeamLink, useGameHost } from "@/lib/game-host-team";
 import { getJoinGuardianNeeds } from "@/lib/join-guardian.functions";
 import { HOST_APPROVE_NOTE, hostBadge, joinWait, playerWaitCopy } from "@/lib/join-guardian-status";
 import { refundTermsDisplay } from "@/lib/refund-policy";
+import { useGameJoinPolicy } from "@/hooks/use-game-join-policy";
 import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import {
   CANCEL_CUTOFF_PRESETS,
@@ -361,6 +363,9 @@ function GameDetail() {
   const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const refundTerms = useGameRefundTerms(gameId, settings);
+  // The full settings row is host-and-linked-only, so a prospective viewer reads
+  // the host's approval setting from the public join-policy RPC instead.
+  const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -914,8 +919,11 @@ function GameDetail() {
   });
   const myHoldLabel = myHoldExpiresAt ? formatHoldRemaining(myHoldExpiresAt.getTime() - now) : null;
   // Host approval is the default. A game whose host hasn't saved settings yet
-  // is treated as request-to-join; hosts can opt out in game settings.
-  const hostRequiresApproval = settings ? !!settings.requires_approval : true;
+  // is treated as request-to-join; hosts can opt out in game settings. A
+  // prospective viewer can't read the settings row, so the public join-policy
+  // RPC supplies the host's actual flag; it's null until that resolves (or when
+  // there is no settings row), and then the default holds.
+  const hostRequiresApproval = publicRequiresApproval ?? true;
   // An age requirement forces the request-to-join flow for anyone outside the
   // range (or who hasn't shared a birthday), even on instant-join games.
   const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
@@ -4585,28 +4593,15 @@ function RosterPlayerRow({
       await loadPayment();
     })();
 
-    // Realtime: update paid chip immediately when this player's submission for this game changes.
-    const channel = supabase
-      .channel(`payment_submissions:${req.game_id}:${req.player_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payment_submissions",
-          filter: `player_id=eq.${req.player_id}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as any;
-          if (row?.game_id && row.game_id !== req.game_id) return;
-          loadPayment(true);
-        },
-      )
-      .subscribe();
+    // Realtime: update the paid chip as soon as this player's submission for this game
+    // changes. One channel per game is shared by every roster row (P2-6).
+    const unsubscribe = subscribeGamePaymentChanges(req.game_id, req.player_id, () =>
+      loadPayment(true),
+    );
 
     return () => {
       cancel = true;
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [req.player_id, req.game_id]);
 

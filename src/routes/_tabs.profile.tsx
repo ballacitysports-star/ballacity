@@ -77,6 +77,8 @@ import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
@@ -138,6 +140,15 @@ function PlayerProfile() {
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
   const { isParentMode } = useParentMode();
+  const childStatus = useMyChildStatus();
+  // Until the age status has loaded, the policy engine answers "allowed" for everything,
+  // so the shortcuts wait for it rather than flash a link a minor may not use.
+  const statusKnown = childStatus.isSuccess;
+  const quickLinks = meQuickLinks({
+    canHost: statusKnown && childStatus.can("game_hosting").allowed,
+    canUploadVideo: statusKnown && childStatus.can("video_upload").allowed,
+    parentMode: isParentMode,
+  });
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -471,6 +482,22 @@ function PlayerProfile() {
             <ChannelPill onClick={() => setReviewsOpen(true)}>
               <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
             </ChannelPill>
+            {quickLinks.map((l) =>
+              l.to === "/reels" ? (
+                <Link
+                  key={l.to}
+                  to="/reels"
+                  search={{ game: "", title: "", upload: "" }}
+                  className={channelPillClass()}
+                >
+                  {l.label}
+                </Link>
+              ) : (
+                <Link key={l.to} to={l.to} className={channelPillClass()}>
+                  {l.label}
+                </Link>
+              ),
+            )}
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
             <Link to="/settings" className={channelPillClass()}>
               Settings

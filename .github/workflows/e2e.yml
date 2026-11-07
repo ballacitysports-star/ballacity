@@ -83,6 +83,10 @@ jobs:
     # ceiling killed it, which also destroyed the JSON report and with it any
     # view of what actually failed. 75 leaves room to finish and still report.
     timeout-minutes: 75
+    # Read by the `E2E smoke` job below. It is "passed" only when the smoke gate step
+    # ran and exited 0; anything else (failed, skipped, cancelled) leaves it empty.
+    outputs:
+      smoke: ${{ steps.smoke.outputs.result }}
     env:
       # Force Playwright to use its own managed Chromium rather than the
       # sandbox-only path baked into playwright.config.ts.
@@ -247,6 +251,17 @@ jobs:
                 .map((t) => `  - ${t.title} — \`${clean(t.err) || "no message"}\``).join("\n")).join("\n") + "\n");
           '
 
+      # P0-9. Decides the `E2E smoke` check from the sanitized report: every test named
+      # in e2e/smoke-set.json must be present and have passed (a skip is not a pass).
+      # It reads only the sanitized file, holds no secrets and prints manifest titles,
+      # never report error text. The result line is written only after the gate exits 0.
+      - name: Check smoke set
+        id: smoke
+        if: always() && steps.redact.outputs.sanitized == 'true'
+        run: |
+          node .github/e2e-smoke-gate.mjs ci-sanitized/results.json e2e/smoke-set.json
+          echo "result=passed" >> "$GITHUB_OUTPUT"
+
       - name: Upload Playwright report
         # Only after the redactor succeeded. `always()` keeps it running after test failures.
         if: always() && steps.redact.outputs.sanitized == 'true'
@@ -258,3 +273,32 @@ jobs:
           path: ci-sanitized/results.json
           retention-days: 3
           if-no-files-found: error
+
+  # P0-9: the smoke subset as its own check, so it can be made a required status check
+  # (by the owner, in branch protection; see docs/e2e-smoke.md) while the full suite stays
+  # optional. It runs nothing itself: the Playwright job above runs the whole suite once
+  # and its "Check smoke set" step judges the smoke subset from the sanitized report.
+  #
+  # Fail closed. `always()` makes this job report even when Playwright failed, was
+  # cancelled by the shared sandbox queue, or was skipped (fork or Dependabot pull
+  # request); in every one of those cases the smoke set did not pass, so this fails.
+  # It has no checkout, no secrets, no environment and no token permissions.
+  smoke:
+    name: E2E smoke
+    needs: playwright
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require the smoke set to have passed
+        env:
+          SMOKE: ${{ needs.playwright.outputs.smoke }}
+          PLAYWRIGHT: ${{ needs.playwright.result }}
+        run: |
+          if [ "$SMOKE" = "passed" ]; then
+            echo "Every test in e2e/smoke-set.json passed."
+            exit 0
+          fi
+          echo "The smoke set did not pass (Playwright job: $PLAYWRIGHT). See the Playwright job's 'Check smoke set' step."
+          exit 1

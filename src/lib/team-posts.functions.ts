@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { parsePostImage } from "@/lib/post-image";
+import { TEAM_POST_PUBLIC_COLUMNS, fetchPostVenues, withVenues } from "@/lib/post-venues";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -47,12 +48,14 @@ export const listTeamPosts = createServerFn({ method: "GET" })
     const sb = viewerClient();
     const { data: rows, error } = await sb
       .from("team_posts" as any)
-      .select("*")
+      .select(TEAM_POST_PUBLIC_COLUMNS)
       .eq("team_id", data.teamId)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (rows ?? []) as any[];
+    // The venue is not a plain column for clients: see lib/post-venues.
+    type Row = { id: string } & Record<string, string | number | boolean | null>;
+    return withVenues(sb, (rows ?? []) as unknown as Row[]);
   });
 
 export const listRecentTeamPosts = createServerFn({ method: "GET" })
@@ -71,7 +74,7 @@ export const listRecentTeamPosts = createServerFn({ method: "GET" })
     const offset = data.offset ?? 0;
     let query = sb
       .from("team_posts" as any)
-      .select("*, teams!inner(id, name, sports, kind, avatar)")
+      .select(`${TEAM_POST_PUBLIC_COLUMNS}, teams!inner(id, name, sports, kind, avatar)`)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -80,27 +83,35 @@ export const listRecentTeamPosts = createServerFn({ method: "GET" })
     }
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
-    return ((rows ?? []) as any[]).map((r) => ({
-      id: r.id as string,
-      teamId: r.team_id as string,
-      teamName: (r.teams?.name ?? "Team") as string,
-      teamSports: (r.teams?.sports ?? []) as string[],
-      teamKind: (r.teams?.kind ?? "team") as string,
-      teamAvatar: (r.teams?.avatar ?? null) as string | null,
-      kind: r.kind as string,
-      title: r.title as string,
-      body: (r.body ?? "") as string,
-      eventDate: (r.event_date ?? null) as string | null,
-      location: (r.location ?? null) as string | null,
-      placeId: (r.place_id ?? null) as string | null,
-      formattedAddress: (r.formatted_address ?? null) as string | null,
-      lat: (r.lat ?? null) as number | null,
-      lng: (r.lng ?? null) as number | null,
-      price: (r.price ?? null) as number | null,
-      spotsMax: (r.spots_max ?? null) as number | null,
-      pinned: !!r.pinned,
-      createdAt: r.created_at as string,
-    }));
+    // The feed lists public posts only; the venue is asked as the viewer so members still
+    // see their own youth team's venue.
+    const venues = await fetchPostVenues(
+      viewerClient(),
+      ((rows ?? []) as any[]).map((r) => String(r.id)),
+    );
+    return ((rows ?? []) as any[])
+      .map((r) => ({ ...r, ...venues.get(String(r.id)) }))
+      .map((r) => ({
+        id: r.id as string,
+        teamId: r.team_id as string,
+        teamName: (r.teams?.name ?? "Team") as string,
+        teamSports: (r.teams?.sports ?? []) as string[],
+        teamKind: (r.teams?.kind ?? "team") as string,
+        teamAvatar: (r.teams?.avatar ?? null) as string | null,
+        kind: r.kind as string,
+        title: r.title as string,
+        body: (r.body ?? "") as string,
+        eventDate: (r.event_date ?? null) as string | null,
+        location: (r.location ?? null) as string | null,
+        placeId: (r.place_id ?? null) as string | null,
+        formattedAddress: (r.formatted_address ?? null) as string | null,
+        lat: (r.lat ?? null) as number | null,
+        lng: (r.lng ?? null) as number | null,
+        price: (r.price ?? null) as number | null,
+        spotsMax: (r.spots_max ?? null) as number | null,
+        pinned: !!r.pinned,
+        createdAt: r.created_at as string,
+      }));
   });
 
 const CreateInput = z.object({
@@ -171,10 +182,18 @@ export const createTeamPost = createServerFn({ method: "POST" })
         // if the image_url migration hasn't reached the database yet.
         ...(image.value ? { image_url: image.value } : {}),
       } as any)
-      .select("*")
+      .select(TEAM_POST_PUBLIC_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
-    const created = row as unknown as Record<string, unknown> & { id: string };
+    // Clients cannot read the venue columns back; the poster just sent them.
+    const created = {
+      ...(row as unknown as Record<string, unknown>),
+      location: data.location ?? null,
+      place_id: data.placeId ?? null,
+      formatted_address: data.formattedAddress ?? null,
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
+    } as unknown as Record<string, unknown> & { id: string };
     const status = await mod.settlePostModeration(supabaseAdmin, "team_posts", created.id, screen);
     return { ...created, moderation_status: status, held: status !== "approved" };
   });

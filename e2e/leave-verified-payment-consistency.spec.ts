@@ -289,9 +289,9 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
   await confirmBtn.click();
 
   // 3. CTA flips back to the pre-join state (approval + paid game → "Request to join").
-  await expect(
-    page.getByRole("button", { name: /request to join/i }),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: /request spot/i })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // 4. Status strip disappears — and stays gone after a realtime rehydrate window.
   await expect(strip).toHaveCount(0, { timeout: 10_000 });
@@ -306,10 +306,7 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
     await expect
       .poll(
         async () => {
-          const t = await page
-            .locator("text=/^\\d+\\s*\\/\\s*\\d+$/")
-            .first()
-            .textContent();
+          const t = await page.locator("text=/^\\d+\\s*\\/\\s*\\d+$/").first().textContent();
           return t ? parseInt(t.split("/")[0]!.trim(), 10) : NaN;
         },
         { timeout: 10_000, message: "roster count did not decrement after leave" },

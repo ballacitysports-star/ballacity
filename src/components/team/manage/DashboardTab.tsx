@@ -72,7 +72,8 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
       const now = Date.now();
       return {
         total: rows.length,
-        upcoming: rows.filter((r) => r.event_date && new Date(r.event_date).getTime() >= now).length,
+        upcoming: rows.filter((r) => r.event_date && new Date(r.event_date).getTime() >= now)
+          .length,
         tryouts: rows.filter((r) => r.kind === "tryout" || r.kind === "clinic").length,
         announcements: rows.filter((r) => r.kind === "announcement").length,
       };
@@ -87,7 +88,9 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
       </div>
     );
   if (roster.error || !roster.data || invites.error || !invites.data)
-    return <p className="text-sm text-coral">Couldn't load the dashboard. Try again in a moment.</p>;
+    return (
+      <p className="text-sm text-coral">Couldn't load the dashboard. Try again in a moment.</p>
+    );
 
   const { members, events, waiverVersion } = roster.data;
   const inv = invites.data.invites;
@@ -109,7 +112,12 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={<Users className="h-3.5 w-3.5" />} label="Roster" value={members.length} hint="players & staff" />
+        <StatCard
+          icon={<Users className="h-3.5 w-3.5" />}
+          label="Roster"
+          value={members.length}
+          hint="players & staff"
+        />
         <StatCard
           icon={<CalendarDays className="h-3.5 w-3.5" />}
           label="Events"
@@ -133,9 +141,9 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
       {posts.data && (
         <p className="flex items-start gap-2 rounded-2xl border border-border bg-surface p-3 text-xs text-muted-foreground">
           <ClipboardList className="mt-0.5 h-4 w-4 shrink-0" />
-          {posts.data.total} post{posts.data.total === 1 ? "" : "s"} total — {posts.data.tryouts} tryout/camp,{" "}
-          {posts.data.announcements} announcement{posts.data.announcements === 1 ? "" : "s"},{" "}
-          {posts.data.upcoming} upcoming.
+          {posts.data.total} post{posts.data.total === 1 ? "" : "s"} total — {posts.data.tryouts}{" "}
+          tryout/camp, {posts.data.announcements} announcement
+          {posts.data.announcements === 1 ? "" : "s"}, {posts.data.upcoming} upcoming.
         </p>
       )}
 
@@ -209,7 +217,10 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                   {going.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {going.map((r) => (
-                        <li key={r.userId} className="flex items-center justify-between gap-2 text-xs">
+                        <li
+                          key={r.userId}
+                          className="flex items-center justify-between gap-2 text-xs"
+                        >
                           <span className="flex items-center gap-2">
                             <UserAvatar avatarUrl={r.avatar} name={r.name} size="xs" />
                             <span className="font-medium">{r.name}</span>
@@ -218,15 +229,18 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                                 <ShieldCheck className="h-3 w-3" /> Parent applied
                               </span>
                             )}
-                            {!r.isMember && <span className="text-[10px] text-muted-foreground">new</span>}
+                            {!r.isMember && (
+                              <span className="text-[10px] text-muted-foreground">new</span>
+                            )}
                           </span>
-                          <span className="text-muted-foreground">{new Date(r.at).toLocaleDateString()}</span>
+                          <span className="text-muted-foreground">
+                            {new Date(r.at).toLocaleDateString()}
+                          </span>
                         </li>
                       ))}
                     </ul>
                   )}
                   <EmailApplicantsButton teamId={teamId} postId={e.id} count={going.length} />
-
                 </li>
               );
             })}
@@ -264,12 +278,16 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                 </p>
                 <ul className="space-y-2">
                   {unsignedMembers.map((m) => (
-                    <li key={m.userId} className="flex items-center gap-3 rounded-2xl border border-coral/30 bg-surface p-3">
+                    <li
+                      key={m.userId}
+                      className="flex items-center gap-3 rounded-2xl border border-coral/30 bg-surface p-3"
+                    >
                       <UserAvatar avatarUrl={m.avatar} initials={null} name={m.name} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{m.name}</p>
                         <p className="text-[11px] text-muted-foreground capitalize">
-                          {m.role}{m.jersey ? ` · #${m.jersey}` : ""}
+                          {m.role}
+                          {m.jersey ? ` · #${m.jersey}` : ""}
                         </p>
                       </div>
                       <WaiverBadge waiver={m.waiver} required />
@@ -285,12 +303,17 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
                 </p>
                 <ul className="space-y-2">
                   {signedMembers.map((m) => (
-                    <li key={m.userId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                    <li
+                      key={m.userId}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                    >
                       <UserAvatar avatarUrl={m.avatar} initials={null} name={m.name} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{m.name}</p>
                         <p className="text-[11px] text-muted-foreground capitalize">
-                          {m.role}{m.jersey ? ` · #${m.jersey}` : ""} · signed {new Date(m.waiver!.signedAt).toLocaleDateString()}
+                          {m.role}
+                          {m.jersey ? ` · #${m.jersey}` : ""} · signed{" "}
+                          {new Date(m.waiver!.signedAt).toLocaleDateString()}
                         </p>
                       </div>
                       <WaiverBadge waiver={m.waiver} required />
@@ -307,8 +330,9 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
         <div className="mb-3 flex items-center justify-between">
           <h2 className="section-eyebrow text-muted-foreground">Pending invites</h2>
           <Link
-            to="/teams/$teamId/invites"
+            to="/teams/$teamId/manage"
             params={{ teamId }}
+            search={{ tab: "invites" }}
             className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground"
           >
             All invites
@@ -321,7 +345,10 @@ export function DashboardTab({ teamId, teamName }: { teamId: string; teamName: s
         ) : (
           <ul className="space-y-2">
             {waiting.slice(0, 5).map((i) => (
-              <li key={i.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+              <li
+                key={i.id}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{i.name}</p>
                   <p className="text-[11px] text-muted-foreground">

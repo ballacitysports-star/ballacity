@@ -35,7 +35,11 @@ SELECT t.eq(
       -- private_sec is not exposed by the API; row level security policies call these.
       'private_sec.can_comment_on_minor_content(_commenter uuid, _content_owner uuid)',
       'private_sec.comment_subject_owner(_subject_type text, _subject_id text)',
+      'private_sec.event_is_listed(_event uuid)',
       'private_sec.guardian_public_profile(_user uuid)',
+      -- Called by public.team_post_venues (SECURITY INVOKER); returns a venue only when
+      -- the youth-venue rule allows it (20261106210000_youth_post_venue_privacy).
+      'private_sec.post_venue(_post uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
       'private_sec.reel_game_readable(_game_id text, _owner uuid)',
       'private_sec.reel_publicly_visible(_reel_id uuid)',
@@ -43,8 +47,14 @@ SELECT t.eq(
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',
       -- Public by design: the checkout page needs the host's PayPal merchant id and a
-      -- game's refund terms before the visitor signs in.
+      -- game's refund terms before the visitor signs in, and the game page needs the
+      -- join policy (requires_approval) so an open game shows one-tap join, not
+      -- request-to-join, to a visitor who can't read the full settings row.
+      -- get_event_location returns the venue of an adult-only event to anyone (D0);
+      -- for any other event it returns nothing unless the caller may see it.
+      'public.get_event_location(_event uuid)',
       'public.get_game_host_paypal(_game_id text)',
+      'public.get_game_join_policy(_game_id text)',
       'public.get_game_refund_terms(_game_id text)')),
   '', 'no unlisted SECURITY DEFINER function is callable by anonymous visitors');
 

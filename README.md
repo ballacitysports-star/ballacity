@@ -55,7 +55,11 @@ The platform supports:
 * Sports highlights
 * Social engagement
 * Video processing and format handling
-* Watermarking for AI-generated content
+* Clear about AI: reel videos are always the member's own footage. AI suggests the edit plan,
+  captions, hashtags and coaching notes, and the member chooses what to post. BallaCity does not
+  generate video or images with AI today (image generation is built in but switched off), so there
+  is no AI-generated media to watermark. If AI-generated media is ever launched, it must be
+  visibly marked as AI-generated before release (Phase 0 plan, P3-1).
 
 BallaCity's goal is to make sports content creation accessible without requiring advanced video-editing skills.
 
@@ -67,13 +71,13 @@ Capabilities include:
 
 * AI-generated posts
 * AI-assisted captions
-* AI-generated images
-* AI-generated video concepts/content
+* AI background removal for profile and team images (AI-generated images are planned, not launched)
+* AI-suggested video concepts and edit plans for your own footage
 * Reel creation assistance
 * Highlight creation
 * Content optimization
 * Sports-focused creative tools
-* AI-generated content watermarking
+* AI suggestions are drafts: a person reviews and chooses what is published
 
 The system is intended to evolve into an advanced creator studio for players, teams, gyms, and sports organizations.
 

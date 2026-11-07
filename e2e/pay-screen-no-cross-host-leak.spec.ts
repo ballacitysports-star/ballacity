@@ -168,8 +168,10 @@ test("Pay screen for HOST_A never renders or requests HOST_B's payment methods",
 
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
-  // HOST_A's method must be rendered.
-  await expect(page.getByText(HOST_A_LABEL).first()).toBeVisible({ timeout: 15_000 });
+  // HOST_A's method must be rendered. With one accepted method the screen opens
+  // it directly ("Send to @username" under the payment type), so the label only
+  // shows in the multi-method list. The username is HOST_A's own data either way.
+  await expect(page.getByText(HOST_A_USERNAME).first()).toBeVisible({ timeout: 15_000 });
 
   // HOST_B's data must never appear anywhere on the pay screen.
   const bodyText = await page.locator("body").innerText();

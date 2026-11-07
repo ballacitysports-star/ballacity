@@ -91,8 +91,8 @@ export function validateBirthday(value: string): string | null {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (d > today) return "Birthday cannot be in the future";
-  // Every age is supported. Under-13 birthdays are valid and route into the
-  // parental-consent flow (see src/lib/age-policy + src/lib/child-policy).
+  // Impossible values only. The minimum age (13) is enforced where a first date of birth
+  // is stored: sign-up and the age gate (checkDobParts) and set_my_birthday.
   return validateAgeMinimum(value);
 }
 

@@ -29,7 +29,7 @@ import {
   useAvatarVisibility,
   type AvatarVisibility,
 } from "@/lib/avatar-privacy";
-import { DeleteAccountButton } from "@/routes/settings";
+import { DeleteAccountButton } from "@/components/account/DeleteAccountButton";
 
 export const Route = createFileRoute("/account/privacy")({
   head: () =>

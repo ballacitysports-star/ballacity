@@ -144,7 +144,7 @@ test("failed first join request can be retried and lands on pending UI with invi
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // First tap — fails.
@@ -160,7 +160,7 @@ test("failed first join request can be retried and lands on pending UI with invi
   });
   await expect(page.getByText(/request pending · tap to cancel/i)).toHaveCount(0);
 
-  const retryCta = page.getByRole("button", { name: /request to join/i }).first();
+  const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeVisible();
   await expect(retryCta).toBeEnabled();
 
@@ -170,7 +170,7 @@ test("failed first join request can be retried and lands on pending UI with invi
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   // Pending status banner also visible.
   await expect(page.getByText(/waiting for host approval/i).first()).toBeVisible({
@@ -193,7 +193,7 @@ test("failed first join request can be retried and lands on pending UI with invi
   // Invite params preserved on the final URL.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 
