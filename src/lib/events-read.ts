@@ -32,11 +32,16 @@ export function parseEventsV2Setting(value: unknown): boolean {
 }
 
 export async function isEventsV2Enabled(client: EventsClient): Promise<boolean> {
+  return isAppSwitchOn(client, EVENTS_V2_SETTING_KEY);
+}
+
+/** An app_settings switch: on only for {"enabled": true}; missing, unreadable or failing reads as off. */
+export async function isAppSwitchOn(client: EventsClient, key: string): Promise<boolean> {
   try {
     const { data, error } = await client
       .from("app_settings")
       .select("value")
-      .eq("key", EVENTS_V2_SETTING_KEY)
+      .eq("key", key)
       .maybeSingle();
     if (error) return false;
     return parseEventsV2Setting((data as { value?: unknown } | null)?.value);
