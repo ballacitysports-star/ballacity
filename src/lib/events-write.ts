@@ -65,3 +65,26 @@ export async function cancelThroughEvents(
   });
   return { handled: true, error: error ? error.message : null };
 }
+
+/**
+ * P2-1 stage 4c: a coach's evaluation through save_event_evaluation, when events_v2_writes is on
+ * and the post has a copy. The database writes it back to tryout_evaluations, which the results
+ * page and the player's "Your result" still read.
+ */
+export async function saveEvaluationThroughEvents(
+  client: EventsClient,
+  postId: string,
+  userId: string,
+  args: { attended: boolean; score: number | null; notes: string | null },
+): Promise<EventsWrite> {
+  const eventId = await copiedEventForWrites(client, postId);
+  if (!eventId) return { handled: false };
+  const { error } = await client.rpc("save_event_evaluation", {
+    _event: eventId,
+    _user: userId,
+    _attended: args.attended,
+    _score: args.score,
+    _notes: args.notes,
+  });
+  return { handled: true, error: error ? error.message : null };
+}
