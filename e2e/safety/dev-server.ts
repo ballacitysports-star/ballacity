@@ -61,6 +61,15 @@ export const PAYMENTS_VAR = "VITE_PAYMENTS_CLIENT_TOKEN";
 export const PAYMENTS_PLACEHOLDER = "e2e-payments-disabled";
 /** A live Stripe-style key anywhere in a value. Stricter than the app, which only reads an exact lowercase prefix. */
 export const LIVE_PAYMENTS_KEY = /(?:^|[^a-z0-9])(?:pk|sk|rk)_live_/i;
+/**
+ * vite.config.ts bakes the PRODUCTION GA4 measurement id into the bundle whenever this is
+ * unset or empty, and src/components/AnalyticsHost.tsx loads the tag for signed-in
+ * confirmed adults, which the E2E fixture accounts include. The E2E server therefore
+ * always gets this fixed dummy id, so test runs never send events to the real property.
+ * e2e/safety/start-dev-server.mjs repeats these two constants; a test keeps them equal.
+ */
+export const ANALYTICS_VAR = "GOOGLE_ANALYTICS_MEASUREMENT_ID";
+export const ANALYTICS_PLACEHOLDER = "G-E2E0000000";
 /** Read as a fallback by one server function; never inherited, never set. */
 export const NEVER_SET_VARS = ["SUPABASE_ANON_KEY"] as const;
 
@@ -240,6 +249,13 @@ export function buildDevServerSpec(env: Env, target: E2eTarget): DevServerSpec {
     );
   }
 
+  // --- Analytics: a fixed dummy id, never the parent's value, never the production one ---
+  if (present(env[ANALYTICS_VAR]) && env[ANALYTICS_VAR]!.trim() !== ANALYTICS_PLACEHOLDER) {
+    problems.push(
+      `${ANALYTICS_VAR} is set to something other than the E2E dummy id. Unset it or use the dummy.`,
+    );
+  }
+
   // --- Base URL / port for Vite -------------------------------------------------------
   let host = "localhost";
   let port = "8080";
@@ -266,6 +282,7 @@ export function buildDevServerSpec(env: Env, target: E2eTarget): DevServerSpec {
   child[SERVER_KEY_VAR] = key!;
   child[BROWSER_KEY_VAR] = key!;
   child[PAYMENTS_VAR] = PAYMENTS_PLACEHOLDER;
+  child[ANALYTICS_VAR] = ANALYTICS_PLACEHOLDER;
   for (const [name, value] of Object.entries(child)) {
     if (LIVE_PAYMENTS_KEY.test(value))
       problems.push(`${name} holds a live payments key. The E2E server must never receive one.`);
@@ -335,6 +352,8 @@ export function assertLaunchedDevServer(webServer: unknown): void {
       if (!ok) problems.push("The launcher spec does not set every required variable explicitly.");
       if (env && env[PAYMENTS_VAR] !== PAYMENTS_PLACEHOLDER)
         problems.push("The launcher spec does not carry the E2E payments placeholder.");
+      if (env && env[ANALYTICS_VAR] !== ANALYTICS_PLACEHOLDER)
+        problems.push("The launcher spec does not carry the E2E analytics dummy id.");
       if (env && Object.values(env).some((v) => LIVE_PAYMENTS_KEY.test(String(v))))
         problems.push("The launcher spec carries a live payments key.");
       if (env && SERVICE_ROLE_VAR in env)

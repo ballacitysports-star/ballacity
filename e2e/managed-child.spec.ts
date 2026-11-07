@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/test";
 import { HAS_BACKEND, account, signInAs } from "./helpers/fixture-auth";
 
 /**

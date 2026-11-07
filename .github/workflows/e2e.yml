@@ -135,6 +135,9 @@ jobs:
       # VITE_PAYMENTS_CLIENT_TOKEN is set on purpose: vite.config.ts fills any unset or empty
       # variable from .env.production, which holds a LIVE Stripe key. The placeholder is not
       # a pk_* key, so the build reads as payments-not-configured and never loads Stripe.
+      # GOOGLE_ANALYTICS_MEASUREMENT_ID is set to a dummy on purpose: vite.config.ts bakes the
+      # production GA4 id into the bundle when it is unset, and fixture adults would then send
+      # funnel events to the real property. Playwright also blocks the Google tag hosts.
       - name: Build (dev mode)
         run: |
           node .github/e2e-preflight.mjs --runtime
@@ -149,6 +152,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
           VITE_PAYMENTS_CLIENT_TOKEN: e2e-payments-disabled
+          GOOGLE_ANALYTICS_MEASUREMENT_ID: G-E2E0000000
           SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
@@ -189,6 +193,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
           VITE_PAYMENTS_CLIENT_TOKEN: e2e-payments-disabled
+          GOOGLE_ANALYTICS_MEASUREMENT_ID: G-E2E0000000
           SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}

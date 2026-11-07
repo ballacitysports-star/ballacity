@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,7 +20,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 
 type Corners = { tl: number[]; tr: number[]; bl: number[]; br: number[] };
-type Diff = { totalPixels: number; mismatched: number; maxChannelDelta: number; meanChannelDelta: number };
+type Diff = {
+  totalPixels: number;
+  mismatched: number;
+  maxChannelDelta: number;
+  meanChannelDelta: number;
+};
 type Sample = { w: number; h: number; diff: Diff } & Corners;
 
 const EXPECTED: Corners = {
@@ -34,11 +39,11 @@ const EXPECTED: Corners = {
 // with a hard-edged 4-quadrant reference. A subtle regression (wrong flip axis,
 // 1px shift, wrong crop) blows past these instantly because it misplaces
 // entire quadrants worth of pixels.
-const PER_CHANNEL_TOL = 24;         // absolute delta before a pixel counts as "mismatched"
-const MAX_MISMATCH_RATIO = 0.08;    // ≤8% of pixels may exceed PER_CHANNEL_TOL — JPEG chroma-subsampling
-                                    // bleeds across the two hard quadrant seams (x=100, y=50)
-const MAX_MEAN_CHANNEL_DELTA = 6;   // avg per-channel delta across the whole image — a misplaced
-                                    // quadrant would push this to ~60, catching subtle mis-orientation
+const PER_CHANNEL_TOL = 24; // absolute delta before a pixel counts as "mismatched"
+const MAX_MISMATCH_RATIO = 0.08; // ≤8% of pixels may exceed PER_CHANNEL_TOL — JPEG chroma-subsampling
+// bleeds across the two hard quadrant seams (x=100, y=50)
+const MAX_MEAN_CHANNEL_DELTA = 6; // avg per-channel delta across the whole image — a misplaced
+// quadrant would push this to ~60, catching subtle mis-orientation
 const TOL = 15; // JPEG quantization noise on 200×100 fixtures
 
 const CASES = [
@@ -159,10 +164,22 @@ test.describe("image orientation normalization", () => {
       expect(result.h, `height for orientation ${orientation}`).toBe(100);
 
       // Corners should match the upright reference regardless of EXIF tag.
-      expect(close(result.tl, EXPECTED.tl), `TL for orientation ${orientation}: got ${result.tl}`).toBe(true);
-      expect(close(result.tr, EXPECTED.tr), `TR for orientation ${orientation}: got ${result.tr}`).toBe(true);
-      expect(close(result.bl, EXPECTED.bl), `BL for orientation ${orientation}: got ${result.bl}`).toBe(true);
-      expect(close(result.br, EXPECTED.br), `BR for orientation ${orientation}: got ${result.br}`).toBe(true);
+      expect(
+        close(result.tl, EXPECTED.tl),
+        `TL for orientation ${orientation}: got ${result.tl}`,
+      ).toBe(true);
+      expect(
+        close(result.tr, EXPECTED.tr),
+        `TR for orientation ${orientation}: got ${result.tr}`,
+      ).toBe(true);
+      expect(
+        close(result.bl, EXPECTED.bl),
+        `BL for orientation ${orientation}: got ${result.bl}`,
+      ).toBe(true);
+      expect(
+        close(result.br, EXPECTED.br),
+        `BR for orientation ${orientation}: got ${result.br}`,
+      ).toBe(true);
 
       // Whole-image pixel diff against the upright reference — catches subtle
       // orientation/crop regressions (wrong flip axis, 1px shift, wrong scale)
@@ -180,4 +197,3 @@ test.describe("image orientation normalization", () => {
     });
   }
 });
-

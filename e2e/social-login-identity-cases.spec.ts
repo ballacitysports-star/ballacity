@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 import { toJSONAsync } from "seroval";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 
@@ -153,7 +153,6 @@ async function readState(page: Page) {
   }
 }
 
-
 test.describe("social login: identity-present vs identity-missing", () => {
   for (const provider of ["google", "apple"] as const) {
     test(`identity-present (${provider}): new user lands on onboarding with state preserved`, async ({
@@ -242,7 +241,6 @@ test.describe("social login: identity-present vs identity-missing", () => {
     }
   });
 
-
   for (const provider of ["google", "apple"] as const) {
     test(`identity-present (${provider}), onboarding complete: saved next path is consumed`, async ({
       browser,
@@ -263,14 +261,11 @@ test.describe("social login: identity-present vs identity-missing", () => {
         await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
         // Consumed on success so a later sign-in doesn't re-navigate.
-        await expect
-          .poll(async () => (await readState(page)).next, { timeout: 10_000 })
-          .toBeNull();
+        await expect.poll(async () => (await readState(page)).next, { timeout: 10_000 }).toBeNull();
         expect((await readState(page)).provider).toBeNull();
       } finally {
         await context.close();
       }
     });
   }
-
 });

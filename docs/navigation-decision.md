@@ -33,8 +33,10 @@ argument against B.
 
 None that is quantitative.
 
-- **No analytics yet.** The funnel analytics tag only loads when `VITE_GA_MEASUREMENT_ID` is set.
-  It is not set in `.env.production`, and P0-8 (choosing an analytics vendor) is still open.
+- **The analytics tag is configured.** GA4 `G-MEWLGXSWXC` has been baked into every build since
+  #209 (2026-10-28): `vite.config.ts` sets `VITE_GA_MEASUREMENT_ID` from
+  `GOOGLE_ANALYTICS_MEASUREMENT_ID`, falling back to that id, and `src/components/AnalyticsHost.tsx`
+  loads the tag. E2E builds use a dummy id instead.
 - **Adults only.** Even once the tag is live, it measures confirmed adults only. That is a privacy
   rule in `src/lib/analytics.ts`. Minors, likely the heaviest Reels users, will not appear in the
   numbers. Weigh that when reading them.

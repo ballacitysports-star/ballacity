@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 import { HAS_BACKEND, account, signInAs } from "./helpers/fixture-auth";
 

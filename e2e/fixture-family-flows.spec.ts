@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 import { HAS_BACKEND, childStatus, signInAs, stubChildStatus } from "./helpers/fixture-auth";
 
 /**
@@ -47,9 +47,9 @@ test("Parent Center shows no linked children for a fresh fixture guardian", asyn
   await signInAs(page, "player2");
 
   await page.goto("/parent", { waitUntil: "domcontentloaded" });
-  await expect(
-    page.getByText(/No linked child accounts|Loading…/i).first(),
-  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/No linked child accounts|Loading…/i).first()).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("a child account is steered to the consent flow, not the guardian surface", async ({

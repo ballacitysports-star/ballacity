@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: applying the FilterBar sport chip on Feed, Players, Teams, and
@@ -34,7 +34,11 @@ async function restoreSession(page: Page) {
       "openrun:players-search",
       "openrun.feedPrefs.v1",
     ]) {
-      try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+      try {
+        window.localStorage.removeItem(k);
+      } catch {
+        /* ignore */
+      }
     }
   });
 }
@@ -43,7 +47,11 @@ async function countCards(page: Page): Promise<number> {
   // Feed/Players/Teams/Trainers render each result as an anchor link. This
   // covers grid, list, and map-off density variants without depending on
   // internal CSS class names.
-  return await page.locator('a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]').count();
+  return await page
+    .locator(
+      'a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]',
+    )
+    .count();
 }
 
 async function pickSport(page: Page, route: string) {
@@ -74,7 +82,9 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
         .first()
         .waitFor({ state: "visible", timeout: 15_000 });
     } else {
-      await page.getByRole("button", { name: "Filters" }).waitFor({ state: "visible", timeout: 15_000 });
+      await page
+        .getByRole("button", { name: "Filters" })
+        .waitFor({ state: "visible", timeout: 15_000 });
     }
 
     const baseline = await countCards(page);

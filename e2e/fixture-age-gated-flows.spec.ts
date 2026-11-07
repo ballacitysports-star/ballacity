@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 import { HOSTING_BLOCKED_MESSAGE } from "../src/lib/hosting-policy";
 import { hostingAllowedForCohort } from "../src/lib/hosting-policy";
 import { paymentsAllowedForCohort } from "../src/lib/payments-policy";
