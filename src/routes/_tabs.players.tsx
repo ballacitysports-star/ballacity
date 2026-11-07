@@ -461,8 +461,13 @@ function PlayersPage() {
     const hasWeekendDay = (days: string[]) => days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
       if (
-        !matchesSportSkillFilter(a.author_sport_levels, a.sports, a.skill_level, sports, skills, (s) =>
-          postTiersForSport(a, s),
+        !matchesSportSkillFilter(
+          a.author_sport_levels,
+          a.sports,
+          a.skill_level,
+          sports,
+          skills,
+          (s) => postTiersForSport(a, s),
         )
       )
         return false;
@@ -483,7 +488,8 @@ function PlayersPage() {
       if (minA !== null || maxA !== null) {
         const age = a.author_age ?? null;
         if (age === null) {
-          // No birthday on file — include only when the user has opted in.
+          // No birthday on file, or a minor whose age is only shown to their guardian:
+          // include only when the user has opted in.
           if (!includeUnknownAge) return false;
         } else {
           if (minA !== null && age < minA) return false;
@@ -505,7 +511,18 @@ function PlayersPage() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when, availableAs]);
+  }, [
+    list,
+    q,
+    sportsKey,
+    search.skill,
+    maxDistance,
+    ageMin,
+    ageMax,
+    includeUnknownAge,
+    when,
+    availableAs,
+  ]);
 
   const { coords } = useUserLocation();
   const sorted = useMemo(() => {
@@ -582,27 +599,29 @@ function PlayersPage() {
       </motion.div>
 
       {/* Browse everyone's availability, or manage your own posts/requests. */}
-      {!isParentMode && <div className="mb-4 flex gap-2">
-        {(
-          [
-            { id: "browse", label: "Browse" },
-            { id: "mine", label: "Mine" },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            aria-pressed={tab === t.id}
-            className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-colors ${
-              tab === t.id
-                ? "border-lime bg-lime text-primary-foreground"
-                : "border-border bg-surface text-muted-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>}
+      {!isParentMode && (
+        <div className="mb-4 flex gap-2">
+          {(
+            [
+              { id: "browse", label: "Browse" },
+              { id: "mine", label: "Mine" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+              className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-colors ${
+                tab === t.id
+                  ? "border-lime bg-lime text-primary-foreground"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!isParentMode && tab === "mine" ? (
         <div className="space-y-3 pb-6">
@@ -640,15 +659,17 @@ function PlayersPage() {
             searchPlaceholder="Search name, city, sport"
             activeFilterCount={activeFilterCount}
             sheetTitle="Filter players"
-            rightExtra={isParentMode ? undefined : (
-              <button
-                onClick={openPostFlow}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-                aria-label="Post availability"
-              >
-                <Plus className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            )}
+            rightExtra={
+              isParentMode ? undefined : (
+                <button
+                  onClick={openPostFlow}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+                  aria-label="Post availability"
+                >
+                  <Plus className="h-5 w-5" strokeWidth={2.5} />
+                </button>
+              )
+            }
             onReset={() => {
               markSportChoice("players");
               setSports([]);
@@ -800,20 +821,22 @@ function PlayersPage() {
         </>
       )}
 
-      {!isParentMode && <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Post availability</DialogTitle>
-          </DialogHeader>
-          <AvailabilityRequiredNotice
-            reason={availGate.reason}
-            onSwitched={() => {
-              setGateOpen(false);
-              setPostOpen(true);
-            }}
-          />
-        </DialogContent>
-      </Dialog>}
+      {!isParentMode && (
+        <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Post availability</DialogTitle>
+            </DialogHeader>
+            <AvailabilityRequiredNotice
+              reason={availGate.reason}
+              onSwitched={() => {
+                setGateOpen(false);
+                setPostOpen(true);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {!isParentMode && (postOpen || editingPost) && (
         <PostAvailabilityDialog
@@ -1222,9 +1245,7 @@ function AvailabilityCard({
           { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
         ].map((s) => (
           <div key={s.label}>
-            <dt className="micro-label text-muted-foreground">
-              {s.label}
-            </dt>
+            <dt className="micro-label text-muted-foreground">{s.label}</dt>
             <dd className="truncate text-xs font-semibold">{s.value}</dd>
           </div>
         ))}
@@ -1463,8 +1484,11 @@ function PostAvailabilityDialog({
                       const next = toggle(arr, s.name);
                       // Prefill from the profile tiers the first time a sport is added.
                       if (!arr.includes(s.name)) {
-                        const mine = levelTiers(myProfile?.sports.find((x) => x.name === s.name)?.level);
-                        if (mine.length) setLevels((l) => (l[s.name]?.length ? l : { ...l, [s.name]: mine }));
+                        const mine = levelTiers(
+                          myProfile?.sports.find((x) => x.name === s.name)?.level,
+                        );
+                        if (mine.length)
+                          setLevels((l) => (l[s.name]?.length ? l : { ...l, [s.name]: mine }));
                       }
                       return next;
                     });
@@ -1488,7 +1512,9 @@ function PostAvailabilityDialog({
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {scale.system}
                     </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">Pick all that fit</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      Pick all that fit
+                    </span>
                   </div>
                   <TierChips
                     scale={scale}
@@ -1499,7 +1525,9 @@ function PostAvailabilityDialog({
                         const cur = l[name] ?? [];
                         return {
                           ...l,
-                          [name]: cur.includes(tier) ? cur.filter((t) => t !== tier) : [...cur, tier],
+                          [name]: cur.includes(tier)
+                            ? cur.filter((t) => t !== tier)
+                            : [...cur, tier],
                         };
                       })
                     }
@@ -1549,11 +1577,17 @@ function PostAvailabilityDialog({
               <Label>Travel radius</Label>
               <DistanceSlider
                 valueMi={
-                  radius >= maxDistanceInUnit(unit) ? null : unit === "km" ? radius / 1.609344 : radius
+                  radius >= maxDistanceInUnit(unit)
+                    ? null
+                    : unit === "km"
+                      ? radius / 1.609344
+                      : radius
                 }
                 onChange={(mi) =>
                   setRadius(
-                    mi == null ? maxDistanceInUnit(unit) : Math.round(unit === "km" ? miToKm(mi) : mi),
+                    mi == null
+                      ? maxDistanceInUnit(unit)
+                      : Math.round(unit === "km" ? miToKm(mi) : mi),
                   )
                 }
                 unit={unit}
