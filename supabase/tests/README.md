@@ -60,6 +60,7 @@ platform the migrations assume (the API roles and their default grants, the `aut
 | `540_team_announcement_notifications.test.sql` | An approved team announcement notifies every member once, except the author and anyone with a block either way; pending, held, hidden and non-announcement posts notify nobody                                                                                                                                |
 | `550_comment_reaction_notifications.test.sql`  | Owners of posts, games and highlights hear about approved comments and reactions (never their own, never across a block, no repeats); reacting to a minor's content follows the comment rule; a game's owner is found by its text id                                                                          |
 | `580_games_near.test.sql`                      | Server-side game discovery: radius, sport, soonest or nearest, paging; never lists private, hidden, cancelled or past games; a signed-out visitor still sees adult-only games only                                                                                                                            |
+| `690_capture_structured_reviews.test.sql`      | A replay builds exactly production's structured-review schema (columns, recommend check, four functions) and its order of the messages body/attachment check, pinned to production's definitions                                                                                                              |
 
 ## Races
 
