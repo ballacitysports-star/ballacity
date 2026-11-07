@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import {
   Building2,
   MapPin,
@@ -202,6 +203,10 @@ function OrgPage() {
         reviewCount={reviewSummary.count}
       >
         <div className="flex flex-col gap-2">
+          {isOwner && <EntityFollowerCount kind="org" id={orgId} />}
+          {(!auth.user || (access.data && !access.data.isOwner && !access.data.unclaimed)) && (
+            <FollowEntityButton kind="org" id={orgId} name={org.name} className="self-start" />
+          )}
           <MembershipCta orgId={orgId} members={members} />
           <MemberJoinCta orgId={orgId} />
         </div>

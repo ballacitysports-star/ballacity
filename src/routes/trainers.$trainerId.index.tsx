@@ -27,7 +27,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { GAMES, type Org } from "@/lib/sample-data";
-import { ensureOrgById, isMyOrg } from "@/lib/org-store";
+import { ensureOrgById, isMyOrg, isOrgUnclaimed } from "@/lib/org-store";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation } from "@/lib/reviews";
@@ -351,6 +352,10 @@ function TrainerPage({ org }: { org: Org }) {
               >
                 <Star className="h-3.5 w-3.5" /> Review
               </Link>
+            )}
+            {canEdit && <EntityFollowerCount kind="team" id={org.id} />}
+            {mounted && !canEdit && !isOrgUnclaimed(org.id) && (
+              <FollowEntityButton kind="team" id={org.id} name={org.name} />
             )}
           </div>
         </div>

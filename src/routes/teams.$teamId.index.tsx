@@ -42,6 +42,7 @@ import { useTeamPermissions } from "@/lib/team-roster";
 import { SignTeamWaiverCard } from "@/components/team/SignTeamWaiverCard";
 import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import { PostCard } from "@/components/PostCard";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -360,6 +361,10 @@ function TeamPage({ org }: { org: Org }) {
             >
               <Share2 className="h-3.5 w-3.5" /> Share
             </button>
+            {canEdit && <EntityFollowerCount kind="team" id={org.id} />}
+            {mounted && !canEdit && !isUnclaimed && (
+              <FollowEntityButton kind="team" id={org.id} name={org.name} />
+            )}
           </div>
         </div>
 
@@ -377,10 +382,7 @@ function TeamPage({ org }: { org: Org }) {
             sports: (org.sports ?? []).map((s) => ({ name: s })),
             trustScore: orgRep.count ? orgRep.trustScore : undefined,
             reviewCount: orgRep.count,
-            extras: [
-              org.followers ? `${org.followers.toLocaleString()} followers` : null,
-              org.founded ? `Est. ${org.founded}` : null,
-            ],
+            extras: [org.founded ? `Est. ${org.founded}` : null],
           }}
         />
 
@@ -427,8 +429,6 @@ function TeamPage({ org }: { org: Org }) {
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-3 gap-2">
-          {/* Following a team is not built yet (a team id is not an account), so this shows
-              the review count rather than a follower number that could never change. */}
           <Stat
             label="Reviews"
             value={String(orgRep.count)}
