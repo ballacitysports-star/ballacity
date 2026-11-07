@@ -1,4 +1,4 @@
--- ROLLBACK for supabase/migrations/20261106190000_team_announcement_notifications.sql (P1-6).
+-- ROLLBACK for supabase/migrations/20261107220000_team_announcement_notifications.sql (P1-6).
 -- NOT a migration (outside supabase/migrations). It stops team announcements from notifying members.
 -- Notifications already delivered stay in members' inboxes. It refuses to run unless the session confirms:
 --     PGOPTIONS="-c app.confirm_stop_announcement_notifications=yes" psql ... -f <this file>
