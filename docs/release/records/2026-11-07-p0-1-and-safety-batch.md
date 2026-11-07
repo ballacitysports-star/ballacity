@@ -72,11 +72,28 @@ apply went through Lovable's database tool (`query_database`) on the published p
 | #330 | 0 tryout or clinic posts with a stored venue, so nothing visibly changed today                                                    |
 | #332 | 184 signed-out sign-in events lost their full user agent (owner decision; this cannot be undone). No minors' rows needed clearing |
 
+## P0-1 step E: catalog fingerprint (read-only, after the batch)
+
+`docs/migration-evidence/catalog-fingerprint-cte.sql` (per-row form) was run on production and on a local replay of
+`main` at `9cc42d2b` (405 migrations, postgres 16). 2,940 objects on production, 2,934 in the replay.
+
+- **Only in the replay:** none.
+- **Only on production (6), all expected:** drift register rows 1 to 3, which #245 captures:
+  - columns `reviews.answers`, `reviews.recommend`, `reviews.tags`;
+  - constraint `reviews_recommend_check`;
+  - functions `review_question_keys(text)`, `review_tag_keys(text)`.
+- **Different (3):**
+  - `enforce_review_integrity()` and `player_trait_counts(uuid)`: expected (drift rows 1 to 3, #245).
+  - `messages.messages_body_or_attachment_chk`: **new drift, cosmetic.** Production reads
+    `deleted_at IS NOT NULL OR (body IS NOT NULL AND length(btrim(body)) > 0) OR attachment_path IS NOT NULL`, and `main`
+    has the same three conditions in a different order. Same logic. Recorded here, not changed by hand, as the runbook
+    says. A capture migration that writes production's order would make the fingerprints match exactly.
+
 ## Not done here
 
 - **Ledger groups A, B, C and E** of `docs/release/p0-1-ledger-rows.sql` (older hand-applied history). Each needs the
   owner's approval per group.
-- **P0-1 step E** (catalog fingerprint of all of production against a replay of `main`), **step F** (activate the `main`
+- **P0-1 step F** (activate the `main`
   ruleset) and **step G** (how Lovable works under the ruleset).
 - **Held PRs with migrations still not on production:** #315, #317, #343 (events stage 1), #344 and #345 (coach identity).
 - **A check of the live site** from this session (the proxy refuses it). Owner's smoke test: a team page with a tryout
