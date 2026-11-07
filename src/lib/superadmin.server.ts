@@ -76,6 +76,17 @@ export const CONTENT_KINDS = {
     hideCol: "hidden_at",
     textStatusCol: "moderation_status",
   },
+  network_posts: {
+    table: "posts",
+    idCol: "id",
+    label: "Network post",
+    select:
+      "id, author_id, posted_as, team_id, org_id, kind, audience, body, hidden_at, deleted_at, moderation_status, created_at",
+    searchCols: ["body"],
+    orderBy: "created_at",
+    hideCol: "hidden_at",
+    textStatusCol: "moderation_status",
+  },
   availability: {
     table: "player_availabilities",
     idCol: "id",

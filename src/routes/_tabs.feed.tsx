@@ -50,6 +50,7 @@ import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
 import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
+import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
 import { kindsForFeedType, parseFeedType, type FeedType } from "@/lib/feed-events";
 import { isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
 import { supabase as feedEventsClient } from "@/integrations/supabase/client";
@@ -573,6 +574,8 @@ function Feed() {
           heading={feedType === "all" ? "Tryouts & clinics" : undefined}
         />
       )}
+      {/* Posts (network_posts switch) belong to All: people, teams and venues, with a Following tab. */}
+      {tab !== "archive" && feedType === "all" && <NetworkPostsSection />}
       {showGames && (
         <>
           {/* Tier 2: where you are + run count on the left (tap to update
