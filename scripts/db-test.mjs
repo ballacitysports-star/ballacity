@@ -17,8 +17,8 @@
 // together, so they are replayed together in timestamp order (a drizzle entry's
 // time is `when` in its journal; at the same instant ours goes first).
 import { spawn, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import { dedupeMigrations } from "./migration-twins.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -227,23 +227,25 @@ try {
     if (r.status !== 0) fail("The Supabase platform stub failed to load.", r.stderr);
 
     // -- replay -------------------------------------------------------------
-    const migrations = migrationOrder();
+    let migrations;
+    try {
+      const order = dedupeMigrations(migrationOrder());
+      migrations = order.replay;
+      if (order.skipped.length > 0)
+        console.log(
+          `Skipped ${order.skipped.length} known identical copies (applied once): ${order.skipped
+            .map((t) => t.name)
+            .join(", ")}`,
+        );
+    } catch (e) {
+      fail(e.message);
+    }
     const started = Date.now();
     for (const migration of migrations) {
       let sql = readFileSync(migration.path, "utf8");
       if (stripMaintain) sql = sql.replace(/,\s*MAINTAIN\b/gi, "");
       r = psql(dbName, ["-1"], sql);
-      if (r.status !== 0) {
-        // The same migration committed to both folders applies twice. Most are
-        // repeatable and harmless; one that creates a table is not, and the error
-        // alone ("already exists") does not say why. Name the other copy.
-        const digest = (m) => createHash("sha256").update(readFileSync(m.path)).digest("hex");
-        const twin = migrations.find((m) => m !== migration && digest(m) === digest(migration));
-        const hint = twin
-          ? `\nThis file is identical to ${twin.name}, which is also replayed. Keep one: if Lovable already applied the drizzle copy, remove the supabase/migrations one.`
-          : "";
-        fail(`Migration failed to apply: ${migration.name}${hint}`, r.stderr);
-      }
+      if (r.status !== 0) fail(`Migration failed to apply: ${migration.name}`, r.stderr);
     }
     console.log(
       `Replayed ${migrations.length} migrations in ${((Date.now() - started) / 1000).toFixed(1)}s.`,

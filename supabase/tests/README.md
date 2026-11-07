@@ -21,7 +21,10 @@ anything else on that server. Supabase runs Postgres 17; 16 also works.
 drizzle entry's time is `when` in its `meta/_journal.json`). The live schema is both folders: the second is
 what Lovable writes and applies itself. `support/supabase-stub.sql` stands in for the parts of the Supabase
 platform the migrations assume (the API roles and their default grants, the `auth`, `storage`, `realtime` and
-`vault` schemas, `auth.uid()`). If a migration fails to apply here, it would fail on a rebuild too. If it fails because the same file is committed to both folders, the error names the other copy: keep one (the drizzle copy if Lovable already applied it).
+`vault` schemas, `auth.uid()`). If a migration fails to apply here, it would fail on a rebuild too. Each migration is applied once (P0-4): nine files were committed to both folders with identical content, and the
+replay applies whichever copy comes first and skips its twin (`scripts/migration-twins.mjs` lists them; production
+applied each once, and the replayed schema matches production's fingerprint). Any other identical copy fails the
+replay, naming both files: commit a migration to one folder only (keep the drizzle copy if Lovable already applied it).
 
 ## The files
 
