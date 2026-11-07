@@ -1,5 +1,5 @@
 {
-  "$comment": "P0-9 E2E smoke set. Each entry names one Playwright test by spec file and title path (describe titles, then the test title, joined with ' › '). The 'E2E smoke' check passes only when every entry ran and passed. Chosen 2026-11-06 from tests that passed in all four recent sandbox runs (PRs #298, #304, #314, #317). Add a spec here only after it has passed on the sandbox; see docs/e2e-smoke.md.",
+  "$comment": "P0-9 E2E smoke set. Each entry names one Playwright test by spec file and title path (describe titles, then the test title, joined with ' › '). The 'E2E smoke' check passes only when every entry ran and passed. Chosen 2026-11-06 from tests that passed in all four recent sandbox runs (PRs #298, #304, #314, #317); the two pay-screen security specs added 2026-11-07 after passing in three runs (#341, #334, #347). Add a spec here only after it has passed on the sandbox; see docs/e2e-smoke.md.",
   "tests": [
     {
       "file": "desktop-refresh-protected.spec.ts",
@@ -104,6 +104,14 @@
     {
       "file": "invite-fallback-params.spec.ts",
       "title": "unknown gameId with invite params → routes to notFound fallback, not invite flow"
+    },
+    {
+      "file": "pay-screen-no-cross-host-leak.spec.ts",
+      "title": "Pay screen for HOST_A never renders or requests HOST_B's payment methods"
+    },
+    {
+      "file": "pay-screen-rpc-and-empty-state.spec.ts",
+      "title": "Pay screen uses host-scoped RPC and renders empty state when no methods"
     }
   ]
 }

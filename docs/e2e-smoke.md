@@ -7,7 +7,7 @@ us an E2E signal we can trust while the rest of the suite is repaired.
 ## How it works
 
 - `e2e/smoke-set.json` lists the smoke tests by spec file and title path. A title path is the
-  describe titles, then the test title, joined with `›`. The file lists 26 tests.
+  describe titles, then the test title, joined with `›`. The file lists 28 tests.
 - The `Playwright` job runs the whole suite once, as before. After the report is sanitized, its
   `Check smoke set` step runs `.github/e2e-smoke-gate.mjs` on `ci-sanitized/results.json`.
 - The gate passes only if every listed test is in the report and passed. A skipped, missing
@@ -32,17 +32,19 @@ That runs the whole of each listed file. The gate then judges only the listed te
 The tests were chosen on 2026-11-06. Each passed in all four sandbox runs available then: #298 run
 42138934406 attempt 3, and the latest runs of #304, #314 and #317. None was skipped in any of them.
 
-| Area                                    | Spec                                                    | Tests |
-| --------------------------------------- | ------------------------------------------------------- | ----- |
-| Route persistence on refresh            | `desktop-refresh-protected`, `mobile-refresh-protected` | 7     |
-| Sign-in, session survival, bad password | `fixture-auth-flows`                                    | 7     |
-| Minor and consent safety                | `fixture-age-gated-flows`, `child-lifecycle-cohorts`    | 7     |
-| No leaks on public reel pages           | `public-reel-page`                                      | 3     |
-| Signed-out entry and invite fallback    | `signed-out-preview`, `invite-fallback-params`          | 2     |
+| Area                                    | Spec                                                              | Tests |
+| --------------------------------------- | ----------------------------------------------------------------- | ----- |
+| Route persistence on refresh            | `desktop-refresh-protected`, `mobile-refresh-protected`           | 7     |
+| Sign-in, session survival, bad password | `fixture-auth-flows`                                              | 7     |
+| Minor and consent safety                | `fixture-age-gated-flows`, `child-lifecycle-cohorts`              | 7     |
+| No leaks on public reel pages           | `public-reel-page`                                                | 3     |
+| Signed-out entry and invite fallback    | `signed-out-preview`, `invite-fallback-params`                    | 2     |
+| Payment security (no cross-host leak)   | `pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state` | 2     |
 
-The audit also names the invite happy path and the two payment security specs
-(`pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state`). They are left out because they
-still fail on the sandbox. Add them once #298 is merged and they have passed there.
+The two payment security specs (`pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state`)
+were added on 2026-11-07, after #298 and #341 fixed them and they passed in three sandbox runs (#341,
+#334, #347). The audit also names the invite happy path. It is still left out because it fails on
+the sandbox (the invite and join specs wait on the payment-settings guard decision).
 
 ## Changing the set
 
