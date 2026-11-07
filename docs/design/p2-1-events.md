@@ -140,3 +140,6 @@ event_availability    -- generalises team_event_availability
   2026-11-07). Moderation, the team feed, venue privacy and AI drafting stay on `team_posts`, and the
   stage 2 mirror keeps `events` in step. Only new things (camps, tournaments, facility events, stage 5)
   are created as events. Stage 4 therefore covers sign-ups (4a) and coach evaluations (4c) only.
+- **D7. Trainer group sessions become events (replaces D3, recorded 2026-11-07).** Trainers can post group clinics and
+  camps as events; 1-on-1 sessions stay booking requests. Venues create events too (stage 5). See
+  `docs/design/home-feed.md` (F3, F4).
