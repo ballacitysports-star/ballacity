@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
+vi.mock("@/components/PostLikeButton", () => ({
+  PostLikeButton: () => <button type="button">Like</button>,
+}));
 vi.mock("@/components/ResponsiveImage", () => ({
   ResponsiveImage: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }));
