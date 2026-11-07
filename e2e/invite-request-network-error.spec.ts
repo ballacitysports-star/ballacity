@@ -149,7 +149,7 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // First tap — starts the doomed POST.
@@ -186,7 +186,7 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
     timeout: 5_000,
   });
 
-  const retryCta = page.getByRole("button", { name: /request to join/i }).first();
+  const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeVisible({ timeout: 5_000 });
   await expect(retryCta).toBeEnabled();
   // Pending UI must NOT be showing yet.
@@ -198,7 +198,7 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
   // Exactly two POSTs total: one failed, one successful retry.
   await page.waitForTimeout(500);

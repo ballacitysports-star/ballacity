@@ -5429,6 +5429,12 @@ export type Database = {
           merchant_id: string
         }[]
       }
+      get_game_join_policy: {
+        Args: { _game_id: string }
+        Returns: {
+          requires_approval: boolean
+        }[]
+      }
       get_game_refund_terms: {
         Args: { _game_id: string }
         Returns: {
@@ -5657,6 +5663,10 @@ export type Database = {
       }
       minor_messaging_block: {
         Args: { _a: string; _b: string }
+        Returns: string
+      }
+      minor_messaging_block_me: {
+        Args: { _other: string }
         Returns: string
       }
       minor_messaging_block_reason: {

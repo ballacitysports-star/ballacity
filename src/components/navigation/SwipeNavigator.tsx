@@ -6,6 +6,7 @@ import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { isTabPath, tabsForMode, type SwipeIntent } from "@/lib/navigation-gestures";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { trackTabSelect } from "@/lib/nav-analytics";
 
 /**
  * Wraps the routed view so horizontal swipes navigate, the way Instagram and
@@ -55,10 +56,11 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
       if (intent.kind === "back") {
         router.history.back();
       } else if (intent.kind === "tab") {
+        trackTabSelect(intent.to, "swipe", pathname);
         router.navigate({ to: intent.to });
       }
     },
-    [router],
+    [router, pathname],
   );
 
   const { state, handlers } = useSwipeNavigation({

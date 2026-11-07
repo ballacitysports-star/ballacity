@@ -75,11 +75,9 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     ]);
 
     // --- Baseline: viewer is NOT joined on any surface ---
-    const joinCta = detailPage
-      .getByRole("button", { name: /join free|you're in|full/i })
-      .first();
+    const joinCta = detailPage.getByRole("button", { name: /join run|you're in|full/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
-    await expect(joinCta).toContainText(/join free/i);
+    await expect(joinCta).toContainText(/join run/i);
 
     // Feed card for this game shouldn't show a "Joined" pill yet. Cards
     // link to /games/<id> — locate by href.
@@ -119,15 +117,15 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
       .first()
       .click();
 
-    await expect(
-      detailPage.getByRole("button", { name: /join free/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(detailPage.getByRole("button", { name: /join run/i }).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     await expect
-      .poll(
-        async () => await profilePage.locator(`a[href*="/games/${GAME_ID}"]`).count(),
-        { timeout: 15_000, message: "profile still shows joined game after leaving" },
-      )
+      .poll(async () => await profilePage.locator(`a[href*="/games/${GAME_ID}"]`).count(), {
+        timeout: 15_000,
+        message: "profile still shows joined game after leaving",
+      })
       .toBe(0);
 
     if (feedCardCount > 0) {

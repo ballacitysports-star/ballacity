@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * OAuth returns where `document.referrer` is NOT `/` (e.g. user tapped a
@@ -27,8 +28,11 @@ const NEXT_KEY = "openrun:oauth-next";
 const NEXT_PATH = "/players?src=non-root-referrer-e2e";
 const REFERRER_PATH = "/players";
 
-function stubAccountType(page: Page, accountType: string | null) {
-  return page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
+async function stubAccountType(page: Page, accountType: string | null) {
+  // The root gate asks the server first (getOnboardingStatus reads the profile
+  // server-side), so the table stub below only covers its client fallback.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(accountType));
+  await page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -62,8 +66,7 @@ async function primeAndLandOnAuth(page: Page) {
 async function emitOAuthSignedIn(page: Page, provider: string) {
   await page.evaluate(async (providerId) => {
     const mod = await import("/src/integrations/supabase/client.ts");
-    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-      .supabase;
+    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     if (!session) throw new Error("no session in test context");
@@ -124,12 +127,9 @@ test.describe("OAuth from /auth with non-root referrer", () => {
         await emitOAuthSignedIn(page, provider);
 
         // Must NOT bounce to `/` and must NOT go to onboarding.
-        await expect(page).toHaveURL(
-          new RegExp(
-            "/players(?:[?#/].*)?$".replace(/\//g, "\\/"),
-          ),
-          { timeout: 15_000 },
-        );
+        await expect(page).toHaveURL(new RegExp("/players(?:[?#/].*)?$".replace(/\//g, "\\/")), {
+          timeout: 15_000,
+        });
         await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
         await expect(page).not.toHaveURL(/^https?:\/\/[^/]+\/?$/);
       } finally {

@@ -123,12 +123,14 @@ async function signIn(page: Page) {
 }
 
 const gate = (page: Page) =>
-  page.getByText(/parent or guardian|turned this account off/i);
+  page.getByText(/parent approval needed|parent or guardian|turned this account off/i);
 
 test.describe("child lifecycle: consent gate per cohort", () => {
   const blocked: Array<[string, Consent["status"], RegExp]> = [
-    ["consent required", "required", /A parent or guardian needs to approve this account/i],
-    ["consent pending", "pending", /Waiting for your parent or guardian/i],
+    // ChildConsentGate shows the same banner for "required" and "pending"; only
+    // the link differs (Start approval / Check status), asserted below.
+    ["consent required", "required", /Parent approval needed/i],
+    ["consent pending", "pending", /Parent approval needed/i],
     ["consent revoked", "revoked", /A parent or guardian turned this account off/i],
   ];
 
@@ -188,9 +190,7 @@ test.describe("child lifecycle: consent gate per cohort", () => {
     });
   }
 
-  test("a blocked child can still reach the consent flow and safety pages", async ({
-    browser,
-  }) => {
+  test("a blocked child can still reach the consent flow and safety pages", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {

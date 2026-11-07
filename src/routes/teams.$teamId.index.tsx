@@ -224,7 +224,6 @@ function TeamPage({ org }: { org: Org }) {
     navigate({ to: ".", search: { ...search, filter: v === "all" ? "" : v }, replace: true });
   const setReviewsOpen = (v: boolean) =>
     navigate({ to: ".", search: { ...search, modal: v ? "reviews" : "" }, replace: true });
-  const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -284,11 +283,7 @@ function TeamPage({ org }: { org: Org }) {
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
-        <BackButton
-          fallbackTo="/teams"
-          variant="overlay"
-          className="absolute top-4 left-4"
-        />
+        <BackButton fallbackTo="/teams" variant="overlay" className="absolute top-4 left-4" />
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -365,18 +360,6 @@ function TeamPage({ org }: { org: Org }) {
             >
               <Share2 className="h-3.5 w-3.5" /> Share
             </button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setFollowing((f) => !f)}
-              data-render="ssr-stable"
-              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                following
-                  ? "border border-border bg-surface text-foreground"
-                  : "bg-lime-gradient text-primary-foreground glow-lime"
-              }`}
-            >
-              {following ? "Following ✓" : "Follow"}
-            </motion.button>
           </div>
         </div>
 
@@ -444,10 +427,12 @@ function TeamPage({ org }: { org: Org }) {
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-3 gap-2">
+          {/* Following a team is not built yet (a team id is not an account), so this shows
+              the review count rather than a follower number that could never change. */}
           <Stat
-            label="Followers"
-            value={org.followers.toLocaleString()}
-            icon={<Users className="h-3.5 w-3.5 text-lime" />}
+            label="Reviews"
+            value={String(orgRep.count)}
+            icon={<Star className="h-3.5 w-3.5 text-lime" />}
           />
           {org.kind === "team" ? (
             <>
