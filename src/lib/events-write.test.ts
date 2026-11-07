@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { EventsClient } from "./events-read";
-import { cancelThroughEvents, copiedEventForWrites, signUpThroughEvents } from "./events-write";
+import {
+  cancelThroughEvents,
+  copiedEventForWrites,
+  saveEvaluationThroughEvents,
+  signUpThroughEvents,
+} from "./events-write";
 
 type Result = { data: unknown; error: { message: string } | null };
 
@@ -163,5 +168,59 @@ describe("tryout sign-up server functions", () => {
     for (const code of ["EVENT_FULL", "EVENT_STARTED", "EVENT_NOT_FOUND", "NOT_ALLOWED"]) {
       expect(src).toMatch(new RegExp(`${code}: "`));
     }
+  });
+});
+
+describe("saveEvaluationThroughEvents", () => {
+  it("leaves the old path in charge when the writes switch is off", async () => {
+    const calls: string[] = [];
+    expect(
+      await saveEvaluationThroughEvents(
+        fakeClient({ switchValue: { enabled: false }, calls }),
+        "p1",
+        "u1",
+        {
+          attended: true,
+          score: 7,
+          notes: null,
+        },
+      ),
+    ).toEqual({ handled: false });
+    expect(calls.some((c) => c.startsWith("rpc."))).toBe(false);
+  });
+
+  it("saves through save_event_evaluation for the copy, and reports its error", async () => {
+    const calls: string[] = [];
+    const client = fakeClient({
+      switchValue: ON,
+      copy: { data: { id: "e1" }, error: null },
+      rpcs: { save_event_evaluation: { data: null, error: { message: "NOT_ALLOWED" } } },
+      calls,
+    });
+    expect(
+      await saveEvaluationThroughEvents(client, "p1", "u1", {
+        attended: true,
+        score: 7,
+        notes: "ok",
+      }),
+    ).toEqual({ handled: true, error: "NOT_ALLOWED" });
+    expect(calls).toContain(
+      'rpc.save_event_evaluation({"_event":"e1","_user":"u1","_attended":true,"_score":7,"_notes":"ok"})',
+    );
+  });
+});
+
+describe("saveTryoutEvaluation", () => {
+  it("tries events first, never retries a handled save on the old path", () => {
+    const src = readFileSync("src/lib/tryouts.functions.ts", "utf8");
+    const at = src.indexOf("export const saveTryoutEvaluation");
+    const body = src.slice(at, src.indexOf("export const", at + 10));
+    const v2 = body.indexOf("saveEvaluationThroughEvents(");
+    const legacy = body.indexOf('.from("tryout_evaluations").upsert(');
+    expect(v2).toBeGreaterThan(-1);
+    expect(legacy).toBeGreaterThan(v2);
+    expect(body.slice(v2, legacy)).toMatch(/if \(viaEvents\.handled\) \{[\s\S]*?return/);
+    // The RSVP is checked against this post and team before its player is used.
+    expect(body).toMatch(/\.eq\("post_id", data\.postId\)\s*\.eq\("team_id", data\.teamId\)/);
   });
 });
