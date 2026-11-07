@@ -22,6 +22,7 @@ import {
   type PostAudience,
 } from "@/lib/network-posts";
 import { createNetworkPost } from "@/lib/network-posts.functions";
+import { HighlightsStrip } from "@/components/reels/HighlightsStrip";
 
 const FEED_KEY = ["network-posts-feed"];
 
@@ -185,6 +186,12 @@ function FeedTabs({ viewerId }: { viewerId: string }) {
           </button>
         ))}
       </div>
+      {/* P3-2: reels in Home and Following, gated exactly as the public highlight feed. */}
+      <HighlightsStrip
+        key={view}
+        following={view === "following"}
+        heading={view === "following" ? "Highlights from people you follow" : "Latest highlights"}
+      />
       <PostList viewerId={viewerId} view={view} />
     </div>
   );

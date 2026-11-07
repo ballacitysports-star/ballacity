@@ -15,6 +15,7 @@ vi.mock("@/lib/use-my-age", () => ({ useMyAge: () => ({ age: state.age, loading:
 vi.mock("@/lib/team-roster", () => ({ useMyTeamMemberships: () => ({ data: state.teams }) }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: () => vi.fn() }));
 vi.mock("@/lib/network-posts.functions", () => ({ createNetworkPost: vi.fn() }));
+vi.mock("@/components/reels/HighlightsStrip", () => ({ HighlightsStrip: () => null }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
 vi.mock("@/lib/network-posts", async () => {
   const rules = await vi.importActual<typeof import("@/lib/network-posts-rules")>(
