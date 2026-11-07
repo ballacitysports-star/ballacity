@@ -1,0 +1,109 @@
+{
+  "$comment": "P0-9 E2E smoke set. Each entry names one Playwright test by spec file and title path (describe titles, then the test title, joined with ' › '). The 'E2E smoke' check passes only when every entry ran and passed. Chosen 2026-11-06 from tests that passed in all four recent sandbox runs (PRs #298, #304, #314, #317). Add a spec here only after it has passed on the sandbox; see docs/e2e-smoke.md.",
+  "tests": [
+    {
+      "file": "desktop-refresh-protected.spec.ts",
+      "title": "refresh on /create stays on /create (desktop)"
+    },
+    {
+      "file": "desktop-refresh-protected.spec.ts",
+      "title": "refresh on /feed stays on /feed (desktop)"
+    },
+    {
+      "file": "desktop-refresh-protected.spec.ts",
+      "title": "refresh on /messages stays on /messages (desktop)"
+    },
+    {
+      "file": "desktop-refresh-protected.spec.ts",
+      "title": "refresh on /players stays on /players (desktop)"
+    },
+    {
+      "file": "desktop-refresh-protected.spec.ts",
+      "title": "refresh on /teams stays on /teams (desktop)"
+    },
+    {
+      "file": "mobile-refresh-protected.spec.ts",
+      "title": "Android Chrome (Pixel 7) › refresh on /feed stays on /feed"
+    },
+    {
+      "file": "mobile-refresh-protected.spec.ts",
+      "title": "iOS Safari (iPhone 13) › refresh on /feed stays on /feed"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "host: signs in and reaches a protected surface"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "host: session survives a hard refresh of a protected route"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "player: signs in and reaches a protected surface"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "player: session survives a hard refresh of a protected route"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "player2: signs in and reaches a protected surface"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "player2: session survives a hard refresh of a protected route"
+    },
+    {
+      "file": "fixture-auth-flows.spec.ts",
+      "title": "wrong password is rejected and keeps the visitor on /auth"
+    },
+    {
+      "file": "fixture-age-gated-flows.spec.ts",
+      "title": "an under-13 account without consent still cannot reach hosting"
+    },
+    {
+      "file": "fixture-age-gated-flows.spec.ts",
+      "title": "a minor cohort keeps the app browsable rather than locking it out"
+    },
+    {
+      "file": "fixture-age-gated-flows.spec.ts",
+      "title": "a revoked child sees the account-off explanation with a way forward"
+    },
+    {
+      "file": "fixture-age-gated-flows.spec.ts",
+      "title": "payment coordination policy agrees for every cohort"
+    },
+    {
+      "file": "child-lifecycle-cohorts.spec.ts",
+      "title": "child lifecycle: consent gate per cohort › a blocked child can still reach the consent flow and safety pages"
+    },
+    {
+      "file": "child-lifecycle-cohorts.spec.ts",
+      "title": "child lifecycle: consent gate per cohort › adult is never consent-gated"
+    },
+    {
+      "file": "child-lifecycle-cohorts.spec.ts",
+      "title": "child lifecycle: consent gate per cohort › under-13 with consent revoked gets limited, browse-only access"
+    },
+    {
+      "file": "public-reel-page.spec.ts",
+      "title": "a malformed reel id shows the same not-available page"
+    },
+    {
+      "file": "public-reel-page.spec.ts",
+      "title": "an unknown reel id shows the not-available page and leaks nothing"
+    },
+    {
+      "file": "public-reel-page.spec.ts",
+      "title": "unknown and malformed ids are indistinguishable"
+    },
+    {
+      "file": "signed-out-preview.spec.ts",
+      "title": "the landing page's main buttons open the app preview, not the city pages"
+    },
+    {
+      "file": "invite-fallback-params.spec.ts",
+      "title": "unknown gameId with invite params → routes to notFound fallback, not invite flow"
+    }
+  ]
+}

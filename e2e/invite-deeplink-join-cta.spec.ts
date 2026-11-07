@@ -165,7 +165,7 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
   await expect(banner).not.toContainText(/Pay & join/i);
 
   // CTA button shows "Join Run · N spots left".
-  const cta = page.getByRole("button", { name: /join free/i }).first();
+  const cta = page.getByRole("button", { name: /join run/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 

@@ -307,6 +307,23 @@ export async function getGameRefundTerms(gameId: string): Promise<{
   return data?.[0] ?? null;
 }
 
+/**
+ * The game's join policy — whether the host screens joiners — for anyone who can
+ * see the game. The full settings row is restricted to the host and linked
+ * players, but `requires_approval` is a non-sensitive join-UX flag, so it is
+ * exposed on its own (public.get_game_join_policy) so a prospective viewer sees
+ * the host's actual setting instead of the request-to-join default. Returns null
+ * when the game has no settings row (the caller keeps approval-by-default).
+ */
+export async function getGameJoinPolicy(
+  gameId: string,
+): Promise<{ requires_approval: boolean } | null> {
+  const { data, error } = await supabase.rpc("get_game_join_policy", { _game_id: gameId });
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? { requires_approval: !!row.requires_approval } : null;
+}
+
 export async function getMyGamePaymentSettings(
   gameId: string,
 ): Promise<GamePaymentSettings | null> {
@@ -546,7 +563,9 @@ export async function createJoinRequest(input: {
 
   const { data, error } = await attemptInsert();
   if (!error && data) {
-    void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", (data as JoinRequest).id));
+    void import("@/lib/guardian-push.functions").then((m) =>
+      m.pingGuardians("join_request", (data as JoinRequest).id),
+    );
     return data as JoinRequest;
   }
 
@@ -597,7 +616,9 @@ export async function createJoinRequest(input: {
           // Trigger raises P0001 with a human-readable message for cap/cooldown.
           throw new Error(retryErr.message);
         }
-        void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("join_request", prev.id));
+        void import("@/lib/guardian-push.functions").then((m) =>
+          m.pingGuardians("join_request", prev.id),
+        );
         return retryData as JoinRequest;
       }
       return prev;
