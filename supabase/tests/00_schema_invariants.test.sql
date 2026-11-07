@@ -39,6 +39,7 @@ SELECT t.eq(
       'private_sec.guardian_public_profile(_user uuid)',
       -- Called by public.team_post_venues (SECURITY INVOKER); returns a venue only when
       -- the youth-venue rule allows it (20261106210000_youth_post_venue_privacy).
+      'private_sec.can_view_post(_author uuid, _posted_as text, _team text, _org uuid, _audience text, _viewer uuid)',
       'private_sec.post_venue(_post uuid)',
       'private_sec.profile_visibility_of(_user uuid)',
       'private_sec.reel_game_readable(_game_id text, _owner uuid)',
