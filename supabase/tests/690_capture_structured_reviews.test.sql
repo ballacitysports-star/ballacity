@@ -25,10 +25,13 @@ CREATE TEMP VIEW fn_hash AS
          md5(regexp_replace(regexp_replace(pg_get_functiondef(p.oid), '--[^\n]*', '', 'g'), '\s+', ' ', 'g')) AS h
     FROM pg_proc p
    WHERE p.proname IN ('enforce_review_integrity', 'player_trait_counts', 'review_question_keys', 'review_tag_keys');
-SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'enforce_review_integrity()'), 'f947c41b1861a79f9055767070bbcc14',
-  'enforce_review_integrity is production''s');
-SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'player_trait_counts(uuid)'), '939f6254eb2516ab01b1f4f3fb354061',
-  'player_trait_counts is production''s');
+-- PRIV-1 (20261108100000_minor_review_privacy) deliberately redefines these two, building on the captured versions.
+-- Until PRIV-1 is applied there, production keeps the captured ones: enforce_review_integrity f947c41b1861a79f9055767070bbcc14,
+-- player_trait_counts 939f6254eb2516ab01b1f4f3fb354061.
+SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'enforce_review_integrity()'), '200bf368b5cdd8e9763e3555d4756dfd',
+  'enforce_review_integrity is the captured version as PRIV-1 extends it');
+SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'player_trait_counts(uuid)'), '8aca32746b2b12a62bd47a949edde559',
+  'player_trait_counts is the captured version as PRIV-1 extends it');
 SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'review_question_keys(text)'), '7be31278957db98b5c477d25b279e9c9',
   'review_question_keys is production''s');
 SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'review_tag_keys(text)'), '4627f1e129b4aa158d5d65d46a6c3d56',
