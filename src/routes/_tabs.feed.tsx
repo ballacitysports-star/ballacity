@@ -51,8 +51,13 @@ import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
 import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
 import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
-import { kindsForFeedType, parseFeedType, type FeedType } from "@/lib/feed-events";
-import { isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
+import {
+  VENUE_EVENTS_SETTING_KEY,
+  kindsForFeedType,
+  parseFeedType,
+  type FeedType,
+} from "@/lib/feed-events";
+import { isAppSwitchOn, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
 import { supabase as feedEventsClient } from "@/integrations/supabase/client";
 import { useQuery as useFeedQuery } from "@tanstack/react-query";
 
@@ -113,8 +118,21 @@ function Feed() {
       queryFn: () => isEventsV2Enabled(feedEventsClient as unknown as EventsClient),
       staleTime: 5 * 60_000,
     }).data === true;
+  // Slice E: venue events and the Camps, Tournaments and Open gym chips (venue_events).
+  const venueEventsOn =
+    useFeedQuery({
+      queryKey: ["venue-events-switch"],
+      queryFn: () =>
+        isAppSwitchOn(feedEventsClient as unknown as EventsClient, VENUE_EVENTS_SETTING_KEY),
+      staleTime: 5 * 60_000,
+      enabled: eventsOn,
+    }).data === true;
   const [feedTypeState, setFeedType] = useState<FeedType>(parseFeedType(search.type));
-  const feedType: FeedType = eventsOn ? feedTypeState : "all";
+  const feedType: FeedType = !eventsOn
+    ? "all"
+    : !venueEventsOn && kindsForFeedType(feedTypeState).length === 0 && feedTypeState !== "pickup"
+      ? "all"
+      : feedTypeState;
   const showGames = feedType === "all" || feedType === "pickup";
 
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
@@ -565,13 +583,17 @@ function Feed() {
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
       {tab !== "archive" && <NeedsActionStrip />}
-      {tab !== "archive" && eventsOn && <FeedTypeChips value={feedType} onChange={setFeedType} />}
+      {tab !== "archive" && eventsOn && (
+        <FeedTypeChips value={feedType} onChange={setFeedType} venueEventsOn={venueEventsOn} />
+      )}
       {tab !== "archive" && eventsOn && feedType !== "pickup" && (
         <FeedEventsList
-          kinds={kindsForFeedType(feedType)}
+          kinds={kindsForFeedType(feedType, venueEventsOn)}
           sports={prefs.preferredSports}
           limit={feedType === "all" ? 3 : undefined}
-          heading={feedType === "all" ? "Tryouts & clinics" : undefined}
+          heading={
+            feedType === "all" ? (venueEventsOn ? "Coming up" : "Tryouts & clinics") : undefined
+          }
         />
       )}
       {/* Posts (network_posts switch) belong to All: people, teams and venues, with a Following tab. */}

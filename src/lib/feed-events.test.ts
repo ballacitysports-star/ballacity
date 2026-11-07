@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  feedTypes,
   kindsForFeedType,
   listFeedEvents,
   parseFeedType,
@@ -58,6 +59,29 @@ describe("feed types", () => {
     expect(kindsForFeedType("clinics")).toEqual(["clinic"]);
     expect(kindsForFeedType("pickup")).toEqual([]);
   });
+  it("adds Camps, Tournaments and Open gym only once venue events are on", () => {
+    expect(feedTypes(false).map((t) => t.id)).toEqual(["all", "pickup", "tryouts", "clinics"]);
+    expect(feedTypes(true).map((t) => t.id)).toEqual([
+      "all",
+      "pickup",
+      "tryouts",
+      "clinics",
+      "camps",
+      "tournaments",
+      "open_gym",
+    ]);
+    expect(parseFeedType("open_gym")).toBe("open_gym");
+    expect(kindsForFeedType("camps")).toEqual([]);
+    expect(kindsForFeedType("camps", true)).toEqual(["camp"]);
+    expect(kindsForFeedType("open_gym", true)).toEqual(["open_gym"]);
+    expect(kindsForFeedType("all", true)).toEqual([
+      "tryout",
+      "clinic",
+      "camp",
+      "tournament",
+      "open_gym",
+    ]);
+  });
 });
 
 describe("listFeedEvents", () => {
@@ -105,6 +129,45 @@ describe("listFeedEvents", () => {
     ).toEqual(["e2"]);
   });
 
+  it("names the venue of a venue event, links it to the venue and keeps it under a sport filter", async () => {
+    const calls: string[] = [];
+    const venueRow = row("v1", {
+      kind: "open_gym",
+      legacy_post_id: null,
+      host_kind: "facility",
+      host_ref: "org-1",
+      team_id: null,
+      teams: null,
+    });
+    const client = fake({ data: [venueRow], error: null }, {}, calls);
+    // The fake answers every from() with the events result; give the venue lookup its own answer.
+    const orgClient: FeedEventsClient = {
+      ...client,
+      from: (t: string) => {
+        if (t !== "trainer_orgs") return client.from(t);
+        calls.push("from(trainer_orgs)");
+        const q: Record<string, unknown> = {};
+        for (const m of ["select", "in"]) q[m] = () => q;
+        q.then = (ok: (r: unknown) => unknown) =>
+          Promise.resolve({
+            data: [{ id: "org-1", name: "City Gym", verified: true }],
+            error: null,
+          }).then(ok);
+        return q as unknown as ReturnType<FeedEventsClient["from"]>;
+      },
+    };
+    const [ev] = await listFeedEvents(orgClient, ["open_gym"], { sports: ["basketball"] });
+    expect([ev.id, ev.orgId, ev.hostName, ev.hostVerified, ev.teamId, ev.postId]).toEqual([
+      "v1",
+      "org-1",
+      "City Gym",
+      true,
+      null,
+      null,
+    ]);
+    expect(calls).toContain("from(trainer_orgs)");
+  });
+
   it("asks nothing for Pickup, and throws on a read error", async () => {
     const calls: string[] = [];
     expect(await listFeedEvents(fake({ data: [], error: null }, {}, calls), [])).toEqual([]);
@@ -119,8 +182,9 @@ describe("Home feed page", () => {
   it("shows the type chips and events only while events_v2 is on, and keeps games for All and Pickup", () => {
     const src = readFileSync("src/routes/_tabs.feed.tsx", "utf8");
     expect(src).toMatch(/isEventsV2Enabled\(/);
-    expect(src).toMatch(/const feedType: FeedType = eventsOn \? feedTypeState : "all";/);
-    expect(src).toMatch(/eventsOn && <FeedTypeChips/);
+    expect(src).toMatch(/const feedType: FeedType = !eventsOn\s*\? "all"/);
+    expect(src).toMatch(/VENUE_EVENTS_SETTING_KEY/);
+    expect(src).toMatch(/eventsOn && \(\s*<FeedTypeChips/);
     expect(src).toMatch(/const showGames = feedType === "all" \|\| feedType === "pickup";/);
   });
 });
