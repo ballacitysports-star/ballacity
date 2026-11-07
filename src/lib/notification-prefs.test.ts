@@ -57,6 +57,7 @@ describe("categoryFor", () => {
     ["payment_received", "payments"],
     ["moderation", "safety"],
     ["follow", "social"],
+    ["follow_request", "social"],
     ["reel_ready", "social"],
     ["announcement", "marketing"],
     ["totally_unknown", "general"],
