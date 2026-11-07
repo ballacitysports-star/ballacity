@@ -161,6 +161,7 @@ export function categoryFor(type: string): NotifCategory {
     return "gameUpdates";
   if (
     type === "follow" ||
+    type === "follow_request" ||
     type === "unfollow" ||
     type === "comment" ||
     type === "reaction" ||

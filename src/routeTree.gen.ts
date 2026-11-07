@@ -14,6 +14,7 @@ import { Route as SportRouteImport } from './routes/$sport'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AiDisclosureRouteImport } from './routes/ai-disclosure'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CoachRouteImport } from './routes/coach'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
@@ -151,6 +152,11 @@ const AiDisclosureRoute = AiDisclosureRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoachRoute = CoachRouteImport.update({
+  id: '/coach',
+  path: '/coach',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
@@ -738,6 +744,7 @@ export interface FileRoutesByFullPath {
   '/$sport': typeof SportRoute
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
+  '/coach': typeof CoachRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -858,6 +865,7 @@ export interface FileRoutesByTo {
   '/$sport': typeof SportRoute
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
+  '/coach': typeof CoachRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -979,6 +987,7 @@ export interface FileRoutesById {
   '/_tabs': typeof TabsRouteWithChildren
   '/ai-disclosure': typeof AiDisclosureRoute
   '/auth': typeof AuthRoute
+  '/coach': typeof CoachRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -1101,6 +1110,7 @@ export interface FileRouteTypes {
     | '/$sport'
     | '/ai-disclosure'
     | '/auth'
+    | '/coach'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
@@ -1221,6 +1231,7 @@ export interface FileRouteTypes {
     | '/$sport'
     | '/ai-disclosure'
     | '/auth'
+    | '/coach'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
@@ -1341,6 +1352,7 @@ export interface FileRouteTypes {
     | '/_tabs'
     | '/ai-disclosure'
     | '/auth'
+    | '/coach'
     | '/community-guidelines'
     | '/contact'
     | '/cookies'
@@ -1463,6 +1475,7 @@ export interface RootRouteChildren {
   TabsRoute: typeof TabsRouteWithChildren
   AiDisclosureRoute: typeof AiDisclosureRoute
   AuthRoute: typeof AuthRoute
+  CoachRoute: typeof CoachRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
@@ -1601,6 +1614,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coach': {
+      id: '/coach'
+      path: '/coach'
+      fullPath: '/coach'
+      preLoaderRoute: typeof CoachRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/community-guidelines': {
@@ -2454,6 +2474,7 @@ const rootRouteChildren: RootRouteChildren = {
   TabsRoute: TabsRouteWithChildren,
   AiDisclosureRoute: AiDisclosureRoute,
   AuthRoute: AuthRoute,
+  CoachRoute: CoachRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
