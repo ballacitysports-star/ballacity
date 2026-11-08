@@ -243,6 +243,21 @@ function TrainerPage({ org }: { org: Org }) {
           qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
         },
       )
+      // A removed membership or withdrawn request: Supabase cannot filter
+      // deletes, and these tables change rarely, so just re-read this trainer's link.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "trainer_org_members" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
+          qc.invalidateQueries({ queryKey: ["trainer-org-memberships", org.id] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "trainer_org_join_requests" },
+        () => qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] }),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);

@@ -261,6 +261,17 @@ function PlayerProfile() {
           refreshRequests({ silent: true });
         },
       )
+      // Withdrawn/removed requests: Supabase cannot filter deletes. Removing by
+      // id is a no-op for rows that are not in either list, so no refetch.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "join_requests" },
+        (payload) => {
+          const del = payload as unknown as Parameters<typeof applyPayload>[0];
+          applyPayload(del, "mine");
+          applyPayload(del, "host");
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -298,6 +309,7 @@ function PlayerProfile() {
       return;
     }
     let cancelled = false;
+    let shownIds = new Set<string>();
     const load = () =>
       supabase
         .from("highlight_reels")
@@ -307,6 +319,7 @@ function PlayerProfile() {
         .then(({ data }) => {
           if (cancelled) return;
           const rows = (data ?? []) as RecapSummary[];
+          shownIds = new Set(rows.map((r) => r.id));
           setAllRecaps(rows);
           const map: Record<string, RecapSummary[]> = {};
           rows.forEach((r) => {
@@ -333,6 +346,17 @@ function PlayerProfile() {
           if (row?.status === "completed" && (payload.old as any)?.status !== "completed") {
             toast.success(`Recap ready${row.game_title ? ` · ${row.game_title}` : ""}`);
           }
+          load();
+        },
+      )
+      // A deleted recap: deletes cannot be filtered, and the old row carries only
+      // its id, so reload only when that recap is on screen.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "highlight_reels" },
+        (payload) => {
+          const id = (payload.old as { id?: string } | null)?.id;
+          if (id && !shownIds.has(id)) return;
           load();
         },
       )

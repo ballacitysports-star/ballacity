@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
+import { deleteIsForOther } from "@/lib/realtime-delete";
 import { openDeepLink, toAbsoluteDeepLink } from "@/lib/deep-links";
 
 export type Notification = {
@@ -123,6 +124,15 @@ export function useUnreadNotificationCount(scope = "", opts: { excludeType?: str
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         fetchCount,
       )
+      // A deleted unread notification lowers the count; deletes cannot be filtered.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "notifications" },
+        (payload) => {
+          if (deleteIsForOther(payload, "user_id", user.id)) return;
+          void fetchCount();
+        },
+      )
       .subscribe();
     return () => {
       cancelled = true;
@@ -160,6 +170,15 @@ export function useUnreadMessageCount() {
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         fetchCount,
+      )
+      // A deleted unread notification lowers the count; deletes cannot be filtered.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "notifications" },
+        (payload) => {
+          if (deleteIsForOther(payload, "user_id", user.id)) return;
+          void fetchCount();
+        },
       )
       .subscribe();
     return () => {

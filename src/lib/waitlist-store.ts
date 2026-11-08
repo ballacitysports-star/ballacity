@@ -104,7 +104,8 @@ export function useGameWaitlist(gameId: string | undefined): {
           event: "DELETE",
           schema: "public",
           table: "game_position_waitlist",
-          filter: `game_id=eq.${gameId}`,
+          // No filter: Supabase cannot filter deletes. Removing by primary key
+          // is a no-op for another game's row, so no refetch is needed.
         },
         (payload) => {
           const old = payload.old as Partial<Row>;

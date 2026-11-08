@@ -6,7 +6,7 @@ type Handler = (payload: { new?: unknown; old?: unknown }) => void;
 
 /** A stand-in for the Supabase client that records channels and lets a test fire changes. */
 function fakeClient() {
-  const open = new Map<string, { handler: Handler; filter: string }>();
+  const open = new Map<string, { handler: Handler; filter: string; onDelete?: Handler }>();
   const created: string[] = [];
   const removed: string[] = [];
   const client = {
@@ -14,8 +14,12 @@ function fakeClient() {
       created.push(name);
       const ch = {
         name,
-        on(_type: string, opts: { filter: string }, handler: Handler) {
-          open.set(name, { handler, filter: opts.filter });
+        on(_type: string, opts: { event: string; filter?: string }, handler: Handler) {
+          if (opts.event === "DELETE") {
+            // Supabase cannot filter deletes, so this listener must have no filter.
+            expect(opts.filter).toBeUndefined();
+            open.get(name)!.onDelete = handler;
+          } else open.set(name, { handler, filter: opts.filter ?? "" });
           return ch;
         },
         subscribe() {
@@ -32,7 +36,9 @@ function fakeClient() {
   };
   const fire = (gameId: string, row: unknown, kind: "new" | "old" = "new") =>
     open.get(gamePaymentChannelName(gameId))?.handler({ [kind]: row });
-  return { client, created, removed, open, fire };
+  const fireDelete = (gameId: string, old: unknown) =>
+    open.get(gamePaymentChannelName(gameId))?.onDelete?.({ old });
+  return { client, created, removed, open, fire, fireDelete };
 }
 
 describe("one payment channel per game (P2-6)", () => {
@@ -70,6 +76,26 @@ describe("one payment channel per game (P2-6)", () => {
     f.fire("g1", { id: "x" }, "old");
     expect(a).toHaveBeenCalledTimes(1);
     expect(b).toHaveBeenCalledTimes(1);
+    offA();
+    offB();
+  });
+
+  it("hears deletes, which Supabase cannot filter by game", () => {
+    const f = fakeClient();
+    const a = vi.fn();
+    const b = vi.fn();
+    const offA = subscribeGamePaymentChanges("g1", "p1", a, f.client);
+    const offB = subscribeGamePaymentChanges("g1", "p2", b, f.client);
+    // Primary key only: it may be any game's row, so every row re-checks.
+    f.fireDelete("g1", { id: "x" });
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+    // Named player: only that row. Named other game: nobody.
+    f.fireDelete("g1", { id: "x", game_id: "g1", player_id: "p2" });
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(2);
+    f.fireDelete("g1", { id: "x", game_id: "other", player_id: "p1" });
+    expect(a).toHaveBeenCalledTimes(1);
     offA();
     offB();
   });

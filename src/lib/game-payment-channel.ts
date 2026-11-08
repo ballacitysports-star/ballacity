@@ -64,6 +64,19 @@ export function subscribeGamePaymentChanges(
           for (const set of targets) for (const fn of set ?? []) fn();
         },
       )
+      // Supabase cannot filter DELETE events, so the listener above never sees
+      // them: listen unfiltered, skip deletes naming another game, and let every
+      // row on this game re-check when the old row names no player.
+      .on(
+        "postgres_changes" as never,
+        { event: "DELETE", schema: "public", table: "payment_submissions" } as never,
+        (payload: { old?: PaymentChangeRow }) => {
+          const row = payload.old ?? null;
+          if (row?.game_id && row.game_id !== gameId) return;
+          const targets = row?.player_id ? [byPlayer.get(row.player_id)] : [...byPlayer.values()];
+          for (const set of targets) for (const fn of set ?? []) fn();
+        },
+      )
       .subscribe();
     entry = { channel, byPlayer };
     games.set(gameId, entry);

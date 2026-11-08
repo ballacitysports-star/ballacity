@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { deleteIsForOther } from "@/lib/realtime-delete";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -404,6 +405,15 @@ function PayPage() {
           if (row?.game_id === gameId) refreshRef.current();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "join_requests" },
+        (payload) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          if (deleteIsForOther(payload, "player_id", userId)) return;
+          refreshRef.current();
+        },
+      )
       .subscribe();
 
     const poll = window.setInterval(() => refreshRef.current(), 15_000);
@@ -467,6 +477,15 @@ function PayPage() {
         (payload) => {
           const row = (payload.new ?? payload.old) as PaymentSubmission | undefined;
           if (row?.game_id === gameId) refreshSubsRef.current();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "payment_submissions" },
+        (payload) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          if (deleteIsForOther(payload, "player_id", userId)) return;
+          refreshSubsRef.current();
         },
       )
       .subscribe();

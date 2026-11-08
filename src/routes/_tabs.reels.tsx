@@ -708,7 +708,8 @@ function ReelsPage() {
   const { children: guardianChildren, isFetched: guardianChildrenLoaded } = useMyChildren();
   const subjectChild = childParam
     ? (guardianChildren.find(
-        (c) => c.childUserId === childParam &&
+        (c) =>
+          c.childUserId === childParam &&
           (c.cohort === "child_under_13" || c.cohort === "teen_13_15"),
       ) ?? null)
     : null;
@@ -843,7 +844,9 @@ function ReelsPage() {
 
     /** Applies one live row change in place so the card updates without a refetch. */
     const applyRow = (row: Reel | null, event: string) => {
-      if (!row || row.environment !== env) return;
+      if (!row) return;
+      // A delete's old row carries only its id, so it has no environment to match.
+      if (event !== "DELETE" && row.environment !== env) return;
       setReels((prev) => {
         if (event === "DELETE") return prev.filter((r) => r.id !== row.id);
         const i = prev.findIndex((r) => r.id === row.id);
@@ -873,6 +876,12 @@ function ReelsPage() {
           }
           applyRow(row, payload.eventType);
         },
+      )
+      // Supabase cannot filter deletes; removing by id is a no-op for other users' reels.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "highlight_reels" },
+        (payload) => applyRow(payload.old as Reel | null, "DELETE"),
       )
       .subscribe();
 
@@ -1394,8 +1403,9 @@ function ReelsPage() {
             <p className="micro-label text-lime">Family post</p>
             <p className="mt-1 text-xs font-semibold">A clip of {subjectChild.displayName}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Guardian only by default. You can share it with your child's verified team and coaches after upload. It is never shown on the highlights feed, on a profile, or to
-              other members. Every clip is analysed by AI, which you control in the Parent Center.
+              Guardian only by default. You can share it with your child's verified team and coaches
+              after upload. It is never shown on the highlights feed, on a profile, or to other
+              members. Every clip is analysed by AI, which you control in the Parent Center.
             </p>
           </div>
         )}
@@ -1406,7 +1416,10 @@ function ReelsPage() {
           </p>
         )}
 
-        <ReelPrivacyPanel cohort={subjectChild ? subjectChild.cohort : myCohort} familyPost={!!subjectChild} />
+        <ReelPrivacyPanel
+          cohort={subjectChild ? subjectChild.cohort : myCohort}
+          familyPost={!!subjectChild}
+        />
 
         <AiDisclosureNotice />
 

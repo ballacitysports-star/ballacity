@@ -130,7 +130,8 @@ export function NotificationsPanel() {
           event: "DELETE",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${user.id}`,
+          // No filter: Supabase cannot filter deletes. Removing by primary key
+          // is a no-op for another user's row.
         },
         (payload) => {
           const old = payload.old as Partial<Notification>;
@@ -470,12 +471,8 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="micro-label text-muted-foreground text-center">
-            In-app
-          </div>
-          <div className="micro-label text-muted-foreground text-center">
-            Push
-          </div>
+          <div className="micro-label text-muted-foreground text-center">In-app</div>
+          <div className="micro-label text-muted-foreground text-center">Push</div>
           {categories.map((cat) => (
             <PrefRow key={cat} category={cat} prefs={prefs} />
           ))}

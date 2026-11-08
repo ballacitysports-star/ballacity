@@ -35,6 +35,9 @@ export function useReelRealtime(
         },
         fire,
       )
+      // Supabase cannot filter deletes, so a deleted reel never reached the
+      // filtered listener. Fire on any delete; the callback is debounced.
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "highlight_reels" }, fire)
       .subscribe();
 
     return () => {

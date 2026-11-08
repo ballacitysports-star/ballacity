@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { deleteIsForOther } from "@/lib/realtime-delete";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -205,9 +206,7 @@ export function PaymentPoliciesCard({
                 className={`h-4 w-4 mt-0.5 shrink-0 ${isPastDue ? "text-coral" : "text-lime"}`}
               />
               <div className="min-w-0 flex-1">
-                <div className="micro-label text-muted-foreground">
-                  Payment deadline
-                </div>
+                <div className="micro-label text-muted-foreground">Payment deadline</div>
                 <div className="text-sm font-semibold">{fmtDeadline(deadline)}</div>
                 {isPastDue && (
                   <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-coral">
@@ -367,6 +366,15 @@ export function HostPaymentsPanel({
         },
         () => load(),
       )
+      // Deletes (a player leaving, a cancelled submission) cannot be filtered.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "payment_submissions" },
+        (payload) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          void load();
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -466,7 +474,9 @@ export function HostPaymentsPanel({
     setBusyId(row.id);
     try {
       await markRefundSent(row.id);
-      toast.success(`Marked $${Number(row.refund_amount ?? 0).toFixed(2)} refunded to ${row.playerName}.`);
+      toast.success(
+        `Marked $${Number(row.refund_amount ?? 0).toFixed(2)} refunded to ${row.playerName}.`,
+      );
       void load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Could not update the refund.");
@@ -551,21 +561,15 @@ export function HostPaymentsPanel({
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
             <div className="font-display text-lg font-bold text-amber-500">{counts.pending}</div>
-            <div className="micro-label text-muted-foreground">
-              Pending
-            </div>
+            <div className="micro-label text-muted-foreground">Pending</div>
           </div>
           <div className="rounded-xl border border-lime/30 bg-lime/10 p-2">
             <div className="font-display text-lg font-bold text-lime">{counts.verified}</div>
-            <div className="micro-label text-muted-foreground">
-              Verified
-            </div>
+            <div className="micro-label text-muted-foreground">Verified</div>
           </div>
           <div className="rounded-xl border border-coral/40 bg-coral/10 p-2">
             <div className="font-display text-lg font-bold text-coral">{counts.rejected}</div>
-            <div className="micro-label text-muted-foreground">
-              Declined
-            </div>
+            <div className="micro-label text-muted-foreground">Declined</div>
           </div>
         </div>
         <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
@@ -780,6 +784,15 @@ export function PlayerPaymentsPanel({
           (payload) => {
             const row = (payload.new ?? payload.old) as any;
             if (row?.game_id && row.game_id !== gameId) return;
+            load();
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "payment_submissions" },
+          (payload) => {
+            if (deleteIsForOther(payload, "game_id", gameId)) return;
+            if (deleteIsForOther(payload, "player_id", uid ?? undefined)) return;
             load();
           },
         )

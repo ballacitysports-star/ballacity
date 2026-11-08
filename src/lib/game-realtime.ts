@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteIsForOther } from "@/lib/realtime-delete";
 
 type PayloadRow = { game_id?: string; player_id?: string } | null;
 
@@ -53,6 +54,15 @@ export function useGameRealtimeChannels(params: {
           cbs.current.onHostJoinRequestChange();
         },
       )
+      // Deletes (a withdrawn request) cannot be filtered; see realtime-delete.ts.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "join_requests" },
+        (payload: { old?: PayloadRow }) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          cbs.current.onHostJoinRequestChange();
+        },
+      )
       .subscribe((status: string) => {
         if (status !== "SUBSCRIBED") {
           console.warn(`[realtime] join_requests:host channel status: ${status}`);
@@ -81,6 +91,15 @@ export function useGameRealtimeChannels(params: {
           if (row?.game_id === gameId) {
             cbs.current.onMyJoinRequestChange();
           }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "join_requests" },
+        (payload: { old?: PayloadRow }) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          if (deleteIsForOther(payload, "player_id", userId)) return;
+          cbs.current.onMyJoinRequestChange();
         },
       )
       .subscribe((status: string) => {
@@ -139,6 +158,15 @@ export function useGameRealtimeChannels(params: {
           const row = (payload.new ?? payload.old) as PayloadRow;
           if (row?.game_id !== gameId) return;
           if (row?.player_id !== userId) return;
+          cbs.current.onMyPaymentChange();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "payment_submissions" },
+        (payload: { old?: PayloadRow }) => {
+          if (deleteIsForOther(payload, "game_id", gameId)) return;
+          if (deleteIsForOther(payload, "player_id", userId)) return;
           cbs.current.onMyPaymentChange();
         },
       )

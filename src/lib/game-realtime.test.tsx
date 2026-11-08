@@ -18,6 +18,8 @@ type Recorded = {
   activeNames: () => string[];
 };
 
+const deleteHandlers: { table: string; cb: (p: unknown) => void }[] = [];
+
 const recorded: Recorded = {
   subscribed: [],
   removed: [],
@@ -37,7 +39,17 @@ vi.mock("@/integrations/supabase/client", () => {
   const makeChannel = (name: string) => {
     const ch: any = {
       _name: name,
-      on: () => ch,
+      on: (
+        _t: string,
+        spec: { event: string; table: string; filter?: string },
+        cb: (p: unknown) => void,
+      ) => {
+        if (spec.event === "DELETE") {
+          if (spec.filter) throw new Error("Supabase cannot filter DELETE events");
+          deleteHandlers.push({ table: spec.table, cb });
+        }
+        return ch;
+      },
       subscribe: () => ch,
     };
     return ch;
@@ -242,5 +254,34 @@ describe("useGameRealtimeChannels — no leaks", () => {
       }),
     );
     expect(recorded.activeNames()).toEqual(["game_payment_settings:g1"]);
+  });
+});
+
+describe("deletes, which Supabase cannot filter", () => {
+  it("a withdrawn join request or payment reaches the game page, scoped by what the old row names", () => {
+    deleteHandlers.length = 0;
+    const cbs = {
+      onHostJoinRequestChange: vi.fn(),
+      onMyJoinRequestChange: vi.fn(),
+      onSettingsChange: noop,
+      onMyPaymentChange: vi.fn(),
+    };
+    renderHook(() =>
+      useGameRealtimeChannels({ gameId: "g1", userId: "u1", hostsThisGame: true, ...cbs }),
+    );
+    const fire = (table: string, old: unknown) =>
+      deleteHandlers.filter((h) => h.table === table).forEach((h) => h.cb({ old }));
+
+    fire("join_requests", { id: "r" }); // primary key only: may be ours
+    expect(cbs.onHostJoinRequestChange).toHaveBeenCalledTimes(1);
+    expect(cbs.onMyJoinRequestChange).toHaveBeenCalledTimes(1);
+    fire("join_requests", { id: "r", game_id: "g2", player_id: "u1" });
+    fire("join_requests", { id: "r", game_id: "g1", player_id: "u2" });
+    expect(cbs.onHostJoinRequestChange).toHaveBeenCalledTimes(2); // other player, same game: host still cares
+    expect(cbs.onMyJoinRequestChange).toHaveBeenCalledTimes(1);
+
+    fire("payment_submissions", { id: "p" });
+    fire("payment_submissions", { id: "p", game_id: "g1", player_id: "u2" });
+    expect(cbs.onMyPaymentChange).toHaveBeenCalledTimes(1);
   });
 });

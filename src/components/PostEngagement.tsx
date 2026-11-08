@@ -78,6 +78,18 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
         },
         () => qc.invalidateQueries({ queryKey: commentsKey }),
       )
+      // Deletes cannot be filtered by subject, so an unfiltered listener hears
+      // every comment delete. Only refetch when the deleted comment is on screen.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "post_comments" },
+        (payload) => {
+          const id = (payload.old as { id?: string } | null)?.id;
+          const shown = qc.getQueryData<{ id: string }[]>(commentsKey);
+          if (id && shown && !shown.some((c) => c.id === id)) return;
+          qc.invalidateQueries({ queryKey: commentsKey });
+        },
+      )
       .on(
         "postgres_changes",
         {
@@ -86,6 +98,16 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
           table: "post_reactions",
           filter: `subject_id=eq.${subjectId}`,
         },
+        () => {
+          qc.invalidateQueries({ queryKey: reactionsKey });
+          qc.invalidateQueries({ queryKey: myReactionsKey });
+        },
+      )
+      // A removed reaction (toggle off) carries only its id; refetch the two
+      // small reaction queries of this post.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "post_reactions" },
         () => {
           qc.invalidateQueries({ queryKey: reactionsKey });
           qc.invalidateQueries({ queryKey: myReactionsKey });
