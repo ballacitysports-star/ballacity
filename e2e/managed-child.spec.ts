@@ -147,10 +147,17 @@ test.describe("managed child, end to end", () => {
       await page.locator("#attest").click();
       await page.getByRole("button", { name: /^add child$/i }).click();
 
-      // The confirmation, not a raw error (§23).
-      await expect(
-        page.getByRole("heading", { name: new RegExp(`${CHILD_FIRST}'s profile is ready`, "i") }),
-      ).toBeVisible({ timeout: 30_000 });
+      // The confirmation, not a raw error (§23). When the add fails, the app
+      // says why in an error toast; put that in the failure, since CI keeps no
+      // screenshot (run 42454894247 reported only the missing heading).
+      const ready = page.getByRole("heading", {
+        name: new RegExp(`${CHILD_FIRST}'s profile is ready`, "i"),
+      });
+      const failed = page.locator('[data-sonner-toast][data-type="error"]').first();
+      await expect(ready.or(failed)).toBeVisible({ timeout: 30_000 });
+      if (await failed.isVisible()) {
+        throw new Error(`Adding the child failed: ${(await failed.innerText()).trim()}`);
+      }
 
       // Parent Center lists the child as managed, with every control in place.
       await page.getByRole("button", { name: /go to parent center/i }).click();
