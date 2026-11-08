@@ -8,8 +8,9 @@ import { expect, test } from "@playwright/test";
  */
 async function enableBootWatchdog(page: import("@playwright/test").Page) {
   await page.addInitScript(() => {
-    (window as unknown as { __openrun_force_boot_watchdog?: boolean }).__openrun_force_boot_watchdog =
-      true;
+    (
+      window as unknown as { __openrun_force_boot_watchdog?: boolean }
+    ).__openrun_force_boot_watchdog = true;
   });
 }
 
@@ -20,10 +21,9 @@ test("the app boots with the dependency-free OG image endpoint", async ({ page, 
   // reload the page once after optimizing dependencies, which destroys the
   // evaluate's context (run 42407610703). The app booting is what counts.
   await expect
-    .poll(
-      () => page.evaluate(() => window.__openrun_booted === true).catch(() => false),
-      { timeout: 30_000 },
-    )
+    .poll(() => page.evaluate(() => window.__openrun_booted === true).catch(() => false), {
+      timeout: 30_000,
+    })
     .toBe(true);
 
   const ogResponse = await request.get(
@@ -61,7 +61,9 @@ test("failed client boot reloads once, then shows recovery actions", async ({ pa
   expect(documentRequests, "the watchdog must perform only one automatic reload").toBe(2);
 });
 
-test("a silently stalled startup module reloads once, then becomes actionable", async ({ page }) => {
+test("a silently stalled startup module reloads once, then becomes actionable", async ({
+  page,
+}) => {
   await enableBootWatchdog(page);
   let documentRequests = 0;
   page.on("request", (request) => {

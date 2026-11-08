@@ -119,9 +119,7 @@ async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
   return await Promise.race([ready, retry]);
 }
 
-test("Pay CTA reaches the ready pay screen when the backend responds", async ({
-  browser,
-}) => {
+test("Pay CTA reaches the ready pay screen when the backend responds", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
@@ -147,9 +145,7 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({
   await ctx.close();
 });
 
-test("Pay CTA surfaces retry affordance when the payment service hangs", async ({
-  browser,
-}) => {
+test("Pay CTA surfaces retry affordance when the payment service hangs", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
@@ -184,9 +180,7 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("retry");
-  await expect(
-    page.getByText(/couldn't reach the payment service/i).first(),
-  ).toBeVisible();
+  await expect(page.getByText(/couldn't reach the payment service/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^retry$/i }).first()).toBeVisible();
 
   await ctx.close();

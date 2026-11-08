@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { signInAs } from "./helpers/fixture-auth";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -36,15 +37,6 @@ function userId(): string {
   return s?.user?.id as string;
 }
 
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([k, v]) => window.localStorage.setItem(k!, v!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
-  await page.waitForLoadState("networkidle").catch(() => {});
-}
-
 test("player profile Organizations section updates in real time", async ({ page }) => {
   const sb = userClient();
   const uid = userId();
@@ -53,15 +45,13 @@ test("player profile Organizations section updates in real time", async ({ page 
   // Seed a coach (trainer) profile owned by the fixture user — required by
   // trainer_org_members.trainer_id FK.
   const trainerId = `c-e2e-${suffix}`.slice(0, 40);
-  const { error: teamErr } = await sb
-    .from("teams")
-    .insert({
-      id: trainerId,
-      owner_id: uid,
-      kind: "coach",
-      name: `E2E Coach ${suffix}`,
-      handle: `e2e-coach-${suffix}`.slice(0, 32),
-    } as any);
+  const { error: teamErr } = await sb.from("teams").insert({
+    id: trainerId,
+    owner_id: uid,
+    kind: "coach",
+    name: `E2E Coach ${suffix}`,
+    handle: `e2e-coach-${suffix}`.slice(0, 32),
+  } as any);
   if (teamErr) throw new Error(`Failed to seed coach: ${teamErr.message}`);
 
   // Seed an organization owned by the fixture user.
@@ -76,8 +66,12 @@ test("player profile Organizations section updates in real time", async ({ page 
   if (orgErr) throw new Error(`Failed to seed org: ${orgErr.message}`);
 
   try {
-    await restoreSession(page);
+    // Look at the player as another member does. Opening your own
+    // /players/<id> redirects to /profile, which has no Organizations section,
+    // so as the fixture player itself the section can never appear.
+    await signInAs(page, "host");
     await page.goto(`/players/${uid}`, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(new RegExp(`/players/${uid}`));
 
     // The Organizations section renders nothing when the user has no orgs,
     // so the seeded org name must not be visible initially.

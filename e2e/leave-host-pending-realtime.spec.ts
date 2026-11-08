@@ -36,8 +36,7 @@ const GAME_ID = "g2";
 const OTHER_PLAYER_ID = "11111111-2222-3333-4444-555555555555";
 const JOIN_REQ_ID = "mock-pending-req-id";
 
-const isTable = (url: string | URL, table: string) =>
-  String(url).includes(`/rest/v1/${table}`);
+const isTable = (url: string | URL, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -205,7 +204,8 @@ test("host's pending list clears in realtime when the player's join_request is d
       for (const ch of chans as Array<{ topic?: string; bindings?: Record<string, unknown> }>) {
         if (typeof ch.topic !== "string" || !ch.topic.includes("join_requests:host:")) continue;
         const bindings =
-          (ch.bindings && ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
+          (ch.bindings &&
+            ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
           [];
         for (const b of bindings as Array<{ callback: (p: unknown) => void }>) {
           try {

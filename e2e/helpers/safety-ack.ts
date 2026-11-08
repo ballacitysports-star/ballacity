@@ -25,7 +25,9 @@ export async function stubRiskAcknowledged(target: Page | BrowserContext) {
       status: 200,
       contentType: "application/json",
       headers: { "content-range": "0-0/1" },
-      body: JSON.stringify([{ version: SAFETY_ACK_VERSION, accepted_at: new Date().toISOString() }]),
+      body: JSON.stringify([
+        { version: SAFETY_ACK_VERSION, accepted_at: new Date().toISOString() },
+      ]),
     });
   });
 }

@@ -10,7 +10,9 @@ import { pgrstBody } from "./postgrest";
  * `GAMES` has been `[]` since a06a087d), so an empty answer now means "no such
  * game" and the pay page stays in its lookup stage. Serve the row instead.
  */
-export function hostedGameRow(overrides: { id: string; host_id: string } & Record<string, unknown>) {
+export function hostedGameRow(
+  overrides: { id: string; host_id: string } & Record<string, unknown>,
+) {
   const now = new Date().toISOString();
   return {
     sport: "Soccer",

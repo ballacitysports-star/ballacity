@@ -26,9 +26,11 @@ test("adult host reaches the Parent Center from Settings", async ({ page }) => {
   await link.click();
 
   await expect(page).toHaveURL(/\/parent/, { timeout: 20_000 });
-  await expect(
-    page.getByRole("heading", { name: /Your child’s account|Your child's account/i }),
-  ).toBeVisible({ timeout: 20_000 });
+  // The Parent Center became a family roster in e4774bf5; its heading is
+  // "Your family" (was "Your child's account").
+  await expect(page.getByRole("heading", { name: /^Your family$/i, level: 1 })).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("Parent Center offers the invite-a-minor form to a guardian", async ({ page }) => {
@@ -47,9 +49,9 @@ test("Parent Center shows no linked children for a fresh fixture guardian", asyn
   await signInAs(page, "player2");
 
   await page.goto("/parent", { waitUntil: "domcontentloaded" });
-  await expect(
-    page.getByText(/No linked child accounts|Loading…/i).first(),
-  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/No linked child accounts|Loading…/i).first()).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("a child account is steered to the consent flow, not the guardian surface", async ({
