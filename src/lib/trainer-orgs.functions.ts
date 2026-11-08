@@ -73,7 +73,7 @@ const handleRe = /^[a-z0-9_-]{3,40}$/;
 // anon-readable except `owner_id`, which only a signed-in viewer is given
 // (phone/email are never anon-readable — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
-  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,org_type,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
 const ORG_DIRECTORY_COLUMNS_ANON = ORG_DIRECTORY_COLUMNS.replace(
   ",owner_id",
   "",
@@ -85,15 +85,18 @@ function likePattern(term: string): string {
 }
 
 export const listTrainerOrgs = createServerFn({ method: "GET" })
-  .inputValidator((d: { search?: string; q?: string } | undefined) =>
-    z
-      .object({
-        // `search` matches the name only (used by the org pickers); `q` is the
-        // directory search and also matches city and street address.
-        search: z.string().max(80).optional(),
-        q: z.string().max(80).optional(),
-      })
-      .parse(d ?? {}),
+  .inputValidator(
+    (d: { search?: string; q?: string; type?: "facility" | "business" } | undefined) =>
+      z
+        .object({
+          // `search` matches the name only (used by the org pickers); `q` is the
+          // directory search and also matches city and street address.
+          search: z.string().max(80).optional(),
+          q: z.string().max(80).optional(),
+          // P2-4: venues or businesses; both when absent.
+          type: z.enum(["facility", "business"]).optional(),
+        })
+        .parse(d ?? {}),
   )
   .handler(async ({ data }) => {
     const { sb, signedIn } = viewerClient();
@@ -105,6 +108,7 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
       .order("featured_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(100);
+    if (data.type) query = query.eq("org_type", data.type);
     if (data.search?.trim()) query = query.ilike("name", likePattern(data.search.trim()));
     if (data.q?.trim()) {
       // Commas, parentheses and quotes are separators inside an or() group.
@@ -226,7 +230,7 @@ export const listMyOrgs = createServerFn({ method: "GET" })
 // the database revokes them from the `anon` role so contact details cannot be
 // scraped from every gym listing, so selecting "*" here would fail for guests.
 const ORG_PUBLIC_COLUMNS =
-  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone,booking_url";
+  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,org_type,amenities,photos,hours,timezone,booking_url";
 const ORG_PUBLIC_COLUMNS_ANON = ORG_PUBLIC_COLUMNS.replace(
   "id,owner_id,",
   "id,",
@@ -762,6 +766,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       geo?: { lat: number; lng: number } | null;
       phone?: string;
       email?: string;
+      orgType?: "facility" | "business";
       category?: string;
       amenities?: string[];
       photos?: string[];
@@ -784,6 +789,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
           geo: geoSchema,
           phone: z.string().max(40).optional(),
           email: z.string().email().max(200).optional(),
+          orgType: z.enum(["facility", "business"]).optional(),
           category: z.string().max(60).optional(),
           amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
@@ -812,6 +818,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         geo: data.geo ?? null,
         phone: data.phone ?? null,
         email: data.email ?? null,
+        org_type: data.orgType ?? "facility",
         category: data.category ?? null,
         amenities: data.amenities ?? [],
         photos: data.photos ?? [],
@@ -868,6 +875,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
       geo?: { lat: number; lng: number } | null;
       phone?: string | null;
       email?: string | null;
+      orgType?: "facility" | "business";
       category?: string | null;
       amenities?: string[];
       photos?: string[];
@@ -891,6 +899,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           geo: geoSchema,
           phone: z.string().max(40).nullable().optional(),
           email: z.string().email().max(200).nullable().optional(),
+          orgType: z.enum(["facility", "business"]).optional(),
           category: z.string().max(60).nullable().optional(),
           amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
@@ -916,6 +925,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     const extra = patch as Record<string, unknown>;
     if (data.phone !== undefined) extra.phone = data.phone;
     if (data.email !== undefined) extra.email = data.email;
+    if (data.orgType !== undefined) extra.org_type = data.orgType;
     if (data.category !== undefined) extra.category = data.category;
     if (data.amenities !== undefined) extra.amenities = data.amenities;
     if (data.photos !== undefined) extra.photos = data.photos;

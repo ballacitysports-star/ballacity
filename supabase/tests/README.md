@@ -71,6 +71,7 @@ replay, naming both files: commit a migration to one folder only (keep the drizz
 | `710_events_stage6_trainer_events.test.sql`    | Trainer group sessions: staff create clinics and camps only, age range required; strangers, minors, hidden trainers refused; pending until approved; sign-ups ask for the trainer's waiver; never on a team page                                                                                              |
 | `720_app_error_events.test.sql`                | Error reports (P0-8): only the service role reads or writes them; no user id, IP, email or URL column; message and fingerprint checks; the purge keeps 30 days and refuses under a day                                                                                                                        |
 | `730_scheduled_jobs.test.sql`                  | Scheduled jobs (P2-7): worker helpers not callable by clients; base URL setting private and https-origin only; worker_post refuses paths outside /api/public/ and does nothing without a base URL                                                                                                             |
+| `740_business_listings.test.sql`               | Business listings (P2-4): listings are venues unless the owner says otherwise; only facility or business; only the owner changes it; signed-out visitors read the type, never contact details                                                                                                                 |
 
 ## Races
 

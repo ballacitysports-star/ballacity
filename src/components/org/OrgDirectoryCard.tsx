@@ -11,6 +11,8 @@ import { bookingHref, highlightAmenities } from "@/lib/org-listing";
 export type OrgDirectoryRow = {
   /** Given to signed-in viewers only; null for an unclaimed listing. */
   owner_id?: string | null;
+  /** P2-4: a venue or a business. */
+  org_type?: string | null;
   id: string;
   name: string;
   handle: string;
@@ -53,6 +55,8 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
   // P2-5: follow from the list, as on the venue page: anyone signed out (they get a sign-in
   // link), or a signed-in viewer for a claimed venue that is not their own.
   const canFollow = !user || (!!org.owner_id && org.owner_id !== user.id);
+  // P2-4: a business books or takes inquiries, it has no courts.
+  const isBusiness = org.org_type === "business";
   const photos = [org.cover_url, ...(org.photos ?? [])].filter(Boolean) as string[];
   const hero = photos[0] ?? null;
   const thumbs = photos.slice(1, 4);
@@ -187,7 +191,7 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2.5 text-sm font-bold text-primary-foreground glow-lime"
             >
-              <ExternalLink className="h-4 w-4" /> Book court
+              <ExternalLink className="h-4 w-4" /> {isBusiness ? "Book" : "Book court"}
             </a>
             <button
               type="button"
@@ -203,7 +207,7 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
             onClick={() => setInquiryOpen(true)}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2.5 text-sm font-bold text-primary-foreground glow-lime"
           >
-            <CalendarPlus className="h-4 w-4" /> Book court
+            <CalendarPlus className="h-4 w-4" /> {isBusiness ? "Send inquiry" : "Book court"}
           </button>
         )}
       </div>

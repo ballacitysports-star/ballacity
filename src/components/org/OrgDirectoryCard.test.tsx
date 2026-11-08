@@ -152,4 +152,24 @@ describe("OrgDirectoryCard", () => {
     expect(screen.queryByTestId("follow")).toBeNull();
     authState.user = null;
   });
+
+  it("words a business's actions for a business, not a court (P2-4)", () => {
+    const now = new Date("2026-10-06T12:00:00Z");
+    render(
+      <OrgDirectoryCard
+        org={row({ org_type: "business", website: null, booking_url: null })}
+        now={now}
+      />,
+    );
+    expect(screen.queryByText(/Book court/)).toBeNull();
+    expect(screen.getAllByText(/Send inquiry/).length).toBeGreaterThan(0);
+    cleanup();
+    render(
+      <OrgDirectoryCard
+        org={row({ org_type: "facility", website: null, booking_url: null })}
+        now={now}
+      />,
+    );
+    expect(screen.getByText(/Book court/)).toBeTruthy();
+  });
 });
