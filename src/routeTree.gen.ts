@@ -126,6 +126,7 @@ import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/pu
 import { Route as ApiPublicPaymentsReleaseHoldsRouteImport } from './routes/api/public/payments/release-holds'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
+import { Route as ApiPublicRemindersRunRouteImport } from './routes/api/public/reminders/run'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -722,6 +723,11 @@ const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
   path: '/api/public/reels/process',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRemindersRunRoute = ApiPublicRemindersRunRouteImport.update({
+  id: '/api/public/reminders/run',
+  path: '/api/public/reminders/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LovableEmailAuthPreviewRoute = LovableEmailAuthPreviewRouteImport.update({
   id: '/lovable/email/auth/preview',
   path: '/lovable/email/auth/preview',
@@ -856,6 +862,7 @@ export interface FileRoutesByFullPath {
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
+  '/api/public/reminders/run': typeof ApiPublicRemindersRunRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -976,6 +983,7 @@ export interface FileRoutesByTo {
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
+  '/api/public/reminders/run': typeof ApiPublicRemindersRunRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -1099,6 +1107,7 @@ export interface FileRoutesById {
   '/api/public/payments/release-holds': typeof ApiPublicPaymentsReleaseHoldsRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
+  '/api/public/reminders/run': typeof ApiPublicRemindersRunRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -1222,6 +1231,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
+    | '/api/public/reminders/run'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/transactional/preview'
@@ -1342,6 +1352,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
+    | '/api/public/reminders/run'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/transactional/preview'
@@ -1464,6 +1475,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/release-holds'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
+    | '/api/public/reminders/run'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/transactional/preview'
@@ -1574,6 +1586,7 @@ export interface RootRouteChildren {
   ApiPublicPaymentsReleaseHoldsRoute: typeof ApiPublicPaymentsReleaseHoldsRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
+  ApiPublicRemindersRunRoute: typeof ApiPublicRemindersRunRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -2400,6 +2413,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicReelsProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/reminders/run': {
+      id: '/api/public/reminders/run'
+      path: '/api/public/reminders/run'
+      fullPath: '/api/public/reminders/run'
+      preLoaderRoute: typeof ApiPublicRemindersRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lovable/email/auth/preview': {
       id: '/lovable/email/auth/preview'
       path: '/lovable/email/auth/preview'
@@ -2575,6 +2595,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPaymentsReleaseHoldsRoute: ApiPublicPaymentsReleaseHoldsRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
+  ApiPublicRemindersRunRoute: ApiPublicRemindersRunRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
