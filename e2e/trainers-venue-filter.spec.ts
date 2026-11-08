@@ -31,8 +31,10 @@ async function openFiltersAndPickVenue(page: Page): Promise<string | null> {
   const anyVenue = page.getByRole("button", { name: "Any venue" });
   await anyVenue.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
   // Venue chips are siblings of "Any venue" and carry a `title` attribute
-  // equal to the full address.
-  const venueChips = page.locator('button[title]').filter({ hasNot: page.locator("nothing") });
+  // equal to the full address. Look only inside that group: other titled
+  // buttons on the page are not venues, and one that is off-screen or covered
+  // held the click until the test timed out.
+  const venueChips = anyVenue.locator("xpath=..").locator("button[title]");
   const count = await venueChips.count();
   for (let i = 0; i < count; i++) {
     const chip = venueChips.nth(i);

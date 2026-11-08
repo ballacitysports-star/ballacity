@@ -21,6 +21,11 @@ import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import {
+  LEGAL_DOCUMENT_LIST,
+  effectiveVersion,
+  type PublishedLegalDocument,
+} from "../src/lib/legal-documents";
 import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
   assertSafeE2eTarget,
@@ -201,7 +206,54 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       }
     }
 
-    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+    const fixtureIds: string[] = [];
+    for (const acct of TEST_ACCOUNTS) {
+      const id = await upsertAccount(acct);
+      if (id) fixtureIds.push(id);
+    }
+
+    // Each fixture account accepts the Terms and Privacy Policy versions in
+    // force, as a real member has. Without that, LegalReacceptGate covers the
+    // whole app with "Updated legal documents" (fixed, z-[100]) whenever a
+    // published version is newer than what the account accepted, and every
+    // click in a spec signed in as that account is intercepted until the test
+    // times out (filterbar-persistence, trainers-venue-filter, the OAuth tab
+    // hops). The versions are computed the way the gate computes them:
+    // published rows first, else the bundled version (effectiveVersion).
+    try {
+      const { data: published, error: docsErr } = await admin
+        .from("legal_documents")
+        .select("*")
+        .not("published_at", "is", null)
+        .order("effective_date", { ascending: false });
+      if (docsErr) throw new Error(docsErr.message);
+      const now = new Date().toISOString();
+      const rows = fixtureIds.flatMap((userId) =>
+        LEGAL_DOCUMENT_LIST.map((doc) => ({
+          user_id: userId,
+          document_type: doc.type,
+          document_version: effectiveVersion(
+            doc.type,
+            (published ?? []) as PublishedLegalDocument[],
+          ).version,
+          accepted_at: now,
+          user_agent: "e2e-global-setup",
+        })),
+      );
+      if (rows.length > 0) {
+        const { error } = await admin.from("legal_consents").upsert(rows, {
+          onConflict: "user_id,document_type,document_version",
+          ignoreDuplicates: true,
+        });
+        if (error) throw new Error(error.message);
+      }
+    } catch (err) {
+      console.warn(
+        `[e2e global-setup] Could not record legal consent for the fixture accounts: ${
+          err instanceof Error ? err.message : String(err)
+        }. Specs signed in as them will be blocked by the "Updated legal documents" gate.`,
+      );
+    }
 
     // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
     // hardcodes as a lightweight fixture game.

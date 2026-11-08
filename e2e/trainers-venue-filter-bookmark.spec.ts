@@ -36,7 +36,9 @@ async function discoverVenue(page: Page): Promise<string | null> {
   await page.getByRole("button", { name: "Filters" }).click();
   const anyVenue = page.getByRole("button", { name: "Any venue" });
   await anyVenue.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
-  const chips = page.locator("button[title]");
+  // Only the venue group's chips (siblings of "Any venue"); other titled
+  // buttons on the page are not venues.
+  const chips = anyVenue.locator("xpath=..").locator("button[title]");
   const count = await chips.count();
   for (let i = 0; i < count; i++) {
     const title = await chips.nth(i).getAttribute("title");
