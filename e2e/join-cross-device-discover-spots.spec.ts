@@ -52,9 +52,14 @@ async function restoreSession(ctx: BrowserContext, page: Page) {
  * marked `aria-live="polite"` and formatted as "<n> spots".
  */
 async function readSpotsPill(page: Page): Promise<string | null> {
-  const pill = page.locator('[aria-live="polite"]', { hasText: /\d+\s+spots/ }).first();
-  if ((await pill.count()) === 0) return null;
-  return (await pill.textContent())?.trim() ?? null;
+  // Read the target game's own card. The first "N spots" on the page can belong
+  // to any game (run 42454894247 read 3 where g1 started at 2), and a card with
+  // plenty of room shows "N spots open" rather than the pill, so take the count
+  // from the card's `title="X of Y joined"` (src/components/GameCard.tsx).
+  const counter = page.locator(`a[href$="/games/${GAME_ID}"] [title$=" joined"]`).first();
+  if ((await counter.count()) === 0) return null;
+  const m = (await counter.getAttribute("title"))?.match(/(\d+) of (\d+) joined/);
+  return m ? `${Number(m[2]) - Number(m[1])} spots` : null;
 }
 
 function parseSpots(text: string | null): number | null {
@@ -100,9 +105,10 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
     // hash if the store supports it. Fallback: just poll for the pill
     // once any bottom card is visible — the sample data places g1 first
     // in the list, so it's the default active pin.
-    await expect(
-      aDiscover.locator('[aria-live="polite"]', { hasText: /\d+\s+spots/ }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    // /discover redirects to /feed (238b4b6d); wait for the target game's card.
+    await expect(aDiscover.locator(`a[href$="/games/${GAME_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     // If the active card isn't linking to g1, try clicking its pin marker
     // (element with the sport emoji). Otherwise just proceed.

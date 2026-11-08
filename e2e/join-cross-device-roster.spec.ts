@@ -55,12 +55,17 @@ async function readSpotsFromDetail(page: Page): Promise<string | null> {
   return (await header.textContent())?.trim() ?? null;
 }
 
+/**
+ * The game card's joined count. Cards no longer print "X/Y"; they show "N spots"
+ * or "N spots open" and keep the exact count in `title="X of Y joined"`
+ * (src/components/GameCard.tsx), so read that.
+ */
 async function readFeedCounterFor(page: Page, gameId: string): Promise<string | null> {
-  const card = page.locator(`a[href*="/games/${gameId}"]`).first();
+  const card = page.locator(`a[href$="/games/${gameId}"]`).first();
   if ((await card.count()) === 0) return null;
-  const counter = card.locator("text=/\\d+\\/\\d+/").first();
+  const counter = card.locator('[title$=" joined"]').first();
   if ((await counter.count()) === 0) return null;
-  return (await counter.textContent())?.trim() ?? null;
+  return (await counter.getAttribute("title"))?.trim() ?? null;
 }
 
 test("another device joining updates roster + counters on feed, map, detail, profile", async ({
@@ -101,6 +106,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     });
     const beforeRoster = await readSpotsFromDetail(aDetail);
     const beforeFeed = await readFeedCounterFor(aFeed, GAME_ID);
+    const beforeMap = await readFeedCounterFor(aMap, GAME_ID);
 
     // Ensure device B is on the CTA — if already joined from prior run, leave first.
     const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
@@ -144,17 +150,13 @@ test("another device joining updates roster + counters on feed, map, detail, pro
 
     // 3. Map surface: the discover route lists game cards; any card linking
     // to this game should reflect the new counter. Only assert if present.
-    const mapCard = aMap.locator(`a[href*="/games/${GAME_ID}"]`).first();
-    if ((await mapCard.count()) > 0) {
+    if (beforeMap !== null) {
       await expect
-        .poll(
-          async () => {
-            const c = mapCard.locator("text=/\\d+\\/\\d+/").first();
-            return (await c.count()) > 0 ? (await c.textContent())?.trim() : null;
-          },
-          { timeout: 20_000, message: "map card counter did not update on Device A" },
-        )
-        .not.toBe(beforeFeed); // baselines match since same GameCard component
+        .poll(async () => await readFeedCounterFor(aMap, GAME_ID), {
+          timeout: 20_000,
+          message: "map card counter did not update on Device A",
+        })
+        .not.toBe(beforeMap);
     }
 
     // 4. Profile: because both devices are the same user, joining from B

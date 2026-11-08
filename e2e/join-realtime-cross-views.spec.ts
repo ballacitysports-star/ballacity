@@ -80,7 +80,15 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     // --- Baseline: viewer is NOT joined on any surface ---
     const joinCta = detailPage.getByRole("button", { name: /join run|you're in|full/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
-    await expect(joinCta).toContainText(/join run/i);
+    // clearJoinedState only clears the local cache. The shared fixture can still
+    // hold a participant row on g1 from an earlier spec that stopped before
+    // leaving (run 42454894247), so leave first, as the cross-device specs do.
+    if (/you're in/i.test((await joinCta.textContent()) ?? "")) {
+      await joinCta.click();
+      await confirmLeave(detailPage);
+      await Promise.all([feedPage.reload(), profilePage.reload()]);
+    }
+    await expect(joinCta).toContainText(/join run/i, { timeout: 10_000 });
 
     // Feed card for this game shouldn't show a "Joined" pill yet. Cards
     // link to /games/<id> — locate by href.
