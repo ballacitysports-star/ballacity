@@ -9,6 +9,8 @@ type Props = {
   /** Used in the accessible label, e.g. "Follow Lakeside FC". */
   name: string;
   className?: string;
+  /** "sm" for cards in lists (Discover, P2-5). */
+  size?: "md" | "sm";
 };
 
 /**
@@ -16,10 +18,13 @@ type Props = {
  * it at all (not for the owner, not for an unclaimed listing); the database refuses those
  * anyway. Signed-out viewers get a sign-in link instead of a dead button.
  */
-export function FollowEntityButton({ kind, id, name, className = "" }: Props) {
+export function FollowEntityButton({ kind, id, name, className = "", size = "md" }: Props) {
   const { user } = useAuth();
   const follow = useEntityFollow(kind, id);
-  const base = "inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold";
+  const base =
+    size === "sm"
+      ? "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold"
+      : "inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold";
 
   if (!user) {
     return (

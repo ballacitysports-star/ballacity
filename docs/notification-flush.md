@@ -6,6 +6,14 @@ notification is written at once). Nothing sends it later unless something calls
 the flush endpoint, so **a scheduler must call it**; without one, held pushes
 never go out.
 
+## The scheduler (P2-7)
+
+`supabase/migrations/20261108160000_scheduled_jobs.sql` schedules it with pg_cron every 5 minutes
+(`flush-held-notifications`), next to `send-game-reminders` (`/api/public/reminders/run`, reminders while the
+app is closed) and a daily `purge-app-error-events`. The jobs call the app through
+`private_sec.worker_post`, which reads the secret from Vault and the app's address from the
+`worker_base_url` setting or, when that is empty, from the existing reels job.
+
 ## The call
 
 - `POST /api/public/notifications/flush`
@@ -32,8 +40,17 @@ For each queued row that is due (up to 50 per call), oldest first:
 ## The response, for monitoring
 
 ```json
-{ "ok": true, "processed": 3, "sent": 2, "rescheduled": 1, "cancelled": 0,
-  "retrying": 0, "failed": 0, "skipped": 0, "overdue": 0 }
+{
+  "ok": true,
+  "processed": 3,
+  "sent": 2,
+  "rescheduled": 1,
+  "cancelled": 0,
+  "retrying": 0,
+  "failed": 0,
+  "skipped": 0,
+  "overdue": 0
+}
 ```
 
 Alert when `overdue` is above 0 on consecutive calls (queued rows more than an
