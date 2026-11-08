@@ -100,23 +100,23 @@ async function mockPaidSettingsHang(page: Page) {
  * Returns which outcome occurred so the caller can assert on it.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
-  // The pay page first looks the game up (stage "lookup", no heading and no
-  // "Loading payment options" yet), so a "hidden" wait started then succeeds
-  // at once and reports "ready" before payment options ever loaded. The title
-  // heading renders only after the lookup, with `fetching` already true, so
-  // start the race from there.
-  await page.locator("h1").first().waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS });
-  const ready = page
-    .getByText(/loading payment options/i)
-    .first()
-    .waitFor({ state: "hidden", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "ready" as const);
-  const retry = page
-    .getByRole("button", { name: /^retry$/i })
-    .first()
-    .waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "retry" as const);
-  return await Promise.race([ready, retry]);
+  // Decide only once the pay page itself is up and done loading.
+  //  - Its header ("Back to game" link) renders only after the game lookup.
+  //    The URL flips to /pay before the detail page unmounts, so a bare `h1`
+  //    could still be the detail page's heading.
+  //  - A race between "loading text hidden" and "Retry visible" is unsound:
+  //    on a timeout one commit hides the one and shows the other, and the
+  //    hidden-waiter could win (run 42454894247 reported "ready"). Poll the
+  //    state instead and read the outcome after loading ends.
+  await expect(page.getByRole("link", { name: "Back to game" }).first()).toBeVisible({
+    timeout: OUTCOME_TIMEOUT_MS,
+  });
+  const loading = page.getByText(/loading payment options/i);
+  const retry = page.getByRole("button", { name: /^retry$/i });
+  const state = async () =>
+    (await retry.count()) > 0 ? "retry" : (await loading.count()) > 0 ? "loading" : "ready";
+  await expect.poll(state, { timeout: OUTCOME_TIMEOUT_MS }).not.toBe("loading");
+  return (await state()) === "retry" ? "retry" : "ready";
 }
 
 test("Pay CTA reaches the ready pay screen when the backend responds", async ({ browser }) => {

@@ -51,10 +51,10 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // Block realtime at the network layer — WebSocket handshakes to
   // /realtime/v1/websocket start as HTTP upgrades and can be aborted here.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // page.route() never sees WebSocket traffic, so it did not block realtime:
+  // against a live backend the channels joined (run 42454894247). Refuse the
+  // realtime socket itself.
+  await page.routeWebSocket(/\/realtime\//, (ws) => ws.close());
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),

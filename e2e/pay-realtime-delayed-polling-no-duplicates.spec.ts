@@ -107,10 +107,10 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // keep the realtime WebSocket unavailable. The client will still create
   // channel objects (with bindings) so we can synthesize a "late" frame
   // later in the test.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // page.route() never sees WebSocket traffic, so it did not block realtime:
+  // against a live backend the channels joined (run 42454894247). Refuse the
+  // realtime socket itself.
+  await page.routeWebSocket(/\/realtime\//, (ws) => ws.close());
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),

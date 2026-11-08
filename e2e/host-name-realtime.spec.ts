@@ -79,9 +79,14 @@ test("realtime refetches never flicker the host name off display_name", async ({
 
   // Same again on the feed card.
   await page.goto("/feed");
+  // A game card is a link to the game (src/components/GameCard.tsx); there is
+  // no <article> or data-testid="game-card" to find it by. The feed's "needs
+  // action" strip links to the same game ("· hosting", no host name), so take
+  // the link that shows the roster's spots, which only the card does.
   const card = page
-    .locator('article, [data-testid="game-card"]')
+    .locator(`a[href$="${game.url}"]`)
     .filter({ hasText: game.title })
+    .filter({ hasText: /\bspots?\b|\bfull\b/i })
     .first();
   await card.waitFor({ state: "visible", timeout: 15_000 });
   await expect(card).toContainText(displayName);

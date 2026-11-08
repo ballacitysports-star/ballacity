@@ -99,6 +99,10 @@ async function performLeave(page: Page) {
 }
 
 test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ browser }) => {
+  // Its own step budgets add up to ~100 s (15 + 20 + 20 + 25 + 20). Under the
+  // 60 s default a slow step killed the test and only the cleanup's error was
+  // reported (run 42454894247), hiding which step failed.
+  test.setTimeout(150_000);
   // --- Device A: passive observer ---
   const deviceA = await browser.newContext();
   const bootA = await deviceA.newPage();
