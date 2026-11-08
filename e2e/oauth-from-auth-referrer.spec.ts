@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForAppToSettle } from "./helpers/app-boot";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -95,6 +96,7 @@ test.describe("OAuth from /auth with referrer '/' → onboarding picker", () => 
         // a SIGNED_IN with app_metadata.provider set. This exercises the
         // exact reconcile branch in src/routes/__root.tsx that must redirect
         // OAuth new-users to the picker instead of auto-applying `pending`.
+        await waitForAppToSettle(page);
         await page.evaluate(async (providerId) => {
           const mod = await import("/src/integrations/supabase/client.ts");
           const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForAppToSettle } from "./helpers/app-boot";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -59,11 +60,14 @@ async function primeAndLandOnAuth(page: Page) {
   }, NEXT_PATH);
   await page.waitForURL(/\/auth(?:[?#/].*)?$/, { timeout: 15_000 });
 
+  // /players writes its filter state into its URL (q, sport, …), so the
+  // referrer carries a query string; the page it names is what matters here.
   const referrer = await page.evaluate(() => document.referrer);
-  expect(referrer.replace(/^https?:\/\/[^/]+/, "")).toBe(REFERRER_PATH);
+  expect(new URL(referrer).pathname).toBe(REFERRER_PATH);
 }
 
 async function emitOAuthSignedIn(page: Page, provider: string) {
+  await waitForAppToSettle(page);
   await page.evaluate(async (providerId) => {
     const mod = await import("/src/integrations/supabase/client.ts");
     const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;

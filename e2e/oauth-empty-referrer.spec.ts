@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForAppToSettle } from "./helpers/app-boot";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -69,6 +70,7 @@ async function stubAccountType(page: Page, accountType: string | null) {
 }
 
 async function emitOAuthSignedIn(page: Page, provider: string) {
+  await waitForAppToSettle(page);
   await page.evaluate(async (providerId) => {
     const mod = await import("/src/integrations/supabase/client.ts");
     const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;
