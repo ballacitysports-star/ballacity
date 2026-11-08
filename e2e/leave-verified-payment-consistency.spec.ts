@@ -232,7 +232,10 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
     (u) => tableUrl(u, "game_participants"),
     async (route: Route) => {
       const method = route.request().method();
-      if (method === "GET") {
+      // HEAD too: the live roster count is a `head: true` count query
+      // (src/lib/game-participants-store.ts). Unanswered, it reached the real
+      // backend, which has no such game, and the baseline read 0.
+      if (method === "GET" || method === "HEAD") {
         const rows = participantDeleted
           ? []
           : [
