@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { FollowEntityButton } from "@/components/FollowEntityButton";
 import { Link } from "@tanstack/react-router";
 import { CalendarPlus, Star, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
@@ -7,6 +9,8 @@ import { describeOpenBadge, parseHours, type OpenBadge } from "@/lib/org-hours";
 import { bookingHref, highlightAmenities } from "@/lib/org-listing";
 
 export type OrgDirectoryRow = {
+  /** Given to signed-in viewers only; null for an unclaimed listing. */
+  owner_id?: string | null;
   id: string;
   name: string;
   handle: string;
@@ -45,6 +49,10 @@ function categoryTone(category: string): string {
 /** Facility card for the /orgs directory: photos, live hours, tags, Book court. */
 export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date }) {
   const [inquiryOpen, setInquiryOpen] = useState(false);
+  const { user } = useAuth();
+  // P2-5: follow from the list, as on the venue page: anyone signed out (they get a sign-in
+  // link), or a signed-in viewer for a claimed venue that is not their own.
+  const canFollow = !user || (!!org.owner_id && org.owner_id !== user.id);
   const photos = [org.cover_url, ...(org.photos ?? [])].filter(Boolean) as string[];
   const hero = photos[0] ?? null;
   const thumbs = photos.slice(1, 4);
@@ -199,6 +207,12 @@ export function OrgDirectoryCard({ org, now }: { org: OrgDirectoryRow; now: Date
           </button>
         )}
       </div>
+
+      {canFollow && (
+        <div className="px-3 pb-3 -mt-1">
+          <FollowEntityButton kind="org" id={org.id} name={org.name} size="sm" />
+        </div>
+      )}
 
       {inquiryOpen && (
         <CourtInquiryDialog
