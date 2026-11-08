@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { DiscoverCardActions } from "@/components/feed/DiscoverCardActions";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -143,7 +144,10 @@ export function DiscoverResults({
       body: (
         <div className="grid gap-3 sm:grid-cols-2">
           {take(teams).map((o, i) => (
-            <OrgCard key={o.id} org={o} index={i} />
+            <div key={o.id}>
+              <OrgCard org={o} index={i} />
+              <DiscoverCardActions org={o} />
+            </div>
           ))}
         </div>
       ),
@@ -171,7 +175,10 @@ export function DiscoverResults({
       body: (
         <div className="grid gap-3 sm:grid-cols-2">
           {take(trainers).map((o, i) => (
-            <OrgCard key={o.id} org={o} index={i} />
+            <div key={o.id}>
+              <OrgCard org={o} index={i} />
+              <DiscoverCardActions org={o} />
+            </div>
           ))}
         </div>
       ),
