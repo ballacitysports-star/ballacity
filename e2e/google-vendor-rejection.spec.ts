@@ -94,6 +94,12 @@ test.describe("OAuth vendor rejection", () => {
         const button = providerButton(page, provider);
         await expect(button).toBeVisible();
 
+        // Social sign-up asks for the Terms and Privacy Policy first (the
+        // consent guard in src/routes/auth.tsx `oauth`); without the ticks the
+        // tap stops at "Please agree…" and never reaches the provider.
+        await page.getByRole("checkbox", { name: /terms of service/i }).check();
+        await page.getByRole("checkbox", { name: /privacy policy/i }).check();
+
         await stubOAuth(page, {
           error: { message: "failed to sign in with vendor" },
           redirected: false,

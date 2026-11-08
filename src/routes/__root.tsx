@@ -279,6 +279,15 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   setTimeout(checkProgress,1000);
 })();`;
 
+/**
+ * Development builds skip the watchdog (see WATCHDOG_DISABLED) unless a test
+ * opts in by setting `window.__openrun_force_boot_watchdog` before the page's
+ * scripts run (Playwright `addInitScript`). The E2E suite runs on the dev
+ * server, so without this the boot-recovery specs could never see the
+ * watchdog they test. Production output is unaffected.
+ */
+const BOOT_WATCHDOG_DEV_SCRIPT = `if(window.__openrun_force_boot_watchdog===true){${BOOT_WATCHDOG_SCRIPT}}else{${BOOT_RETRY_CLEAR_SCRIPT}}`;
+
 /** Called once the React app is running, so the watchdog stands down. */
 function markAppBooted() {
   try {
@@ -300,7 +309,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script
           dangerouslySetInnerHTML={{
-            __html: WATCHDOG_DISABLED ? BOOT_RETRY_CLEAR_SCRIPT : BOOT_WATCHDOG_SCRIPT,
+            __html: WATCHDOG_DISABLED ? BOOT_WATCHDOG_DEV_SCRIPT : BOOT_WATCHDOG_SCRIPT,
           }}
         />
       </head>
