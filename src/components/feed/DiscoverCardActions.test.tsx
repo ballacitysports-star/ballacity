@@ -56,4 +56,10 @@ describe("DiscoverCardActions (P2-5)", () => {
     render(<DiscoverCardActions org={org("t2", "team")} />);
     expect(screen.queryByTestId("follow")).toBeNull();
   });
+
+  it("followOnly shows just Follow (the trainers list already has request and message)", () => {
+    render(<DiscoverCardActions org={org("c1", "coach")} followOnly />);
+    expect(screen.getByTestId("follow")).toBeTruthy();
+    expect(screen.queryByTestId("trainer")).toBeNull();
+  });
 });

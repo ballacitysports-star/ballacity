@@ -14,7 +14,9 @@ import {
   MAX_COURT_COUNT,
   MAX_ORG_AMENITIES,
   ORG_AMENITY_GROUPS,
-  ORG_CATEGORIES,
+  ORG_TYPES,
+  categoriesForType,
+  type OrgType,
   courtCountFromAmenities,
   isValidPhone,
   scoreListing,
@@ -46,6 +48,8 @@ export type OrgFormValue = {
   coverUrl: string;
   phone: string;
   email: string;
+  /** P2-4: venue or business. */
+  orgType: OrgType;
   category: string;
   amenities: string[];
   photos: string[];
@@ -68,6 +72,7 @@ export function emptyOrgForm(): OrgFormValue {
     coverUrl: "",
     phone: "",
     email: "",
+    orgType: "facility",
     category: "",
     amenities: [],
     photos: [],
@@ -277,7 +282,7 @@ export function OrgForm({
           address: d.formattedAddress || fallbackAddress,
           placeId: s.id,
           geo: { lat: d.lat, lng: d.lng },
-          category: value.category || "Gym",
+          category: value.category || (value.orgType === "business" ? "" : "Gym"),
           ...(handleAutoRef.current ? { handle: suggestHandle(s.primary) } : {}),
         });
       })
@@ -362,9 +367,39 @@ export function OrgForm({
           </label>
 
           <div className="space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Listing type</span>
+            <div role="radiogroup" aria-label="Listing type" className="flex gap-1.5">
+              {ORG_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={value.orgType === t.id}
+                  onClick={() =>
+                    patch({
+                      orgType: t.id,
+                      // A category from the other list no longer fits.
+                      category: categoriesForType(t.id).includes(value.category)
+                        ? value.category
+                        : "",
+                    })
+                  }
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    value.orgType === t.id
+                      ? "bg-lime/15 text-lime border border-lime/40"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">Primary category</span>
             <div className="flex flex-wrap gap-1.5">
-              {ORG_CATEGORIES.map((c) => (
+              {categoriesForType(value.orgType).map((c) => (
                 <button
                   key={c}
                   type="button"

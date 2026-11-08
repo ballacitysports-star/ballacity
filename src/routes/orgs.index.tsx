@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { OrgType } from "@/lib/org-listing";
 import { DiscoverTabs } from "@/components/navigation/DiscoverTabs";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { pageHead } from "@/lib/seo";
@@ -25,9 +26,11 @@ export const Route = createFileRoute("/orgs/")({
     }),
   // The Discover strip carries a search over from Players, Teams and Trainers.
   // `f` holds the quick-filter pills, so Back from a venue returns to the same list.
-  validateSearch: (s: Record<string, unknown>): { q?: string; f?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { q?: string; f?: string; t?: OrgType } => ({
     ...(typeof s.q === "string" && s.q.trim() ? { q: s.q.slice(0, 80) } : {}),
     ...(typeof s.f === "string" && s.f.trim() ? { f: s.f.slice(0, 80) } : {}),
+    // P2-4: venues or businesses; both when absent.
+    ...(s.t === "facility" || s.t === "business" ? { t: s.t } : {}),
   }),
   component: OrgsIndexGate,
 });
@@ -65,15 +68,33 @@ function OrgsIndex() {
   useEffect(() => {
     if ((search.q ?? "") === q) return;
     void navigate({
-      search: { ...(q ? { q } : {}), ...(search.f ? { f: search.f } : {}) },
+      search: {
+        ...(q ? { q } : {}),
+        ...(search.f ? { f: search.f } : {}),
+        ...(search.t ? { t: search.t } : {}),
+      },
       replace: true,
     });
-  }, [q, search.q, search.f, navigate]);
+  }, [q, search.q, search.f, search.t, navigate]);
 
   const setSelected = (next: ReadonlySet<DirectoryFilterId>) => {
     const f = serializeDirectoryFilters(next);
     void navigate({
-      search: { ...(search.q ? { q: search.q } : {}), ...(f ? { f } : {}) },
+      search: {
+        ...(search.q ? { q: search.q } : {}),
+        ...(f ? { f } : {}),
+        ...(search.t ? { t: search.t } : {}),
+      },
+      replace: true,
+    });
+  };
+  const setType = (t: OrgType | null) => {
+    void navigate({
+      search: {
+        ...(search.q ? { q: search.q } : {}),
+        ...(search.f ? { f: search.f } : {}),
+        ...(t ? { t } : {}),
+      },
       replace: true,
     });
   };
@@ -86,13 +107,13 @@ function OrgsIndex() {
   }, []);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["orgs-index", q],
-    queryFn: () => listTrainerOrgs({ data: { q: q || undefined } }),
+    queryKey: ["orgs-index", q, search.t ?? "all"],
+    queryFn: () => listTrainerOrgs({ data: { q: q || undefined, type: search.t } }),
   });
 
   const all = useMemo(() => (data ?? []) as unknown as OrgDirectoryRow[], [data]);
   const rows = useMemo(() => applyDirectoryFilters(all, selected, now), [all, selected, now]);
-  const filtered = !!q || selected.size > 0;
+  const filtered = !!q || selected.size > 0 || !!search.t;
 
   const toggle = (id: DirectoryFilterId) => {
     const next = new Set(selected);
@@ -108,9 +129,11 @@ function OrgsIndex() {
     <div className="page-shell-content pt-3 pb-40 space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="page-title">Venues.</h1>
+          <h1 className="page-title">{search.t === "business" ? "Businesses." : "Venues."}</h1>
           <p className="mt-1 page-subtitle">
-            See the courts, check live hours, and book a spot to play.
+            {search.t === "business"
+              ? "Shops, physios, photographers, leagues and camps near you."
+              : "See the courts, check live hours, and book a spot to play."}
           </p>
         </div>
         <Link
@@ -130,6 +153,30 @@ function OrgsIndex() {
           aria-label="Search venues"
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
+      </div>
+
+      {/* P2-4: venues and businesses share the directory. */}
+      <div role="radiogroup" aria-label="Listing type" className="flex gap-1.5">
+        {[
+          { id: null, label: "All" },
+          { id: "facility" as const, label: "Venues" },
+          { id: "business" as const, label: "Businesses" },
+        ].map((o) => (
+          <button
+            key={o.label}
+            type="button"
+            role="radio"
+            aria-checked={(search.t ?? null) === o.id}
+            onClick={() => setType(o.id)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              (search.t ?? null) === o.id
+                ? "bg-foreground text-background"
+                : "border border-border text-muted-foreground"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
 
       <OrgFilterPills
