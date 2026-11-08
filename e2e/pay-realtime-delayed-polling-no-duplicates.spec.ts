@@ -278,7 +278,12 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
   const flipElapsed = Date.now() - approvedAt;
-  expect(flipElapsed, "polling should take at least a tick").toBeGreaterThan(1_000);
+  // Realtime is ruled out (WS refused, no channel joined); the 15 s poll can
+  // tick at any moment after approval (run 42466912150 saw 108 ms), so only
+  // the upper bound tells polling apart: within one interval.
+  expect(flipElapsed, "polling should pick the approval up within one interval").toBeLessThan(
+    15_000 + 5_000,
+  );
   expect(joinGets).toBeGreaterThan(getsBeforeApproval);
 
   // A late realtime frame arrives AFTER polling already flipped the UI.

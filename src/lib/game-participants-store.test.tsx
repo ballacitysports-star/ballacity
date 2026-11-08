@@ -9,18 +9,30 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 const rt = vi.hoisted(() => {
   const created: string[] = [];
   const removed: string[] = [];
+  const handlers: { spec: { event: string; filter?: string }; cb: (p: unknown) => void }[] = [];
+  const counted = { n: 0 };
   const channel = (topic: string) => {
     created.push(topic);
-    const c = { topic, on: () => c, subscribe: () => c };
+    const c = {
+      topic,
+      on: (_t: string, spec: { event: string; filter?: string }, cb: (p: unknown) => void) => {
+        handlers.push({ spec, cb });
+        return c;
+      },
+      subscribe: () => c,
+    };
     return c;
   };
-  return { created, removed, channel };
+  return { created, removed, handlers, counted, channel };
 });
 
 vi.mock("@/integrations/supabase/client", () => {
   const chain: Record<string, unknown> = {};
   chain.select = () => chain;
-  chain.eq = async () => ({ count: 3, error: null });
+  chain.eq = async () => {
+    rt.counted.n += 1;
+    return { count: 3, error: null };
+  };
   return {
     supabase: {
       auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
@@ -39,6 +51,8 @@ afterEach(() => {
   cleanup();
   rt.created.length = 0;
   rt.removed.length = 0;
+  rt.handlers.length = 0;
+  rt.counted.n = 0;
 });
 
 describe("useLiveParticipantCount realtime channel", () => {
@@ -56,5 +70,18 @@ describe("useLiveParticipantCount realtime channel", () => {
     await waitFor(() => expect(rt.created.length).toBe(1));
     unmount();
     await waitFor(() => expect(rt.removed.length).toBe(1));
+  });
+
+  it("re-counts on a delete, which Supabase cannot filter", async () => {
+    renderHook(() => useLiveParticipantCount("host-e-f"));
+    await waitFor(() => expect(rt.handlers.length).toBeGreaterThan(0));
+    const del = rt.handlers.find((h) => h.spec.event === "DELETE")!;
+    expect(del.spec.filter).toBeUndefined();
+    const before = rt.counted.n;
+    del.cb({ old: { id: "row-1" } });
+    await waitFor(() => expect(rt.counted.n).toBe(before + 1));
+    del.cb({ old: { id: "row-2", game_id: "another-game" } });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(rt.counted.n).toBe(before + 1);
   });
 });

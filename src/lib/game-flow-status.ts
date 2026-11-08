@@ -266,6 +266,29 @@ export function useMyFlowStatus(gameId: string | undefined): {
           if (concernsThisGame(p)) void reload();
         },
       )
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // a leave or a withdrawn request arrives only through unfiltered listeners.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "join_requests" },
+        (p) => {
+          if (concernsThisGame(p)) void reload();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "payment_submissions" },
+        (p) => {
+          if (concernsThisGame(p)) void reload();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "game_participants" },
+        (p) => {
+          if (concernsThisGame(p)) void reload();
+        },
+      )
       .subscribe();
 
     return () => {

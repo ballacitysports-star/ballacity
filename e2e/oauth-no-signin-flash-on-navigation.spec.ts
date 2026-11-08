@@ -146,6 +146,11 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
   await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
   await authLog.signedIn();
+  // After sign-in the age and account-type checks still hold the first loader
+  // (run 42466912150 caught it on /feed); start watching once it is gone.
+  for (const needle of LOADER_TEXTS) {
+    await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
+  }
 
   await installLoaderFlashObserver(page);
 

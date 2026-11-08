@@ -82,17 +82,15 @@ async function attachChannel(gameId: string) {
           emit(gameId);
         },
       )
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // listen unfiltered and re-count; the old row cannot say which game it was.
       .on(
         "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "game_participants",
-          filter: `game_id=eq.${gameId}`,
-        },
-        () => {
-          counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
-          emit(gameId);
+        { event: "DELETE", schema: "public", table: "game_participants" },
+        (payload) => {
+          const old = payload.old as { game_id?: string };
+          if (old.game_id && old.game_id !== gameId) return;
+          void hydrate(gameId);
         },
       )
       .subscribe((status) => {

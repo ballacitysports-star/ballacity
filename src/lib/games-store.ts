@@ -120,6 +120,17 @@ function ensureRealtime() {
           emit();
         },
       )
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // on any delete, re-read this member's roster from the database.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "game_participants" },
+        (payload) => {
+          const old = payload.old as { user_id?: string };
+          if (old.user_id && old.user_id !== userId) return;
+          void hydrateFromDb(userId);
+        },
+      )
       .subscribe();
   };
 
