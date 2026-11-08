@@ -344,6 +344,34 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
           if (error) throw new Error(error.message);
         }
 
+        // Every run starts with the fixture accounts out of the fixture games.
+        // Specs join, request and pay on g1/g2 for real, and one that stops
+        // part-way (a failed assertion before its own leave step) left the
+        // shared fixture joined for the NEXT run: run 42458824586 then found
+        // "You're in" where invite-fallback-params expected "Join Run", and
+        // join-realtime-cross-views started joined. Only rows of the fixture
+        // accounts on games this setup owns are removed.
+        const ownGameIds = writable.map((r) => r.id);
+        if (ownGameIds.length > 0 && fixtureIds.length > 0) {
+          for (const [table, userColumn] of [
+            ["payment_submissions", "player_id"],
+            ["join_requests", "player_id"],
+            ["game_participants", "user_id"],
+          ] as const) {
+            const { error } = await admin
+              .from(table)
+              .delete()
+              .in("game_id", ownGameIds)
+              .in(userColumn, fixtureIds);
+            if (error) {
+              console.warn(
+                `[e2e global-setup] Could not reset ${table} for the fixture accounts: ${error.message}. ` +
+                  "Specs on g1/g2 may start already joined.",
+              );
+            }
+          }
+        }
+
         // The game page derives "requires approval" from game_payment_settings,
         // and FAILS CLOSED: with no settings row, `requiresApproval` defaults to
         // true (src/routes/games.$gameId.index.tsx), so the join CTA reads

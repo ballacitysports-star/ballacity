@@ -73,8 +73,23 @@ async function readFlashes(page: Page) {
   return page.evaluate(() => window.__authLoaderFlashes ?? []);
 }
 
+/**
+ * The app logs every AuthGate decision in dev builds (src/lib/authgate-log.ts).
+ * CI keeps no trace, so carry the recent ones (and auth errors) into a failure
+ * message: they say which state put the loader back up.
+ */
+function collectAuthLog(page: Page) {
+  const lines: string[] = [];
+  page.on("console", (m) => {
+    const t = m.text();
+    if (/\[AuthGate\]|auth|session|token/i.test(t)) lines.push(`${m.type()}: ${t.slice(0, 240)}`);
+  });
+  return () => lines.slice(-12).join("\n");
+}
+
 for (const provider of ["google", "apple"] as const) {
   test(`no auth loader flash while navigating after ${provider} login`, async ({ page }) => {
+    const authLog = collectAuthLog(page);
     await restoreOAuthSession(page, provider);
 
     // Land on the signed-in home first; the initial loader here is expected.
@@ -94,7 +109,7 @@ for (const provider of ["google", "apple"] as const) {
       const flashes = await readFlashes(page);
       expect(
         flashes,
-        `auth loader flashed during navigation to "${label}": ${JSON.stringify(flashes)}`,
+        `auth loader flashed during navigation to "${label}": ${JSON.stringify(flashes)}\n${authLog()}`,
       ).toEqual([]);
     }
 
@@ -107,6 +122,7 @@ for (const provider of ["google", "apple"] as const) {
 test("deep-linking between protected routes after OAuth keeps the app mounted", async ({
   page,
 }) => {
+  const authLog = collectAuthLog(page);
   await restoreOAuthSession(page, "google");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
@@ -122,6 +138,9 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
     await expect(page).toHaveURL(new RegExp(`${path}(?:[?#].*)?$`));
 
     const flashes = await readFlashes(page);
-    expect(flashes, `auth loader flashed on ${path}: ${JSON.stringify(flashes)}`).toEqual([]);
+    expect(
+      flashes,
+      `auth loader flashed on ${path}: ${JSON.stringify(flashes)}\n${authLog()}`,
+    ).toEqual([]);
   }
 });
