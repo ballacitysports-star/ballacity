@@ -272,7 +272,7 @@ control, and static assertions on step order, upload path and absence of raw upl
   accepting that.
 - Third-party actions (`actions/checkout@v4`, `oven-sh/setup-bun@v2`,
   `actions/upload-artifact@v4`) are pinned to major-version tags, not commit SHAs, and
-  `bun-version` is `latest`. The repository has no documented pinning convention, and no
+  `bun-version` is pinned to 1.4.4. The repository has no documented pinning convention, and no
   trustworthy tag-to-SHA mapping exists locally; a SHA invented or copied without checking
   it against the action's repository would be worse than a tag. Recommended as a separate,
   authorized change: resolve each tag to its commit in the action's own repository, pin

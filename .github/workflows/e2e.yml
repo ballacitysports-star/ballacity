@@ -111,10 +111,18 @@ jobs:
           E2E_SANDBOX_PROJECT_REF: ${{ vars.E2E_SANDBOX_PROJECT_REF }}
         run: node .github/e2e-preflight.mjs
 
+      # Bun is pinned (not `latest`) and kept in step with unit-lint.yml. With `latest`
+      # the action must ask github.com/oven-sh/bun/releases which release is newest on
+      # every run, so a GitHub-side outage fails this step. On 2026-11-08 runs
+      # 42464693819 and 42466912150 failed here with "Unexpected HTTP response: 504"
+      # (after the action's three retries); no test ran, so the required `E2E smoke`
+      # check failed closed. Re-running fixed both. An exact version lets the action
+      # reuse its tool cache and skip the lookup. 1.4.4 is what `latest` resolved to
+      # in CI that day; bump it here and in unit-lint.yml together.
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
