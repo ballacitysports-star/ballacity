@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getGamePaymentSettings,
@@ -177,8 +177,11 @@ export function useMyFlowStatus(gameId: string | undefined): {
   loading: boolean;
   meta: FlowStepMeta;
   settings: GamePaymentSettings | null;
+  /** Re-read the flow inputs now (e.g. right after this tab left the game). */
+  refresh: () => void;
 } {
   const [status, setStatus] = useState<PlayerFlowStatus>("none");
+  const reloadRef = useRef<() => void>(() => {});
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -213,6 +216,17 @@ export function useMyFlowStatus(gameId: string | undefined): {
       setLoading(false);
     };
     void reload();
+    reloadRef.current = () => void reload();
+
+    // Without REPLICA IDENTITY FULL a DELETE event carries only the primary key
+    // in `old`, so `game_id` is missing; reload then too, or a leave seen over
+    // realtime would never clear the status.
+    const concernsThisGame = (p: { new?: unknown; old?: unknown }) => {
+      const row = ((p.new && Object.keys(p.new as object).length ? p.new : p.old) ?? {}) as {
+        game_id?: string;
+      };
+      return row.game_id === undefined || row.game_id === gameId;
+    };
 
     const chan = supabase
       .channel(`flow-status:${gameId}:${userId}:${++flowChannelSeq}`)
@@ -225,8 +239,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
           filter: `player_id=eq.${userId}`,
         },
         (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
+          if (concernsThisGame(p)) void reload();
         },
       )
       .on(
@@ -238,8 +251,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
           filter: `player_id=eq.${userId}`,
         },
         (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
+          if (concernsThisGame(p)) void reload();
         },
       )
       .on(
@@ -251,14 +263,14 @@ export function useMyFlowStatus(gameId: string | undefined): {
           filter: `user_id=eq.${userId}`,
         },
         (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
+          if (concernsThisGame(p)) void reload();
         },
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      reloadRef.current = () => {};
       try {
         supabase.removeChannel(chan);
       } catch {
@@ -267,5 +279,6 @@ export function useMyFlowStatus(gameId: string | undefined): {
     };
   }, [gameId, userId]);
 
-  return { status, loading, meta: FLOW_META[status], settings };
+  const refresh = useCallback(() => reloadRef.current(), []);
+  return { status, loading, meta: FLOW_META[status], settings, refresh };
 }

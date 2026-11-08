@@ -203,7 +203,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   );
 
   // Paid CTA → /pay with invite params preserved.
-  const payCta = page.getByRole("button", { name: /pay host/i }).first();
+  const payCta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(payCta).toBeVisible({ timeout: 10_000 });
   await payCta.click();
 
@@ -241,8 +241,9 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   expect(row.player_id).toBe(userId);
   expect(row.payment_method_id).toBe(METHOD_ID);
 
-  // Confirmation state renders (pending verification submission list item).
-  const pending = page.getByText(/pending verification/i).first();
+  // Confirmation state renders. "Pending verification" is labelled "Awaiting
+  // host confirmation" since PAYMENT_STATE_META (696cb3c8).
+  const pending = page.getByText(/awaiting host confirmation/i).first();
   await expect(pending).toBeVisible({ timeout: 10_000 });
 
   // URL STILL preserves invite=1 and from=<hostId> at the confirmation step.

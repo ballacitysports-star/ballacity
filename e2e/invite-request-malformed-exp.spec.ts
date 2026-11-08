@@ -137,7 +137,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
     // Guard fires: toast surfaces + navigation to /discover fallback.
     const toast = page.getByText(/invite has expired/i).first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
-    await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+    // /discover is kept only as a redirect to /feed (the map view moved there in
+    // 238b4b6d), so the fallback lands on /feed.
+    await page.waitForURL((u) => u.pathname === "/feed", { timeout: 10_000 });
 
     // Give any illegitimate POST a chance to land before asserting.
     await page.waitForTimeout(500);

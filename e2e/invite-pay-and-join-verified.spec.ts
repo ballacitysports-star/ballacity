@@ -206,7 +206,7 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
 
   // Pay host → /pay.
   await page
-    .getByRole("button", { name: /pay host/i })
+    .getByRole("link", { name: /pay host/i })
     .first()
     .click();
   await page.waitForURL(
@@ -230,8 +230,11 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   await submitBtn.click();
   await insertReq;
 
-  // Pending-verification state renders on /pay.
-  await expect(page.getByText(/pending verification/i).first()).toBeVisible({ timeout: 10_000 });
+  // Pending state renders on /pay ("Awaiting host confirmation" since
+  // PAYMENT_STATE_META, 696cb3c8; was "Pending verification").
+  await expect(page.getByText(/awaiting host confirmation/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Host verifies the payment (flip the mocked status).
   subStatus = "verified";

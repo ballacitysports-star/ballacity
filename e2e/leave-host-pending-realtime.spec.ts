@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
 
 /**
  * E2E: viewing the game as the host, when a player leaves (their
@@ -62,13 +63,9 @@ test("host's pending list clears in realtime when the player's join_request is d
   let joinGets = 0;
 
   // hosted_games: rely on sample fallback for g2.
-  await page.route(
-    (u) => isTable(u, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself. It used to come from the bundled sample data, which was
+  // removed (a06a087d), so an empty hosted_games answer now means "no game".
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: userId!, price: 0 }));
 
   // game_payment_settings: viewer is the host.
   await page.route(
