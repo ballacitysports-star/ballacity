@@ -77,10 +77,14 @@ test("a pending child sees the waiting state and can re-check status", async ({ 
   await signInAs(page, "player");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Waiting for your parent or guardian/i)).toBeVisible({
+  // ChildConsentGate's banner: "Parent approval needed · …" with "Check status"
+  // for a pending request (as child-lifecycle-cohorts asserts). "Waiting for
+  // your parent or guardian" is the team-invites inbox's copy, present only
+  // when the fixture happens to have such an invite.
+  await expect(page.getByText(/Parent approval needed/i).first()).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByRole("link", { name: /Start approval|Check status/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Check status$/i })).toBeVisible();
 });
 
 test("guardian safety pages stay public and reachable while signed in", async ({ page }) => {
