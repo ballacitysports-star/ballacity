@@ -91,9 +91,11 @@ test("tapping an invite notification opens the game with preserved invite params
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
   // ...with CTA-specific copy. g1 is free + no-approval → "Join".
-  await expect(banner).toContainText(/tap\s+[“"']?Join[”"']?\s+below/i);
-  await expect(banner).not.toContainText(/Request to join/i);
-  await expect(banner).not.toContainText(/Pay & join/i);
+  // CTA names from e2c76954 ("Request to join"/"Pay & join"/"Join" became
+  // "Request Spot"/"Pay Host"/"Join Run").
+  await expect(banner).toContainText(/tap\s+[“"']?Join Run[”"']?\s+below/i);
+  await expect(banner).not.toContainText(/Request Spot/i);
+  await expect(banner).not.toContainText(/Pay Host/i);
 
   await ctx.close();
 });

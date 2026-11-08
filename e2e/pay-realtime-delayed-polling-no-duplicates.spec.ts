@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: with realtime frames delayed / intermittently blocked, the pay page
@@ -215,7 +216,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
         return;
       }

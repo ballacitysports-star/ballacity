@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: the "Request to join" CTA on an approval-gated game must show an error
@@ -95,7 +97,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
         await route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
+          body: pgrstBody(route, [{ id: "should-not-happen" }]),
         });
         return;
       }
@@ -138,6 +140,7 @@ async function runTamperedCase(
   await installMocks(page, () => {
     joinPostFired = true;
   });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await seedInvite(page, userId, notifTitle, link);
 

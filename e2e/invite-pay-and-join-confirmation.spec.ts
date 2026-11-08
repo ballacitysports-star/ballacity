@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: end-to-end Pay & join flow starting from an invite notification.
@@ -130,7 +132,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
         await route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([{ id: "mock-sub-id" }]),
+          body: pgrstBody(route, [{ id: "mock-sub-id" }]),
         });
         return;
       }
@@ -163,6 +165,8 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
 

@@ -1,4 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: joining a game from the game-detail view must propagate in real time
@@ -57,6 +59,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
 
   // Seed session on a bootstrap page so every subsequent tab inherits it.
   const boot = await ctx.newPage();
+  await stubRiskAcknowledged(ctx);
   await restoreSession(ctx, boot);
   await clearJoinedState(boot);
   await boot.close();
@@ -94,6 +97,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
 
     // --- Action: join from the detail page ---
     await joinCta.click();
+    await confirmFreeJoin(detailPage);
 
     // Detail page flips locally (same tab, sync store update).
     await expect(
@@ -116,6 +120,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()
       .click();
+    await confirmLeave(detailPage);
 
     await expect(detailPage.getByRole("button", { name: /join run/i }).first()).toBeVisible({
       timeout: 10_000,

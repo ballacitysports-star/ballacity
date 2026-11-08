@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: end-to-end mocked payment that transitions to verified.
@@ -107,13 +109,9 @@ test("payment verified by host updates pay screen to confirmed state", async ({ 
     },
   );
 
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself, owned by the host whose settings are mocked above (the
+  // bundled sample "g2" these specs once relied on no longer exists).
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: HOST_ID, price: 15 }));
 
   await page.route(
     (url) => tableUrl(url, "game_participants"),
@@ -187,7 +185,7 @@ test("payment verified by host updates pay screen to confirmed state", async ({ 
         return route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
       }
       return route.fallback();
@@ -233,8 +231,9 @@ test("payment verified by host updates pay screen to confirmed state", async ({ 
 
   // The pay screen updates to the approved / confirmed state.
   await expect(timeline).toHaveAttribute("data-status", "verified", { timeout: 10_000 });
-  await expect(timeline).toContainText(/verified/i);
-  await expect(timeline).toContainText(/payment verified/i);
+  // Timeline labels come from PAYMENT_STATE_META since 696cb3c8: "Payment
+  // verified" became "Confirmed by host".
+  await expect(timeline).toContainText(/confirmed by host/i);
   await expect(timeline).toContainText(/see you at the game/i);
 
   await ctx.close();

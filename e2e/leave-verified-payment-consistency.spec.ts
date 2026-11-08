@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: leaving a game with a verified payment must, in a single tap,
@@ -259,6 +260,8 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
   );
 
   // ---- Flow ---------------------------------------------------------------
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });

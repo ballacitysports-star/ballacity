@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: tapping the "Pay host" button on the game detail page must
@@ -161,6 +162,7 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -238,6 +240,8 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
+  await stubRiskAcknowledged(page);
+
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
 
@@ -247,7 +251,7 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(
-    page.getByText(/host hasn't configured payment yet/i).first(),
+    page.getByText(/host hasn't set up payment yet/i).first(),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/couldn't reach the payment service/i)).toHaveCount(0);
   expect(writeAttempts, "opening pay should remain read-only").toEqual([]);
@@ -285,6 +289,8 @@ test("Pay screen exits payment-options loading when payment settings hang", asyn
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
+  await stubRiskAcknowledged(page);
+
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
@@ -307,6 +313,7 @@ test("Pay host button remains a pay link when local joined state is stale", asyn
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -337,6 +344,7 @@ test("Payment status button with a pending submission still routes to the pay sc
     submissions: [mockPendingSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -368,6 +376,7 @@ test("Payment rejected button routes back to the pay screen without deleting the
     submissions: [mockRejectedSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -445,6 +454,7 @@ test("Pay host button on a hosted game routes to the pay screen", async ({ brows
   );
 
   await mockPaymentBackend(page, HOSTED_GAME_ID);
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${HOSTED_GAME_ID}`, { waitUntil: "domcontentloaded" });

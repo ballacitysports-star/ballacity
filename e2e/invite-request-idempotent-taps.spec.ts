@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: rapidly tapping "Request to join" must result in exactly one pending
@@ -154,7 +156,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
             status: 201,
             contentType: "application/json",
             headers: { "content-range": "0-0/1" },
-            body: JSON.stringify([existing]),
+            body: pgrstBody(route, [existing]),
           });
           return;
         }
@@ -165,7 +167,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
         return;
       }
@@ -173,6 +175,8 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });

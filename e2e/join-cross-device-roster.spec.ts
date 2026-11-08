@@ -1,4 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: when a participant joins from another device, the roster list and
@@ -67,6 +69,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
   // --- Device A: passive observer with four surfaces open ---
   const deviceA = await browser.newContext();
   const bootA = await deviceA.newPage();
+  await stubRiskAcknowledged(deviceA);
   await restoreSession(deviceA, bootA);
   await bootA.close();
 
@@ -78,6 +81,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
   // --- Device B: joiner ---
   const deviceB = await browser.newContext();
   const bootB = await deviceB.newPage();
+  await stubRiskAcknowledged(deviceB);
   await restoreSession(deviceB, bootB);
   await bootB.close();
   const bDetail = await deviceB.newPage();
@@ -102,6 +106,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
     if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
       await leaveCta.click();
+      await confirmLeave(bDetail);
       await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
         timeout: 10_000,
       });
@@ -110,6 +115,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
     await joinCta.click();
+    await confirmFreeJoin(bDetail);
 
     // Device B flips locally.
     await expect(
@@ -162,6 +168,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()
       .click();
+    await confirmLeave(bDetail);
     await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
       timeout: 10_000,
     });

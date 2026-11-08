@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
@@ -99,6 +100,12 @@ async function mockPaidSettingsHang(page: Page) {
  * Returns which outcome occurred so the caller can assert on it.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
+  // The pay page first looks the game up (stage "lookup", no heading and no
+  // "Loading payment options" yet), so a "hidden" wait started then succeeds
+  // at once and reports "ready" before payment options ever loaded. The title
+  // heading renders only after the lookup, with `fetching` already true, so
+  // start the race from there.
+  await page.locator("h1").first().waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS });
   const ready = page
     .getByText(/loading payment options/i)
     .first()
@@ -120,6 +127,7 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({
 
   await mockPaidSettingsOk(page);
   await mockEmptyLists(page);
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -147,6 +155,21 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   await mockPaidSettingsHang(page);
   await mockEmptyLists(page);
+  // With the settings read hung, the game page takes the host's join policy
+  // from the public get_game_join_policy RPC (src/hooks/use-game-join-policy.ts)
+  // and fails closed to "Request Spot" when it has none. Answer it the way it
+  // answers for this paid, no-approval game so the Pay host link renders.
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_game_join_policy"),
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ requires_approval: false }]),
+      });
+    },
+  );
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });

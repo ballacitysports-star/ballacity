@@ -582,13 +582,20 @@ function GameDetail() {
     if (!game) return;
     if (leavingRef.current) return;
     try {
+      // Settings decide the CTA (fee, approval). Publish them as soon as they
+      // arrive: the viewer's own submissions and join request are optional
+      // status lookups, and a slow or hung one must not hold the page on the
+      // fail-closed "Request Spot" default (requiresApproval with no settings).
+      const settingsLoaded = getGamePaymentSettings(game.id).then((s) => {
+        if (!leavingRef.current) setSettings(s);
+        return s;
+      });
       const [s, subs, req] = await Promise.all([
-        getGamePaymentSettings(game.id),
+        settingsLoaded,
         listMySubmissionsForGame(game.id),
         getMyJoinRequest(game.id),
       ]);
       if (leavingRef.current) return;
-      setSettings(s);
       setMySubs(subs);
       setMyReq(req);
       // Auto-join locally only when there's nothing left to pay. Otherwise the

@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: submitting proof-of-payment fails (declined at the API layer).
@@ -107,13 +109,9 @@ test("declined submission shows actionable error and stays on the pay screen", a
     },
   );
 
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself, owned by the host whose settings are mocked above (the
+  // bundled sample "g2" these specs once relied on no longer exists).
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: HOST_ID, price: 15 }));
 
   await page.route(
     (url) => tableUrl(url, "game_participants"),
@@ -194,7 +192,7 @@ test("declined submission shows actionable error and stays on the pay screen", a
         return route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
       }
       return route.fallback();
