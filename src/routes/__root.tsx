@@ -48,6 +48,7 @@ import { AccountTypeScreen } from "@/components/onboarding/AccountTypeScreen";
 import { logNotFound } from "@/lib/route-doctor";
 import { devToolsEnabled } from "@/lib/dev-tools";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
+import { installBrowserErrorReporting } from "@/lib/error-report-client";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
 import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { AnalyticsHost } from "@/components/AnalyticsHost";
@@ -948,6 +949,8 @@ function RootComponent() {
 
   useEffect(() => {
     markAppBooted();
+    // P0-8: uncaught browser errors go to our own error table (scrubbed, no personal data).
+    installBrowserErrorReporting();
     const onError = (event: ErrorEvent) => maybeReloadForStaleChunk(event.error ?? event.message);
 
     const onRejection = (event: PromiseRejectionEvent) => maybeReloadForStaleChunk(event.reason);
