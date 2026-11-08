@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
 import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
@@ -111,6 +112,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     // Ensure device B is on the CTA — if already joined from prior run, leave first.
     const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
     if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
+      await appBooted(bDetail);
       await leaveCta.click();
       await confirmLeave(bDetail);
       await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
@@ -120,6 +122,11 @@ test("another device joining updates roster + counters on feed, map, detail, pro
 
     const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
+    // Device A must be listening before B joins (see helpers/realtime.ts).
+    await realtimeJoined(aDetail, `game_participants:game:${GAME_ID}`);
+    if (beforeFeed !== null) await realtimeJoined(aFeed, `game_participants:game:${GAME_ID}`);
+    if (beforeMap !== null) await realtimeJoined(aMap, `game_participants:game:${GAME_ID}`);
+    await appBooted(bDetail);
     await joinCta.click();
     await confirmFreeJoin(bDetail);
 
@@ -166,6 +173,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     });
 
     // --- Reverse: leave from B and confirm Device A tears back down ---
+    await appBooted(bDetail);
     await bDetail
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()

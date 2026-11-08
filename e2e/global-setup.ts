@@ -212,6 +212,32 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       if (id) fixtureIds.push(id);
     }
 
+    // No fixture account starts a run with managed children left over.
+    // managed-child.spec creates one on the host fixture and deletes it at the
+    // end, but a run that dies in between leaves it behind, and the per-guardian
+    // caps (MAX_MANAGED, MAX_MANAGED_PER_DAY in managed-children.functions.ts)
+    // then refuse every later run: run 42460824214 failed with "You've reached
+    // the limit for child profiles right now". Only children managed by the
+    // fixture accounts are removed; deleting a child's auth user cascades to
+    // its managed_accounts row.
+    try {
+      const { data: leftovers, error: listErr } = await admin
+        .from("managed_accounts")
+        .select("child_user_id")
+        .in("managed_by", fixtureIds);
+      if (listErr) throw new Error(listErr.message);
+      for (const row of (leftovers ?? []) as { child_user_id: string }[]) {
+        const { error } = await admin.auth.admin.deleteUser(row.child_user_id);
+        if (error) throw new Error(error.message);
+      }
+    } catch (err) {
+      console.warn(
+        `[e2e global-setup] Could not remove leftover managed children of the fixture accounts: ${
+          err instanceof Error ? err.message : String(err)
+        }. managed-child.spec may hit the child-profile limit.`,
+      );
+    }
+
     // Each fixture account accepts the Terms and Privacy Policy versions in
     // force, as a real member has. Without that, LegalReacceptGate covers the
     // whole app with "Updated legal documents" (fixed, z-[100]) whenever a
@@ -291,7 +317,12 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
             location: "Tompkins Square Courts",
             neighborhood: "East Village",
             max_players: 10,
-            joined: 8,
+            // hosted_games.joined is maintained from game_participants by the
+            // sync_hosted_game_joined_count trigger, and after the reset below
+            // g1 has no participants. Seeding 8 here made the cached counter
+            // disagree with the live one: a card first showed "2 spots", then
+            // "9 spots" once a live count arrived (run 42460824214).
+            joined: 0,
             skill: "Intermediate",
             price: 0,
             indoor: false,

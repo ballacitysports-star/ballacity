@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
 import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
@@ -69,6 +70,7 @@ function joinedFromHeader(text: string | null): number | null {
 async function ensureLeft(bDetail: Page) {
   const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
   if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
+    await appBooted(bDetail);
     await leaveCta.click();
     await confirmLeave(bDetail);
     await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
@@ -80,6 +82,7 @@ async function ensureLeft(bDetail: Page) {
 async function performJoin(page: Page) {
   const joinCta = page.getByRole("button", { name: /join run/i }).first();
   await expect(joinCta).toBeVisible({ timeout: 15_000 });
+  await appBooted(page);
   await joinCta.click();
   await confirmFreeJoin(page);
   await expect(page.getByRole("button", { name: /you're in · tap to leave/i }).first()).toBeVisible(
@@ -88,6 +91,7 @@ async function performJoin(page: Page) {
 }
 
 async function performLeave(page: Page) {
+  await appBooted(page);
   await page
     .getByRole("button", { name: /you're in · tap to leave/i })
     .first()
@@ -137,6 +141,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
     await ensureLeft(bDetail);
 
     // ============ Step 1: INSERT propagates A ←— B ============
+    await realtimeJoined(aDetail, `game_participants:game:${GAME_ID}`);
     await performJoin(bDetail);
 
     await expect

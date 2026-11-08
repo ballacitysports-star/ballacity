@@ -84,7 +84,24 @@ function collectAuthLog(page: Page) {
     const t = m.text();
     if (/\[AuthGate\]|auth|session|token/i.test(t)) lines.push(`${m.type()}: ${t.slice(0, 240)}`);
   });
-  return () => lines.slice(-12).join("\n");
+  const dump = () => lines.slice(-12).join("\n");
+  /**
+   * Wait until AuthGate has verified the stored session ("user-present").
+   * /feed is also a signed-out page: while the session is still being
+   * verified it renders the signed-out preview, bottom bar and "Home" label
+   * included, so those alone do not prove the member is signed in. Run
+   * 42460824214 started watching in that state, and the next tab (a protected
+   * page) showed the loader until verification finished, which is the loader
+   * doing its job, not a flash after login.
+   */
+  const signedIn = () =>
+    expect
+      .poll(() => lines.some((l) => /\[AuthGate\] user-present/.test(l)), {
+        timeout: 20_000,
+        message: `AuthGate never reported user-present:\n${dump()}`,
+      })
+      .toBe(true);
+  return Object.assign(dump, { signedIn });
 }
 
 for (const provider of ["google", "apple"] as const) {
@@ -95,6 +112,7 @@ for (const provider of ["google", "apple"] as const) {
     // Land on the signed-in home first; the initial loader here is expected.
     await page.goto("/feed", { waitUntil: "domcontentloaded" });
     await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
+    await authLog.signedIn();
     for (const needle of LOADER_TEXTS) {
       await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
     }
@@ -127,6 +145,7 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
   await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
+  await authLog.signedIn();
 
   await installLoaderFlashObserver(page);
 

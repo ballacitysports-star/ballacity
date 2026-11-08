@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { confirmFreeJoin } from "./helpers/join";
+import { appBooted, confirmFreeJoin } from "./helpers/join";
 import { stubRiskAcknowledged } from "./helpers/safety-ack";
 import { pgrstBody } from "./helpers/postgrest";
 
@@ -174,6 +174,7 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
   // CTA button shows "Join Run · N spots left".
   const cta = page.getByRole("button", { name: /join run/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await appBooted(page);
   await cta.click();
   await confirmFreeJoin(page);
 

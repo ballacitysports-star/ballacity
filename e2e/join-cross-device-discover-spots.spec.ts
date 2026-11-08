@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
 import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
@@ -127,6 +128,7 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
     // leave first so the join action produces a real INSERT.
     const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
     if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
+      await appBooted(bDetail);
       await leaveCta.click();
       await confirmLeave(bDetail);
       await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
@@ -136,6 +138,9 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
 
     const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
+    // Device A must be listening before B joins (see helpers/realtime.ts).
+    await realtimeJoined(aDiscover, `game_participants:game:${GAME_ID}`);
+    await appBooted(bDetail);
     await joinCta.click();
     await confirmFreeJoin(bDetail);
 
@@ -153,6 +158,7 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
       .toBe((beforeCount ?? 0) - 1);
 
     // --- Reverse: leave from B and confirm pill increments back ---
+    await appBooted(bDetail);
     await bDetail
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()

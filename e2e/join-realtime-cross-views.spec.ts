@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
 import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
@@ -83,6 +84,10 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     // clearJoinedState only clears the local cache. The shared fixture can still
     // hold a participant row on g1 from an earlier spec that stopped before
     // leaving (run 42454894247), so leave first, as the cross-device specs do.
+    // Read the CTA only once the app has hydrated and loaded the viewer's state:
+    // the server-rendered button does not know who is signed in.
+    await appBooted(detailPage);
+    await detailPage.waitForLoadState("networkidle").catch(() => {});
     if (/you're in/i.test((await joinCta.textContent()) ?? "")) {
       await joinCta.click();
       await confirmLeave(detailPage);
@@ -104,6 +109,11 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     expect(await profileCardBefore.count()).toBe(0);
 
     // --- Action: join from the detail page ---
+    // The other tabs must be listening before the join (see helpers/realtime.ts);
+    // the feed pill and profile list follow the viewer's own participation.
+    await realtimeJoined(feedPage, "game_participants:me:");
+    await realtimeJoined(profilePage, "game_participants:me:");
+    await appBooted(detailPage);
     await joinCta.click();
     await confirmFreeJoin(detailPage);
 
@@ -124,6 +134,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     });
 
     // --- Reverse: leave and confirm state clears everywhere ---
+    await appBooted(detailPage);
     await detailPage
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { realtimeJoined } from "./helpers/realtime";
 import { account, signInAs } from "./helpers/fixture-auth";
 import { createClient } from "@supabase/supabase-js";
 
@@ -106,6 +107,9 @@ test("player profile Organizations section updates in real time", async ({ page 
     await page.goto(`/players/${uid}`, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(new RegExp(`/players/${uid}`));
     await expect(page.getByText(orgName)).toHaveCount(0);
+    // The section does not re-read when it subscribes, so accept only once the
+    // page is listening (see helpers/realtime.ts).
+    await realtimeJoined(page, `player-orgs:${uid}`);
 
     // The player accepts — the realtime subscription on trainer_org_members
     // should push the new membership to the open page.
