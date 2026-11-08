@@ -136,13 +136,21 @@ function ensureRealtime() {
   }
 
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+    // INITIAL_SESSION too: a page that loads with a stored session gets that,
+    // not SIGNED_IN. This runs before ensureHydrated() has resolved the user,
+    // so `currentUserId` was still null above and nothing attached; without
+    // this case a returning member never had a live game_participants channel.
+    if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
       const uid = session?.user?.id ?? null;
-      if (uid && uid !== currentUserId) {
+      if (!uid) return;
+      if (uid !== currentUserId) {
         currentUserId = uid;
         hydrated = false;
         hydratingPromise = null;
         ensureHydrated();
+        attach(uid);
+      } else if (!channel) {
+        // Hydration already resolved this user; only the channel is missing.
         attach(uid);
       }
     } else if (event === "SIGNED_OUT") {

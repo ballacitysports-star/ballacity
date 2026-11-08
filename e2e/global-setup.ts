@@ -212,6 +212,25 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       if (id) fixtureIds.push(id);
     }
 
+    // The fixture accounts are adults with profiles other members can open, as
+    // the specs that look at one fixture from another assume. The player
+    // fixture held profile_visibility "private" in the sandbox (the protective
+    // value an account without a known age gets), so its /players page showed
+    // "not found" to the host fixture and player-orgs-realtime could never see
+    // the Organizations section. Reset it to the column's adult default.
+    {
+      const { error } = await admin
+        .from("privacy_preferences")
+        .update({ profile_visibility: "public" } as never)
+        .in("user_id", fixtureIds)
+        .neq("profile_visibility", "public");
+      if (error) {
+        console.warn(
+          `[e2e global-setup] Could not reset profile visibility for the fixture accounts: ${error.message}.`,
+        );
+      }
+    }
+
     // No fixture account starts a run with managed children left over.
     // managed-child.spec creates one on the host fixture and deletes it at the
     // end, but a run that dies in between leaves it behind, and the per-guardian
