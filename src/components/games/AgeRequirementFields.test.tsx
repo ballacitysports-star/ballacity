@@ -101,7 +101,8 @@ describe("AgeRequirementFields public discovery note", () => {
 describe("create and edit forms", () => {
   const read = (p: string) => readFileSync(p, "utf8");
   const create = read("src/routes/_tabs.create.tsx");
-  const edit = read("src/routes/games.$gameId.index.tsx");
+  // The edit form lives in its own component since P2-6 slice 2; the route renders it.
+  const edit = read("src/components/game-detail/EditGameModal.tsx");
 
   it("both use the one shared component, so they carry the same note exactly once", () => {
     expect(create.match(/<AgeRequirementFields/g)).toHaveLength(1);
