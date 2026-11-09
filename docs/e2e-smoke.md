@@ -69,3 +69,16 @@ The audit's rule: require `E2E smoke` after three consecutive green runs. Before
 
 Then add `E2E smoke` under required status checks (see `docs/branch-protection.md`). To roll back,
 remove it from the required checks. Nothing in the repository needs to change.
+
+## Accessibility gate (P3-5)
+
+`e2e/a11y-public-pages.spec.ts` runs axe (`@axe-core/playwright`, WCAG 2.1 A and AA) on ten public
+pages, signed out, plus `/` at phone width. A serious or critical violation fails the test.
+Moderate and minor findings are only printed.
+
+- Baseline, 2026-11-09, dev server on the sandbox: 18 public pages scanned. The only serious
+  finding was `aria-prohibited-attr` on the skip-link target, on every page. It is fixed in the
+  same change. Putting the old target back fails the spec on every page.
+- The 11 tests join `e2e/smoke-set.json` once they have passed on the sandbox in CI, like every
+  other smoke test.
+- Signed-in pages are not covered yet. They need the fixture accounts, so they come next.
