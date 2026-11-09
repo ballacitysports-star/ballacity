@@ -1,4 +1,6 @@
 import { createFileRoute, Link, redirect, useLocation } from "@tanstack/react-router";
+import { TeamChatPanel } from "@/components/team/TeamChatPanel";
+import { useTeamChatAccess } from "@/lib/team-chat";
 import { BackButton } from "@/components/layout/BackButton";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
@@ -213,13 +215,17 @@ function TeamPage({ org }: { org: Org }) {
   const { user } = useAuth();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "posts" | "roster" | "about" | "games" =
+  // P2-3: the Chat tab exists only for people the database puts in this team's chat.
+  const chatAccess = useTeamChatAccess(org.id, !!user);
+  const tab: "posts" | "roster" | "about" | "games" | "chat" =
     search.tab === "about" || search.tab === "games" || search.tab === "roster"
       ? search.tab
-      : "posts";
+      : search.tab === "chat" && chatAccess
+        ? "chat"
+        : "posts";
   const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
   const reviewsOpen = search.modal === "reviews";
-  const setTab = (v: "posts" | "roster" | "about" | "games") =>
+  const setTab = (v: "posts" | "roster" | "about" | "games" | "chat") =>
     navigate({ to: ".", search: { ...search, tab: v === "posts" ? "" : v }, replace: true });
   const setFilter = (v: PostKind | "all") =>
     navigate({ to: ".", search: { ...search, filter: v === "all" ? "" : v }, replace: true });
@@ -236,6 +242,8 @@ function TeamPage({ org }: { org: Org }) {
   const teamPerms = useTeamPermissions(org.id);
   const isUnclaimed = mounted && isOrgUnclaimed(org.id);
   const canManage = mounted && teamPerms.canInvite;
+  // Staff hide or unhide chat messages; the database checks the role again.
+  const canManageChat = canEdit || canManage;
 
   const orgReviews = useReviewsFor(org.id);
   const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
@@ -482,7 +490,10 @@ function TeamPage({ org }: { org: Org }) {
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "roster", "about", "games"] as const).map((t) => (
+          {(chatAccess
+            ? (["posts", "chat", "roster", "about", "games"] as const)
+            : (["posts", "roster", "about", "games"] as const)
+          ).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -496,7 +507,9 @@ function TeamPage({ org }: { org: Org }) {
                   ? `Posts · ${allPosts.length}`
                   : t === "roster"
                     ? "Roster"
-                    : "About"}
+                    : t === "chat"
+                      ? "Chat"
+                      : "About"}
             </button>
           ))}
         </div>
@@ -688,6 +701,10 @@ function TeamPage({ org }: { org: Org }) {
         )}
 
         {/* Games tab */}
+        {tab === "chat" && chatAccess && user && (
+          <TeamChatPanel teamId={org.id} viewerId={user.id} isStaff={canManageChat} />
+        )}
+
         {tab === "games" && (
           <div className="mt-5 space-y-3">
             {upcomingGames.length === 0 && (
