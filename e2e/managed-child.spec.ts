@@ -21,7 +21,23 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?
 const PUBLISHABLE_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
 
-const CHILD_FIRST = "Eetwoemanaged";
+/** Every child this spec creates starts with this, so leftovers can be found. */
+const CHILD_PREFIX = "Eetwoemanaged";
+/** The form checks below never save, so they can share the bare prefix. */
+const CHILD_FIRST = CHILD_PREFIX;
+
+/**
+ * A first name no other run uses. Names are letters only (childDisplayName),
+ * so the per-run part is letters too. Two children with the same name made
+ * every locator in the end-to-end test ambiguous (runs 42697337005 and
+ * 42700110383: "resolved to 3 elements").
+ */
+function uniqueChildFirst(): string {
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  let tail = "";
+  for (let i = 0; i < 8; i++) tail += letters[Math.floor(Math.random() * letters.length)];
+  return `${CHILD_PREFIX}${tail}`;
+}
 
 test.describe("Add your child form", () => {
   test("needs a name, a birthday and the guardian's confirmation — not a sport", async ({
@@ -111,37 +127,73 @@ test.describe("managed child, end to end", () => {
     );
   });
 
-  const appears = (locator: ReturnType<Page["getByRole"]>, timeout: number) =>
-    locator.waitFor({ state: "visible", timeout }).then(
-      () => true,
-      () => false,
-    );
-
-  async function deleteChild(page: Page) {
+  /** The Parent Center, as the guardian, with the roster loaded. */
+  async function openParentCenter(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
-    // Still inside the child's profile (a step failed mid-way)? The banner is
-    // on every page there; go back to the guardian first.
+    // Loaded means the roster or the empty state. Never sample "is the tab
+    // there?" against a page that is still loading: that is how the old
+    // cleanup skipped the delete and still passed.
+    const loaded = page
+      .getByRole("tablist", { name: /your linked children/i })
+      .or(page.getByText(/^no children yet$/i));
+    // Still inside a child's profile (a step failed mid-way)? The banner is on
+    // every page there; go back to the guardian first.
     const back = page.getByRole("button", { name: /^back to /i });
-    if (await appears(back, 5_000)) {
+    await expect(loaded.or(back).first()).toBeVisible({ timeout: 30_000 });
+    if (await back.isVisible()) {
       await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }
-    // The roster loads after the page; wait for it rather than sampling once.
-    const tab = page.getByRole("tab", { name: new RegExp(CHILD_FIRST) });
-    if (!(await appears(tab, 15_000))) return;
-    await tab.click();
-    page.once("dialog", (d) => void d.accept(CHILD_FIRST));
-    await page
-      .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
-      .click();
-    await expect(tab).toBeHidden({ timeout: 20_000 });
+    await expect(loaded.first()).toBeVisible({ timeout: 30_000 });
+  }
+
+  /**
+   * Delete, through the Parent Center, every managed child this spec has ever
+   * created for the host (any name starting with CHILD_PREFIX), and check each
+   * one leaves the roster. Fails loudly, with the app's error toast when there
+   * is one: a cleanup that cannot clean up must not let the test pass.
+   */
+  async function deleteChildren(page: Page) {
+    await openParentCenter(page);
+    const ours = page.getByRole("tab", { name: new RegExp(CHILD_PREFIX) });
+    const errorToast = page.locator('[data-sonner-toast][data-type="error"]');
+    for (let round = 0; round < 20; round++) {
+      const before = await ours.count();
+      if (before === 0) return;
+      await ours.first().click();
+      // Only the selected child's panel is open, so there is one such button.
+      const del = page.getByRole("button", { name: /^delete .+'s profile$/i });
+      await expect(del).toBeVisible({ timeout: 15_000 });
+      const first = /^delete (.+)'s profile$/i.exec(((await del.textContent()) ?? "").trim())?.[1];
+      expect(first ?? "", "the delete button names one of this spec's children").toMatch(
+        new RegExp(`^${CHILD_PREFIX}`),
+      );
+      // The confirmation is a prompt that asks for the first name.
+      page.once("dialog", (d) => void d.accept(first));
+      await del.click();
+      const deadline = Date.now() + 30_000;
+      while ((await ours.count()) >= before) {
+        if ((await errorToast.count()) > 0) {
+          throw new Error(`Deleting ${first} failed: ${await errorToast.first().innerText()}`);
+        }
+        if (Date.now() > deadline) throw new Error(`${first} was still listed 30 s after Delete.`);
+        await page.waitForTimeout(500);
+      }
+    }
+    throw new Error(`Over 20 leftover ${CHILD_PREFIX} children for the host; stopped deleting.`);
   }
 
   test("add, switch in, switch back, delete", async ({ page }) => {
+    // Room for clearing leftovers from earlier runs before the flow itself.
+    test.setTimeout(180_000);
+    const childFirst = uniqueChildFirst();
     await signInAs(page, "host");
+    // Leftovers from a run that could not clean up (a cancelled job, a crash)
+    // would otherwise sit in the roster beside this run's child.
+    await deleteChildren(page);
     try {
       await page.goto("/players/add?from=parent", { waitUntil: "domcontentloaded" });
-      await page.locator("#first-name").fill(CHILD_FIRST);
+      await page.locator("#first-name").fill(childFirst);
       await page.locator("#last-name").fill("Tester");
       await page.locator("#dob").fill("2015-04-02");
       await page.locator("#attest").click();
@@ -149,24 +201,24 @@ test.describe("managed child, end to end", () => {
 
       // The confirmation, not a raw error (§23).
       await expect(
-        page.getByRole("heading", { name: new RegExp(`${CHILD_FIRST}'s profile is ready`, "i") }),
+        page.getByRole("heading", { name: new RegExp(`${childFirst}'s profile is ready`, "i") }),
       ).toBeVisible({ timeout: 30_000 });
 
       // Parent Center lists the child as managed, with every control in place.
       await page.getByRole("button", { name: /go to parent center/i }).click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 15_000 });
-      const tab = page.getByRole("tab", { name: new RegExp(CHILD_FIRST) });
+      const tab = page.getByRole("tab", { name: new RegExp(`${childFirst} T\\.`) });
       await expect(tab).toBeVisible({ timeout: 20_000 });
       await tab.click();
       await expect(page.getByText(/managed by you — no email or password/i)).toBeVisible();
 
       // Switch in: the whole app is now the child, with the child's rules.
       await page
-        .getByRole("button", { name: new RegExp(`switch to ${CHILD_FIRST}'s profile`, "i") })
+        .getByRole("button", { name: new RegExp(`switch to ${childFirst}'s profile`, "i") })
         .click();
       await expect(page).toHaveURL(/\/profile/, { timeout: 30_000 });
       await expect(
-        page.getByText(new RegExp(`managing ${CHILD_FIRST} T\\.'s profile`, "i")),
+        page.getByText(new RegExp(`managing ${childFirst} T\\.'s profile`, "i")),
       ).toBeVisible({
         timeout: 20_000,
       });
@@ -181,7 +233,7 @@ test.describe("managed child, end to end", () => {
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
       await expect(page.getByText(/managing .*'s profile/i)).toHaveCount(0);
     } finally {
-      await deleteChild(page);
+      await deleteChildren(page);
     }
   });
 });
