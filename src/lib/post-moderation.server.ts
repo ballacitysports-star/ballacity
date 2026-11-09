@@ -14,7 +14,8 @@ import { moderateAiText } from "@/lib/ai/moderation.server";
 
 export { POST_BLOCKED_MESSAGE } from "@/lib/post-moderation";
 
-export type PostTextTable = "team_posts" | "post_comments" | "posts" | "events";
+export type PostTextTable =
+  "team_posts" | "post_comments" | "posts" | "events" | "team_chat_messages";
 export type PostScreen = "allow" | "hold" | "block";
 export type PostModerationStatus = "approved" | "held";
 
@@ -73,3 +74,5 @@ export const VENUE_EVENT_CONTEXT =
   "A clinic, camp, tournament or open gym listed by a sports venue in a community sports app used by adults and minors.";
 export const TRAINER_EVENT_CONTEXT =
   "A group clinic or camp listed by a sports trainer in a community sports app used by adults and minors.";
+export const TEAM_CHAT_CONTEXT =
+  "A message in a sports team's group chat, read by the team's adults, teenage players and players' parents.";
