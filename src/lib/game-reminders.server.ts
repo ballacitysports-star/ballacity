@@ -6,8 +6,15 @@
  * Each reminder is CLAIMED before its notification is written: last_sent_offset moves only if
  * it is still above the offset being sent, so two callers at once (the app and the scheduler,
  * or two tabs) send it once.
+ *
+ * Once the in-app notification is written, the reminder also goes to the player's phone through
+ * deliverPush (OneSignal), unless they switched game-reminder push off. deliverPush holds a
+ * minor's push during their quiet hours for the flush job and records each outcome in
+ * notification_delivery_log.
  */
 import { formatNotificationWhen } from "@/lib/format";
+import { isAllowedIn, mergeNotifPrefs } from "@/lib/notification-prefs-core";
+import { deliverPush } from "@/lib/push.server";
 
 export type ReminderRow = {
   id: string;
@@ -66,6 +73,26 @@ export type ReminderAdmin = {
 };
 
 /**
+ * Whether the player wants game reminders pushed to their phone: their saved preferences
+ * (notification_preferences.prefs), merged exactly as the app merges them, so it is on unless
+ * they switched it off. A failed read sends no push: the in-app notification is already
+ * written, and a push the player may have turned off is never sent on a guess.
+ */
+async function wantsReminderPush(admin: ReminderAdmin, userId: string): Promise<boolean> {
+  const { data, error } = await (admin
+    .from("notification_preferences")
+    .select("prefs")
+    .eq("user_id", userId)
+    .limit(1) as Q<unknown>);
+  if (error) return false;
+  const stored = ((data ?? []) as { prefs?: unknown }[])[0]?.prefs;
+  const prefs = mergeNotifPrefs(
+    stored && typeof stored === "object" ? (stored as Record<string, unknown>) : null,
+  );
+  return isAllowedIn(prefs, "game_reminder", "push");
+}
+
+/**
  * Sends due reminders. `userId` limits it to one player (their own flush); without it, the
  * sweep covers every player with an upcoming game in the next 8 days (the longest lead offered
  * is a week). Returns how many were sent.
@@ -96,6 +123,8 @@ export async function sendDueGameReminders(
 
   let sent = 0;
   let checked = 0;
+  // One preferences read per player per run, however many of their reminders are due.
+  const pushWanted = new Map<string, Promise<boolean>>();
   for (const r of reminders) {
     const game = byId.get(r.game_id);
     if (!game || game.status === "cancelled") continue;
@@ -115,19 +144,18 @@ export async function sendDueGameReminders(
     const { data: claimed, error: cErr } = await claim;
     if (cErr || !Array.isArray(claimed) || claimed.length === 0) continue;
 
+    const title = `${game.title} starts in ${leadText(offset)}`;
+    // All-day games never surface a clock time in reminders.
+    const when = formatNotificationWhen({ date: String(game.date), allDay: !!game.all_day });
+    const link = `/games/${r.game_id}`;
     const { error: insErr } = await admin.from("notifications").insert({
       user_id: r.user_id,
       type: "game_reminder",
-      title: `${game.title} starts in ${leadText(offset)}`,
-      // All-day games never surface a clock time in reminders.
+      title,
       body:
-        [
-          formatNotificationWhen({ date: String(game.date), allDay: !!game.all_day }),
-          game.location ? `Where: ${game.location}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || null,
-      link: `/games/${r.game_id}`,
+        [when, game.location ? `Where: ${game.location}` : null].filter(Boolean).join(" · ") ||
+        null,
+      link,
     });
     if (insErr) {
       // Give the claim back so the next run tries again.
@@ -138,6 +166,21 @@ export async function sendDueGameReminders(
       continue;
     }
     sent += 1;
+
+    // Then the phone, with the game's title and start time only: no venue on a lock screen.
+    let wanted = pushWanted.get(r.user_id);
+    if (!wanted) {
+      wanted = wantsReminderPush(admin, r.user_id).catch(() => false);
+      pushWanted.set(r.user_id, wanted);
+    }
+    if (await wanted) {
+      try {
+        await deliverPush({ userId: r.user_id, title, body: when, url: link });
+      } catch (e) {
+        // A push is best effort; the notification row is the record.
+        console.warn("[reminders] push failed", e);
+      }
+    }
   }
   return { sent, checked };
 }

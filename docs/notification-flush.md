@@ -9,10 +9,36 @@ never go out.
 ## The scheduler (P2-7)
 
 `supabase/migrations/20261108160000_scheduled_jobs.sql` schedules it with pg_cron every 5 minutes
-(`flush-held-notifications`), next to `send-game-reminders` (`/api/public/reminders/run`, reminders while the
-app is closed) and a daily `purge-app-error-events`. The jobs call the app through
+(`flush-held-notifications`), next to `send-game-reminders` (`/api/public/reminders/run`, game
+reminders, below) and a daily `purge-app-error-events`. The jobs call the app through
 `private_sec.worker_post`, which reads the secret from Vault and the app's address from the
 `worker_base_url` setting or, when that is empty, from the existing reels job.
+
+## Game reminders (`src/lib/game-reminders.server.ts`)
+
+`send-game-reminders` runs the same sweep the app runs for a signed-in player (on load and every
+5 minutes while the app is open). For each reminder that is due, it:
+
+1. Claims it, so the scheduler and the app (or two runs) send it once.
+2. Writes the in-app notification: `<game> starts in <lead time>`, the start time, the venue, and
+   a link to the game. If the write fails, the claim is given back, nothing is pushed, and the
+   next run tries again.
+3. Pushes it to the player's phone with `deliverPush` (`src/lib/push.server.ts`): the same title,
+   the start time, and the game link. The game's location is left out, so a lock screen does not
+   show the venue (the title is the host's, as written). No push when the player switched Game
+   reminders push off
+   (`notification_preferences.prefs.gameReminders.push`, read with the app's own merge rules from
+   `src/lib/notification-prefs-core.ts`; on when not set), or when their preferences cannot be
+   read.
+4. `deliverPush` then applies the minor curfew: inside a minor's quiet window the push is held in
+   `scheduled_notifications` and this flush sends it once the window ends; if a guardian switched
+   the child's notifications off, nothing is sent. Each push writes a `notification_delivery_log`
+   row (`sent`, `failed`, or `skipped` with the reason, e.g. `minor_notification_curfew` or
+   `no_subscribers`).
+
+A reminder reaches a phone while the app is closed only when the player has a push subscription
+on it; without one, the log row says `no_subscribers`. A push sent straight away that fails is not
+retried (a held one retries as below). Either way the reminder is in the app's notifications.
 
 ## The call
 
