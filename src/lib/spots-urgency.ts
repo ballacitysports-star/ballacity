@@ -37,3 +37,23 @@ export function spotsOpenLabel(spotsLeft: number, opts: { short?: boolean } = {}
   if (opts.short) return `${spotsLeft} open`;
   return `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} open`;
 }
+
+/**
+ * The pay page's "this game just filled up" warning. Only for a viewer still about to pay: the live count says the
+ * game is full, and the viewer neither holds a place on it nor has a payment in (submitted, waiting for the host, or
+ * verified). A player whose own payment just filled the last spot must not be told to hold off.
+ */
+export function showFilledUpWarning(opts: {
+  /** The live count; undefined until it is known, and then there is no warning. */
+  liveCount: number | undefined;
+  spotsLeft: number;
+  viewerHoldsPlace: boolean;
+  hasSubmission: boolean;
+}): boolean {
+  return (
+    opts.liveCount !== undefined &&
+    opts.spotsLeft <= 0 &&
+    !opts.viewerHoldsPlace &&
+    !opts.hasSubmission
+  );
+}

@@ -19,6 +19,8 @@ const db = vi.hoisted(() => ({
   channels: [] as string[],
   handlers: [] as ((payload: { eventType: string; new?: unknown; old?: unknown }) => void)[],
   queries: [] as string[],
+  subscribed: [] as ((status: string) => void)[],
+  auth: [] as ((event: string) => void)[],
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -63,7 +65,8 @@ vi.mock("@/integrations/supabase/client", () => {
             db.handlers.push(handler);
             return ch;
           },
-          subscribe() {
+          subscribe(cb?: (status: string) => void) {
+            if (cb) db.subscribed.push(cb);
             return ch;
           },
         };
@@ -72,7 +75,10 @@ vi.mock("@/integrations/supabase/client", () => {
       removeChannel() {},
       auth: {
         getSession: async () => ({ data: { session: { user: { id: "viewer" } } } }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+        onAuthStateChange: (cb: (event: string) => void) => {
+          db.auth.push(cb);
+          return { data: { subscription: { unsubscribe() {} } } };
+        },
       },
     },
   };
@@ -142,6 +148,46 @@ describe("useLiveParticipantCount", () => {
     expect(db.channels).toEqual(["hosted_games:all"]);
     expect(db.queries.filter((q) => q.includes("head-count"))).toEqual([]);
     expect(db.queries.filter((q) => q.startsWith("game_participants"))).toEqual([]);
+    view.unmount();
+  });
+
+  it("stays live through a re-load after an auth event, and catches up after a dropped connection", async () => {
+    const { useHostedGames } = await import("@/lib/hosted-games-store");
+    const { useLiveParticipantCount } = await import("@/lib/game-participants-store");
+    const seen: (number | undefined)[] = [];
+    function Card() {
+      const n = useLiveParticipantCount("g-a");
+      seen.push(n);
+      return <span data-testid="g-a">{n === undefined ? "fallback" : n}</span>;
+    }
+    function Feed() {
+      useHostedGames();
+      return <Card />;
+    }
+    db.rows = [{ id: "g-a", joined: 2, max_players: 10 }];
+    const view = render(<Feed />);
+    await settle();
+    expect(view.getByTestId("g-a").textContent).toBe("2");
+
+    // Every tab refocus emits SIGNED_IN: the store loads again. The count must not drop to the
+    // card's own copy meanwhile, and must show the new value once the load is in.
+    db.rows = [{ id: "g-a", joined: 5, max_players: 10 }];
+    seen.length = 0;
+    await act(async () => db.auth.forEach((cb) => cb("SIGNED_IN")));
+    await settle();
+    expect(view.getByTestId("g-a").textContent).toBe("5");
+    expect(seen).not.toContain(undefined);
+
+    // The connection drops; a join happens meanwhile (no event delivered); the channel joins again.
+    const channelStatus = db.subscribed[0]!;
+    await act(async () => channelStatus("SUBSCRIBED"));
+    await act(async () => channelStatus("CHANNEL_ERROR"));
+    db.rows = [{ id: "g-a", joined: 6, max_players: 10 }];
+    expect(view.getByTestId("g-a").textContent).toBe("5");
+    await act(async () => channelStatus("SUBSCRIBED"));
+    await settle();
+    expect(view.getByTestId("g-a").textContent).toBe("6");
+    expect(db.channels).toEqual(["hosted_games:all"]);
     view.unmount();
   });
 

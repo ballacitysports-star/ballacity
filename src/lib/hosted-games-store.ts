@@ -10,6 +10,9 @@ const listeners = new Set<() => void>();
 let cache: Game[] = [];
 let loaded = false;
 let dbHydrated = false;
+// True once a load from the database has finished. Unlike dbHydrated it stays true while a later re-load runs (after
+// an auth event), so live counts do not drop back to each card's own copy for the length of that re-load.
+let dbLoadedOnce = false;
 let dbHydratePromise: Promise<void> | null = null;
 
 /** Where the first load from the database stands, so a screen can say so. */
@@ -25,6 +28,7 @@ function setLoadStatus(next: HostedGamesLoad) {
   listeners.forEach((l) => l());
 }
 let realtimeAttached = false;
+let subscribedOnce = false;
 const EMPTY = "[]";
 let snapshotCache = EMPTY;
 
@@ -268,6 +272,7 @@ function ensureDbHydrated() {
   dbHydratePromise = fetchAll()
     .then(() => {
       dbHydrated = true;
+      dbLoadedOnce = true;
       setLoadStatus("ready");
     })
     .catch(() => {
@@ -314,7 +319,13 @@ function ensureRealtime() {
         emit();
       }
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (status !== "SUBSCRIBED") return;
+      // Joining again follows a dropped connection (a phone resumed, a laptop woke up): changes made meanwhile were
+      // never delivered, so load the games again. The first join needs nothing; the first load is already running.
+      if (subscribedOnce && dbLoadedOnce) fetchAll().catch(() => {});
+      subscribedOnce = true;
+    });
 
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => {
@@ -696,7 +707,7 @@ export function useHostedGameJoined(gameId: string | undefined): number | undefi
   const joined = useSyncExternalStore(
     subscribe,
     () => {
-      if (!gameId || !dbHydrated) return -1;
+      if (!gameId || !dbLoadedOnce) return -1;
       const game = cache.find((g) => g.id === gameId);
       return typeof game?.joined === "number" ? game.joined : -1;
     },

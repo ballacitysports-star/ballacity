@@ -74,6 +74,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
+import { rosterPlaceholderCount } from "@/lib/roster-placeholders";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
@@ -301,6 +302,7 @@ function GameDetail() {
   const liveParticipantCount = useLiveParticipantCount(gameId);
   const {
     participants: liveRoster,
+    loading: rosterLoading,
     refetch: refetchRoster,
     removeLocal: removeRosterLocal,
   } = useLiveParticipants(gameId);
@@ -1243,12 +1245,15 @@ function GameDetail() {
       displayName: p.displayName,
       avatarUrl: p.avatarUrl,
     }));
-  // Only show placeholder avatars while the live roster hasn't hydrated yet.
-  // Once `liveParticipantCount` is defined we trust it as the authoritative
-  // count, so a host removal that drops the roster to 0 doesn't leave ghost
-  // avatars behind derived from the stale `game.joined` value.
-  const rosterHydrated = liveParticipantCount !== undefined;
-  const placeholderCount = rosterHydrated ? 0 : Math.max(0, (game.joined ?? 0) - liveRoster.length);
+  // Anonymous chips for places taken by players this viewer cannot name: only the host and the game's own
+  // players can read the roster, and anyone's roster is still loading at first (lib/roster-placeholders).
+  const placeholderCount = rosterPlaceholderCount({
+    takenPlaces: effectiveJoined,
+    viewerHoldsPlace: viewerCountsAsJoined,
+    namedOthers: rosterOthers.length,
+    rosterLoading,
+    canReadRoster: isHost || liveRoster.some((p) => p.userId === meId),
+  });
   const placeholderOthers: RosterEntry[] = Array.from({ length: placeholderCount }, (_, i) => ({
     kind: "player" as const,
     initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
