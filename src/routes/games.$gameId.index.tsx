@@ -1506,7 +1506,7 @@ function GameDetail() {
             >
               Payments
               {isHost && pendingCount > 0 && (
-                <span className="inline-flex items-center justify-center rounded-full bg-coral px-1.5 text-[10px] font-bold text-white min-w-[18px] h-[18px]">
+                <span className="inline-flex items-center justify-center rounded-full bg-coral-strong px-1.5 text-[10px] font-bold text-white min-w-[18px] h-[18px]">
                   {pendingCount}
                 </span>
               )}
@@ -2591,7 +2591,7 @@ function GameDetail() {
                     p.initials
                   )}
                   {p.pending && (
-                    <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+                    <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral-strong text-[8px] text-white">
                       <Clock className="h-2.5 w-2.5" />
                     </span>
                   )}

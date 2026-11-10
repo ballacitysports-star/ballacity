@@ -81,4 +81,9 @@ Moderate and minor findings are only printed.
   same change. Putting the old target back fails the spec on every page.
 - The 11 tests join `e2e/smoke-set.json` once they have passed on the sandbox in CI, like every
   other smoke test.
-- Signed-in pages are not covered yet. They need the fixture accounts, so they come next.
+- Signed-in pages: `e2e/a11y-signed-in-pages.spec.ts` signs in once as the adult `host` fixture and
+  runs the same check on `/feed`, `/discover`, `/teams`, `/players`, `/messages`, `/notifications`,
+  `/profile`, `/settings` and `/create`. Its baseline (2026-11-10) found one serious problem on every
+  one of them: white text on the brand coral in the unread badges (4.1:1, under AA's 4.5:1). Those
+  now use `bg-coral-strong` (4.9:1, and 5.3:1 in the light theme), and `src/lib/coral-contrast.test.ts`
+  keeps plain `bg-coral` out from behind white text.
