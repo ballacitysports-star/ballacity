@@ -45,27 +45,34 @@ export async function getEntityFollowState(
 
 export type EntityFollowCount = { followers: number; following: boolean };
 
+/** entity_follow_counts reads at most this many ids per call. */
+const FOLLOW_COUNTS_BATCH = 200;
+
 /**
- * Follower counts for a list of entities in one call (entity_follow_counts, at most 200
- * ids): counts only, and nothing for an entity the caller cannot see.
+ * Follower counts for a list of entities (entity_follow_counts, one call per 200 ids):
+ * counts only, and nothing for an entity the caller cannot see.
  */
 export async function getEntityFollowCounts(
   kind: EntityKind,
   ids: string[],
 ): Promise<Map<string, EntityFollowCount>> {
   const out = new Map<string, EntityFollowCount>();
-  if (ids.length === 0) return out;
-  const { data, error } = await rpc("entity_follow_counts", {
-    _kind: kind,
-    _ids: ids.slice(0, 200),
-  });
-  if (error) throw new Error(entityFollowErrorMessage(error.message));
-  for (const row of (Array.isArray(data) ? data : []) as {
-    id: string;
-    followers: number;
-    following: boolean;
-  }[]) {
-    out.set(row.id, { followers: Number(row.followers ?? 0), following: !!row.following });
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += FOLLOW_COUNTS_BATCH) {
+    batches.push(ids.slice(i, i + FOLLOW_COUNTS_BATCH));
+  }
+  const results = await Promise.all(
+    batches.map((batch) => rpc("entity_follow_counts", { _kind: kind, _ids: batch })),
+  );
+  for (const { data, error } of results) {
+    if (error) throw new Error(entityFollowErrorMessage(error.message));
+    for (const row of (Array.isArray(data) ? data : []) as {
+      id: string;
+      followers: number;
+      following: boolean;
+    }[]) {
+      out.set(row.id, { followers: Number(row.followers ?? 0), following: !!row.following });
+    }
   }
   return out;
 }
@@ -129,7 +136,11 @@ export function useEntityFollow(kind: EntityKind, id: string) {
       });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["entity-follow", kind, id] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["entity-follow", kind, id] });
+      // The count on list cards (Discover, /teams, /trainers) changes with this follow too.
+      qc.invalidateQueries({ queryKey: ["entity-follow-counts", kind] });
+    },
   });
 
   return {

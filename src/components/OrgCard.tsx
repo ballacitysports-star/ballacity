@@ -110,12 +110,10 @@ export function OrgCard({
 
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
             {typeof followers === "number" ? (
-              <span
-                className="inline-flex items-center gap-1"
-                aria-label={`${followers} follower${followers === 1 ? "" : "s"}`}
-              >
+              <span className="inline-flex items-center gap-1" data-testid="org-followers">
                 <Users className="h-3.5 w-3.5 text-lime" aria-hidden />
                 {followers.toLocaleString()}
+                <span className="sr-only">{followers === 1 ? " follower" : " followers"}</span>
               </span>
             ) : null}
             {org.kind === "coach" && org.ratePerHour ? (

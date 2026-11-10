@@ -15,7 +15,10 @@ import {
   unfollowEntity,
 } from "./entity-follows";
 
-beforeEach(() => rpc.mockReset());
+// A block body: vitest runs a function returned from beforeEach as teardown.
+beforeEach(() => {
+  rpc.mockReset();
+});
 
 describe("entityFollowErrorMessage", () => {
   it("explains a consent lock", () => {
@@ -83,28 +86,36 @@ describe("entity follow counts for a list (P1-1)", () => {
     expect(counts.has("hidden")).toBe(false);
   });
 
-  it("sends at most 200 ids and makes no call for none", async () => {
-    rpc.mockResolvedValue({ data: [], error: null });
-    await getEntityFollowCounts(
-      "team",
-      Array.from({ length: 250 }, (_, i) => `t${i}`),
+  it("asks in calls of at most 200 ids (the database's cap) and counts every id", async () => {
+    rpc.mockImplementation((_fn: string, args: { _ids: string[] }) =>
+      Promise.resolve({
+        data: args._ids.map((id) => ({ id, followers: 1, following: false })),
+        error: null,
+      }),
     );
-    expect((rpc.mock.calls[0]![1] as { _ids: string[] })._ids).toHaveLength(200);
-    rpc.mockReset();
+    const ids = Array.from({ length: 450 }, (_, i) => `t${i}`);
+    const counts = await getEntityFollowCounts("team", ids);
+    expect(rpc.mock.calls.map((c) => (c[1] as { _ids: string[] })._ids.length)).toEqual([
+      200, 200, 50,
+    ]);
+    expect(counts.size).toBe(450);
+    expect(counts.get("t449")).toEqual({ followers: 1, following: false });
+  });
+
+  it("makes no call for no ids", async () => {
     expect((await getEntityFollowCounts("team", [])).size).toBe(0);
     expect(rpc).not.toHaveBeenCalled();
   });
-});
 
-describe("Discover cards", () => {
-  it("pass each team and trainer card its real count from one list call", async () => {
-    const { readFileSync } = await import("node:fs");
-    const src = readFileSync("src/components/feed/DiscoverResults.tsx", "utf8");
-    expect(src).toContain("useEntityFollowCounts(");
-    expect(
-      src.match(
-        /<OrgCard org=\{o\} index=\{i\} followers=\{followCounts\?\.get\(o\.id\)\?\.followers\} \/>/g,
+  it("fails as a whole when one batch is refused, so no card shows a wrong number", async () => {
+    rpc
+      .mockResolvedValueOnce({ data: [{ id: "t0", followers: 2, following: false }], error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: "NOT_SIGNED_IN" } });
+    await expect(
+      getEntityFollowCounts(
+        "team",
+        Array.from({ length: 201 }, (_, i) => `t${i}`),
       ),
-    ).toHaveLength(2);
+    ).rejects.toThrow("Sign in to follow");
   });
 });

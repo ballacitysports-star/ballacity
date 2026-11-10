@@ -8,7 +8,7 @@ import { OrgCard } from "@/components/OrgCard";
 import { OrgDirectoryCard, type OrgDirectoryRow } from "@/components/org/OrgDirectoryCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAllOrgs } from "@/lib/org-store";
-import { useEntityFollowCounts } from "@/lib/entity-follows";
+import { useOrgFollowCounts } from "@/lib/org-follow-counts";
 import { matchesOrgQuery } from "@/lib/org-search";
 import { matchesSportList } from "@/lib/sport-filter";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
@@ -129,15 +129,8 @@ export function DiscoverResults({
 
   const [now] = useState(() => new Date());
   const take = <T,>(rows: T[]) => (grouped ? rows.slice(0, GROUP_LIMIT) : rows);
-  // Real follower counts for the team and trainer cards on screen, in one call (P1-1).
-  const shownCards = [
-    ...(grouped || cat === "teams" ? take(teams) : []),
-    ...(grouped || cat === "trainers" ? take(trainers) : []),
-  ];
-  const followCounts = useEntityFollowCounts(
-    "team",
-    shownCards.map((o) => o.id),
-  );
+  // Real follower counts for the team and trainer cards (P1-1).
+  const followCounts = useOrgFollowCounts();
 
   const sections: {
     id: Exclude<DiscoverCategory, "all" | "runs">;

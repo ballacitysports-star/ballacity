@@ -9,7 +9,11 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 vi.mock("@/components/OrgCard", () => ({
-  OrgCard: ({ org }: { org: { name: string } }) => <div data-testid="org">{org.name}</div>,
+  OrgCard: ({ org, followers }: { org: { name: string }; followers?: number }) => (
+    <div data-testid="org" data-followers={followers ?? "none"}>
+      {org.name}
+    </div>
+  ),
 }));
 vi.mock("@/components/org/OrgDirectoryCard", () => ({
   OrgDirectoryCard: ({ org }: { org: { name: string } }) => <li data-testid="gym">{org.name}</li>,
@@ -35,7 +39,7 @@ const followCountCalls = vi.hoisted(() => [] as { kind: string; ids: string[] }[
 vi.mock("@/lib/entity-follows", () => ({
   useEntityFollowCounts: (kind: string, ids: string[]) => {
     followCountCalls.push({ kind, ids });
-    return null;
+    return new Map([["t1", { followers: 2, following: false }]]);
   },
 }));
 vi.mock("@/components/feed/DiscoverCardActions", () => ({
@@ -111,12 +115,24 @@ describe("DiscoverResults", () => {
     expect(screen.getByTestId("actions-t1")).toBeTruthy();
   });
 
-  it("asks for real follower counts once, for exactly the team and trainer cards shown (P1-1)", () => {
+  it("shows each card's real follower count, and no number where none is known (P1-1)", () => {
+    wrap(<DiscoverResults cat="teams" q="" sports={[]} />);
+    const card = (name: string) =>
+      screen.getAllByTestId("org").find((n) => n.textContent === name)!;
+    expect(card("Apex Elite").dataset.followers).toBe("2");
+    expect(card("Atlanta Squad 0").dataset.followers).toBe("none");
+  });
+
+  it("asks for the counts of the whole directory, so a search asks for nothing new (P1-1)", () => {
     followCountCalls.length = 0;
-    wrap(<DiscoverResults cat="all" q="atlanta" sports={[]} />);
-    const last = followCountCalls.at(-1)!;
-    expect(last.kind).toBe("team");
-    // Five teams (the grouped view's cap) and the one Atlanta trainer.
-    expect(last.ids).toEqual(["t1", "tx0", "tx1", "tx2", "tx3", "c1"]);
+    const { rerender } = wrap(<DiscoverResults cat="all" q="atlanta" sports={[]} />);
+    const qc = new QueryClient();
+    rerender(
+      <QueryClientProvider client={qc}>
+        <DiscoverResults cat="all" q="denver" sports={[]} />
+      </QueryClientProvider>,
+    );
+    const asked = followCountCalls.map((c) => `${c.kind}:${c.ids.join(",")}`);
+    expect(new Set(asked)).toEqual(new Set([`team:${orgs.map((o) => o.id).join(",")}`]));
   });
 });
