@@ -1,3 +1,4 @@
+import { isAnimatedImage } from "@/lib/image-animation";
 import { sniffImageMime } from "@/lib/image-validation";
 import { sniffVideoContainer } from "@/lib/video-validation";
 
@@ -38,8 +39,13 @@ export function classifyAttachment(bytes: Uint8Array): CheckedAttachment | null 
 /** Why a file is refused, or null when it passes. */
 export function attachmentProblem(bytes: Uint8Array, size = bytes.byteLength): string | null {
   if (size > MAX_ATTACHMENT_BYTES) return "Attachment too large (max 20MB).";
-  if (!classifyAttachment(bytes)) {
+  const checked = classifyAttachment(bytes);
+  if (!checked) {
     return "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.";
+  }
+  // F05: every frame of an animated picture would be sent, but only one is checked. Refuse until frames are scanned.
+  if (checked.kind === "image" && isAnimatedImage(bytes)) {
+    return "Animated pictures can't be sent. Send a still photo instead.";
   }
   return null;
 }
