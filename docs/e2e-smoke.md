@@ -7,7 +7,7 @@ us an E2E signal we can trust while the rest of the suite is repaired.
 ## How it works
 
 - `e2e/smoke-set.json` lists the smoke tests by spec file and title path. A title path is the
-  describe titles, then the test title, joined with `›`. The file lists 30 tests.
+  describe titles, then the test title, joined with `›`. The file lists 31 tests.
 - The `Playwright` job runs the whole suite once, as before. After the report is sanitized, its
   `Check smoke set` step runs `.github/e2e-smoke-gate.mjs` on `ci-sanitized/results.json`.
 - The gate passes only if every listed test is in the report and passed. A skipped, missing
@@ -40,16 +40,24 @@ The tests were chosen on 2026-11-06. Each passed in all four sandbox runs availa
 | No leaks on public reel pages           | `public-reel-page`                                                | 3     |
 | Signed-out entry and invite fallback    | `signed-out-preview`, `invite-fallback-params`                    | 2     |
 | Payment security (no cross-host leak)   | `pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state` | 2     |
+| Managed child: add, switch, delete      | `managed-child`                                                   | 1     |
 
 The two payment security specs (`pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state`)
 were added on 2026-11-07, after #298 and #341 fixed them and they passed in three sandbox runs (#341,
 #334, #347). The audit also names the invite happy path. It is still left out because it fails on
 the sandbox (the invite and join specs wait on the payment-settings guard decision).
 
+The managed-child end-to-end test (`managed child, end to end › add, switch in, switch back,
+delete`) was added on 2026-11-10, with the cap raised from 30 to 31 for it (owner decision). #381
+fixed its cleanup: it used to skip the delete silently and leave children behind in the sandbox.
+It now gives each run's child a unique name and deletes every leftover before and after the flow.
+It joins after passing on the sandbox in #381, which merges only once three of its
+sandbox runs have passed it.
+
 ## Changing the set
 
 - Add a test only after it has passed on the sandbox, and preferably in three runs.
-- Keep the set between 20 and 30 tests. A unit test enforces this.
+- Keep the set between 20 and 31 tests. A unit test enforces this.
 - If you rename a smoke test, update its entry in the same pull request. Otherwise the gate reports
   it as "missing from the report" and fails.
 - Never remove a test from the set just to turn the check green. If a smoke test fails, fix the test
