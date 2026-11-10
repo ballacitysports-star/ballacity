@@ -304,13 +304,17 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
     <section
       className="mt-4 rounded-2xl border border-border bg-surface p-4"
       id={`child-panel-${childUserId}`}
-      role={children.length > 1 ? "tabpanel" : undefined}
-      aria-labelledby={children.length > 1 ? `child-tab-${childUserId}` : undefined}
+      aria-labelledby={`child-panel-title-${childUserId}`}
       tabIndex={-1}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-display text-lg font-bold">{child.displayName}</h2>
+          <h2
+            id={`child-panel-title-${childUserId}`}
+            className="truncate font-display text-lg font-bold"
+          >
+            {child.displayName}
+          </h2>
           <p className="text-xs text-muted-foreground">
             {COHORT_META[child.cohort].label} ·{" "}
             {child.consent?.status === "approved"
@@ -438,6 +442,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             <Switch
               checked={value as boolean}
               onCheckedChange={(next) => set({ [String(key)]: next })}
+              aria-label={String(label)}
             />
           </div>
         ))}
@@ -446,6 +451,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             <span className="text-sm font-semibold">Public recruitment profile</span>
             <Switch
               checked={c.publicProfile}
+              aria-label="Public recruitment profile"
               onCheckedChange={(next) => {
                 if (
                   next &&

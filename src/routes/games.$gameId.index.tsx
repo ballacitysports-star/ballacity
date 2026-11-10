@@ -2928,7 +2928,7 @@ function GameDetail() {
               }}
               className={
                 confirmAction === "leave"
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  ? "bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
                   : undefined
               }
             >
@@ -2969,7 +2969,7 @@ function GameDetail() {
                   void handleRemoveParticipant(removeTarget.userId, removeTarget.name);
                 }
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
               Remove player
             </AlertDialogAction>

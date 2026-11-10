@@ -175,7 +175,7 @@ export function DeleteAccountButton() {
               e.preventDefault();
               onDelete();
             }}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
           >
             {busy ? "Deleting…" : "Permanently delete account"}
           </AlertDialogAction>

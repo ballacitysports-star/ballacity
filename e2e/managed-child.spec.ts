@@ -117,6 +117,13 @@ test.describe("managed child, end to end", () => {
       () => false,
     );
 
+  /**
+   * A child's card button in the Parent Center roster. Found by its stable id prefix rather than a
+   * role: the cards were tabs until the roster stopped using tab semantics (axe), and are buttons now.
+   */
+  const childCard = (page: Page, first: string) =>
+    page.locator('button[id^="child-tab-"]', { hasText: new RegExp(first) });
+
   async function deleteChild(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
     // Still inside the child's profile (a step failed mid-way)? The banner is
@@ -127,7 +134,7 @@ test.describe("managed child, end to end", () => {
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }
     // The roster loads after the page; wait for it rather than sampling once.
-    const tab = page.getByRole("tab", { name: new RegExp(CHILD_FIRST) });
+    const tab = childCard(page, CHILD_FIRST);
     if (!(await appears(tab, 15_000))) return;
     await tab.click();
     page.once("dialog", (d) => void d.accept(CHILD_FIRST));
@@ -155,7 +162,7 @@ test.describe("managed child, end to end", () => {
       // Parent Center lists the child as managed, with every control in place.
       await page.getByRole("button", { name: /go to parent center/i }).click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 15_000 });
-      const tab = page.getByRole("tab", { name: new RegExp(CHILD_FIRST) });
+      const tab = childCard(page, CHILD_FIRST);
       await expect(tab).toBeVisible({ timeout: 20_000 });
       await tab.click();
       await expect(page.getByText(/managed by you — no email or password/i)).toBeVisible();
