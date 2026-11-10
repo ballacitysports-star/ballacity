@@ -97,6 +97,14 @@ jobs:
           FORMAT_BASE: origin/${{ github.base_ref }}
         run: bun run format:check:changed
 
+      # Blocking (plan 9.2 test gate): a migration in this pull request that adds or changes a
+      # row-level security policy needs a SQL test under supabase/tests/ in the same pull request.
+      - name: Policy changes come with a SQL test
+        if: github.event_name == 'pull_request'
+        env:
+          POLICY_BASE: origin/${{ github.base_ref }}
+        run: node scripts/policy-tests-gate.mjs
+
   # Two blocking checks that nothing else in CI makes: that the code type-checks, and
   # that the production bundle builds. Unit tests run through Vitest, which strips
   # types without checking them, and no other job builds the app, so a type error or a
