@@ -8,7 +8,6 @@ import { OrgCard } from "@/components/OrgCard";
 import { OrgDirectoryCard, type OrgDirectoryRow } from "@/components/org/OrgDirectoryCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAllOrgs } from "@/lib/org-store";
-import { useOrgFollowCounts } from "@/lib/org-follow-counts";
 import { matchesOrgQuery } from "@/lib/org-search";
 import { matchesSportList } from "@/lib/sport-filter";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
@@ -129,8 +128,6 @@ export function DiscoverResults({
 
   const [now] = useState(() => new Date());
   const take = <T,>(rows: T[]) => (grouped ? rows.slice(0, GROUP_LIMIT) : rows);
-  // Real follower counts for the team and trainer cards (P1-1).
-  const followCounts = useOrgFollowCounts();
 
   const sections: {
     id: Exclude<DiscoverCategory, "all" | "runs">;
@@ -148,7 +145,7 @@ export function DiscoverResults({
         <div className="grid gap-3 sm:grid-cols-2">
           {take(teams).map((o, i) => (
             <div key={o.id}>
-              <OrgCard org={o} index={i} followers={followCounts?.get(o.id)?.followers} />
+              <OrgCard org={o} index={i} />
               <DiscoverCardActions org={o} />
             </div>
           ))}
@@ -179,7 +176,7 @@ export function DiscoverResults({
         <div className="grid gap-3 sm:grid-cols-2">
           {take(trainers).map((o, i) => (
             <div key={o.id}>
-              <OrgCard org={o} index={i} followers={followCounts?.get(o.id)?.followers} />
+              <OrgCard org={o} index={i} />
               <DiscoverCardActions org={o} />
             </div>
           ))}
