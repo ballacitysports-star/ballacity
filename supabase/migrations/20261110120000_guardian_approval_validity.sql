@@ -16,16 +16,22 @@
 --   2. private_sec.guardian_approval_valid(child, approver): the approver is the child's guardian now (is_guardian_of:
 --      active, verified link) and is eligible.
 --   3. The payment gate, the roster gate and team_respond_invite count an approval only if it is valid.
---   4. guardian_approve_join_request refuses an ineligible guardian (GUARDIAN_NOT_ELIGIBLE) and replaces a stale
---      approval instead of keeping it.
+--   4. guardian_approve_join_request refuses to let an ineligible guardian approve (GUARDIAN_NOT_ELIGIBLE; declining
+--      stays open to any linked guardian) and replaces a stale approval instead of keeping it.
 --   5. revoke_guardian_link clears that guardian's approvals of requests still open (not of places already taken), so
 --      the app shows them as waiting on a guardian again.
 --   6. A trigger on join_requests: through the API (roles authenticated and anon) nobody can set or change who approved
 --      a request. Only the approval function and revoke_guardian_link (SECURITY DEFINER) and the server (service role)
 --      can.
+--   7. Every other way a guardian loses authority clears their approvals of requests still open too: the guardian's
+--      account is deleted (the foreign key empties guardian_approved_by), a link is changed or deleted outside
+--      revoke_guardian_link, the guardian is suspended or held for an age review. Approvals that already stopped
+--      counting are cleared once, when this migration runs. The app reads a set stamp as an approval and lists a
+--      request with no stamp in the other guardian's queue, so a stamp that no longer counts must not stay behind.
 -- team_invites needs no write guard: its direct insert and update policies are already false.
 --
--- Families: a request approved by a guardian who was later removed has to be approved again by a current guardian.
+-- Families: a request approved by a guardian who was later removed, deleted their account or was suspended has to be
+-- approved again by a current guardian. Lifting a suspension does not bring the approval back.
 -- Rollback: docs/rollbacks/20261110120000_guardian_approval_validity.down.sql (guarded).
 
 -- ============================================================ 1-2. who may approve
@@ -226,7 +232,8 @@ BEGIN
   SELECT * INTO _row FROM public.join_requests WHERE id = _request FOR UPDATE;
   IF _row.id IS NULL THEN RAISE EXCEPTION 'REQUEST_NOT_FOUND'; END IF;
   IF NOT public.is_guardian_of(_me, _row.player_id) THEN RAISE EXCEPTION 'NOT_GUARDIAN'; END IF;
-  IF NOT private_sec.guardian_approver_eligible(_me) THEN RAISE EXCEPTION 'GUARDIAN_NOT_ELIGIBLE'; END IF;
+  -- Approving needs an eligible guardian. Declining, the protective answer, needs only the link.
+  IF _approve AND NOT private_sec.guardian_approver_eligible(_me) THEN RAISE EXCEPTION 'GUARDIAN_NOT_ELIGIBLE'; END IF;
   IF _row.status NOT IN ('pending', 'approved') THEN RAISE EXCEPTION 'REQUEST_NOT_PENDING'; END IF;
   IF EXISTS (SELECT 1 FROM public.game_participants gp
               WHERE gp.game_id = _row.game_id AND gp.user_id = _row.player_id) THEN
@@ -345,3 +352,100 @@ DROP TRIGGER IF EXISTS trg_guard_join_request_guardian_stamp ON public.join_requ
 CREATE TRIGGER trg_guard_join_request_guardian_stamp
 BEFORE INSERT OR UPDATE ON public.join_requests
 FOR EACH ROW EXECUTE FUNCTION public.guard_join_request_guardian_stamp();
+
+-- ============================================================ 7. wherever authority ends, the open approvals it gave are cleared
+-- Clears the stamp on requests still open (pending or host-approved, child not yet on the roster) whose approval no
+-- longer counts, for one child, one approver, or everyone. A place already taken keeps its record.
+CREATE OR REPLACE FUNCTION private_sec.clear_stale_guardian_approvals(_child uuid DEFAULT NULL, _approver uuid DEFAULT NULL)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _n integer;
+BEGIN
+  UPDATE public.join_requests jr
+     SET guardian_approved_at = NULL, guardian_approved_by = NULL
+   WHERE (jr.guardian_approved_at IS NOT NULL OR jr.guardian_approved_by IS NOT NULL)
+     AND (_child IS NULL OR jr.player_id = _child)
+     AND (_approver IS NULL OR jr.guardian_approved_by = _approver)
+     AND jr.status IN ('pending', 'approved')
+     AND NOT private_sec.guardian_approval_valid(jr.player_id, jr.guardian_approved_by)
+     AND NOT EXISTS (SELECT 1 FROM public.game_participants gp
+                      WHERE gp.game_id = jr.game_id AND gp.user_id = jr.player_id);
+  GET DIAGNOSTICS _n = ROW_COUNT;
+  RETURN _n;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.clear_stale_guardian_approvals(uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- A link that changes (revoked, unverified) or is deleted, by any path, including with an account.
+CREATE OR REPLACE FUNCTION private_sec.guardian_link_change_clears_approvals()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM private_sec.clear_stale_guardian_approvals(_child => OLD.child_user_id);
+  IF TG_OP = 'UPDATE' AND NEW.child_user_id IS DISTINCT FROM OLD.child_user_id THEN
+    PERFORM private_sec.clear_stale_guardian_approvals(_child => NEW.child_user_id);
+  END IF;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.guardian_link_change_clears_approvals() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_guardian_link_clears_approvals ON public.guardian_links;
+CREATE TRIGGER trg_guardian_link_clears_approvals
+AFTER UPDATE OR DELETE ON public.guardian_links
+FOR EACH ROW EXECUTE FUNCTION private_sec.guardian_link_change_clears_approvals();
+
+-- A guardian who is suspended or held for an age review.
+CREATE OR REPLACE FUNCTION private_sec.ineligible_guardian_clears_approvals()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM private_sec.clear_stale_guardian_approvals(_approver => NEW.id);
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.ineligible_guardian_clears_approvals() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_ineligible_guardian_clears_approvals ON public.profiles;
+CREATE TRIGGER trg_ineligible_guardian_clears_approvals
+AFTER UPDATE OF suspended_at, age_review_required ON public.profiles
+FOR EACH ROW
+WHEN ((NEW.suspended_at IS NOT NULL AND OLD.suspended_at IS NULL)
+   OR (NEW.age_review_required IS TRUE AND OLD.age_review_required IS NOT TRUE))
+EXECUTE FUNCTION private_sec.ineligible_guardian_clears_approvals();
+
+-- The approver's account is deleted: the foreign key sets guardian_approved_by to NULL (as the table owner, so the
+-- stamp guard above lets it through) and would leave guardian_approved_at behind on a request still open.
+CREATE OR REPLACE FUNCTION private_sec.join_request_approver_gone()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.guardian_approved_at IS NOT NULL
+     AND NEW.status IN ('pending', 'approved')
+     AND NOT EXISTS (SELECT 1 FROM public.game_participants gp
+                      WHERE gp.game_id = NEW.game_id AND gp.user_id = NEW.player_id) THEN
+    NEW.guardian_approved_at := NULL;
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.join_request_approver_gone() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_join_request_approver_gone ON public.join_requests;
+CREATE TRIGGER trg_join_request_approver_gone
+BEFORE UPDATE OF guardian_approved_by ON public.join_requests
+FOR EACH ROW
+WHEN (NEW.guardian_approved_by IS NULL AND OLD.guardian_approved_by IS NOT NULL)
+EXECUTE FUNCTION private_sec.join_request_approver_gone();
+
+-- Approvals that had already stopped counting before this migration (none on production on 2026-11-10).
+SELECT private_sec.clear_stale_guardian_approvals();

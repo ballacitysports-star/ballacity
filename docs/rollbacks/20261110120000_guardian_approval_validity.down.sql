@@ -1,7 +1,8 @@
 -- ROLLBACK for supabase/migrations/20261110120000_guardian_approval_validity.sql (audit F03, P0-5).
 -- NOT a migration. It puts back the gates that accept any guardian approval stamp, the approval function that keeps
 -- the first approver, revoke_guardian_link without clearing approvals, and the API's ability to write the stamp: the
--- holes the migration closed. Approvals the migration's revoke cleared are not restored.
+-- holes the migration closed. It also drops the triggers that clear approvals when a guardian's account is deleted,
+-- a link changes or is deleted, or a guardian is suspended. Approvals the migration cleared are not restored.
 -- It refuses to run unless:
 --     PGOPTIONS="-c app.confirm_guardian_approval_rollback=yes" psql ... -f <this file>
 BEGIN;
@@ -15,6 +16,14 @@ $guard$;
 
 DROP TRIGGER IF EXISTS trg_guard_join_request_guardian_stamp ON public.join_requests;
 DROP FUNCTION IF EXISTS public.guard_join_request_guardian_stamp();
+
+DROP TRIGGER IF EXISTS trg_join_request_approver_gone ON public.join_requests;
+DROP TRIGGER IF EXISTS trg_ineligible_guardian_clears_approvals ON public.profiles;
+DROP TRIGGER IF EXISTS trg_guardian_link_clears_approvals ON public.guardian_links;
+DROP FUNCTION IF EXISTS private_sec.join_request_approver_gone();
+DROP FUNCTION IF EXISTS private_sec.ineligible_guardian_clears_approvals();
+DROP FUNCTION IF EXISTS private_sec.guardian_link_change_clears_approvals();
+DROP FUNCTION IF EXISTS private_sec.clear_stale_guardian_approvals(uuid, uuid);
 
 -- The definitions in force before the migration (main at 57a398a7), unchanged.
 CREATE OR REPLACE FUNCTION public.enforce_guardian_before_payment()
