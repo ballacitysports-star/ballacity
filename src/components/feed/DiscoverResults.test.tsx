@@ -31,6 +31,13 @@ const orgs = [
   org("c2", "Coach Sam", "coach", "Denver"),
 ];
 vi.mock("@/lib/org-store", () => ({ useAllOrgs: () => orgs }));
+const followCountCalls = vi.hoisted(() => [] as { kind: string; ids: string[] }[]);
+vi.mock("@/lib/entity-follows", () => ({
+  useEntityFollowCounts: (kind: string, ids: string[]) => {
+    followCountCalls.push({ kind, ids });
+    return null;
+  },
+}));
 vi.mock("@/components/feed/DiscoverCardActions", () => ({
   DiscoverCardActions: ({ org }: { org: { id: string } }) => (
     <span data-testid={`actions-${org.id}`} />
@@ -102,5 +109,14 @@ describe("DiscoverResults", () => {
     cleanup();
     wrap(<DiscoverResults cat="teams" q="" sports={[]} />);
     expect(screen.getByTestId("actions-t1")).toBeTruthy();
+  });
+
+  it("asks for real follower counts once, for exactly the team and trainer cards shown (P1-1)", () => {
+    followCountCalls.length = 0;
+    wrap(<DiscoverResults cat="all" q="atlanta" sports={[]} />);
+    const last = followCountCalls.at(-1)!;
+    expect(last.kind).toBe("team");
+    // Five teams (the grouped view's cap) and the one Atlanta trainer.
+    expect(last.ids).toEqual(["t1", "tx0", "tx1", "tx2", "tx3", "c1"]);
   });
 });

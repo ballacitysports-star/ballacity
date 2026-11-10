@@ -10,6 +10,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 import {
   entityFollowErrorMessage,
   followEntity,
+  getEntityFollowCounts,
   getEntityFollowState,
   unfollowEntity,
 } from "./entity-follows";
@@ -59,5 +60,51 @@ describe("entity follow calls", () => {
       following: false,
       followers: 0,
     });
+  });
+});
+
+describe("entity follow counts for a list (P1-1)", () => {
+  it("asks once for the whole list and maps the rows by id", async () => {
+    rpc.mockResolvedValue({
+      data: [
+        { id: "a", followers: 3, following: true },
+        { id: "b", followers: 0, following: false },
+      ],
+      error: null,
+    });
+    const counts = await getEntityFollowCounts("team", ["a", "b", "hidden"]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("entity_follow_counts", {
+      _kind: "team",
+      _ids: ["a", "b", "hidden"],
+    });
+    expect(counts.get("a")).toEqual({ followers: 3, following: true });
+    expect(counts.get("b")).toEqual({ followers: 0, following: false });
+    expect(counts.has("hidden")).toBe(false);
+  });
+
+  it("sends at most 200 ids and makes no call for none", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    await getEntityFollowCounts(
+      "team",
+      Array.from({ length: 250 }, (_, i) => `t${i}`),
+    );
+    expect((rpc.mock.calls[0]![1] as { _ids: string[] })._ids).toHaveLength(200);
+    rpc.mockReset();
+    expect((await getEntityFollowCounts("team", [])).size).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Discover cards", () => {
+  it("pass each team and trainer card its real count from one list call", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/components/feed/DiscoverResults.tsx", "utf8");
+    expect(src).toContain("useEntityFollowCounts(");
+    expect(
+      src.match(
+        /<OrgCard org=\{o\} index=\{i\} followers=\{followCounts\?\.get\(o\.id\)\?\.followers\} \/>/g,
+      ),
+    ).toHaveLength(2);
   });
 });
