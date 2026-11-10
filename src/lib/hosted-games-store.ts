@@ -681,6 +681,30 @@ export function useHostedGamesStatus(): HostedGamesLoad {
   );
 }
 
+/**
+ * Live player count of one hosted game: hosted_games.joined, which the
+ * game_participants_sync_count trigger sets to the game's participant rows on
+ * every join and leave, and which reaches this store through its hosted_games
+ * realtime channel. Undefined until the store has loaded from the database (a
+ * copy restored from localStorage may be stale) and for a game it does not
+ * hold, so callers keep the count on the game object they already have.
+ *
+ * Reading it never starts a load or a channel; pages that list games already
+ * keep this store live.
+ */
+export function useHostedGameJoined(gameId: string | undefined): number | undefined {
+  const joined = useSyncExternalStore(
+    subscribe,
+    () => {
+      if (!gameId || !dbHydrated) return -1;
+      const game = cache.find((g) => g.id === gameId);
+      return typeof game?.joined === "number" ? game.joined : -1;
+    },
+    () => -1,
+  );
+  return joined < 0 ? undefined : joined;
+}
+
 export function useHostedGames(): Game[] {
   const snap = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
   return snap === EMPTY ? [] : (JSON.parse(snap) as Game[]);
