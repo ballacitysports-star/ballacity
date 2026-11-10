@@ -396,11 +396,9 @@ function GameDetail() {
     _setReviewsOpen(urlModal === "reviews");
   }, [urlModal]);
 
-  // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
-  // Only starts when there's an active cooldown to avoid unnecessary re-renders.
-  const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
+  // The resubmit cooldown's countdown ticks inside GameApprovalBanner
+  // (useResubmitCooldownMs), so this page does not re-render every second.
   const capReached = joinResubmitCapReached(myReq);
-  const [, setNowTick] = useState(0);
   const [reportGameOpen, setReportGameOpen] = useState(false);
   // Risk-acknowledgment gate state (physical activity safety).
   const [riskAckOpen, setRiskAckOpen] = useState(false);
@@ -409,12 +407,6 @@ function GameDetail() {
     gameId,
     "participant_risk",
   );
-
-  useEffect(() => {
-    if (cooldownMs <= 0) return;
-    const t = setInterval(() => setNowTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [cooldownMs > 0]);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -1085,6 +1077,7 @@ function GameDetail() {
           );
           return;
         }
+        const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
         if (cooldownMs > 0) {
           toast.error(`Please wait ${formatCooldownLabel(cooldownMs)} before resubmitting.`);
           return;
@@ -1632,7 +1625,6 @@ function GameDetail() {
 
         <GameApprovalBanner
           capReached={capReached}
-          cooldownMs={cooldownMs}
           fee={fee}
           game={game}
           isHost={isHost}
