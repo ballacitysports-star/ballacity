@@ -285,7 +285,7 @@ export function HostPendingChip({
         ) : (
           initials
         )}
-        <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+        <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral-strong text-[8px] text-white">
           <Clock className="h-2.5 w-2.5" />
         </span>
       </motion.button>
