@@ -82,4 +82,19 @@ describe("OrgForm facility onboarding", () => {
     expect(screen.getAllByText("Open now").length).toBeGreaterThan(0);
     expect(screen.getByText("Weekly hours")).toBeTruthy();
   });
+
+  it("switches between a venue and a business, offering each its own categories (P2-4)", () => {
+    let latest: OrgFormValue | null = null;
+    render(<Harness onChange={(v) => (latest = v)} />);
+    expect(screen.getByRole("radio", { name: "Venue" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("button", { name: "Physiotherapy" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Fieldhouse" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Business" }));
+    expect(latest!.orgType).toBe("business");
+    // A venue category does not carry over to a business.
+    expect(latest!.category).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Physiotherapy" }));
+    expect(latest!.category).toBe("Physiotherapy");
+    expect(screen.queryByRole("button", { name: "Fieldhouse" })).toBeNull();
+  });
 });

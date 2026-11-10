@@ -10,7 +10,7 @@ policy decision.
 | --- | --- | --- |
 | Age screen / neutral DOB collection | GREEN | `BirthdayInput` + `age_cohort_from_birthday`, no age gate rejection |
 | Age cohorts (under 13 / 13–15 / 16–17 / 18+) | GREEN | `src/lib/child-policy.ts`, thresholds from `app_settings.age_policy` |
-| Under-13 supported (not blocked) | GREEN | `/onboarding/child` child-safe flow |
+| Under-13 accounts | GREEN (changed 2026-11-06) | Self-registration under 13 is refused (sign-up and age gate `checkDobParts`; database `set_my_birthday`, migration `20261106160000`). Under-13s join only as guardian-created managed accounts with the full child protections. See the legal-review issue on under-13 sign-up. |
 | Pre-consent data minimization | GREEN | Child onboarding collects display name + guardian email only; DB triggers block games/messages/reels/availability while locked |
 | Parental consent request + audit trail | GREEN | `parental_consents`, `parental_consent_events`, `guardian_links` |
 | Verifiable consent *method* | YELLOW | Infrastructure is method-agnostic (`consent_method` column, `CONSENT_METHOD_META`). Current default is email confirmation by a signed-in adult account. **Legal counsel must approve the mechanism** (e.g. approved third-party verification vendor) before under-13 launch |
@@ -111,6 +111,12 @@ which cohorts need consent in which jurisdictions, retention periods, third-part
 AI-training authorization.
 
 ## Age-policy refactor (all cohorts supported)
+
+> **Superseded (2026-11-06).** The two bullets below described the original design. Since then the minimum age to
+> self-register is 13, per the published Terms: `MINIMUM_SIGNUP_AGE` in `src/lib/age-verification.ts`, enforced by
+> sign-up and the age gate and, since migration `20261106160000`, by `set_my_birthday` in the database. The stale
+> `MINIMUM_ACCOUNT_AGE = 0` constant was removed. Under-13s join only as guardian-created managed accounts.
+> `/onboarding/child` remains the consent flow for 13–15 year olds and for managed children.
 
 - `src/lib/age-policy.ts` is now a thin compatibility layer over
   `src/lib/child-policy.ts`. There is no 13+ signup block: `MINIMUM_ACCOUNT_AGE`

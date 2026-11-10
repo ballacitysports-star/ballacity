@@ -47,7 +47,7 @@ export function SpotsPill({
     urgency === "full"
       ? "rounded-full bg-destructive px-2.5 py-0.5 micro-label text-destructive-foreground"
       : urgency === "critical"
-        ? "rounded-full bg-coral px-2.5 py-0.5 text-[11px] font-bold text-white motion-safe:animate-pulse"
+        ? "rounded-full bg-coral-strong px-2.5 py-0.5 text-[11px] font-bold text-white motion-safe:animate-pulse"
         : urgency === "low"
           ? "rounded-full bg-amber-500/90 px-2.5 py-0.5 text-[11px] font-bold text-white"
           : "rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold text-primary-foreground";

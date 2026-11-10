@@ -85,5 +85,7 @@ function friendlyDobError(message: string): string {
   if (m.includes("DOB_INVALID"))
     return "That date of birth isn't valid. Check the month, day and year.";
   if (m.includes("AUTH_REQUIRED")) return "Sign in again, then add your date of birth.";
+  // Same text as MIN_AGE_MESSAGE in age-verification.ts (not imported: that module is client-side).
+  if (m.includes("MIN_AGE")) return "You need to be at least 13 to use BallaCity.";
   return "We couldn't save your date of birth. Please try again.";
 }

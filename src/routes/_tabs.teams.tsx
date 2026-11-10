@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { DiscoverCardActions } from "@/components/feed/DiscoverCardActions";
 import { matchesOrgQuery } from "@/lib/org-search";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -322,6 +323,8 @@ function TeamsPage() {
           {list.map(({ o, dist }, i) => (
             <div key={o.id} className="relative">
               <OrgCard org={o} index={i} />
+              {/* P2-5: follow, and parents message the team's staff, from the list. */}
+              <DiscoverCardActions org={o} />
               {dist && (
                 <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
                   {dist.approx && "~"}

@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { POST_HELD_NOTICE } from "../src/lib/post-moderation";
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * E2E: verify the team-profile composer can publish a post end-to-end
@@ -53,15 +56,13 @@ test("team-post composer publishes a post end-to-end", async ({ page }) => {
 
   // Seed a team owned by the fixture user (RLS: owner_id = auth.uid()).
   const teamId = crypto.randomUUID();
-  const { error: teamErr } = await sb
-    .from("teams")
-    .insert({
-      id: teamId,
-      owner_id: uid,
-      kind: "team",
-      name: `E2E Team ${suffix}`,
-      handle,
-    } as any);
+  const { error: teamErr } = await sb.from("teams").insert({
+    id: teamId,
+    owner_id: uid,
+    kind: "team",
+    name: `E2E Team ${suffix}`,
+    handle,
+  } as any);
   if (teamErr) throw new Error(`Failed to seed team: ${teamErr.message}`);
 
   try {
@@ -83,8 +84,14 @@ test("team-post composer publishes a post end-to-end", async ({ page }) => {
 
     await dialog.getByRole("button", { name: /Publish post/i }).click();
 
-    // Toast confirms server-side success.
-    await expect(page.getByText("Post published")).toBeVisible({ timeout: 15_000 });
+    // Toast confirms server-side success. The text is screened by AI moderation before it
+    // is stored; where the screen is unavailable (the E2E sandbox build has no AI gateway
+    // key) the post fails safe to "held": stored, visible only to its author, with the
+    // held notice instead of "Post published" (lib/post-moderation). Both are a successful
+    // publish from the author's side.
+    await expect(
+      page.getByText(new RegExp(`^(Post published|${escapeRegExp(POST_HELD_NOTICE)})$`)),
+    ).toBeVisible({ timeout: 15_000 });
 
     // Composer closes and the new post renders in the feed.
     await expect(dialog).toBeHidden({ timeout: 10_000 });
@@ -93,15 +100,21 @@ test("team-post composer publishes a post end-to-end", async ({ page }) => {
     // DB confirms the row exists with the right author + team.
     const { data: rows, error: readErr } = await sb
       .from("team_posts" as any)
-      .select("id, title, author_id, team_id")
+      .select("id, title, author_id, team_id, moderation_status")
       .eq("team_id", teamId)
       .eq("title", title);
     if (readErr) throw new Error(readErr.message);
     expect(rows?.length).toBe(1);
     expect((rows![0] as any).author_id).toBe(uid);
+    // Settled by the screen: approved, or held for review. Never left pending.
+    const status = (rows![0] as unknown as { moderation_status: string }).moderation_status;
+    expect(["approved", "held"]).toContain(status);
   } finally {
     // Cleanup: RLS allows author/owner to delete posts and owner to delete team.
-    await sb.from("team_posts" as any).delete().eq("team_id", teamId);
+    await sb
+      .from("team_posts" as any)
+      .delete()
+      .eq("team_id", teamId);
     await sb.from("teams").delete().eq("id", teamId);
   }
 });

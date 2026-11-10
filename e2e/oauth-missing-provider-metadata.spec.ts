@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * Regression: an OAuth return where the session omits provider metadata
@@ -28,6 +29,9 @@ const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-missing-meta";
 
 async function stubBackend(page: Page, serverProvider: "google" | "apple") {
+  // The authoritative guard is the server fn, which sees the linked identity
+  // even when the browser session carries no provider metadata.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, serverProvider));
   // Profile lookup: brand-new user, no account_type yet.
   await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
@@ -90,8 +94,7 @@ async function primeStorage(page: Page) {
 async function stripProviderMetadata(page: Page) {
   await page.evaluate(async () => {
     const mod = await import("/src/integrations/supabase/client.ts");
-    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-      .supabase;
+    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     if (!session) throw new Error("no session in test context");

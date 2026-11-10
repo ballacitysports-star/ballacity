@@ -4794,6 +4794,7 @@ export type Database = {
           listed_by: string | null
           moderator_hidden_at: string | null
           name: string
+          org_type: string
           owner_hidden_at: string | null
           owner_id: string | null
           phone: string | null
@@ -4827,6 +4828,7 @@ export type Database = {
           listed_by?: string | null
           moderator_hidden_at?: string | null
           name: string
+          org_type?: string
           owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
@@ -4860,6 +4862,7 @@ export type Database = {
           listed_by?: string | null
           moderator_hidden_at?: string | null
           name?: string
+          org_type?: string
           owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
@@ -5429,6 +5432,12 @@ export type Database = {
           merchant_id: string
         }[]
       }
+      get_game_join_policy: {
+        Args: { _game_id: string }
+        Returns: {
+          requires_approval: boolean
+        }[]
+      }
       get_game_refund_terms: {
         Args: { _game_id: string }
         Returns: {
@@ -5659,6 +5668,10 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: string
       }
+      minor_messaging_block_me: {
+        Args: { _other: string }
+        Returns: string
+      }
       minor_messaging_block_reason: {
         Args: { _a: string; _b: string }
         Returns: string
@@ -5878,6 +5891,14 @@ export type Database = {
       release_expired_payment_holds: {
         Args: { _game_id?: string }
         Returns: number
+      }
+      release_review_screening: {
+        Args: {
+          _review_id: string
+          _screened_body: string
+          _screened_title: string
+        }
+        Returns: boolean
       }
       remove_follower: {
         Args: { _follower: string; _target: string }

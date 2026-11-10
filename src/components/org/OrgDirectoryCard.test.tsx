@@ -11,6 +11,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/components/ResponsiveImage", () => ({
   ResponsiveImage: ({ alt }: { alt?: string }) => <img alt={alt} />,
 }));
+const authState: { user: { id: string } | null } = { user: null };
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => authState }));
+vi.mock("@/components/FollowEntityButton", () => ({
+  FollowEntityButton: ({ id }: { id: string }) => <span data-testid="follow">{id}</span>,
+}));
 vi.mock("@/components/org/CourtInquiryDialog", () => ({
   CourtInquiryDialog: ({ orgName }: { orgName: string }) => (
     <div data-testid="inquiry">{`inquiry for ${orgName}`}</div>
@@ -125,5 +130,46 @@ describe("OrgDirectoryCard", () => {
     );
     expect(screen.getByText("Hours not set")).toBeTruthy();
     expect(screen.queryByText(/photos/)).toBeNull();
+  });
+
+  it("offers Follow (P2-5) signed out, and signed in only for a claimed venue that is not yours", () => {
+    const now = new Date("2026-10-06T12:00:00Z");
+    authState.user = null;
+    render(<OrgDirectoryCard org={row({ owner_id: undefined })} now={now} />);
+    expect(screen.queryByTestId("follow")).not.toBeNull();
+    cleanup();
+
+    authState.user = { id: "me" };
+    render(<OrgDirectoryCard org={row({ owner_id: "someone-else" })} now={now} />);
+    expect(screen.queryByTestId("follow")).not.toBeNull();
+    cleanup();
+
+    render(<OrgDirectoryCard org={row({ owner_id: "me" })} now={now} />);
+    expect(screen.queryByTestId("follow")).toBeNull();
+    cleanup();
+
+    render(<OrgDirectoryCard org={row({ owner_id: null })} now={now} />);
+    expect(screen.queryByTestId("follow")).toBeNull();
+    authState.user = null;
+  });
+
+  it("words a business's actions for a business, not a court (P2-4)", () => {
+    const now = new Date("2026-10-06T12:00:00Z");
+    render(
+      <OrgDirectoryCard
+        org={row({ org_type: "business", website: null, booking_url: null })}
+        now={now}
+      />,
+    );
+    expect(screen.queryByText(/Book court/)).toBeNull();
+    expect(screen.getAllByText(/Send inquiry/).length).toBeGreaterThan(0);
+    cleanup();
+    render(
+      <OrgDirectoryCard
+        org={row({ org_type: "facility", website: null, booking_url: null })}
+        now={now}
+      />,
+    );
+    expect(screen.getByText(/Book court/)).toBeTruthy();
   });
 });

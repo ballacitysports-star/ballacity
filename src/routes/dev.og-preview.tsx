@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { requireDevTools } from "@/lib/dev-tools";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 
 import { OG_IMAGE_SIZES, type OgImageSize, pageHead, withOgSize } from "@/lib/seo";
 
 export const Route = createFileRoute("/dev/og-preview")({
+  beforeLoad: requireDevTools,
   head: () =>
     pageHead({
       path: "/dev/og-preview",

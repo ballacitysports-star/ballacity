@@ -78,6 +78,7 @@ import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { trackEvent, trackTaskError } from "@/lib/analytics";
+import { trackOpenCreate } from "@/lib/nav-analytics";
 import { BackButton } from "@/components/layout/BackButton";
 import {
   clearCreateDraft,
@@ -124,6 +125,8 @@ function CreateGate() {
 function Create() {
   const nav = useNavigate();
   const { orgId: orgIdParam, kind: requestedKind = "run", again: againId } = Route.useSearch();
+  // P1-9: how often the Create screen is reached, to weigh a Create tab against Reels.
+  useEffect(() => trackOpenCreate(requestedKind), []); // eslint-disable-line react-hooks/exhaustive-deps
   // The facility this run is hosted at: from the facility page link, or picked
   // in the "Host at a facility" selector.
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);

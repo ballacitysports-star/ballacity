@@ -79,6 +79,15 @@ jobs:
             exit 1
           fi
 
+      # Blocking (P3-9 lint ratchet): no file this pull request touches may end with more
+      # ESLint errors than it had at the branch point, and a new file must have none.
+      # The full `eslint .` above stays informational until its backlog is gone.
+      - name: Lint (files changed in this pull request add no errors)
+        if: github.event_name == 'pull_request'
+        env:
+          LINT_BASE: origin/${{ github.base_ref }}
+        run: node scripts/lint-changed.mjs
+
       # Blocking, and only for what this pull request touches. 240 older files are
       # not Prettier-formatted, and reformatting them all at once would bury real
       # changes; so edited and new files must be clean and the backlog only shrinks.
@@ -160,3 +169,10 @@ jobs:
             echo "The production project reference is in the build output; see the files above."
             exit 1
           fi
+
+      # P3-4 bundle budget: entry and total client JS may not grow more than 5 percent
+      # over build/bundle-baseline.json, no other chunk may pass 150 kB gzip and the total
+      # may not pass 1.5 MB. The plan's 250 kB entry target is reported until it is met.
+      - name: Bundle budget
+        if: ${{ !cancelled() }}
+        run: node scripts/bundle-budget.mjs .output/public/assets

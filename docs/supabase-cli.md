@@ -5,7 +5,7 @@ Two Supabase projects appear in this repository. They are not interchangeable.
 | Purpose                         | Project ref            | Where it is configured                      |
 | ------------------------------- | ---------------------- | ------------------------------------------- |
 | Default / canonical (app + CLI) | `cpqihhcqeivbgxqbzatv` | `supabase/config.toml`, `.env.production`   |
-| E2E / test sandbox (optional)   | `olrbulvwexrkjcxddjxq` | `supabase/config.e2e.toml` (reference only) |
+| E2E / test sandbox (optional)   | `qkukefvzwlyusvspablz` | `supabase/config.e2e.toml` (reference only) |
 
 ## Normal contributor commands
 
@@ -99,7 +99,7 @@ CLI loads. To point the CLI at the test sandbox, link it explicitly and link
 back afterwards:
 
 ```sh
-supabase link --project-ref olrbulvwexrkjcxddjxq   # test sandbox
+supabase link --project-ref qkukefvzwlyusvspablz   # test sandbox
 supabase link --project-ref cpqihhcqeivbgxqbzatv   # back to default
 ```
 

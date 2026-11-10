@@ -75,6 +75,7 @@ function CreateOrg() {
           coverUrl: value.coverUrl || undefined,
           phone: value.phone.trim() || undefined,
           email: value.email.trim() || undefined,
+          orgType: value.orgType,
           category: value.category || undefined,
           amenities: value.amenities,
           photos: value.photos,
@@ -88,7 +89,9 @@ function CreateOrg() {
       // active profile up on their next mount instead of the pre-create one.
       await qc.invalidateQueries({ queryKey: myProfilesKey(userId), refetchType: "all" });
       clearDraft();
-      trackEvent("create_listing", { kind: "facility" });
+      trackEvent("create_listing", {
+        kind: value.orgType === "business" ? "business" : "facility",
+      });
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
     } catch (e) {

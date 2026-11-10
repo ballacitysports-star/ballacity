@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -27,12 +27,19 @@ import { describe, expect, it } from "vitest";
 
 const ROUTE = new URL("../routes/games.$gameId.index.tsx", import.meta.url);
 const src = readFileSync(ROUTE, "utf8");
+// The game page's pieces moved into src/components/game-detail (P2-6 slice 2); they are held to the
+// same rule, so a read moved out of the route is still checked.
+const PARTS_DIR = new URL("../components/game-detail/", import.meta.url);
+const parts = readdirSync(PARTS_DIR)
+  .filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f))
+  .map((f) => readFileSync(new URL(f, PARTS_DIR), "utf8"));
 
 describe("host id resolution in the game detail route", () => {
   it("never reads settings.host_id without a fallback", () => {
     // Matches `settings?.host_id` that is NOT followed by `??`, ignoring the
     // dependency arrays where a bare read is just a change signal.
-    const bare = src
+    const bare = [src, ...parts]
+      .join("\n")
       .split("\n")
       .map((line, i) => [i + 1, line] as const)
       .filter(([, line]) => /settings\?\.host_id/.test(line))

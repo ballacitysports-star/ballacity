@@ -146,6 +146,11 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // "Database error creating new user" — which is what blocked CI seeding.
         // Naming it here is also just more honest about what these fixtures are.
         account_type: "player",
+        // Specs that exercise the guardian onboarding path flip this flag on the
+        // shared fixture, and it used to stick across runs because this metadata
+        // is merged over what exists. A guardian fixture is in Parent Mode, which
+        // hides every join and pay control on a game page, so reset it each run.
+        is_guardian: false,
       };
       try {
         const { data: list, error: listErr } = await admin.auth.admin.listUsers({
@@ -286,6 +291,30 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
           const { error } = await admin.from("hosted_games").upsert(writable, { onConflict: "id" });
           if (error) throw new Error(error.message);
         }
+
+        // The game page derives "requires approval" from game_payment_settings,
+        // and FAILS CLOSED: with no settings row, `requiresApproval` defaults to
+        // true (src/routes/games.$gameId.index.tsx), so the join CTA reads
+        // "Request Spot" instead of "Join Run". The join-free specs on g1
+        // (join-cross-device-*, join-realtime-*, roster-*) expect a free,
+        // no-approval game, so seed a settings row that says so. g2 keeps the
+        // default (approval-gated), which the invite/request specs rely on, and
+        // the pay-* specs mock their own settings, so only g1 needs a row.
+        const g1Writable = writable.some((r) => r.id === "g1");
+        if (g1Writable) {
+          const { error: psErr } = await admin
+            .from("game_payment_settings")
+            .upsert(
+              { game_id: "g1", host_id: gamesHostId, entry_fee: 0, requires_approval: false },
+              { onConflict: "game_id,host_id" },
+            );
+          if (psErr) {
+            console.warn(
+              `[e2e global-setup] Could not seed g1 payment settings (free, no approval): ${psErr.message}. ` +
+                "join-free specs on g1 will see the approval-gated CTA and fail.",
+            );
+          }
+        }
       } catch (err) {
         console.warn(
           `[e2e global-setup] Could not seed fixture games g1/g2: ${
@@ -313,10 +342,34 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     return;
   }
 
+  // Clear is_guardian on the shared player fixture every run, with the session
+  // we just minted (no service key needed). A guardian-onboarding spec can set
+  // this flag on the account; once set it puts the player in Parent Mode, which
+  // hides the join and pay controls and redirects /profile and /games/:id/pay
+  // to /parent and /guardian, breaking every later join/pay spec. The
+  // service-key seed above also resets it, but that branch is skipped without
+  // the key (local runs), so reset it here too. The player is account_type
+  // "player" with no managed children or guardian links, so this sticks.
+  // Refresh afterwards so the session we inject carries the cleared metadata,
+  // not the stale snapshot from sign-in (the app reads is_guardian from it).
+  let session = data.session;
+  if ((session.user.user_metadata as Record<string, unknown>)?.is_guardian === true) {
+    const { error: guardianErr } = await client.auth.updateUser({ data: { is_guardian: false } });
+    if (guardianErr) {
+      console.warn(
+        `[e2e global-setup] Could not clear is_guardian on ${player.email}: ${guardianErr.message}. ` +
+          "If a guardian-onboarding spec set it, later join/pay specs may redirect to Parent Mode.",
+      );
+    } else {
+      const { data: refreshed } = await client.auth.refreshSession();
+      if (refreshed.session) session = refreshed.session;
+    }
+  }
+
   const storageKey = `sb-${SUPABASE_PROJECT_ID}-auth-token`;
   process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY = storageKey;
-  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(data.session);
-  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = data.session.access_token;
+  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(session);
+  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = session.access_token;
   process.env.LOVABLE_BROWSER_AUTH_STATUS = "injected";
 
   console.log(`[e2e global-setup] Signed in ${player.email} for E2E specs.`);

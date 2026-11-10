@@ -27,7 +27,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { GAMES, type Org } from "@/lib/sample-data";
-import { ensureOrgById, isMyOrg } from "@/lib/org-store";
+import { ensureOrgById, isMyOrg, isOrgUnclaimed } from "@/lib/org-store";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation } from "@/lib/reviews";
@@ -47,6 +48,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
 import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { TrainerEventsSection } from "@/components/org/VenueEventsSection";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
@@ -194,7 +196,6 @@ function TrainerPage({ org }: { org: Org }) {
 
   const [bookOpen, setBookOpen] = useState(false);
   const [bookPrefill, setBookPrefill] = useState<BookPrefill | null>(null);
-  const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
@@ -270,11 +271,7 @@ function TrainerPage({ org }: { org: Org }) {
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
-        <BackButton
-          fallbackTo="/trainers"
-          variant="overlay"
-          className="absolute top-4 left-4"
-        />
+        <BackButton fallbackTo="/trainers" variant="overlay" className="absolute top-4 left-4" />
         <button
           onClick={() => setShareOpen(true)}
           className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
@@ -357,18 +354,10 @@ function TrainerPage({ org }: { org: Org }) {
                 <Star className="h-3.5 w-3.5" /> Review
               </Link>
             )}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setFollowing((f) => !f)}
-              data-render="ssr-stable"
-              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                following
-                  ? "border border-border bg-surface text-foreground"
-                  : "bg-lime-gradient text-primary-foreground glow-lime"
-              }`}
-            >
-              {following ? "Following ✓" : "Follow"}
-            </motion.button>
+            {canEdit && <EntityFollowerCount kind="team" id={org.id} />}
+            {mounted && !canEdit && !isOrgUnclaimed(org.id) && (
+              <FollowEntityButton kind="team" id={org.id} name={org.name} />
+            )}
           </div>
         </div>
 
@@ -462,6 +451,7 @@ function TrainerPage({ org }: { org: Org }) {
             {canEdit && <ListingVisibilityToggle kind="trainer" id={org.id} />}
             {canEdit && <TrainerProfileChecklist org={org} />}
             {canEdit && <TrainerOrgSection trainerId={org.id} />}
+            <TrainerEventsSection trainerId={org.id} canPost={canEdit} />
             <Section title="Bio">
               <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                 {org.bio}
