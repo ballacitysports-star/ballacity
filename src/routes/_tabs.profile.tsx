@@ -24,6 +24,7 @@ import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
 import { useReviewSubjectIsAdult } from "@/lib/review-subject";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { AthletePassportCard } from "@/components/profile/AthletePassportCard";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
@@ -568,6 +569,18 @@ function PlayerProfile() {
       </ProfileAboutSheet>
 
       <div className="px-4">
+        {profileUser && (
+          <AthletePassportCard
+            userId={profileUser.id}
+            sports={me.sports}
+            city={me.city}
+            age={age}
+            played={me.stats.played}
+            reliability={me.stats.reliability}
+            sportsmanship={me.stats.sportsmanship}
+            badgeCount={me.badges.length}
+          />
+        )}
         <ProfileReelsSection recaps={allRecaps} onChanged={() => setRecapTick((t) => t + 1)} />
         <ChannelTabs
           className="mt-5"
