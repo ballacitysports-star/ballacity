@@ -51,10 +51,10 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // Block realtime at the network layer — WebSocket handshakes to
   // /realtime/v1/websocket start as HTTP upgrades and can be aborted here.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // page.route() never sees WebSocket traffic, so it did not block realtime:
+  // against a live backend the channels joined (run 42454894247). Refuse the
+  // realtime socket itself.
+  await page.routeWebSocket(/\/realtime\//, (ws) => ws.close());
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
@@ -186,11 +186,17 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   expect(joinGets).toBeGreaterThan(getsBeforeApproval);
   expect(approvedGets.length).toBeGreaterThan(approvedGetsBefore);
 
-  // The flip took at least a polling tick — not instant like realtime would be.
+  // Realtime is ruled out above (no channel joined, WS refused), and the flip
+  // came from a GET that returned the approved row. How soon after approval it
+  // lands depends only on where the 15 s poll (games.$gameId.pay.tsx) is in its
+  // cycle, which can be any moment: run 42460824214 caught a tick 129 ms after
+  // approval, so a "took at least a second" bound cannot tell polling from
+  // realtime. What polling does guarantee is the upper bound: one interval.
   const elapsed = Date.now() - approvedAt;
-  expect(elapsed, `polling should take at least a few seconds, took ${elapsed}ms`).toBeGreaterThan(
-    1_000,
-  );
+  expect(
+    elapsed,
+    `the poll should pick the approval up within one interval, took ${elapsed}ms`,
+  ).toBeLessThan(15_000 + 5_000);
 
   // URL unchanged — no navigation / reload.
   expect(new URL(page.url()).pathname).toBe(`/games/${GAME_ID}/pay`);

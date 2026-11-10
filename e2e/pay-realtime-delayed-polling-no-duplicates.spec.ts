@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: with realtime frames delayed / intermittently blocked, the pay page
@@ -106,10 +107,10 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // keep the realtime WebSocket unavailable. The client will still create
   // channel objects (with bindings) so we can synthesize a "late" frame
   // later in the test.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // page.route() never sees WebSocket traffic, so it did not block realtime:
+  // against a live backend the channels joined (run 42454894247). Refuse the
+  // realtime socket itself.
+  await page.routeWebSocket(/\/realtime\//, (ws) => ws.close());
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
@@ -215,7 +216,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
         return;
       }
@@ -277,7 +278,12 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
   const flipElapsed = Date.now() - approvedAt;
-  expect(flipElapsed, "polling should take at least a tick").toBeGreaterThan(1_000);
+  // Realtime is ruled out (WS refused, no channel joined); the 15 s poll can
+  // tick at any moment after approval (run 42466912150 saw 108 ms), so only
+  // the upper bound tells polling apart: within one interval.
+  expect(flipElapsed, "polling should pick the approval up within one interval").toBeLessThan(
+    15_000 + 5_000,
+  );
   expect(joinGets).toBeGreaterThan(getsBeforeApproval);
 
   // A late realtime frame arrives AFTER polling already flipped the UI.

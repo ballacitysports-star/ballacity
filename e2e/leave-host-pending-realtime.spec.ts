@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
 
 /**
  * E2E: viewing the game as the host, when a player leaves (their
@@ -35,8 +36,7 @@ const GAME_ID = "g2";
 const OTHER_PLAYER_ID = "11111111-2222-3333-4444-555555555555";
 const JOIN_REQ_ID = "mock-pending-req-id";
 
-const isTable = (url: string | URL, table: string) =>
-  String(url).includes(`/rest/v1/${table}`);
+const isTable = (url: string | URL, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -62,13 +62,9 @@ test("host's pending list clears in realtime when the player's join_request is d
   let joinGets = 0;
 
   // hosted_games: rely on sample fallback for g2.
-  await page.route(
-    (u) => isTable(u, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself. It used to come from the bundled sample data, which was
+  // removed (a06a087d), so an empty hosted_games answer now means "no game".
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: userId!, price: 0 }));
 
   // game_payment_settings: viewer is the host.
   await page.route(
@@ -208,7 +204,8 @@ test("host's pending list clears in realtime when the player's join_request is d
       for (const ch of chans as Array<{ topic?: string; bindings?: Record<string, unknown> }>) {
         if (typeof ch.topic !== "string" || !ch.topic.includes("join_requests:host:")) continue;
         const bindings =
-          (ch.bindings && ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
+          (ch.bindings &&
+            ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
           [];
         for (const b of bindings as Array<{ callback: (p: unknown) => void }>) {
           try {

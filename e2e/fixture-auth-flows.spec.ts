@@ -64,11 +64,18 @@ test("signing out clears the session and protected routes redirect back to /auth
 
   await page.waitForURL(/\/(auth)?(\?|#|$)/, { timeout: 20_000 }).catch(() => {});
 
-  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  // /feed is no longer protected: since 2109cfbc a signed-out visitor sees its
+  // sample preview (src/lib/public-paths.ts). /settings still requires sign-in.
+  // The redirect can supersede the goto while the document is still loading,
+  // which Playwright reports as ERR_ABORTED; that redirect is what this test
+  // checks, so only that error is tolerated.
+  await page.goto("/settings", { waitUntil: "domcontentloaded" }).catch((e: unknown) => {
+    if (!/ERR_ABORTED/.test(String(e))) throw e;
+  });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 20_000 });
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/settings(?:\?|$)/);
 });
 
 test("two fixture accounts hold independent sessions side by side", async ({ browser }) => {

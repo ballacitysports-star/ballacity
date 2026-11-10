@@ -1,4 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: roster + participant count stay in sync across two clients through
@@ -67,12 +70,9 @@ function joinedFromHeader(text: string | null): number | null {
 async function ensureLeft(bDetail: Page) {
   const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
   if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
+    await appBooted(bDetail);
     await leaveCta.click();
-    // Leave shows a "Leave this game?" confirmation dialog with a Leave button.
-    const confirmLeave = bDetail.getByRole("button", { name: /^leave( game)?$/i }).first();
-    if (await confirmLeave.isVisible().catch(() => false)) {
-      await confirmLeave.click();
-    }
+    await confirmLeave(bDetail);
     await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
       timeout: 10_000,
     });
@@ -82,34 +82,35 @@ async function ensureLeft(bDetail: Page) {
 async function performJoin(page: Page) {
   const joinCta = page.getByRole("button", { name: /join run/i }).first();
   await expect(joinCta).toBeVisible({ timeout: 15_000 });
+  await appBooted(page);
   await joinCta.click();
-  // Confirmation dialog: "Join this game?" → "Join game"
-  const confirm = page.getByRole("button", { name: /^join game$/i }).first();
-  await expect(confirm).toBeVisible({ timeout: 5_000 });
-  await confirm.click();
+  await confirmFreeJoin(page);
   await expect(page.getByRole("button", { name: /you're in · tap to leave/i }).first()).toBeVisible(
     { timeout: 10_000 },
   );
 }
 
 async function performLeave(page: Page) {
+  await appBooted(page);
   await page
     .getByRole("button", { name: /you're in · tap to leave/i })
     .first()
     .click();
-  const confirmLeave = page.getByRole("button", { name: /^leave( game)?$/i }).first();
-  if (await confirmLeave.isVisible().catch(() => false)) {
-    await confirmLeave.click();
-  }
+  await confirmLeave(page);
   await expect(page.getByRole("button", { name: /join run/i }).first()).toBeVisible({
     timeout: 10_000,
   });
 }
 
 test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ browser }) => {
+  // Its own step budgets add up to ~100 s (15 + 20 + 20 + 25 + 20). Under the
+  // 60 s default a slow step killed the test and only the cleanup's error was
+  // reported (run 42454894247), hiding which step failed.
+  test.setTimeout(150_000);
   // --- Device A: passive observer ---
   const deviceA = await browser.newContext();
   const bootA = await deviceA.newPage();
+  await stubRiskAcknowledged(deviceA);
   await restoreSession(deviceA, bootA);
   await bootA.close();
   const aDetail = await deviceA.newPage();
@@ -117,6 +118,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
   // --- Device B: actor ---
   const deviceB = await browser.newContext();
   const bootB = await deviceB.newPage();
+  await stubRiskAcknowledged(deviceB);
   await restoreSession(deviceB, bootB);
   await bootB.close();
   const bDetail = await deviceB.newPage();
@@ -139,6 +141,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
     await ensureLeft(bDetail);
 
     // ============ Step 1: INSERT propagates A ←— B ============
+    await realtimeJoined(aDetail, `game_participants:game:${GAME_ID}`);
     await performJoin(bDetail);
 
     await expect

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: tapping a `game_invite` notification for a paid game must
@@ -106,6 +107,8 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
     },
   );
 
+  await stubRiskAcknowledged(page);
+
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.
@@ -146,10 +149,11 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/Pay & join/i);
+  // "Pay & join" was renamed "Pay Host" in e2c76954.
+  await expect(banner).toContainText(/tap\s+[“"']?Pay Host[”"']?\s+below/i);
 
-  // CTA button — paid variant shows "Pay host · $X".
-  const cta = page.getByRole("button", { name: /pay host/i }).first();
+  // Paid CTA — "Pay Host · $X", rendered as a link to the pay page.
+  const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 

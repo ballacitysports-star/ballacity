@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForAppToSettle } from "./helpers/app-boot";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -92,6 +93,7 @@ async function primeStorage(page: Page) {
 }
 
 async function stripProviderMetadata(page: Page) {
+  await waitForAppToSettle(page);
   await page.evaluate(async () => {
     const mod = await import("/src/integrations/supabase/client.ts");
     const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;

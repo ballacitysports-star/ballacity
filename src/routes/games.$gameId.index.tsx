@@ -328,7 +328,11 @@ function GameDetail() {
   const [positionRosterOpen, _setPositionRosterOpen] = useState(urlModal === "positions");
   const [reviewsOpen, _setReviewsOpen] = useState(urlModal === "reviews");
   const [activeTab, _setActiveTab] = useState<"overview" | "payments">(urlTab ?? "overview");
-  const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
+  const {
+    status: myFlowStatus,
+    settings: flowSettings,
+    refresh: refreshFlowStatus,
+  } = useMyFlowStatus(gameId);
 
   // Deep-link writers: mirror UI state into the URL so refresh/share re-opens
   // the same tab or modal. Only one modal can be encoded at a time.
@@ -533,13 +537,20 @@ function GameDetail() {
     if (!game) return;
     if (leavingRef.current) return;
     try {
+      // Settings decide the CTA (fee, approval). Publish them as soon as they
+      // arrive: the viewer's own submissions and join request are optional
+      // status lookups, and a slow or hung one must not hold the page on the
+      // fail-closed "Request Spot" default (requiresApproval with no settings).
+      const settingsLoaded = getGamePaymentSettings(game.id).then((s) => {
+        if (!leavingRef.current) setSettings(s);
+        return s;
+      });
       const [s, subs, req] = await Promise.all([
-        getGamePaymentSettings(game.id),
+        settingsLoaded,
         listMySubmissionsForGame(game.id),
         getMyJoinRequest(game.id),
       ]);
       if (leavingRef.current) return;
-      setSettings(s);
       setMySubs(subs);
       setMyReq(req);
       // Auto-join locally only when there's nothing left to pay. Otherwise the
@@ -1023,8 +1034,12 @@ function GameDetail() {
         toast.error(e.message ?? "Could not leave.");
       } finally {
         leavingRef.current = false;
-        // Single reconcile pass now that all deletes have committed.
+        // Single reconcile pass now that all deletes have committed. The shared
+        // flow status (status strip, pill) re-reads too: realtime DELETE events
+        // can't be matched to this game, so it would otherwise keep showing the
+        // pre-leave state.
         void refreshStatus();
+        refreshFlowStatus();
         void refetchRoster();
       }
       return;
@@ -1044,6 +1059,8 @@ function GameDetail() {
         setMyReq(prevReq);
         setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
+      } finally {
+        refreshFlowStatus();
       }
       return;
     }

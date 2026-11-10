@@ -79,7 +79,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
 
     // Following the CTA lands on /discover.
     await cta.click();
-    await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+    // /discover is kept only as a redirect to /feed (the map view moved there in
+    // 238b4b6d), so the fallback lands on /feed.
+    await page.waitForURL((u) => u.pathname === "/feed", { timeout: 10_000 });
 
     expect(writeAttempts, "malformed-exp invite must not trigger join/payment writes").toEqual([]);
 

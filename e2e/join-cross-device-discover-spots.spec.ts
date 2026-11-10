@@ -1,4 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { realtimeJoined } from "./helpers/realtime";
+import { appBooted, confirmFreeJoin, confirmLeave } from "./helpers/join";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: joining a game from a second device must instantly refresh the
@@ -50,9 +53,14 @@ async function restoreSession(ctx: BrowserContext, page: Page) {
  * marked `aria-live="polite"` and formatted as "<n> spots".
  */
 async function readSpotsPill(page: Page): Promise<string | null> {
-  const pill = page.locator('[aria-live="polite"]', { hasText: /\d+\s+spots/ }).first();
-  if ((await pill.count()) === 0) return null;
-  return (await pill.textContent())?.trim() ?? null;
+  // Read the target game's own card. The first "N spots" on the page can belong
+  // to any game (run 42454894247 read 3 where g1 started at 2), and a card with
+  // plenty of room shows "N spots open" rather than the pill, so take the count
+  // from the card's `title="X of Y joined"` (src/components/GameCard.tsx).
+  const counter = page.locator(`a[href$="/games/${GAME_ID}"] [title$=" joined"]`).first();
+  if ((await counter.count()) === 0) return null;
+  const m = (await counter.getAttribute("title"))?.match(/(\d+) of (\d+) joined/);
+  return m ? `${Number(m[2]) - Number(m[1])} spots` : null;
 }
 
 function parseSpots(text: string | null): number | null {
@@ -67,6 +75,7 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
   // --- Device A: observer on the Discover map ---
   const deviceA = await browser.newContext();
   const bootA = await deviceA.newPage();
+  await stubRiskAcknowledged(deviceA);
   await restoreSession(deviceA, bootA);
   await bootA.close();
   const aDiscover = await deviceA.newPage();
@@ -74,6 +83,7 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
   // --- Device B: joiner on the game detail page ---
   const deviceB = await browser.newContext();
   const bootB = await deviceB.newPage();
+  await stubRiskAcknowledged(deviceB);
   await restoreSession(deviceB, bootB);
   await bootB.close();
   const bDetail = await deviceB.newPage();
@@ -96,9 +106,10 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
     // hash if the store supports it. Fallback: just poll for the pill
     // once any bottom card is visible — the sample data places g1 first
     // in the list, so it's the default active pin.
-    await expect(
-      aDiscover.locator('[aria-live="polite"]', { hasText: /\d+\s+spots/ }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    // /discover redirects to /feed (238b4b6d); wait for the target game's card.
+    await expect(aDiscover.locator(`a[href$="/games/${GAME_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     // If the active card isn't linking to g1, try clicking its pin marker
     // (element with the sport emoji). Otherwise just proceed.
@@ -117,7 +128,9 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
     // leave first so the join action produces a real INSERT.
     const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
     if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
+      await appBooted(bDetail);
       await leaveCta.click();
+      await confirmLeave(bDetail);
       await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
         timeout: 10_000,
       });
@@ -125,7 +138,11 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
 
     const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
+    // Device A must be listening before B joins (see helpers/realtime.ts).
+    await realtimeJoined(aDiscover, `game_participants:game:${GAME_ID}`);
+    await appBooted(bDetail);
     await joinCta.click();
+    await confirmFreeJoin(bDetail);
 
     // Device B flips locally.
     await expect(
@@ -141,10 +158,12 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
       .toBe((beforeCount ?? 0) - 1);
 
     // --- Reverse: leave from B and confirm pill increments back ---
+    await appBooted(bDetail);
     await bDetail
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()
       .click();
+    await confirmLeave(bDetail);
     await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
       timeout: 10_000,
     });

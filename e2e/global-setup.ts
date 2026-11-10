@@ -21,6 +21,11 @@ import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import {
+  LEGAL_DOCUMENT_LIST,
+  effectiveVersion,
+  type PublishedLegalDocument,
+} from "../src/lib/legal-documents";
 import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
   assertSafeE2eTarget,
@@ -201,7 +206,99 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       }
     }
 
-    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+    const fixtureIds: string[] = [];
+    for (const acct of TEST_ACCOUNTS) {
+      const id = await upsertAccount(acct);
+      if (id) fixtureIds.push(id);
+    }
+
+    // The fixture accounts are adults with profiles other members can open, as
+    // the specs that look at one fixture from another assume. The player
+    // fixture held profile_visibility "private" in the sandbox (the protective
+    // value an account without a known age gets), so its /players page showed
+    // "not found" to the host fixture and player-orgs-realtime could never see
+    // the Organizations section. Reset it to the column's adult default.
+    {
+      const { error } = await admin
+        .from("privacy_preferences")
+        .update({ profile_visibility: "public" } as never)
+        .in("user_id", fixtureIds)
+        .neq("profile_visibility", "public");
+      if (error) {
+        console.warn(
+          `[e2e global-setup] Could not reset profile visibility for the fixture accounts: ${error.message}.`,
+        );
+      }
+    }
+
+    // No fixture account starts a run with managed children left over.
+    // managed-child.spec creates one on the host fixture and deletes it at the
+    // end, but a run that dies in between leaves it behind, and the per-guardian
+    // caps (MAX_MANAGED, MAX_MANAGED_PER_DAY in managed-children.functions.ts)
+    // then refuse every later run: run 42460824214 failed with "You've reached
+    // the limit for child profiles right now". Only children managed by the
+    // fixture accounts are removed; deleting a child's auth user cascades to
+    // its managed_accounts row.
+    try {
+      const { data: leftovers, error: listErr } = await admin
+        .from("managed_accounts")
+        .select("child_user_id")
+        .in("managed_by", fixtureIds);
+      if (listErr) throw new Error(listErr.message);
+      for (const row of (leftovers ?? []) as { child_user_id: string }[]) {
+        const { error } = await admin.auth.admin.deleteUser(row.child_user_id);
+        if (error) throw new Error(error.message);
+      }
+    } catch (err) {
+      console.warn(
+        `[e2e global-setup] Could not remove leftover managed children of the fixture accounts: ${
+          err instanceof Error ? err.message : String(err)
+        }. managed-child.spec may hit the child-profile limit.`,
+      );
+    }
+
+    // Each fixture account accepts the Terms and Privacy Policy versions in
+    // force, as a real member has. Without that, LegalReacceptGate covers the
+    // whole app with "Updated legal documents" (fixed, z-[100]) whenever a
+    // published version is newer than what the account accepted, and every
+    // click in a spec signed in as that account is intercepted until the test
+    // times out (filterbar-persistence, trainers-venue-filter, the OAuth tab
+    // hops). The versions are computed the way the gate computes them:
+    // published rows first, else the bundled version (effectiveVersion).
+    try {
+      const { data: published, error: docsErr } = await admin
+        .from("legal_documents")
+        .select("*")
+        .not("published_at", "is", null)
+        .order("effective_date", { ascending: false });
+      if (docsErr) throw new Error(docsErr.message);
+      const now = new Date().toISOString();
+      const rows = fixtureIds.flatMap((userId) =>
+        LEGAL_DOCUMENT_LIST.map((doc) => ({
+          user_id: userId,
+          document_type: doc.type,
+          document_version: effectiveVersion(
+            doc.type,
+            (published ?? []) as PublishedLegalDocument[],
+          ).version,
+          accepted_at: now,
+          user_agent: "e2e-global-setup",
+        })),
+      );
+      if (rows.length > 0) {
+        const { error } = await admin.from("legal_consents").upsert(rows, {
+          onConflict: "user_id,document_type,document_version",
+          ignoreDuplicates: true,
+        });
+        if (error) throw new Error(error.message);
+      }
+    } catch (err) {
+      console.warn(
+        `[e2e global-setup] Could not record legal consent for the fixture accounts: ${
+          err instanceof Error ? err.message : String(err)
+        }. Specs signed in as them will be blocked by the "Updated legal documents" gate.`,
+      );
+    }
 
     // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
     // hardcodes as a lightweight fixture game.
@@ -239,7 +336,12 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
             location: "Tompkins Square Courts",
             neighborhood: "East Village",
             max_players: 10,
-            joined: 8,
+            // hosted_games.joined is maintained from game_participants by the
+            // sync_hosted_game_joined_count trigger, and after the reset below
+            // g1 has no participants. Seeding 8 here made the cached counter
+            // disagree with the live one: a card first showed "2 spots", then
+            // "9 spots" once a live count arrived (run 42460824214).
+            joined: 0,
             skill: "Intermediate",
             price: 0,
             indoor: false,
@@ -290,6 +392,34 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         if (writable.length > 0) {
           const { error } = await admin.from("hosted_games").upsert(writable, { onConflict: "id" });
           if (error) throw new Error(error.message);
+        }
+
+        // Every run starts with the fixture accounts out of the fixture games.
+        // Specs join, request and pay on g1/g2 for real, and one that stops
+        // part-way (a failed assertion before its own leave step) left the
+        // shared fixture joined for the NEXT run: run 42458824586 then found
+        // "You're in" where invite-fallback-params expected "Join Run", and
+        // join-realtime-cross-views started joined. Only rows of the fixture
+        // accounts on games this setup owns are removed.
+        const ownGameIds = writable.map((r) => r.id);
+        if (ownGameIds.length > 0 && fixtureIds.length > 0) {
+          for (const [table, userColumn] of [
+            ["payment_submissions", "player_id"],
+            ["join_requests", "player_id"],
+            ["game_participants", "user_id"],
+          ] as const) {
+            const { error } = await admin
+              .from(table)
+              .delete()
+              .in("game_id", ownGameIds)
+              .in(userColumn, fixtureIds);
+            if (error) {
+              console.warn(
+                `[e2e global-setup] Could not reset ${table} for the fixture accounts: ${error.message}. ` +
+                  "Specs on g1/g2 may start already joined.",
+              );
+            }
+          }
         }
 
         // The game page derives "requires approval" from game_payment_settings,

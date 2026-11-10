@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: the first "Request to join" POST fails with a network error, the
@@ -127,13 +129,15 @@ test("failed first join request can be retried and lands on pending UI with invi
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
+          body: pgrstBody(route, [pendingRow()]),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
@@ -187,7 +191,9 @@ test("failed first join request can be retried and lands on pending UI with invi
   for (const p of joinPosts) {
     expect(p.body?.game_id).toBe(GAME_ID);
     expect(p.body?.host_id).toBe(FAKE_HOST_ID);
-    expect(p.body?.status).toBe("pending");
+    // createJoinRequest() does not send `status`; the column defaults to
+    // 'pending'. Same allowance as invite-request-happy-path.
+    if (p.body?.status !== undefined) expect(p.body.status).toBe("pending");
   }
 
   // Invite params preserved on the final URL.

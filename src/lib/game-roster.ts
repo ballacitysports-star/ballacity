@@ -154,15 +154,13 @@ export function useLiveParticipants(gameId: string | undefined): {
       )
       .on(
         "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "game_participants",
-          filter: `game_id=eq.${gameId}`,
-        },
+        // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+        // listen unfiltered, ignore deletes that name another game, resync otherwise.
+        { event: "DELETE", schema: "public", table: "game_participants" },
         (payload) => {
-          const old = payload.old as Partial<Row>;
-          if (!old.user_id) {
+          const old = payload.old as Partial<Row> & { game_id?: string };
+          if (old.game_id && old.game_id !== gameId) return;
+          if (!old.user_id || !old.game_id) {
             // Replica identity may not include user_id — fall back to a full
             // resync so the row disappears everywhere.
             void reloadRef.current();

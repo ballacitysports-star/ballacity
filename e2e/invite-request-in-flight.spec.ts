@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: double-tapping "Request to join" while the first POST is still
@@ -130,13 +132,15 @@ test("double-tapping Request to join while the first POST is in flight blocks th
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
+          body: pgrstBody(route, [pendingRow()]),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
 
@@ -153,10 +157,14 @@ test("double-tapping Request to join while the first POST is in flight blocks th
 
   // Fire two rapid clicks — the second one happens while the first POST
   // is still hanging server-side.
+  // A double tap lands on the same spot on screen. The first tap flips the
+  // CTA optimistically to "Request pending · Tap to cancel" (disabled while the
+  // request is in flight), so a role/name locator for "Request Spot" would wait
+  // for a button that no longer exists; tap its coordinates instead.
+  const box = (await cta.boundingBox())!;
+  const tapAgain = () => page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await cta.click({ force: true });
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
-    /* button may already be disabled/replaced */
-  });
+  await tapAgain();
 
   // While in flight, the first POST should already have registered.
   await expect
@@ -167,16 +175,18 @@ test("double-tapping Request to join while the first POST is in flight blocks th
   expect(firstPostResolvedAt, "first POST resolved before we could double-tap").toBe(0);
 
   // Fire a third click for good measure, still mid-flight.
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
-    /* ignore */
-  });
+  await tapAgain();
 
   // Wait for the first POST to resolve and pending UI to appear.
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: POST_DELAY_MS + 5_000,
   });
 
-  expect(firstPostResolvedAt).toBeGreaterThan(0);
+  // The pending label is optimistic (it shows while the POST is in flight),
+  // so wait for the held response to actually resolve.
+  await expect
+    .poll(() => firstPostResolvedAt, { timeout: POST_DELAY_MS + 5_000 })
+    .toBeGreaterThan(0);
 
   // Give the app a beat to (not) fire any additional POSTs.
   await page.waitForTimeout(750);

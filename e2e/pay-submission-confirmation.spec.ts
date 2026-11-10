@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: end-to-end mocked payment submission.
@@ -77,9 +79,11 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   // Host has one enabled Venmo method (no payment_url so no external launch
   // is triggered — clicking the row picks it and shows the proof form).
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (url) =>
+      tableUrl(url, "host_payment_methods") ||
+      String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -109,14 +113,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
     },
   );
 
-  // No prior hosted game overrides.
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself, owned by the host whose settings are mocked above (the
+  // bundled sample "g2" these specs once relied on no longer exists).
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: HOST_ID, price: 15 }));
 
   // Swallow best-effort game_participants writes triggered by joinGame().
   await page.route(
@@ -145,7 +144,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
         return route.fulfill({
           status: 200,
           contentType: "application/json",
-          headers: { "content-range": `0-${Math.max(0, submissions.length - 1)}/${submissions.length}` },
+          headers: {
+            "content-range": `0-${Math.max(0, submissions.length - 1)}/${submissions.length}`,
+          },
           body: JSON.stringify(submissions),
         });
       }
@@ -180,7 +181,7 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
         return route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
       }
       return route.fallback();
@@ -210,8 +211,7 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
 
   const [submitReq] = await Promise.all([
     page.waitForRequest(
-      (req) =>
-        tableUrl(req.url(), "payment_submissions") && req.method() === "POST",
+      (req) => tableUrl(req.url(), "payment_submissions") && req.method() === "POST",
       { timeout: 10_000 },
     ),
     submitBtn.click(),
@@ -222,8 +222,11 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   const timeline = page.getByTestId("payment-status-timeline");
   await expect(timeline).toBeVisible({ timeout: 10_000 });
   await expect(timeline).toHaveAttribute("data-status", "pending");
-  await expect(timeline).toContainText(/proof submitted/i);
-  await expect(timeline).toContainText(/host reviewing/i);
+  // Timeline labels come from PAYMENT_STATE_META since 696cb3c8: "Proof
+  // submitted" / "Host reviewing" became "Payment sent" / "Awaiting host
+  // confirmation".
+  await expect(timeline).toContainText(/payment sent/i);
+  await expect(timeline).toContainText(/awaiting host confirmation/i);
 
   await ctx.close();
 });

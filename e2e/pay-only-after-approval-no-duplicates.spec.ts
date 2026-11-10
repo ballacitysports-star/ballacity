@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: while the join request is `pending`, tapping "Pay" (and any direct
@@ -182,7 +183,7 @@ test("pay is blocked while pending; after approval exactly one submission is cre
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
         return;
       }

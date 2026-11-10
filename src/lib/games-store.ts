@@ -120,6 +120,17 @@ function ensureRealtime() {
           emit();
         },
       )
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // on any delete, re-read this member's roster from the database.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "game_participants" },
+        (payload) => {
+          const old = payload.old as { user_id?: string };
+          if (old.user_id && old.user_id !== userId) return;
+          void hydrateFromDb(userId);
+        },
+      )
       .subscribe();
   };
 
@@ -136,13 +147,21 @@ function ensureRealtime() {
   }
 
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+    // INITIAL_SESSION too: a page that loads with a stored session gets that,
+    // not SIGNED_IN. This runs before ensureHydrated() has resolved the user,
+    // so `currentUserId` was still null above and nothing attached; without
+    // this case a returning member never had a live game_participants channel.
+    if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
       const uid = session?.user?.id ?? null;
-      if (uid && uid !== currentUserId) {
+      if (!uid) return;
+      if (uid !== currentUserId) {
         currentUserId = uid;
         hydrated = false;
         hydratingPromise = null;
         ensureHydrated();
+        attach(uid);
+      } else if (!channel) {
+        // Hydration already resolved this user; only the channel is missing.
         attach(uid);
       }
     } else if (event === "SIGNED_OUT") {

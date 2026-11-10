@@ -25,40 +25,20 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
+// "/notifications" was one of these until Alerts moved into the Inbox
+// (f6f79be5); it now redirects to /messages?tab=alerts, so the Inbox stands in.
+const PROTECTED_ROUTES = ["/feed", "/profile", "/messages"] as const;
 const PROVIDERS = ["google", "apple"] as const;
 
 async function stubNullAccountType(page: Page) {
   // The root gate asks the server first (getOnboardingStatus reads the profile
   // server-side), so the table stub below only covers its client fallback.
   await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, "email"));
-  // The gate asks the server first (`getOnboardingStatus`) and only falls back
-  // to PostgREST when that call fails, so both layers must report "no type".
-  // Server-fn addresses are base64-encoded ({file, export}), so decode the
-  // path segment instead of pattern-matching the raw URL.
-  await page.route("**/_serverFn/**", async (route) => {
-    const segment = new URL(route.request().url()).pathname.split("/_serverFn/")[1] ?? "";
-    let decoded = "";
-    try {
-      decoded = Buffer.from(decodeURIComponent(segment), "base64").toString("utf8");
-    } catch {
-      decoded = "";
-    }
-    if (!decoded.includes("getOnboardingStatus")) {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        needsOnboarding: true,
-        isSocial: false,
-        provider: "email",
-        accountType: null,
-      }),
-    });
-  });
+  // Only the seroval-encoded stub above. A second, plain-JSON responder for the
+  // same function used to be registered here; Playwright runs the most recent
+  // matching route first, so it won, and TanStack Start's client decodes a
+  // plain-JSON body (no x-tss-serialized) to undefined. The SIGNED_IN
+  // reconcile then threw on `status.isSocial` and never redirected.
 
   // The root gate hits `/rest/v1/profiles?select=account_type&id=eq.<uid>`.
   // Force every read of that column to return NULL so the redirect logic runs
@@ -124,6 +104,14 @@ test.describe("null account_type → account-type setup", () => {
         // Land on a public-ish route first so the SIGNED_IN handler owns the
         // decision (mirrors the OAuth callback returning to `window.location.origin`).
         await page.goto("/", { waitUntil: "domcontentloaded" });
+        // RootComponent subscribes to auth events in the same effect that sets
+        // window.__openrun_booted; an event emitted before that reaches no
+        // listener and the reconcile under test never runs.
+        await page.waitForFunction(
+          () => (window as unknown as { __openrun_booted?: boolean }).__openrun_booted === true,
+          undefined,
+          { timeout: 20_000 },
+        );
 
         // Simulate the provider callback firing a SIGNED_IN event on the
         // existing Supabase client. Every provider that lands back in-app

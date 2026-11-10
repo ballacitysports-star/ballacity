@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForAppToSettle } from "./helpers/app-boot";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -92,17 +93,21 @@ test.describe("OAuth new-user onboarding gate", () => {
 
         // The landing page itself is public, so this verifies the real
         // regression path: a hydrated OAuth session on `/` with no account
-        // type must be sent to onboarding instead of staying on marketing or
-        // restoring `/feed` from last-visited state.
-        await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
-          timeout: 15_000,
-        });
+        // type must reach the account-type picker instead of staying on
+        // marketing or showing the feed. Since 31108d78 the app shell renders
+        // the picker in place on the protected page it lands on (no redirect),
+        // so assert the picker, not the URL.
+        await expect(page).not.toHaveURL(/^https?:\/\/[^/]+\/?$/, { timeout: 15_000 });
+        await expect(
+          page.getByRole("heading", { name: /Where do you want to start/i }),
+        ).toBeVisible({ timeout: 15_000 });
 
         await page.goto("/", { waitUntil: "domcontentloaded" });
 
         // Force the SIGNED_IN reconcile with the correct app_metadata.provider
         // so the "new OAuth user" branch runs. We patch getSession() so the
         // reconcile sees provider=<google|apple> without touching real auth.
+        await waitForAppToSettle(page);
         await page.evaluate(async (providerId) => {
           const mod = await import("/src/integrations/supabase/client.ts");
           const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
@@ -158,6 +163,7 @@ test.describe("OAuth new-user onboarding gate", () => {
       await primeStorage(page, "google");
       await page.goto("/", { waitUntil: "domcontentloaded" });
 
+      await waitForAppToSettle(page);
       await page.evaluate(async () => {
         const mod = await import("/src/integrations/supabase/client.ts");
         const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })

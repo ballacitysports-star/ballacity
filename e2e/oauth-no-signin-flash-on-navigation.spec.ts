@@ -73,13 +73,46 @@ async function readFlashes(page: Page) {
   return page.evaluate(() => window.__authLoaderFlashes ?? []);
 }
 
+/**
+ * The app logs every AuthGate decision in dev builds (src/lib/authgate-log.ts).
+ * CI keeps no trace, so carry the recent ones (and auth errors) into a failure
+ * message: they say which state put the loader back up.
+ */
+function collectAuthLog(page: Page) {
+  const lines: string[] = [];
+  page.on("console", (m) => {
+    const t = m.text();
+    if (/\[AuthGate\]|auth|session|token/i.test(t)) lines.push(`${m.type()}: ${t.slice(0, 240)}`);
+  });
+  const dump = () => lines.slice(-12).join("\n");
+  /**
+   * Wait until AuthGate has verified the stored session ("user-present").
+   * /feed is also a signed-out page: while the session is still being
+   * verified it renders the signed-out preview, bottom bar and "Home" label
+   * included, so those alone do not prove the member is signed in. Run
+   * 42460824214 started watching in that state, and the next tab (a protected
+   * page) showed the loader until verification finished, which is the loader
+   * doing its job, not a flash after login.
+   */
+  const signedIn = () =>
+    expect
+      .poll(() => lines.some((l) => /\[AuthGate\] user-present/.test(l)), {
+        timeout: 20_000,
+        message: `AuthGate never reported user-present:\n${dump()}`,
+      })
+      .toBe(true);
+  return Object.assign(dump, { signedIn });
+}
+
 for (const provider of ["google", "apple"] as const) {
   test(`no auth loader flash while navigating after ${provider} login`, async ({ page }) => {
+    const authLog = collectAuthLog(page);
     await restoreOAuthSession(page, provider);
 
     // Land on the signed-in home first; the initial loader here is expected.
     await page.goto("/feed", { waitUntil: "domcontentloaded" });
     await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
+    await authLog.signedIn();
     for (const needle of LOADER_TEXTS) {
       await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
     }
@@ -94,7 +127,7 @@ for (const provider of ["google", "apple"] as const) {
       const flashes = await readFlashes(page);
       expect(
         flashes,
-        `auth loader flashed during navigation to "${label}": ${JSON.stringify(flashes)}`,
+        `auth loader flashed during navigation to "${label}": ${JSON.stringify(flashes)}\n${authLog()}`,
       ).toEqual([]);
     }
 
@@ -107,10 +140,17 @@ for (const provider of ["google", "apple"] as const) {
 test("deep-linking between protected routes after OAuth keeps the app mounted", async ({
   page,
 }) => {
+  const authLog = collectAuthLog(page);
   await restoreOAuthSession(page, "google");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
   await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
+  await authLog.signedIn();
+  // After sign-in the age and account-type checks still hold the first loader
+  // (run 42466912150 caught it on /feed); start watching once it is gone.
+  for (const needle of LOADER_TEXTS) {
+    await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
+  }
 
   await installLoaderFlashObserver(page);
 
@@ -122,6 +162,9 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
     await expect(page).toHaveURL(new RegExp(`${path}(?:[?#].*)?$`));
 
     const flashes = await readFlashes(page);
-    expect(flashes, `auth loader flashed on ${path}: ${JSON.stringify(flashes)}`).toEqual([]);
+    expect(
+      flashes,
+      `auth loader flashed on ${path}: ${JSON.stringify(flashes)}\n${authLog()}`,
+    ).toEqual([]);
   }
 });

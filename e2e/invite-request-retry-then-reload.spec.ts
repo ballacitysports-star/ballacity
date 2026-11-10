@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: after a network-error retry on "Request to join" succeeds, reloading
@@ -124,13 +126,15 @@ test("pending UI + invite params survive a reload after network-error retry", as
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
+          body: pgrstBody(route, [pendingRow()]),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });

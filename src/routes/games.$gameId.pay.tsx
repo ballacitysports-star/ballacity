@@ -121,8 +121,21 @@ function launchExternalPayment(url: string, copyText?: string | null) {
       .then(() => toast.success(`Copied ${copyText}`))
       .catch(() => {});
   }
-  const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
-  if (!externalWindow) window.location.assign(url);
+  // Not `window.open(url, "_blank", "noopener")`: with that feature the call
+  // returns null even when the tab DID open, so the blocked-popup fallback
+  // below fired every time and navigated this tab away from the proof step
+  // too. Open normally and cut the opener link by hand instead.
+  const externalWindow = window.open(url, "_blank");
+  if (externalWindow) {
+    try {
+      externalWindow.opener = null;
+    } catch {
+      /* cross-origin already — nothing to sever */
+    }
+  } else {
+    // Popup blocked (some in-app browsers): go there in this tab.
+    window.location.assign(url);
+  }
 }
 
 function feeLabel(fee: number | null | undefined) {

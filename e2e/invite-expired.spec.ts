@@ -111,7 +111,9 @@ test("expired invite → renders Invite expired banner, CTA routes to /discover 
 
   // Following it lands on the discovery route — the safe fallback.
   await fallbackCta.click();
-  await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+  // /discover is kept only as a redirect to /feed (the map view moved there in
+  // 238b4b6d), so the fallback lands on /feed.
+  await page.waitForURL((u) => u.pathname === "/feed", { timeout: 10_000 });
 
   // No join / payment write ever fired from the expired-invite flow.
   expect(writeAttempts, "expired invite must not trigger join/payment writes").toEqual([]);

@@ -1,4 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
+import { appBooted, confirmFreeJoin } from "./helpers/join";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: opening an invite deeplink to an unpaid (free, no-approval) game and
@@ -128,13 +131,15 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify(rows),
+          body: pgrstBody(route, rows),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
 
@@ -160,14 +165,18 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/tap\s+[“"']?Join[”"']?\s+below/i);
-  await expect(banner).not.toContainText(/Request to join/i);
-  await expect(banner).not.toContainText(/Pay & join/i);
+  // CTA names from e2c76954 ("Request to join"/"Pay & join"/"Join" became
+  // "Request Spot"/"Pay Host"/"Join Run").
+  await expect(banner).toContainText(/tap\s+[“"']?Join Run[”"']?\s+below/i);
+  await expect(banner).not.toContainText(/Request Spot/i);
+  await expect(banner).not.toContainText(/Pay Host/i);
 
   // CTA button shows "Join Run · N spots left".
   const cta = page.getByRole("button", { name: /join run/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await appBooted(page);
   await cta.click();
+  await confirmFreeJoin(page);
 
   // The join insert should fire...
   await expect

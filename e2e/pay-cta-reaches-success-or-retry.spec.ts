@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
@@ -99,27 +100,32 @@ async function mockPaidSettingsHang(page: Page) {
  * Returns which outcome occurred so the caller can assert on it.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
-  const ready = page
-    .getByText(/loading payment options/i)
-    .first()
-    .waitFor({ state: "hidden", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "ready" as const);
-  const retry = page
-    .getByRole("button", { name: /^retry$/i })
-    .first()
-    .waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "retry" as const);
-  return await Promise.race([ready, retry]);
+  // Decide only once the pay page itself is up and done loading.
+  //  - Its header ("Back to game" link) renders only after the game lookup.
+  //    The URL flips to /pay before the detail page unmounts, so a bare `h1`
+  //    could still be the detail page's heading.
+  //  - A race between "loading text hidden" and "Retry visible" is unsound:
+  //    on a timeout one commit hides the one and shows the other, and the
+  //    hidden-waiter could win (run 42454894247 reported "ready"). Poll the
+  //    state instead and read the outcome after loading ends.
+  await expect(page.getByRole("link", { name: "Back to game" }).first()).toBeVisible({
+    timeout: OUTCOME_TIMEOUT_MS,
+  });
+  const loading = page.getByText(/loading payment options/i);
+  const retry = page.getByRole("button", { name: /^retry$/i });
+  const state = async () =>
+    (await retry.count()) > 0 ? "retry" : (await loading.count()) > 0 ? "loading" : "ready";
+  await expect.poll(state, { timeout: OUTCOME_TIMEOUT_MS }).not.toBe("loading");
+  return (await state()) === "retry" ? "retry" : "ready";
 }
 
-test("Pay CTA reaches the ready pay screen when the backend responds", async ({
-  browser,
-}) => {
+test("Pay CTA reaches the ready pay screen when the backend responds", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
   await mockPaidSettingsOk(page);
   await mockEmptyLists(page);
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -139,14 +145,27 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({
   await ctx.close();
 });
 
-test("Pay CTA surfaces retry affordance when the payment service hangs", async ({
-  browser,
-}) => {
+test("Pay CTA surfaces retry affordance when the payment service hangs", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
   await mockPaidSettingsHang(page);
   await mockEmptyLists(page);
+  // With the settings read hung, the game page takes the host's join policy
+  // from the public get_game_join_policy RPC (src/hooks/use-game-join-policy.ts)
+  // and fails closed to "Request Spot" when it has none. Answer it the way it
+  // answers for this paid, no-approval game so the Pay host link renders.
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_game_join_policy"),
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ requires_approval: false }]),
+      });
+    },
+  );
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -161,9 +180,7 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("retry");
-  await expect(
-    page.getByText(/couldn't reach the payment service/i).first(),
-  ).toBeVisible();
+  await expect(page.getByText(/couldn't reach the payment service/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^retry$/i }).first()).toBeVisible();
 
   await ctx.close();

@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: on an approval-gated game, tapping "Request to join" from an invite
@@ -81,7 +83,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
         await route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
+          body: pgrstBody(route, [{ id: "should-not-happen" }]),
         });
         return;
       }
@@ -108,6 +110,7 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await installMocks(page, () => {
       joinPostFired = true;
     });
+    await stubRiskAcknowledged(page);
     await restoreSession(page);
 
     await page.goto(
@@ -134,7 +137,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
     // Guard fires: toast surfaces + navigation to /discover fallback.
     const toast = page.getByText(/invite has expired/i).first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
-    await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+    // /discover is kept only as a redirect to /feed (the map view moved there in
+    // 238b4b6d), so the fallback lands on /feed.
+    await page.waitForURL((u) => u.pathname === "/feed", { timeout: 10_000 });
 
     // Give any illegitimate POST a chance to land before asserting.
     await page.waitForTimeout(500);

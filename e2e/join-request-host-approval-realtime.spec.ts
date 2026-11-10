@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: on the game view (`/games/:gameId`), a player creates a join
@@ -135,13 +137,15 @@ test("join request → host approval arrives via realtime and status flips live"
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row("pending")]),
+          body: pgrstBody(route, [row("pending")]),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });

@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: if the first "Request to join" POST fails with a network error,
@@ -132,13 +134,15 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
+          body: pgrstBody(route, [pendingRow()]),
         });
         return;
       }
       return route.fallback();
     },
   );
+
+  await stubRiskAcknowledged(page);
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
@@ -152,6 +156,13 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
+  // Taps land on the same spot on screen. The first tap flips the CTA
+  // optimistically to "Request pending · Tap to cancel" (disabled in flight),
+  // so a "Request Spot" locator would wait until the failed POST restored it
+  // and only then tap, sending a second POST. Tap its coordinates instead.
+  const box = (await cta.boundingBox())!;
+  const tapAgain = () => page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
   // First tap — starts the doomed POST.
   await cta.click({ force: true });
 
@@ -163,12 +174,8 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   expect(firstPostSettledAt, "first POST settled before we could double-tap").toBe(0);
 
   // Second tap while still in flight — must be swallowed.
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
-    /* button may be disabled */
-  });
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
-    /* ignore */
-  });
+  await tapAgain();
+  await tapAgain();
 
   // Wait for the first POST to fail.
   await expect

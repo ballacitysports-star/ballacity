@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { hostedGameRow, serveHostedGame } from "./helpers/hosted-game";
+import { pgrstBody } from "./helpers/postgrest";
 
 /**
  * E2E: end-to-end mocked payment that transitions to rejected.
@@ -77,9 +79,11 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
   );
 
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (url) =>
+      tableUrl(url, "host_payment_methods") ||
+      String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -108,13 +112,9 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
     },
   );
 
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself, owned by the host whose settings are mocked above (the
+  // bundled sample "g2" these specs once relied on no longer exists).
+  await serveHostedGame(page, hostedGameRow({ id: GAME_ID, host_id: HOST_ID, price: 15 }));
 
   await page.route(
     (url) => tableUrl(url, "game_participants"),
@@ -187,7 +187,7 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
         return route.fulfill({
           status: 201,
           contentType: "application/json",
-          body: JSON.stringify([row]),
+          body: pgrstBody(route, [row]),
         });
       }
       return route.fallback();
@@ -229,8 +229,9 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
   });
 
   await expect(timeline).toHaveAttribute("data-status", "rejected", { timeout: 10_000 });
-  await expect(timeline).toContainText(/rejected/i);
-  await expect(timeline).toContainText(/rejected — try again/i);
+  // Timeline labels come from PAYMENT_STATE_META since 696cb3c8; a rejection
+  // reads "Declined — try again" (was "Rejected — try again").
+  await expect(timeline).toContainText(/declined — try again/i);
   await expect(timeline).toContainText(REJECT_NOTE);
 
   await ctx.close();

@@ -34,7 +34,11 @@ async function restoreSession(page: Page) {
       "openrun:players-search",
       "openrun.feedPrefs.v1",
     ]) {
-      try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+      try {
+        window.localStorage.removeItem(k);
+      } catch {
+        /* ignore */
+      }
     }
   });
 }
@@ -43,7 +47,28 @@ async function countCards(page: Page): Promise<number> {
   // Feed/Players/Teams/Trainers render each result as an anchor link. This
   // covers grid, list, and map-off density variants without depending on
   // internal CSS class names.
-  return await page.locator('a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]').count();
+  return await page
+    .locator(
+      'a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]',
+    )
+    .count();
+}
+
+/**
+ * The count once the list stops changing. Results load asynchronously, and
+ * a snapshot after a fixed sleep raced that on a slower backend (run
+ * 42458824586 counted 1 where the filtered list had 2).
+ */
+async function settledCount(page: Page): Promise<number> {
+  let last = -1;
+  let same = 0;
+  for (let i = 0; i < 25 && same < 3; i++) {
+    const n = await countCards(page);
+    same = n === last ? same + 1 : 0;
+    last = n;
+    await page.waitForTimeout(300);
+  }
+  return last;
 }
 
 async function pickSport(page: Page, route: string) {
@@ -74,14 +99,15 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
         .first()
         .waitFor({ state: "visible", timeout: 15_000 });
     } else {
-      await page.getByRole("button", { name: "Filters" }).waitFor({ state: "visible", timeout: 15_000 });
+      await page
+        .getByRole("button", { name: "Filters" })
+        .waitFor({ state: "visible", timeout: 15_000 });
     }
 
-    const baseline = await countCards(page);
+    const baseline = await settledCount(page);
 
     await pickSport(page, route);
-    await page.waitForTimeout(500);
-    const filtered = await countCards(page);
+    const filtered = await settledCount(page);
     expect(filtered, `${route}: filtered <= baseline`).toBeLessThanOrEqual(baseline);
 
     // Navigate away and back with a *clean* URL. usePersistedSearch must
@@ -89,8 +115,11 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/[?&]sport=Basketball/, { timeout: 5_000 });
-    await page.waitForTimeout(400);
-    const restored = await countCards(page);
-    expect(restored, `${route}: restored count matches filtered count`).toBe(filtered);
+    await expect
+      .poll(() => countCards(page), {
+        timeout: 10_000,
+        message: `${route}: restored count matches filtered count`,
+      })
+      .toBe(filtered);
   });
 }

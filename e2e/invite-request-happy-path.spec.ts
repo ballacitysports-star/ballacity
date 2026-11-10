@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { pgrstBody } from "./helpers/postgrest";
+import { stubRiskAcknowledged } from "./helpers/safety-ack";
 
 /**
  * E2E happy path: a well-formed, non-expired invite deep-link on an
@@ -128,7 +130,7 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
+          body: pgrstBody(route, [pendingRow()]),
         });
         return;
       }
@@ -136,6 +138,7 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Land directly on the game with a well-formed, non-expired invite.

@@ -77,9 +77,11 @@ test.describe("OAuth vendor rejection", () => {
     }) => {
       const { context, page } = await openSignedOutAuthPage(browser);
       try {
-
         // Switch to signup mode.
-        await page.getByRole("button", { name: /create( an)? account|sign ?up/i }).first().click();
+        await page
+          .getByRole("button", { name: /create( an)? account|sign ?up/i })
+          .first()
+          .click();
 
         // Pick the "player" account type on the picker.
         const playerCard = page
@@ -89,10 +91,19 @@ test.describe("OAuth vendor rejection", () => {
         await playerCard.click();
 
         // Advance to the form step (Continue button on the picker).
-        await page.getByRole("button", { name: /^continue$/i }).first().click();
+        await page
+          .getByRole("button", { name: /^continue$/i })
+          .first()
+          .click();
 
         const button = providerButton(page, provider);
         await expect(button).toBeVisible();
+
+        // Social sign-up asks for the Terms and Privacy Policy first (the
+        // consent guard in src/routes/auth.tsx `oauth`); without the ticks the
+        // tap stops at "Please agree…" and never reaches the provider.
+        await page.getByRole("checkbox", { name: /terms of service/i }).check();
+        await page.getByRole("checkbox", { name: /privacy policy/i }).check();
 
         await stubOAuth(page, {
           error: { message: "failed to sign in with vendor" },
@@ -105,7 +116,9 @@ test.describe("OAuth vendor rejection", () => {
 
         // Still on /auth, still in signup form (email field is present).
         await expect(page).toHaveURL(/\/auth(?:\?.*)?$/);
-        await expect(page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first()).toBeVisible();
+        await expect(
+          page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first(),
+        ).toBeVisible();
 
         const state = await page.evaluate(
           ([pendingKey, providerKey]) => ({

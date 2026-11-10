@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -65,7 +65,7 @@ async function attachChannel(gameId: string) {
   attaching.add(gameId);
   try {
     if (!(await hasSession())) return;
-    if (channels.has(gameId)) return;
+    if (channels.has(gameId) || !listeners.get(gameId)?.size) return;
 
     const channel = supabase
       .channel(`game_participants:game:${gameId}:${++channelSeq}`)
@@ -82,17 +82,15 @@ async function attachChannel(gameId: string) {
           emit(gameId);
         },
       )
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // listen unfiltered and re-count; the old row cannot say which game it was.
       .on(
         "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "game_participants",
-          filter: `game_id=eq.${gameId}`,
-        },
-        () => {
-          counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
-          emit(gameId);
+        { event: "DELETE", schema: "public", table: "game_participants" },
+        (payload) => {
+          const old = payload.old as { game_id?: string };
+          if (old.game_id && old.game_id !== gameId) return;
+          void hydrate(gameId);
         },
       )
       .subscribe((status) => {
@@ -133,12 +131,17 @@ function detachIfIdle(gameId: string) {
 export function useLiveParticipantCount(gameId: string | undefined): number | undefined {
   useEffect(() => {
     if (!gameId) return;
-    void attachChannel(gameId);
     void hydrate(gameId);
   }, [gameId]);
 
-  const snapshot = useSyncExternalStore(
-    (cb) => {
+  // Stable per game. An inline subscribe is a new function on every render, so
+  // React unsubscribed and resubscribed each time; the listener set emptied in
+  // between, detachIfIdle() removed the channel, and nothing attached it again
+  // (the attach ran once, in an effect keyed on gameId). Live counts then
+  // stopped after the first re-render. The channel now follows the listeners:
+  // attached with the first, removed only once none is left after a tick.
+  const subscribe = useCallback(
+    (cb: () => void) => {
       if (!gameId) return () => {};
       let set = listeners.get(gameId);
       if (!set) {
@@ -146,14 +149,22 @@ export function useLiveParticipantCount(gameId: string | undefined): number | un
         listeners.set(gameId, set);
       }
       set.add(cb);
+      void attachChannel(gameId);
       return () => {
-        set!.delete(cb);
-        if (set!.size === 0) {
+        const current = listeners.get(gameId);
+        current?.delete(cb);
+        if (current && current.size === 0) {
           listeners.delete(gameId);
-          detachIfIdle(gameId);
+          // A resubscribe in the same commit adds a listener back first.
+          setTimeout(() => detachIfIdle(gameId), 0);
         }
       };
     },
+    [gameId],
+  );
+
+  const snapshot = useSyncExternalStore(
+    subscribe,
     () => (gameId && hydrated.has(gameId) ? String(counts.get(gameId) ?? 0) : ""),
     () => "",
   );

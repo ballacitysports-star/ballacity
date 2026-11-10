@@ -59,6 +59,12 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   fullyParallel: false,
+  // One worker, always. Specs share a handful of fixture accounts, the g1/g2
+  // games and one injected session, so two workers race on the same rows and
+  // sessions. `fullyParallel: false` alone does not ensure this: it only keeps
+  // the tests of ONE file together, while Playwright still spreads files over
+  // its default worker count (CI logged "226 tests using 2 workers").
+  workers: 1,
   retries: 0,
   // The list reporter writes its tally to stdout at the very end, and twice now
   // that tally has not survived: runs 70 and 71 both stop after the last

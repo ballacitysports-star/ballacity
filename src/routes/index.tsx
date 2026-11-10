@@ -101,6 +101,13 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user || startedSetup.current) return;
+    // Send the member on only while the app is still on the landing page. It
+    // can stay mounted (and remount) while the next route resolves, and an
+    // OAuth return updates `user` again (SIGNED_IN) in that window; a late run
+    // would navigate to the feed over the root reconcile's redirect to
+    // /onboarding/account-type.
+    const stillOnLanding = () => router.state.location.pathname === "/";
+    if (!stillOnLanding()) return;
     // A returning member has nothing to route through first: go straight on.
     // A member who has not picked a role is caught by the app shell's own
     // account-type check, so the profile lookup below is only for a pending setup.
@@ -115,7 +122,7 @@ function Landing() {
         .select("account_type")
         .eq("id", user.id)
         .maybeSingle();
-      if (cancelled) return;
+      if (cancelled || !stillOnLanding()) return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (!isAccountType(t)) {
         router.navigate({ to: "/onboarding/account-type", replace: true });

@@ -754,6 +754,17 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trainer_orgs" }, () => {
         fetchRows();
       })
+      // Supabase cannot filter DELETE events (the old row carries only its primary key), so a filtered subscription never receives them:
+      // a member leaving an org reaches this page only through an unfiltered listener.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "trainer_org_members" },
+        (payload) => {
+          const old = payload.old as { user_id?: string };
+          if (old.user_id && old.user_id !== userId) return;
+          fetchRows();
+        },
+      )
       .subscribe();
 
     return () => {
