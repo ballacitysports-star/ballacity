@@ -281,12 +281,13 @@ Within each pair the two files touch disjoint objects, so their relative order d
 
 Disposition:
 
-- **Do not rename these files.** They are applied history. Renaming would change the reviewed paths and sha256 values in the release
-  manifest's `known_unledgered` list and in `ledger-evidence.csv`, and would add nothing to production.
-- `schema_migrations.version` is a primary key, so only one row per version can ever exist. If the owner approves ledger rows for these
-  versions, insert one row per version, named after the first file. Record in `ledger-evidence.csv` that the version covers both files.
-  Alternatively, leave the versions unledgered: the preflight already treats both files of each pair as `known_unledgered`. This is the
-  owner's decision; nothing is inserted here.
-- **New collisions are blocked.** `scripts/migration-versions.test.mjs` (vitest) fails if any version other than these four is shared.
-  The next new migration must also sort after every existing file. The current last file is in the privacy release, so the next version
-  must be at least `20261108180001`.
+- **Do not rename these files.** They are applied history. Renaming would change the reviewed paths and sha256 values in
+  `ledger-evidence.csv` (and in the release branches' manifest), and would add nothing to production.
+- `schema_migrations.version` is a primary key, so only one row per version can ever exist. **Decided and done:** the owner chose one
+  row per version, named after the first file of each pair (`refund_policies`, `family_post_links`, `family_post_team_tier`,
+  `accept_message_request`). The four rows were inserted in production on 2026-11-07 as ledger group E
+  (`docs/release/records/2026-11-07-batch-3.md`, row 10 and the group E note). Each row covers both files of its pair.
+- **New collisions are blocked.** `scripts/migration-versions.test.mjs` (vitest) fails if any version other than these four is shared,
+  or if a file name does not start with a 14-digit version. A new migration must also sort after every existing file in
+  `supabase/migrations`; P0-4's replay (`scripts/migration-twins.mjs`) only catches identical copies, not two different files that
+  share a version.
