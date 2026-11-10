@@ -135,7 +135,9 @@ test.describe("managed child, end to end", () => {
     // cleanup skipped the delete and still passed.
     const loaded = page
       .getByRole("tablist", { name: /your linked children/i })
-      .or(page.getByText(/^no children yet$/i));
+      // A string, not an anchored regex: Playwright tests a regex against the
+      // untrimmed text, and the icon before it leaves " No children yet".
+      .or(page.getByText("No children yet", { exact: true }));
     // Still inside a child's profile (a step failed mid-way)? The banner is on
     // every page there; go back to the guardian first.
     const back = page.getByRole("button", { name: /^back to /i });
