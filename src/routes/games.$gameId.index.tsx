@@ -172,19 +172,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, formatEndsAt, Meta } from "@/components/game-detail/GameDetailBits";
+import {
+  Field,
+  formatCooldownLabel,
+  formatEndsAt,
+  hostReviewId,
+  Meta,
+} from "@/components/game-detail/GameDetailBits";
+import type { RosterEntry } from "@/components/game-detail/game-roster-entry";
 import { EditGameModal } from "@/components/game-detail/EditGameModal";
 import { RosterPlayerRow } from "@/components/game-detail/RosterPlayerRow";
 import { HostRequestRow, HostPendingChip } from "@/components/game-detail/HostRequestRows";
+import { GameLocationCard } from "@/components/game-detail/GameInfoSections";
+import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
+import { GameHostSection } from "@/components/game-detail/GameHostSection";
+import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
+import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
 );
-
-const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
-/** Real hosts are reviewed by auth user id; sample games keep the demo id. */
-const hostReviewId = (game?: { hostUserId?: string; host: { username: string } } | null) =>
-  game?.hostUserId ?? hostIdFor(game?.host.username ?? "");
 
 export const Route = createFileRoute("/games/$gameId/")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -261,14 +268,6 @@ function GameRoute() {
   if (loading) return <AuthRedirectSkeleton label="Loading game…" />;
   if (!user) return <PublicGamePreview seo={seo} next={`${pathname}${searchStr}`} />;
   return <GameDetail />;
-}
-
-function formatCooldownLabel(ms: number): string {
-  const secs = Math.max(1, Math.ceil(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return s ? `${m}m ${s}s` : `${m}m`;
 }
 
 function GameDetail() {
@@ -1229,19 +1228,6 @@ function GameDetail() {
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
   const pendingCount = hostPendingReqs.length;
-  type RosterEntry =
-    | {
-        kind: "player";
-        initials: string;
-        isMe: boolean;
-        pending: false;
-        userId?: string;
-        displayName?: string;
-        avatarUrl?: string | null;
-      }
-    | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
-    | { kind: "hostPending"; req: JoinRequest; pending: true };
-
   // Real confirmed roster from `game_participants` (live via realtime).
   // Falls back to game.joined-sized placeholders during hydration so the
   // slot count never briefly collapses to zero.
@@ -1644,207 +1630,21 @@ function GameDetail() {
           </div>
         )}
 
-        {/* Approval status banner (player view).
-            Driven by the shared useMyFlowStatus so paid games always show
-            "Payment due" (or the matching payment stage) until the host
-            verifies the payment — never "You're approved / on the roster". */}
-        {myWait && (
-          <div
-            className="rounded-2xl border border-coral/40 bg-coral/10 p-4 flex items-start gap-3"
-            role="status"
-            aria-live="polite"
-            data-testid="waiting-on-parent"
-          >
-            <Clock className="h-5 w-5 shrink-0 mt-0.5 text-coral" />
-            <div className="min-w-0">
-              <div className="font-display text-sm font-bold">{playerWaitCopy(myWait).title}</div>
-              <p className="text-xs text-muted-foreground mt-0.5">{playerWaitCopy(myWait).body}</p>
-              {myReq?.status === "pending" && (
-                <div className="mt-3">
-                  <LeaveFlowButton
-                    gameId={game.id}
-                    gameTitle={game.title}
-                    variant="danger"
-                    onDone={() => void refreshStatus()}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {!isHost &&
-          !myWait &&
-          requiresApproval &&
-          myReq &&
-          (() => {
-            // Paid games: pick copy from the shared flow status so this banner
-            // can't disagree with the pill / PaymentRequiredBanner / pay page.
-            if (isPaid) {
-              const paidCopy: Record<
-                string,
-                { title: string; body: string; tone: "warn" | "info" | "ok" | "bad" | "muted" }
-              > = {
-                requested: {
-                  title: "Waiting for host approval",
-                  body: "Your spot isn't held until the host approves. You'll get a notification when they respond.",
-                  tone: "warn",
-                },
-                payment_pending: {
-                  title: myHoldLabel
-                    ? `Approved · Pay host directly to lock your spot · ⏳ ${myHoldLabel}`
-                    : "Approved · Pay host directly to lock your spot",
-                  body: myHoldLabel
-                    ? `Send your $${fee} fee to the host and submit proof before the hold runs out, or your spot goes to the next player.`
-                    : `Send your $${fee} fee to the host and submit proof — your spot isn't locked until they confirm it.`,
-                  tone: "warn",
-                },
-                payment_submitted: {
-                  title: "Proof sent · Awaiting host confirmation",
-                  body: "Your proof is with the host. You'll be confirmed the moment they verify it.",
-                  tone: "info",
-                },
-                payment_rejected: {
-                  title: myHoldLabel
-                    ? `Payment declined by host · Resubmit proof or message host · ⏳ ${myHoldLabel}`
-                    : "Payment declined by host · Resubmit proof or message host",
-                  body:
-                    myReq.reviewer_notes ||
-                    "The host couldn't verify your last payment. Send new proof to lock your spot.",
-                  tone: "bad",
-                },
-                payment_verified: {
-                  title: "You're in! Payment confirmed",
-                  body: "You're all set. See you at the game!",
-                  tone: "ok",
-                },
-                confirmed: {
-                  title: "You're in! Payment confirmed",
-                  body: "You're all set. See you at the game!",
-                  tone: "ok",
-                },
-                rejected: {
-                  title: "Request declined",
-                  body: capReached
-                    ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
-                    : cooldownMs > 0
-                      ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
-                      : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`,
-                  tone: "muted",
-                },
-              };
-              const entry = paidCopy[myFlowStatus];
-              if (!entry) return null;
-              const toneClass =
-                entry.tone === "warn"
-                  ? "border-coral/40 bg-coral/10"
-                  : entry.tone === "bad"
-                    ? "border-destructive/50 bg-destructive/10"
-                    : entry.tone === "ok"
-                      ? "border-lime/40 bg-lime/10"
-                      : entry.tone === "info"
-                        ? "border-lime/40 bg-lime/5"
-                        : "border-border bg-surface";
-              const Icon =
-                entry.tone === "warn" || entry.tone === "info"
-                  ? Clock
-                  : entry.tone === "ok"
-                    ? Check
-                    : entry.tone === "bad"
-                      ? XIcon
-                      : XIcon;
-              const iconColor =
-                entry.tone === "warn"
-                  ? "text-coral"
-                  : entry.tone === "ok"
-                    ? "text-lime"
-                    : entry.tone === "bad"
-                      ? "text-destructive"
-                      : entry.tone === "info"
-                        ? "text-lime"
-                        : "text-muted-foreground";
-              return (
-                <div
-                  className={`rounded-2xl border p-4 flex items-start gap-3 ${toneClass}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} />
-                  <div className="min-w-0">
-                    <div className="font-display text-sm font-bold">{entry.title}</div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{entry.body}</p>
-                    {/* A request is the player's to take back until the host answers. */}
-                    {myFlowStatus === "requested" && (
-                      <div className="mt-3">
-                        <LeaveFlowButton
-                          gameId={game.id}
-                          gameTitle={game.title}
-                          variant="danger"
-                          onDone={() => void refreshStatus()}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            // Free games: original approval-only copy (no payment stage exists).
-            return (
-              <div
-                className={`rounded-2xl border p-4 flex items-start gap-3 ${
-                  myReq.status === "pending"
-                    ? "border-coral/40 bg-coral/10"
-                    : myReq.status === "approved"
-                      ? "border-lime/40 bg-lime/10"
-                      : "border-border bg-surface"
-                }`}
-                role="status"
-                aria-live="polite"
-              >
-                {myReq.status === "pending" ? (
-                  <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
-                ) : myReq.status === "approved" ? (
-                  <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
-                ) : (
-                  <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                )}
-                <div className="min-w-0">
-                  <div className="font-display text-sm font-bold">
-                    {myReq.status === "pending"
-                      ? "Waiting for host approval"
-                      : myReq.status === "approved"
-                        ? isPaid && !isPaymentVerified
-                          ? "Approved — payment due"
-                          : "You're approved — see you there!"
-                        : "Request declined"}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {myReq.status === "pending"
-                      ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
-                      : myReq.status === "approved"
-                        ? isPaid && !isPaymentVerified
-                          ? `Payment due: pay $${fee} to the host to lock in your spot. You'll be added to the roster once it's confirmed.`
-                          : "The host approved your request. You're on the roster."
-                        : capReached
-                          ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
-                          : cooldownMs > 0
-                            ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
-                            : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
-                  </p>
-                  {myReq.status === "pending" && (
-                    <div className="mt-3">
-                      <LeaveFlowButton
-                        gameId={game.id}
-                        gameTitle={game.title}
-                        variant="danger"
-                        onDone={() => void refreshStatus()}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
+        <GameApprovalBanner
+          capReached={capReached}
+          cooldownMs={cooldownMs}
+          fee={fee}
+          game={game}
+          isHost={isHost}
+          isPaid={isPaid}
+          isPaymentVerified={isPaymentVerified}
+          myFlowStatus={myFlowStatus}
+          myHoldLabel={myHoldLabel}
+          myReq={myReq}
+          myWait={myWait}
+          refreshStatus={refreshStatus}
+          requiresApproval={requiresApproval}
+        />
 
         {/* Compact "Your status" strip for paid games — driven by shared flow
             status so it never disagrees with the banner above. Shown for any
@@ -1947,188 +1747,18 @@ function GameDetail() {
 
         {viewerCountsAsJoined && <GameReminderCard gameId={game.id} />}
 
-        {/* Location card */}
-        <div className="rounded-3xl border border-border bg-surface overflow-hidden">
-          <div
-            className="h-32 relative"
-            style={{
-              background:
-                "radial-gradient(50% 60% at 50% 50%, oklch(0.30 0.08 145 / 0.5), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
-            }}
-          >
-            <svg className="absolute inset-0 h-full w-full opacity-30" aria-hidden>
-              <defs>
-                <pattern id="g2" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path
-                    d="M 32 0 L 0 0 0 32"
-                    fill="none"
-                    stroke="oklch(1 0 0 / 0.1)"
-                    strokeWidth="1"
-                  />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#g2)" />
-            </svg>
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-lime text-primary-foreground glow-lime">
-              <MapPin className="h-5 w-5" />
-            </div>
-          </div>
-          <OpenInMaps address={[game.location, game.neighborhood].filter(Boolean).join(", ")}>
-            <div className="flex items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold underline-offset-2 hover:underline">
-                  {game.location}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}
-                </div>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-semibold text-lime">
-                <Navigation className="h-3.5 w-3.5" /> Directions
-              </span>
-            </div>
-          </OpenInMaps>
-          <VenueHostedAt orgId={game.orgId} />
-        </div>
+        <GameLocationCard game={game} />
 
-        {/* Host */}
-        <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
-          {(() => {
-            const hostId = settings?.host_id ?? game.hostUserId;
-            const NameTag: any = hostId ? Link : "span";
-            const nameProps = hostId
-              ? {
-                  to: "/players/$userId",
-                  params: { userId: hostId },
-                  className: "hover:text-lime hover:underline",
-                }
-              : {};
-            const avatarEl = (
-              <UserAvatarById
-                userId={hostId}
-                avatarUrl={(game as { hostAvatarUrl?: string | null }).hostAvatarUrl ?? null}
-                initials={game.host.avatar}
-                name={game.host.name}
-                size="lg"
-                rounded="square"
-              />
-            );
-            if (hostTeam) {
-              const link = hostTeamLink(hostTeam) as unknown as ComponentProps<typeof Link>;
-              return (
-                <>
-                  <Link {...link} aria-label={`View ${hostTeam.name}`}>
-                    <UserAvatar
-                      avatarUrl={hostTeam.avatarUrl}
-                      initials={hostTeam.initials}
-                      name={hostTeam.name}
-                      size="lg"
-                      rounded="logo"
-                    />
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                      Hosted by
-                    </div>
-                    <div className="font-semibold truncate">
-                      <Link {...link} className="hover:text-lime hover:underline">
-                        {hostTeam.name}
-                      </Link>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Organized by <NameTag {...nameProps}>{game.host.name}</NameTag>
-                      {game.host.rating ? (
-                        <span className="text-lime font-semibold"> · ★ {game.host.rating}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                </>
-              );
-            }
-            return (
-              <>
-                {hostId ? (
-                  <Link
-                    to="/players/$userId"
-                    params={{ userId: hostId }}
-                    aria-label={`View ${game.host.name}'s profile`}
-                  >
-                    {avatarEl}
-                  </Link>
-                ) : (
-                  avatarEl
-                )}
-                <div className="flex-1">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Hosted by
-                  </div>
-                  <div className="font-semibold">
-                    <NameTag {...nameProps}>{game.host.name}</NameTag>{" "}
-                    <span className="text-muted-foreground font-normal text-sm">
-                      {game.host.username}
-                    </span>
-                  </div>
-                  <div className="text-xs text-lime font-semibold">
-                    ★ {game.host.rating} host rating
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-
-          {canReviewHost ? (
-            <Link
-              to="/review/new"
-              search={
-                {
-                  revieweeId: hostReviewId(game),
-                  revieweeKind: "host",
-                  revieweeName: game.host.name,
-                  kind: "player",
-                  context: game.title,
-                } as any
-              }
-              className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
-            >
-              <Star className="h-3 w-3" /> Write review
-            </Link>
-          ) : null}
-        </div>
-
-        {/* Host reputation (opens reviews popup) */}
-        {hostRep.count > 0 && (
-          <div className="mt-3">
-            <ReputationBadge
-              rep={hostRep}
-              onClick={() => setReviewsOpen(true)}
-              ariaLabel={`Open host reviews for ${game.host.name}. Trust score ${hostRep.trustScore}, ${hostRep.avg.toFixed(1)} out of 5 from ${hostRep.count} review${hostRep.count === 1 ? "" : "s"}.`}
-            />
-          </div>
-        )}
-
-        {/* Host reviews popup */}
-        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
-          <DialogContent
-            className="max-h-[90dvh] w-[min(100%,40rem)] overflow-y-auto p-0"
-            aria-labelledby="host-reviews-title"
-            aria-describedby="host-reviews-desc"
-          >
-            <DialogHeader className="sr-only">
-              <DialogTitle id="host-reviews-title">Reviews for host {game.host.name}</DialogTitle>
-              <DialogDescription id="host-reviews-desc">
-                Browse, filter, and sort reviews left for this host. Press Escape to close.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="p-4">
-              <ReviewsSection
-                revieweeId={hostReviewId(game)}
-                revieweeKind="host"
-                revieweeName={game.host.name}
-                isOwner={ownsViaGame}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        <GameHostSection
+          canReviewHost={canReviewHost}
+          game={game}
+          hostRep={hostRep}
+          hostTeam={hostTeam}
+          ownsViaGame={ownsViaGame}
+          reviewsOpen={reviewsOpen}
+          setReviewsOpen={setReviewsOpen}
+          settings={settings}
+        />
 
         {/* About */}
         <div>
@@ -2182,59 +1812,12 @@ function GameDetail() {
           <PostEngagement subjectType="game" subjectId={game.id} />
         </div>
 
-        {/* Payment settings summary */}
-        {(isPaid ||
-          settings?.payment_deadline ||
-          settings?.refund_policy ||
-          settings?.payment_instructions) && (
-          <div className="rounded-3xl border border-border bg-surface p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet className="h-4 w-4 text-lime" />
-              <h2 className="section-eyebrow text-muted-foreground">Payment settings</h2>
-            </div>
-            <div className="space-y-3">
-              {settings?.payment_deadline && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">Payment deadline</div>
-                  <div className="text-sm font-semibold">
-                    {new Date(settings.payment_deadline).toLocaleString()}
-                  </div>
-                </div>
-              )}
-              {isPaid && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
-                  {(() => {
-                    const display = refundTermsDisplay(refundTerms, game.cancelCutoffMin);
-                    if (!display)
-                      return (
-                        <p className="text-sm leading-relaxed text-muted-foreground">
-                          The host hasn't posted refund terms yet.
-                        </p>
-                      );
-                    return (
-                      <>
-                        <p className="text-sm leading-relaxed">{display.summary}</p>
-                        {display.hostNote && (
-                          <p className="mt-1 text-sm leading-relaxed">
-                            <span className="font-semibold">Host's note: </span>
-                            {display.hostNote}
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-              {settings?.payment_instructions && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">Payment instructions</div>
-                  <p className="text-sm leading-relaxed">{settings.payment_instructions}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <GamePaymentTerms
+          game={game}
+          isPaid={isPaid}
+          refundTerms={refundTerms}
+          settings={settings}
+        />
 
         {/* Positions needed */}
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
@@ -2512,125 +2095,18 @@ function GameDetail() {
           </SheetContent>
         </Sheet>
 
-        {/* Players */}
-        <div>
-          <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="section-eyebrow text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span>
-                Roster (
-                <span
-                  key={effectiveJoined}
-                  className="inline-block motion-safe:animate-scale-in tabular-nums"
-                >
-                  {effectiveJoined}
-                </span>
-                /{game.maxPlayers})
-              </span>
-              <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
-              {(viewerPending || pendingCount > 0) && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral normal-case tracking-normal">
-                  <Clock className="h-3 w-3" />
-                  {viewerPending ? "You're pending" : `${pendingCount} pending`}
-                </span>
-              )}
-            </h2>
-            <button className="text-xs font-semibold text-lime">See all</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {players.map((p, i) => {
-              if (p.kind === "hostPending") {
-                return (
-                  <HostPendingChip
-                    key={`pending-${p.req.id}`}
-                    req={p.req}
-                    gameTitle={game.title}
-                    onOptimistic={applyOptimisticReview}
-                    index={i}
-                  />
-                );
-              }
-              const linkableUserId = p.kind === "player" ? p.userId : undefined;
-              const chip = (
-                <motion.div
-                  key={i}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: i * 0.04 }}
-                  title={
-                    p.pending
-                      ? "Pending host approval"
-                      : p.kind === "player" && p.displayName
-                        ? p.displayName
-                        : undefined
-                  }
-                  className={`relative grid h-11 w-11 place-items-center overflow-hidden rounded-full border text-xs font-bold ${
-                    p.pending
-                      ? "border-dashed border-coral/60 bg-coral/10 text-coral"
-                      : p.isMe
-                        ? "border-lime bg-lime/15 text-lime"
-                        : "border-border bg-surface"
-                  } ${linkableUserId ? "cursor-pointer transition-transform hover:scale-105" : ""}`}
-                >
-                  {p.kind === "player" && linkableUserId ? (
-                    <UserAvatarById
-                      userId={linkableUserId}
-                      avatarUrl={p.avatarUrl ?? null}
-                      initials={p.initials}
-                      name={p.displayName}
-                      size="md"
-                      className="h-full w-full border-0 rounded-full text-xs"
-                    />
-                  ) : p.kind === "player" && p.avatarUrl ? (
-                    <img
-                      src={p.avatarUrl}
-                      alt={p.displayName ?? p.initials}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    p.initials
-                  )}
-                  {p.pending && (
-                    <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral-strong text-[8px] text-white">
-                      <Clock className="h-2.5 w-2.5" />
-                    </span>
-                  )}
-                </motion.div>
-              );
-              if (linkableUserId) {
-                return (
-                  <Link
-                    key={i}
-                    to="/players/$userId"
-                    params={{ userId: linkableUserId }}
-                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-lime rounded-full"
-                  >
-                    {chip}
-                  </Link>
-                );
-              }
-              return chip;
-            })}
-            {Array.from({
-              length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount),
-            }).map((_, i) => (
-              <div
-                key={`empty-${i}`}
-                className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border bg-transparent text-muted-foreground text-lg"
-              >
-                +
-              </div>
-            ))}
-          </div>
-          {(viewerPending || pendingCount > 0) && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {isHost && pendingCount > 0
-                ? "Tap a dashed coral avatar to approve or decline that pickup request."
-                : "Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved."}
-            </p>
-          )}
-          <RosterRecruitPanel roster={liveRoster} meId={meId} />
-        </div>
+        <GamePlayersSection
+          applyOptimisticReview={applyOptimisticReview}
+          effectiveJoined={effectiveJoined}
+          game={game}
+          isHost={isHost}
+          liveRoster={liveRoster}
+          meId={meId}
+          pendingCount={pendingCount}
+          players={players}
+          spotsLeft={spotsLeft}
+          viewerPending={viewerPending}
+        />
       </div>
 
       {/* Host controls */}

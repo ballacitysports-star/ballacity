@@ -43,3 +43,16 @@ export function Meta({
     </div>
   );
 }
+
+const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
+/** Real hosts are reviewed by auth user id; sample games keep the demo id. */
+export const hostReviewId = (game?: { hostUserId?: string; host: { username: string } } | null) =>
+  game?.hostUserId ?? hostIdFor(game?.host.username ?? "");
+
+export function formatCooldownLabel(ms: number): string {
+  const secs = Math.max(1, Math.ceil(ms / 1000));
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
