@@ -7,7 +7,7 @@ us an E2E signal we can trust while the rest of the suite is repaired.
 ## How it works
 
 - `e2e/smoke-set.json` lists the smoke tests by spec file and title path. A title path is the
-  describe titles, then the test title, joined with `›`. The file lists 28 tests.
+  describe titles, then the test title, joined with `›`. The file lists 30 tests.
 - The `Playwright` job runs the whole suite once, as before. After the report is sanitized, its
   `Check smoke set` step runs `.github/e2e-smoke-gate.mjs` on `ci-sanitized/results.json`.
 - The gate passes only if every listed test is in the report and passed. A skipped, missing
