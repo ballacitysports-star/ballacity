@@ -185,6 +185,29 @@ test.describe("managed child, end to end", () => {
     throw new Error(`Over 20 leftover ${CHILD_PREFIX} children for the host; stopped deleting.`);
   }
 
+  /**
+   * Wait for the switch into the child's profile. It ends in a full page load
+   * of /profile, which the dev server may compile on first request, so a slow
+   * runner gets 60 s (run 42762605497 attempt 2 needed more than 30). A switch
+   * that fails shows an error toast instead; report its text at once rather
+   * than waiting out the timeout.
+   */
+  async function waitForSwitchIn(page: Page) {
+    const errorToast = page.locator('[data-sonner-toast][data-type="error"]');
+    const deadline = Date.now() + 60_000;
+    while (!new URL(page.url()).pathname.startsWith("/profile")) {
+      const message = await errorToast
+        .first()
+        .innerText({ timeout: 1_000 })
+        .catch(() => null);
+      if (message) throw new Error(`Switching into the child's profile failed: ${message}`);
+      if (Date.now() > deadline) {
+        throw new Error(`Still on ${new URL(page.url()).pathname} 60 s after Switch.`);
+      }
+      await page.waitForTimeout(500);
+    }
+  }
+
   test("add, switch in, switch back, delete", async ({ page }) => {
     // Room for clearing leftovers from earlier runs before the flow itself.
     test.setTimeout(180_000);
@@ -218,7 +241,7 @@ test.describe("managed child, end to end", () => {
       await page
         .getByRole("button", { name: new RegExp(`switch to ${childFirst}'s profile`, "i") })
         .click();
-      await expect(page).toHaveURL(/\/profile/, { timeout: 30_000 });
+      await waitForSwitchIn(page);
       await expect(
         page.getByText(new RegExp(`managing ${childFirst} T\\.'s profile`, "i")),
       ).toBeVisible({
