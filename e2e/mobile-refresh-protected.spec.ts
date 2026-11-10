@@ -1,4 +1,4 @@
-import { test, expect, devices, type Browser, type Page } from "@playwright/test";
+import { test, expect, devices, type Browser, type Page } from "./helpers/test";
 
 /**
  * E2E: hard-refreshing a protected route on mobile (iOS Safari / Android

@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { test, expect, type Page, type Route as PWRoute } from "./helpers/test";
 
 /**
  * E2E: opening the same valid invite twice must not allow a second

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 import { toJSONAsync } from "seroval";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 import { DEFAULT_AGE_POLICY, DEFAULT_CHILD_CONTROLS } from "../src/lib/child-policy";

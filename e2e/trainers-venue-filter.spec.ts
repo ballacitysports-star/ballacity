@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: the trainers page venue filter (chip + radius slider) writes to the
@@ -32,7 +32,7 @@ async function openFiltersAndPickVenue(page: Page): Promise<string | null> {
   await anyVenue.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
   // Venue chips are siblings of "Any venue" and carry a `title` attribute
   // equal to the full address.
-  const venueChips = page.locator('button[title]').filter({ hasNot: page.locator("nothing") });
+  const venueChips = page.locator("button[title]").filter({ hasNot: page.locator("nothing") });
   const count = await venueChips.count();
   for (let i = 0; i < count; i++) {
     const chip = venueChips.nth(i);

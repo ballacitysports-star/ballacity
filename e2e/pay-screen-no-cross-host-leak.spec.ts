@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page, type Route } from "./helpers/test";
 
 /**
  * E2E: loading the pay screen for a game hosted by HOST_A must never

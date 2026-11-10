@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -53,15 +53,13 @@ test("player profile Organizations section updates in real time", async ({ page 
   // Seed a coach (trainer) profile owned by the fixture user — required by
   // trainer_org_members.trainer_id FK.
   const trainerId = `c-e2e-${suffix}`.slice(0, 40);
-  const { error: teamErr } = await sb
-    .from("teams")
-    .insert({
-      id: trainerId,
-      owner_id: uid,
-      kind: "coach",
-      name: `E2E Coach ${suffix}`,
-      handle: `e2e-coach-${suffix}`.slice(0, 32),
-    } as any);
+  const { error: teamErr } = await sb.from("teams").insert({
+    id: trainerId,
+    owner_id: uid,
+    kind: "coach",
+    name: `E2E Coach ${suffix}`,
+    handle: `e2e-coach-${suffix}`.slice(0, 32),
+  } as any);
   if (teamErr) throw new Error(`Failed to seed coach: ${teamErr.message}`);
 
   // Seed an organization owned by the fixture user.

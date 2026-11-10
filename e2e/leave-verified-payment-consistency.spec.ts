@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page, type Route } from "./helpers/test";
 
 /**
  * E2E: leaving a game with a verified payment must, in a single tap,

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E regression: after an OAuth (social) login, client-side route changes

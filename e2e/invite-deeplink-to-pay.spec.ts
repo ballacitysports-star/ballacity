@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: opening an invite deeplink directly (as if tapped from email/SMS)

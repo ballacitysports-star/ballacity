@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: opening an invite deeplink to an unpaid (free, no-approval) game and

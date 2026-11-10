@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: an expired invite deep-link (`invite=1&from=<hostId>&exp=<past-ms>`)

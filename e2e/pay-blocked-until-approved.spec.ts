@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { test, expect, type Page, type Route as PWRoute } from "./helpers/test";
 
 /**
  * E2E: while a join request is still unapproved, the pay page must not let

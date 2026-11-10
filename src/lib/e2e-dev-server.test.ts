@@ -3,6 +3,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ANALYTICS_PLACEHOLDER,
+  ANALYTICS_VAR,
   assertLaunchedDevServer,
   buildDevServerSpec,
   DEV_SERVER_COMMAND,
@@ -194,10 +196,10 @@ describe("nothing leaks in from the parent shell", () => {
     expect(env.HTTPS_PROXY).toBe("http://proxy.local:3128");
   });
 
-  it("only ever contains allowlisted names plus the explicit Supabase set", () => {
+  it("only ever contains allowlisted names plus the explicit Supabase and analytics set", () => {
     const { env } = buildDevServerSpec(parent, SB_TARGET);
-    const allowed = new Set([...PASS_THROUGH_VARS, ...KNOWN_SUPABASE_VARS]);
-    for (const name of Object.keys(env)) expect(allowed.has(name)).toBe(true);
+    const allowed = new Set([...PASS_THROUGH_VARS, ...KNOWN_SUPABASE_VARS, ANALYTICS_VAR]);
+    for (const name of Object.keys(env)) expect(allowed.has(name), name).toBe(true);
   });
 
   it("never puts the service-role key in the spec, only whether the launcher should inherit one", () => {
@@ -554,6 +556,97 @@ describe("the payments token cannot fall back to .env.production (Blocker A)", (
     expect(stripe).toContain('token?.startsWith("pk_live_")');
     const vite = readFileSync("vite.config.ts", "utf8");
     expect(vite).toContain("if (process.env[key]) continue;");
+  });
+});
+
+describe("the dev server never bakes in the production GA4 measurement id", () => {
+  const prodId = /"G-MEWLGXSWXC"/.exec(readFileSync("vite.config.ts", "utf8"))?.[0].slice(1, -1);
+
+  it("vite.config.ts still falls back to the production id when the variable is unset", () => {
+    expect(prodId).toBe("G-MEWLGXSWXC");
+    expect(readFileSync("vite.config.ts", "utf8")).toContain(`process.env.${ANALYTICS_VAR} ?? ""`);
+  });
+
+  it("always gives the child the fixed dummy id, for sandbox and local targets", () => {
+    for (const [env, target] of [
+      [sandboxEnv(), SB_TARGET],
+      [localEnv(), LOCAL_TARGET],
+    ] as const) {
+      const spec = buildDevServerSpec(env, target);
+      expect(spec.env[ANALYTICS_VAR]).toBe(ANALYTICS_PLACEHOLDER);
+      expect(spec.env[ANALYTICS_VAR]).toBe("G-E2E0000000");
+      expect(JSON.stringify(spec.env)).not.toContain(prodId!);
+    }
+  });
+
+  it("accepts the dummy from the parent, and replaces an empty value with it", () => {
+    for (const value of [" G-E2E0000000 ", ""]) {
+      expect(
+        buildDevServerSpec(sandboxEnv({ [ANALYTICS_VAR]: value }), SB_TARGET).env[ANALYTICS_VAR],
+      ).toBe(ANALYTICS_PLACEHOLDER);
+    }
+  });
+
+  it.each([
+    ["the production id", "G-MEWLGXSWXC"],
+    ["another id", "G-SOMETHING01"],
+  ])("refuses a parent value that is %s", (_label, value) => {
+    expect(
+      problemsOf(() => buildDevServerSpec(sandboxEnv({ [ANALYTICS_VAR]: value }), SB_TARGET)),
+    ).toContain(ANALYTICS_VAR);
+  });
+
+  it("the global-setup check refuses a spec without the dummy id", () => {
+    const good = devServerWebServer(sandboxEnv(), SB_TARGET);
+    expect(() => assertLaunchedDevServer(good)).not.toThrow();
+    const tamper = (mutate: (e: Record<string, string>) => void) => {
+      const spec = JSON.parse(good.env[DEV_SERVER_SPEC_VAR]);
+      mutate(spec.env);
+      return { ...good, env: { [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) } };
+    };
+    expect(() => assertLaunchedDevServer(tamper((e) => delete e[ANALYTICS_VAR]))).toThrow(
+      /analytics dummy id/,
+    );
+    expect(() =>
+      assertLaunchedDevServer(tamper((e) => (e[ANALYTICS_VAR] = "G-MEWLGXSWXC"))),
+    ).toThrow(/analytics dummy id/);
+  });
+
+  it("the plain-JavaScript launcher refuses a missing, empty or real measurement id", () => {
+    const base = buildDevServerSpec(sandboxEnv(), SB_TARGET);
+    for (const mutate of [
+      (e: Record<string, string>) => delete e[ANALYTICS_VAR],
+      (e: Record<string, string>) => (e[ANALYTICS_VAR] = ""),
+      (e: Record<string, string>) => (e[ANALYTICS_VAR] = "G-MEWLGXSWXC"),
+    ]) {
+      const spec = JSON.parse(JSON.stringify(base));
+      mutate(spec.env);
+      const r = spawnSync(process.execPath, ["e2e/safety/start-dev-server.mjs"], {
+        env: { PATH: process.env.PATH ?? "", [DEV_SERVER_SPEC_VAR]: JSON.stringify(spec) },
+        encoding: "utf8",
+        timeout: 20_000,
+      });
+      expect(r.status).toBe(2);
+      expect(`${r.stdout}${r.stderr}`).toContain(ANALYTICS_VAR);
+    }
+  });
+
+  it("the launcher's constants equal the module's", () => {
+    const src = readFileSync("e2e/safety/start-dev-server.mjs", "utf8");
+    expect(src).toContain(`const ANALYTICS_VAR = "${ANALYTICS_VAR}";`);
+    expect(src).toContain(`const ANALYTICS_PLACEHOLDER = "${ANALYTICS_PLACEHOLDER}";`);
+  });
+
+  it("the E2E workflow sets the dummy id for the build and for Playwright", () => {
+    const wf = readFileSync(".github/workflows/e2e.yml", "utf8");
+    const steps = ["- name: Build (dev mode)", "- name: Run Playwright tests"];
+    for (const name of steps) {
+      const start = wf.indexOf(name);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = wf.indexOf("\n      - name:", start + 1);
+      const step = wf.slice(start, next === -1 ? undefined : next);
+      expect(step, name).toContain(`${ANALYTICS_VAR}: ${ANALYTICS_PLACEHOLDER}`);
+    }
   });
 });
 

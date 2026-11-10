@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page, type Route } from "./helpers/test";
 
 /**
  * E2E: complete the (mocked) payment verification and confirm the viewer is

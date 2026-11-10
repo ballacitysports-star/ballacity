@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 import { HAS_BACKEND, childStatus, signInAs, stubChildStatus } from "./helpers/fixture-auth";
 import { DEFAULT_CHILD_CONTROLS } from "../src/lib/child-policy";
 

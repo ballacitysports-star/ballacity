@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * E2E: opening a bookmarked /trainers URL that already carries `venue=` and
@@ -72,9 +72,7 @@ test("bookmarked venue+radius URL persists across tabs, profile, and booking she
   await expect(activeChip).toHaveClass(/border-lime/);
 
   // Toggle the trainers view (list ↔ map / grid) — URL params must survive.
-  const toggle = page
-    .getByRole("button", { name: /^(Map|List|Grid)$/ })
-    .first();
+  const toggle = page.getByRole("button", { name: /^(Map|List|Grid)$/ }).first();
   if (await toggle.count()) {
     await toggle.click();
     await expect(page).toHaveURL(/[?&]venue=/);
@@ -94,13 +92,17 @@ test("bookmarked venue+radius URL persists across tabs, profile, and booking she
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible({ timeout: 5_000 });
   // Best-effort: sticky venue label surfaces somewhere inside the dialog.
-  await expect(dialog.getByText(venue!, { exact: false }).first()).toBeVisible({
-    timeout: 3_000,
-  }).catch(() => {});
+  await expect(dialog.getByText(venue!, { exact: false }).first())
+    .toBeVisible({
+      timeout: 3_000,
+    })
+    .catch(() => {});
 
   // Dismiss the dialog (Escape is universally supported by Radix).
   await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden({ timeout: 3_000 }).catch(() => {});
+  await expect(dialog)
+    .toBeHidden({ timeout: 3_000 })
+    .catch(() => {});
 
   // Back-link returns to the feed with both params intact.
   await page.getByRole("link", { name: "Back to trainers" }).click();

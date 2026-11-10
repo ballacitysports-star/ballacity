@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { test, expect, type Page, type Route as PWRoute } from "./helpers/test";
 
 /**
  * E2E: with realtime frames delayed / intermittently blocked, the pay page

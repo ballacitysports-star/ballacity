@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 
 test("the app boots with the dependency-free OG image endpoint", async ({ page, request }) => {
   const rootResponse = await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -26,7 +26,8 @@ test("failed client boot reloads once, then shows recovery actions", async ({ pa
       await route.abort("failed");
       return;
     }
-    await route.continue();
+    // fallback(), not continue(): the shared test's analytics block must still see it.
+    await route.fallback();
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -38,7 +39,9 @@ test("failed client boot reloads once, then shows recovery actions", async ({ pa
   expect(documentRequests, "the watchdog must perform only one automatic reload").toBe(2);
 });
 
-test("a silently stalled startup module reloads once, then becomes actionable", async ({ page }) => {
+test("a silently stalled startup module reloads once, then becomes actionable", async ({
+  page,
+}) => {
   let documentRequests = 0;
   page.on("request", (request) => {
     if (request.isNavigationRequest()) documentRequests += 1;

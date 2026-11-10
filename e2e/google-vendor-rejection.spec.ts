@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
+import { test, expect, type Browser, type Page } from "./helpers/test";
 
 /**
  * Reproduces the "failed to sign in with vendor" OAuth error by stubbing
@@ -77,9 +77,11 @@ test.describe("OAuth vendor rejection", () => {
     }) => {
       const { context, page } = await openSignedOutAuthPage(browser);
       try {
-
         // Switch to signup mode.
-        await page.getByRole("button", { name: /create( an)? account|sign ?up/i }).first().click();
+        await page
+          .getByRole("button", { name: /create( an)? account|sign ?up/i })
+          .first()
+          .click();
 
         // Pick the "player" account type on the picker.
         const playerCard = page
@@ -89,7 +91,10 @@ test.describe("OAuth vendor rejection", () => {
         await playerCard.click();
 
         // Advance to the form step (Continue button on the picker).
-        await page.getByRole("button", { name: /^continue$/i }).first().click();
+        await page
+          .getByRole("button", { name: /^continue$/i })
+          .first()
+          .click();
 
         const button = providerButton(page, provider);
         await expect(button).toBeVisible();
@@ -105,7 +110,9 @@ test.describe("OAuth vendor rejection", () => {
 
         // Still on /auth, still in signup form (email field is present).
         await expect(page).toHaveURL(/\/auth(?:\?.*)?$/);
-        await expect(page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first()).toBeVisible();
+        await expect(
+          page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first(),
+        ).toBeVisible();
 
         const state = await page.evaluate(
           ([pendingKey, providerKey]) => ({

@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "./helpers/test";
 
 /**
  * E2E: joining a game from a second device must instantly refresh the

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 
 /**
  * E2E: a signed-out visitor can open each tab and sees a sample

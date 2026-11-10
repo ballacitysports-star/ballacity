@@ -51,6 +51,16 @@ if (spec.env[PAYMENTS_VAR] !== PAYMENTS_PLACEHOLDER) {
     `${PAYMENTS_VAR} is not the E2E placeholder, so vite.config.ts could fill it from .env.production.`,
   );
 }
+// Repeats ANALYTICS_VAR / ANALYTICS_PLACEHOLDER from dev-server.ts (a test keeps them
+// equal). vite.config.ts would otherwise bake the production GA4 measurement id into the
+// bundle, and test runs would send events to the real property.
+const ANALYTICS_VAR = "GOOGLE_ANALYTICS_MEASUREMENT_ID";
+const ANALYTICS_PLACEHOLDER = "G-E2E0000000";
+if (spec.env[ANALYTICS_VAR] !== ANALYTICS_PLACEHOLDER) {
+  refuse(
+    `${ANALYTICS_VAR} is not the E2E dummy id, so vite.config.ts would use the production GA4 id.`,
+  );
+}
 for (const [name, value] of Object.entries(spec.env)) {
   if (LIVE_PAYMENTS_KEY.test(String(value))) refuse(`${name} holds a live payments key.`);
 }
