@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Package } from "lucide-react";
@@ -8,8 +7,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { MERCH_ITEMS } from "@/lib/catalog";
+import { getMerchShopOpen } from "@/lib/monetization/shop.functions";
+import { requireMerchShopOpen } from "@/lib/monetization/shop-gate";
 
 export const Route = createFileRoute("/shop")({
+  // Closed while BallaCity is free: the ordinary 404, not an empty page that
+  // redirects in the browser. The route stays registered so a superadmin can
+  // open the shop again without a deploy.
+  beforeLoad: async () => {
+    const { open } = await getMerchShopOpen();
+    requireMerchShopOpen(open);
+  },
   head: () =>
     pageHead({
       path: "/shop",
@@ -23,15 +31,9 @@ function ShopPage() {
   const { user } = useAuth();
   const { openCheckout, checkoutElement, closeCheckout, isOpen } = useStripeCheckout();
   const { merchEnabled, loading: accessLoading } = useFeatureAccess();
-  const navigate = useNavigate();
 
-  // The shop is switched off while BallaCity is free. Same imperative-guard
-  // idiom the other gated screens use; the route stays registered so a
-  // superadmin can bring it back without a deploy.
-  useEffect(() => {
-    if (!accessLoading && !merchEnabled) navigate({ to: "/profile" });
-  }, [accessLoading, merchEnabled, navigate]);
-
+  // beforeLoad already answers 404 while the shop is closed; this only covers a
+  // config change between that check and the client's own read.
   if (accessLoading || !merchEnabled) return null;
 
   function buy(priceId: string) {
