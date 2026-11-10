@@ -355,11 +355,11 @@ function UsersPanel() {
   const mut = useMutation({
     mutationFn: (vars: { userId: string; role: "admin" | "moderator"; grant: boolean }) =>
       setRole({ data: vars }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success("Updated");
-    },
-    onError: (e: Error) => toast.error(e.message),
+    onSuccess: () => toast.success("Updated"),
+    // A failed grant or revoke shows the server's reason.
+    onError: (e: Error) => toast.error(e.message || "Could not change the role"),
+    // Reload after a failure too, so the badges and buttons show the roles the user really has.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
@@ -393,6 +393,8 @@ function UsersPanel() {
                     key={role}
                     size="sm"
                     variant={has ? "destructive" : "outline"}
+                    // One change at a time: a second click would repeat the grant and fail.
+                    disabled={mut.isPending}
                     onClick={() => mut.mutate({ userId: u.id, role, grant: !has })}
                   >
                     {has ? `Revoke ${role}` : `Make ${role}`}

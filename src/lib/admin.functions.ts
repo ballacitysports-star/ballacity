@@ -64,18 +64,33 @@ export const adminSetRole = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (data.grant) {
-      await supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: data.userId, role: data.role })
-        .select();
-    } else {
-      await supabaseAdmin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", data.userId)
-        .eq("role", data.role);
+    const { writeAudit } = await import("@/lib/superadmin.server");
+    const { error } = data.grant
+      ? await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: data.userId, role: data.role })
+          .select()
+      : await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", data.userId)
+          .eq("role", data.role);
+    // A failed grant or revoke is an error for the admin to see, never a success, and is not
+    // audited as a change.
+    if (error) {
+      throw new Error(
+        `Could not ${data.grant ? "grant" : "revoke"} the ${data.role} role: ${error.message}`,
+      );
     }
+    // Same entry as superadminSetRole writes, so the audit log shows both paths alike; the
+    // source says the change came from the admin panel.
+    await writeAudit(supabaseAdmin, context.userId, {
+      action: data.grant ? "role.grant" : "role.revoke",
+      targetType: "user",
+      targetId: data.userId,
+      after: { role: data.role },
+      metadata: { source: "admin_panel" },
+    });
     return { ok: true };
   });
 
