@@ -85,6 +85,7 @@ describe("entry points screen before writing", () => {
     ["src/lib/team-posts.functions.ts", "export const updateTeamPost", ".update("],
     ["src/lib/post-engagement.functions.ts", "export const createComment", ".insert("],
     ["src/lib/post-engagement.functions.ts", "export const updateComment", ".update("],
+    ["src/lib/network-posts.functions.ts", "export const createNetworkPost", ".insert("],
   ];
 
   it.each(sources)("%s %s", (file, marker, write) => {

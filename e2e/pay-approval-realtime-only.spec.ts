@@ -82,9 +82,11 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   );
 
   await page.route(
-    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (u) =>
+      isTable(String(u), "host_payment_methods") ||
+      String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -149,7 +151,7 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   // Gate is up, picker is not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/pay host using/i)).toHaveCount(0);
+  await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // Wait for the pay page's realtime channel to be registered.
   await expect
@@ -226,7 +228,9 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   // Gate must flip well before the 15s polling interval → realtime did the work.
   const t0 = Date.now();
   await expect(gate).toHaveCount(0, { timeout: 5_000 });
-  await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/pay \$\d+ in /i)).toBeVisible({
+    timeout: 5_000,
+  });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
   const elapsed = Date.now() - t0;
   expect(

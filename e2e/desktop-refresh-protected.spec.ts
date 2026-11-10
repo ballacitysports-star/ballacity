@@ -15,14 +15,15 @@ const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
 
 // Routes that render themselves (no app-level redirect). Keep in sync
 // with the mobile spec and with new protected top-level pages.
+// `/discover` (merged into `/feed`) and `/notifications` (alerts live in the
+// Inbox at `/messages?tab=alerts`) are redirects now, so "stays on the same
+// URL" cannot hold for them; the pages they land on are covered below.
 const PROTECTED_ROUTES = [
   "/feed",
   "/players",
   "/teams",
-  "/discover",
   "/create",
   "/profile",
-  "/notifications",
   "/messages",
   "/settings",
 ] as const;
@@ -87,18 +88,18 @@ for (const route of PROTECTED_ROUTES) {
 test("signed-out refresh on a protected route still redirects to /auth", async ({ page }) => {
   test.skip(!STORAGE_KEY, "Requires the managed auth storage key.");
   // Sanity check: the guard should still send unauthenticated users to
-  // /auth?next=/notifications. This ensures the "stay on page" fix didn't
-  // over-correct. (/feed is not used here: a signed-out visitor now gets a
-  // blurred sample preview of it, see SignedOutPreview.)
+  // /auth?next=/settings. This ensures the "stay on page" fix didn't
+  // over-correct. (The tabs and the inbox are not used here: a signed-out
+  // visitor now gets a sample preview of those, see PreviewGate.)
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate((key) => window.localStorage.removeItem(key!), STORAGE_KEY!);
 
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 15_000 });
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/notifications(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/settings(?:\?|$)/);
 });
 
 test("unusable persisted session exits the loader and redirects to sign-in", async ({ page }) => {
@@ -117,10 +118,10 @@ test("unusable persisted session exits the loader and redirects to sign-in", asy
     await route.abort("failed");
   });
 
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 15_000 });
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/notifications(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/settings(?:\?|$)/);
 });

@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ReputationCard } from "@/components/ReputationCard";
 import { RatingExplainer } from "@/components/RatingExplainer";
 import { useCanReview } from "@/lib/transactions";
+import { ReviewSubjectGate } from "@/components/ReviewSubjectGate";
 import { toast } from "sonner";
 import {
   Select,
@@ -197,7 +198,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
   );
 }
 
-export function ReviewsSection({
+function ReviewsSectionBody({
   revieweeId,
   revieweeKind = "player",
   revieweeName,
@@ -423,5 +424,19 @@ function PaginatedList({ list, isOwner }: { list: Review[]; isOwner: boolean }) 
         </div>
       )}
     </div>
+  );
+}
+
+type ReviewsSectionProps = Parameters<typeof ReviewsSectionBody>[0];
+
+/**
+ * Reviews and reputation for one subject. Nothing renders for a person under 18 or of unknown
+ * age (the database returns nothing for them either); teams, trainers and places are unaffected.
+ */
+export function ReviewsSection(props: ReviewsSectionProps) {
+  return (
+    <ReviewSubjectGate revieweeId={props.revieweeId} revieweeKind={props.revieweeKind ?? "player"}>
+      <ReviewsSectionBody {...props} />
+    </ReviewSubjectGate>
   );
 }

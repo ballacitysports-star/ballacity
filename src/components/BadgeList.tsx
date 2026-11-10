@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Trophy } from "lucide-react";
 import { badgesInProgress, getBadge, type BadgeStats } from "@/lib/badges";
 
@@ -45,8 +45,11 @@ export function BadgeList({
   showProgress = false,
   title = "Badges",
   className = "",
+  renderAction,
 }: {
   badgeIds: string[];
+  /** Optional control shown next to a badge (e.g. Share, P3-8). */
+  renderAction?: (badgeId: string) => ReactNode;
   stats?: BadgeStats;
   showProgress?: boolean;
   title?: string;
@@ -63,7 +66,10 @@ export function BadgeList({
       {badgeIds.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {badgeIds.map((b) => (
-            <BadgeChip key={b} id={b} />
+            <span key={b} className="inline-flex items-center gap-1">
+              <BadgeChip id={b} />
+              {renderAction?.(b)}
+            </span>
           ))}
         </div>
       ) : (

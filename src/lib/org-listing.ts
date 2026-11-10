@@ -26,6 +26,39 @@ export const ORG_CATEGORIES = [
 export type OrgCategory = (typeof ORG_CATEGORIES)[number];
 
 /**
+ * P2-4: a listing is a venue ('facility') or a business. Businesses live in the same table
+ * (trainer_orgs.org_type) and keep claims, reviews, follows, hours and photos.
+ */
+export type OrgType = "facility" | "business";
+export const ORG_TYPES: { id: OrgType; label: string }[] = [
+  { id: "facility", label: "Venue" },
+  { id: "business", label: "Business" },
+];
+
+/** Categories offered for a business listing. */
+export const BUSINESS_CATEGORIES = [
+  "Sporting goods",
+  "Physiotherapy",
+  "Sports medicine",
+  "Massage & recovery",
+  "Strength & conditioning",
+  "Photography & video",
+  "League & tournament organizer",
+  "Camp provider",
+  "Nutrition",
+  "Equipment repair",
+  "Other business",
+] as const;
+
+export function parseOrgType(v: unknown): OrgType {
+  return v === "business" ? "business" : "facility";
+}
+
+export function categoriesForType(type: OrgType): readonly string[] {
+  return type === "business" ? BUSINESS_CATEGORIES : ORG_CATEGORIES;
+}
+
+/**
  * Amenity chips, grouped so the editor can present courts, gear and
  * facilities separately. The flat {@link ORG_AMENITIES} list is derived from
  * this and stays the single source of truth for what can be stored.

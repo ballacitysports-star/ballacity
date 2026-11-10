@@ -42,9 +42,7 @@ async function restoreSession(ctx: BrowserContext, page: Page) {
     ([key, value]) => window.localStorage.setItem(key!, value!),
     [STORAGE_KEY!, SESSION_JSON!],
   );
-  await page.evaluate(() =>
-    window.localStorage.removeItem("openrun.joinedGameIds.v1"),
-  );
+  await page.evaluate(() => window.localStorage.removeItem("openrun.joinedGameIds.v1"));
 }
 
 /**
@@ -117,17 +115,15 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
 
     // Ensure Device B starts un-joined; if already joined from a prior run,
     // leave first so the join action produces a real INSERT.
-    const leaveCta = bDetail
-      .getByRole("button", { name: /you're in · tap to leave/i })
-      .first();
+    const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
     if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
       await leaveCta.click();
-      await expect(
-        bDetail.getByRole("button", { name: /join free/i }).first(),
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
 
-    const joinCta = bDetail.getByRole("button", { name: /join free/i }).first();
+    const joinCta = bDetail.getByRole("button", { name: /join run/i }).first();
     await expect(joinCta).toBeVisible({ timeout: 15_000 });
     await joinCta.click();
 
@@ -149,9 +145,9 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
       .getByRole("button", { name: /you're in · tap to leave/i })
       .first()
       .click();
-    await expect(
-      bDetail.getByRole("button", { name: /join free/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     await expect
       .poll(async () => parseSpots(await readSpotsPill(aDiscover)), {

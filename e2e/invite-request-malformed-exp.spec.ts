@@ -127,7 +127,7 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await expect(normalBanner).toHaveCount(0);
 
     // Sticky "Request to join" CTA still renders on approval-gated games.
-    const cta = page.getByRole("button", { name: /request to join/i }).first();
+    const cta = page.getByRole("button", { name: /request spot/i }).first();
     await expect(cta).toBeVisible({ timeout: 10_000 });
     await cta.click();
 

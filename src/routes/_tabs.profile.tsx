@@ -22,6 +22,7 @@ import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
+import { useReviewSubjectIsAdult } from "@/lib/review-subject";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -61,7 +62,8 @@ import {
 } from "@/lib/reels.functions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
-import { makeBadgeStats } from "@/lib/badges";
+import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+import { ShareBadge } from "@/components/posts/ShareBadge";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { ActiveProfileView } from "@/components/profile/ActiveProfileView";
@@ -77,6 +79,8 @@ import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
@@ -136,8 +140,19 @@ function ProfileRoute() {
 function PlayerProfile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
+  // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
+  const reputationVisible = useReviewSubjectIsAdult("me", "player") === true;
   const { user, loading } = useAuth();
   const { isParentMode } = useParentMode();
+  const childStatus = useMyChildStatus();
+  // Until the age status has loaded, the policy engine answers "allowed" for everything,
+  // so the shortcuts wait for it rather than flash a link a minor may not use.
+  const statusKnown = childStatus.isSuccess;
+  const quickLinks = meQuickLinks({
+    canHost: statusKnown && childStatus.can("game_hosting").allowed,
+    canUploadVideo: statusKnown && childStatus.can("video_upload").allowed,
+    parentMode: isParentMode,
+  });
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -419,6 +434,15 @@ function PlayerProfile() {
   }
 
   const age = me.birthday ? ageFrom(me.birthday) : null;
+  // The badge engine's stats, from the database aggregates (never sample data).
+  const badgeStats = makeBadgeStats({
+    gamesPlayed: me.stats.played,
+    hosted: me.stats.hosted ?? 0,
+    showUpRate: (me.stats.reliability ?? 0) / 100,
+    onTimeRate: (me.stats.reliability ?? 0) / 100,
+    sportsmanshipRating: me.stats.sportsmanship ?? 0,
+  });
+  const shareableBadges = new Set(earnedBadgeIds(badgeStats));
 
   return (
     <div className="page-shell-flush">
@@ -468,9 +492,27 @@ function PlayerProfile() {
             <Link to="/profile/edit" className={channelPillClass("primary")}>
               Edit profile
             </Link>
-            <ChannelPill onClick={() => setReviewsOpen(true)}>
-              <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
-            </ChannelPill>
+            {reputationVisible && (
+              <ChannelPill onClick={() => setReviewsOpen(true)}>
+                <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+              </ChannelPill>
+            )}
+            {quickLinks.map((l) =>
+              l.to === "/reels" ? (
+                <Link
+                  key={l.to}
+                  to="/reels"
+                  search={{ game: "", title: "", upload: "" }}
+                  className={channelPillClass()}
+                >
+                  {l.label}
+                </Link>
+              ) : (
+                <Link key={l.to} to={l.to} className={channelPillClass()}>
+                  {l.label}
+                </Link>
+              ),
+            )}
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
             <Link to="/settings" className={channelPillClass()}>
               Settings
@@ -518,9 +560,11 @@ function PlayerProfile() {
             <ProfileLinksList links={me.links} />
           </AboutBlock>
         )}
-        <AboutBlock label="Reputation">
-          <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
-        </AboutBlock>
+        {reputationVisible && (
+          <AboutBlock label="Reputation">
+            <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
+          </AboutBlock>
+        )}
       </ProfileAboutSheet>
 
       <div className="px-4">
@@ -533,7 +577,7 @@ function PlayerProfile() {
             { k: "games" as const, label: "Games" },
             { k: "hosting" as const, label: "Hosting" },
             { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
-            { k: "reviews" as const, label: "Reviews" },
+            ...(reputationVisible ? [{ k: "reviews" as const, label: "Reviews" }] : []),
             {
               k: "archive" as const,
               label: "Archive",
@@ -908,14 +952,10 @@ function PlayerProfile() {
         <BadgeList
           className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}
           badgeIds={me.badges}
-          stats={makeBadgeStats({
-            gamesPlayed: me.stats.played,
-            hosted: me.stats.hosted ?? 0,
-            showUpRate: (me.stats.reliability ?? 0) / 100,
-            onTimeRate: (me.stats.reliability ?? 0) / 100,
-            sportsmanshipRating: me.stats.sportsmanship ?? 0,
-          })}
+          stats={badgeStats}
           showProgress
+          // P3-8: only badges the engine earned from real activity can be shared.
+          renderAction={(id) => (shareableBadges.has(id) ? <ShareBadge badgeId={id} /> : null)}
         />
 
         {/* Reviews tab — inline */}

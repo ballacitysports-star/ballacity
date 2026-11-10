@@ -174,3 +174,13 @@ describe("signup state machine", () => {
     ).toBe("NEW");
   });
 });
+
+describe("the minimum-age refusal from the database", () => {
+  it("is explained with the same words as the sign-up form", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const fns = readFileSync(resolve(__dirname, "age-verification.functions.ts"), "utf8");
+    const { MIN_AGE_MESSAGE } = await import("./age-verification");
+    expect(fns).toContain(`if (m.includes("MIN_AGE")) return ${JSON.stringify(MIN_AGE_MESSAGE)};`);
+  });
+});

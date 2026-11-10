@@ -94,7 +94,7 @@ export function ThreadSafetyDialog({
                     type="button"
                     disabled={block.pending}
                     onClick={() => void toggleBlock()}
-                    className="flex-1 rounded-full bg-coral py-2 text-xs font-bold text-white disabled:opacity-60"
+                    className="flex-1 rounded-full bg-coral-strong py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
                     {block.pending ? "Blocking…" : "Block"}
                   </button>

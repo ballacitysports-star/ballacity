@@ -54,7 +54,11 @@ export function useMyAge(): { age: number | null; loading: boolean } {
   return { age, loading };
 }
 
-/** Ages for a list of profile ids (host-side views). */
+/**
+ * Ages for a list of profile ids (host-side views). The database returns an
+ * adult's age by their visibility setting, and a minor's only to the minor, a
+ * verified guardian or a moderator; everyone else gets no row (null here).
+ */
 export async function fetchProfileAges(ids: string[]): Promise<Record<string, number | null>> {
   if (ids.length === 0) return {};
   try {

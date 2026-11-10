@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * A brand-new user tapping "Continue with Google/Apple" on `/auth` — arriving
@@ -26,6 +27,9 @@ const NEXT_KEY = "openrun:oauth-next";
 const NEXT_PATH = "/feed?src=auth-referrer-e2e";
 
 async function stubNullAccountType(page: Page) {
+  // The root gate asks the server first (getOnboardingStatus reads the profile
+  // server-side), so the table stub below only covers its client fallback.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null));
   await page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,

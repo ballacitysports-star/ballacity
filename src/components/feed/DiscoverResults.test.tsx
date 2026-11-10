@@ -31,6 +31,11 @@ const orgs = [
   org("c2", "Coach Sam", "coach", "Denver"),
 ];
 vi.mock("@/lib/org-store", () => ({ useAllOrgs: () => orgs }));
+vi.mock("@/components/feed/DiscoverCardActions", () => ({
+  DiscoverCardActions: ({ org }: { org: { id: string } }) => (
+    <span data-testid={`actions-${org.id}`} />
+  ),
+}));
 vi.mock("@/lib/trainer-orgs.functions", () => ({
   listTrainerOrgs: () => Promise.resolve([{ id: "g1", name: "Apex Basketball Hub" }]),
 }));
@@ -88,5 +93,14 @@ describe("DiscoverResults", () => {
     expect(screen.getAllByTestId("org")).toHaveLength(7);
     expect(await screen.findByText("Spring Tryout")).toBeTruthy();
     expect(screen.queryByText("Coach Dre")).toBeNull();
+  });
+
+  it("gives every team and trainer card its actions (P2-5)", () => {
+    wrap(<DiscoverResults cat="trainers" q="" sports={[]} />);
+    expect(screen.getByTestId("actions-c1")).toBeTruthy();
+    expect(screen.getByTestId("actions-c2")).toBeTruthy();
+    cleanup();
+    wrap(<DiscoverResults cat="teams" q="" sports={[]} />);
+    expect(screen.getByTestId("actions-t1")).toBeTruthy();
   });
 });

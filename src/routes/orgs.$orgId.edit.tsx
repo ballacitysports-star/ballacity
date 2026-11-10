@@ -1,4 +1,5 @@
 import { withRequireAuth } from "@/components/RequireAuth";
+import { parseOrgType } from "@/lib/org-listing";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -141,6 +142,7 @@ function EditOrg() {
         hours?: unknown;
         timezone?: string | null;
         booking_url?: string | null;
+        org_type?: string | null;
       };
       const geo = orgQ.data.geo as { lat?: number; lng?: number } | null;
       setValue({
@@ -157,6 +159,7 @@ function EditOrg() {
         coverUrl: orgQ.data.cover_url ?? "",
         phone: row.phone ?? "",
         email: row.email ?? "",
+        orgType: parseOrgType(row.org_type),
         category: row.category ?? "",
         amenities: row.amenities ?? [],
         photos: row.photos ?? [],
@@ -191,6 +194,7 @@ function EditOrg() {
         coverUrl: v.coverUrl || null,
         phone: v.phone.trim() || null,
         email: v.email.trim() || null,
+        orgType: v.orgType,
         category: v.category || null,
         amenities: v.amenities,
         photos: v.photos,

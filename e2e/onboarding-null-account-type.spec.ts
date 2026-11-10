@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { toJSONAsync } from "seroval";
+import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
  * Integration test: any signed-in user whose `profiles.account_type` is NULL
@@ -28,6 +29,9 @@ const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
 const PROVIDERS = ["google", "apple"] as const;
 
 async function stubNullAccountType(page: Page) {
+  // The root gate asks the server first (getOnboardingStatus reads the profile
+  // server-side), so the table stub below only covers its client fallback.
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, "email"));
   // The gate asks the server first (`getOnboardingStatus`) and only falls back
   // to PostgREST when that call fails, so both layers must report "no type".
   // Server-fn addresses are base64-encoded ({file, export}), so decode the
@@ -69,7 +73,6 @@ async function stubNullAccountType(page: Page) {
   });
 }
 
-
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
@@ -96,7 +99,9 @@ test.describe("null account_type → account-type setup", () => {
         await page.goto(route, { waitUntil: "domcontentloaded" });
 
         await expect(page).toHaveURL(new RegExp(route));
-        await expect(page.getByRole("heading", { name: /Where do you want to start/i })).toBeVisible({
+        await expect(
+          page.getByRole("heading", { name: /Where do you want to start/i }),
+        ).toBeVisible({
           timeout: 15_000,
         });
         await expect(page.getByRole("button", { name: /Player/i })).toBeVisible();
@@ -215,6 +220,16 @@ async function stubAgeCohort(page: Page, cohort: "adult" | "teen_16_17") {
 /** Swallow the account-type save, and hand back what was sent. */
 async function stubAccountTypeSave(page: Page): Promise<string[]> {
   const saved: string[] = [];
+  // Picking Parent / Guardian also marks the auth user as a guardian. That must
+  // not reach the shared fixture account: a guardian fixture is in Parent Mode
+  // and loses every join and pay control for the rest of the suite.
+  await page.route(/\/auth\/v1\/user(?:\?|$)/, async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({ status: 400, contentType: "application/json", body: "{}" });
+  });
   await page.route(/\/rest\/v1\/profiles\?/, async (route) => {
     if (route.request().method() !== "PATCH") {
       await route.fallback();
@@ -242,7 +257,7 @@ const ROLE_CARDS: [label: string, blurb: string][] = [
   ["Player", "Athletes looking for games and runs"],
   ["Parent / Guardian", "Parents managing kids' sports schedules"],
   ["Team / Coach", "Coaches and captains organizing squads"],
-  ["Facility / Gym", "Venue owners and sports facilities"],
+  ["Facility / Venue", "Venue owners and sports facilities"],
 ];
 
 const ROLE_SETUPS = [
@@ -280,8 +295,8 @@ const ROLE_SETUPS = [
     goes: /\/trainers\/create(?:\?finish=1)?$/,
   },
   {
-    name: "Facility / Gym",
-    pick: async (page: Page) => page.getByRole("button", { name: /Facility \/ Gym/ }).click(),
+    name: "Facility / Venue",
+    pick: async (page: Page) => page.getByRole("button", { name: /Facility \/ Venue/ }).click(),
     saves: "gym",
     goes: /\/orgs\/create(?:\?finish=1)?$/,
   },
@@ -350,7 +365,7 @@ test.describe("role picker: one selection, straight to that role's setup", () =>
       await openPicker(page, "teen_16_17");
       await expect(page.getByRole("button", { name: /Player/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /Team \/ Coach/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /Facility \/ Gym/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Facility \/ Venue/ })).toBeVisible();
       await expect(page.getByRole("button", { name: /Parent \/ Guardian/ })).toHaveCount(0);
     } finally {
       await context.close();

@@ -2,7 +2,7 @@
 
 Purpose: prove, from the Supabase and GitHub dashboards, that the E2E/rehearsal sandbox is a separate non-production project, and only then let the repository's E2E guard run against it. Nothing in this file changes production. **Never paste a key, token, password or full connection string into a chat, an issue or a pull request.** Where a value is needed, send only the project reference (20 lowercase letters) or a yes/no.
 
-Production reference (for comparison): `cpqihhcqeivbgxqbzatv`. Candidate named in `supabase/config.e2e.toml`: `olrbulvwexrkjcxddjxq` (**unverified**; a repository file is not proof of identity). The Lovable project `ballacity-staging` is a separate Lovable project whose Supabase project is not exposed to the tools used here; check it in step 1.
+Production reference (for comparison): `cpqihhcqeivbgxqbzatv`. Designated sandbox, named in `supabase/config.e2e.toml` and the guard allowlist: `qkukefvzwlyusvspablz`, the Supabase project behind the Lovable project `ballacity-staging` (read from that project's `supabase/config.toml`). A repository file is not proof of isolation; confirm it in step 1.
 
 ## 1. Identify and confirm the project
 

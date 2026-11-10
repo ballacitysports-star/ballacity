@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportBrowserError } from "@/lib/error-report-client";
 
 export interface ErrorFallbackProps {
   error?: Error | null;
@@ -89,6 +90,8 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[error-boundary${this.props.scope ? `:${this.props.scope}` : ""}]`, error, info);
+    // P0-8: report it to our own error table (scrubbed, no personal data). Never throws.
+    reportBrowserError(error, "boundary");
 
     // A stale deploy chunk is not a real app bug: reload once to pick up
     // the new build instead of showing a failure screen.

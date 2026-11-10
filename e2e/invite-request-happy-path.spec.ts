@@ -146,7 +146,7 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
   await page.waitForURL(
     (u) =>
       u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
+      ["1", "true"].includes(u.searchParams.get("invite") ?? "") &&
       u.searchParams.get("from") === FAKE_HOST_ID &&
       u.searchParams.get("exp") === String(FUTURE_MS),
     { timeout: 10_000 },
@@ -159,10 +159,10 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/Request to join/i);
+  await expect(banner).toContainText(/Request Spot/i);
 
   // Fire the CTA.
-  const cta = page.getByRole("button", { name: /request to join/i }).first();
+  const cta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 
@@ -195,7 +195,7 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
   // Invite params (including exp) survive the whole flow.
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
   expect(finalUrl.searchParams.get("exp")).toBe(String(FUTURE_MS));
 
