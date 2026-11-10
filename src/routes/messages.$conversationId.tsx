@@ -824,9 +824,13 @@ function Thread() {
         {otherTyping && (
           <div className="flex justify-start">
             <div className="rounded-2xl bg-surface border border-border px-3 py-2 flex gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" />
+              {/* Still dots under "reduce motion". The delays are motion-safe: as
+                  well: Tailwind emits that group after the plain classes, so its
+                  animation shorthand would reset a plain delay and the dots
+                  would bounce in step. */}
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground motion-safe:animate-bounce motion-safe:[animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground motion-safe:animate-bounce motion-safe:[animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground motion-safe:animate-bounce" />
             </div>
           </div>
         )}
