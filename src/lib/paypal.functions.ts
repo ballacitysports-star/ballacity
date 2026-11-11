@@ -7,6 +7,7 @@ import {
   CAPTURE_UNCONFIRMED_MESSAGE,
   ORDER_NOT_CAPTURABLE_MESSAGE,
   PAYMENT_CHECK_FAILED_MESSAGE,
+  PAYMENT_HELD_FOR_SUPPORT_MESSAGE,
   PAYMENT_RECORD_MISSING_MESSAGE,
   PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
   PAYMENT_REFUNDED_MESSAGE,
@@ -178,6 +179,21 @@ async function findPaymentRecord(admin: AdminClient, order: OrderRow, reference:
   }
 }
 
+/** Whether an order is still capturable ("open"), has been taken by a request ("taken"), or could not be read (null). */
+async function orderStatus(admin: AdminClient, orderId: string): Promise<"open" | "taken" | null> {
+  try {
+    const { data, error } = await admin
+      .from("paypal_orders")
+      .select("status")
+      .eq("order_id", orderId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return CAPTURABLE.includes(String((data as { status?: unknown }).status)) ? "open" : "taken";
+  } catch {
+    return null;
+  }
+}
+
 /** captureOrder's PayPalCaptureRefused (read by its fields, so a test double works): PayPal certainly did not capture. */
 function captureRefusal(e: unknown): { notSent: boolean } | null {
   const r = e as { notCaptured?: unknown; httpStatus?: unknown } | null;
@@ -261,17 +277,24 @@ async function recordCapturedPayment(
     }
     const written = await findPaymentRecord(admin, order, captureId ?? order.order_id);
     if (written !== true) {
-      // Not known whether the payment is recorded. The order is marked captured with its capture id, so the next
+      // Not known whether the payment is recorded. The order is marked captured with its capture id, so a later
       // request looks for the record again (ensureCapturedRecorded) and other orders for the game are refused
-      // meanwhile (PAYMENT_IN_PROGRESS while it has no record).
+      // meanwhile (PAYMENT_IN_PROGRESS while it has no record). The player is not placed on the roster on a guess;
+      // the report is how the place gets settled. PayPal did pay the host, so the host is told.
       const kept = await moveOrder(admin, order.order_id, "capturing", {
         status: "captured",
         capture_id: captureId,
         captured_at: now,
       });
       if (!kept) await reportPaymentProblem("unconfirmed_order_not_marked", order.order_id);
-      await reportPaymentProblem("payment_record_unconfirmed", order.order_id, cause);
-      throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+      const why = cause instanceof Error ? cause.message : String(cause ?? "");
+      await reportPaymentProblem(
+        "payment_record_unconfirmed",
+        order.order_id,
+        `capture ${captureId ?? "none"}, not placed on the roster: ${why}`,
+      );
+      await notifyHostOfPayment(admin, order);
+      throw new Error(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
     }
     // The insert did write the row; only its answer was lost.
   }
@@ -292,7 +315,12 @@ async function recordCapturedPayment(
     console.error("[paypal] roster placement after payment failed", e);
   }
 
-  // Notify the host in-app, non-blocking.
+  await notifyHostOfPayment(admin, order);
+  return rostered;
+}
+
+/** Tells the host in-app that PayPal checkout paid them for this game. Non-blocking: a failure is only logged. */
+async function notifyHostOfPayment(admin: AdminClient, order: OrderRow) {
   try {
     const { error } = await admin.from("notifications").insert({
       user_id: order.host_id,
@@ -305,11 +333,28 @@ async function recordCapturedPayment(
   } catch (e) {
     console.error("[paypal] host notification failed", e);
   }
-  return rostered;
+}
+
+/** Whether the player is on the game's roster now (read only), or null when that could not be read. */
+async function isOnRoster(admin: AdminClient, order: OrderRow): Promise<boolean | null> {
+  try {
+    const { data, error } = await admin
+      .from("game_participants")
+      .select("id")
+      .eq("game_id", order.game_id)
+      .eq("user_id", order.player_id)
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    return !!data;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * An order already captured. Normally its payment is recorded and this says so. If the record is missing (it was
+ * An order already captured. Normally its payment is recorded and this says so, with whether the player is on the
+ * roster now (read, never written: a place the host removed is not put back). If the record is missing (it was
  * removed after the capture: recordCapturedPayment writes it before it marks the order captured, or the write's answer
  * was lost), nothing is written here: a new verified payment and roster place written by the server would skip the
  * payment rules (a host's rejection or block, a refund already owed). It is reported for a superadmin to settle, and
@@ -318,8 +363,12 @@ async function recordCapturedPayment(
 async function ensureCapturedRecorded(admin: AdminClient, order: OrderRow) {
   const recorded = await findPaymentRecord(admin, order, order.capture_id ?? order.order_id);
   if (recorded === null) throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
-  // Recorded by the request that captured it, which also placed the player on the roster if it could.
-  if (recorded) return { ok: true as const, already: true as const, rostered: null };
+  // Recorded by the request that captured it, which placed the player on the roster if it could. That request may
+  // have lost the record's answer and placed no one (PAYPAL_PAYMENT_RECORD_UNCONFIRMED), so the roster is read, not
+  // assumed.
+  if (recorded) {
+    return { ok: true as const, already: true as const, rostered: await isOnRoster(admin, order) };
+  }
   await reportPaymentProblem("captured_record_missing", order.order_id);
   throw new Error(PAYMENT_RECORD_MISSING_MESSAGE);
 }
@@ -466,6 +515,19 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
     // One capture at a time: whoever moves the order to 'capturing' captures it. A player's other order for the same
     // game cannot be 'capturing' at the same time (paypal_orders_one_capture_per_player_game), so that claim fails too.
     if (!(await moveOrder(supabaseAdmin, data.orderId, CAPTURABLE, { status: "capturing" }))) {
+      // Another request took this order (it is no longer created/approved): that request settles it. Otherwise, for an
+      // order PayPal already captured, the claim was refused for another reason (another order of the player's for
+      // this game is 'capturing', or the database did not answer) and nothing holds this capture.
+      if (alreadyCaptured && (await orderStatus(supabaseAdmin, data.orderId)) !== "taken") {
+        // PAYMENT_IN_PROGRESS does not count an order that is not held, so it is reported with its capture for a
+        // superadmin to record or refund.
+        await reportPaymentProblem(
+          "late_capture_unclaimed",
+          data.orderId,
+          `capture ${pending.captureId ?? "unknown"} order status ${pending.status}`,
+        );
+        throw new Error(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
+      }
       throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
     }
 
@@ -581,7 +643,8 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
             await reportPaymentProblem("capture_id_not_saved", data.orderId);
           }
           await reportPaymentProblem("late_capture_rules_unchecked", data.orderId);
-          throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+          // Nothing re-checks a held order by itself, so the player is told support settles it.
+          throw new Error(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
         }
         return refundUnrecorded(
           supabaseAdmin,

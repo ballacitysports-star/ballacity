@@ -109,6 +109,13 @@ export const PAYMENT_UNRECORDED_MESSAGE =
 export const PAYMENT_RECORD_UNCONFIRMED_MESSAGE =
   "Your PayPal payment went through, but we couldn't confirm it's recorded yet. Don't pay again: refresh this page in a minute.";
 /**
+ * PayPal took the money and the app could not finish with it: the payment record's write got no clear answer, or a
+ * capture that completed after an earlier attempt could not be checked or held. Nothing settles it by itself; it is
+ * reported, and a superadmin records or refunds it.
+ */
+export const PAYMENT_HELD_FOR_SUPPORT_MESSAGE =
+  "Your PayPal payment went through, but we couldn't finish recording it, so your place isn't confirmed yet. Don't pay again: we've flagged it, and support will record or refund it.";
+/**
  * An order PayPal captured whose payment record is gone (for example withdrawn after the host rejected it). The server
  * does not write it again on its own, since that would skip the payment rules; it is flagged for support.
  */
@@ -136,6 +143,7 @@ export const PAYMENT_POLICY_MESSAGES: readonly string[] = [
   PAYMENT_REFUNDED_MESSAGE,
   PAYMENT_UNRECORDED_MESSAGE,
   PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
+  PAYMENT_HELD_FOR_SUPPORT_MESSAGE,
   PAYMENT_RECORD_MISSING_MESSAGE,
 ];
 

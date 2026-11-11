@@ -39,14 +39,15 @@ async function getAccessToken(): Promise<string> {
  * A POST that PayPal makes idempotent: a repeat carrying the same PayPal-Request-Id returns the first request's result
  * instead of acting again (Orders v2 create and capture, Payments v2 refund). When no answer comes back at all (the
  * connection failed or timed out, so PayPal may or may not have acted) it is sent once more with the same id. Any
- * answer PayPal does give, success or error, is returned as it is.
+ * answer PayPal does give, success or error, is returned as it is. `resent` says the answer is the second send's: it
+ * describes that send, and the first may still be running at PayPal.
  */
 async function postIdempotent(
   url: string,
   requestId: string,
   headers: Record<string, string>,
   body?: string,
-): Promise<Response> {
+): Promise<{ res: Response; resent: boolean }> {
   // A fresh timeout for each send.
   const send = () =>
     fetch(url, {
@@ -56,9 +57,9 @@ async function postIdempotent(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   try {
-    return await send();
+    return { res: await send(), resent: false };
   } catch {
-    return send();
+    return { res: await send(), resent: true };
   }
 }
 
@@ -72,8 +73,9 @@ function getOrderJson(orderId: string, token: string): Promise<Response> {
 
 /**
  * Thrown by captureOrder only when PayPal certainly did not capture: the request was never sent (no access token), or
- * PayPal refused it with a client error that is not "already captured" or "a request with this id is still running".
- * Any other failure (no answer, a timeout, a 5xx, an unreadable answer) is a plain Error: the capture may have happened.
+ * PayPal refused the first send with a client error that is not "already captured", "a request with this id is still
+ * running" or a rate limit. Any other failure (no answer, a timeout, a 5xx, an unreadable answer, or any error answer
+ * to a resend, since the first send may still be capturing) is a plain Error: the capture may have happened.
  * The caller tests `notCaptured`, not the class, so a test double can throw one too.
  */
 export class PayPalCaptureRefused extends Error {
@@ -88,15 +90,23 @@ export class PayPalCaptureRefused extends Error {
   }
 }
 
+/** PayPal issues that say another request for the order is running or already captured it, not that this one failed. */
+const CAPTURE_MAY_BE_RUNNING_ISSUES = new Set([
+  "ORDER_ALREADY_CAPTURED",
+  "PREVIOUS_REQUEST_IN_PROGRESS",
+]);
+
 /**
- * Whether a capture answer with this status and PayPal issue means nothing was captured. 4xx answers are PayPal
- * refusing the request (INSTRUMENT_DECLINED, ORDER_NOT_APPROVED, PAYER_ACTION_REQUIRED, an auth failure, ...), except
- * 408 (timed out), 409 (a request with the same id may still be running) and ORDER_ALREADY_CAPTURED.
+ * Whether the answer to a capture's first send, with this status and PayPal issue, means nothing was captured. 4xx
+ * answers are PayPal refusing the request (INSTRUMENT_DECLINED, ORDER_NOT_APPROVED, PAYER_ACTION_REQUIRED, an auth
+ * failure, ...), except 408 (timed out), 409 (a request with the same id may still be running), 429 (rate limited: it
+ * says nothing about another send) and the issues in CAPTURE_MAY_BE_RUNNING_ISSUES. An answer to a resend is never a
+ * definite no (captureOrder): it describes the resend, not the first send.
  */
 export function captureRefusalIsDefinite(httpStatus: number, issue: string | null): boolean {
   if (httpStatus < 400 || httpStatus >= 500) return false;
-  if (httpStatus === 408 || httpStatus === 409) return false;
-  return issue !== "ORDER_ALREADY_CAPTURED";
+  if (httpStatus === 408 || httpStatus === 409 || httpStatus === 429) return false;
+  return !issue || !CAPTURE_MAY_BE_RUNNING_ISSUES.has(issue);
 }
 
 /** The PayPal-Request-Id of an order's capture: the same for every attempt, so PayPal captures an order at most once. */
@@ -122,7 +132,7 @@ export async function createOrder(input: {
   requestId: string;
 }): Promise<{ orderId: string }> {
   const token = await getAccessToken();
-  const res = await postIdempotent(
+  const { res } = await postIdempotent(
     `${baseUrl()}/v2/checkout/orders`,
     input.requestId,
     { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -310,7 +320,7 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
       null,
     );
   }
-  const res = await postIdempotent(
+  const { res, resent } = await postIdempotent(
     `${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
     captureRequestId(orderId),
     {
@@ -323,7 +333,9 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
   if (!res.ok) {
     const issue = json?.details?.[0]?.issue ?? null;
     const message = json?.message || `PayPal capture failed (${res.status}).`;
-    if (captureRefusalIsDefinite(res.status, issue)) {
+    // A resend happens only when the first send got no answer, so PayPal may still be capturing with it: whatever
+    // the resend is told (a rate limit, "previous request in progress", ...) says nothing about the first send.
+    if (!resent && captureRefusalIsDefinite(res.status, issue)) {
       throw new PayPalCaptureRefused(message, res.status, issue);
     }
     throw new Error(message);
@@ -355,7 +367,7 @@ export async function refundCapture(
   captureId: string,
 ): Promise<{ refundId: string | null; status: string }> {
   const token = await getAccessToken();
-  const res = await postIdempotent(
+  const { res } = await postIdempotent(
     `${baseUrl()}/v2/payments/captures/${encodeURIComponent(captureId)}/refund`,
     refundRequestId(captureId),
     { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

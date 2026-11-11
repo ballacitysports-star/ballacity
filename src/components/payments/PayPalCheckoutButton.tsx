@@ -67,10 +67,13 @@ export function PayPalCheckoutButton(props: {
             onApprove: async (data: { orderID: string }) => {
               try {
                 const res = await captureGamePayPalOrder({ data: { orderId: data.orderID } });
+                // "You're in" only when the server says the player is on the roster; null means it could not tell.
                 toast.success(
-                  res.rostered === false
-                    ? "Payment confirmed. The host will confirm your place on the roster."
-                    : "Payment confirmed — you're in!",
+                  res.rostered === true
+                    ? "Payment confirmed — you're in!"
+                    : res.rostered === false
+                      ? "Payment confirmed. The host will confirm your place on the roster."
+                      : "Payment confirmed. Check the game page for your place on the roster.",
                 );
                 props.onPaid();
               } catch (e) {

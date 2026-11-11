@@ -424,6 +424,39 @@ describe("what a failed capture says about the money (re-review)", () => {
     }
   });
 
+  it("a rate limit or 'previous request in progress' on the first send is not a refusal either", async () => {
+    for (const r of [
+      () => paypalError(429, "RATE_LIMIT_REACHED"),
+      () => paypalError(422, "PREVIOUS_REQUEST_IN_PROGRESS"),
+    ]) {
+      reply = r;
+      const e = await failure(captureOrder("ORDER-1"));
+      expect(e).toBeInstanceOf(Error);
+      expect(e?.notCaptured).toBeUndefined();
+    }
+  });
+
+  it("any error answer to a resend is not a refusal: the first send may still be capturing (re-review)", async () => {
+    // The first send gets no answer (the 15 s limit fired while PayPal was still working on it), so it is resent with
+    // the same id. Whatever the resend is told describes the resend, not the first send.
+    for (const [status, issue] of [
+      [422, "PREVIOUS_REQUEST_IN_PROGRESS"],
+      [429, "RATE_LIMIT_REACHED"],
+      [422, "INSTRUMENT_DECLINED"],
+    ] as const) {
+      let n = 0;
+      reply = () => {
+        n += 1;
+        if (n === 1) throw new DOMException("The operation timed out.", "TimeoutError");
+        return paypalError(status, issue);
+      };
+      const e = await failure(captureOrder("ORDER-1"));
+      expect(n).toBe(2);
+      expect(e).toBeInstanceOf(Error);
+      expect(e?.notCaptured).toBeUndefined();
+    }
+  });
+
   it("no answer at all is not a refusal", async () => {
     reply = () => {
       throw new TypeError("fetch failed");
@@ -447,6 +480,9 @@ describe("what a failed capture says about the money (re-review)", () => {
     expect(captureRefusalIsDefinite(422, "ORDER_ALREADY_CAPTURED")).toBe(false);
     expect(captureRefusalIsDefinite(408, null)).toBe(false);
     expect(captureRefusalIsDefinite(409, null)).toBe(false);
+    expect(captureRefusalIsDefinite(429, null)).toBe(false);
+    expect(captureRefusalIsDefinite(429, "RATE_LIMIT_REACHED")).toBe(false);
+    expect(captureRefusalIsDefinite(422, "PREVIOUS_REQUEST_IN_PROGRESS")).toBe(false);
     expect(captureRefusalIsDefinite(500, null)).toBe(false);
     expect(captureRefusalIsDefinite(201, null)).toBe(false);
   });

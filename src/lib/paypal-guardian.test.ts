@@ -253,7 +253,8 @@ describe("capturing an approved PayPal order", () => {
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).resolves.toEqual({
       ok: true,
       already: true,
-      rostered: null,
+      // This fake finds a row for every read, the roster included.
+      rostered: true,
     });
     expect(h.paypal.captured).toBe(0);
   });

@@ -13,6 +13,7 @@ import {
   CAPTURE_UNCONFIRMED_MESSAGE,
   ORDER_NOT_CAPTURABLE_MESSAGE,
   PAYMENT_CHECK_FAILED_MESSAGE,
+  PAYMENT_HELD_FOR_SUPPORT_MESSAGE,
   PAYMENT_POLICY_MESSAGES,
   PAYMENT_PRECONDITION_MESSAGES,
   PAYMENT_RECORD_MISSING_MESSAGE,
@@ -65,6 +66,8 @@ const h = vi.hoisted(() => ({
   insertError: {} as Record<string, { message: string; code?: string } | undefined>,
   /** The payment_submissions insert writes its row, then its answer is lost (the call throws). */
   insertCommitsThenThrows: false,
+  /** How many of the next maybeSingle() reads of a table throw (a lost connection), by table. */
+  findFailures: {} as Record<string, number>,
   updateError: null as null | { message: string },
   notifications: 0,
   paypal: {
@@ -167,6 +170,10 @@ vi.mock("@/integrations/supabase/client.server", () => {
       },
       limit: () => q,
       maybeSingle: async () => {
+        if ((h.findFailures[table] ?? 0) > 0) {
+          h.findFailures[table] -= 1;
+          throw new TypeError("fetch failed");
+        }
         const data = rows().find((r) => filters.every((f) => f(r))) ?? null;
         return { data, error: null };
       },
@@ -189,7 +196,13 @@ vi.mock("@/integrations/supabase/client.server", () => {
             ? [...h.orders.values()]
             : table === "payment_submissions"
               ? h.submissions
-              : [];
+              : table === "game_participants"
+                ? h.rostered.map((user_id) => ({
+                    id: `gp-${user_id}`,
+                    game_id: "g-order",
+                    user_id,
+                  }))
+                : [];
         return {
           ...finder(table, rows),
           insert: async (row: Row) => {
@@ -325,6 +338,7 @@ beforeEach(() => {
   h.submissions = [];
   h.insertError = {};
   h.insertCommitsThenThrows = false;
+  h.findFailures = {};
   h.updateError = null;
   h.notifications = 0;
   h.paypal = {
@@ -603,10 +617,34 @@ describe("an order already captured", () => {
       transaction_reference: "CAPTURE-1",
     });
     h.precondition = { data: "ALREADY_PAID", error: null };
-    await expect(capture()).resolves.toEqual({ ok: true, already: true, rostered: null });
+    h.rostered = [PLAYER];
+    await expect(capture()).resolves.toEqual({ ok: true, already: true, rostered: true });
     expect(h.paypal.captured).toBe(0);
     expect(h.submissions).toHaveLength(1);
     expect(h.playerRpcs).toEqual([]);
+  });
+
+  it("with its payment recorded and the player not on the roster: says so, and does not place them (re-review)", async () => {
+    // Not 'rostered: null', which the button read as "you're in". Not placed either: the host may have removed them.
+    seedOrder({ status: "captured", capture_id: "CAPTURE-1" });
+    h.submissions.push({
+      game_id: "g-order",
+      player_id: PLAYER,
+      transaction_reference: "CAPTURE-1",
+    });
+    await expect(capture()).resolves.toEqual({ ok: true, already: true, rostered: false });
+    expect(h.rostered).toEqual([]);
+  });
+
+  it("when the roster cannot be read, it says it does not know (null), not that the player is in", async () => {
+    seedOrder({ status: "captured", capture_id: "CAPTURE-1" });
+    h.submissions.push({
+      game_id: "g-order",
+      player_id: PLAYER,
+      transaction_reference: "CAPTURE-1",
+    });
+    h.findFailures = { game_participants: 1 };
+    await expect(capture()).resolves.toEqual({ ok: true, already: true, rostered: null });
   });
 
   it("without a payment record: reports it and writes nothing (review: the repair skipped the payment rules)", async () => {
@@ -909,11 +947,32 @@ describe("a capture PayPal finishes after the attempt stopped waiting (re-review
   it("when those rules cannot be checked, the late capture is held with its id, not refunded or recorded", async () => {
     h.getOrder = async () => details("COMPLETED", "CAPTURE-LATE");
     h.precondition = { data: null, error: { message: "timeout" } };
-    await expect(capture()).rejects.toThrow(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+    // Nothing re-checks a held order by itself: the player is told support settles it, not to refresh (re-review).
+    await expect(capture()).rejects.toThrow(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
     expect(h.paypal.refunded).toEqual([]);
     expect(h.submissions).toEqual([]);
     expect(order()).toMatchObject({ status: "capturing", capture_id: "CAPTURE-LATE" });
     expect(h.reports.some((m) => /PAYPAL_LATE_CAPTURE_RULES_UNCHECKED/.test(m))).toBe(true);
+  });
+
+  it("a late capture that cannot be held (another order of the player's is 'capturing') is reported with its capture (re-review)", async () => {
+    seedOrder({ status: "capturing" }, "ORDER-STUCK");
+    h.getOrder = async () => details("COMPLETED", "CAPTURE-LATE");
+    await expect(capture()).rejects.toThrow(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
+    expect(order()).toMatchObject({ status: "created", capture_id: null });
+    expect(h.paypal.refunded).toEqual([]);
+    expect(h.submissions).toEqual([]);
+    expect(h.reports.some((m) => /PAYPAL_LATE_CAPTURE_UNCLAIMED.*CAPTURE-LATE/.test(m))).toBe(true);
+  });
+
+  it("a late capture whose order another request already took is left to that request, not reported", async () => {
+    // Control for the case above: the claim fails because the order itself moved on.
+    h.getOrder = async () => {
+      order().status = "captured";
+      return details("COMPLETED", "CAPTURE-1");
+    };
+    await expect(capture()).rejects.toThrow(CAPTURE_IN_PROGRESS_MESSAGE);
+    expect(h.reports).toEqual([]);
   });
 
   it("a late capture of an order the game's price no longer matches is refunded, not marked failed", async () => {
@@ -938,13 +997,51 @@ describe("a payment insert without a clear answer (re-review)", () => {
   it("that cannot be shown to have written it: nothing is refunded, the order is kept and reported", async () => {
     // supabase-js reports a lost connection as an error with an empty code.
     h.insertError.payment_submissions = { message: "TypeError: fetch failed", code: "" };
-    await expect(capture()).rejects.toThrow(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+    await expect(capture()).rejects.toThrow(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
     expect(h.paypal.refunded).toEqual([]);
     expect(order()).toMatchObject({ status: "captured", capture_id: "CAPTURE-1" });
-    expect(h.reports.some((m) => /PAYPAL_PAYMENT_RECORD_UNCONFIRMED/.test(m))).toBe(true);
+    expect(h.reports.some((m) => /PAYPAL_PAYMENT_RECORD_UNCONFIRMED.*CAPTURE-1/.test(m))).toBe(
+      true,
+    );
+    expect(h.rostered).toEqual([]);
+    expect(h.notifications).toBe(1);
     // The next request looks for the record again; with none, it is flagged, not written by the server.
     h.insertError = {};
     await expect(capture()).rejects.toThrow(PAYMENT_RECORD_MISSING_MESSAGE);
+    expect(h.submissions).toEqual([]);
+  });
+
+  it("that wrote the row while its lookup failed too: the host is told, and a retry never says the player is in (re-review)", async () => {
+    h.insertCommitsThenThrows = true;
+    h.findFailures = { payment_submissions: 1 };
+    await expect(capture()).rejects.toThrow(PAYMENT_HELD_FOR_SUPPORT_MESSAGE);
+    expect(h.submissions).toHaveLength(1);
+    expect(order()).toMatchObject({ status: "captured", capture_id: "CAPTURE-1" });
+    expect(h.notifications).toBe(1);
+    expect(h.reports.some((m) => /PAYPAL_PAYMENT_RECORD_UNCONFIRMED/.test(m))).toBe(true);
+    // A retry finds the record and reads the roster: the player was not placed, and is not placed now.
+    await expect(capture()).resolves.toEqual({ ok: true, already: true, rostered: false });
+    expect(h.rostered).toEqual([]);
+    expect(h.notifications).toBe(1);
+  });
+});
+
+describe("a capture whose resend PayPal refused (re-review)", () => {
+  it("is held, not released: a second order for the game cannot capture while it is unresolved", async () => {
+    // captureOrder throws a plain Error for any error answer to a resend (paypal.server.test): the first send may
+    // still be capturing, and the order shows no capture yet.
+    h.captureOrder = async () => {
+      throw new Error("PREVIOUS_REQUEST_IN_PROGRESS");
+    };
+    h.getOrder = async () => details("APPROVED");
+    await expect(capture()).rejects.toThrow(CAPTURE_UNCONFIRMED_MESSAGE);
+    expect(order()).toMatchObject({ status: "capturing", capture_id: null });
+    expect(h.reports.some((m) => /PAYPAL_CAPTURE_UNCONFIRMED/.test(m))).toBe(true);
+    h.captureOrder = null;
+    h.getOrder = null;
+    seedOrder({}, "ORDER-2");
+    await expect(capture("ORDER-2")).rejects.toThrow(CAPTURE_IN_PROGRESS_MESSAGE);
+    expect(h.paypal.captured).toBe(1);
     expect(h.submissions).toEqual([]);
   });
 });
@@ -991,6 +1088,7 @@ describe("the messages", () => {
       PAYMENT_REFUNDED_MESSAGE,
       PAYMENT_UNRECORDED_MESSAGE,
       PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
+      PAYMENT_HELD_FOR_SUPPORT_MESSAGE,
       PAYMENT_RECORD_MISSING_MESSAGE,
     ]) {
       expect(PAYMENT_POLICY_MESSAGES).toContain(m);
@@ -1021,6 +1119,7 @@ describe("the messages", () => {
       PAYMENT_UNRECORDED_MESSAGE,
       CAPTURE_IN_PROGRESS_MESSAGE,
       PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
+      PAYMENT_HELD_FOR_SUPPORT_MESSAGE,
       PAYMENT_RECORD_MISSING_MESSAGE,
     ]) {
       expect(m).not.toMatch(/weren't charged/);

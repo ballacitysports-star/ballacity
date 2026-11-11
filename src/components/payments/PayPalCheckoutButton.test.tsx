@@ -126,4 +126,16 @@ describe("PayPalCheckoutButton", () => {
       "Payment confirmed. The host will confirm your place on the roster.",
     );
   });
+
+  it("says the player is in only when the server says so, not when it could not tell (re-review)", async () => {
+    await renderButton();
+    h.captureOrder.mockResolvedValue({ ok: true, already: true, rostered: null });
+    await h.buttons!.onApprove({ orderID: "ORDER-1" });
+    expect(h.toastSuccess).toHaveBeenCalledWith(
+      "Payment confirmed. Check the game page for your place on the roster.",
+    );
+    h.captureOrder.mockResolvedValue({ ok: true, already: false, rostered: true });
+    await h.buttons!.onApprove({ orderID: "ORDER-1" });
+    expect(h.toastSuccess).toHaveBeenLastCalledWith("Payment confirmed — you're in!");
+  });
 });
