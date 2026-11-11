@@ -20,7 +20,12 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 
-import { REPORT_TIMEOUT_MS, reportServerError } from "./error-report.server";
+import {
+  REPORTS_PER_MINUTE,
+  REPORT_TIMEOUT_MS,
+  reportServerError,
+  saveErrorReport,
+} from "./error-report.server";
 
 beforeEach(() => {
   h.rows.length = 0;
@@ -91,6 +96,28 @@ describe("reportServerError (P0-8)", () => {
     expect(h.rows).toEqual([]);
     h.fail = true;
     await expect(reportServerError(new Error("x"), null)).resolves.toBeUndefined();
+  });
+
+  it("a minute's worth of browser reports does not block a server report", async () => {
+    // An anonymous caller can send reportClientError as often as it likes; it files source client.
+    for (let i = 0; i <= REPORTS_PER_MINUTE; i += 1) {
+      await saveErrorReport({
+        source: "client",
+        kind: "window",
+        message: `noise ${i}`,
+        route: "/",
+        fingerprint: `f${i}`,
+        release: null,
+        signedIn: false,
+      });
+    }
+    expect(h.rows.filter((r) => r.source === "client")).toHaveLength(REPORTS_PER_MINUTE);
+    await reportServerError(new Error('relation "public.x" does not exist'), null, "server_fn", {
+      route: "/_serverFn/getGame",
+    });
+    expect(h.rows.filter((r) => r.kind === "server_fn")).toEqual([
+      expect.objectContaining({ source: "server", route: "/_serverFn/getGame" }),
+    ]);
   });
 
   it("stops waiting for a save that hangs after REPORT_TIMEOUT_MS", async () => {

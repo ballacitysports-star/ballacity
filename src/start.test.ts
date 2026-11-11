@@ -54,6 +54,23 @@ describe("src/start.ts wiring (P0-8)", () => {
     expect(h.reportServerError).toHaveBeenCalledWith(error, request, "ssr");
   });
 
+  it("waits for the report to be saved before it answers with the 500 page", async () => {
+    let settle!: () => void;
+    h.reportServerError.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (settle = () => resolve(undefined))),
+    );
+    let answered = false;
+    const answer = run(page(), () => Promise.reject(new Error("render broke"))).then((r) => {
+      answered = true;
+      return r;
+    });
+    await vi.waitFor(() => expect(h.reportServerError).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(answered).toBe(false);
+    settle();
+    expect((await answer).status).toBe(500);
+  });
+
   it("a reporter that fails never changes the 500 page", async () => {
     h.reportServerError.mockRejectedValueOnce(new Error("db down"));
     const first = await run(page(), () => Promise.reject(new Error("render broke")));

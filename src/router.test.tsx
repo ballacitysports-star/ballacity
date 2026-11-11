@@ -13,9 +13,11 @@ vi.mock("@/lib/error-report-client", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/error-report-client")>();
   return { ...real, reportBrowserError: vi.fn(real.reportBrowserError) };
 });
-// A one-route app whose page throws while rendering, with its own error screen.
+// A small app: a page that throws while rendering, and one whose loader gets a server function's
+// refusal of a malformed id, each with its own error screen.
 vi.mock("./routeTree.gen", async () => {
   const { createElement } = await import("react");
+  const { z } = await import("zod");
   const { createRootRoute, createRoute, Outlet } = await import("@tanstack/react-router");
   const root = createRootRoute({ component: () => createElement(Outlet) });
   const index = createRoute({
@@ -26,7 +28,18 @@ vi.mock("./routeTree.gen", async () => {
     },
     errorComponent: () => createElement("p", null, "Route error screen"),
   });
-  return { routeTree: root.addChildren([index]) };
+  const org = createRoute({
+    getParentRoute: () => root,
+    path: "/orgs/$orgId",
+    loader: ({ params }) => {
+      // The server's ZodError as the browser gets it back: the message only.
+      const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: params.orgId });
+      if (!parsed.success) throw new Error(parsed.error.message);
+    },
+    component: () => createElement("p", null, "Org page"),
+    errorComponent: () => createElement("p", null, "Org error screen"),
+  });
+  return { routeTree: root.addChildren([index, org]) };
 });
 
 import { getRouter } from "./router";
@@ -37,6 +50,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const info = { componentStack: "" };
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   resetBrowserErrorReporting();
   vi.mocked(reportBrowserError).mockClear();
   h.reportClientError.mockClear();
@@ -73,6 +87,33 @@ describe("route error screens report what they caught (P0-8)", () => {
     const { defaultOnCatch } = getRouter().options;
     defaultOnCatch?.(redirect({ to: "/auth" }), info);
     defaultOnCatch?.(notFound(), info);
+    await flush();
+    expect(reportBrowserError).not.toHaveBeenCalled();
+    expect(h.reportClientError).not.toHaveBeenCalled();
+  });
+
+  it("a loader's bad-input refusal shows the error screen and is not reported", async () => {
+    window.history.replaceState(null, "", "/orgs/not-a-uuid");
+    render(<RouterProvider router={getRouter()} />);
+    expect(await screen.findByText("Org error screen")).toBeTruthy();
+    await flush();
+    expect(reportBrowserError).not.toHaveBeenCalled();
+    expect(h.reportClientError).not.toHaveBeenCalled();
+  });
+
+  it("validation errors and auth refusals are answers, not failures: none is reported", async () => {
+    const { defaultOnCatch } = getRouter().options;
+    const zodError = Object.assign(new Error("[]"), { name: "ZodError", issues: [] });
+    for (const error of [
+      zodError,
+      new Error(JSON.stringify([{ code: "invalid_type", path: ["id"], message: "Required" }])),
+      new Error("Unauthorized: No authorization header provided"),
+      new Error("Forbidden"),
+      new Error("NOT_SIGNED_IN"),
+      new Error("JWT expired"),
+    ]) {
+      defaultOnCatch?.(error, info);
+    }
     await flush();
     expect(reportBrowserError).not.toHaveBeenCalled();
     expect(h.reportClientError).not.toHaveBeenCalled();

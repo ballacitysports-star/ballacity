@@ -66,6 +66,40 @@ const FAILURES = [
   "<html><body><h1>502 Bad Gateway</h1></body></html>",
 ];
 
+/**
+ * What a Supabase outage or timeout reads as. For a non-2xx answer postgrest-js puts the body's
+ * message, or the raw body of an HTML page, in error.message; for a fetch that failed it writes
+ * "<name>: <message>". Handlers pass it on as `new Error(error.message)`.
+ */
+const OUTAGES = [
+  // PostgREST without its database (PGRST000 to PGRST003).
+  "Database connection error. Retrying the connection.",
+  "Database client error. Retrying the connection.",
+  "Could not query the database for the schema cache. Retrying.",
+  "Timed out acquiring connection from connection pool.",
+  // Supabase's API gateway, when the service behind it fails.
+  "An invalid response was received from the upstream server",
+  "The upstream server is timing out",
+  "The upstream server is currently unavailable",
+  "name resolution failed",
+  // Cloudflare's own pages in front of Supabase, status text in Cloudflare's case.
+  "<!DOCTYPE html><html><head><title>abc.supabase.co | 502: Bad gateway</title></head></html>",
+  "<title>abc.supabase.co | 503: Service temporarily unavailable</title>",
+  "<title>abc.supabase.co | 504: Gateway time-out</title>",
+  "<title>abc.supabase.co | 520: Web server is returning an unknown error</title>",
+  "<title>abc.supabase.co | 521: Web server is down</title>",
+  "<title>abc.supabase.co | 522: Connection timed out</title>",
+  "<title>abc.supabase.co | 523: Origin is unreachable</title>",
+  "<title>abc.supabase.co | 524: A timeout occurred</title>",
+  "<title>abc.supabase.co | 525: SSL handshake failed</title>",
+  "<title>abc.supabase.co | 526: Invalid SSL certificate</title>",
+  // The Workers runtime, as postgrest-js passes a failed fetch on.
+  "TypeError: Network connection lost.",
+  "Network connection lost.",
+  "Error: internal error",
+  "internal error; reference = 9a1t0n2uq5c7b3e8d4f6g0h1",
+];
+
 /** Refusals written for the person to read, as handlers in src/lib/*.functions.ts throw them. */
 const REFUSALS = [
   "Game not found.",
@@ -84,6 +118,21 @@ describe("which server-function failures are reported (P0-8)", () => {
     expect(isReportableServerFnError(new Error(message))).toBe(true);
     // The same text in an error-shaped object (a PostgREST error thrown as is).
     expect(isReportableServerFnError({ message, code: "XX000" })).toBe(true);
+  });
+
+  it.each(OUTAGES)("reports a Supabase outage or timeout passed on as text: %s", (message) => {
+    expect(isReportableServerFnError(new Error(message))).toBe(true);
+    expect(isReportableServerFnError({ message, details: "", hint: "", code: "" })).toBe(true);
+  });
+
+  it("classifies a huge message quickly: only its start is read", () => {
+    // The function rule rescans to the end for every "function a(": 2.6 s on 176 KB unbounded.
+    const started = performance.now();
+    expect(isReportableServerFnError(new Error("function a(".repeat(16_000)))).toBe(false);
+    expect(performance.now() - started).toBeLessThan(500);
+    // A failure's text at the start of a huge page is still found.
+    const page = `<title>abc.supabase.co | 522: Connection timed out</title>${"<p>x</p>".repeat(60_000)}`;
+    expect(isReportableServerFnError(new Error(page))).toBe(true);
   });
 
   it("reports JavaScript runtime errors and timeouts: a bug or a failed call", () => {

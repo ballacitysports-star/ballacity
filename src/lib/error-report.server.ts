@@ -2,22 +2,33 @@
  * P0-8: saves error reports with the service role (server only). Saving never throws: a broken
  * reporter must not break the page or request it is reporting on.
  */
-import type { ErrorReport, ServerErrorKind } from "@/lib/error-report";
+import type { ErrorReport, ErrorSource, ServerErrorKind } from "@/lib/error-report";
 
-/** At most this many reports per server instance per minute; the rest are dropped. */
+/**
+ * At most this many reports per source per server instance per minute; the rest are dropped.
+ * Browser reports (source "client", which reportClientError always files, whatever the caller
+ * sends) and the server's own (source "server": ssr and server_fn) each have this budget, so browser
+ * noise, or an anonymous caller sending reportClientError over and over, can never use up what a
+ * failing server needs. Each source keeps the whole limit they used to share (so at most 120 rows a
+ * minute in all) rather than a part of it: in a real outage both sides fail at once, and a split
+ * would halve what either may file.
+ */
 export const REPORTS_PER_MINUTE = 60;
 /** The longest a server error page waits for its report to be saved. */
 export const REPORT_TIMEOUT_MS = 1500;
-let windowStart = 0;
-let windowCount = 0;
+const budgets: Record<ErrorSource, { start: number; count: number }> = {
+  client: { start: 0, count: 0 },
+  server: { start: 0, count: 0 },
+};
 
-export function allowReport(now = Date.now()): boolean {
-  if (now - windowStart > 60_000) {
-    windowStart = now;
-    windowCount = 0;
+export function allowReport(source: ErrorSource, now = Date.now()): boolean {
+  const budget = budgets[source];
+  if (now - budget.start > 60_000) {
+    budget.start = now;
+    budget.count = 0;
   }
-  windowCount += 1;
-  return windowCount <= REPORTS_PER_MINUTE;
+  budget.count += 1;
+  return budget.count <= REPORTS_PER_MINUTE;
 }
 
 type Insertable = {
@@ -28,7 +39,7 @@ type Insertable = {
 
 export async function saveErrorReport(report: ErrorReport, admin?: Insertable): Promise<boolean> {
   try {
-    if (!allowReport()) return false;
+    if (!allowReport(report.source)) return false;
     const client =
       admin ??
       ((await import("@/integrations/supabase/client.server"))

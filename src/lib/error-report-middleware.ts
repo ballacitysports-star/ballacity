@@ -9,7 +9,7 @@
  */
 import { createMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
-import { isIgnorableError } from "@/lib/error-report";
+import { isAuthRefusal, isIgnorableError, isValidationError, messageOf } from "@/lib/error-report";
 
 /*
  * Which failures are reported.
@@ -24,19 +24,20 @@ import { isIgnorableError } from "@/lib/error-report";
  * Never reported:
  *   - control flow: redirects, notFound, thrown Responses;
  *   - input validation: the ZodError an inputValidator throws, or the issue list TanStack throws
- *     for a schema validator;
+ *     for a schema validator (isValidationError in error-report.ts, which route error screens use too);
  *   - auth refusals: requireSupabaseAuth's "Unauthorized: …", "Forbidden", "Not authenticated",
- *     AUTH_REQUIRED, NOT_SIGNED_IN, an expired or invalid JWT;
+ *     AUTH_REQUIRED, NOT_SIGNED_IN, an expired or invalid JWT (isAuthRefusal, likewise shared);
  *   - aborts, as everywhere else in error-report.ts (and nothing at all once the caller has gone).
  * Reported:
  *   - a database, network or upstream failure, even when the handler passed it on as
  *     `throw new Error(error.message)` (about 200 of those throws do): FAILURE_TEXTS are written by
- *     Postgres, PostgREST or the runtime, never by us. They are what breaks after a publish: a
- *     migration not applied ("relation … does not exist", "Could not find the function … in the
- *     schema cache"), a grant or policy missing, a timeout, Supabase unreachable. A test checks
- *     that no message the app writes itself (every string literal in src, so also the texts
- *     handlers throw from maps and mappers, and every RAISE EXCEPTION in supabase/migrations)
- *     matches one of them;
+ *     Postgres, PostgREST, Supabase's gateway, Cloudflare or the runtime, never by us. For a non-2xx
+ *     answer postgrest-js puts the body's message, or the raw body of an HTML page, in
+ *     error.message. They are what breaks after a publish or in an outage: a migration not applied
+ *     ("relation … does not exist", "Could not find the function … in the schema cache"), a grant
+ *     or policy missing, a timeout, the database or Supabase unreachable. A test checks that no
+ *     message the app writes itself (every string literal in src, so also the texts handlers throw
+ *     from maps and mappers, and every RAISE EXCEPTION in supabase/migrations) matches one of them;
  *   - a JavaScript runtime error (TypeError, ReferenceError, SyntaxError…, or a TimeoutError):
  *     a bug or a failed call, never a refusal;
  *   - anything thrown that is not an Error and has no message (a string, undefined…).
@@ -81,12 +82,23 @@ const FAILURE_TEXTS: readonly RegExp[] = [
   /\bfetch failed\b/i,
   /\b(?:ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b|\bsocket hang up\b/,
   /\bupstream (?:connect error|request timeout)\b|\bno healthy upstream\b/i,
-  // An upstream answered with an HTTP 5xx page (the status text as servers write it).
-  /\b(?:Internal Server Error|Bad Gateway|Service Unavailable|Gateway Time-?out)\b/,
+  // PostgREST lost its database (PGRST000 to PGRST003).
+  /\bDatabase (?:connection|client) error\. Retrying the connection\b/i,
+  /\bCould not query the database for the schema cache\b/i,
+  /\bTimed out acquiring connection from connection pool\b/i,
+  // Supabase's API gateway, when the service behind it is down, slow or answers nonsense.
+  /\bAn invalid response was received from the upstream server\b/i,
+  /\bupstream server is (?:currently )?(?:unavailable|timing out)\b/i,
+  /\bname resolution failed\b/i,
+  // The Workers runtime lost a connection, or failed inside ("internal error; reference = …").
+  /\bNetwork connection lost\b/i,
+  /^(?:[\w$]*Error: )?internal error\b/i,
+  // An upstream answered with an HTTP 5xx page: the status text in any case ("502 Bad Gateway",
+  // Cloudflare's "502: Bad gateway"), or one of Cloudflare's own pages in front of Supabase, whose
+  // title reads "abc.supabase.co | 522: Connection timed out".
+  /\b(?:Internal Server Error|Bad Gateway|Service (?:Temporarily )?Unavailable|Gateway Time-?out)\b/i,
+  /\b52[0-6]: (?:Web server is returning an unknown error|Web server is down|Connection timed out|Origin is unreachable|A timeout occurred|SSL handshake failed|Invalid SSL certificate)\b/i,
 ];
-
-const AUTH_REFUSAL =
-  /^(?:Unauthorized|Forbidden|Not authenticated|AUTH_REQUIRED|NOT_SIGNED_IN|JWT expired|invalid JWT)\b/i;
 
 /** Errors the JavaScript runtime throws (TimeoutError: AbortSignal.timeout). */
 const RUNTIME_ERROR_NAMES = new Set([
@@ -100,50 +112,17 @@ const RUNTIME_ERROR_NAMES = new Set([
   "TimeoutError",
 ]);
 
-function messageOf(error: unknown): string | null {
-  if (error instanceof Error) return error.message;
-  if (error !== null && typeof error === "object") {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return null;
-}
-
-/** TanStack throws a schema validator's issues as JSON: `[{ "message": "…", "path": […] }, …]`. */
-function isIssueList(message: string): boolean {
-  if (!message.trimStart().startsWith("[")) return false;
-  try {
-    const parsed: unknown = JSON.parse(message);
-    return (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      parsed.every(
-        (issue) =>
-          issue !== null &&
-          typeof issue === "object" &&
-          typeof (issue as { message?: unknown }).message === "string",
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isValidationError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return (
-    error.name === "ZodError" ||
-    Array.isArray((error as { issues?: unknown }).issues) ||
-    isIssueList(error.message)
-  );
-}
+/**
+ * Only the start of a message is classified, as only the start is scrubbed: some rules are slow on a
+ * huge text (a 176 KB message took 2.6 s), and the texts they look for come first, even in a page.
+ */
+const CLASSIFY_INPUT_MAX = 20_000;
 
 /** True when a server function's error is a failure worth recording (see the rule above). */
 export function isReportableServerFnError(error: unknown): boolean {
   if (error instanceof Response || isRedirect(error) || isNotFound(error)) return false;
-  if (isIgnorableError(error) || isValidationError(error)) return false;
-  const message = messageOf(error);
-  if (message !== null && AUTH_REFUSAL.test(message.trim())) return false;
+  if (isIgnorableError(error) || isValidationError(error) || isAuthRefusal(error)) return false;
+  const message = messageOf(error)?.slice(0, CLASSIFY_INPUT_MAX) ?? null;
   if (message !== null && FAILURE_TEXTS.some((text) => text.test(message))) return true;
   if (error instanceof Error) return RUNTIME_ERROR_NAMES.has(error.name);
   return message === null;

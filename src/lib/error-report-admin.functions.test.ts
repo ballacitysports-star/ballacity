@@ -103,6 +103,14 @@ describe("superadminListErrors window (P0-8)", () => {
     expect(h.calls.some((c) => c[0] === "in")).toBe(false);
   });
 
+  it("refuses anyone who is not a superadmin before reading a row", async () => {
+    const refusal = new Error("Forbidden"); // what assertSuperadmin throws
+    h.assertSuperadmin.mockRejectedValueOnce(refusal);
+    await expect(list({ hours: 1 })).rejects.toBe(refusal);
+    expect(h.assertSuperadmin).toHaveBeenCalledTimes(1);
+    expect(h.calls).toEqual([]);
+  });
+
   it.each([
     [{ hours: 0 }],
     [{ hours: 721 }],

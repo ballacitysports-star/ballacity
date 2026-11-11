@@ -5,7 +5,9 @@
  *   * the route is a path only (no query string or hash), with ids masked;
  *   * the message is scrubbed of emails, tokens, ids, long numbers, URLs' query strings and the input
  *     values Postgres repeats in its errors, and capped;
- *   * a short fingerprint groups the same error together without storing a stack.
+ *   * a short fingerprint groups the same error together without storing a stack;
+ *   * aborts are noise and never reported; bad input and auth refusals are answers, which the
+ *     server-function reporter and the route error screens both skip.
  * No user id, IP or full URL is ever part of a report: only whether the person was signed in.
  */
 
@@ -44,11 +46,14 @@ const QUERY = /(https?:\/\/[^\s?#]+)[?#][^\s]*/gi;
 // `invalid input syntax for type uuid: "…"`, `Key (email)=(…) already exists`, `Failing row contains (…)`.
 // A value can hold quotes or brackets itself, so each rule runs to where Postgres's own text resumes
 // (or to the last quote or bracket), never to the first one: removing too much is the safe side.
+// A key's column list can hold an expression with brackets of its own (an index on lower(name)):
+// `Key (team_id, lower(name::text))=(…)`. A row is the last thing Postgres writes, so that rule runs
+// to the end of the text: a row that was cut short, or holds a line break, is removed whole too.
 const PG_INPUT_VALUE = /(invalid input (?:syntax|value) for (?:type|enum) [^:"]{1,80}: )".*"/gi;
 const PG_KEY_VALUE =
-  /\b(Key \([^)]{1,200}\)=)\(.*?\)(?=\s+(?:already exists|is not present|is still referenced|conflicts with)\b|\.?(?:"|\s*$))/gi;
-const PG_KEY_VALUE_SHORT = /\b(Key \([^)]{1,200}\)=)\([^)]*\)/gi;
-const PG_FAILING_ROW = /\bFailing row contains \(.*\)/g;
+  /\b(Key \((?:[^()]|\([^()]*\)){1,200}\)=)\(.*?\)(?=\s+(?:already exists|is not present|is still referenced|conflicts with)\b|\.?(?:"|\s*$))/gi;
+const PG_KEY_VALUE_SHORT = /\b(Key \((?:[^()]|\([^()]*\)){1,200}\)=)\([^)]*\)/gi;
+const PG_FAILING_ROW = /\bFailing row contains \([\s\S]*/g;
 /** A path segment that is an id: a UUID, a number, or a long hex string. Not global, so .test is stateless. */
 const ID_SEGMENT =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+|[0-9a-f]{16,})$/i;
@@ -101,12 +106,38 @@ export function fingerprintOf(message: string, route: string | null): string {
   return h.toString(36);
 }
 
-/** The message of anything thrown, without the stack. */
+/** The message an Error or an error-shaped object carries (without its name), or null if none. */
+export function messageOf(error: unknown): string | null {
+  if (error instanceof Error) return error.message;
+  if (error !== null && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return null;
+}
+
+/**
+ * The message of anything thrown, without the stack. It is not cut short here: scrubMessage removes
+ * the values first and caps after, so a cap never leaves a value its rule can no longer find. An
+ * error-shaped object (a PostgREST error thrown as is) reads as its message, code and details, in
+ * that order, so the details, where Postgres repeats a key or a whole row, come last.
+ */
 export function errorMessageOf(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
   if (typeof error === "string") return error;
+  const message = messageOf(error);
+  if (message !== null) {
+    const { name, code, details } = error as { name?: unknown; code?: unknown; details?: unknown };
+    return [
+      typeof name === "string" && name ? `${name}: ${message}` : message,
+      typeof code === "string" && code ? `(${code})` : "",
+      typeof details === "string" ? details : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
   try {
-    return JSON.stringify(error)?.slice(0, MESSAGE_MAX) ?? "Unknown error";
+    return JSON.stringify(error) ?? "Unknown error";
   } catch {
     return "Unknown error";
   }
@@ -141,6 +172,53 @@ export function isIgnorableError(error: unknown): boolean {
     /^Error: (Script error\.?)$/i.test(msg) ||
     msg === "Script error."
   );
+}
+
+/** TanStack throws a schema validator's issues as JSON: `[{ "message": "…", "path": […] }, …]`. */
+function isIssueList(message: string): boolean {
+  if (!message.trimStart().startsWith("[")) return false;
+  try {
+    const parsed: unknown = JSON.parse(message);
+    return (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.every(
+        (issue) =>
+          issue !== null &&
+          typeof issue === "object" &&
+          typeof (issue as { message?: unknown }).message === "string",
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Bad input, not a failure: the ZodError an inputValidator throws, the issue list TanStack throws for
+ * a schema validator, or either one after the trip to the browser, which keeps only the message.
+ * Used by the server-function reporter and the route error screens alike.
+ */
+export function isValidationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === "ZodError" ||
+    Array.isArray((error as { issues?: unknown }).issues) ||
+    isIssueList(error.message)
+  );
+}
+
+const AUTH_REFUSAL =
+  /^(?:Unauthorized|Forbidden|Not authenticated|AUTH_REQUIRED|NOT_SIGNED_IN|JWT expired|invalid JWT)\b/i;
+
+/**
+ * A refusal to someone not signed in, or not allowed: requireSupabaseAuth's "Unauthorized: …",
+ * "Forbidden", "Not authenticated", AUTH_REQUIRED, NOT_SIGNED_IN, an expired or invalid JWT. An
+ * answer, not a failure, on the server and on a route error screen alike.
+ */
+export function isAuthRefusal(error: unknown): boolean {
+  const message = messageOf(error);
+  return message !== null && AUTH_REFUSAL.test(message.trim());
 }
 
 export type ErrorRow = {
