@@ -111,6 +111,9 @@ function fakeAdmin(
       let patch: Record<string, unknown> | null = null;
       let row: Record<string, unknown> | null = null;
       let badColumn: string | null = null;
+      // A read returns only the columns it selected, as PostgREST does, so a select that drops a
+      // column the sweep relies on fails a test instead of reading a whole row.
+      let picked: string[] | null = null;
       const run = () => {
         if (badColumn) return { data: null, error: { message: `column ${badColumn} missing` } };
         if (mode === "insert") {
@@ -134,16 +137,21 @@ function fakeAdmin(
           }
           return { data: rows.map((r) => ({ id: r.id })), error: null };
         }
-        return { data: rows.map((r) => ({ ...r })), error: null };
+        const cols = picked;
+        return {
+          data: rows.map((r) =>
+            cols ? Object.fromEntries(cols.map((c) => [c, r[c] ?? null])) : { ...r },
+          ),
+          error: null,
+        };
       };
       const q: Record<string, unknown> = {
         select: (cols: string) => {
           const known = columnsOf(table);
-          const unknown = cols
-            .split(",")
-            .map((c) => c.trim())
-            .find((c) => !known.includes(c));
+          const list = cols.split(",").map((c) => c.trim());
+          const unknown = list.find((c) => !known.includes(c));
           badColumn = unknown ? `${table}.${unknown}` : null;
+          if (mode === "read") picked = list;
           return q;
         },
         limit: () => q,
@@ -214,10 +222,10 @@ describe("dueOffset", () => {
     expect(dueOffset([1440, 120], null, 125)).toBe(120);
     expect(dueOffset([1440, 120], null, 135)).toBe(120);
     expect(dueOffset([1440, 120], null, 136)).toBe(1440);
-    // ...a tenth (2 hours 24 minutes) for the day window.
+    // ...a ninth (2 hours 40 minutes) for the day window: up to where leadText still says "1 day".
     expect(dueOffset([10080, 1440], null, 1500)).toBe(1440);
-    expect(dueOffset([10080, 1440], null, 1584)).toBe(1440);
-    expect(dueOffset([10080, 1440], null, 1585)).toBe(10080);
+    expect(dueOffset([10080, 1440], null, 1600)).toBe(1440);
+    expect(dueOffset([10080, 1440], null, 1601)).toBe(10080);
     // The margin never makes a reminder due by itself: something must have opened.
     expect(dueOffset([120], null, 125)).toBeNull();
     expect(dueOffset([1440, 120], 1440, 125)).toBeNull();

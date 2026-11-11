@@ -73,8 +73,8 @@ seconds for the answer.
 2. Finds each reminder's due window: the **smallest** window that has opened and was not sent. A
    player who joins 100 minutes before a game with reminders at 1 day and 2 hours gets one
    reminder, for the 2-hour window; the 1-day window passes with it. A smaller window that opens
-   soon goes with it too: within 15 minutes, or a tenth of the window when that is longer
-   (2 hours 24 minutes for 1 day). A player who joins 125 minutes before that game gets
+   soon goes with it too: within 15 minutes, or a ninth of the window when that is longer
+   (2 hours 40 minutes for 1 day, as far as "starts in 1 day" still reads true). A player who joins 125 minutes before that game gets
    "starts in 2 hours" once, not again 5 minutes later when the 2-hour window opens; one who
    joins 25 hours before a game with 1 week and 1 day gets "starts in 1 day" once. Nothing is
    sent before a window has opened.

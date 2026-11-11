@@ -75,17 +75,17 @@ export type ReminderRunSummary = {
 
 /**
  * How soon a window that has not opened yet must open to go out with one that has: 15 minutes,
- * or a tenth of the window when that is longer (2 hours 24 minutes for a day).
+ * or a ninth of the window when that is longer (2 hours 40 minutes for a day).
  * - 15 minutes is three runs of the sweep (every 5 minutes), so a late joiner does not get the
- *   same reminder again a few minutes later. A tenth alone would not do that for small windows
+ *   same reminder again a few minutes later. A ninth alone would not do that for small windows
  *   (3 minutes for 30, less than one run).
- * - A tenth is how close leadText rounds the time left to the whole window, so the reminder sent
- *   now reads like the one it stands for. 15 minutes alone is too short for the day window:
- *   25 hours left already reads "starts in 1 day", and the day window would say it again an hour
- *   later.
+ * - A ninth matches leadText: it names the whole window while the time left is within a tenth of
+ *   the time left, which is up to ten ninths of the window (1600 minutes still reads "starts in
+ *   1 day"). So whatever is sent now reads exactly like the window it stands for, and that window
+ *   is never sent again with the same words.
  */
 function earlyMargin(window: number): number {
-  return Math.max(15, window / 10);
+  return Math.max(15, window / 9);
 }
 
 /**
