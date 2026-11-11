@@ -98,14 +98,15 @@ BEGIN
   IF _payee IS NULL OR NOT public.game_payments_allowed(_payee) THEN
     RETURN 'PAYMENT_DESTINATION_INVALID';
   END IF;
+  -- enforce_child_game_participation, for a player joining themselves (the server's roster write skips it): a declared
+  -- date of birth. Asked before the cohort rule, so a player with no birthday is told what to do: with
+  -- 20261111120000 (minor-safety gates) game_payments_allowed is false for them too, and would answer first.
+  IF NOT public.age_verified(_me) THEN
+    RETURN 'AGE_VERIFICATION_REQUIRED';
+  END IF;
   -- enforce_game_payment_cohort, for the player.
   IF NOT public.game_payments_allowed(_me) THEN
     RETURN 'PAYMENTS_NOT_AVAILABLE';
-  END IF;
-  -- enforce_child_game_participation, for a player joining themselves (the server's roster write skips it): a declared
-  -- date of birth.
-  IF NOT public.age_verified(_me) THEN
-    RETURN 'AGE_VERIFICATION_REQUIRED';
   END IF;
   -- enforce_child_game_participation: the paid place could not be given.
   IF NOT public.child_game_participation_allowed(_me) THEN

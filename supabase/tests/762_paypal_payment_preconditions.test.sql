@@ -151,9 +151,7 @@ UPDATE public.child_controls SET game_participation = true WHERE child_user_id =
 INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
 VALUES (t.id('nodob'), 'nodob@example.test', now(),
         jsonb_build_object('display_name', 'Nodob', 'account_type', 'player'));
-SELECT t.ok(NOT public.age_verified(t.id('nodob')) AND public.game_payments_allowed(t.id('nodob'))
-            AND public.child_game_participation_allowed(t.id('nodob')),
-  'setup: an account with no date of birth passes the payment and participation helpers');
+SELECT t.ok(NOT public.age_verified(t.id('nodob')), 'setup: an account with no date of birth');
 SELECT t.eq(pg_temp.code('nodob', 'g-open'), 'AGE_VERIFICATION_REQUIRED', 'an account with no declared age');
 
 -- Age range.
@@ -236,18 +234,21 @@ SELECT t.reset();
 
 -- ---- 6. the triggers are unchanged -----------------------------------------------------------------------------
 -- The migration defines two new functions and widens one CHECK; it replaces no trigger function. These are the
--- definitions 20261111100000 left in force. paypal_payment_block repeats parts of them, so if one of these is changed
--- on purpose, change paypal_payment_block to match and then update the hash here.
-SELECT t.eq(md5(pg_get_functiondef(p.oid)), w.hash, 'unchanged: ' || w.fn)
-  FROM (VALUES ('enforce_approval_before_payment',  '3ffff8c3b95ae10ce43cdc4197cc886a'),
-               ('enforce_game_payment_cohort',      'aadeafedb16085a27b6e67f46fc4abfa'),
-               ('enforce_payment_destination',      '9966e4bbbab1c529c669a5f0d0b4a6f8'),
-               ('enforce_guardian_before_payment',  'e75b6f828c5626f77418f279a2abcdc0'),
-               ('payment_submissions_state_guard',  '16e42f30df68ac4be5298e1370883c72'),
-               ('enforce_game_join_gate',           '9d4924a2d53915fca8fa245e15281a25'),
-               ('enforce_game_age_requirement',     'a978b62c4004040d8388fe5a87803788'),
-               ('enforce_child_game_participation', '81eec75a132cc28db4fc4926980e283b'),
-               ('enforce_host_block',               '6b1d17279ccbb3238ceecd2bde49ba2d')) AS w(fn, hash)
+-- definitions paypal_payment_block was checked against. It repeats parts of them, so if one of these is changed on
+-- purpose, change paypal_payment_block to match and then add the new hash here. Two have a second known definition,
+-- from 20261111120000 (minor-safety gates, #405), which may be applied before or after this migration: it refuses a
+-- player or payee with no date of birth, which paypal_payment_block already answers (AGE_VERIFICATION_REQUIRED,
+-- PAYMENT_DESTINATION_INVALID).
+SELECT t.ok(md5(pg_get_functiondef(p.oid)) = ANY (w.hashes), 'unchanged: ' || w.fn)
+  FROM (VALUES ('enforce_approval_before_payment',  ARRAY['3ffff8c3b95ae10ce43cdc4197cc886a']),
+               ('enforce_game_payment_cohort',      ARRAY['aadeafedb16085a27b6e67f46fc4abfa', '1dc979d906a05301645d9a67f42262c5']),
+               ('enforce_payment_destination',      ARRAY['9966e4bbbab1c529c669a5f0d0b4a6f8']),
+               ('enforce_guardian_before_payment',  ARRAY['e75b6f828c5626f77418f279a2abcdc0']),
+               ('payment_submissions_state_guard',  ARRAY['16e42f30df68ac4be5298e1370883c72']),
+               ('enforce_game_join_gate',           ARRAY['9d4924a2d53915fca8fa245e15281a25']),
+               ('enforce_game_age_requirement',     ARRAY['a978b62c4004040d8388fe5a87803788']),
+               ('enforce_child_game_participation', ARRAY['81eec75a132cc28db4fc4926980e283b', '918954dc17f017a0133454fddecea1c4']),
+               ('enforce_host_block',               ARRAY['6b1d17279ccbb3238ceecd2bde49ba2d'])) AS w(fn, hashes)
   JOIN pg_proc p ON p.proname = w.fn AND p.pronamespace = 'public'::regnamespace
  ORDER BY w.fn;
 -- And they behave as before for a manual payment claim (a signed-in player writing a pending claim).
