@@ -1,4 +1,5 @@
-import { loadStripe, Stripe } from "@stripe/stripe-js";
+// No @stripe/* import here: this module is read by Reels, /plans and the subscription hooks for every viewer. The
+// Stripe.js loader lives in stripe-loader.ts and is reached only when checkout opens.
 
 export type StripeEnv = "sandbox" | "live";
 
@@ -47,16 +48,6 @@ function paymentsEnvironment(): StripeEnv {
   throw new Error(
     "Stripe payments are not configured for this build. Complete Stripe go-live in your Lovable project to enable production checkout.",
   );
-}
-
-let stripePromise: Promise<Stripe | null> | null = null;
-
-export function getStripe(): Promise<Stripe | null> {
-  if (!stripePromise) {
-    paymentsEnvironment();
-    stripePromise = loadStripe(clientToken as string);
-  }
-  return stripePromise;
 }
 
 /**
