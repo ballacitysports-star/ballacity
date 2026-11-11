@@ -74,6 +74,7 @@ replay, naming both files: commit a migration to one folder only (keep the drizz
 | `740_business_listings.test.sql`               | Business listings (P2-4): listings are venues unless the owner says otherwise; only facility or business; only the owner changes it; signed-out visitors read the type, never contact details                                                                                                                 |
 | `750_team_chat.test.sql`                       | Team chat (P2-3): adults, 13-17s with a guardian and teammates messaging, and minors' guardians are in; no under-13, unguarded teen or stranger; pending until approved; rate limit, staff hide, member report                                                                                                |
 | `780_minor_safety_gates.test.sql`              | Minor-safety gates: a declared age to take a game place (any writer), accept a team invite, be added to an organization directly (adults only) or pay; no direct roster writes, no moving an org membership; payment handles and the PayPal merchant id only for an adult payee; two oracles closed           |
+| `790_guarded_minor_open_games.test.sql`        | A minor with a guardian takes a game place only on a request a current guardian approved, open games included (no direct join, deleting the request does not help, the server too); on an open game the guardian alone answers                                                                                |
 
 ## Races
 

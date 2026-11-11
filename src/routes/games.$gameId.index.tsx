@@ -188,6 +188,14 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
+import {
+  ASK_PARENT_AGAIN_LABEL,
+  ASK_PARENT_LABEL,
+  guardedOpenCopy,
+  guardedOpenStep,
+  guardianOnlyJoin,
+  guardianOnlyRequestKey,
+} from "@/lib/guarded-open-join";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -427,15 +435,6 @@ function GameDetail() {
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
   const hasGuardian = useHasActiveGuardian();
-  // A minor's request needs the host and a guardian; say who is still to answer.
-  const myWait =
-    !isHost && myReq
-      ? joinWait({
-          hostStatus: myReq.status,
-          needsGuardian: hasGuardian,
-          guardianApproved: !!myReq.guardian_approved_at,
-        })
-      : null;
   // Host only: which requests come from a minor with a guardian, and whether the
   // guardian has approved. Refetched when a request changes.
   const guardianNeedsQuery = useQuery({
@@ -881,10 +880,29 @@ function GameDetail() {
   const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
   const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
   const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
+  // A minor with a linked guardian on a game that needs no host approval asks their parent instead: the database
+  // gives them a place, or takes their payment, only on a request their guardian approved, and the host never answers
+  // it (20261111160000).
+  const guardianOnly = guardianOnlyJoin({ isHost, hasGuardian, requiresApproval });
+  // A minor's request needs the host and a guardian (on an open game, the guardian alone); say who is still to answer.
+  const myWait =
+    !isHost && myReq
+      ? joinWait({
+          hostStatus: myReq.status,
+          needsGuardian: hasGuardian,
+          guardianApproved: !!myReq.guardian_approved_at,
+          hostAnswers: !guardianOnly,
+        })
+      : null;
+  // null once they are on the roster, or when the parent-only path does not apply.
+  const parentStep = guardianOnly && !joined ? guardedOpenStep(myReq) : null;
+  // The main action asks the parent (first time, or again after a no).
+  const parentAsk = parentStep === "ask_parent" || parentStep === "declined";
   const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
-  const isRequestPending = myReq?.status === "pending";
+  // On an open game a guarded minor's request waits on the parent (myWait), not the host.
+  const isRequestPending = myReq?.status === "pending" && !guardianOnly;
   const isPaymentVerified = latestSub?.status === "verified";
   const isPaymentPending = latestSub?.status === "pending";
   // Approval-gated games treat approval as the *first* gate. Payment (if any)
@@ -940,6 +958,57 @@ function GameDetail() {
     // The host said yes but a guardian has not: nothing to join or pay yet.
     if (myWait?.onParent && !myWait.onHost) {
       toast.info("Waiting for your parent to approve. They can do it in their Parent Center.");
+      return;
+    }
+    // Open game, guarded minor: ask the parent. The request goes to the guardian only (the key marks it); the host is
+    // not notified and never has to answer it.
+    if (parentAsk) {
+      if (gate.locked) {
+        toast.error(gate.reason);
+        return;
+      }
+      if (spotsLeft <= 0) {
+        toast.error("This game is full.");
+        return;
+      }
+      const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
+      if (!requestHostId) {
+        toast.error("This host can't take requests yet.");
+        return;
+      }
+      if (myReq?.status === "rejected") {
+        if (capReached) {
+          toast.error(
+            `You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game.`,
+          );
+          return;
+        }
+        if (cooldownMs > 0) {
+          toast.error(`Please wait ${formatCooldownLabel(cooldownMs)} before asking again.`);
+          return;
+        }
+      }
+      setRequesting(true);
+      try {
+        const created = await createJoinRequest({
+          game_id: game.id,
+          host_id: requestHostId,
+          idempotency_key: guardianOnlyRequestKey(game.id),
+        });
+        setMyReq(created);
+        trackEvent("join_game", { game_id: game.id, kind: "guardian_request" });
+        toast.success("Asked your parent. You can join once they say yes.");
+      } catch (e) {
+        trackTaskError("request_to_join");
+        const msg = e instanceof Error ? e.message : "";
+        toast.error(
+          msg.includes("BLOCKED_BY_HOST")
+            ? "You can't request to join this game."
+            : msg || "Could not send the request.",
+        );
+      } finally {
+        setRequesting(false);
+      }
       return;
     }
     // Approved-but-unpaid on a paid game → route to pay page/status (don't
@@ -1563,8 +1632,14 @@ function GameDetail() {
                 <div className="font-display text-sm font-bold">You're invited to this game</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   The host invited you personally{inviteFrom ? "" : ""}. Tap{" "}
-                  {requiresApproval ? "“Request Spot”" : isPaid ? "“Pay Host”" : "“Join Run”"} below
-                  to confirm your spot.
+                  {parentAsk
+                    ? `“${ASK_PARENT_LABEL}”`
+                    : requiresApproval
+                      ? "“Request Spot”"
+                      : isPaid
+                        ? "“Pay Host”"
+                        : "“Join Run”"}{" "}
+                  below to confirm your spot.
                 </p>
               </div>
             </div>
@@ -1642,6 +1717,17 @@ function GameDetail() {
           myHoldLabel={myHoldLabel}
           myReq={myReq}
           myWait={myWait}
+          guardedOpen={
+            // Once a payment is under way the payment strip and banner take over.
+            parentStep &&
+            parentStep !== "waiting_parent" &&
+            !(parentStep === "cleared" && latestSub)
+              ? guardedOpenCopy(parentStep, {
+                  isPaid,
+                  declinedByGuardian: myReq?.reviewer_notes === "Declined by guardian",
+                })
+              : null
+          }
           refreshStatus={refreshStatus}
           requiresApproval={requiresApproval}
         />
@@ -1858,7 +1944,8 @@ function GameDetail() {
                   !isPaid &&
                   !gate.locked &&
                   spotsLeft > 0 &&
-                  !!user;
+                  !!user &&
+                  (!parentStep || parentStep === "cleared");
                 const canWaitlist =
                   !isParentMode &&
                   (isFull || viewerGate.waitlistOpen) &&
@@ -2697,7 +2784,7 @@ function GameDetail() {
                 const canEnterPaymentFlow =
                   spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
                 const paymentAction =
-                  isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
+                  isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow && !parentAsk;
                 const paymentSearch: { invite?: true; from?: string } = {};
                 if (isInvite) paymentSearch.invite = true;
                 if (inviteFrom) paymentSearch.from = inviteFrom;
@@ -2788,7 +2875,8 @@ function GameDetail() {
                         !isPending &&
                         spotsLeft > 0 &&
                         !(requiresApproval && !isApproved) &&
-                        !isPaid;
+                        !isPaid &&
+                        !parentAsk;
                       if (wantsLeave) {
                         setConfirmAction("leave");
                         return;
@@ -2849,6 +2937,11 @@ function GameDetail() {
                           aria-hidden
                         />
                         Join Waitlist
+                      </>
+                    ) : parentAsk ? (
+                      <>
+                        {parentStep === "declined" ? ASK_PARENT_AGAIN_LABEL : ASK_PARENT_LABEL} ·{" "}
+                        <LiveSpots />
                       </>
                     ) : requiresApproval && !isApproved ? (
                       <>

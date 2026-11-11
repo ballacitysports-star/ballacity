@@ -18,6 +18,8 @@ export type GameApprovalBannerProps = {
   myHoldLabel: string | null;
   myReq: JoinRequest | null;
   myWait: JoinWait | null;
+  /** A guarded minor on an open game: asking their parent, declined, or cleared to join or pay. */
+  guardedOpen?: { title: string; body: string } | null;
   refreshStatus: () => Promise<void>;
   requiresApproval: boolean;
 };
@@ -34,6 +36,7 @@ export function GameApprovalBanner({
   myHoldLabel,
   myReq,
   myWait,
+  guardedOpen = null,
   refreshStatus,
   requiresApproval,
 }: GameApprovalBannerProps) {
@@ -64,6 +67,20 @@ export function GameApprovalBanner({
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {!isHost && !myWait && guardedOpen && (
+        <div
+          className="rounded-2xl border border-coral/40 bg-coral/10 p-4 flex items-start gap-3"
+          role="status"
+          aria-live="polite"
+          data-testid="guarded-open-join"
+        >
+          <Clock className="h-5 w-5 shrink-0 mt-0.5 text-coral" />
+          <div className="min-w-0">
+            <div className="font-display text-sm font-bold">{guardedOpen.title}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">{guardedOpen.body}</p>
           </div>
         </div>
       )}

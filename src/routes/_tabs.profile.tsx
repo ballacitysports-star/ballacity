@@ -82,6 +82,7 @@ import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
+import { isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -257,7 +258,12 @@ function PlayerProfile() {
           filter: `host_id=eq.${profileUser.id}`,
         },
         (payload) => {
-          applyPayload(payload as any, "host");
+          // A guarded minor's request to their guardian on an open game is not the host's to answer: the refresh
+          // below decides whether it shows, so it does not flash into the list first.
+          if (
+            !isGuardianOnlyRequest((payload as { new?: { idempotency_key?: string | null } }).new)
+          )
+            applyPayload(payload as any, "host");
           refreshRequests({ silent: true });
         },
       )
