@@ -35,6 +35,8 @@ type Details = {
   payeeMerchantId: string | null;
   captureId: string | null;
   captureStatus: string | null;
+  captureCount: number;
+  statusReason: string | null;
 };
 const details = (status: string, captureId: string | null = null): Details => ({
   status,
@@ -43,6 +45,8 @@ const details = (status: string, captureId: string | null = null): Details => ({
   payeeMerchantId: "HOSTMERCHANT1",
   captureId,
   captureStatus: captureId ? "COMPLETED" : null,
+  captureCount: captureId ? 1 : 0,
+  statusReason: null,
 });
 
 const h = vi.hoisted(() => ({
@@ -61,7 +65,15 @@ const h = vi.hoisted(() => ({
   insertError: {} as Record<string, { message: string } | undefined>,
   updateError: null as null | { message: string },
   notifications: 0,
-  paypal: { created: 0, looked: 0, captured: 0, refunded: [] as string[] },
+  paypal: {
+    created: 0,
+    looked: 0,
+    captured: 0,
+    refunded: [] as string[],
+    /** getOrderCapture calls (also counted in `looked`, which getOrder and getOrderCapture share). */
+    captureReads: 0,
+    createInputs: [] as { requestId?: string }[],
+  },
   getOrder: null as null | ((n: number) => Promise<unknown>),
   createOrder: null as null | (() => Promise<unknown>),
   captureOrder: null as null | (() => Promise<unknown>),
@@ -202,12 +214,18 @@ vi.mock("@/lib/paypal.server", async () => {
   const actual = await vi.importActual<typeof import("./paypal.server")>("./paypal.server");
   return {
     paypalPaymentMatches: actual.paypalPaymentMatches,
-    createOrder: async () => {
+    createOrder: async (input: { requestId?: string }) => {
       h.paypal.created += 1;
+      h.paypal.createInputs.push(input);
       return h.createOrder ? h.createOrder() : { orderId: "ORDER-1" };
     },
     getOrder: async () => {
       h.paypal.looked += 1;
+      return h.getOrder ? h.getOrder(h.paypal.looked) : details("APPROVED");
+    },
+    getOrderCapture: async () => {
+      h.paypal.looked += 1;
+      h.paypal.captureReads += 1;
       return h.getOrder ? h.getOrder(h.paypal.looked) : details("APPROVED");
     },
     captureOrder: async () => {
@@ -307,7 +325,14 @@ beforeEach(() => {
   h.insertError = {};
   h.updateError = null;
   h.notifications = 0;
-  h.paypal = { created: 0, looked: 0, captured: 0, refunded: [] };
+  h.paypal = {
+    created: 0,
+    looked: 0,
+    captured: 0,
+    refunded: [],
+    captureReads: 0,
+    createInputs: [],
+  };
   h.getOrder = null;
   h.captureOrder = null;
   h.refund = null;
@@ -784,6 +809,65 @@ describe("what PayPal answers to the capture (review)", () => {
     await expect(capture()).rejects.toThrow(PAYMENT_REFUNDED_MESSAGE);
     expect(h.paypal.refunded).toEqual(["CAPTURE-1"]);
     expect(h.submissions).toEqual([]);
+  });
+});
+
+describe("PayPal request ids and the capture read after a lost answer (F04 port)", () => {
+  it("each checkout attempt sends createOrder its own request id", async () => {
+    h.orders.clear();
+    await start();
+    h.orders.clear();
+    await start();
+    const ids = h.paypal.createInputs.map((i) => i.requestId);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) expect(id).toMatch(/^create-[0-9a-f-]{36}$/);
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  it("when the capture call fails, PayPal is asked for the order's capture, not only the order", async () => {
+    h.captureOrder = async () => {
+      throw new Error("socket hang up");
+    };
+    h.getOrder = async (n) =>
+      n === 1 ? details("APPROVED") : details("COMPLETED", "CAPTURE-LATE");
+    await expect(capture()).resolves.toMatchObject({ ok: true, already: false });
+    expect(h.paypal.captureReads).toBe(1);
+    expect(h.paypal.looked).toBe(2);
+  });
+
+  it("the capture read after a lost answer is checked by the capture's own amount: a mismatch is refunded", async () => {
+    h.captureOrder = async () => {
+      throw new Error("socket hang up");
+    };
+    h.getOrder = async (n) =>
+      n === 1
+        ? details("APPROVED")
+        : { ...details("COMPLETED", "CAPTURE-LATE"), amountValue: "99.00" };
+    await expect(capture()).rejects.toThrow(PAYMENT_REFUNDED_MESSAGE);
+    expect(h.paypal.refunded).toEqual(["CAPTURE-LATE"]);
+    expect(h.submissions).toEqual([]);
+  });
+
+  it("more than one capture on the order is never read as 'nothing captured': the order stays held for support", async () => {
+    h.captureOrder = async () => {
+      throw new Error("socket hang up");
+    };
+    h.getOrder = async (n) =>
+      n === 1 ? details("APPROVED") : { ...details("APPROVED"), captureCount: 2 };
+    await expect(capture()).rejects.toThrow(CAPTURE_UNCONFIRMED_MESSAGE);
+    expect(order().status).toBe("capturing");
+    expect(h.submissions).toEqual([]);
+    expect(h.reports.some((m) => /PAYPAL_CAPTURE_UNCONFIRMED/.test(m))).toBe(true);
+  });
+
+  it("a PENDING capture's reason reaches the report", async () => {
+    h.captureOrder = async () => ({
+      ...details("COMPLETED", "CAPTURE-1"),
+      captureStatus: "PENDING",
+      statusReason: "PENDING_REVIEW",
+    });
+    await expect(capture()).rejects.toThrow(CAPTURE_PENDING_MESSAGE);
+    expect(h.reports.some((m) => /PAYPAL_CAPTURE_PENDING.*PENDING_REVIEW/.test(m))).toBe(true);
   });
 });
 

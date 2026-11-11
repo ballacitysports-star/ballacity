@@ -350,6 +350,10 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
         currency: "USD",
         merchantId: quote.merchantId,
         description: `BallaCity: ${quote.title ?? "pickup game"}`,
+        // One PayPal-Request-Id per checkout attempt. createOrder resends with it when PayPal's answer is lost, so that
+        // resend returns this attempt's order instead of making a second one. A new attempt (the player presses the
+        // button again) gets a new id and a new order; an order nobody approves charges nothing.
+        requestId: `create-${crypto.randomUUID()}`,
       }));
     } catch (e) {
       // PayPal's own error (issue codes, auth failures) stays in the server log.
@@ -458,17 +462,18 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
     }
     if (!result || !result.captureId) {
       // PayPal did not show a capture (an error, a timeout, or an answer without one). Did the money move anyway? Ask
-      // PayPal what the order is now rather than guess.
-      const after = await paypal.getOrder(data.orderId).catch(() => null);
-      if (after && !after.captureId && after.status !== "COMPLETED") {
+      // PayPal what the order's capture is now rather than guess.
+      const after = await paypal.getOrderCapture(data.orderId).catch(() => null);
+      if (after && after.captureCount === 0 && after.status !== "COMPLETED") {
         // Not captured. After an error the order goes back to how it was so the player can try again.
         await moveOrder(supabaseAdmin, data.orderId, "capturing", {
           status: captureError ? order.status : "failed",
         });
         throw new Error(CAPTURE_DECLINED_MESSAGE);
       }
-      if (!after || !after.captureId) {
-        // Unknown: the order stays 'capturing' for a superadmin, and the player is not told it worked.
+      if (!after || after.captureCount !== 1 || !after.captureId) {
+        // Unknown (no answer, a capture with no id, or more than one capture): the order stays 'capturing' for a
+        // superadmin, and the player is not told it worked.
         await reportPaymentProblem("capture_unconfirmed", data.orderId, captureError);
         throw new Error(CAPTURE_UNCONFIRMED_MESSAGE);
       }
@@ -493,7 +498,9 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       await reportPaymentProblem(
         "capture_pending",
         data.orderId,
-        `capture ${captureId} status ${result.captureStatus ?? "none"}`,
+        `capture ${captureId} status ${result.captureStatus ?? "none"}${
+          result.statusReason ? ` reason ${result.statusReason}` : ""
+        }`,
       );
       throw new Error(CAPTURE_PENDING_MESSAGE);
     }
