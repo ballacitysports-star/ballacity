@@ -50,7 +50,7 @@ import { isAuthRefusal, isIgnorableError, isValidationError, messageOf } from "@
  * server-function serializer copies every own property, `cause` included, to the browser.)
  */
 
-/** Texts that only Postgres, PostgREST or the runtime write. */
+/** Texts that only Postgres, PostgREST, the Supabase gateway, Cloudflare or the Workers runtime write. */
 const FAILURE_TEXTS: readonly RegExp[] = [
   // The schema is not what the code expects: a migration not applied, or applied out of order.
   /\b(?:relation|table|view|column|function|procedure|type|schema|sequence) (?:"[^"]+"|[\w$]+(?:\.[\w$]+)+|[\w$.]+\([^)]*\))(?: of relation "[^"]+")? does not exist\b/i,
