@@ -83,6 +83,11 @@ describe("formatDatedWhen (push text)", () => {
     expect(formatDatedWhen({ date: mondayEvening })).toBe("Mon, Nov 9 · 6:00 PM");
   });
 
+  it("names the New York date when the UTC date is already the next day", () => {
+    // 10 PM on Tuesday in New York is 3 AM on Wednesday in UTC.
+    expect(formatDatedWhen({ date: "2026-11-11T03:00:00Z" })).toBe("Tue, Nov 10 · 10:00 PM");
+  });
+
   it("uses the same day and time format as the app's other game times, in daylight time too", () => {
     expect(formatDatedWhen({ date: "2026-07-04T22:00:00Z" })).toBe("Sat, Jul 4 · 6:00 PM");
     expect(formatDatedWhen({ date: "2026-07-04T22:00:00Z", allDay: null })).toMatch(TIME_RE);

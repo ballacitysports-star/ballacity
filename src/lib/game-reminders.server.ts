@@ -5,17 +5,20 @@
  *
  * Who gets one is decided on every run from the game's roster and join requests, not from the
  * reminder row alone (rows are written at join and at join request and are not cleared on leave):
- *   - a player with a place in the game (a game_participants row): the in-app reminder, and a push
- *     to their phone unless they switched game-reminder push off;
- *   - a player whose join request is still open (pending or approved, no place yet): the in-app
- *     reminder only;
+ *   - a player with a place in the game (a game_participants row), or whose request the host
+ *     approved for a game with no fee (and their guardian too, if they have an active guardian
+ *     link; see readRecipients): the in-app reminder, and a push to their phone unless they
+ *     switched game-reminder push off;
+ *   - a player whose join request is otherwise still open (pending, or approved but not yet a
+ *     place: a fee to pay, or a guardian still to approve): the in-app reminder only;
  *   - anyone else (declined, withdrew, left, removed): nothing, and their reminder row for that
  *     game is deleted so later runs stop checking it.
  *
  * Each reminder is CLAIMED before its notification is written: last_sent_offset moves only if
  * it is still above the offset being sent, so two callers at once (the app and the scheduler,
  * or two tabs) send it once. When several windows have opened at once (the player joined late),
- * one reminder goes out, for the smallest of them; the claim passes the larger ones with it.
+ * one reminder goes out, for the smallest of them, or for a smaller one that opens within its
+ * margin (dueOffset); the claim passes the larger ones with it.
  *
  * pg_net stops waiting for the scheduled call after 5 seconds, so a run stops claiming after
  * RUN_BUDGET_MS and leaves the rest due for the next run, and the pushes go out after the in-app
@@ -51,6 +54,10 @@ export type ReminderGame = {
   location: string | null;
   all_day: boolean | null;
   status?: string | null;
+  /** The game's payee (private_sec.game_payee is the host): only their payment settings count. */
+  host_id?: string | null;
+  /** The listed price, the fee when the payee has no payment settings for the game. */
+  price?: number | null;
 };
 
 export type ReminderRunSummary = {
@@ -67,21 +74,39 @@ export type ReminderRunSummary = {
 };
 
 /**
- * The window (minutes before start) to send now, or null: the SMALLEST window that has opened
- * and was not sent. Claiming it passes the larger ones too, so a player who joins 100 minutes
- * before a game with [1440, 120] gets one reminder, not "1 day" and then "2 hours" minutes later.
+ * How soon a window that has not opened yet must open to go out with one that has: 15 minutes,
+ * or a tenth of the window when that is longer (2 hours 24 minutes for a day).
+ * - 15 minutes is three runs of the sweep (every 5 minutes), so a late joiner does not get the
+ *   same reminder again a few minutes later. A tenth alone would not do that for small windows
+ *   (3 minutes for 30, less than one run).
+ * - A tenth is how close leadText rounds the time left to the whole window, so the reminder sent
+ *   now reads like the one it stands for. 15 minutes alone is too short for the day window:
+ *   25 hours left already reads "starts in 1 day", and the day window would say it again an hour
+ *   later.
+ */
+function earlyMargin(window: number): number {
+  return Math.max(15, window / 10);
+}
+
+/**
+ * The window (minutes before start) to send now, or null. Nothing is due until a window that
+ * was not sent has opened. Then the SMALLEST unsent window that has opened, or opens within its
+ * margin (earlyMargin), is sent, and claiming it passes the larger ones too: a player who joins
+ * 100 minutes before a game with [1440, 120] gets one reminder, not "1 day" and then "2 hours"
+ * minutes later, and one who joins 125 minutes before gets "2 hours" once, not again when the
+ * 2-hour window opens 5 minutes later. The margin never makes a reminder due by itself.
  */
 export function dueOffset(
   offsets: number[] | null,
   lastSent: number | null,
   minutesToStart: number,
 ): number | null {
-  const candidates = (offsets ?? [])
+  const unsent = (offsets ?? [])
     .map(Number)
     .filter((m) => Number.isFinite(m) && m > 0)
-    .filter((m) => m >= minutesToStart)
     .filter((m) => lastSent == null || m < lastSent);
-  return candidates.length > 0 ? Math.min(...candidates) : null;
+  if (!unsent.some((m) => m >= minutesToStart)) return null;
+  return Math.min(...unsent.filter((m) => m + earlyMargin(m) >= minutesToStart));
 }
 
 /**
@@ -121,13 +146,52 @@ export type ReminderAdmin = {
 
 const pairKey = (gameId: string, userId: string) => `${gameId}\u0000${userId}`;
 
+type SettingsRow = { game_id: string; host_id: string; entry_fee: number; created_at: string };
+type RequestRow = {
+  game_id: string;
+  player_id: string;
+  status: string;
+  guardian_approved_at: string | null;
+};
+
 /**
- * Who among these players holds a place in each game, and who has an open join request: one
- * roster query and one request query for the run. Throws when either cannot be read, so nothing
- * is sent or deleted on a guess; the reminders stay due for the next run.
+ * The games that charge no fee, by the rule the app and the database use (refreshStatus on the
+ * game page, quoteGamePayPalFee, enforce_game_join_gate): the entry fee of the newest payment
+ * settings row held by the game's payee, or the game's price when the payee has none. The payee is
+ * private_sec.game_payee, the game's host (hosted_games.host_id), read with the games instead of
+ * one game_payee_id call per game; a row held by anyone else is ignored, as there.
  */
-async function readRecipients(admin: ReminderAdmin, gameIds: string[], userIds: string[]) {
-  const [roster, requests] = await Promise.all([
+function gamesWithoutFee(games: ReminderGame[], settings: SettingsRow[]): Set<string> {
+  const payeeOf = new Map(games.map((g) => [String(g.id), g.host_id]));
+  const newest = new Map<string, SettingsRow>();
+  for (const s of settings) {
+    const payee = payeeOf.get(String(s.game_id));
+    if (payee == null || String(s.host_id) !== String(payee)) continue;
+    const seen = newest.get(String(s.game_id));
+    if (!seen || String(s.created_at) > String(seen.created_at)) newest.set(String(s.game_id), s);
+  }
+  const fee = (g: ReminderGame) => Number(newest.get(String(g.id))?.entry_fee ?? g.price ?? 0);
+  return new Set(games.filter((g) => !(fee(g) > 0)).map((g) => String(g.id)));
+}
+
+/**
+ * Who among these players has a place in each game, and who has an open join request, from one
+ * query per table for the run: the roster (game_participants), open requests (join_requests,
+ * pending or approved), the games' payment settings and the players' active guardian links.
+ *
+ * A place is a roster row, or a request the host approved for a game with no fee: nothing on the
+ * server rosters that player (reviewJoinRequest only changes the status; the game page's
+ * refreshStatus adds the row when they next open it), and they were told "You're in". For a
+ * player with an active guardian link (guardian_links, status active) the request also needs the
+ * guardian's approval (guardian_approved_at), as the game page and the roster gate require.
+ * Pending requests, and approved ones on a paid game, are open requests without a place.
+ *
+ * Throws when any read fails, so nothing is sent or deleted on a guess; the reminders stay due
+ * for the next run.
+ */
+async function readRecipients(admin: ReminderAdmin, games: ReminderGame[], userIds: string[]) {
+  const gameIds = games.map((g) => String(g.id));
+  const [roster, requests, settings, guardians] = await Promise.all([
     admin
       .from("game_participants")
       .select("game_id, user_id")
@@ -135,23 +199,40 @@ async function readRecipients(admin: ReminderAdmin, gameIds: string[], userIds: 
       .in("user_id", userIds) as Q<unknown>,
     admin
       .from("join_requests")
-      .select("game_id, player_id, status")
+      .select("game_id, player_id, status, guardian_approved_at")
       .in("game_id", gameIds)
       .in("player_id", userIds)
       .in("status", OPEN_REQUEST_STATUSES) as Q<unknown>,
+    admin
+      .from("game_payment_settings")
+      .select("game_id, host_id, entry_fee, created_at")
+      .in("game_id", gameIds) as Q<unknown>,
+    admin
+      .from("guardian_links")
+      .select("child_user_id")
+      .in("child_user_id", userIds)
+      .eq("status", "active") as Q<unknown>,
   ]);
   if (roster.error) throw new Error(`roster read failed: ${roster.error.message}`);
   if (requests.error) throw new Error(`join request read failed: ${requests.error.message}`);
+  if (settings.error) throw new Error(`payment settings read failed: ${settings.error.message}`);
+  if (guardians.error) throw new Error(`guardian link read failed: ${guardians.error.message}`);
+  const free = gamesWithoutFee(games, (settings.data ?? []) as SettingsRow[]);
+  const guarded = new Set(
+    ((guardians.data ?? []) as { child_user_id: string }[]).map((l) => String(l.child_user_id)),
+  );
   const places = new Set(
     ((roster.data ?? []) as { game_id: string; user_id: string }[]).map((p) =>
       pairKey(String(p.game_id), String(p.user_id)),
     ),
   );
-  const openRequests = new Set(
-    ((requests.data ?? []) as { game_id: string; player_id: string }[]).map((q) =>
-      pairKey(String(q.game_id), String(q.player_id)),
-    ),
-  );
+  const openRequests = new Set<string>();
+  for (const q of (requests.data ?? []) as RequestRow[]) {
+    const key = pairKey(String(q.game_id), String(q.player_id));
+    openRequests.add(key);
+    const guardianOk = !guarded.has(String(q.player_id)) || q.guardian_approved_at != null;
+    if (q.status === "approved" && free.has(String(q.game_id)) && guardianOk) places.add(key);
+  }
   return { places, openRequests };
 }
 
@@ -241,7 +322,7 @@ export async function sendDueGameReminders(
   const gameIds = [...new Set(reminders.map((r) => r.game_id))];
   const { data: games, error: gErr } = await (admin
     .from("hosted_games")
-    .select("id, title, date, location, all_day, status")
+    .select("id, title, date, location, all_day, status, host_id, price")
     .in("id", gameIds)
     .gt("date", new Date(now).toISOString())
     .lt("date", new Date(now + 8 * 86_400_000).toISOString()) as Q<unknown>);
@@ -267,8 +348,9 @@ export async function sendDueGameReminders(
   summary.deferred += due.length - batch.length;
 
   const batchUsers = [...new Set(batch.map((d) => d.r.user_id))];
+  const batchGames = [...new Map(batch.map((d) => [d.r.game_id, d.game])).values()];
   const [{ places, openRequests }, wantsPush] = await Promise.all([
-    readRecipients(admin, [...new Set(batch.map((d) => d.r.game_id))], batchUsers),
+    readRecipients(admin, batchGames, batchUsers),
     playersWantingPush(admin, batchUsers),
   ]);
   const hasPlace = (d: Due) => places.has(pairKey(d.r.game_id, d.r.user_id));

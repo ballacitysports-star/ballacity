@@ -11,8 +11,9 @@ go out.
 ## Before a push goes out (`deliverPush`, `src/lib/push.server.ts`)
 
 The app's pushes go out through `deliverPush` (game reminders, notifications
-sent from the app, guardian prompts; the settings page's test push and the
-flush below send on their own). It first asks `curfewGateFor`
+sent from the app, guardian prompts; the test push in the superadmin Ops tab
+(`PushTester`, `sendTestPushToSelf`) and the flush below send on their own). It
+first asks `curfewGateFor`
 (`src/lib/push-curfew.server.ts`), which reads the active age policy
 (`app_settings`), the recipient's profile (age cohort, time zone) and their
 guardian controls (`child_controls`):
@@ -31,8 +32,13 @@ guardian controls (`child_controls`):
 - A push with `expiresAt` that would be delivered at or after it (now, or when
   its hold ends) is dropped: not sent, not held. Game reminders pass the game's
   start. The flush does not check the expiry again (`scheduled_notifications`
-  has no column for it), so a held push whose window moves, or whose settings
-  check keeps failing through the flush's retries, can still arrive late.
+  has no column for it), so a held push can still arrive late when:
+  - its quiet window moves, and the flush waits for the new end;
+  - its settings check keeps failing through the flush's retries;
+  - it was held because the settings check failed: held with `deliver_after` =
+    now, it passes the expiry check, and if the flush then finds the minor
+    inside their quiet window, it moves the push to the end of that window
+    without checking the expiry.
 
 Each outcome writes a `notification_delivery_log` row: `sent`, `failed`, or
 `skipped` with the reason in `error` (`guardian_notifications_off`,
@@ -66,18 +72,31 @@ seconds for the answer.
    are skipped.
 2. Finds each reminder's due window: the **smallest** window that has opened and was not sent. A
    player who joins 100 minutes before a game with reminders at 1 day and 2 hours gets one
-   reminder, for the 2-hour window; the 1-day window passes with it.
+   reminder, for the 2-hour window; the 1-day window passes with it. A smaller window that opens
+   soon goes with it too: within 15 minutes, or a tenth of the window when that is longer
+   (2 hours 24 minutes for 1 day). A player who joins 125 minutes before that game gets
+   "starts in 2 hours" once, not again 5 minutes later when the 2-hour window opens; one who
+   joins 25 hours before a game with 1 week and 1 day gets "starts in 1 day" once. Nothing is
+   sent before a window has opened.
 3. Takes on at most 100 due reminders, soonest game first, and reads with one query each: the
    games' roster (`game_participants`), their open join requests (`join_requests` with status
-   `pending` or `approved`), and the players' notification preferences.
+   `pending` or `approved`), the games' payment settings (`game_payment_settings`), the players'
+   active guardian links (`guardian_links`), and the players' notification preferences.
 4. Decides who gets a reminder:
-   - a place in the game: the in-app reminder and a push;
-   - an open request (pending or approved, no place yet): the in-app reminder only;
+   - a place in the game, or a request the host approved for a game with no fee: the in-app
+     reminder and a push. The fee is the app's: the entry fee in the newest payment settings of
+     the game's payee (its host), or else the game's price. Nothing on the server puts an
+     approved player of a free game on the roster (the game page does when they next open it),
+     and they were told "You're in". A player with an active guardian link also needs their
+     guardian's approval on the request (`guardian_approved_at`), as the game page and the roster
+     gate require;
+   - any other open request (pending, or approved with a fee to pay or a guardian still to
+     approve): the in-app reminder only;
    - neither (declined, withdrew, left, removed): nothing, and their reminder row for that game
      is deleted, unless they saved it again after the run read it.
 
-   If the roster or the requests cannot be read, the run fails without sending or deleting
-   anything, and the reminders stay due.
+   If the roster, the requests, the payment settings or the guardian links cannot be read, the
+   run fails without sending or deleting anything, and the reminders stay due.
 5. Goes through the reminders in order until the run has taken 3 seconds. For each, it claims
    it (so the scheduler and the app, or two runs, send it once; the claim passes the larger
    windows too) and writes the in-app notification: `<game> starts in <time left>`, worded from

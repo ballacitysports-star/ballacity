@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { formatDatedWhen, formatNotificationWhen } from "./format";
 import {
   dueOffset,
@@ -47,13 +47,21 @@ function columnsOf(table: string): string[] {
 }
 
 type Pair = [gameId: string, userId: string];
-type JoinRequest = { game_id: string; player_id: string; status: string };
+type JoinRequest = {
+  game_id: string;
+  player_id: string;
+  status: string;
+  guardian_approved_at?: string | null;
+};
+type PaymentSettings = { game_id: string; host_id: string; entry_fee: number; created_at: string };
+type GuardianLink = { child_user_id: string; status: string };
 
 /**
  * An in-memory admin client for game_reminders, hosted_games, notifications,
  * notification_preferences (`prefs`: user id → stored prefs; no entry, no row),
- * game_participants (`roster`; by default every reminder's player holds a place) and
- * join_requests. A query runs when it is awaited, as PostgREST's does.
+ * game_participants (`roster`; by default every reminder's player holds a place),
+ * join_requests, game_payment_settings (`settings`) and guardian_links (`guardianLinks`).
+ * A query runs when it is awaited, as PostgREST's does.
  */
 function fakeAdmin(
   reminders: ReminderRow[],
@@ -64,8 +72,12 @@ function fakeAdmin(
     failPrefs?: boolean;
     roster?: Pair[];
     requests?: JoinRequest[];
+    settings?: PaymentSettings[];
+    guardianLinks?: GuardianLink[];
     failRoster?: boolean;
     failRequests?: boolean;
+    failSettings?: boolean;
+    failGuardians?: boolean;
     /** Runs as a claim is made, before it is checked: another caller can get there first. */
     beforeClaim?: () => void;
     /** Runs as a delete is sent, before it is applied. */
@@ -83,10 +95,14 @@ function fakeAdmin(
       Object.entries(opts.prefs ?? {}).map(([user_id, prefs]) => ({ user_id, prefs })),
     game_participants: () => roster.map(([game_id, user_id]) => ({ game_id, user_id })),
     join_requests: () => opts.requests ?? [],
+    game_payment_settings: () => opts.settings ?? [],
+    guardian_links: () => opts.guardianLinks ?? [],
   };
   const down = (opts.failPrefs ? ["notification_preferences"] : [])
     .concat(opts.failRoster ? ["game_participants"] : [])
-    .concat(opts.failRequests ? ["join_requests"] : []);
+    .concat(opts.failRequests ? ["join_requests"] : [])
+    .concat(opts.failSettings ? ["game_payment_settings"] : [])
+    .concat(opts.failGuardians ? ["guardian_links"] : []);
 
   const admin: ReminderAdmin = {
     from(table: string) {
@@ -156,12 +172,15 @@ function fakeAdmin(
   return { admin, notifications, readsOf, deleted };
 }
 
+/** A free game (price 0, no payment settings) hosted by "host", unless `over` says otherwise. */
 const game = (id: string, startsIn: number, over: Partial<ReminderGame> = {}): ReminderGame => ({
   id,
   title: `Game ${id}`,
   date: inMinutes(startsIn),
   location: "Court 1",
   all_day: false,
+  host_id: "host",
+  price: 0,
   ...over,
 });
 const rem = (
@@ -188,6 +207,20 @@ describe("dueOffset", () => {
     expect(dueOffset([10080, 1440, 120], null, 1000)).toBe(1440);
     expect(dueOffset([1440, 120], null, 2000)).toBeNull();
     expect(dueOffset([], null, 10)).toBeNull();
+  });
+
+  it("sends a smaller window that opens within its margin with the one that has opened (P2-7 re-review)", () => {
+    // 15 minutes for the 2-hour window...
+    expect(dueOffset([1440, 120], null, 125)).toBe(120);
+    expect(dueOffset([1440, 120], null, 135)).toBe(120);
+    expect(dueOffset([1440, 120], null, 136)).toBe(1440);
+    // ...a tenth (2 hours 24 minutes) for the day window.
+    expect(dueOffset([10080, 1440], null, 1500)).toBe(1440);
+    expect(dueOffset([10080, 1440], null, 1584)).toBe(1440);
+    expect(dueOffset([10080, 1440], null, 1585)).toBe(10080);
+    // The margin never makes a reminder due by itself: something must have opened.
+    expect(dueOffset([120], null, 125)).toBeNull();
+    expect(dueOffset([1440, 120], 1440, 125)).toBeNull();
   });
 });
 
@@ -282,6 +315,29 @@ describe("sendDueGameReminders: one reminder when several windows are open (P2-7
     expect(notifications).toHaveLength(1);
   });
 
+  it("a player who joins 125 minutes before a [1 day, 2 hours] game gets one reminder across runs at T and T+5", async () => {
+    const reminders = [rem("r1", "u1", "g1", [1440, 120])];
+    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 125)]);
+    await sendDueGameReminders(admin, { now: NOW });
+    // The 2-hour window opens 5 minutes later: it goes now, with the 1-day window.
+    expect(reminders[0].last_sent_offset).toBe(120);
+    await sendDueGameReminders(admin, { now: NOW + 5 * 60_000 });
+    expect(notifications.map((n) => n.title)).toEqual(["Game g1 starts in 2 hours"]);
+    expect(pushes().map((p) => p.title)).toEqual(["Game g1 starts in 2 hours"]);
+  });
+
+  it("a player who joins 1500 minutes before a [1 week, 1 day] game gets one reminder, not 1 day twice", async () => {
+    const reminders = [rem("r1", "u1", "g1", [10080, 1440])];
+    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 1500)]);
+    await sendDueGameReminders(admin, { now: NOW });
+    expect(reminders[0].last_sent_offset).toBe(1440);
+    // The day window opens an hour later; nothing more is sent then or after.
+    await sendDueGameReminders(admin, { now: NOW + 60 * 60_000 });
+    await sendDueGameReminders(admin, { now: NOW + 65 * 60_000 });
+    expect(notifications.map((n) => n.title)).toEqual(["Game g1 starts in 1 day"]);
+    expect(pushes()).toHaveLength(1);
+  });
+
   it("still sends a later window once it opens", async () => {
     const reminders = [rem("r1", "u1", "g1", [1440, 30])];
     const { admin, notifications } = fakeAdmin(reminders, [game("g1", 1435)]);
@@ -295,13 +351,13 @@ describe("sendDueGameReminders: one reminder when several windows are open (P2-7
 });
 
 describe("sendDueGameReminders: who gets a reminder (P2-7 review)", () => {
-  it("pushes only to players with a place; an open request gets the in-app reminder only", async () => {
+  it("pushes only to players with a place; an open request on a paid game gets the in-app reminder only", async () => {
     const reminders = [
       rem("r1", "u1", "g1", [120]), // on the roster
       rem("r2", "u2", "g1", [120]), // request pending
-      rem("r3", "u3", "g1", [120]), // request approved, no place yet (e.g. not paid)
+      rem("r3", "u3", "g1", [120]), // request approved, no place yet: the fee is not paid
     ];
-    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 100)], {
+    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 100, { price: 10 })], {
       roster: [["g1", "u1"]],
       requests: [
         { game_id: "g1", player_id: "u2", status: "pending" },
@@ -373,7 +429,7 @@ describe("sendDueGameReminders: who gets a reminder (P2-7 review)", () => {
     expect(notifications).toHaveLength(0);
   });
 
-  it("reads the roster, the open requests and the preferences once per run, for every due player", async () => {
+  it("reads the roster, the open requests, the fees, the guardian links and the preferences once per run, for every due player", async () => {
     const reminders = ["u1", "u2", "u3"].flatMap((u, i) => [
       rem(`a${i}`, u, "g1", [120]),
       rem(`b${i}`, u, "g2", [120]),
@@ -382,12 +438,16 @@ describe("sendDueGameReminders: who gets a reminder (P2-7 review)", () => {
     expect((await sendDueGameReminders(admin, { now: NOW })).sent).toBe(6);
     expect(readsOf("game_participants")).toBe(1);
     expect(readsOf("join_requests")).toBe(1);
+    expect(readsOf("game_payment_settings")).toBe(1);
+    expect(readsOf("guardian_links")).toBe(1);
     expect(readsOf("notification_preferences")).toBe(1);
   });
 
   it.each([
     ["roster", { failRoster: true }],
     ["join requests", { failRequests: true }],
+    ["payment settings", { failSettings: true }],
+    ["guardian links", { failGuardians: true }],
   ] as const)(
     "sends and deletes nothing when the %s cannot be read; the reminders stay due",
     async (_what, failure) => {
@@ -403,6 +463,106 @@ describe("sendDueGameReminders: who gets a reminder (P2-7 review)", () => {
       expect(reminders.map((r) => r.last_sent_offset)).toEqual([null, null]);
     },
   );
+});
+
+describe("sendDueGameReminders: an approved request on a free game is a place (P2-7 re-review)", () => {
+  const approved = (gameId: string, player = "u1", over: Partial<JoinRequest> = {}) => ({
+    game_id: gameId,
+    player_id: player,
+    status: "approved",
+    ...over,
+  });
+  const fee = (gameId: string, entryFee: number, hostId = "host", createdAt = READ_AT) => ({
+    game_id: gameId,
+    host_id: hostId,
+    entry_fee: entryFee,
+    created_at: createdAt,
+  });
+
+  it("pushes to a player approved for a game with no fee, by the app's fee rule; on a paid game the reminder stays in-app", async () => {
+    const reminders = ["g1", "g2", "g3", "g4", "g5"].map((g) => rem(`r-${g}`, "u1", g, [120]));
+    reminders.push(rem("r-pending", "u2", "g1", [120]));
+    const { admin, notifications } = fakeAdmin(
+      reminders,
+      [
+        game("g1", 101), // no payment settings, price 0: free
+        game("g2", 102, { price: 15 }), // the payee's settings say 0, and they win over the price
+        game("g3", 103, { price: 10 }), // no payment settings, price 10: paid
+        game("g4", 104), // the payee's settings say 12: paid
+        game("g5", 105), // the payee's say 20; a newer row held by someone else is ignored
+      ],
+      {
+        roster: [],
+        requests: [
+          ...["g1", "g2", "g3", "g4", "g5"].map((g) => approved(g)),
+          { game_id: "g1", player_id: "u2", status: "pending" }, // pending: in-app only
+        ],
+        settings: [
+          fee("g2", 0),
+          fee("g4", 12),
+          fee("g5", 20),
+          fee("g5", 0, "someone-else", "2026-11-05T09:00:00+00:00"),
+        ],
+      },
+    );
+    const out = await sendDueGameReminders(admin, { now: NOW });
+    expect(notifications.map((n) => [n.user_id, n.link])).toEqual([
+      ["u1", "/games/g1"],
+      ["u2", "/games/g1"],
+      ["u1", "/games/g2"],
+      ["u1", "/games/g3"],
+      ["u1", "/games/g4"],
+      ["u1", "/games/g5"],
+    ]);
+    expect(pushes().map((p) => [p.userId, p.url])).toEqual([
+      ["u1", "/games/g1"],
+      ["u1", "/games/g2"],
+    ]);
+    expect(out).toMatchObject({ sent: 6, pushed: 2, removed: 0 });
+  });
+
+  it("a guarded child's approved request on a free game gets the push only once their guardian approved it", async () => {
+    const reminders = ["kid1", "kid2", "kid3"].map((u) => rem(`r-${u}`, u, "g1", [120]));
+    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 100)], {
+      roster: [],
+      requests: [
+        approved("g1", "kid1"), // the guardian has not approved it yet: in-app only
+        approved("g1", "kid2", { guardian_approved_at: "2026-11-07T18:00:00+00:00" }),
+        approved("g1", "kid3"), // their guardian link was revoked: no guardian to wait for
+      ],
+      guardianLinks: [
+        { child_user_id: "kid1", status: "active" },
+        { child_user_id: "kid2", status: "active" },
+        { child_user_id: "kid3", status: "revoked" },
+      ],
+    });
+    await sendDueGameReminders(admin, { now: NOW });
+    expect(notifications.map((n) => n.user_id)).toEqual(["kid1", "kid2", "kid3"]);
+    expect(pushes().map((p) => p.userId)).toEqual(["kid2", "kid3"]);
+  });
+
+  it("takes the payee as the database does: every private_sec.game_payee returns the game's host", () => {
+    // The sweep reads the payee from hosted_games.host_id with the games, not with one
+    // game_payee_id call per game, so a migration that changes who the payee is (a minor host's
+    // payment manager) has to change gamesWithoutFee too.
+    const definitions = ["supabase/migrations", "drizzle/migrations"]
+      .flatMap((dir) =>
+        readdirSync(dir)
+          .filter((f) => f.endsWith(".sql"))
+          .map((f) => readFileSync(`${dir}/${f}`, "utf8")),
+      )
+      .flatMap((sql) =>
+        sql.split(/create\s+(?:or\s+replace\s+)?function\s+private_sec\.game_payee\b/i).slice(1),
+      )
+      .map((rest) => rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ").trim());
+    expect(definitions.length).toBeGreaterThan(0);
+    for (const d of definitions) {
+      expect(d, "private_sec.game_payee changed: update gamesWithoutFee").toBe(
+        "(_game_id text) RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO '' " +
+          "AS $$ SELECT g.host_id FROM public.hosted_games g WHERE g.id = _game_id $$",
+      );
+    }
+  });
 });
 
 describe("sendDueGameReminders pushes reminders to phones (P2-7)", () => {
@@ -533,14 +693,24 @@ describe("sendDueGameReminders pushes reminders to phones (P2-7)", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const evening = Date.parse("2026-11-09T00:30:00Z");
     vi.setSystemTime(evening);
-    const reminders = [rem("r1", "u1", "g1", [1440]), rem("r2", "u1", "g2", [10080])];
+    const reminders = [
+      rem("r1", "u1", "g1", [1440]),
+      rem("r2", "u1", "g2", [10080]),
+      rem("r3", "u1", "g3", [10080]),
+    ];
     const { admin } = fakeAdmin(reminders, [
       { id: "g1", title: "Run", date: "2026-11-09T23:00:00Z", location: null, all_day: false },
       // An all-day game is stored as midnight in New York.
       { id: "g2", title: "Camp", date: "2026-11-10T05:00:00Z", location: null, all_day: true },
+      // 10 PM on Tuesday in New York is already Wednesday in UTC.
+      { id: "g3", title: "Late run", date: "2026-11-11T03:00:00Z", location: null, all_day: false },
     ]);
     await sendDueGameReminders(admin, { now: evening });
-    expect(pushes().map((p) => p.body)).toEqual(["Mon, Nov 9 · 6:00 PM", "Tue, Nov 10 (all day)"]);
+    expect(pushes().map((p) => p.body)).toEqual([
+      "Mon, Nov 9 · 6:00 PM",
+      "Tue, Nov 10 (all day)",
+      "Tue, Nov 10 · 10:00 PM",
+    ]);
     expect(
       pushes()
         .map((p) => p.body)
