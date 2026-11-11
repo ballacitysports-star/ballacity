@@ -145,7 +145,7 @@ beforeEach(() => {
   h.playerRpcs = [];
   h.order = {
     order_id: "ORDER-1",
-    game_id: "g1",
+    game_id: "g-order",
     player_id: PLAYER,
     host_id: HOST,
     amount_cents: 1000,
@@ -216,11 +216,14 @@ describe("capturing an approved PayPal order", () => {
     expect(payments()).toEqual([]);
   });
 
-  it("captures and records the payment when the rule allows it", async () => {
+  it("captures and records the payment when the rule allows it, asking about the order's own game", async () => {
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).resolves.toEqual({
       ok: true,
       already: false,
     });
+    expect(h.playerRpcs).toEqual([
+      { name: "game_payment_guardian_ready", args: { _game_id: "g-order" } },
+    ]);
     expect(h.paypal.captured).toBe(1);
     expect(payments()).toHaveLength(1);
     expect(h.rostered).toEqual([PLAYER]);

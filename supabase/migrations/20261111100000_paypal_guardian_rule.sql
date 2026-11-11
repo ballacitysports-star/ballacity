@@ -12,7 +12,10 @@
 --   3. public.game_payment_guardian_ready(game): whether the signed-in caller may pay for the game as far as the
 --      guardian rule goes. The server asks it, as the player, before creating a PayPal order and again right before
 --      capturing one, and refuses (nothing is charged) when it is not true.
--- Rollback: docs/rollbacks/20261111100000_paypal_guardian_rule.down.sql (guarded).
+-- Deploy order: this migration BEFORE the app. The server's check fails closed, so a published server without this
+-- function refuses every PayPal checkout.
+-- Rollback: docs/rollbacks/20261111100000_paypal_guardian_rule.down.sql (guarded). Roll it back before
+-- 20261110120000's rollback, which refuses while this one is applied.
 
 -- ============================================================ 1. the payment gate's rule
 CREATE OR REPLACE FUNCTION private_sec.guardian_payment_approval_missing(_player uuid, _game_id text)
@@ -69,5 +72,5 @@ AS $$
   SELECT auth.uid() IS NOT NULL
      AND NOT private_sec.guardian_payment_approval_missing(auth.uid(), _game_id);
 $$;
-REVOKE ALL ON FUNCTION public.game_payment_guardian_ready(text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.game_payment_guardian_ready(text) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.game_payment_guardian_ready(text) TO authenticated;
