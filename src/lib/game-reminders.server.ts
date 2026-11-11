@@ -3,18 +3,38 @@
  * interval) and the scheduled sweep (pg_cron → /api/public/reminders/run), so reminders arrive
  * while the app is closed.
  *
+ * Who gets one is decided on every run from the game's roster and join requests, not from the
+ * reminder row alone (rows are written at join and at join request and are not cleared on leave):
+ *   - a player with a place in the game (a game_participants row): the in-app reminder, and a push
+ *     to their phone unless they switched game-reminder push off;
+ *   - a player whose join request is still open (pending or approved, no place yet): the in-app
+ *     reminder only;
+ *   - anyone else (declined, withdrew, left, removed): nothing, and their reminder row for that
+ *     game is deleted so later runs stop checking it.
+ *
  * Each reminder is CLAIMED before its notification is written: last_sent_offset moves only if
  * it is still above the offset being sent, so two callers at once (the app and the scheduler,
- * or two tabs) send it once.
+ * or two tabs) send it once. When several windows have opened at once (the player joined late),
+ * one reminder goes out, for the smallest of them; the claim passes the larger ones with it.
  *
- * Once the in-app notification is written, the reminder also goes to the player's phone through
- * deliverPush (OneSignal), unless they switched game-reminder push off. deliverPush holds a
- * minor's push during their quiet hours for the flush job and records each outcome in
- * notification_delivery_log.
+ * pg_net stops waiting for the scheduled call after 5 seconds, so a run stops claiming after
+ * RUN_BUDGET_MS and leaves the rest due for the next run, and the pushes go out after the in-app
+ * rows are written, PUSH_CONCURRENCY at a time. deliverPush holds a minor's push during their
+ * quiet hours for the flush job (or drops it if it would arrive once the game has started) and
+ * records each outcome in notification_delivery_log.
  */
-import { formatNotificationWhen } from "@/lib/format";
+import { formatDatedWhen, formatNotificationWhen } from "@/lib/format";
 import { isAllowedIn, mergeNotifPrefs } from "@/lib/notification-prefs-core";
-import { deliverPush } from "@/lib/push.server";
+import { deliverPush, type PushInput } from "@/lib/push.server";
+
+/** A run stops claiming reminders once it has taken this long; the rest stay due. */
+export const RUN_BUDGET_MS = 3_000;
+/** Pushes in flight at once. */
+export const PUSH_CONCURRENCY = 4;
+/** Due reminders one run takes on, soonest game first. Also keeps its .in() lists short. */
+export const MAX_DUE_PER_RUN = 100;
+/** Join request statuses that are still open: the player may yet get a place. */
+const OPEN_REQUEST_STATUSES = ["pending", "approved"];
 
 export type ReminderRow = {
   id: string;
@@ -22,6 +42,7 @@ export type ReminderRow = {
   game_id: string;
   offsets: number[] | null;
   last_sent_offset: number | null;
+  updated_at: string;
 };
 export type ReminderGame = {
   id: string;
@@ -32,7 +53,24 @@ export type ReminderGame = {
   status?: string | null;
 };
 
-/** The offset (minutes before start) to send now, or null. The largest window that has opened and was not sent. */
+export type ReminderRunSummary = {
+  /** In-app reminders written. */
+  sent: number;
+  /** Reminders whose game is still ahead. */
+  checked: number;
+  /** Pushes handed to deliverPush (it may still hold or skip one; see the delivery log). */
+  pushed: number;
+  /** Reminder rows deleted: the player no longer has a place or an open request. */
+  removed: number;
+  /** Due reminders left for the next run: past the run's budget or its cap. */
+  deferred: number;
+};
+
+/**
+ * The window (minutes before start) to send now, or null: the SMALLEST window that has opened
+ * and was not sent. Claiming it passes the larger ones too, so a player who joins 100 minutes
+ * before a game with [1440, 120] gets one reminder, not "1 day" and then "2 hours" minutes later.
+ */
 export function dueOffset(
   offsets: number[] | null,
   lastSent: number | null,
@@ -42,17 +80,24 @@ export function dueOffset(
     .map(Number)
     .filter((m) => Number.isFinite(m) && m > 0)
     .filter((m) => m >= minutesToStart)
-    .filter((m) => lastSent == null || m < lastSent)
-    .sort((a, b) => b - a);
-  return candidates[0] ?? null;
+    .filter((m) => lastSent == null || m < lastSent);
+  return candidates.length > 0 ? Math.min(...candidates) : null;
 }
 
-export function leadText(offset: number): string {
-  return offset >= 1440
-    ? `${Math.round(offset / 1440)} day${offset >= 2880 ? "s" : ""}`
-    : offset >= 60
-      ? `${Math.round(offset / 60)} hour${offset >= 120 ? "s" : ""}`
-      : `${offset} minutes`;
+/**
+ * The time left before a game, as a reminder words it: "25 minutes", "1 hour 40 minutes",
+ * "2 hours", "35 hours", "1 day", "7 days". Whole hours or a whole day when that is within a
+ * tenth of the time left, hours and minutes under 3 hours otherwise, whole days from 1.5 days.
+ */
+export function leadText(minutesLeft: number): string {
+  const m = Math.max(1, Math.round(minutesLeft));
+  const n = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
+  if (m < 60) return n(m, "minute");
+  const days = Math.round(m / 1440);
+  if (days >= 2 || (days === 1 && Math.abs(m - 1440) <= m / 10)) return n(days, "day");
+  const hours = Math.round(m / 60);
+  if (m >= 180 || Math.abs(m - hours * 60) <= m / 10) return n(hours, "hour");
+  return `${n(Math.floor(m / 60), "hour")} ${n(m % 60, "minute")}`;
 }
 
 type Res<T> = PromiseLike<{ data: T | null; error: { message: string } | null }>;
@@ -62,54 +107,136 @@ type Q<T> = Res<T> & {
   in: (c: string, v: readonly unknown[]) => Q<T>;
   gt: (c: string, v: unknown) => Q<T>;
   lt: (c: string, v: unknown) => Q<T>;
+  lte: (c: string, v: unknown) => Q<T>;
   or: (f: string) => Q<T>;
   limit: (n: number) => Q<T>;
 };
 export type ReminderAdmin = {
   from: (t: string) => Q<unknown> & {
-    insert: (row: Record<string, unknown>) => Res<unknown>;
+    insert: (row: Record<string, unknown>) => Q<unknown>;
     update: (row: Record<string, unknown>) => Q<unknown>;
+    delete: () => Q<unknown>;
   };
 };
 
+const pairKey = (gameId: string, userId: string) => `${gameId}\u0000${userId}`;
+
 /**
- * Whether the player wants game reminders pushed to their phone: their saved preferences
- * (notification_preferences.prefs), merged exactly as the app merges them, so it is on unless
- * they switched it off. A failed read sends no push: the in-app notification is already
- * written, and a push the player may have turned off is never sent on a guess.
+ * Who among these players holds a place in each game, and who has an open join request: one
+ * roster query and one request query for the run. Throws when either cannot be read, so nothing
+ * is sent or deleted on a guess; the reminders stay due for the next run.
  */
-async function wantsReminderPush(admin: ReminderAdmin, userId: string): Promise<boolean> {
-  const { data, error } = await (admin
-    .from("notification_preferences")
-    .select("prefs")
-    .eq("user_id", userId)
-    .limit(1) as Q<unknown>);
-  if (error) return false;
-  const stored = ((data ?? []) as { prefs?: unknown }[])[0]?.prefs;
-  const prefs = mergeNotifPrefs(
-    stored && typeof stored === "object" ? (stored as Record<string, unknown>) : null,
+async function readRecipients(admin: ReminderAdmin, gameIds: string[], userIds: string[]) {
+  const [roster, requests] = await Promise.all([
+    admin
+      .from("game_participants")
+      .select("game_id, user_id")
+      .in("game_id", gameIds)
+      .in("user_id", userIds) as Q<unknown>,
+    admin
+      .from("join_requests")
+      .select("game_id, player_id, status")
+      .in("game_id", gameIds)
+      .in("player_id", userIds)
+      .in("status", OPEN_REQUEST_STATUSES) as Q<unknown>,
+  ]);
+  if (roster.error) throw new Error(`roster read failed: ${roster.error.message}`);
+  if (requests.error) throw new Error(`join request read failed: ${requests.error.message}`);
+  const places = new Set(
+    ((roster.data ?? []) as { game_id: string; user_id: string }[]).map((p) =>
+      pairKey(String(p.game_id), String(p.user_id)),
+    ),
   );
-  return isAllowedIn(prefs, "game_reminder", "push");
+  const openRequests = new Set(
+    ((requests.data ?? []) as { game_id: string; player_id: string }[]).map((q) =>
+      pairKey(String(q.game_id), String(q.player_id)),
+    ),
+  );
+  return { places, openRequests };
+}
+
+/**
+ * Which of these players want game reminders pushed to their phone: their saved preferences
+ * (notification_preferences.prefs), merged exactly as the app merges them, so it is on unless
+ * they switched it off. One query for the run. A failed read pushes to nobody: the in-app
+ * reminders are written either way, and a push a player may have turned off is never sent on
+ * a guess.
+ */
+async function playersWantingPush(admin: ReminderAdmin, userIds: string[]): Promise<Set<string>> {
+  try {
+    const { data, error } = await (admin
+      .from("notification_preferences")
+      .select("user_id, prefs")
+      .in("user_id", userIds) as Q<unknown>);
+    if (error) throw new Error(error.message);
+    const stored = new Map(
+      ((data ?? []) as { user_id: string; prefs?: unknown }[]).map((r) => [
+        String(r.user_id),
+        r.prefs,
+      ]),
+    );
+    return new Set(
+      userIds.filter((u) => {
+        const p = stored.get(u);
+        const prefs = mergeNotifPrefs(
+          p && typeof p === "object" ? (p as Record<string, unknown>) : null,
+        );
+        return isAllowedIn(prefs, "game_reminder", "push");
+      }),
+    );
+  } catch (e) {
+    console.warn("[reminders] preferences unavailable; no pushes this run", e);
+    return new Set();
+  }
+}
+
+/** Runs `task` over `items`, at most `limit` at a time, and waits for every one to settle. */
+async function settleWithLimit<T>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<unknown>,
+): Promise<PromiseSettledResult<unknown>[]> {
+  const results: PromiseSettledResult<unknown>[] = [];
+  let next = 0;
+  const lane = async () => {
+    while (next < items.length) {
+      const i = next++;
+      [results[i]] = await Promise.allSettled([Promise.resolve().then(() => task(items[i]!))]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+  return results;
 }
 
 /**
  * Sends due reminders. `userId` limits it to one player (their own flush); without it, the
  * sweep covers every player with an upcoming game in the next 8 days (the longest lead offered
- * is a week). Returns how many were sent.
+ * is a week). `clock` is the wall clock the run budget is measured on (tests inject one).
  */
 export async function sendDueGameReminders(
   admin: ReminderAdmin,
-  opts: { userId?: string; now?: number; limit?: number } = {},
-): Promise<{ sent: number; checked: number }> {
+  opts: {
+    userId?: string;
+    now?: number;
+    limit?: number;
+    clock?: () => number;
+    budgetMs?: number;
+    maxDue?: number;
+  } = {},
+): Promise<ReminderRunSummary> {
+  const clock = opts.clock ?? Date.now;
+  const startedAt = clock();
   const now = opts.now ?? Date.now();
+  const summary: ReminderRunSummary = { sent: 0, checked: 0, pushed: 0, removed: 0, deferred: 0 };
+
   let q = admin
     .from("game_reminders")
-    .select("id, user_id, game_id, offsets, last_sent_offset") as Q<unknown>;
+    .select("id, user_id, game_id, offsets, last_sent_offset, updated_at") as Q<unknown>;
   if (opts.userId) q = q.eq("user_id", opts.userId);
   const { data: rows, error } = await q.limit(opts.limit ?? 2000);
   if (error) throw new Error(error.message);
   const reminders = ((rows ?? []) as ReminderRow[]).filter((r) => (r.offsets ?? []).length > 0);
-  if (reminders.length === 0) return { sent: 0, checked: 0 };
+  if (reminders.length === 0) return summary;
 
   const gameIds = [...new Set(reminders.map((r) => r.game_id))];
   const { data: games, error: gErr } = await (admin
@@ -121,20 +248,65 @@ export async function sendDueGameReminders(
   if (gErr) throw new Error(gErr.message);
   const byId = new Map(((games ?? []) as ReminderGame[]).map((g) => [String(g.id), g]));
 
-  let sent = 0;
-  let checked = 0;
-  // One preferences read per player per run, however many of their reminders are due.
-  const pushWanted = new Map<string, Promise<boolean>>();
+  type Due = { r: ReminderRow; game: ReminderGame; startMs: number; offset: number };
+  const due: Due[] = [];
   for (const r of reminders) {
     const game = byId.get(r.game_id);
     if (!game || game.status === "cancelled") continue;
     const startMs = new Date(String(game.date)).getTime();
     if (!Number.isFinite(startMs) || startMs <= now) continue;
-    checked += 1;
+    summary.checked += 1;
     const offset = dueOffset(r.offsets, r.last_sent_offset, (startMs - now) / 60000);
-    if (offset == null) continue;
+    if (offset != null) due.push({ r, game, startMs, offset });
+  }
+  if (due.length === 0) return summary;
 
-    // Claim: only one caller moves last_sent_offset past this offset.
+  // Soonest game first: if the run runs out of time, the reminders left are the least urgent.
+  due.sort((a, b) => a.startMs - b.startMs);
+  const batch = due.slice(0, Math.max(1, opts.maxDue ?? MAX_DUE_PER_RUN));
+  summary.deferred += due.length - batch.length;
+
+  const batchUsers = [...new Set(batch.map((d) => d.r.user_id))];
+  const [{ places, openRequests }, wantsPush] = await Promise.all([
+    readRecipients(admin, [...new Set(batch.map((d) => d.r.game_id))], batchUsers),
+    playersWantingPush(admin, batchUsers),
+  ]);
+  const hasPlace = (d: Due) => places.has(pairKey(d.r.game_id, d.r.user_id));
+  const isRecipient = (d: Due) =>
+    hasPlace(d) || openRequests.has(pairKey(d.r.game_id, d.r.user_id));
+
+  // No place and no open request: nothing is sent, and the row is deleted so later runs stop
+  // checking it. Only rows nobody has saved since this run read them (any update stamps
+  // updated_at): a player who joins again right now keeps the reminders they just set.
+  const gone = batch.filter((d) => !isRecipient(d));
+  if (gone.length > 0) {
+    const newest = gone.map((d) => String(d.r.updated_at)).reduce((a, b) => (b > a ? b : a));
+    const { data: deleted, error: dErr } = await (admin
+      .from("game_reminders")
+      .delete()
+      .in(
+        "id",
+        gone.map((d) => d.r.id),
+      )
+      .lte("updated_at", newest)
+      .select("id") as Q<unknown>);
+    if (dErr) console.warn("[reminders] could not delete reminders of players who left", dErr);
+    else summary.removed += Array.isArray(deleted) ? deleted.length : 0;
+  }
+
+  const work = batch.filter(isRecipient);
+  const pushes: PushInput[] = [];
+  for (let i = 0; i < work.length; i++) {
+    if (clock() - startedAt >= (opts.budgetMs ?? RUN_BUDGET_MS)) {
+      // Out of time: these stay unclaimed, so they are still due on the next run.
+      summary.deferred += work.length - i;
+      break;
+    }
+    const d = work[i]!;
+    const { r, game, startMs, offset } = d;
+
+    // Claim: only one caller moves last_sent_offset past this offset. Setting it to the smallest
+    // opened window also passes every larger one.
     const claim = admin
       .from("game_reminders")
       .update({ last_sent_offset: offset })
@@ -144,19 +316,24 @@ export async function sendDueGameReminders(
     const { data: claimed, error: cErr } = await claim;
     if (cErr || !Array.isArray(claimed) || claimed.length === 0) continue;
 
-    const title = `${game.title} starts in ${leadText(offset)}`;
+    // Worded from the minutes actually left, not from the window.
+    const title = `${game.title} starts in ${leadText((startMs - now) / 60000)}`;
     // All-day games never surface a clock time in reminders.
-    const when = formatNotificationWhen({ date: String(game.date), allDay: !!game.all_day });
+    const whenFor = { date: String(game.date), allDay: !!game.all_day };
     const link = `/games/${r.game_id}`;
-    const { error: insErr } = await admin.from("notifications").insert({
-      user_id: r.user_id,
-      type: "game_reminder",
-      title,
-      body:
-        [when, game.location ? `Where: ${game.location}` : null].filter(Boolean).join(" · ") ||
-        null,
-      link,
-    });
+    const { data: inserted, error: insErr } = await (admin
+      .from("notifications")
+      .insert({
+        user_id: r.user_id,
+        type: "game_reminder",
+        title,
+        body:
+          [formatNotificationWhen(whenFor), game.location ? `Where: ${game.location}` : null]
+            .filter(Boolean)
+            .join(" · ") || null,
+        link,
+      })
+      .select("id") as Q<unknown>);
     if (insErr) {
       // Give the claim back so the next run tries again.
       await admin
@@ -165,22 +342,29 @@ export async function sendDueGameReminders(
         .eq("id", r.id);
       continue;
     }
-    sent += 1;
+    summary.sent += 1;
 
-    // Then the phone, with the game's title and start time only: no venue on a lock screen.
-    let wanted = pushWanted.get(r.user_id);
-    if (!wanted) {
-      wanted = wantsReminderPush(admin, r.user_id).catch(() => false);
-      pushWanted.set(r.user_id, wanted);
-    }
-    if (await wanted) {
-      try {
-        await deliverPush({ userId: r.user_id, title, body: when, url: link });
-      } catch (e) {
-        // A push is best effort; the notification row is the record.
-        console.warn("[reminders] push failed", e);
-      }
+    if (hasPlace(d) && wantsPush.has(r.user_id)) {
+      pushes.push({
+        userId: r.user_id,
+        title,
+        // A lock screen is read away from the app: the weekday and date, never "Today", and no
+        // venue.
+        body: formatDatedWhen(whenFor),
+        url: link,
+        // Held past the start (a minor's quiet hours), it is dropped rather than sent late.
+        expiresAt: new Date(startMs).toISOString(),
+        notificationId: ((inserted ?? []) as { id?: string }[])[0]?.id ?? null,
+      });
     }
   }
-  return { sent, checked };
+
+  // Then the phones, once every in-app row is written, a few at a time. A push is best effort:
+  // the notification row is the record.
+  const results = await settleWithLimit(pushes, PUSH_CONCURRENCY, (p) => deliverPush(p));
+  for (const res of results) {
+    if (res.status === "rejected") console.warn("[reminders] push failed", res.reason);
+  }
+  summary.pushed = pushes.length;
+  return summary;
 }
