@@ -44,6 +44,28 @@ async function quoteGamePayPalFee(admin: AdminClient, gameId: string) {
   };
 }
 
+type PlayerClient = Pick<AdminClient, "rpc">;
+
+/**
+ * The guardian rule for paying (enforce_guardian_before_payment), asked as the
+ * player through game_payment_guardian_ready. The server records a PayPal
+ * payment with the service role, which that trigger lets through because the
+ * money has already moved, so this has to run before PayPal is asked to move
+ * it. Fails closed: an error or any answer but true refuses.
+ */
+export async function assertGuardianAllowsPayment(player: PlayerClient, gameId: string) {
+  const { data, error } = await player.rpc(
+    "game_payment_guardian_ready" as never,
+    { _game_id: gameId } as never,
+  );
+  if (error)
+    throw new Error("Couldn't check guardian approval. You weren't charged — please try again.");
+  if ((data as unknown) !== true) {
+    const { GUARDIAN_PAYMENT_MESSAGE } = await import("@/lib/payments-policy");
+    throw new Error(GUARDIAN_PAYMENT_MESSAGE);
+  }
+}
+
 /**
  * Public config for rendering the PayPal button on a game's pay screen.
  * The client id and merchant id are publishable identifiers, not secrets.
@@ -78,6 +100,7 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
       const { PAYMENTS_BLOCKED_MESSAGE } = await import("@/lib/payments-policy");
       throw new Error(PAYMENTS_BLOCKED_MESSAGE);
     }
+    await assertGuardianAllowsPayment(context.supabase, data.gameId);
 
     // Visibility check as the player; pricing is read with server privileges
     // so it matches what capture recomputes.
@@ -132,6 +155,10 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!order || order.player_id !== context.userId) throw new Error("Order not found.");
     if (order.status === "captured") return { ok: true as const, already: true as const };
+
+    // Again right before the money moves: a guardian may have declined, been
+    // removed or been suspended since the order was created.
+    await assertGuardianAllowsPayment(context.supabase, order.game_id);
 
     // Re-price from the game rather than trusting the stored order row.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
