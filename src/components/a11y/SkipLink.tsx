@@ -27,8 +27,14 @@ export function SkipLink() {
   );
 }
 
+/**
+ * The name is visually hidden text, not `aria-label`: ARIA forbids naming a plain `div` that way
+ * (axe: aria-prohibited-attr), and screen readers read the text when focus lands here.
+ */
 export function MainContentTarget() {
   return (
-    <div id={MAIN_CONTENT_ID} tabIndex={-1} aria-label="Main content" className="outline-none" />
+    <div id={MAIN_CONTENT_ID} tabIndex={-1} className="outline-none">
+      <span className="sr-only">Main content</span>
+    </div>
   );
 }

@@ -4794,6 +4794,7 @@ export type Database = {
           listed_by: string | null
           moderator_hidden_at: string | null
           name: string
+          org_type: string
           owner_hidden_at: string | null
           owner_id: string | null
           phone: string | null
@@ -4827,6 +4828,7 @@ export type Database = {
           listed_by?: string | null
           moderator_hidden_at?: string | null
           name: string
+          org_type?: string
           owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
@@ -4860,6 +4862,7 @@ export type Database = {
           listed_by?: string | null
           moderator_hidden_at?: string | null
           name?: string
+          org_type?: string
           owner_hidden_at?: string | null
           owner_id?: string | null
           phone?: string | null
@@ -5663,6 +5666,10 @@ export type Database = {
       }
       minor_messaging_block: {
         Args: { _a: string; _b: string }
+        Returns: string
+      }
+      minor_messaging_block_me: {
+        Args: { _other: string }
         Returns: string
       }
       minor_messaging_block_reason: {

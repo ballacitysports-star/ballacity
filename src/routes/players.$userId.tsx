@@ -39,6 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
+import { useReviewSubjectIsAdult } from "@/lib/review-subject";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
@@ -218,6 +219,8 @@ function PlayerProfilePage() {
   const unit = useDistanceUnit();
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
+  // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
+  const reputationVisible = useReviewSubjectIsAdult(userId, "player") === true;
   const follow = useFollow(userId);
   const privacyFlags = usePublicPrivacyFlags(userId);
   const showSports = privacyFlags.data?.show_sports ?? true;
@@ -339,9 +342,7 @@ function PlayerProfilePage() {
       {guardianFallback.dialog}
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
-        bannerOverlay={
-          <BackButton fallbackTo="/players" variant="overlay" />
-        }
+        bannerOverlay={<BackButton fallbackTo="/players" variant="overlay" />}
         avatarUrl={avatarUrl}
         avatarFallback={initials}
         name={displayName}
@@ -422,7 +423,9 @@ function PlayerProfilePage() {
               )}
               Message
             </ChannelPill>
-            <ChannelPill onClick={() => setReviewsOpen(true)}>Reviews · {rep.count}</ChannelPill>
+            {reputationVisible && (
+              <ChannelPill onClick={() => setReviewsOpen(true)}>Reviews · {rep.count}</ChannelPill>
+            )}
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
             <ChannelPill onClick={() => setShareOpen(true)}>
               <Share2 className="h-4 w-4" /> Share
@@ -448,8 +451,8 @@ function PlayerProfilePage() {
             name: s.name,
             level: s.level ? formatSportLevel(s.level as any) : null,
           })),
-          trustScore: rep.trustScore,
-          reviewCount: rep.count,
+          trustScore: reputationVisible ? rep.trustScore : undefined,
+          reviewCount: reputationVisible ? rep.count : undefined,
           linkCount: links.length,
         }}
       />
@@ -478,13 +481,15 @@ function PlayerProfilePage() {
             <ProfileLinksList links={links} />
           </AboutBlock>
         )}
-        <AboutBlock label="Reputation">
-          <ReputationBadge
-            rep={rep}
-            onClick={() => setReviewsOpen(true)}
-            ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
-          />
-        </AboutBlock>
+        {reputationVisible && (
+          <AboutBlock label="Reputation">
+            <ReputationBadge
+              rep={rep}
+              onClick={() => setReviewsOpen(true)}
+              ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
+            />
+          </AboutBlock>
+        )}
       </ProfileAboutSheet>
 
       <div className="px-4">
@@ -520,20 +525,22 @@ function PlayerProfilePage() {
                 </ExpandableAboutSection>
               )}
 
-              <ExpandableAboutSection
-                label="Reputation"
-                badge={
-                  <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                    {rep.trustScore}
-                  </span>
-                }
-              >
-                <ReputationBadge
-                  rep={rep}
-                  onClick={() => setReviewsOpen(true)}
-                  ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
-                />
-              </ExpandableAboutSection>
+              {reputationVisible && (
+                <ExpandableAboutSection
+                  label="Reputation"
+                  badge={
+                    <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                      {rep.trustScore}
+                    </span>
+                  }
+                >
+                  <ReputationBadge
+                    rep={rep}
+                    onClick={() => setReviewsOpen(true)}
+                    ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
+                  />
+                </ExpandableAboutSection>
+              )}
             </div>
           </div>
         )}

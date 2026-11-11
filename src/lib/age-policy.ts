@@ -32,10 +32,11 @@ import {
 export const LEGAL_REVIEW_REQUIRED = "LEGAL REVIEW REQUIRED";
 
 /**
- * There is no minimum account age. Under-13 members are supported through the
- * parental-consent architecture rather than refused at the door.
+ * The minimum age to register is 13 (the published Terms; `MINIMUM_SIGNUP_AGE` in
+ * age-verification.ts, enforced in sign-up, the age gate and `set_my_birthday`). Children
+ * under 13 join only as guardian-created managed accounts, which keep the full under-13
+ * protections (consent, controls, privacy floor).
  */
-export const MINIMUM_ACCOUNT_AGE = 0;
 
 /** Oldest age that requires verifiable parental consent (configurable). */
 export const PARENTAL_CONSENT_MAX_AGE = DEFAULT_AGE_POLICY.parentalConsentMaxAge;
@@ -106,9 +107,10 @@ export function isMinorCategory(cat: AgeCategory): boolean {
 }
 
 /**
- * Birthday validation. Under-13 is VALID — it routes the member into the
- * parental-consent flow instead of being refused. Only impossible values are
- * rejected here; the database applies the same cohort rules on write.
+ * Birthday validation for the profile form: rejects impossible values only. It is not the
+ * minimum-age check: a member's first date of birth goes through sign-up or the age gate
+ * (checkDobParts) and `set_my_birthday`, both of which refuse under 13, and the stored
+ * date is locked afterwards.
  */
 export function validateAgeMinimum(iso: string | null | undefined): string | null {
   if (!iso) return null;

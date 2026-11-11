@@ -102,7 +102,10 @@ describe("one payment channel per game (P2-6)", () => {
   });
 
   it("the game page no longer opens a channel per roster row", () => {
-    const src = readFileSync("src/routes/games.$gameId.index.tsx", "utf8");
+    // The roster row moved out of the route into its own component (P2-6 slice 2).
+    const route = readFileSync("src/routes/games.$gameId.index.tsx", "utf8");
+    const src = readFileSync("src/components/game-detail/RosterPlayerRow.tsx", "utf8");
+    expect(route).not.toContain("payment_submissions:${req.game_id}:${req.player_id}");
     expect(src).not.toContain("payment_submissions:${req.game_id}:${req.player_id}");
     expect(src).toContain("subscribeGamePaymentChanges(req.game_id, req.player_id");
   });

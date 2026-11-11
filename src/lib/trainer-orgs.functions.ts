@@ -26,7 +26,11 @@ function publicClient() {
   const url = process.env.SUPABASE_URL!;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
   return createClient<Database>(url, key, {
-    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    auth: {
+      storage: undefined,
+      persistSession: false,
+      autoRefreshToken: false,
+    },
     global: {
       fetch: (input, init) => {
         const h = new Headers(init?.headers);
@@ -52,7 +56,11 @@ function viewerClient() {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_KEY!,
     {
-      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+      auth: {
+        storage: undefined,
+        persistSession: false,
+        autoRefreshToken: false,
+      },
       global: { headers: { Authorization: bearer } },
     },
   );
@@ -65,7 +73,7 @@ const handleRe = /^[a-z0-9_-]{3,40}$/;
 // anon-readable except `owner_id`, which only a signed-in viewer is given
 // (phone/email are never anon-readable — see ORG_PUBLIC_COLUMNS below).
 const ORG_DIRECTORY_COLUMNS =
-  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
+  "id,name,handle,avatar,avatar_url,cover_url,photos,city,address,bio,category,org_type,amenities,hours,timezone,website,booking_url,verified,owner_id,featured_at";
 const ORG_DIRECTORY_COLUMNS_ANON = ORG_DIRECTORY_COLUMNS.replace(
   ",owner_id",
   "",
@@ -77,15 +85,18 @@ function likePattern(term: string): string {
 }
 
 export const listTrainerOrgs = createServerFn({ method: "GET" })
-  .inputValidator((d: { search?: string; q?: string } | undefined) =>
-    z
-      .object({
-        // `search` matches the name only (used by the org pickers); `q` is the
-        // directory search and also matches city and street address.
-        search: z.string().max(80).optional(),
-        q: z.string().max(80).optional(),
-      })
-      .parse(d ?? {}),
+  .inputValidator(
+    (d: { search?: string; q?: string; type?: "facility" | "business" } | undefined) =>
+      z
+        .object({
+          // `search` matches the name only (used by the org pickers); `q` is the
+          // directory search and also matches city and street address.
+          search: z.string().max(80).optional(),
+          q: z.string().max(80).optional(),
+          // P2-4: venues or businesses; both when absent.
+          type: z.enum(["facility", "business"]).optional(),
+        })
+        .parse(d ?? {}),
   )
   .handler(async ({ data }) => {
     const { sb, signedIn } = viewerClient();
@@ -97,6 +108,7 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
       .order("featured_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(100);
+    if (data.type) query = query.eq("org_type", data.type);
     if (data.search?.trim()) query = query.ilike("name", likePattern(data.search.trim()));
     if (data.q?.trim()) {
       // Commas, parentheses and quotes are separators inside an or() group.
@@ -118,75 +130,84 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
  * the public-visibility rules are applied explicitly here (hidden trainers and
  * facilities, private/flagged reviews) and the result carries no user ids.
  */
-export const getFeaturedFacilityTrainer = createServerFn({ method: "GET" }).handler(
-  async (): Promise<FeaturedTrainer | null> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: links, error } = await supabaseAdmin
-      .from("trainer_org_members")
-      .select(
-        "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,avatar_url,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
-      )
-      .limit(200);
-    if (error) throw new Error(error.message);
+export const getFeaturedFacilityTrainer = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<FeaturedTrainer | null> => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: links, error } = await supabaseAdmin
+    .from("trainer_org_members")
+    .select(
+      "trainer_id, org:org_id(id,name,city,hidden_at), teams:trainer_id(id,kind,owner_id,name,avatar,avatar_url,city,sports,verified,rate_per_hour,session_types,tagline,bio,availability_slots,availability_rules,hidden_at)",
+    )
+    .limit(200);
+  if (error) throw new Error(error.message);
 
-    type Row = {
-      org: { id: string; name: string; city: string | null; hidden_at: string | null } | null;
-      teams: {
-        id: string;
-        kind: string | null;
-        owner_id: string | null;
-        name: string;
-        avatar: string | null;
-        avatar_url?: string | null;
-        city: string | null;
-        sports: string[] | null;
-        verified: boolean | null;
-        rate_per_hour: number | null;
-        session_types: string[] | null;
-        tagline: string | null;
-        bio: string | null;
-        availability_slots: unknown;
-        availability_rules: unknown;
-        hidden_at: string | null;
-      } | null;
-    };
-    const candidates: TrainerCandidate[] = [];
-    for (const row of (links ?? []) as unknown as Row[]) {
-      const t = row.teams;
-      if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
-      candidates.push({
-        id: t.id,
-        kind: t.kind,
-        ownerId: t.owner_id,
-        name: t.name,
-        avatar: teamAvatarDisplay(t) || null,
-        city: t.city,
-        sports: t.sports ?? [],
-        verified: !!t.verified,
-        ratePerHour: t.rate_per_hour,
-        sessionTypes: t.session_types ?? [],
-        tagline: t.tagline,
-        bio: t.bio,
-        availabilitySlots: t.availability_slots,
-        availabilityRules: t.availability_rules,
-        facility: { id: row.org.id, name: row.org.name, city: row.org.city },
-      });
-    }
-    if (candidates.length === 0) return null;
+  type Row = {
+    org: {
+      id: string;
+      name: string;
+      city: string | null;
+      hidden_at: string | null;
+    } | null;
+    teams: {
+      id: string;
+      kind: string | null;
+      owner_id: string | null;
+      name: string;
+      avatar: string | null;
+      avatar_url?: string | null;
+      city: string | null;
+      sports: string[] | null;
+      verified: boolean | null;
+      rate_per_hour: number | null;
+      session_types: string[] | null;
+      tagline: string | null;
+      bio: string | null;
+      availability_slots: unknown;
+      availability_rules: unknown;
+      hidden_at: string | null;
+    } | null;
+  };
+  const candidates: TrainerCandidate[] = [];
+  for (const row of (links ?? []) as unknown as Row[]) {
+    const t = row.teams;
+    if (!t || t.hidden_at || !row.org || row.org.hidden_at) continue;
+    candidates.push({
+      id: t.id,
+      kind: t.kind,
+      ownerId: t.owner_id,
+      name: t.name,
+      avatar: teamAvatarDisplay(t) || null,
+      city: t.city,
+      sports: t.sports ?? [],
+      verified: !!t.verified,
+      ratePerHour: t.rate_per_hour,
+      sessionTypes: t.session_types ?? [],
+      tagline: t.tagline,
+      bio: t.bio,
+      availabilitySlots: t.availability_slots,
+      availabilityRules: t.availability_rules,
+      facility: { id: row.org.id, name: row.org.name, city: row.org.city },
+    });
+  }
+  if (candidates.length === 0) return null;
 
-    const { data: reviews } = await supabaseAdmin
-      .from("reviews")
-      .select("reviewee_id, rating")
-      .eq("reviewee_kind", "trainer")
-      .eq("is_private", false)
-      .eq("flagged", false)
-      .in(
-        "reviewee_id",
-        candidates.map((c) => c.id),
-      );
-    return pickFeaturedTrainer(candidates, summarizeRatings(reviews ?? []));
-  },
-);
+  const { data: allReviews } = await supabaseAdmin
+    .from("reviews")
+    .select("id, reviewee_id, rating")
+    .eq("reviewee_kind", "trainer")
+    .eq("is_private", false)
+    .eq("flagged", false)
+    .in(
+      "reviewee_id",
+      candidates.map((c) => c.id),
+    );
+  // Only reviews that may be published count: nothing written by or about someone who was a minor feeds this
+  // public aggregate (the database decides; a failed lookup counts none).
+  const { onlyPublishable } = await import("@/lib/review-age.server");
+  const reviews = await onlyPublishable(supabaseAdmin, allReviews ?? []);
+  return pickFeaturedTrainer(candidates, summarizeRatings(reviews));
+});
 
 export const listMyOrgs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -197,14 +218,19 @@ export const listMyOrgs = createServerFn({ method: "GET" })
       .eq("owner_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []) as { id: string; name: string; handle: string; avatar: string | null }[];
+    return (data ?? []) as {
+      id: string;
+      name: string;
+      handle: string;
+      avatar: string | null;
+    }[];
   });
 
 // Columns anonymous visitors may read. `phone`/`email` are deliberately absent:
 // the database revokes them from the `anon` role so contact details cannot be
 // scraped from every gym listing, so selecting "*" here would fail for guests.
 const ORG_PUBLIC_COLUMNS =
-  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone,booking_url";
+  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,org_type,amenities,photos,hours,timezone,booking_url";
 const ORG_PUBLIC_COLUMNS_ANON = ORG_PUBLIC_COLUMNS.replace(
   "id,owner_id,",
   "id,",
@@ -400,7 +426,10 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
           address: z.string().max(300).optional(),
           placeId: z.string().max(200).optional(),
           geo: z
-            .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+            .object({
+              lat: z.number().min(-90).max(90),
+              lng: z.number().min(-180).max(180),
+            })
             .nullable()
             .optional(),
         })
@@ -456,7 +485,12 @@ export const listInvitesForTrainer = createServerFn({ method: "GET" })
 export const respondToTrainerOrgInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { inviteId: string; action: "accept" | "decline" }) =>
-    z.object({ inviteId: z.string().uuid(), action: z.enum(["accept", "decline"]) }).parse(d),
+    z
+      .object({
+        inviteId: z.string().uuid(),
+        action: z.enum(["accept", "decline"]),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     if (data.action === "accept") {
@@ -550,7 +584,9 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (data.action === "approve") {
-      const { error } = await context.supabase.rpc("approve_trainer_org_join", { _req: data.id });
+      const { error } = await context.supabase.rpc("approve_trainer_org_join", {
+        _req: data.id,
+      });
       if (error) throw new Error(error.message);
       return { ok: true };
     }
@@ -705,7 +741,10 @@ export const getMyJoinRequestsForOrg = createServerFn({ method: "GET" })
 // -----------------------------------------------------------------------
 
 const geoSchema = z
-  .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+  .object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  })
   .nullable()
   .optional();
 
@@ -727,6 +766,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       geo?: { lat: number; lng: number } | null;
       phone?: string;
       email?: string;
+      orgType?: "facility" | "business";
       category?: string;
       amenities?: string[];
       photos?: string[];
@@ -749,6 +789,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
           geo: geoSchema,
           phone: z.string().max(40).optional(),
           email: z.string().email().max(200).optional(),
+          orgType: z.enum(["facility", "business"]).optional(),
           category: z.string().max(60).optional(),
           amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
@@ -777,6 +818,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         geo: data.geo ?? null,
         phone: data.phone ?? null,
         email: data.email ?? null,
+        org_type: data.orgType ?? "facility",
         category: data.category ?? null,
         amenities: data.amenities ?? [],
         photos: data.photos ?? [],
@@ -799,7 +841,12 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
     if (seed) {
       await context.supabase
         .from("trainer_org_members")
-        .insert({ org_id: row.id, trainer_id: seed, user_id: context.userId, role: "owner" })
+        .insert({
+          org_id: row.id,
+          trainer_id: seed,
+          user_id: context.userId,
+          role: "owner",
+        })
         .then(
           () => undefined,
           () => undefined,
@@ -828,6 +875,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
       geo?: { lat: number; lng: number } | null;
       phone?: string | null;
       email?: string | null;
+      orgType?: "facility" | "business";
       category?: string | null;
       amenities?: string[];
       photos?: string[];
@@ -851,6 +899,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
           geo: geoSchema,
           phone: z.string().max(40).nullable().optional(),
           email: z.string().email().max(200).nullable().optional(),
+          orgType: z.enum(["facility", "business"]).optional(),
           category: z.string().max(60).nullable().optional(),
           amenities: z.array(z.string().max(60)).max(MAX_ORG_AMENITIES).optional(),
           photos: z.array(z.string().url().max(1000)).max(12).optional(),
@@ -876,6 +925,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     const extra = patch as Record<string, unknown>;
     if (data.phone !== undefined) extra.phone = data.phone;
     if (data.email !== undefined) extra.email = data.email;
+    if (data.orgType !== undefined) extra.org_type = data.orgType;
     if (data.category !== undefined) extra.category = data.category;
     if (data.amenities !== undefined) extra.amenities = data.amenities;
     if (data.photos !== undefined) extra.photos = data.photos;
@@ -997,18 +1047,30 @@ export const listOrgMembers = createServerFn({ method: "GET" })
       profiles = profs ?? [];
     }
     const map = new Map(profiles.map((p) => [p.id, p]));
-    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profile: map.get(r.user_id) ?? null,
+    }));
   });
 
 export const requestOrgMembership = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; message?: string }) =>
-    z.object({ orgId: z.string().uuid(), message: z.string().max(500).optional() }).parse(d),
+    z
+      .object({
+        orgId: z.string().uuid(),
+        message: z.string().max(500).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("org_member_requests")
-      .insert({ org_id: data.orgId, user_id: context.userId, message: data.message ?? null })
+      .insert({
+        org_id: data.orgId,
+        user_id: context.userId,
+        message: data.message ?? null,
+      })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -1069,7 +1131,10 @@ export const listOrgMemberRequests = createServerFn({ method: "GET" })
       profiles = profs ?? [];
     }
     const map = new Map(profiles.map((p) => [p.id, p]));
-    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profile: map.get(r.user_id) ?? null,
+    }));
   });
 
 export const approveOrgMemberRequest = createServerFn({ method: "POST" })

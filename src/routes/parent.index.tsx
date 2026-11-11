@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChildrenActivitySection } from "@/components/child/ChildrenActivitySection";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -643,16 +644,11 @@ function ParentCenterPage() {
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>
-      <Link
-        to="/guardian"
-        className="mt-2 inline-block text-xs font-semibold text-primary underline"
-      >
-        See your kids' teams and games → Guardian Dashboard
-      </Link>
 
       <GuardianProfileCard />
       <GuardianApprovalsDashboard />
       <FamilyApprovalsPanel />
+      <ChildrenActivitySection />
 
       <section className="mt-5 rounded-2xl border border-primary/40 bg-primary/5 p-4">
         <div className="flex items-center gap-2">

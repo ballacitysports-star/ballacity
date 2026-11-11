@@ -17,8 +17,8 @@
 // together, so they are replayed together in timestamp order (a drizzle entry's
 // time is `when` in its journal; at the same instant ours goes first).
 import { spawn, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import { dedupeMigrations } from "./migration-twins.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -162,6 +162,64 @@ async function lastSeatRace() {
   ];
 }
 
+// P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
+// events (register_for_event) for the last seat of the same copied tryout. Both lock the post
+// first, so the second waits for the first and is told it is full: one seat is taken, never two,
+// and no mirror write fails. Run in both orders.
+const SIGNUP_RACE_CLEANUP = `
+  DELETE FROM public.team_posts WHERE id = t.id('race-post');
+  DELETE FROM public.teams WHERE id = 'race-team';
+  DELETE FROM private_sec.event_mirror_failures WHERE source_id LIKE t.id('race-post')::text || '%';
+  DELETE FROM auth.users WHERE id IN (t.id('raceowner'), t.id('raceold'), t.id('racenew'));`;
+
+async function oldVsNewSignupRace(oldFirst) {
+  psql(dbName, [], SIGNUP_RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('raceowner', 40), t.person('raceold', 30), t.person('racenew', 31);
+     INSERT INTO public.teams (id, owner_id, kind, name, handle, age_groups)
+       VALUES ('race-team', t.id('raceowner'), 'team', 'Race', 'race-team', ARRAY['adult']);
+     INSERT INTO public.team_posts (id, team_id, author_id, kind, title, event_date, moderation_status, spots_max)
+       VALUES (t.id('race-post'), 'race-team', t.id('raceowner'), 'tryout', 'Last seat tryout',
+               now() + interval '3 days', 'approved', 1);`,
+  );
+  if (r.status !== 0) fail("The sign-up race could not set up its tryout.", r.stderr);
+  const oldPath = (hold) =>
+    `BEGIN; SELECT t.as_user(t.id('raceold'));
+     SELECT public.rsvp_tryout(t.id('race-post'));
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const newPath = (hold) =>
+    `BEGIN; SELECT t.as_user(t.id('racenew'));
+     SELECT public.register_for_event((SELECT id FROM public.events WHERE legacy_post_id = t.id('race-post')));
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const first = session(oldFirst ? oldPath(true) : newPath(true));
+  await pause(1000);
+  const second = session(oldFirst ? newPath(false) : oldPath(false));
+  const results = await Promise.all([first, second]);
+  const state = psql(dbName, [
+    "-At",
+    "-c",
+    `SELECT (SELECT spots_taken FROM public.team_posts WHERE id = t.id('race-post')) || '|' ||
+            (SELECT count(*) FROM public.tryout_rsvps WHERE post_id = t.id('race-post') AND status = 'registered') || '|' ||
+            (SELECT count(*) FROM public.event_registrations g JOIN public.events e ON e.id = g.event_id
+              WHERE e.legacy_post_id = t.id('race-post') AND g.status = 'registered') || '|' ||
+            (SELECT count(*) FROM private_sec.event_mirror_failures WHERE source_id LIKE t.id('race-post')::text || '%')`,
+  ]).stdout.trim();
+  psql(dbName, [], SIGNUP_RACE_CLEANUP);
+  const lost = results.filter((x) => x.code !== 0);
+  const order = oldFirst ? "old path first" : "events path first";
+  return [
+    [`last seat, ${order}: one seat taken everywhere, no mirror failure`, state === "1|1|1|0"],
+    [
+      `last seat, ${order}: the other is told it is full, without a deadlock`,
+      lost.length === 1 &&
+        /TRYOUT_FULL|EVENT_FULL/.test(lost[0].out) &&
+        !/deadlock/i.test(results.map((x) => x.out).join("")),
+    ],
+  ];
+}
+
 let exitCode = 0;
 try {
   if (!reuse) {
@@ -169,23 +227,25 @@ try {
     if (r.status !== 0) fail("The Supabase platform stub failed to load.", r.stderr);
 
     // -- replay -------------------------------------------------------------
-    const migrations = migrationOrder();
+    let migrations;
+    try {
+      const order = dedupeMigrations(migrationOrder());
+      migrations = order.replay;
+      if (order.skipped.length > 0)
+        console.log(
+          `Skipped ${order.skipped.length} known identical copies (applied once): ${order.skipped
+            .map((t) => t.name)
+            .join(", ")}`,
+        );
+    } catch (e) {
+      fail(e.message);
+    }
     const started = Date.now();
     for (const migration of migrations) {
       let sql = readFileSync(migration.path, "utf8");
       if (stripMaintain) sql = sql.replace(/,\s*MAINTAIN\b/gi, "");
       r = psql(dbName, ["-1"], sql);
-      if (r.status !== 0) {
-        // The same migration committed to both folders applies twice. Most are
-        // repeatable and harmless; one that creates a table is not, and the error
-        // alone ("already exists") does not say why. Name the other copy.
-        const digest = (m) => createHash("sha256").update(readFileSync(m.path)).digest("hex");
-        const twin = migrations.find((m) => m !== migration && digest(m) === digest(migration));
-        const hint = twin
-          ? `\nThis file is identical to ${twin.name}, which is also replayed. Keep one: if Lovable already applied the drizzle copy, remove the supabase/migrations one.`
-          : "";
-        fail(`Migration failed to apply: ${migration.name}${hint}`, r.stderr);
-      }
+      if (r.status !== 0) fail(`Migration failed to apply: ${migration.name}`, r.stderr);
     }
     console.log(
       `Replayed ${migrations.length} migrations in ${((Date.now() - started) / 1000).toFixed(1)}s.`,
@@ -242,7 +302,11 @@ try {
     }
     if (raceSelected) {
       console.log("\nraces");
-      for (const [name, ok] of await lastSeatRace()) {
+      for (const [name, ok] of [
+        ...(await lastSeatRace()),
+        ...(await oldVsNewSignupRace(true)),
+        ...(await oldVsNewSignupRace(false)),
+      ]) {
         if (ok) passed += 1;
         else failed += 1;
         console.log(`  ${ok ? "ok" : "NOT OK"} - ${name}`);

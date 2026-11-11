@@ -36,6 +36,9 @@ describe("followUser", () => {
     await expect(followUser("them")).rejects.toThrow(/parent or guardian/);
     rpc.mockResolvedValueOnce({ data: null, error: { message: "INVALID_FOLLOW_TARGET" } });
     await expect(followUser("them")).rejects.toThrow(/isn't available/);
+    // A block is reported with the same neutral words, so it is not disclosed.
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "FOLLOW_BLOCKED" } });
+    await expect(followUser("them")).rejects.toThrow("That account isn't available.");
   });
 });
 

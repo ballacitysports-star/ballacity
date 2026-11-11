@@ -16,6 +16,7 @@
 import { runAiCall, type AiSession } from "@/lib/ai/gate.server";
 import { moderateAiFields } from "@/lib/ai/moderation.server";
 import { withAiSession } from "@/lib/ai/session.server";
+import { mayAnalyseSubject, onlyPublishable } from "@/lib/review-age.server";
 
 /** Must match SportsmanshipTraitCounts keys in badges.ts. */
 export const REVIEW_TRAITS = [
@@ -37,7 +38,11 @@ const cap = (s: unknown, n: number) =>
 // Pure helpers (unit-tested)
 // ---------------------------------------------------------------------------
 
-export type ReviewAnalysis = { traits: ReviewTrait[]; sentiment: number; mismatch: boolean };
+export type ReviewAnalysis = {
+  traits: ReviewTrait[];
+  sentiment: number;
+  mismatch: boolean;
+};
 
 /** A rating that disagrees strongly with the words next to it. */
 export function isRatingMismatch(rating: number, sentiment: number): boolean {
@@ -60,7 +65,11 @@ export function normalizeAnalysis(raw: unknown, rating: number): ReviewAnalysis 
   return { traits, sentiment, mismatch: isRatingMismatch(rating, sentiment) };
 }
 
-export type InsightDraft = { summary: string; strengths: string[]; growth: string[] };
+export type InsightDraft = {
+  summary: string;
+  strengths: string[];
+  growth: string[];
+};
 
 export function normalizeInsight(raw: unknown): InsightDraft | null {
   const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -73,10 +82,19 @@ export function normalizeInsight(raw: unknown): InsightDraft | null {
           .filter(Boolean)
           .slice(0, 4)
       : [];
-  return { summary, strengths: list(src["strengths"]), growth: list(src["growth"]) };
+  return {
+    summary,
+    strengths: list(src["strengths"]),
+    growth: list(src["growth"]),
+  };
 }
 
-const SUBJECT = { player: "player", trainer: "coach", team: "team", host: "game host" } as const;
+const SUBJECT = {
+  player: "player",
+  trainer: "coach",
+  team: "team",
+  host: "game host",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Moderation + analysis (run for the review's author, platform-level)
@@ -86,7 +104,12 @@ export type ReviewModeration = { verdict: "allow" | "review" | "block" };
 
 export async function moderateReviewText(
   admin: any,
-  input: { userId: string; reviewId?: string | null; title?: string; body: string },
+  input: {
+    userId: string;
+    reviewId?: string | null;
+    title?: string;
+    body: string;
+  },
 ): Promise<ReviewModeration> {
   const out = await moderateAiFields(admin, {
     userId: input.userId,
@@ -117,6 +140,8 @@ export async function analyzeReview(
   },
 ): Promise<ReviewAnalysis | null> {
   if (!input.revieweeUserId) return null;
+  // Nothing about a person who is not a confirmed adult is sent to an AI service.
+  if (!(await mayAnalyseSubject(admin, input))) return null;
   try {
     return await withAiSession(
       { admin, userId: input.revieweeUserId, feature: "review_insights" },
@@ -164,22 +189,35 @@ export function shouldRefreshInsight(existing: { review_count: number } | null, 
 
 export async function refreshInsight(
   admin: any,
-  input: { revieweeUserId: string | null; revieweeId: string; revieweeKind: keyof typeof SUBJECT },
+  input: {
+    revieweeUserId: string | null;
+    revieweeId: string;
+    revieweeKind: keyof typeof SUBJECT;
+  },
   opts: { force?: boolean } = {},
 ): Promise<InsightDraft | null> {
   if (!input.revieweeUserId) return null;
+  // No AI reputation summary is made about a person who is not a confirmed adult.
+  if (!(await mayAnalyseSubject(admin, input))) return null;
 
   const { data: rows } = await admin
     .from("reviews")
-    .select("id, rating, title, body, created_at")
+    .select("id, reviewer_id, rating, title, body, created_at")
     .eq("reviewee_id", input.revieweeId)
     .eq("reviewee_kind", input.revieweeKind)
     .eq("flagged", false)
     .eq("is_private", false)
     .order("created_at", { ascending: false })
     .limit(30);
-  const reviews: Array<{ id: string; rating: number; title: string | null; body: string }> =
-    rows ?? [];
+  // Reviews written by or about someone who was under 18 (or of unknown age) when they were written are nonpublic
+  // permanently, even after that person turns 18, so they do not feed a summary that others can read either.
+  const reviews: Array<{
+    id: string;
+    reviewer_id: string;
+    rating: number;
+    title: string | null;
+    body: string;
+  }> = await onlyPublishable(admin, rows ?? []);
   if (reviews.length === 0) return null;
 
   const { data: existing } = await admin

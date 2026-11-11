@@ -6,12 +6,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyTeamAvailability, setTeamEventAvailability } from "@/lib/team-availability.functions";
-import { AVAILABILITY_LABEL, AVAILABILITY_STATUSES, type AvailabilityStatus } from "@/lib/team-availability";
+import {
+  AVAILABILITY_LABEL,
+  AVAILABILITY_STATUSES,
+  type AvailabilityStatus,
+} from "@/lib/team-availability";
 
 const ACTIVE_CLASS: Record<AvailabilityStatus, string> = {
   available: "bg-lime text-primary-foreground hover:bg-lime/90",
   maybe: "bg-amber-500 text-black hover:bg-amber-500/90",
-  unavailable: "bg-coral text-white hover:bg-coral/90",
+  unavailable: "bg-coral-strong text-white hover:bg-coral/90",
 };
 
 /**
@@ -36,7 +40,12 @@ export function TeamEventAvailabilityCard({ teamId }: { teamId: string }) {
   if (!user || !q.data || q.data.people.length === 0 || q.data.events.length === 0) return null;
   const { people, events, answers } = q.data;
 
-  const choose = async (postId: string, userId: string, current: AvailabilityStatus | undefined, next: AvailabilityStatus) => {
+  const choose = async (
+    postId: string,
+    userId: string,
+    current: AvailabilityStatus | undefined,
+    next: AvailabilityStatus,
+  ) => {
     const id = `${postId}:${userId}`;
     setSaving(id);
     try {
@@ -50,17 +59,31 @@ export function TeamEventAvailabilityCard({ teamId }: { teamId: string }) {
   };
 
   return (
-    <section aria-labelledby="team-availability-heading" className="mt-5 rounded-2xl border border-border bg-surface p-4">
-      <h2 id="team-availability-heading" className="inline-flex items-center gap-2 text-sm font-semibold">
+    <section
+      aria-labelledby="team-availability-heading"
+      className="mt-5 rounded-2xl border border-border bg-surface p-4"
+    >
+      <h2
+        id="team-availability-heading"
+        className="inline-flex items-center gap-2 text-sm font-semibold"
+      >
         <CalendarCheck className="h-4 w-4" /> Your availability
       </h2>
-      <p className="text-xs text-muted-foreground">Let the coaches know who can make upcoming events. Only team staff see your answers.</p>
+      <p className="text-xs text-muted-foreground">
+        Let the coaches know who can make upcoming events. Only team staff see your answers.
+      </p>
       <ul className="mt-3 space-y-4">
         {events.map((event) => (
           <li key={event.id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
             <p className="text-sm font-semibold">{event.title}</p>
             <p className="text-xs text-muted-foreground">
-              {new Date(event.eventDate).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              {new Date(event.eventDate).toLocaleString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
               {event.location ? ` · ${event.location}` : ""}
             </p>
             <div className="mt-2 space-y-2">
@@ -68,9 +91,18 @@ export function TeamEventAvailabilityCard({ teamId }: { teamId: string }) {
                 const current = answers[event.id]?.find((a) => a.userId === person.userId)?.status;
                 const busy = saving === `${event.id}:${person.userId}`;
                 return (
-                  <div key={person.userId} className="flex flex-wrap items-center justify-between gap-2">
-                    {people.length > 1 && <span className="text-xs font-medium">{person.name}</span>}
-                    <div className="flex flex-wrap gap-1" role="group" aria-label={`${person.isSelf ? "Your" : `${person.name}'s`} availability for ${event.title}`}>
+                  <div
+                    key={person.userId}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    {people.length > 1 && (
+                      <span className="text-xs font-medium">{person.name}</span>
+                    )}
+                    <div
+                      className="flex flex-wrap gap-1"
+                      role="group"
+                      aria-label={`${person.isSelf ? "Your" : `${person.name}'s`} availability for ${event.title}`}
+                    >
                       {AVAILABILITY_STATUSES.map((status) => (
                         <Button
                           key={status}
