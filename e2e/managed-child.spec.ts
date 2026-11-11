@@ -21,6 +21,19 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?
 const PUBLISHABLE_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
 
+/** Is this a call to the deleteManagedChild server function? The id names the export. */
+function isDeleteManagedChild(url: string): boolean {
+  if (!url.includes("/_serverFn/")) return false;
+  const seg = decodeURIComponent(new URL(url).pathname.split("/_serverFn/")[1] ?? "");
+  let id = seg;
+  try {
+    id = Buffer.from(seg, "base64").toString("utf8");
+  } catch {
+    /* not base64: use it as is */
+  }
+  return id.includes("deleteManagedChild") || seg.includes("deleteManagedChild");
+}
+
 /** Every child this spec creates starts with this, so leftovers can be found. */
 const CHILD_PREFIX = "Eetwoemanaged";
 /** The form checks below never save, so they can share the bare prefix. */
@@ -171,14 +184,47 @@ test.describe("managed child, end to end", () => {
         new RegExp(`^${CHILD_PREFIX}`),
       );
       // The confirmation is a prompt that asks for the first name.
-      page.once("dialog", (d) => void d.accept(first));
+      let prompted = false;
+      page.once("dialog", (d) => {
+        prompted = true;
+        void d.accept(first);
+      });
+      // Watch the delete request itself, so a failure says which step broke:
+      // the prompt, the request, the server's answer, or the roster refresh.
+      // (Run 42909483332 attempt 2 only said "still listed": the server never
+      // logged the third delete, and the app showed no error.)
+      const request = page
+        .waitForRequest((r) => isDeleteManagedChild(r.url()), { timeout: 15_000 })
+        .catch(() => null);
       await del.click();
+      const sent = await request;
+      if (!sent) {
+        throw new Error(
+          `Deleting ${first}: no deleteManagedChild request within 15 s of Delete (${
+            prompted ? "the prompt was answered" : "no confirmation prompt appeared"
+          }).`,
+        );
+      }
+      const answer = await Promise.race([
+        sent.response(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 30_000)),
+      ]);
+      if (!answer) throw new Error(`Deleting ${first}: the server did not answer within 30 s.`);
+      if (!answer.ok()) {
+        const toast = await errorToast
+          .first()
+          .innerText({ timeout: 2_000 })
+          .catch(() => "");
+        throw new Error(`Deleting ${first}: the server answered HTTP ${answer.status()}. ${toast}`);
+      }
       const deadline = Date.now() + 30_000;
       while ((await ours.count()) >= before) {
         if ((await errorToast.count()) > 0) {
           throw new Error(`Deleting ${first} failed: ${await errorToast.first().innerText()}`);
         }
-        if (Date.now() > deadline) throw new Error(`${first} was still listed 30 s after Delete.`);
+        if (Date.now() > deadline) {
+          throw new Error(`${first} was deleted (HTTP 200) but still listed 30 s later.`);
+        }
         await page.waitForTimeout(500);
       }
     }
