@@ -1,5 +1,5 @@
 {
-  "$comment": "P0-9 E2E smoke set. Each entry names one Playwright test by spec file and title path (describe titles, then the test title, joined with ' › '). The 'E2E smoke' check passes only when every entry ran and passed. Chosen 2026-11-06 from tests that passed in all four recent sandbox runs (PRs #298, #304, #314, #317); the two pay-screen security specs added 2026-11-07 after passing in three runs (#341, #334, #347). Add a spec here only after it has passed on the sandbox; see docs/e2e-smoke.md. Two accessibility tests (axe on / and /auth, signed out) added 2026-11-10 after passing in three CI runs on the sandbox (#380 twice, main after #380).",
+  "$comment": "P0-9 E2E smoke set. Each entry names one Playwright test by spec file and title path (describe titles, then the test title, joined with ' › '). The 'E2E smoke' check passes only when every entry ran and passed. Chosen 2026-11-06 from tests that passed in all four recent sandbox runs (PRs #298, #304, #314, #317); the two pay-screen security specs added 2026-11-07 after passing in three runs (#341, #334, #347). The managed-child end-to-end test added 2026-11-10 after #381 made its cleanup reliable (cap raised to 31 for it). Add a spec here only after it has passed on the sandbox; see docs/e2e-smoke.md. Two accessibility tests (axe on / and /auth, signed out) added 2026-11-10 after passing in three CI runs on the sandbox (#380 twice, main after #380).",
   "tests": [
     {
       "file": "desktop-refresh-protected.spec.ts",
@@ -120,6 +120,10 @@
     {
       "file": "a11y-public-pages.spec.ts",
       "title": "accessibility: public pages (P3-5) › no serious or critical axe violations on /auth"
+    },
+    {
+      "file": "managed-child.spec.ts",
+      "title": "managed child, end to end › add, switch in, switch back, delete"
     }
   ]
 }
