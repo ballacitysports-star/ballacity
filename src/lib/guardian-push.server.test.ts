@@ -104,6 +104,20 @@ describe("planGuardianApprovalPush", () => {
     }
   });
 
+  it("says nothing about an invite held back because of a block (20261111120000)", async () => {
+    const plan = await planGuardianApprovalPush(
+      fakeAdmin(world({ team_invite_suppressions: [{ invite_id: "inv1" }] })) as any,
+      { kind: "team_invite", id: "inv1", callerId: "coach" },
+    );
+    expect(plan.messages).toEqual([]);
+    // Any other invite is still raised with the guardians.
+    const other = await planGuardianApprovalPush(
+      fakeAdmin(world({ team_invite_suppressions: [{ invite_id: "inv-other" }] })) as any,
+      { kind: "team_invite", id: "inv1", callerId: "coach" },
+    );
+    expect(other.messages).toHaveLength(2);
+  });
+
   it("says nothing once it is answered or has been approved", async () => {
     for (const patch of [
       { status: "approved" },

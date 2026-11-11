@@ -8,6 +8,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { parseHours } from "./org-hours";
 import { teamAvatarDisplay } from "./team-avatar";
 import { MAX_ORG_AMENITIES } from "./org-listing";
+import { orgMemberAddErrorMessage } from "./org-members";
 import {
   pickFeaturedTrainer,
   summarizeRatings,
@@ -1262,7 +1263,9 @@ export const addOrgMemberDirect = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("org_members")
       .insert({ org_id: data.orgId, user_id: data.userId, role: data.role });
-    if (error && !/duplicate key|unique/i.test(error.message)) throw new Error(error.message);
+    if (error && !/duplicate key|unique/i.test(error.message)) {
+      throw new Error(orgMemberAddErrorMessage(error.message));
+    }
 
     const { data: org } = await context.supabase
       .from("trainer_orgs")

@@ -4118,6 +4118,29 @@ export type Database = {
           },
         ]
       }
+      team_invite_suppressions: {
+        Row: {
+          created_at: string
+          invite_id: string
+        }
+        Insert: {
+          created_at?: string
+          invite_id: string
+        }
+        Update: {
+          created_at?: string
+          invite_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invite_suppressions_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: true
+            referencedRelation: "team_invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invites: {
         Row: {
           created_at: string

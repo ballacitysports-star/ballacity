@@ -73,6 +73,7 @@ replay, naming both files: commit a migration to one folder only (keep the drizz
 | `730_scheduled_jobs.test.sql`                  | Scheduled jobs (P2-7): worker helpers not callable by clients; base URL setting private and https-origin only; worker_post refuses paths outside /api/public/ and does nothing without a base URL                                                                                                             |
 | `740_business_listings.test.sql`               | Business listings (P2-4): listings are venues unless the owner says otherwise; only facility or business; only the owner changes it; signed-out visitors read the type, never contact details                                                                                                                 |
 | `750_team_chat.test.sql`                       | Team chat (P2-3): adults, 13-17s with a guardian and teammates messaging, and minors' guardians are in; no under-13, unguarded teen or stranger; pending until approved; rate limit, staff hide, member report                                                                                                |
+| `780_minor_safety_gates.test.sql`              | Minor-safety gates: a declared age to take a game place (any writer), accept a team invite or be added directly (adults only); payment handles only for an adult payee and a caller who sees or is in the game; two oracles closed                                                                            |
 
 ## Races
 
