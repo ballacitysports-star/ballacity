@@ -28,7 +28,33 @@ function setLoadStatus(next: HostedGamesLoad) {
   listeners.forEach((l) => l());
 }
 let realtimeAttached = false;
-let subscribedOnce = false;
+// Catch-up loads after the hosted_games channel (re)joins: one at a time, with one more run if another join
+// arrives meanwhile, and one right after the first load if the channel joined before that load finished.
+let resyncInFlight = false;
+let resyncAgain = false;
+let resyncAfterFirstLoad = false;
+function resync() {
+  if (!dbLoadedOnce) {
+    resyncAfterFirstLoad = true;
+    return;
+  }
+  if (resyncInFlight) {
+    resyncAgain = true;
+    return;
+  }
+  resyncInFlight = true;
+  fetchAll()
+    .catch(() => {
+      /* keep the cache; the next join or auth event loads again */
+    })
+    .finally(() => {
+      resyncInFlight = false;
+      if (resyncAgain) {
+        resyncAgain = false;
+        resync();
+      }
+    });
+}
 const EMPTY = "[]";
 let snapshotCache = EMPTY;
 
@@ -274,6 +300,10 @@ function ensureDbHydrated() {
       dbHydrated = true;
       dbLoadedOnce = true;
       setLoadStatus("ready");
+      if (resyncAfterFirstLoad) {
+        resyncAfterFirstLoad = false;
+        resync();
+      }
     })
     .catch(() => {
       // Keep the local cache, say the load failed, and try again after a pause.
@@ -320,11 +350,9 @@ function ensureRealtime() {
       }
     })
     .subscribe((status) => {
-      if (status !== "SUBSCRIBED") return;
-      // Joining again follows a dropped connection (a phone resumed, a laptop woke up): changes made meanwhile were
-      // never delivered, so load the games again. The first join needs nothing; the first load is already running.
-      if (subscribedOnce && dbLoadedOnce) fetchAll().catch(() => {});
-      subscribedOnce = true;
+      // Every join, the first included: changes made before it (since the first load, or while a phone slept or a
+      // laptop was closed) were never delivered, so catch up with a load.
+      if (status === "SUBSCRIBED") resync();
     });
 
   if (typeof window !== "undefined") {

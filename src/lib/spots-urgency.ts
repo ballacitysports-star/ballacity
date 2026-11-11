@@ -48,12 +48,23 @@ export function showFilledUpWarning(opts: {
   liveCount: number | undefined;
   spotsLeft: number;
   viewerHoldsPlace: boolean;
+  /** A payment that is in: submitted and waiting for the host, verified, or disputed (not rejected or cancelled). */
   hasSubmission: boolean;
+  /** The viewer's own payments are still loading: say nothing until they are known. */
+  loading?: boolean;
 }): boolean {
   return (
+    !opts.loading &&
     opts.liveCount !== undefined &&
     opts.spotsLeft <= 0 &&
     !opts.viewerHoldsPlace &&
     !opts.hasSubmission
+  );
+}
+
+/** Whether any of the viewer's payments for a game is in (pending, verified or disputed). */
+export function hasPaymentIn(subs: readonly { status: string }[]): boolean {
+  return subs.some(
+    (s) => s.status === "pending" || s.status === "verified" || s.status === "disputed",
   );
 }

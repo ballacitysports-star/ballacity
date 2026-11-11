@@ -74,7 +74,7 @@ describe("wiring", () => {
   it("the pay page warns only a viewer without a place or a payment", () => {
     const src = readFileSync("src/routes/games.$gameId.pay.tsx", "utf8");
     expect(src).toMatch(
-      /justFilledDuringPay = showFilledUpWarning\(\{[\s\S]*?viewerHoldsPlace,[\s\S]*?hasSubmission,/,
+      /justFilledDuringPay = showFilledUpWarning\(\{[\s\S]*?viewerHoldsPlace,[\s\S]*?hasSubmission: hasPaymentIn\(mySubs\),[\s\S]*?loading: fetching,/,
     );
     expect(src).not.toContain(
       "const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;",

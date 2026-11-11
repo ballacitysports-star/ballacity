@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { getSpotsUrgency, spotsOpenLabel, showFilledUpWarning } from "./spots-urgency";
+import {
+  getSpotsUrgency,
+  hasPaymentIn,
+  spotsOpenLabel,
+  showFilledUpWarning,
+} from "./spots-urgency";
 
 describe("getSpotsUrgency", () => {
   it("returns full when no spots remain", () => {
@@ -61,8 +66,25 @@ describe("showFilledUpWarning (pay page)", () => {
     expect(showFilledUpWarning({ ...full, hasSubmission: true })).toBe(false);
   });
 
+  it("says nothing while the viewer's own payments are still loading", () => {
+    expect(showFilledUpWarning({ ...full, loading: true })).toBe(false);
+  });
+
   it("stays quiet while spots remain or the live count is unknown", () => {
     expect(showFilledUpWarning({ ...full, spotsLeft: 1, liveCount: 9 })).toBe(false);
     expect(showFilledUpWarning({ ...full, liveCount: undefined })).toBe(false);
+  });
+});
+
+describe("hasPaymentIn", () => {
+  it("counts a payment waiting for the host, verified or disputed", () => {
+    expect(hasPaymentIn([{ status: "pending" }])).toBe(true);
+    expect(hasPaymentIn([{ status: "verified" }])).toBe(true);
+    expect(hasPaymentIn([{ status: "disputed" }])).toBe(true);
+  });
+
+  it("does not count a rejected or cancelled one: that player is about to pay again", () => {
+    expect(hasPaymentIn([{ status: "rejected" }, { status: "cancelled" }])).toBe(false);
+    expect(hasPaymentIn([])).toBe(false);
   });
 });

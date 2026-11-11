@@ -64,7 +64,7 @@ import { useLiveParticipantCount } from "@/lib/game-participants-store";
 // joinGame no longer called here — player is added to roster only after host verifies payment.
 import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { useIsJoined } from "@/lib/games-store";
-import { showFilledUpWarning } from "@/lib/spots-urgency";
+import { hasPaymentIn, showFilledUpWarning } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { z } from "zod";
@@ -512,7 +512,8 @@ function PayPage() {
     liveCount,
     spotsLeft,
     viewerHoldsPlace,
-    hasSubmission,
+    hasSubmission: hasPaymentIn(mySubs),
+    loading: fetching,
   });
   const currentStep: "pay" | "confirm" = picked ? "confirm" : "pay";
   const showStepper =

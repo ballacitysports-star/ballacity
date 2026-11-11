@@ -21,6 +21,10 @@ const db = vi.hoisted(() => ({
   queries: [] as string[],
   subscribed: [] as ((status: string) => void)[],
   auth: [] as ((event: string) => void)[],
+  // A load can be held open, to see that catch-up loads never overlap.
+  hold: null as Promise<void> | null,
+  inFlight: 0,
+  maxInFlight: 0,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -53,7 +57,16 @@ vi.mock("@/integrations/supabase/client", () => {
             return builder;
           },
           then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
-            return Promise.resolve({ data: db.rows.map(row), error: null }).then(resolve, reject);
+            db.inFlight += 1;
+            db.maxInFlight = Math.max(db.maxInFlight, db.inFlight);
+            const answer = () => {
+              db.inFlight -= 1;
+              return { data: db.rows.map(row), error: null };
+            };
+            return (db.hold ? db.hold.then(answer) : Promise.resolve().then(answer)).then(
+              resolve,
+              reject,
+            );
           },
         };
         return builder;
@@ -151,7 +164,18 @@ describe("useLiveParticipantCount", () => {
     view.unmount();
   });
 
-  it("stays live through a re-load after an auth event, and catches up after a dropped connection", async () => {
+  /** A fresh store module and an empty fake database, so a test sees only its own loads. */
+  async function freshStore() {
+    vi.resetModules();
+    window.localStorage.clear();
+    db.channels.length = 0;
+    db.handlers.length = 0;
+    db.queries.length = 0;
+    db.subscribed.length = 0;
+    db.auth.length = 0;
+    db.hold = null;
+    db.inFlight = 0;
+    db.maxInFlight = 0;
     const { useHostedGames } = await import("@/lib/hosted-games-store");
     const { useLiveParticipantCount } = await import("@/lib/game-participants-store");
     const seen: (number | undefined)[] = [];
@@ -164,9 +188,16 @@ describe("useLiveParticipantCount", () => {
       useHostedGames();
       return <Card />;
     }
+    const loads = () => db.queries.filter((q) => q === "hosted_games").length;
+    return { Feed, seen, loads };
+  }
+
+  it("stays live through a re-load after an auth event", async () => {
+    const { Feed, seen, loads } = await freshStore();
     db.rows = [{ id: "g-a", joined: 2, max_players: 10 }];
     const view = render(<Feed />);
     await settle();
+    expect(loads()).toBe(1);
     expect(view.getByTestId("g-a").textContent).toBe("2");
 
     // Every tab refocus emits SIGNED_IN: the store loads again. The count must not drop to the
@@ -175,19 +206,60 @@ describe("useLiveParticipantCount", () => {
     seen.length = 0;
     await act(async () => db.auth.forEach((cb) => cb("SIGNED_IN")));
     await settle();
+    expect(loads()).toBe(2);
     expect(view.getByTestId("g-a").textContent).toBe("5");
     expect(seen).not.toContain(undefined);
+    view.unmount();
+  });
 
-    // The connection drops; a join happens meanwhile (no event delivered); the channel joins again.
-    const channelStatus = db.subscribed[0]!;
+  it("catches up when the channel joins after the first load, and after a dropped connection", async () => {
+    const { Feed, loads } = await freshStore();
+    db.rows = [{ id: "g-a", joined: 2, max_players: 10 }];
+    const view = render(<Feed />);
+    await settle();
+    expect(loads()).toBe(1);
+    const channelStatus = db.subscribed.at(-1)!;
+
+    // A join lands after the first load but before the channel is subscribed: no event carries it.
+    db.rows = [{ id: "g-a", joined: 3, max_players: 10 }];
     await act(async () => channelStatus("SUBSCRIBED"));
+    await settle();
+    expect(loads()).toBe(2);
+    expect(view.getByTestId("g-a").textContent).toBe("3");
+
+    // The connection drops; a join happens meanwhile; the channel joins again.
     await act(async () => channelStatus("CHANNEL_ERROR"));
     db.rows = [{ id: "g-a", joined: 6, max_players: 10 }];
-    expect(view.getByTestId("g-a").textContent).toBe("5");
+    expect(view.getByTestId("g-a").textContent).toBe("3");
     await act(async () => channelStatus("SUBSCRIBED"));
     await settle();
     expect(view.getByTestId("g-a").textContent).toBe("6");
     expect(db.channels).toEqual(["hosted_games:all"]);
+    view.unmount();
+  });
+
+  it("runs catch-up loads one at a time, with one more run for joins that arrive meanwhile", async () => {
+    const { Feed, loads } = await freshStore();
+    db.rows = [{ id: "g-a", joined: 2, max_players: 10 }];
+    const view = render(<Feed />);
+    await settle();
+    const channelStatus = db.subscribed.at(-1)!;
+    const before = loads();
+
+    let release = () => {};
+    db.hold = new Promise<void>((r) => (release = r));
+    await act(async () => {
+      channelStatus("SUBSCRIBED");
+      channelStatus("SUBSCRIBED");
+      channelStatus("SUBSCRIBED");
+    });
+    expect(loads() - before).toBe(1);
+    db.hold = null;
+    release();
+    await settle();
+    // The three joins cost two loads, never two at once.
+    expect(loads() - before).toBe(2);
+    expect(db.maxInFlight).toBe(1);
     view.unmount();
   });
 
