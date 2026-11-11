@@ -11,7 +11,9 @@
 --   2. enforce_guardian_before_payment asks it. Its behaviour is unchanged.
 --   3. public.game_payment_guardian_ready(game): whether the signed-in caller may pay for the game as far as the
 --      guardian rule goes. The server asks it, as the player, before creating a PayPal order and again right before
---      capturing one, and refuses (nothing is charged) when it is not true.
+--      capturing one, and refuses (nothing is charged) when it is not true. A player known to be 18 or over is exempt,
+--      as the roster gate exempts adults, even if a guardian link made before 18 was never ended. (The payment trigger
+--      has no such exemption for a manual payment; that is unchanged here.)
 -- Deploy order: this migration BEFORE the app. The server's check fails closed, so a published server without this
 -- function refuses every PayPal checkout.
 -- Rollback: docs/rollbacks/20261111100000_paypal_guardian_rule.down.sql (guarded). Roll it back before
@@ -70,7 +72,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT auth.uid() IS NOT NULL
-     AND NOT private_sec.guardian_payment_approval_missing(auth.uid(), _game_id);
+     AND (
+       -- A player known to be 18 or over (a stored birthday) is under no guardian's authority, whatever link remains
+       -- from before 18; the roster gate exempts adults the same way. An unknown age stays gated: is_minor would call
+       -- it an adult, so it is not used here.
+       EXISTS (SELECT 1 FROM public.profile_birthdays pb
+                WHERE pb.user_id = auth.uid() AND pb.birthday IS NOT NULL
+                  AND date_part('year', age(pb.birthday))::int >= 18)
+       OR NOT private_sec.guardian_payment_approval_missing(auth.uid(), _game_id)
+     );
 $$;
 REVOKE ALL ON FUNCTION public.game_payment_guardian_ready(text) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.game_payment_guardian_ready(text) TO authenticated;

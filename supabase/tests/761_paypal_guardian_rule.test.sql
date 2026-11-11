@@ -97,15 +97,24 @@ SELECT t.as_user(t.id('solo'));
 SELECT t.eq(public.game_payment_guardian_ready('pp'), true, 'a 17-year-old with no guardian link may pay, as before');
 SELECT t.as_user(t.id('adult'));
 SELECT t.eq(public.game_payment_guardian_ready('pp'), true, 'an adult may pay, as before');
--- The payment trigger has no age condition, so an 18-year-old whose guardian link is still active needs an approval
--- for a manual payment on main. PayPal now gives the same answer (whether that rule should stop at 18 is the owner's
--- call: see the PR).
+-- A guardian link made before 18 is never ended automatically. A player known to be 18 or over is under no guardian's
+-- authority, so PayPal lets them pay, as the roster gate seats them. The payment trigger still refuses their manual
+-- payment (it has no age condition, unchanged here: see the PR).
 SELECT t.as_user(t.id('grown'));
-SELECT t.eq(public.game_payment_guardian_ready('pp'), false,
-  'an 18-year-old whose guardian link is still active gets the payment trigger''s answer');
+SELECT t.eq(public.game_payment_guardian_ready('pp'), true,
+  'an 18-year-old whose guardian link from before 18 is still active may pay by PayPal');
 SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'pp', %L)$q$,
                        t.id('grown'), t.id('host')),
-  'GUARDIAN_APPROVAL_REQUIRED', 'which is the payment trigger''s refusal for a manual payment');
+  'GUARDIAN_APPROVAL_REQUIRED', 'the payment trigger still refuses their manual payment (unchanged)');
+SELECT t.reset();
+-- An unknown age stays gated. nobday signed up without a birthday, and ga is linked to them.
+INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
+VALUES (t.id('nobday'), 'nobday@example.test', now(), jsonb_build_object('display_name', 'Nobday', 'account_type', 'player'));
+SELECT t.guardian('ga', 'nobday');
+SELECT t.ok(NOT public.is_minor(t.id('nobday')), 'setup: is_minor calls a player with no birthday an adult');
+SELECT t.as_user(t.id('nobday'));
+SELECT t.eq(public.game_payment_guardian_ready('pp'), false,
+  'a player whose age is unknown and who has a guardian link still needs the approval');
 SELECT t.as_anon();
 SELECT t.throws((SELECT sql FROM ready_q), 'permission denied', 'a signed-out visitor is refused');
 SELECT t.reset();
