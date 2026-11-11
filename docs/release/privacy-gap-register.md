@@ -32,6 +32,14 @@ Checked against `main` at `57a398a7` and the GitHub pull request list on 2026-11
 - **F06 (direct uploads to public image buckets).** Not on `main`, and not in #393. #292 adds a database switch, `image_direct_uploads`, and a storage trigger that refuses user writes into the public image buckets once it is closed (commits `fdc93991` and `b9a106e2`, test 547). It depends on G3b's staging bucket and SEC-6's quarantine, neither of which is on `main`. F06 is part of the G3b/SEC-6 rebuild.
 - **Alpha-channel residual (open).** `main` scans each uploaded picture once, as its original bytes, with no flattened copies (`finalizeImageUpload`, `src/lib/image-uploads.functions.ts:82`; `finalizeMessageAttachment`, `src/lib/message-attachments.functions.ts:74`). Content hidden in a transparent picture's alpha channel therefore gets no scan of its own. #293 adds white and black flattened scan renditions, but it is open, needs an image runtime the owner has not chosen, and carries the whole stack, so it is parked. Closing this needs that runtime decision.
 - **`sandbox_exec` (open owner question).** A read-only production check on 2026-11-04 found a role `sandbox_exec` (login, BYPASSRLS, not a superuser; `postgres` is a member) that holds INSERT and SELECT on every listed public table. It is recorded only in `docs/release/pg17-production-catalog-check.md` on the unmerged #277 branch, and as item P15 in #278's rehearsal plan. `main`'s fingerprint (`docs/migration-evidence/catalog-fingerprint-cte.sql`) compares grants to PUBLIC, `anon`, `authenticated` and `service_role` only, so "production equals a replay of `main`" cannot see this role. The owner should confirm with the hosting platform what the role is and who holds its credentials, and record the answer.
+  - **Re-checked read-only on 2026-11-11.** The role is wider than the 2026-11-04 entry says:
+    - It can still log in, bypasses row level security and has no expiry.
+    - It holds INSERT and SELECT on 111 `public` tables and on `storage.buckets` and `storage.objects`.
+    - It holds **SELECT on 16 `auth` tables**, including `auth.users`, `auth.sessions`, `auth.refresh_tokens`, `auth.one_time_tokens` and `auth.identities`.
+    - It had no open session, owns no table or function, and only `postgres` is a member of it.
+    - The repository never created it (no migration or script mentions it), and the E2E sandbox project has no such role.
+  - Whoever holds its password can read every account's email, session and refresh-token rows, and every row of every app table, minors' included.
+  - **Suggested owner action:** ask the hosting platform (Lovable, then Supabase) what created it and who holds its credentials. If neither owns it, stop it logging in (`ALTER ROLE sandbox_exec NOLOGIN`) and then revoke its grants, as an owner-approved production change. Record the answer here.
 
 ## Master status (revision 4)
 
