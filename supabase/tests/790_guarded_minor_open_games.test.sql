@@ -3,14 +3,16 @@
 -- the place. On an open game the request needs the guardian only, never the host. Adults and 16-17-year-olds with no
 -- guardian are untouched, and so is every host, payment and cohort rule.
 --
--- teeng (16) has guardian ga; kid (14) has guardian gk; teenu (16) has no guardian; adult is 28.
+-- teeng (16) has guardian ga; kid (14) has guardian gk; teenu (16) has no guardian; adult is 28; grown (18) still has
+-- an active link to ga; gb is a second adult who becomes teeng's guardian in section 8.
 -- Games: fo* free open, po* paid open (requires_approval false); fq free and pq paid with a host queue.
 BEGIN;
 
 SELECT t.person('host', 40), t.person('ga', 41), t.person('gk', 42), t.person('teeng', 16), t.person('teenu', 16),
-       t.person('kid', 14), t.person('adult', 28);
+       t.person('kid', 14), t.person('adult', 28), t.person('grown', 18), t.person('gb', 43);
 SELECT t.guardian('ga', 'teeng');
 SELECT t.guardian('gk', 'kid');
+SELECT t.guardian('ga', 'grown');
 
 INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price)
 VALUES ('fo', t.id('host'), 'Free open', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
@@ -20,6 +22,11 @@ VALUES ('fo', t.id('host'), 'Free open', 'Basketball', now() + interval '3 days'
        ('fo-no', t.id('host'), 'Free open 3', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
        ('fo-stale', t.id('host'), 'Free open 4', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
        ('fo-legacy', t.id('host'), 'Free open 5', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('fo-other', t.id('host'), 'Free open 6', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('fo-hostno', t.id('host'), 'Free open 7', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('fo-gone', t.id('host'), 'Free open 8', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('fo-grown', t.id('host'), 'Free open 9', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('fo-two', t.id('host'), 'Free open 10', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
        ('po', t.id('host'), 'Paid open', 'Basketball', now() + interval '3 days', 'Gym', 10, 10),
        ('po-paypal', t.id('host'), 'Paid open 2', 'Basketball', now() + interval '3 days', 'Gym', 10, 10),
        ('fq', t.id('host'), 'Free queue', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
@@ -28,6 +35,8 @@ INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_
 VALUES ('fo', t.id('host'), 0, false), ('fo-direct', t.id('host'), 0, false), ('fo-server', t.id('host'), 0, false),
        ('fo-dodge', t.id('host'), 0, false), ('fo-no', t.id('host'), 0, false),
        ('fo-stale', t.id('host'), 0, false), ('fo-legacy', t.id('host'), 0, false),
+       ('fo-other', t.id('host'), 0, false), ('fo-hostno', t.id('host'), 0, false), ('fo-gone', t.id('host'), 0, false),
+       ('fo-grown', t.id('host'), 0, false), ('fo-two', t.id('host'), 0, true), ('fo-two', t.id('adult'), 0, false),
        ('po', t.id('host'), 10, false), ('po-paypal', t.id('host'), 10, false),
        ('fq', t.id('host'), 0, true), ('pq', t.id('host'), 10, true);
 
@@ -201,5 +210,48 @@ SELECT t.eq((SELECT count(*)::int FROM pg_trigger
   'the roster gate is a BEFORE INSERT trigger, so rows already written are not re-checked');
 SELECT t.eq((SELECT count(*)::int FROM public.game_participants WHERE game_id = 'fo-legacy' AND user_id = t.id('teeng')), 1,
   'a place taken before the migration is still there');
+
+-- ---- 8. an approval opens one game, from a current guardian, and the host's no still counts (task #71 review) -----
+-- teeng's approval for 'fo' (section 3) does not open another open game.
+SELECT t.as_user(t.id('teeng'));
+SELECT t.throws(pg_temp.place('fo-other', 'teeng'), 'GUARDIAN_APPROVAL_REQUIRED',
+  'the guardian''s approval for one game does not open another');
+-- The host turns a request to the parent down (through the API): a rejected request gives no place.
+SELECT t.lives(pg_temp.ask('fo-hostno', 'teeng'), 'the child asks about another open game');
+SELECT t.as_user(t.id('ga'));
+SELECT t.lives(pg_temp.approve('fo-hostno', 'teeng'), 'the guardian approves it');
+SELECT t.as_user(t.id('host'));
+SELECT t.eq(t.changed(format($q$UPDATE public.join_requests SET status = 'rejected', reviewed_at = now() WHERE id = %L$q$,
+                             t.id('req-fo-hostno-teeng'))), 1, 'the host turns the request down');
+SELECT t.as_user(t.id('teeng'));
+SELECT t.throws(pg_temp.place('fo-hostno', 'teeng'), 'GUARDIAN_APPROVAL_REQUIRED',
+  'a request the host turned down gives no place, whatever the guardian said');
+-- An approval from a guardian whose link has ended does not count once someone else is the guardian.
+SELECT t.lives(pg_temp.ask('fo-gone', 'teeng'), 'the child asks about one more open game');
+SELECT t.as_user(t.id('ga'));
+SELECT t.lives(pg_temp.approve('fo-gone', 'teeng'), 'the guardian approves it');
+SELECT t.reset();
+UPDATE public.guardian_links SET status = 'revoked' WHERE child_user_id = t.id('teeng');
+SELECT t.guardian('gb', 'teeng');
+SELECT t.as_user(t.id('teeng'));
+SELECT t.throws(pg_temp.place('fo-gone', 'teeng'), 'GUARDIAN_APPROVAL_REQUIRED',
+  'an approval from a guardian who is no longer linked does not give a place');
+-- An adult whose guardian link is still active is not a minor: the roster gate lets them join directly.
+SELECT t.as_user(t.id('grown'));
+SELECT t.lives(pg_temp.place('fo-grown', 'grown'), 'an 18-year-old with a link still active joins an open game directly');
+SELECT t.reset();
+
+-- The host's list of requests hides a request to the parent only when the game's own settings say it is open
+-- (withoutGuardianOnly). The host reads only the payee's settings row, so a second, stale row cannot hide a request
+-- the host must answer.
+SELECT t.as_user(t.id('host'));
+SELECT t.eq((SELECT count(*)::int FROM public.game_payment_settings WHERE game_id = 'fo-two'), 1,
+  'a host reads one settings row for their game, though two exist');
+SELECT t.eq((SELECT requires_approval FROM public.game_payment_settings WHERE game_id = 'fo-two'), true,
+  'and it is the payee''s row');
+SELECT t.as_user(t.id('adult'));
+SELECT t.eq((SELECT count(*)::int FROM public.game_payment_settings WHERE game_id = 'fo-two'), 0,
+  'the owner of the other row reads none, so their list keeps every request');
+SELECT t.reset();
 
 ROLLBACK;

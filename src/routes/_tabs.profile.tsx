@@ -82,7 +82,7 @@ import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
-import { isGuardianOnlyRequest } from "@/lib/guarded-open-join";
+import { isGuardianOnlyRequest, listablePlayerRequests } from "@/lib/guarded-open-join";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -282,12 +282,17 @@ function PlayerProfile() {
     return m;
   }, [hosted]);
 
-  const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
+  // A request to the parent on an open game stays pending once the child is in; leave it out then.
+  const listedMine = useMemo(
+    () => listablePlayerRequests(myRequests, joinedGameIds),
+    [myRequests, joinedGameIds],
+  );
+  const allRequests = useMemo(() => [...listedMine, ...hostRequests], [listedMine, hostRequests]);
   const filteredRequests = useMemo(() => {
     if (requestFilter === "all") return allRequests;
     if (requestFilter === "host") return hostRequests;
-    return myRequests;
-  }, [requestFilter, allRequests, hostRequests, myRequests]);
+    return listedMine;
+  }, [requestFilter, allRequests, hostRequests, listedMine]);
   const pendingRequests = filteredRequests.filter((r) => r.status === "pending");
   const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));

@@ -26,13 +26,38 @@ export function isGuardianOnlyRequest(row: { idempotency_key?: string | null } |
  * Whether this viewer joins through their parent alone: not the host, has an active guardian link, and the game
  * (for this viewer) needs no host approval. A game that needs the host keeps its usual request, which the guardian
  * also answers.
+ *
+ * Two cases keep the ordinary button, matching what the database does:
+ * - a paid game the viewer's age group cannot pay for (13-15, under 13): the parent's yes could not lead to a place,
+ *   so the viewer gets Pay Host and the pay page's "payments aren't available" message, as before;
+ * - a free game when the viewer is known to be 18 or over: the roster gate checks the guardian only for a minor, so
+ *   an adult whose link is still active joins directly. On a paid game the payment gate checks the link itself, so
+ *   the parent is still asked there. An unknown age counts as a minor.
  */
 export function guardianOnlyJoin(input: {
   isHost: boolean;
   hasGuardian: boolean;
   requiresApproval: boolean;
+  isPaid?: boolean;
+  canPay?: boolean;
+  viewerAge?: number | null;
 }): boolean {
-  return !input.isHost && input.hasGuardian && !input.requiresApproval;
+  if (input.isHost || !input.hasGuardian || input.requiresApproval) return false;
+  if (input.isPaid) return input.canPay !== false;
+  return input.viewerAge == null || input.viewerAge < 18;
+}
+
+/**
+ * Whether the main button asks the parent (first time, or again after a no). Not while a payment is pending or
+ * verified: the button then follows the payment (view it, or withdraw it), so a child whose parent said no after they
+ * paid can still take the payment back.
+ */
+export function asksParent(
+  step: GuardedOpenStep | null,
+  latestPaymentStatus: string | null | undefined,
+): boolean {
+  if (step !== "ask_parent" && step !== "declined") return false;
+  return !latestPaymentStatus || latestPaymentStatus === "rejected";
 }
 
 /**
@@ -92,6 +117,43 @@ export function guardedOpenCopy(
           }
         : { title: "Your parent said yes", body: "Tap Join Run to take your spot." };
   }
+}
+
+/**
+ * The player's own line on a request card (Me tab, "My sent requests"). A request to the parent on an open game is
+ * never answered by the host, so it must not say "Waiting for host approval"; a guardian's no is the parent's, not
+ * the host's.
+ */
+export function playerRequestLine(r: {
+  status: "pending" | "approved" | "rejected";
+  idempotency_key?: string | null;
+  guardian_approved_at?: string | null;
+  reviewer_notes?: string | null;
+}): string {
+  if (r.status === "rejected")
+    return r.reviewer_notes === "Declined by guardian"
+      ? "Declined by your parent."
+      : "Declined by host.";
+  if (r.status === "approved") return "Approved — you're on the roster.";
+  if (isGuardianOnlyRequest(r))
+    return r.guardian_approved_at
+      ? "Your parent said yes. Open the game to join."
+      : "Waiting for your parent";
+  return "Waiting for host approval";
+}
+
+/**
+ * The player's own requests worth listing. A request to the parent stays pending after the child is on the roster
+ * (the host never answers it), so it is left out for a game they have joined: its Cancel would only delete the
+ * request and say "Request canceled." while the place stays.
+ */
+export function listablePlayerRequests<
+  T extends { game_id: string; status: string; idempotency_key?: string | null },
+>(rows: T[], joinedGameIds: Iterable<string>): T[] {
+  const joined = new Set(joinedGameIds);
+  return rows.filter(
+    (r) => !(r.status === "pending" && isGuardianOnlyRequest(r) && joined.has(r.game_id)),
+  );
 }
 
 /** The main button's label before the player is in. */

@@ -31,12 +31,15 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const {
   ASK_PARENT_LABEL,
+  asksParent,
   guardedOpenCopy,
   guardedOpenStep,
   guardianOnlyJoin,
   guardianOnlyRequestKey,
   hostAnswersRequest,
   isGuardianOnlyRequest,
+  listablePlayerRequests,
+  playerRequestLine,
 } = await import("./guarded-open-join");
 const { joinWait, playerWaitCopy } = await import("./join-guardian-status");
 const { paymentSubmissionErrorMessage, PAYMENTS_GUARDIAN_APPROVAL_MESSAGE } =
@@ -69,6 +72,56 @@ describe("who asks their parent instead of joining", () => {
     expect(guardianOnlyJoin({ isHost: true, hasGuardian: true, requiresApproval: false })).toBe(
       false,
     );
+  });
+});
+
+// Task #71 review.
+describe("who asks their parent: age group and payments", () => {
+  const open = { isHost: false, hasGuardian: true, requiresApproval: false };
+
+  it("a guarded 16-17 asks on a paid open game", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: true, canPay: true, viewerAge: 16 })).toBe(true);
+  });
+
+  it("a guarded 13-15 who cannot pay is not sent to the parent on a paid game (no place could follow)", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: true, canPay: false, viewerAge: 14 })).toBe(false);
+  });
+
+  it("on a free game a 13-15 still asks", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: false, canPay: false, viewerAge: 14 })).toBe(true);
+  });
+
+  it("an adult whose link is still active joins a free game directly, as the database allows", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: false, viewerAge: 18 })).toBe(false);
+  });
+
+  it("but still asks on a paid game, where the payment gate checks the link itself", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: true, canPay: true, viewerAge: 18 })).toBe(true);
+  });
+
+  it("an unknown age counts as a minor", () => {
+    expect(guardianOnlyJoin({ ...open, isPaid: false, viewerAge: null })).toBe(true);
+    expect(guardianOnlyJoin({ ...open, isPaid: false })).toBe(true);
+  });
+});
+
+describe("the main button asks the parent only while no payment is under way", () => {
+  it("asks first, and again after a no", () => {
+    expect(asksParent("ask_parent", undefined)).toBe(true);
+    expect(asksParent("declined", null)).toBe(true);
+    expect(asksParent("declined", "rejected")).toBe(true);
+  });
+
+  it("after a no with a payment pending or verified, the button follows the payment instead", () => {
+    expect(asksParent("declined", "pending")).toBe(false);
+    expect(asksParent("declined", "verified")).toBe(false);
+    expect(asksParent("ask_parent", "pending")).toBe(false);
+  });
+
+  it("never while waiting, once cleared, or off the parent-only path", () => {
+    expect(asksParent("waiting_parent", undefined)).toBe(false);
+    expect(asksParent("cleared", undefined)).toBe(false);
+    expect(asksParent(null, undefined)).toBe(false);
   });
 });
 
@@ -200,5 +253,56 @@ describe("a refused payment before the parent approved", () => {
     expect(msg).toBe(PAYMENTS_GUARDIAN_APPROVAL_MESSAGE);
     expect(msg).not.toMatch(/GUARDIAN_APPROVAL_REQUIRED/);
     expect(msg).toMatch(/parent/);
+  });
+});
+
+// Task #71 review: the child's own request card on the Me tab.
+describe("the child's request card", () => {
+  const key = "guardian-only:g1";
+  it("a request to the parent waits on the parent, never the host", () => {
+    expect(playerRequestLine({ status: "pending", idempotency_key: key })).toBe(
+      "Waiting for your parent",
+    );
+    expect(
+      playerRequestLine({
+        status: "pending",
+        idempotency_key: key,
+        guardian_approved_at: "2026-11-11T00:00:00Z",
+      }),
+    ).toBe("Your parent said yes. Open the game to join.");
+  });
+
+  it("a guardian's no is the parent's, not the host's", () => {
+    expect(
+      playerRequestLine({
+        status: "rejected",
+        idempotency_key: key,
+        reviewer_notes: "Declined by guardian",
+      }),
+    ).toBe("Declined by your parent.");
+    expect(playerRequestLine({ status: "rejected", reviewer_notes: "Declined by guardian" })).toBe(
+      "Declined by your parent.",
+    );
+  });
+
+  it("an ordinary request reads as before", () => {
+    expect(playerRequestLine({ status: "pending", idempotency_key: "k" })).toBe(
+      "Waiting for host approval",
+    );
+    expect(playerRequestLine({ status: "approved" })).toBe("Approved — you're on the roster.");
+    expect(playerRequestLine({ status: "rejected", reviewer_notes: null })).toBe(
+      "Declined by host.",
+    );
+  });
+
+  it("a request to the parent drops out of the list once the child is on the roster", () => {
+    const rows = [
+      { id: "a", game_id: "g1", status: "pending", idempotency_key: key },
+      { id: "b", game_id: "g2", status: "pending", idempotency_key: "guardian-only:g2" },
+      { id: "c", game_id: "g3", status: "pending", idempotency_key: "k3" },
+      { id: "d", game_id: "g1", status: "rejected", idempotency_key: key },
+    ];
+    expect(listablePlayerRequests(rows, ["g1", "g3"]).map((r) => r.id)).toEqual(["b", "c", "d"]);
+    expect(listablePlayerRequests(rows, []).map((r) => r.id)).toEqual(["a", "b", "c", "d"]);
   });
 });

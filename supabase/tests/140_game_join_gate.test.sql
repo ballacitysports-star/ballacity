@@ -177,6 +177,9 @@ SELECT t.as_user(t.id('teenmid'));
 SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('teenmid')),
   'GUARDIAN_APPROVAL_REQUIRED', 'a teen with a guardian cannot join an instant-join game with no request their guardian approved');
 SELECT t.reset();
+-- If the gate ever let that join through, take the place back so the rest of the file still runs (a guardian cannot
+-- approve for a child already on the roster).
+DELETE FROM public.game_participants WHERE game_id = 'open' AND user_id = t.id('teenmid');
 SELECT pg_temp.guardian_ok('open', 'teenmid');
 SELECT t.as_user(t.id('teenmid'));
 SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('teenmid')),

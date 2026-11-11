@@ -191,6 +191,7 @@ import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner"
 import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
+  asksParent,
   guardedOpenCopy,
   guardedOpenStep,
   guardianOnlyJoin,
@@ -883,7 +884,14 @@ function GameDetail() {
   // A minor with a linked guardian on a game that needs no host approval asks their parent instead: the database
   // gives them a place, or takes their payment, only on a request their guardian approved, and the host never answers
   // it (20261111160000).
-  const guardianOnly = guardianOnlyJoin({ isHost, hasGuardian, requiresApproval });
+  const guardianOnly = guardianOnlyJoin({
+    isHost,
+    hasGuardian,
+    requiresApproval,
+    isPaid,
+    canPay: canChildFeature("game_payments").allowed,
+    viewerAge: myAge,
+  });
   // A minor's request needs the host and a guardian (on an open game, the guardian alone); say who is still to answer.
   const myWait =
     !isHost && myReq
@@ -896,8 +904,8 @@ function GameDetail() {
       : null;
   // null once they are on the roster, or when the parent-only path does not apply.
   const parentStep = guardianOnly && !joined ? guardedOpenStep(myReq) : null;
-  // The main action asks the parent (first time, or again after a no).
-  const parentAsk = parentStep === "ask_parent" || parentStep === "declined";
+  // The main action asks the parent (first time, or again after a no), unless a payment is under way.
+  const parentAsk = asksParent(parentStep, mySubs[0]?.status);
   const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
