@@ -35,9 +35,48 @@ describe("scrubbing (P0-8: no personal data)", () => {
     expect(out).toContain("https://x.supabase.co/rest/v1/profiles");
   });
 
+  it("removes the input values Postgres repeats in its errors, keeping the failure readable", () => {
+    expect(scrubMessage('invalid input syntax for type uuid: "jane-smith-1990"')).toBe(
+      'invalid input syntax for type uuid: "[value]"',
+    );
+    expect(scrubMessage('invalid input value for enum sport: "Janes Hoops"')).toBe(
+      'invalid input value for enum sport: "[value]"',
+    );
+    // A value with a space: the older token rule alone would keep "Smith".
+    const dup = scrubMessage(
+      'duplicate key value violates unique constraint "teams_name_key" Key (name)=(Jane Smith) already exists.',
+    );
+    expect(dup).not.toMatch(/Jane|Smith/);
+    expect(dup).toContain('violates unique constraint "teams_name_key"');
+    // Values holding brackets or quotes of their own are removed whole.
+    for (const raw of [
+      'duplicate key value violates unique constraint "t_key" Key (name)=(Jane (JJ) Smith) already exists.',
+      'violates foreign key constraint "y" Key (owner)=(Jane (JJ) Smith) is not present in table "p".',
+      "conflicts with existing key (slot)=(Jane (JJ) Smith).",
+      // A PostgREST error thrown as a plain object reaches the report as JSON, details included.
+      JSON.stringify({ code: "23505", details: "Key (name)=(Jane (JJ) Smith).", hint: null }),
+      'invalid input syntax for type uuid: "Jane "JJ" Smith"',
+    ]) {
+      expect(scrubMessage(raw), raw).not.toMatch(/Jane|JJ|Smith/);
+    }
+    const row = scrubMessage(
+      'null value in column "city" violates not-null constraint Failing row contains (7, Jane Smith, null).',
+    );
+    expect(row).not.toMatch(/Jane/);
+    expect(row).toContain("violates not-null constraint Failing row contains ([values])");
+  });
+
   it("caps the message and never sends an empty one", () => {
     expect(scrubMessage("x".repeat(2000)).length).toBe(MESSAGE_MAX);
     expect(scrubMessage("   ")).toBe("Unknown error");
+  });
+
+  it("scrubs a very long message quickly: only the start is read", () => {
+    // Without the bound, the Postgres value rules take seconds on this (they rescan per match).
+    const started = Date.now();
+    const out = scrubMessage("Key (a)=(".repeat(50_000));
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(out.length).toBeLessThanOrEqual(MESSAGE_MAX);
   });
 
   it("keeps the path only, with ids masked", () => {
