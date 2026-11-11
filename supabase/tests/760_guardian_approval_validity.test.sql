@@ -3,8 +3,9 @@
 --
 -- teen (16) has two guardians, ga and gb. Payment (enforce_guardian_before_payment), a roster place
 -- (enforce_child_game_participation) and accepting a team invite (team_respond_invite) all need a valid approval.
--- Wherever a guardian loses authority (link revoked, unverified or deleted, account deleted, suspended), their
--- approvals of requests still open are cleared, so the request shows as waiting on a guardian again.
+-- Wherever a guardian loses authority (link revoked, unverified or deleted, account deleted, suspended, found to be a
+-- minor), their approvals of requests not yet a place are cleared, so the request shows as waiting on a guardian
+-- again.
 BEGIN;
 
 SELECT t.person('host', 40), t.person('ga', 41), t.person('gb', 44), t.person('teen', 16), t.person('adult', 28),
@@ -16,9 +17,13 @@ INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_
 VALUES ('paid', t.id('host'), 'Paid run', 'Basketball', now() + interval '3 days', 'Gym', 10, 10),
        ('roster', t.id('host'), 'Roster run', 'Basketball', now() + interval '4 days', 'Gym', 10, 0),
        ('decline', t.id('host'), 'Decline run', 'Basketball', now() + interval '5 days', 'Gym', 10, 0),
-       ('later', t.id('host'), 'Later run', 'Basketball', now() + interval '6 days', 'Gym', 10, 0);
+       ('later', t.id('host'), 'Later run', 'Basketball', now() + interval '6 days', 'Gym', 10, 0),
+       ('reask', t.id('host'), 'Reask run', 'Basketball', now() + interval '7 days', 'Gym', 10, 0),
+       ('reask2', t.id('host'), 'Reask run 2', 'Basketball', now() + interval '7 days', 'Gym', 10, 0),
+       ('reask3', t.id('host'), 'Reask run 3', 'Basketball', now() + interval '7 days', 'Gym', 10, 0),
+       ('paid2', t.id('host'), 'Paid run 2', 'Basketball', now() + interval '8 days', 'Gym', 10, 10);
 INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
-VALUES ('paid', t.id('host'), 10, false);
+VALUES ('paid', t.id('host'), 10, false), ('paid2', t.id('host'), 10, false);
 
 CREATE TEMP TABLE pay_stmt AS
 SELECT format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'paid', %L)$q$,
@@ -193,6 +198,104 @@ SELECT t.reset();
 SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'later', t.id('teen')),
   'and the child can take the place');
 
+-- ---- 6c. a guardian's no, a new ask, and rejected requests -------------------------------------------------------------
+SELECT t.person('gd', 47);
+SELECT t.guardian('gd', 'teen');
+
+-- A guardian's no takes back an earlier yes, and a new ask needs a fresh answer.
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (id, game_id, player_id, host_id, idempotency_key)
+                        VALUES (%L, 'reask', %L, %L, 'k-reask')$q$, t.id('req-reask'), t.id('teen'), t.id('host')),
+  'the child asks to join');
+SELECT t.as_user(t.id('gb'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', t.id('req-reask')), 'gb approves');
+SELECT t.as_user(t.id('gd'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, false)', t.id('req-reask')), 'gd declines');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.join_requests WHERE id = t.id('req-reask') AND status = 'rejected'
+              AND guardian_approved_at IS NULL AND guardian_approved_by IS NULL), 1,
+  'a guardian''s no rejects the request and takes back the earlier approval');
+UPDATE public.join_requests SET last_rejected_at = now() - interval '1 hour' WHERE id = t.id('req-reask');
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$UPDATE public.join_requests SET status = 'pending' WHERE id = %L AND status = 'rejected'$q$,
+                      t.id('req-reask')), 'the child asks again');
+SELECT t.as_user(t.id('gb'));
+SELECT t.eq(t.count(format($q$SELECT 1 FROM public.join_requests WHERE id = %L AND status = 'pending'
+                              AND guardian_approved_at IS NULL$q$, t.id('req-reask'))), 1,
+  'the new ask waits on a guardian again');
+SELECT t.reset();
+UPDATE public.join_requests SET status = 'approved', reviewed_at = now() WHERE id = t.id('req-reask');
+SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'reask', t.id('teen')),
+  'GUARDIAN_APPROVAL_REQUIRED', 'the host''s yes alone does not seat the child after a guardian''s no');
+
+-- A host's no keeps the approval on record, but a rejected request seats nobody, and authority ending clears it.
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (id, game_id, player_id, host_id, idempotency_key)
+                        VALUES (%L, 'reask2', %L, %L, 'k-reask2')$q$, t.id('req-reask2'), t.id('teen'), t.id('host')),
+  'the child asks to join another game');
+SELECT t.as_user(t.id('gb'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', t.id('req-reask2')), 'gb approves it');
+SELECT t.as_user(t.id('host'));
+SELECT t.lives(format($q$UPDATE public.join_requests SET status = 'rejected', reviewed_at = now() WHERE id = %L$q$,
+                      t.id('req-reask2')), 'the host turns it down');
+SELECT t.reset();
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE id = t.id('req-reask2')), t.id('gb'),
+  'a host''s no leaves the guardian''s approval on record');
+SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'reask2', t.id('teen')),
+  'GUARDIAN_APPROVAL_REQUIRED', 'an approval on a rejected request does not seat the child');
+UPDATE public.profiles SET suspended_at = now() WHERE id = t.id('gb');
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE id = t.id('req-reask2')), NULL::uuid,
+  'suspending the guardian clears their approval of a rejected request too');
+UPDATE public.profiles SET suspended_at = NULL WHERE id = t.id('gb');
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE id = t.id('req-reask2')), NULL::uuid,
+  'and lifting the suspension does not bring it back');
+
+-- A new ask after a host's no needs a fresh answer, even while the approving guardian still has authority.
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (id, game_id, player_id, host_id, idempotency_key)
+                        VALUES (%L, 'reask3', %L, %L, 'k-reask3')$q$, t.id('req-reask3'), t.id('teen'), t.id('host')),
+  'the child asks to join a third game');
+SELECT t.as_user(t.id('gb'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', t.id('req-reask3')), 'gb approves it too');
+SELECT t.as_user(t.id('host'));
+SELECT t.lives(format($q$UPDATE public.join_requests SET status = 'rejected', reviewed_at = now() WHERE id = %L$q$,
+                      t.id('req-reask3')), 'the host turns it down');
+SELECT t.reset();
+UPDATE public.join_requests SET last_rejected_at = now() - interval '1 hour' WHERE id = t.id('req-reask3');
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$UPDATE public.join_requests SET status = 'pending' WHERE id = %L AND status = 'rejected'$q$,
+                      t.id('req-reask3')), 'the child asks again');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.join_requests WHERE id = t.id('req-reask3') AND status = 'pending'
+              AND guardian_approved_at IS NULL AND guardian_approved_by IS NULL), 1,
+  'reopening a rejected request clears its approval, so the guardians are asked again');
+
+-- A paid place still needs a valid approval after the child deletes the request.
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$INSERT INTO public.join_requests (id, game_id, player_id, host_id, idempotency_key)
+                        VALUES (%L, 'paid2', %L, %L, 'k-paid2')$q$, t.id('req-paid2'), t.id('teen'), t.id('host')),
+  'the child asks to join a paid game');
+SELECT t.as_user(t.id('gb'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', t.id('req-paid2')), 'gb approves the paid game');
+SELECT t.as_user(t.id('teen'));
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'paid2', %L)$q$,
+                      t.id('teen'), t.id('host')), 'the child pays');
+SELECT t.lives(format('DELETE FROM public.join_requests WHERE id = %L', t.id('req-paid2')), 'then deletes the request');
+SELECT t.reset();
+SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'paid2', t.id('teen')),
+  'GUARDIAN_APPROVAL_REQUIRED', 'a paid place still needs a valid approval once the request is gone');
+
+-- A guardian found to be a minor (support's birthday correction): their approval is cleared.
+SELECT t.as_user(t.id('gd'));
+SELECT t.lives(format('SELECT public.guardian_approve_join_request(%L, true)', t.id('req-reask3')), 'gd approves the new ask');
+SELECT t.reset();
+SELECT set_config('openrun.birthday_review', 'on', true);
+UPDATE public.profile_birthdays SET birthday = (current_date - make_interval(years => 17, months => 1))::date
+ WHERE user_id = t.id('gd');
+SELECT set_config('openrun.birthday_review', '', true);
+SELECT t.eq((SELECT guardian_approved_by FROM public.join_requests WHERE id = t.id('req-reask3')), NULL::uuid,
+  'a guardian found to be a minor has their approval cleared');
+
 -- ---- 7. team invites ---------------------------------------------------------------------------------------------------
 SELECT t.team('squad', 'coach');
 INSERT INTO public.team_invites (id, team_id, invitee_id, invited_by, guardian_approved_at, guardian_approved_by)
@@ -206,6 +309,20 @@ SELECT t.as_user(t.id('teen'));
 SELECT t.lives(format('SELECT public.team_respond_invite(%L, true)', t.id('invite-stale')),
   'with a current guardian''s approval it can');
 SELECT t.reset();
+
+-- Approving an invite joins the child in one step, so it needs an eligible guardian too; declining does not.
+SELECT t.team('squad2', 'coach');
+INSERT INTO public.team_invites (id, team_id, invitee_id, invited_by)
+VALUES (t.id('invite-elig'), 'squad2', t.id('teen'), t.id('coach'));
+UPDATE public.profiles SET suspended_at = now() WHERE id = t.id('gb');
+SELECT t.as_user(t.id('gb'));
+SELECT t.throws(format('SELECT public.guardian_approve_team_invite(%L, true)', t.id('invite-elig')), 'GUARDIAN_NOT_ELIGIBLE',
+  'a suspended guardian cannot put the child on a team');
+SELECT t.lives(format('SELECT public.guardian_approve_team_invite(%L, false)', t.id('invite-elig')),
+  'but can decline the invite');
+SELECT t.reset();
+UPDATE public.profiles SET suspended_at = NULL WHERE id = t.id('gb');
+SELECT t.eq((SELECT status FROM public.team_invites WHERE id = t.id('invite-elig')), 'declined', 'and the decline is recorded');
 
 -- ---- 8. adults are unaffected ---------------------------------------------------------------------------------------
 SELECT t.as_user(t.id('adult'));
