@@ -1,6 +1,7 @@
--- Minor-safety gates (20261111120000): a declared age to take a place in a game, join a team by invite, or be added to
--- an organization or a roster directly; payment handles only for an adult payee and a caller who can see or is in the
--- game; revoke_parental_consent and team_invite_player give nobody an answer about other people.
+-- Minor-safety gates (20261111120000): a declared age to take a place in a game, join a team by invite, be added to an
+-- organization directly, or pay; no direct roster writes by managers and no moving an organization membership; payment
+-- handles (and the PayPal merchant id) only for an adult payee, and the game-level read only to a caller who can see or
+-- is in the game; revoke_parental_consent and team_invite_player give nobody an answer about other people.
 --
 -- "nobday" and "nokid" signed up before sign-up asked for a date of birth: their age is unknown. Each defect is shown
 -- closed next to the legitimate path that must keep working.
@@ -124,6 +125,21 @@ SELECT t.throws(format('INSERT INTO public.org_members (org_id, user_id) VALUES 
 SELECT t.reset();
 SELECT t.eq((SELECT count(*)::int FROM public.org_members WHERE org_id = t.id('gym')), 1, 'only the adult was added');
 
+-- Nor can an administrator move an existing membership to someone else, or to another organization.
+INSERT INTO public.trainer_orgs (id, owner_id, name, handle) VALUES (t.id('gym2'), t.id('orgadmin'), 'Gym two', 'gym780b');
+SELECT t.as_user(t.id('orgadmin'));
+SELECT t.throws(format('UPDATE public.org_members SET user_id = %L WHERE org_id = %L AND user_id = %L', t.id('kid'), t.id('gym'), t.id('adult')),
+  'MEMBER_IDENTITY_FIXED', 'an administrator cannot move the adult''s membership to an 11-year-old');
+SELECT t.throws(format('UPDATE public.org_members SET user_id = %L WHERE org_id = %L AND user_id = %L', t.id('nobday'), t.id('gym'), t.id('adult')),
+  'MEMBER_IDENTITY_FIXED', 'nor to an account with no birthday');
+SELECT t.throws(format('UPDATE public.org_members SET org_id = %L WHERE org_id = %L AND user_id = %L', t.id('gym2'), t.id('gym'), t.id('adult')),
+  'MEMBER_IDENTITY_FIXED', 'nor to another organization');
+SELECT t.eq(t.changed(format($q$UPDATE public.org_members SET role = 'admin' WHERE org_id = %L AND user_id = %L$q$, t.id('gym'), t.id('adult'))), 1,
+  'a role change still goes through (all the app writes: updateGenericOrgMember)');
+SELECT t.reset();
+SELECT t.eq((SELECT array_agg(user_id::text || ':' || role::text) FROM public.org_members WHERE org_id = t.id('gym')),
+            ARRAY[t.id('adult')::text || ':admin'], 'the membership is still the adult''s, in the same organization');
+
 -- A person's own request to join, approved by an administrator, is unchanged.
 SELECT t.as_user(t.id('teen'));
 SELECT t.lives(format('INSERT INTO public.org_member_requests (id, org_id, user_id) VALUES (%L, %L, %L)',
@@ -133,12 +149,18 @@ SELECT t.lives(format('SELECT public.approve_org_member_request(%L)', t.id('req-
   'a minor''s own request to join can still be approved');
 SELECT t.reset();
 
+-- A team manager writes nobody onto a roster directly: joining is by invite (consent, age, guardian, waiver, blocks).
 SELECT t.as_user(t.id('manager'));
-SELECT t.lives(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('squad', %L, 'player')$q$, t.id('stranger')),
-  'a team manager adds an adult directly');
+SELECT t.throws(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('squad', %L, 'player')$q$, t.id('stranger')),
+  'row-level security', 'a team manager cannot put even an adult on the roster without asking');
 SELECT t.throws(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('squad', %L, 'player')$q$, t.id('nobday')),
-  'row-level security', 'but not an account with no birthday');
+  'row-level security', 'nor an account with no birthday');
+-- Creating a team still writes its owner's row (team_owner_membership).
+SELECT t.lives($q$INSERT INTO public.teams (id, owner_id, kind, name, handle) VALUES ('mgr780', auth.uid(), 'team', 'Mgr', 'mgr780')$q$,
+  'a manager still creates a team');
 SELECT t.reset();
+SELECT t.eq((SELECT role::text FROM public.team_members WHERE team_id = 'mgr780' AND user_id = t.id('manager')), 'owner',
+  'and is its owner on the roster');
 
 -- ==================================================================================================================
 -- 2. payment handles: an adult payee, and a caller who can see the game or is involved in it
@@ -206,6 +228,40 @@ SELECT t.as_anon();
 SELECT t.eq(t.handles('pub'), 0, 'a signed-out visitor gets nothing (kept)');
 SELECT t.reset();
 
+-- The host-level read (no game named) answered anyone who had filed any claim to the host, and anyone can file one on
+-- an open game: the same adult-payee rule.
+INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price, is_private)
+VALUES ('teenopen', t.id('teenhost'), 'Teen''s open paid run', 'Basketball', now() + interval '3 days', 'Gym', 10, 10, false),
+       ('pubopen', t.id('host'), 'Open paid run', 'Basketball', now() + interval '3 days', 'Gym', 10, 10, false);
+INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+VALUES ('teenopen', t.id('teenhost'), 10, false), ('pubopen', t.id('host'), 10, false);
+CREATE FUNCTION t.host_handles(_payee text) RETURNS int LANGUAGE sql AS $$
+  SELECT t.count(format('SELECT 1 FROM public.get_host_payment_methods(%L)', t.id(_payee)))
+$$;
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.host_handles('teenhost'), 0, 'host-level read: a stranger gets no 16-17-year-old''s handles (kept)');
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, paid_at, notes)
+                         VALUES ('teenopen', %L, %L, 10, now(), 'sent'), ('pubopen', %L, %L, 10, now(), 'sent')$q$,
+                      t.id('stranger'), t.id('teenhost'), t.id('stranger'), t.id('host')),
+  'setup: the stranger files claims on the 17-year-old''s and the adult''s open paid games');
+SELECT t.eq(t.host_handles('teenhost'), 0, 'and still gets none of the 17-year-old''s handles after filing a claim');
+SELECT t.eq(t.host_handles('host'), 1, 'while someone who paid an adult host still gets theirs (kept)');
+SELECT t.as_user(t.id('approved'));
+SELECT t.eq(t.host_handles('teenhost'), 0, 'an approved requester gets none of a 16-17-year-old host''s');
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.eq(t.host_handles('teenhost'), 1, 'the 17-year-old host still sees their own');
+SELECT t.reset();
+
+-- The PayPal checkout button (getPayPalCheckoutConfig asks signed out): an adult host's merchant id only.
+INSERT INTO public.host_paypal_accounts (host_id, merchant_id)
+VALUES (t.id('host'), 'MERCHANT-ADULT'), (t.id('teenhost'), 'MERCHANT-TEEN'), (t.id('nbhost'), 'MERCHANT-LEGACY');
+SELECT t.as_anon();
+SELECT t.eq(t.val($$SELECT merchant_id FROM public.get_game_host_paypal('pub')$$), 'MERCHANT-ADULT',
+  'the PayPal button still gets an adult host''s merchant id');
+SELECT t.eq(t.count($$SELECT 1 FROM public.get_game_host_paypal('teenpaid')$$), 0, 'but not a 16-17-year-old host''s');
+SELECT t.eq(t.count($$SELECT 1 FROM public.get_game_host_paypal('nbpaid')$$), 0, 'nor an unknown-age host''s');
+SELECT t.reset();
+
 -- ==================================================================================================================
 -- 3. revoke_parental_consent answers nobody about other people's consents
 -- ==================================================================================================================
@@ -253,6 +309,8 @@ SELECT t.throws(format($q$SELECT public.team_invite_player('crew', %L, 'player',
   'duplicate key', 'as for anyone else');
 SELECT t.eq(t.val($$SELECT count(*) FROM public.team_invite_suppressions$$), 'ERROR: permission denied for table team_invite_suppressions',
   'the manager cannot read which invitations were held back');
+SELECT t.throws(format($q$INSERT INTO public.team_members (team_id, user_id, role) VALUES ('crew', %L, 'player')$q$, t.id('blocker')),
+  'row-level security', 'nor can the manager put the person who blocked them on the roster directly');
 SELECT t.eq(t.val(format('SELECT private_sec.team_invite_reaches_invitee(%L, %L)',
                          (SELECT id FROM public.team_invites WHERE team_id = 'crew' AND invitee_id = t.id('adult')), t.id('adult'))), 'false',
   'and the helper the read rules use answers nothing to them');
@@ -290,5 +348,77 @@ SELECT t.lives(format('SELECT public.team_respond_invite(%L, true)', (SELECT id 
 SELECT t.reset();
 SELECT t.eq((SELECT count(*)::int FROM public.team_members WHERE team_id = 'crew' AND user_id IN (t.id('blocker'), t.id('teenblock'))), 0,
   'nobody joined through a held-back invitation');
+
+-- A manager who blocked the person themselves is still told so: it reveals nothing they do not know.
+INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('manager'), t.id('asker'));
+SELECT t.as_user(t.id('manager'));
+SELECT t.throws(format($q$SELECT public.team_invite_player('crew', %L, 'player', NULL)$q$, t.id('asker')),
+  'BLOCKED', 'a manager inviting someone they blocked is told BLOCKED');
+SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.team_invites WHERE team_id = 'crew' AND invitee_id = t.id('asker')), 0,
+  'and no invitation is written');
+
+-- ==================================================================================================================
+-- 5. no payment by or to an account of unknown age (it could pay, then be refused its place)
+-- ==================================================================================================================
+INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price)
+VALUES ('paidrun', t.id('host'), 'Open paid run', 'Basketball', now() + interval '3 days', 'Gym', 10, 10),
+       ('paidrun2', t.id('host'), 'Second paid run', 'Basketball', now() + interval '3 days', 'Gym', 10, 10);
+INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+VALUES ('paidrun', t.id('host'), 10, false), ('paidrun2', t.id('host'), 10, false);
+UPDATE public.game_payment_settings SET requires_approval = false WHERE game_id = 'nbpaid';
+
+SELECT t.eq((SELECT public.game_payments_allowed(t.id('nobday'))), false, 'an account with no birthday may not pay');
+SELECT t.eq((SELECT public.game_payments_allowed(t.id('adult'))), true, 'an adult may (kept)');
+SELECT t.eq((SELECT public.game_payments_allowed(t.id('teen'))), true, 'a 16-year-old may (kept)');
+SELECT t.eq((SELECT public.game_payments_allowed(t.id('teenblock'))), false, 'a 15-year-old may not (kept)');
+
+SELECT t.as_user(t.id('nobday'));
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, paid_at)
+                          VALUES ('paidrun', %L, %L, 10, now())$q$, t.id('nobday'), t.id('host')),
+  'AGE_VERIFICATION_REQUIRED', 'an account with no birthday cannot file a payment claim');
+SELECT t.reset();
+SELECT t.as_service();
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, status, reviewed_at, paid_at, notes, payment_type)
+                          VALUES ('paidrun', %L, %L, 10, 'verified', now(), now(), 'Paid with PayPal checkout', 'paypal')$q$, t.id('nobday'), t.id('host')),
+  'AGE_VERIFICATION_REQUIRED', 'nor can the server record a payment for it');
+SELECT t.reset();
+SELECT t.as_user(t.id('adult'));
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, paid_at)
+                         VALUES ('paidrun', %L, %L, 10, now())$q$, t.id('adult'), t.id('host')),
+  'an adult still files a claim');
+-- (A guarded minor needs a guardian's approval of the game first: payment_submissions_guardian_first, unchanged.)
+SELECT t.as_user(t.id('teenhost'));
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, paid_at)
+                         VALUES ('paidrun', %L, %L, 10, now())$q$, t.id('teenhost'), t.id('host')),
+  'and a 17-year-old (kept)');
+SELECT t.as_user(t.id('adult'));
+SELECT t.throws(format($q$INSERT INTO public.payment_submissions (game_id, player_id, host_id, paid_amount, paid_at)
+                          VALUES ('nbpaid', %L, %L, 10, now())$q$, t.id('adult'), t.id('nbhost')),
+  'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this host account', 'nobody pays a host of unknown age, and the answer does not say why');
+SELECT t.reset();
+
+-- Claims made before the rule can still be turned down or withdrawn, but not confirmed.
+SET LOCAL session_replication_role = replica;
+INSERT INTO public.payment_submissions (id, game_id, player_id, host_id, paid_amount, paid_at)
+VALUES (t.id('old-claim'), 'paidrun', t.id('nobday'), t.id('host'), 10, now()),
+       (t.id('old-claim2'), 'paidrun2', t.id('nobday'), t.id('host'), 10, now()),
+       (t.id('old-claim3'), 'nbpaid', t.id('adult'), t.id('nbhost'), 10, now());
+SET LOCAL session_replication_role = origin;
+SELECT t.as_user(t.id('host'));
+SELECT t.throws(format($q$UPDATE public.payment_submissions SET status = 'verified', reviewed_at = now() WHERE id = %L$q$, t.id('old-claim')),
+  'AGE_VERIFICATION_REQUIRED', 'the host cannot confirm an earlier claim by an account with no birthday');
+SELECT t.eq(t.changed(format($q$UPDATE public.payment_submissions SET status = 'rejected', reviewed_at = now() WHERE id = %L$q$, t.id('old-claim'))), 1,
+  'but can turn it down');
+SELECT t.as_user(t.id('nobday'));
+SELECT t.eq(t.changed(format($q$UPDATE public.payment_submissions SET status = 'cancelled', cancellation_reason = 'player_cancelled', cancelled_at = now()
+                                WHERE id = %L$q$, t.id('old-claim2'))), 1,
+  'and the player can withdraw theirs');
+SELECT t.as_user(t.id('nbhost'));
+SELECT t.throws(format($q$UPDATE public.payment_submissions SET status = 'verified', reviewed_at = now() WHERE id = %L$q$, t.id('old-claim3')),
+  'AGE_VERIFICATION_REQUIRED', 'a host of unknown age cannot confirm a payment and is told to add their date of birth');
+SELECT t.eq(t.changed(format($q$UPDATE public.payment_submissions SET status = 'rejected', reviewed_at = now() WHERE id = %L$q$, t.id('old-claim3'))), 1,
+  'but can turn it down');
+SELECT t.reset();
 
 ROLLBACK;

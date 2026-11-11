@@ -2,7 +2,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
-import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import {
+  PAYMENTS_AGE_REQUIRED_MESSAGE,
+  PAYMENTS_BLOCKED_MESSAGE,
+  paymentSubmissionErrorMessage,
+} from "@/lib/payments-policy";
 
 export type PaymentType =
   "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
@@ -414,12 +418,16 @@ export async function createPaymentSubmission(input: {
   const { data: allowed } = await (supabase.rpc as any)("game_payments_allowed", {
     _user: u.user.id,
   });
-  if (allowed === false) throw new Error(PAYMENTS_BLOCKED_MESSAGE);
+  if (allowed === false) {
+    // No date of birth on file is the one refusal the player can fix themselves: say so.
+    const { data: verified } = await supabase.rpc("age_verified", { _user: u.user.id });
+    throw new Error(verified === false ? PAYMENTS_AGE_REQUIRED_MESSAGE : PAYMENTS_BLOCKED_MESSAGE);
+  }
   const { error } = await supabase.from("payment_submissions").insert({
     ...input,
     player_id: u.user.id,
   });
-  if (error) throw error;
+  if (error) throw new Error(paymentSubmissionErrorMessage(error.message ?? ""));
 }
 
 export async function listMySubmissionsForGame(gameId: string): Promise<PaymentSubmission[]> {

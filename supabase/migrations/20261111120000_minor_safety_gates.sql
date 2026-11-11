@@ -13,14 +13,20 @@
 --        rules, so an account with no birthday that paid for an open game was put on the roster with no age check.
 --     b. accepts a team invite (team_respond_invite) or is joined to a team by a guardian's approval
 --        (guardian_approve_team_invite). Declining stays open.
---     c. is added to an organization (org_members) or a team roster (team_members) directly by an administrator or a
---        manager: only a declared adult (SEC-1 1b, R7 F4). Unknown age used to pass "NOT is_minor". A person's own
---        request to join an organization, approved by approve_org_member_request, is unchanged, as in SEC-1 and SEC-7.
+--     c. is added to an organization (org_members) directly by an administrator: only a declared adult (SEC-1 1b).
+--        Unknown age used to pass "NOT is_minor". An administrator can no longer move an existing membership to
+--        another person or organization either (the identity lock team_members already has). A person's own request
+--        to join an organization, approved by approve_org_member_request, is unchanged, as in SEC-1 and SEC-7.
+--        A team manager can no longer write anyone onto a roster directly (R7 F4): nothing in the app did, and it
+--        skipped consent and blocks (and told the manager whether an account is a declared adult). Joining a team is
+--        by invite, or for the owner the row team creation writes.
 --  2. get_game_host_payment_methods answered any signed-in caller who named a game and its payee, so a 16-17-year-old
 --     host's payment handles (often a real name) were readable by anyone. It now answers only for an adult payee (the
 --     payee may still read their own) and only to a caller who can see the game (the hosted_games read policies for a
 --     signed-in account) or is involved in it (private_sec.can_read_game_payment_settings: the payee, an approved
---     requester, a payer, a participant).
+--     requester, a payer, a participant). The same adult-payee rule now applies to its host-level sibling
+--     get_host_payment_methods (which answered anyone who had filed any payment claim to the host, and a claim can be
+--     filed on any open game) and to get_game_host_paypal (the PayPal merchant id behind the checkout button).
 --  3. revoke_parental_consent looked the child's consent up before checking the caller, so anyone could learn whether
 --     an account has a parental-consent record (CONSENT_NOT_FOUND versus NOT_AUTHORIZED). It now authorizes first.
 --  4. team_invite_player answered BLOCKED when the manager and the invitee had a block between them, telling the
@@ -28,7 +34,12 @@
 --     and its id returned, but it is recorded in team_invite_suppressions (server only), nobody is notified, and it
 --     does not exist for the invitee or their guardians (read policies, team_respond_invite,
 --     guardian_approve_team_invite, sign_team_waiver), so it can never be accepted; it expires like an unanswered one.
---     A target who does not exist, a minor and an adult already got the same answer.
+--     A target who does not exist, a minor and an adult already got the same answer. A manager who blocked the person
+--     themselves is still told BLOCKED: that reveals nothing they do not know.
+--  5. An account with no birthday could pay for a game (game_payments_allowed treated an unknown age as allowed), and
+--     after 1a was then refused its place: money moved and no place was given. game_payments_allowed is now false for
+--     an unknown age, and enforce_game_payment_cohort refuses a new or confirmed payment claim by or to such an account
+--     (AGE_VERIFICATION_REQUIRED); claims already made can still be turned down or withdrawn.
 --
 -- Everything here tightens; every existing rule is kept. Rows already written are not changed.
 -- Rollback: docs/rollbacks/20261111120000_minor_safety_gates.down.sql (guarded).
@@ -84,7 +95,11 @@ BEGIN
   IF _role = 'owner' THEN RAISE EXCEPTION 'OWNER_NOT_INVITABLE'; END IF;
   IF _user = _me THEN RAISE EXCEPTION 'SELF_INVITE'; END IF;
   IF public.is_team_member(_team, _user) THEN RAISE EXCEPTION 'ALREADY_MEMBER'; END IF;
-  -- A block between the two no longer answers BLOCKED: the manager gets the same answer as for anyone else.
+  -- A manager who blocked the person is told so (they know it already). A block the person placed on the manager is
+  -- not revealed: the manager gets the same answer as for anyone else.
+  IF EXISTS (SELECT 1 FROM public.user_blocks b WHERE b.blocker_id = _me AND b.blocked_id = _user) THEN
+    RAISE EXCEPTION 'BLOCKED';
+  END IF;
   _blocked := public.blocks_exist_between(_me, _user);
 
   SELECT name INTO _team_name FROM public.teams WHERE id = _team;
@@ -394,15 +409,26 @@ BEGIN
 END;
 $function$;
 
--- ============================================================ 1c. direct adds: a declared adult only
+-- ============================================================ 1c. direct adds
+-- An organization's administrator adds a declared adult only.
 DROP POLICY IF EXISTS "Admins can insert org members" ON public.org_members;
 CREATE POLICY "Admins can insert org members" ON public.org_members FOR INSERT TO authenticated
   WITH CHECK (public.is_trainer_org_admin(org_id, auth.uid()) AND public.age_verified(user_id) AND NOT public.is_minor(user_id));
 
+-- ...and cannot get round that by moving an existing membership to another person or organization ("Admins can update
+-- org members" checks only the organization): the same lock team_members has (a0_team_members_identity_locked). A role
+-- change, all the app writes (updateGenericOrgMember), is unaffected; the server and definer functions are not locked.
+DROP TRIGGER IF EXISTS a0_org_members_identity_locked ON public.org_members;
+CREATE TRIGGER a0_org_members_identity_locked BEFORE UPDATE ON public.org_members
+  FOR EACH ROW EXECUTE FUNCTION public.lock_member_row_identity('user_id', 'org_id');
+
+-- A team manager no longer writes anyone onto a roster directly. Nothing in the app does: a team's owner row is written
+-- by team_owner_membership (definer), and everyone else joins by accepting an invite (team_respond_invite) or by a
+-- guardian's approval of one (guardian_approve_team_invite), both definer functions that check consent, age, the
+-- guardian rule, the waiver and blocks. A direct write skipped all of that: a manager could put any declared adult,
+-- someone who had blocked them included, on the roster without asking, and learn from success that the account is a
+-- declared adult (R7 F4).
 DROP POLICY IF EXISTS "team_members_manager_write" ON public.team_members;
-CREATE POLICY "team_members_manager_write" ON public.team_members FOR INSERT TO authenticated
-  WITH CHECK (public.is_team_manager(team_id, auth.uid()) AND (role <> 'owner'::public.team_role)
-              AND public.age_verified(user_id) AND (NOT public.is_minor(user_id)));
 
 -- ============================================================ 2. payment handles: an adult payee, a caller who can see or is in the game
 CREATE OR REPLACE FUNCTION public.get_game_host_payment_methods(_host_id uuid, _game_id text)
@@ -464,6 +490,117 @@ BEGIN
       );
 END;
 $function$;
+
+-- The host-level sibling (no game named) answered anyone with any payment claim to the host, and a claim can be filed
+-- on any open game, so a stranger who filed one read a 16-17-year-old host's handles. Unchanged except the same
+-- adult-payee rule. The app no longer calls it (every caller names the game).
+CREATE OR REPLACE FUNCTION public.get_host_payment_methods(_host_id uuid)
+ RETURNS TABLE(id uuid, host_id uuid, payment_type text, label text, username text, payment_url text, contact_info text, instructions text, is_enabled boolean)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Only a confirmed adult's handles are shown: not a 16-17-year-old's, not an unknown age's (the host sees their own).
+  IF auth.uid() IS DISTINCT FROM _host_id AND public.age_cohort_of(_host_id) IS DISTINCT FROM 'adult' THEN
+    RETURN;
+  END IF;
+
+  IF auth.uid() = _host_id
+     OR EXISTS (
+       SELECT 1 FROM public.join_requests jr
+       WHERE jr.host_id = _host_id AND jr.player_id = auth.uid() AND jr.status = 'approved'
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.payment_submissions ps
+       WHERE ps.host_id = _host_id AND ps.player_id = auth.uid()
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.game_participants gp
+       JOIN public.hosted_games hg ON hg.id = gp.game_id
+       WHERE hg.host_id = _host_id AND gp.user_id = auth.uid()
+     )
+  THEN
+    RETURN QUERY
+      SELECT hpm.id, hpm.host_id, hpm.payment_type, hpm.label, hpm.username, hpm.payment_url, hpm.contact_info, hpm.instructions, hpm.is_enabled
+      FROM public.host_payment_methods hpm
+      WHERE hpm.host_id = _host_id AND hpm.is_enabled = true;
+  END IF;
+END;
+$function$;
+
+-- The PayPal merchant id for a game's checkout button (getPayPalCheckoutConfig reads it with the publishable key, so the
+-- caller is never known here). Only a confirmed adult host's: with a 16-17-year-old's or an unknown age's, no PayPal
+-- button is offered, as no handles are. Unchanged otherwise (still answers signed-out callers, for any game id).
+CREATE OR REPLACE FUNCTION public.get_game_host_paypal(_game_id text)
+ RETURNS TABLE(merchant_id text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select hpa.merchant_id
+  from public.hosted_games g
+  join public.host_paypal_accounts hpa on hpa.host_id = g.host_id::uuid
+  where g.id = _game_id
+    and public.age_cohort_of(g.host_id::uuid) = 'adult'
+  limit 1
+$function$;
+
+-- ============================================================ 5. no payment by or to an account of unknown age
+-- An account with no birthday could pay (game_payments_allowed treated an unknown age as allowed) but, after 1a, not
+-- be placed in the game: money moved and no place was given. Payment coordination now needs a declared age, as the app
+-- already assumes (child-policy treats an unknown cohort as 13-15, which is blocked from game_payments).
+CREATE OR REPLACE FUNCTION public.game_payments_allowed(_user uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT public.age_cohort_of(_user) NOT IN ('child_under_13', 'teen_13_15', 'unknown')
+     AND NOT public.child_features_locked(_user);
+$function$;
+
+-- The 13-15 / under-13 / locked rule is unchanged (every write). For an unknown age, a claim cannot be made or confirmed
+-- (an insert, or a move to verified); a claim made before this can still be turned down, withdrawn or reopened, so none
+-- is stranded. AGE_VERIFICATION_REQUIRED for the player (also when the server records a PayPal capture) and for a host
+-- acting on their own game; anyone else hears the existing host answer, which says nothing about the host's age.
+CREATE OR REPLACE FUNCTION public.enforce_game_payment_cohort()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _confirming boolean := TG_OP = 'INSERT' OR (NEW.status = 'verified' AND OLD.status IS DISTINCT FROM 'verified');
+BEGIN
+  IF NEW.player_id IS NOT NULL AND NOT public.game_payments_allowed(NEW.player_id) THEN
+    IF public.age_cohort_of(NEW.player_id) <> 'unknown' OR public.child_features_locked(NEW.player_id) THEN
+      RAISE EXCEPTION 'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this account yet.';
+    END IF;
+    IF _confirming THEN
+      IF NEW.player_id = auth.uid() THEN
+        RAISE EXCEPTION 'AGE_VERIFICATION_REQUIRED: add your date of birth before paying for a game.';
+      END IF;
+      RAISE EXCEPTION 'AGE_VERIFICATION_REQUIRED: this player must add their date of birth before paying for a game.';
+    END IF;
+  END IF;
+  IF NEW.host_id IS NOT NULL AND NOT public.game_payments_allowed(NEW.host_id) THEN
+    IF public.age_cohort_of(NEW.host_id) <> 'unknown' OR public.child_features_locked(NEW.host_id) THEN
+      RAISE EXCEPTION 'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this host account yet.';
+    END IF;
+    IF _confirming THEN
+      IF NEW.host_id = auth.uid() THEN
+        RAISE EXCEPTION 'AGE_VERIFICATION_REQUIRED: add your date of birth before taking payments.';
+      END IF;
+      RAISE EXCEPTION 'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this host account yet.';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $function$;
 
 -- ============================================================ 3. revoke_parental_consent: authorize before looking anything up
 -- Unchanged from 20261028160000 except the order: a caller who is neither the child's guardian nor a moderator gets

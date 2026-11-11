@@ -1,10 +1,13 @@
 -- ROLLBACK for supabase/migrations/20261111120000_minor_safety_gates.sql (stale-PR triage step 18).
 -- NOT a migration. It puts back what the migration closed: an account with no birthday can again be placed in a game
--- by the server, accept a team invite (or be joined by a guardian's approval) and be added to an organization or a
--- team roster directly; get_game_host_payment_methods again returns any payee's handles, a 16-17-year-old's included,
--- to any signed-in caller; revoke_parental_consent again tells anyone whether an account has a consent record; and
--- team_invite_player again answers BLOCKED. Every replaced function and policy goes back to its definition before the
--- migration (this branch, PR #389's head e87948fc), byte for byte, and the table and helper it added are dropped.
+-- by the server, accept a team invite (or be joined by a guardian's approval), be added to an organization or a team
+-- roster directly, and pay or be paid for a game; a team manager can again write any declared adult onto a roster and
+-- an organization's administrator can again move a membership to another person or organization;
+-- get_game_host_payment_methods, get_host_payment_methods and get_game_host_paypal again return any payee's handles or
+-- merchant id, a 16-17-year-old's included; revoke_parental_consent again tells anyone whether an account has a consent
+-- record; and team_invite_player again answers BLOCKED. Every replaced function and policy goes back to its definition
+-- before the migration (this branch, PR #389's head e87948fc), byte for byte, and the table, trigger and helper it
+-- added are dropped.
 -- Invitations the migration wrote while a block stood between the manager and the invitee (team_invite_suppressions)
 -- are deleted first: before the migration they would never have been written, and once the table is gone nothing
 -- would keep them from reaching the person who blocked (or was blocked by) the manager.
@@ -406,7 +409,89 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.get_host_payment_methods(_host_id uuid)
+ RETURNS TABLE(id uuid, host_id uuid, payment_type text, label text, username text, payment_url text, contact_info text, instructions text, is_enabled boolean)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF auth.uid() = _host_id
+     OR EXISTS (
+       SELECT 1 FROM public.join_requests jr
+       WHERE jr.host_id = _host_id AND jr.player_id = auth.uid() AND jr.status = 'approved'
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.payment_submissions ps
+       WHERE ps.host_id = _host_id AND ps.player_id = auth.uid()
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.game_participants gp
+       JOIN public.hosted_games hg ON hg.id = gp.game_id
+       WHERE hg.host_id = _host_id AND gp.user_id = auth.uid()
+     )
+  THEN
+    RETURN QUERY
+      SELECT hpm.id, hpm.host_id, hpm.payment_type, hpm.label, hpm.username, hpm.payment_url, hpm.contact_info, hpm.instructions, hpm.is_enabled
+      FROM public.host_payment_methods hpm
+      WHERE hpm.host_id = _host_id AND hpm.is_enabled = true;
+  END IF;
+END;
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.get_game_host_paypal(_game_id text)
+ RETURNS TABLE(merchant_id text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select hpa.merchant_id
+  from public.hosted_games g
+  join public.host_paypal_accounts hpa on hpa.host_id = g.host_id::uuid
+  where g.id = _game_id
+  limit 1
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.game_payments_allowed(_user uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT public.age_cohort_of(_user) NOT IN ('child_under_13', 'teen_13_15')
+     AND NOT public.child_features_locked(_user);
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.enforce_game_payment_cohort()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NEW.player_id IS NOT NULL AND NOT public.game_payments_allowed(NEW.player_id) THEN
+    RAISE EXCEPTION 'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this account yet.';
+  END IF;
+  IF NEW.host_id IS NOT NULL AND NOT public.game_payments_allowed(NEW.host_id) THEN
+    RAISE EXCEPTION 'PAYMENTS_NOT_AVAILABLE: payment coordination is not available for this host account yet.';
+  END IF;
+  RETURN NEW;
+END $function$
+
+;
+
 -- What the migration added.
+DROP TRIGGER IF EXISTS a0_org_members_identity_locked ON public.org_members;
 DROP FUNCTION IF EXISTS private_sec.team_invite_reaches_invitee(uuid, uuid);
 DELETE FROM public.team_invites i WHERE EXISTS (SELECT 1 FROM public.team_invite_suppressions s WHERE s.invite_id = i.id);
 DROP TABLE IF EXISTS public.team_invite_suppressions;
