@@ -39,6 +39,10 @@ const CRAFTED = [
   "%2f%2fevil.com",
   "%5C%5Cevil.com",
   "/%09/evil.com/".replace("%09", "\t"),
+  "/.//evil.com",
+  "/x/..//evil.com",
+  "/%2e//evil.com",
+  "/x/%2E%2E//evil.com",
 ];
 
 // The raw query strings an attacker would put in a link, decoded the way the
@@ -54,6 +58,8 @@ const CRAFTED_QUERIES = [
   "?next=%252F%252Fevil.com",
   "?next=%22%2F%2Fevil.com%22",
   "?next=%22%2F%5Cevil.com%22",
+  "?next=%2F.%2F%2Fevil.com",
+  "?next=%2Fx%2F..%2F%2Fevil.com",
 ];
 
 describe("sanitizeNextPath: a crafted next never leaves the site", () => {

@@ -16,7 +16,8 @@ const BASE = "https://next-path.invalid";
  *   `javascript:` and other schemes, protocol-relative `//host`;
  * - any backslash or control character. Browsers read `\` as `/` and drop tabs
  *   and newlines, so `/\evil.com` and `/<tab>/evil.com` both become `//evil.com`;
- * - anything that still resolves to another origin;
+ * - anything that still resolves to another origin, or to a path that starts
+ *   with `//` once dot segments are resolved;
  * - the landing page, `/auth` and `/reset-password`, which would loop back
  *   through the sign-in flow itself.
  */
@@ -32,6 +33,9 @@ export function sanitizeNextPath(raw: unknown): string | undefined {
     return undefined;
   }
   if (url.origin !== BASE) return undefined;
+  // Dot segments can collapse into a leading `//`: `/.//evil.com` and
+  // `/x/..//evil.com` both resolve to the path `//evil.com`.
+  if (url.pathname.startsWith("//")) return undefined;
   const path = url.pathname.toLowerCase();
   if (path === "/") return undefined;
   if (path === "/auth" || path.startsWith("/auth/")) return undefined;

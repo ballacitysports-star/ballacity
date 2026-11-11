@@ -22,7 +22,9 @@ export function authSearchFor(href: string | undefined): { next?: string } {
 /**
  * `authSearchFor` the page being viewed (path, query and hash), for a sign-in
  * link or button: `<Link to="/auth" search={useAuthSearchHere()}>`. Read from the
- * router, so the server render and the first client render agree.
+ * router's location, not `window`, so it also runs during a server render. The
+ * hash never reaches the server, so a server-rendered link carries no hash; the
+ * browser's router location includes it.
  */
 export function useAuthSearchHere(): { next?: string } {
   const href = useLocation({ select: (l) => l.href });
