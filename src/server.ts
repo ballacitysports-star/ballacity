@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { isRequestAbort } from "./lib/request-abort";
+import { reportServerError } from "./lib/error-report.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -53,7 +54,10 @@ function isCatastrophicSsrErrorBody(body: string, responseStatus: number): boole
 
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  response: Response,
+  request: Request,
+): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return response;
@@ -69,9 +73,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return new Response(null, { status: 499 });
   }
 
-  console.error(captured ?? new Error(`h3 swallowed SSR error: ${body}`));
+  const failure = captured ?? new Error(`h3 swallowed SSR error: ${body}`);
+  console.error(failure);
+  await reportServerError(failure, request);
   return brandedErrorResponse();
-
 }
 
 export default {
@@ -84,14 +89,14 @@ export default {
       // That is not a site error: reporting it as one replaces the page the
       // browser is already leaving with an error screen.
       if (request.signal.aborted) return response;
-      return await normalizeCatastrophicSsrResponse(response);
+      return await normalizeCatastrophicSsrResponse(response, request);
     } catch (error) {
       if (request.signal.aborted || isRequestAbort(error)) {
         return new Response(null, { status: 499 });
       }
       console.error(error);
+      await reportServerError(error, request);
       return brandedErrorResponse();
     }
   },
 };
-

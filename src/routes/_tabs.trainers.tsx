@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { DiscoverCardActions } from "@/components/feed/DiscoverCardActions";
 import { matchesOrgQuery } from "@/lib/org-search";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -725,6 +726,8 @@ function TrainersPage() {
                     </span>
                   </div>
                   <TrainerActions org={o} defaultVenue={venue || null} />
+                  {/* P2-5: follow from the list (request and message are above). */}
+                  <DiscoverCardActions org={o} followOnly />
                 </div>
               );
             })}

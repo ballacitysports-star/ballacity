@@ -7,7 +7,7 @@ us an E2E signal we can trust while the rest of the suite is repaired.
 ## How it works
 
 - `e2e/smoke-set.json` lists the smoke tests by spec file and title path. A title path is the
-  describe titles, then the test title, joined with `›`. The file lists 26 tests.
+  describe titles, then the test title, joined with `›`. The file lists 30 tests.
 - The `Playwright` job runs the whole suite once, as before. After the report is sanitized, its
   `Check smoke set` step runs `.github/e2e-smoke-gate.mjs` on `ci-sanitized/results.json`.
 - The gate passes only if every listed test is in the report and passed. A skipped, missing
@@ -32,17 +32,19 @@ That runs the whole of each listed file. The gate then judges only the listed te
 The tests were chosen on 2026-11-06. Each passed in all four sandbox runs available then: #298 run
 42138934406 attempt 3, and the latest runs of #304, #314 and #317. None was skipped in any of them.
 
-| Area                                    | Spec                                                    | Tests |
-| --------------------------------------- | ------------------------------------------------------- | ----- |
-| Route persistence on refresh            | `desktop-refresh-protected`, `mobile-refresh-protected` | 7     |
-| Sign-in, session survival, bad password | `fixture-auth-flows`                                    | 7     |
-| Minor and consent safety                | `fixture-age-gated-flows`, `child-lifecycle-cohorts`    | 7     |
-| No leaks on public reel pages           | `public-reel-page`                                      | 3     |
-| Signed-out entry and invite fallback    | `signed-out-preview`, `invite-fallback-params`          | 2     |
+| Area                                    | Spec                                                              | Tests |
+| --------------------------------------- | ----------------------------------------------------------------- | ----- |
+| Route persistence on refresh            | `desktop-refresh-protected`, `mobile-refresh-protected`           | 7     |
+| Sign-in, session survival, bad password | `fixture-auth-flows`                                              | 7     |
+| Minor and consent safety                | `fixture-age-gated-flows`, `child-lifecycle-cohorts`              | 7     |
+| No leaks on public reel pages           | `public-reel-page`                                                | 3     |
+| Signed-out entry and invite fallback    | `signed-out-preview`, `invite-fallback-params`                    | 2     |
+| Payment security (no cross-host leak)   | `pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state` | 2     |
 
-The audit also names the invite happy path and the two payment security specs
-(`pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state`). They are left out because they
-still fail on the sandbox. Add them once #298 is merged and they have passed there.
+The two payment security specs (`pay-screen-no-cross-host-leak`, `pay-screen-rpc-and-empty-state`)
+were added on 2026-11-07, after #298 and #341 fixed them and they passed in three sandbox runs (#341,
+#334, #347). The audit also names the invite happy path. It is still left out because it fails on
+the sandbox (the invite and join specs wait on the payment-settings guard decision).
 
 ## Changing the set
 
@@ -67,3 +69,21 @@ The audit's rule: require `E2E smoke` after three consecutive green runs. Before
 
 Then add `E2E smoke` under required status checks (see `docs/branch-protection.md`). To roll back,
 remove it from the required checks. Nothing in the repository needs to change.
+
+## Accessibility gate (P3-5)
+
+`e2e/a11y-public-pages.spec.ts` runs axe (`@axe-core/playwright`, WCAG 2.1 A and AA) on ten public
+pages, signed out, plus `/` at phone width. A serious or critical violation fails the test.
+Moderate and minor findings are only printed.
+
+- Baseline, 2026-11-09, dev server on the sandbox: 18 public pages scanned. The only serious
+  finding was `aria-prohibited-attr` on the skip-link target, on every page. It is fixed in the
+  same change. Putting the old target back fails the spec on every page.
+- The 11 tests join `e2e/smoke-set.json` once they have passed on the sandbox in CI, like every
+  other smoke test.
+- Signed-in pages: `e2e/a11y-signed-in-pages.spec.ts` signs in once as the adult `host` fixture and
+  runs the same check on `/feed`, `/discover`, `/teams`, `/players`, `/messages`, `/notifications`,
+  `/profile`, `/settings` and `/create`. Its baseline (2026-11-10) found one serious problem on every
+  one of them: white text on the brand coral in the unread badges (4.1:1, under AA's 4.5:1). Those
+  now use `bg-coral-strong` (4.9:1, and 5.3:1 in the light theme), and `src/lib/coral-contrast.test.ts`
+  keeps plain `bg-coral` out from behind white text.

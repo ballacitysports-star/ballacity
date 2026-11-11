@@ -32,6 +32,14 @@ describe("skip link (P3-5)", () => {
     expect(target.getAttribute("tabindex")).toBe("-1");
   });
 
+  it("names the target with hidden text, not a prohibited aria-label on a plain div", () => {
+    render(<MainContentTarget />);
+    const target = document.getElementById(MAIN_CONTENT_ID)!;
+    expect(target.hasAttribute("aria-label")).toBe(false);
+    expect(target.textContent).toBe("Main content");
+    expect(target.querySelector("span")?.className).toContain("sr-only");
+  });
+
   it("the root renders the skip link first, the target before the page, and honours reduced motion", () => {
     const src = readFileSync("src/routes/__root.tsx", "utf8");
     expect(src).toContain('<MotionConfig reducedMotion="user">');

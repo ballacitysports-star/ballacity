@@ -25,6 +25,7 @@ export const ANALYTICS_EVENTS = [
   "select_primary_sport", // a member chose which sport comes first (sport only)
   "select_tab", // a bottom-bar tab was chosen: tab, from tab, tap or swipe (P1-9)
   "open_create", // the Create (host a game) screen was opened (P1-9)
+  "web_vital", // a Core Web Vitals measurement: metric, rounded value, rating, masked route (P0-8)
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 

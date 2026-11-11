@@ -155,6 +155,8 @@ function followErrorMessage(message: string): string {
   if (/FOLLOW_NOT_ALLOWED/.test(message)) return "You can't change this account's followers.";
   if (/NO_SUCH_FOLLOW_REQUEST/.test(message)) return "That request is no longer there.";
   if (/INVALID_FOLLOW_TARGET/.test(message)) return "That account isn't available.";
+  // A block in either direction: the same neutral wording, so the block itself is not disclosed.
+  if (/FOLLOW_BLOCKED/.test(message)) return "That account isn't available.";
   return message;
 }
 

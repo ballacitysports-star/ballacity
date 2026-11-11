@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getTryout, getMyTryoutResult } from "@/lib/tryouts.functions";
 import { cancelPolicyNote } from "@/lib/cancel-window";
+import { VENUE_HIDDEN_LABEL } from "@/lib/post-venues";
 
 const tryoutQuery = (postId: string) =>
   queryOptions({
@@ -100,12 +101,17 @@ function TryoutPage() {
               })
             : "Date TBA"}
         </p>
-        {t.location && (
+        {t.location ? (
           <p className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             {t.location}
           </p>
-        )}
+        ) : t.venueHidden ? (
+          <p className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            {VENUE_HIDDEN_LABEL}
+          </p>
+        ) : null}
         {left != null && (
           <p className="flex items-center gap-2">
             <Users className="h-4 w-4" />

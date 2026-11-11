@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import {
   Building2,
   MapPin,
@@ -25,6 +26,7 @@ import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
 import { buildFacilityJsonLd } from "@/lib/org-seo";
 import { FacilityEventsSection } from "@/components/org/FacilityEventsSection";
+import { VenueEventsSection } from "@/components/org/VenueEventsSection";
 import { CourtInquiriesSection } from "@/components/org/CourtInquiriesSection";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
@@ -202,6 +204,10 @@ function OrgPage() {
         reviewCount={reviewSummary.count}
       >
         <div className="flex flex-col gap-2">
+          {isOwner && <EntityFollowerCount kind="org" id={orgId} />}
+          {(!auth.user || (access.data && !access.data.isOwner && !access.data.unclaimed)) && (
+            <FollowEntityButton kind="org" id={orgId} name={org.name} className="self-start" />
+          )}
           <MembershipCta orgId={orgId} members={members} />
           <MemberJoinCta orgId={orgId} />
         </div>
@@ -212,6 +218,8 @@ function OrgPage() {
       )}
 
       {isAdmin && <ListingVisibilityToggle kind="gym" id={orgId} />}
+
+      <VenueEventsSection orgId={orgId} canPost={isAdmin} />
 
       <FacilityEventsSection orgId={orgId} canPost={isAdmin} />
 

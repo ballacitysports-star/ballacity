@@ -47,3 +47,49 @@ describe("review AI normalization", () => {
     expect(shouldRefreshInsight(null, 0)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Minors (PRIV-1): nothing about a person who is not a confirmed adult is sent to AI or summarised.
+// ---------------------------------------------------------------------------
+import { analyzeReview, refreshInsight } from "@/lib/review-ai.server";
+
+describe("AI and people under 18", () => {
+  /** An admin client that answers the age lookup and fails the test on any other use. */
+  function guarded(cohort: string) {
+    const touched: string[] = [];
+    const admin = {
+      rpc: async () => ({ data: cohort, error: null }),
+      from: (table: string) => {
+        touched.push(table);
+        throw new Error(`unexpected read of ${table}`);
+      },
+    };
+    return { admin, touched };
+  }
+
+  for (const cohort of ["child_under_13", "teen_13_15", "teen_16_17", "unknown"]) {
+    it(`makes no summary for a ${cohort} subject`, async () => {
+      const { admin, touched } = guarded(cohort);
+      const out = await refreshInsight(
+        admin,
+        { revieweeUserId: "u1", revieweeId: "u1", revieweeKind: "player" },
+        { force: true },
+      );
+      expect(out).toBeNull();
+      expect(touched).toEqual([]);
+    });
+
+    it(`does not analyse a review about a ${cohort} subject`, async () => {
+      const { admin, touched } = guarded(cohort);
+      const out = await analyzeReview(admin, {
+        revieweeUserId: "u1",
+        reviewId: "r1",
+        revieweeKind: "host",
+        rating: 3,
+        body: "Some review text for the fixture.",
+      });
+      expect(out).toBeNull();
+      expect(touched).toEqual([]);
+    });
+  }
+});

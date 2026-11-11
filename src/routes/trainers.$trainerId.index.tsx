@@ -27,7 +27,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { GAMES, type Org } from "@/lib/sample-data";
-import { ensureOrgById, isMyOrg } from "@/lib/org-store";
+import { ensureOrgById, isMyOrg, isOrgUnclaimed } from "@/lib/org-store";
+import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation } from "@/lib/reviews";
@@ -47,6 +48,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
 import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { TrainerEventsSection } from "@/components/org/VenueEventsSection";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
@@ -352,6 +354,10 @@ function TrainerPage({ org }: { org: Org }) {
                 <Star className="h-3.5 w-3.5" /> Review
               </Link>
             )}
+            {canEdit && <EntityFollowerCount kind="team" id={org.id} />}
+            {mounted && !canEdit && !isOrgUnclaimed(org.id) && (
+              <FollowEntityButton kind="team" id={org.id} name={org.name} />
+            )}
           </div>
         </div>
 
@@ -445,6 +451,7 @@ function TrainerPage({ org }: { org: Org }) {
             {canEdit && <ListingVisibilityToggle kind="trainer" id={org.id} />}
             {canEdit && <TrainerProfileChecklist org={org} />}
             {canEdit && <TrainerOrgSection trainerId={org.id} />}
+            <TrainerEventsSection trainerId={org.id} canPost={canEdit} />
             <Section title="Bio">
               <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                 {org.bio}

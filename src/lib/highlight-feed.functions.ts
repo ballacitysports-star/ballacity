@@ -44,12 +44,83 @@ export type HighlightFeedItem = {
 
 const PAGE_SIZE = 8;
 
+/** How many recent eligible reels the Following strip looks through (P3-2). */
+export const FOLLOWING_SCAN_PAGES = 3;
+const SCAN_PAGE = 50;
+
+/**
+ * Ids of reels by people the viewer follows, newest first (P3-2, Home → Following).
+ * Eligibility (age cohort, audience, finished and visible) stays in SQL via
+ * public_reel_feed_ids; this only keeps the eligible reels whose author the viewer
+ * follows, looking through the most recent FOLLOWING_SCAN_PAGES pages.
+ */
+type ScanResult = { data: unknown; error: { message: string } | null };
+type ScanQuery = PromiseLike<ScanResult> & {
+  select: (cols: string) => ScanQuery;
+  eq: (col: string, v: unknown) => ScanQuery;
+  in: (col: string, v: readonly unknown[]) => ScanQuery;
+  order: (col: string, opts?: { ascending?: boolean }) => ScanQuery;
+  limit: (n: number) => ScanQuery;
+};
+/** The slice of the admin client the Following scan uses. */
+export type FollowingScanClient = { from: (table: string) => ScanQuery };
+
+export async function followedEligibleReelIds<C extends FollowingScanClient>(
+  admin: C,
+  eligibleFeedReelIds: (
+    admin: C,
+    args: { cursor: string | null; sport: string | null; limit: number; includeMembers: boolean },
+  ) => Promise<string[]>,
+  args: { viewerId: string; sport: string | null; want: number },
+): Promise<string[]> {
+  const { data: follows, error: fErr } = await admin
+    .from("follows")
+    .select("followee_id")
+    .eq("follower_id", args.viewerId)
+    .limit(1000);
+  if (fErr) throw new Error(fErr.message);
+  const followees = new Set(
+    ((follows ?? []) as { followee_id: string }[]).map((f) => String(f.followee_id)),
+  );
+  if (followees.size === 0) return [];
+
+  const out: string[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < FOLLOWING_SCAN_PAGES && out.length < args.want; page += 1) {
+    const ids = await eligibleFeedReelIds(admin, {
+      cursor,
+      sport: args.sport,
+      limit: SCAN_PAGE,
+      includeMembers: true, // the viewer is signed in
+    });
+    if (ids.length === 0) break;
+    const { data: rows, error } = await admin
+      .from("highlight_reels")
+      .select("id,user_id,created_at")
+      .in("id", ids)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const list = (rows ?? []) as { id: string; user_id: string; created_at: string }[];
+    for (const r of list) {
+      if (followees.has(String(r.user_id)) && out.length < args.want) out.push(String(r.id));
+    }
+    if (ids.length < SCAN_PAGE || list.length === 0) break;
+    cursor = String(list[list.length - 1].created_at);
+  }
+  return out;
+}
+
 export const listHighlightFeed = createServerFn({ method: "GET" })
   .inputValidator(
-    (input: { cursor?: string | null; sport?: string | null; limit?: number } | undefined) => ({
+    (
+      input:
+        | { cursor?: string | null; sport?: string | null; limit?: number; following?: boolean }
+        | undefined,
+    ) => ({
       cursor: typeof input?.cursor === "string" && input.cursor ? input.cursor : null,
       sport: typeof input?.sport === "string" && input.sport ? input.sport : null,
       limit: Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 20),
+      following: input?.following === true,
     }),
   )
   .handler(async ({ data }) => {
@@ -62,12 +133,20 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     // Age-cohort gate lives in SQL: children and locked child accounts are
     // never returned, and 16-17 year olds only for signed-in viewers.
     const viewerId = await optionalSupabaseUserId();
-    const ids = await eligibleFeedReelIds(supabaseAdmin, {
-      cursor: data.cursor,
-      sport: data.sport,
-      limit: data.limit + 1,
-      includeMembers: viewerId !== null,
-    });
+    // Following (P3-2): only for a signed-in viewer; one strip, no paging.
+    if (data.following && !viewerId) return { items: [] as HighlightFeedItem[], nextCursor: null };
+    const ids = data.following
+      ? await followedEligibleReelIds(supabaseAdmin, eligibleFeedReelIds, {
+          viewerId: viewerId as string,
+          sport: data.sport,
+          want: data.limit,
+        })
+      : await eligibleFeedReelIds(supabaseAdmin, {
+          cursor: data.cursor,
+          sport: data.sport,
+          limit: data.limit + 1,
+          includeMembers: viewerId !== null,
+        });
     if (ids.length === 0) return { items: [] as HighlightFeedItem[], nextCursor: null };
 
     const { data: rows, error } = await supabaseAdmin
@@ -80,7 +159,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const page = ((rows ?? []) as any[]).slice(0, data.limit);
-    const hasMore = ((rows ?? []) as any[]).length > data.limit;
+    const hasMore = !data.following && ((rows ?? []) as any[]).length > data.limit;
     if (page.length === 0) return { items: [] as HighlightFeedItem[], nextCursor: null };
 
     const userIds = Array.from(new Set(page.map((r) => r.user_id as string)));

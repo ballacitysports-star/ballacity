@@ -1,9 +1,5 @@
-import { useState } from "react";
 import {
-  Heart,
   MessageCircle,
-  Send,
-  Bookmark,
   MoreHorizontal,
   Calendar,
   MapPin,
@@ -15,6 +11,7 @@ import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useNavigate } from "@tanstack/react-router";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
+import { PostLikeButton } from "@/components/PostLikeButton";
 
 /**
  * Instagram-style feed card. Preserves every existing datum on OrgPost
@@ -22,9 +19,10 @@ import { ResponsiveImage } from "@/components/ResponsiveImage";
  * re-lays them into IG's canonical order: header row, edge-to-edge media
  * area, action row, caption, then event meta.
  *
- * Like/comment/share/save are UI-only affordances that mirror the
- * existing "onClick opens PostDetailsDialog" behavior — they route to
- * the same click handler so no server logic changes.
+ * Like is the post's real ❤️ reaction (PostLikeButton). Comment opens the
+ * post's details, where comments, the full reaction picker and Share live.
+ * There is no Save: nothing stores saved posts yet, so a toggle here would
+ * pretend to keep something it does not.
  */
 export function PostCard({
   post,
@@ -42,8 +40,6 @@ export function PostCard({
   const spotsLeft = post.spots ? post.spots.max - post.spots.taken : 0;
 
   const navigate = useNavigate();
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   const openable = !!onClick;
@@ -139,21 +135,7 @@ export function PostCard({
 
       {/* Action row */}
       <div className="flex items-center gap-1 px-2 pt-2">
-        <button
-          type="button"
-          onClick={(e) => {
-            stop(e);
-            setLiked((v) => !v);
-          }}
-          aria-label={liked ? "Unlike" : "Like"}
-          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
-        >
-          <Heart
-            className={`h-6 w-6 ${liked ? "text-coral" : ""}`}
-            fill={liked ? "currentColor" : "none"}
-            strokeWidth={2}
-          />
-        </button>
+        <PostLikeButton subjectType="team_post" subjectId={post.id} />
         <button
           type="button"
           onClick={
@@ -169,33 +151,10 @@ export function PostCard({
         >
           <MessageCircle className="h-6 w-6" strokeWidth={2} />
         </button>
-        <button
-          type="button"
-          onClick={stop}
-          aria-label="Share"
-          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
-        >
-          <Send className="h-6 w-6" strokeWidth={2} />
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={(e) => {
-            stop(e);
-            setSaved((v) => !v);
-          }}
-          aria-label={saved ? "Unsave" : "Save"}
-          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
-        >
-          <Bookmark className="h-6 w-6" fill={saved ? "currentColor" : "none"} strokeWidth={2} />
-        </button>
       </div>
 
       {/* Caption + meta */}
       <div {...openProps} className="px-4 pb-3">
-        {typeof post.rsvps === "number" && (
-          <div className="text-sm font-semibold">{post.rsvps} reactions</div>
-        )}
         <p className="mt-1 text-sm">
           <span className="mr-1.5 font-semibold">{meta.label}</span>
           <span className="line-clamp-3 text-foreground/90">{post.body || post.title}</span>
@@ -248,20 +207,11 @@ export function PostCard({
               >
                 {post.kind === "tryout" ? "Apply" : "RSVP"}
               </button>
-              <button
-                type="button"
-                onClick={stop}
-                className="rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-semibold"
-              >
-                Share
-              </button>
             </div>
           </div>
         )}
 
-        <div className="mt-2 micro-label text-muted-foreground">
-          {formatWhen(post.postedAt)}
-        </div>
+        <div className="mt-2 micro-label text-muted-foreground">{formatWhen(post.postedAt)}</div>
       </div>
     </article>
   );

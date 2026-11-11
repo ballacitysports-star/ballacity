@@ -79,7 +79,7 @@ export const CATEGORY_META: Record<
   gameUpdates: {
     label: "Game updates",
     description:
-      "Changes to games you're part of: approvals, declines, join requests, time or venue changes, and cancellations.",
+      "Changes to games you're part of (approvals, declines, join requests, time or venue changes, cancellations) and announcements from your teams.",
   },
   nearbyGames: {
     label: "New nearby games",
@@ -107,7 +107,8 @@ export const CATEGORY_META: Record<
   },
   social: {
     label: "Followers & highlights",
-    description: "New followers, and comments or reactions on your highlight reels.",
+    description:
+      "New followers, and comments or reactions on your posts, games and highlight reels.",
   },
   general: {
     label: "Other activity",
@@ -156,11 +157,13 @@ export function categoryFor(type: string): NotifCategory {
     type === "join_declined" ||
     type === "availability_updated" ||
     type === "trainer_availability" ||
+    type === "team_announcement" ||
     type.startsWith("game_")
   )
     return "gameUpdates";
   if (
     type === "follow" ||
+    type === "follow_request" ||
     type === "unfollow" ||
     type === "comment" ||
     type === "reaction" ||
