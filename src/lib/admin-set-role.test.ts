@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * adminSetRole: the admin panel's "Make admin" / "Revoke moderator" buttons. Every grant and
  * revoke leaves an admin_audit_log row (through writeAudit, as superadminSetRole does), a failed
- * write is an error instead of a success, and only admins may call it.
+ * write, or a revoke that removes no role, is an error instead of a success, and only admins may
+ * call it.
  */
 
 // A server function is its handler for these tests: validate the input, then run it with the
@@ -39,6 +40,8 @@ const db = vi.hoisted(() => ({
   writes: [] as Write[],
   /** The error a user_roles write returns (null: it succeeds). */
   roleError: null as { message: string } | null,
+  /** The user_roles rows that exist: a delete removes the ones its filters match. */
+  roleRows: [] as Row[],
 }));
 
 /** Awaitable like a supabase-js query: resolves to `{ data, error }`. */
@@ -63,12 +66,25 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         delete: () => {
           const eq: Row = {};
           db.writes.push({ table, op: "delete", eq });
+          let returning = false;
           const q: Row = {};
           q.eq = (col: string, value: unknown) => {
             eq[col] = value;
             return q;
           };
-          return settled(q, outcome);
+          // As in PostgREST, the removed rows come back only when asked for with .select().
+          q.select = () => {
+            returning = true;
+            return q;
+          };
+          return settled(q, () => {
+            const result = outcome();
+            if (result.error) return result;
+            const removed = db.roleRows.filter((r) =>
+              Object.entries(eq).every(([col, value]) => r[col] === value),
+            );
+            return { data: returning ? removed : null, error: null };
+          });
         },
       };
     },
@@ -85,6 +101,8 @@ const setRole = adminSetRole as unknown as (arg: {
 
 const ACTOR = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TARGET = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+/** The id of the user_roles row a test gives the target. */
+const ROLE_ROW = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 /** The caller's context; `isAdmin` is what has_role(caller, 'admin') answers. */
 function caller(isAdmin: boolean): Context {
@@ -101,6 +119,7 @@ const roleWrites = () => db.writes.filter((w) => w.table === "user_roles");
 beforeEach(() => {
   db.writes.length = 0;
   db.roleError = null;
+  db.roleRows = [];
 });
 
 describe("adminSetRole audit trail", () => {
@@ -129,6 +148,7 @@ describe("adminSetRole audit trail", () => {
   });
 
   it("revokes the role, then records the revoke", async () => {
+    db.roleRows = [{ id: ROLE_ROW, user_id: TARGET, role: "moderator" }];
     await expect(
       setRole({ data: { userId: TARGET, role: "moderator", grant: false }, context: caller(true) }),
     ).resolves.toEqual({ ok: true });
@@ -170,6 +190,18 @@ describe("adminSetRole failed writes", () => {
       setRole({ data: { userId: TARGET, role: "moderator", grant: false }, context: caller(true) }),
     ).rejects.toThrow("Could not revoke the moderator role: connection reset");
     expect(roleWrites()).toHaveLength(1);
+    expect(auditRows()).toEqual([]);
+  });
+
+  it("reports a revoke of a role the user does not have as an error and audits nothing", async () => {
+    // The user is an admin but not a moderator: the delete matches no row and returns no error.
+    db.roleRows = [{ id: ROLE_ROW, user_id: TARGET, role: "admin" }];
+    await expect(
+      setRole({ data: { userId: TARGET, role: "moderator", grant: false }, context: caller(true) }),
+    ).rejects.toThrow("This user does not have the moderator role.");
+    expect(roleWrites()).toEqual([
+      { table: "user_roles", op: "delete", eq: { user_id: TARGET, role: "moderator" } },
+    ]);
     expect(auditRows()).toEqual([]);
   });
 });

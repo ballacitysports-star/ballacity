@@ -65,7 +65,7 @@ export const adminSetRole = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { writeAudit } = await import("@/lib/superadmin.server");
-    const { error } = data.grant
+    const { data: rows, error } = data.grant
       ? await supabaseAdmin
           .from("user_roles")
           .insert({ user_id: data.userId, role: data.role })
@@ -74,13 +74,20 @@ export const adminSetRole = createServerFn({ method: "POST" })
           .from("user_roles")
           .delete()
           .eq("user_id", data.userId)
-          .eq("role", data.role);
+          .eq("role", data.role)
+          // Return the removed rows, so a revoke that matched none can be told apart.
+          .select("id");
     // A failed grant or revoke is an error for the admin to see, never a success, and is not
     // audited as a change.
     if (error) {
       throw new Error(
         `Could not ${data.grant ? "grant" : "revoke"} the ${data.role} role: ${error.message}`,
       );
+    }
+    // Deleting a role the user does not have (or one another admin already revoked) is no
+    // error to the database, but it changed nothing: say so, and audit nothing.
+    if (!data.grant && !rows?.length) {
+      throw new Error(`This user does not have the ${data.role} role.`);
     }
     // Same entry as superadminSetRole writes, so the audit log shows both paths alike; the
     // source says the change came from the admin panel.
