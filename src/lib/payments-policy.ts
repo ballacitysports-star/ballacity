@@ -108,6 +108,12 @@ export const PAYMENT_UNRECORDED_MESSAGE =
 /** An order already captured whose payment record could not be checked just now. */
 export const PAYMENT_RECORD_UNCONFIRMED_MESSAGE =
   "Your PayPal payment went through, but we couldn't confirm it's recorded yet. Don't pay again: refresh this page in a minute.";
+/**
+ * An order PayPal captured whose payment record is gone (for example withdrawn after the host rejected it). The server
+ * does not write it again on its own, since that would skip the payment rules; it is flagged for support.
+ */
+export const PAYMENT_RECORD_MISSING_MESSAGE =
+  "Your PayPal payment for this order went through, but its payment record is missing. Don't pay again: we've flagged it, and support will settle it.";
 /** The button's fallback for any other failure: the server may or may not have finished. */
 export const CHECKOUT_UNCONFIRMED_MESSAGE =
   "We couldn't confirm the PayPal payment. Check this page before paying again.";
@@ -130,6 +136,7 @@ export const PAYMENT_POLICY_MESSAGES: readonly string[] = [
   PAYMENT_REFUNDED_MESSAGE,
   PAYMENT_UNRECORDED_MESSAGE,
   PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
+  PAYMENT_RECORD_MISSING_MESSAGE,
 ];
 
 /** The error's message when it is one of PAYMENT_POLICY_MESSAGES, else null. */

@@ -9,6 +9,13 @@ function baseUrl(): string {
     : "https://api-m.paypal.com";
 }
 
+/**
+ * How long one PayPal request may take before it is given up (AbortSignal.timeout). Without a limit a hung request
+ * would leave an order held in 'capturing' with nothing reported; with it the caller's fallback runs and reports.
+ */
+const TOKEN_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function getAccessToken(): Promise<string> {
   const id = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
@@ -20,6 +27,7 @@ async function getAccessToken(): Promise<string> {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`PayPal auth failed (${res.status}).`);
   const json = (await res.json()) as { access_token?: string };
@@ -39,16 +47,56 @@ async function postIdempotent(
   headers: Record<string, string>,
   body?: string,
 ): Promise<Response> {
-  const init: RequestInit = {
-    method: "POST",
-    headers: { ...headers, "PayPal-Request-Id": requestId },
-    body,
-  };
+  // A fresh timeout for each send.
+  const send = () =>
+    fetch(url, {
+      method: "POST",
+      headers: { ...headers, "PayPal-Request-Id": requestId },
+      body,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
   try {
-    return await fetch(url, init);
+    return await send();
   } catch {
-    return fetch(url, init);
+    return send();
   }
+}
+
+/** A GET of an order, with the request timeout. */
+function getOrderJson(orderId: string, token: string): Promise<Response> {
+  return fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+}
+
+/**
+ * Thrown by captureOrder only when PayPal certainly did not capture: the request was never sent (no access token), or
+ * PayPal refused it with a client error that is not "already captured" or "a request with this id is still running".
+ * Any other failure (no answer, a timeout, a 5xx, an unreadable answer) is a plain Error: the capture may have happened.
+ * The caller tests `notCaptured`, not the class, so a test double can throw one too.
+ */
+export class PayPalCaptureRefused extends Error {
+  readonly notCaptured = true as const;
+  constructor(
+    message: string,
+    readonly httpStatus: number | null,
+    readonly issue: string | null,
+  ) {
+    super(message);
+    this.name = "PayPalCaptureRefused";
+  }
+}
+
+/**
+ * Whether a capture answer with this status and PayPal issue means nothing was captured. 4xx answers are PayPal
+ * refusing the request (INSTRUMENT_DECLINED, ORDER_NOT_APPROVED, PAYER_ACTION_REQUIRED, an auth failure, ...), except
+ * 408 (timed out), 409 (a request with the same id may still be running) and ORDER_ALREADY_CAPTURED.
+ */
+export function captureRefusalIsDefinite(httpStatus: number, issue: string | null): boolean {
+  if (httpStatus < 400 || httpStatus >= 500) return false;
+  if (httpStatus === 408 || httpStatus === 409) return false;
+  return issue !== "ORDER_ALREADY_CAPTURED";
 }
 
 /** The PayPal-Request-Id of an order's capture: the same for every attempt, so PayPal captures an order at most once. */
@@ -138,7 +186,12 @@ type PayPalUnit = {
   payee?: { merchant_id?: string };
   payments?: { captures?: PayPalCapture[] };
 };
-type PayPalOrderJson = { status?: string; message?: string; purchase_units?: PayPalUnit[] };
+type PayPalOrderJson = {
+  status?: string;
+  message?: string;
+  details?: { issue?: string }[];
+  purchase_units?: PayPalUnit[];
+};
 
 /** Every capture on the order, from every purchase unit, each with the unit it belongs to. */
 function capturesOf(json: PayPalOrderJson) {
@@ -168,9 +221,7 @@ export type OrderDetails = {
  */
 export async function getOrder(orderId: string): Promise<OrderDetails> {
   const token = await getAccessToken();
-  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await getOrderJson(orderId, token);
   const json = ((await res.json().catch(() => null)) ?? {}) as PayPalOrderJson;
   if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
   const unit = json?.purchase_units?.[0];
@@ -243,11 +294,22 @@ export function parseCaptureResponse(raw: unknown): CaptureResult {
  * Captures an approved order. Asks for the full order in the answer (Prefer: return=representation), since PayPal's
  * default minimal answer need not name the payee. Sends PayPal-Request-Id capture-<order> (captureRequestId), the same
  * on every attempt, so a resend (here after a lost answer, or a later retry of the same order) returns the first
- * capture's result and never captures twice. Throws when PayPal refuses, and also when a successful answer cannot be
- * read or has no status: the money may have moved, so the caller must ask PayPal (getOrderCapture) rather than guess.
+ * capture's result and never captures twice. Throws PayPalCaptureRefused when PayPal certainly did not capture (see
+ * there). Throws a plain Error for anything else, including a successful answer that cannot be read or has no status:
+ * the money may have moved, so the caller must ask PayPal (getOrderCapture) rather than guess.
  */
 export async function captureOrder(orderId: string): Promise<CaptureResult> {
-  const token = await getAccessToken();
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (e) {
+    // Nothing was sent to the capture endpoint.
+    throw new PayPalCaptureRefused(
+      `PayPal capture not sent: ${e instanceof Error ? e.message : String(e)}`,
+      null,
+      null,
+    );
+  }
   const res = await postIdempotent(
     `${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
     captureRequestId(orderId),
@@ -258,7 +320,14 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     },
   );
   const json = (await res.json().catch(() => null)) as PayPalOrderJson | null;
-  if (!res.ok) throw new Error(json?.message || `PayPal capture failed (${res.status}).`);
+  if (!res.ok) {
+    const issue = json?.details?.[0]?.issue ?? null;
+    const message = json?.message || `PayPal capture failed (${res.status}).`;
+    if (captureRefusalIsDefinite(res.status, issue)) {
+      throw new PayPalCaptureRefused(message, res.status, issue);
+    }
+    throw new Error(message);
+  }
   if (!json || !json.status) throw new Error(`PayPal capture answer unreadable (${res.status}).`);
   return parseCaptureResponse(json);
 }
@@ -269,9 +338,7 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
  */
 export async function getOrderCapture(orderId: string): Promise<CaptureResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await getOrderJson(orderId, token);
   const json = (await res.json().catch(() => null)) as PayPalOrderJson | null;
   if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
   if (!json || !json.status) throw new Error(`PayPal order answer unreadable (${res.status}).`);

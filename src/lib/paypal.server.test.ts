@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   captureOrder,
+  captureRefusalIsDefinite,
   createOrder,
   getOrder,
   getOrderCapture,
@@ -370,5 +371,101 @@ describe("getOrder and getOrderCapture (F04 port)", () => {
     await expect(getOrderCapture("ORDER-1")).rejects.toThrow();
     body = "{}";
     await expect(getOrderCapture("ORDER-1")).rejects.toThrow();
+  });
+});
+
+describe("what a failed capture says about the money (re-review)", () => {
+  const sent: { url: string; init?: RequestInit }[] = [];
+  let token: () => Response;
+  let reply: () => Response;
+  beforeEach(() => {
+    sent.length = 0;
+    token = () => new Response(JSON.stringify({ access_token: "T" }), { status: 200 });
+    vi.stubEnv("PAYPAL_CLIENT_ID", "id");
+    vi.stubEnv("PAYPAL_CLIENT_SECRET", "secret");
+    vi.stubEnv("PAYPAL_ENV", "sandbox");
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      sent.push({ url, init });
+      return url.endsWith("/v1/oauth2/token") ? token() : reply();
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+  const paypalError = (status: number, issue: string) =>
+    new Response(
+      JSON.stringify({ name: "UNPROCESSABLE_ENTITY", details: [{ issue }], message: issue }),
+      { status },
+    );
+  const failure = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => e as Record<string, unknown>,
+    );
+
+  it("a decline PayPal answers is a refusal: nothing was captured", async () => {
+    reply = () => paypalError(422, "INSTRUMENT_DECLINED");
+    const e = await failure(captureOrder("ORDER-1"));
+    expect(e).toMatchObject({ notCaptured: true, httpStatus: 422, issue: "INSTRUMENT_DECLINED" });
+  });
+
+  it("a 5xx, a 409, a timeout status or 'already captured' is not a refusal: the money may have moved", async () => {
+    for (const r of [
+      () => new Response(JSON.stringify({ message: "internal" }), { status: 500 }),
+      () => paypalError(409, "PREVIOUS_REQUEST_IN_PROGRESS"),
+      () => paypalError(408, "TIMEOUT"),
+      () => paypalError(422, "ORDER_ALREADY_CAPTURED"),
+    ]) {
+      reply = r;
+      const e = await failure(captureOrder("ORDER-1"));
+      expect(e).toBeInstanceOf(Error);
+      expect(e?.notCaptured).toBeUndefined();
+    }
+  });
+
+  it("no answer at all is not a refusal", async () => {
+    reply = () => {
+      throw new TypeError("fetch failed");
+    };
+    const e = await failure(captureOrder("ORDER-1"));
+    expect(e?.notCaptured).toBeUndefined();
+  });
+
+  it("no access token: the capture is never sent, and says so", async () => {
+    token = () => new Response("{}", { status: 401 });
+    reply = () => new Response("{}", { status: 201 });
+    const e = await failure(captureOrder("ORDER-1"));
+    expect(e).toMatchObject({ notCaptured: true, httpStatus: null });
+    expect(sent.some((c) => c.url.endsWith("/capture"))).toBe(false);
+  });
+
+  it("captureRefusalIsDefinite", () => {
+    expect(captureRefusalIsDefinite(400, "INVALID_REQUEST")).toBe(true);
+    expect(captureRefusalIsDefinite(401, null)).toBe(true);
+    expect(captureRefusalIsDefinite(422, "ORDER_NOT_APPROVED")).toBe(true);
+    expect(captureRefusalIsDefinite(422, "ORDER_ALREADY_CAPTURED")).toBe(false);
+    expect(captureRefusalIsDefinite(408, null)).toBe(false);
+    expect(captureRefusalIsDefinite(409, null)).toBe(false);
+    expect(captureRefusalIsDefinite(500, null)).toBe(false);
+    expect(captureRefusalIsDefinite(201, null)).toBe(false);
+  });
+
+  it("every PayPal request has a time limit, a fresh one for each send", async () => {
+    let n = 0;
+    reply = () => {
+      n += 1;
+      if (n === 1) throw new TypeError("fetch failed");
+      return new Response(JSON.stringify(orderJson([cap()])), { status: 201 });
+    };
+    await captureOrder("ORDER-1");
+    await getOrder("ORDER-1");
+    await refundCapture("CAPTURE-1").catch(() => null);
+    const signals = sent.map((c) => c.init?.signal);
+    expect(signals.length).toBeGreaterThanOrEqual(6);
+    for (const sig of signals) expect(sig).toBeInstanceOf(AbortSignal);
+    const captureSends = sent.filter((c) => c.url.endsWith("/capture"));
+    expect(captureSends).toHaveLength(2);
+    expect(captureSends[0].init?.signal).not.toBe(captureSends[1].init?.signal);
   });
 });

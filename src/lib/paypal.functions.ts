@@ -7,6 +7,7 @@ import {
   CAPTURE_UNCONFIRMED_MESSAGE,
   ORDER_NOT_CAPTURABLE_MESSAGE,
   PAYMENT_CHECK_FAILED_MESSAGE,
+  PAYMENT_RECORD_MISSING_MESSAGE,
   PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
   PAYMENT_REFUNDED_MESSAGE,
   PAYMENT_TOO_LARGE_MESSAGE,
@@ -149,6 +150,42 @@ type OrderRow = {
 };
 
 /**
+ * True when the database answered the insert with an error of its own (a SQLSTATE such as P0001 from a trigger or
+ * 23514 from a check, or a PostgREST PGRST code): the request's transaction was rolled back, so nothing was written.
+ * A thrown error, or one without such a code (supabase-js reports a lost connection or a timeout as an error with an
+ * empty code; a gateway answers with no code), says nothing about whether the row was written.
+ */
+function databaseRejected(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && (/^[0-9A-Z]{5}$/.test(code) || code.startsWith("PGRST"));
+}
+
+/** The order's payment record (transaction_reference = the capture id, else the order id): found, absent, or null when the lookup failed. */
+async function findPaymentRecord(admin: AdminClient, order: OrderRow, reference: string) {
+  try {
+    const { data, error } = await admin
+      .from("payment_submissions")
+      .select("id")
+      .eq("game_id", order.game_id)
+      .eq("player_id", order.player_id)
+      .eq("transaction_reference", reference)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return !!data;
+  } catch {
+    return null;
+  }
+}
+
+/** captureOrder's PayPalCaptureRefused (read by its fields, so a test double works): PayPal certainly did not capture. */
+function captureRefusal(e: unknown): { notSent: boolean } | null {
+  const r = e as { notCaptured?: unknown; httpStatus?: unknown } | null;
+  if (!r || typeof r !== "object" || r.notCaptured !== true) return null;
+  return { notSent: r.httpStatus === null };
+}
+
+/**
  * PayPal has the money and it cannot be recorded: give it back. The order ends as refunded_unrecorded, or, when the
  * refund fails too, captured_unrecorded, which a superadmin settles by hand. Always throws, and never tells the
  * player it worked.
@@ -182,8 +219,11 @@ async function refundUnrecorded(
 
 /**
  * Records a captured payment for an order this request holds in 'capturing': the verified payment submission first,
- * then the order as captured, then the roster place and the host's notification. If the submission cannot be written
- * the capture is refunded (refundUnrecorded). Returns whether the player is on the roster.
+ * then the order as captured, then the roster place and the host's notification. If the database refuses the
+ * submission the capture is refunded (refundUnrecorded). If the insert got no clear answer the row may have been
+ * written, so it is looked for: found, carry on; not found or not known, nothing is refunded (that could give back
+ * money for a payment the app has recorded as verified) and the order is kept as captured and reported. Returns
+ * whether the player is on the roster.
  */
 async function recordCapturedPayment(
   admin: AdminClient,
@@ -216,7 +256,24 @@ async function recordCapturedPayment(
   if (insertError) {
     const cause =
       insertError instanceof Error ? insertError : (insertError as { message?: string }).message;
-    return refundUnrecorded(admin, paypal, order.order_id, captureId, "insert_failed", cause);
+    if (databaseRejected(insertError)) {
+      return refundUnrecorded(admin, paypal, order.order_id, captureId, "insert_failed", cause);
+    }
+    const written = await findPaymentRecord(admin, order, captureId ?? order.order_id);
+    if (written !== true) {
+      // Not known whether the payment is recorded. The order is marked captured with its capture id, so the next
+      // request looks for the record again (ensureCapturedRecorded) and other orders for the game are refused
+      // meanwhile (PAYMENT_IN_PROGRESS while it has no record).
+      const kept = await moveOrder(admin, order.order_id, "capturing", {
+        status: "captured",
+        capture_id: captureId,
+        captured_at: now,
+      });
+      if (!kept) await reportPaymentProblem("unconfirmed_order_not_marked", order.order_id);
+      await reportPaymentProblem("payment_record_unconfirmed", order.order_id, cause);
+      throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+    }
+    // The insert did write the row; only its answer was lost.
   }
 
   // The payment is recorded; from here nothing is refunded. A failure is reported for a superadmin to tidy.
@@ -252,54 +309,19 @@ async function recordCapturedPayment(
 }
 
 /**
- * An order already captured. Normally its payment is recorded and this says so. If the record is missing (an order
- * captured before the record was checked, or one whose record was later removed), it is recorded again, or refunded
- * when that fails. It never reports success without a record.
+ * An order already captured. Normally its payment is recorded and this says so. If the record is missing (it was
+ * removed after the capture: recordCapturedPayment writes it before it marks the order captured, or the write's answer
+ * was lost), nothing is written here: a new verified payment and roster place written by the server would skip the
+ * payment rules (a host's rejection or block, a refund already owed). It is reported for a superadmin to settle, and
+ * the order keeps other orders for the game refused meanwhile (PAYMENT_IN_PROGRESS).
  */
-async function ensureCapturedRecorded(admin: AdminClient, paypal: PayPalServer, order: OrderRow) {
-  const reference = order.capture_id ?? order.order_id;
-  const isRecorded = async () => {
-    try {
-      const { data, error } = await admin
-        .from("payment_submissions")
-        .select("id")
-        .eq("game_id", order.game_id)
-        .eq("player_id", order.player_id)
-        .eq("transaction_reference", reference)
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return !!data;
-    } catch {
-      return null;
-    }
-  };
-  const recorded = await isRecorded();
+async function ensureCapturedRecorded(admin: AdminClient, order: OrderRow) {
+  const recorded = await findPaymentRecord(admin, order, order.capture_id ?? order.order_id);
   if (recorded === null) throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
   // Recorded by the request that captured it, which also placed the player on the roster if it could.
   if (recorded) return { ok: true as const, already: true as const, rostered: null };
-
-  // Hold the order while the record is written, so two repairs cannot record it twice.
-  if (!(await moveOrder(admin, order.order_id, "captured", { status: "capturing" }))) {
-    throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
-  }
-  // Look again now the order is held: a repair that held it before this one may have recorded it since the first look.
-  const recordedMeanwhile = await isRecorded();
-  if (recordedMeanwhile !== false) {
-    if (!(await moveOrder(admin, order.order_id, "capturing", { status: "captured" }))) {
-      await reportPaymentProblem("repair_release_not_saved", order.order_id);
-    }
-    if (recordedMeanwhile === null) throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
-    return { ok: true as const, already: true as const, rostered: null };
-  }
-  await reportPaymentProblem("captured_record_missing_repaired", order.order_id);
-  const rostered: boolean | null = await recordCapturedPayment(
-    admin,
-    paypal,
-    order,
-    order.capture_id,
-  );
-  return { ok: true as const, already: true as const, rostered };
+  await reportPaymentProblem("captured_record_missing", order.order_id);
+  throw new Error(PAYMENT_RECORD_MISSING_MESSAGE);
 }
 
 /**
@@ -396,7 +418,7 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const paypal = await import("@/lib/paypal.server");
 
-    if (order.status === "captured") return ensureCapturedRecorded(supabaseAdmin, paypal, order);
+    if (order.status === "captured") return ensureCapturedRecorded(supabaseAdmin, order);
     if (order.status === "capturing") throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
     if (order.status === "refunded_unrecorded") throw new Error(PAYMENT_REFUNDED_MESSAGE);
     if (order.status === "captured_unrecorded") throw new Error(PAYMENT_UNRECORDED_MESSAGE);
@@ -427,9 +449,15 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       );
       throw new Error(PAYMENT_CHECK_FAILED_MESSAGE);
     }
+    // PayPal already shows a capture: an earlier attempt's capture finished after that attempt stopped waiting (the
+    // order was released after a refusal, or a capture PayPal was still working on). The money moved, so this order is
+    // never marked failed or told it wasn't charged: it is held, its capture read, checked against the order and the
+    // payment rules, then recorded or refunded below.
+    const alreadyCaptured = pending.status === "COMPLETED" || !!pending.captureId;
     if (
-      !orderMatchesGame ||
-      !paypal.paypalPaymentMatches(pending, { ...expected, status: "APPROVED" })
+      !alreadyCaptured &&
+      (!orderMatchesGame ||
+        !paypal.paypalPaymentMatches(pending, { ...expected, status: "APPROVED" }))
     ) {
       await moveOrder(supabaseAdmin, data.orderId, CAPTURABLE, { status: "failed" });
       throw new Error(PAYPAL_MISMATCH_MESSAGE);
@@ -444,36 +472,55 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
     // Every payment rule again, as the player, right before the money moves and after the order is held: an approval
     // may have been withdrawn, the game cancelled or filled, or the player paid by another order or another way since
     // the order was created. Asked after the hold, no other order of theirs for this game can capture in between.
-    try {
-      await assertPaymentPreconditions(context.supabase, order.game_id);
-    } catch (refusal) {
+    // An order PayPal already captured is asked below, once its capture is read: a refusal then refunds it.
+    const release = async () => {
       if (!(await moveOrder(supabaseAdmin, data.orderId, "capturing", { status: order.status }))) {
         await reportPaymentProblem("claim_release_not_saved", data.orderId);
       }
-      throw refusal;
-    }
-
+    };
     let result: Awaited<ReturnType<PayPalServer["captureOrder"]>> | null = null;
     let captureError: unknown = null;
-    try {
-      result = await paypal.captureOrder(data.orderId);
-    } catch (e) {
-      captureError = e;
+    if (!alreadyCaptured) {
+      try {
+        await assertPaymentPreconditions(context.supabase, order.game_id);
+      } catch (refusal) {
+        await release();
+        throw refusal;
+      }
+
+      try {
+        result = await paypal.captureOrder(data.orderId);
+      } catch (e) {
+        captureError = e;
+      }
+      if (captureRefusal(captureError)?.notSent) {
+        // The capture was never sent (no PayPal access token): nothing can have been taken.
+        console.error("[paypal] capture not sent", (captureError as Error).message);
+        await release();
+        throw new Error(PAYPAL_UNAVAILABLE_MESSAGE);
+      }
     }
     if (!result || !result.captureId) {
-      // PayPal did not show a capture (an error, a timeout, or an answer without one). Did the money move anyway? Ask
-      // PayPal what the order's capture is now rather than guess.
+      // PayPal did not show a capture (an error, a timeout, or an answer without one), or this order was captured by
+      // an earlier attempt. Ask PayPal what the order's capture is now rather than guess.
       const after = await paypal.getOrderCapture(data.orderId).catch(() => null);
-      if (after && after.captureCount === 0 && after.status !== "COMPLETED") {
-        // Not captured. After an error the order goes back to how it was so the player can try again.
+      const nothingCaptured = !!after && after.captureCount === 0 && after.status !== "COMPLETED";
+      // Nothing is released on one read alone: after no answer, a timeout or a 5xx, PayPal may still be completing
+      // the capture, and a later attempt would then find it (alreadyCaptured above). Only a definite no counts:
+      // PayPal refused the capture (PayPalCaptureRefused), or answered it without an error and neither that answer
+      // nor the order shows the order COMPLETED.
+      const refused = !!captureRefusal(captureError);
+      const answeredUncaptured = !captureError && !!result && result.status !== "COMPLETED";
+      if (nothingCaptured && (refused || answeredUncaptured)) {
+        // Not captured. After a refusal the order goes back to how it was so the player can try again.
         await moveOrder(supabaseAdmin, data.orderId, "capturing", {
-          status: captureError ? order.status : "failed",
+          status: refused ? order.status : "failed",
         });
         throw new Error(CAPTURE_DECLINED_MESSAGE);
       }
       if (!after || after.captureCount !== 1 || !after.captureId) {
-        // Unknown (no answer, a capture with no id, or more than one capture): the order stays 'capturing' for a
-        // superadmin, and the player is not told it worked.
+        // Unknown (no answer, no capture yet after a failure that was not a refusal, a capture with no id, or more
+        // than one capture): the order stays 'capturing' for a superadmin, and the player is not told it worked.
         await reportPaymentProblem("capture_unconfirmed", data.orderId, captureError);
         throw new Error(CAPTURE_UNCONFIRMED_MESSAGE);
       }
@@ -511,9 +558,40 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       ...result,
       payeeMerchantId: result.payeeMerchantId ?? pending.payeeMerchantId,
     };
-    if (!paypal.paypalPaymentMatches(captured, { ...expected, status: "COMPLETED" })) {
+    if (
+      !orderMatchesGame ||
+      !paypal.paypalPaymentMatches(captured, { ...expected, status: "COMPLETED" })
+    ) {
       // PayPal took money that does not match what was checked: give it back.
       return refundUnrecorded(supabaseAdmin, paypal, data.orderId, captureId, "capture_mismatch");
+    }
+
+    if (alreadyCaptured) {
+      // Captured by an earlier attempt: the payment rules are asked now, before anything is recorded, since they may
+      // have changed since (a host's block or rejection, another payment). A refusal gives the money back. When the
+      // check itself fails the order is held with its capture id (other orders for the game refused meanwhile) and
+      // reported; nothing is refunded or recorded on a guess.
+      try {
+        await assertPaymentPreconditions(context.supabase, order.game_id);
+      } catch (refusal) {
+        if (refusal instanceof Error && refusal.message === PAYMENT_CHECK_FAILED_MESSAGE) {
+          if (
+            !(await moveOrder(supabaseAdmin, data.orderId, "capturing", { capture_id: captureId }))
+          ) {
+            await reportPaymentProblem("capture_id_not_saved", data.orderId);
+          }
+          await reportPaymentProblem("late_capture_rules_unchecked", data.orderId);
+          throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+        }
+        return refundUnrecorded(
+          supabaseAdmin,
+          paypal,
+          data.orderId,
+          captureId,
+          "rules_refused",
+          refusal,
+        );
+      }
     }
 
     // Keep the capture id on the order before anything else, so a crash from here on leaves it findable.

@@ -117,7 +117,8 @@ vi.mock("@/lib/paypal.server", () => {
     },
     getOrder: async () => {
       h.paypal.looked += 1;
-      return paid("APPROVED");
+      // An approved order lists no capture yet.
+      return { ...paid("APPROVED"), captureId: null, captureStatus: null };
     },
     captureOrder: async () => {
       h.paypal.captured += 1;
