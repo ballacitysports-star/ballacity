@@ -581,7 +581,10 @@ button:disabled,
    animate-spin keeps turning: it says work is in progress, and a spinner that
    stops reads as a hung page. New code should prefer motion-safe: on the
    class itself; reduced-motion.test.ts fails on any animate-* class that is
-   not motion-safe:, not switched off here, and not allowlisted.
+   not motion-safe:, not switched off here, and not allowlisted, and on any
+   animation this file starts that is not listed here or allowlisted. A class
+   with Tailwind's important modifier (!) beats this block, so it has to be
+   motion-safe:.
 
    Unlayered on purpose, like the focus ring and the iOS zoom fix above. The
    state variants (data-[state=open]:animate-in) live in @layer utilities with
