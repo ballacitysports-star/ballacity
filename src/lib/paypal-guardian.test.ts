@@ -108,6 +108,7 @@ vi.mock("@/lib/paypal.server", () => {
     currency: "USD",
     payeeMerchantId: "HOSTMERCHANT1",
     captureId: "CAPTURE-1",
+    captureStatus: "COMPLETED",
   });
   return {
     createOrder: async () => {

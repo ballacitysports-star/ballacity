@@ -46,10 +46,14 @@ export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
   PAYMENT_DESTINATION_INVALID: "This game can't take payments right now. You weren't charged.",
   PAYMENTS_NOT_AVAILABLE:
     "Payment coordination isn't available for this account yet. You weren't charged.",
+  AGE_VERIFICATION_REQUIRED:
+    "Add your date of birth to your profile before joining games. You weren't charged.",
   GAME_PARTICIPATION_BLOCKED:
     "A parent or guardian has to allow game participation before you can pay. You weren't charged.",
   BLOCKED_BY_HOST: "You can't join this host's games. You weren't charged.",
   ALREADY_PAID: "You've already paid for this game. You weren't charged.",
+  PAYMENT_IN_PROGRESS:
+    "Your earlier PayPal payment for this game is still being confirmed, so you can't pay again yet. Refresh this page in a few minutes, and contact support if it hasn't updated. You weren't charged.",
   HOST_APPROVAL_REQUIRED:
     "The host has to approve your request to join before you can pay. You weren't charged.",
   GUARDIAN_APPROVAL_REQUIRED: GUARDIAN_PAYMENT_MESSAGE,
@@ -64,6 +68,9 @@ export const PAYMENT_CHECK_FAILED_MESSAGE =
   "We couldn't check this payment right now. Please try again in a moment. You weren't charged.";
 export const PAYMENT_REFUSED_MESSAGE =
   "You can't pay for this game right now. You weren't charged.";
+/** PayPal would not start the checkout (its own error stays in the server log). */
+export const PAYPAL_UNAVAILABLE_MESSAGE =
+  "PayPal checkout isn't available right now. Please try again in a moment. You weren't charged.";
 /** paypal_orders.amount_cents above what payment_submissions.paid_amount accepts ($100,000). */
 export const PAYMENT_TOO_LARGE_MESSAGE =
   "This game's fee is more than checkout can take. You weren't charged.";
@@ -89,6 +96,9 @@ export const CAPTURE_IN_PROGRESS_MESSAGE =
 /** The capture failed and PayPal could not say whether money moved. The order stays flagged for support. */
 export const CAPTURE_UNCONFIRMED_MESSAGE =
   "We couldn't confirm with PayPal whether this payment went through. Don't pay again: refresh this page in a few minutes, and contact support if it hasn't updated.";
+/** PayPal accepted the payment but has not completed it (a PENDING capture). The order is held for support. */
+export const CAPTURE_PENDING_MESSAGE =
+  "PayPal is still processing this payment, so it isn't confirmed yet and you're not on the roster. Don't pay again: we've flagged it, and support will record or refund it.";
 /** PayPal took the money, it could not be recorded, and it was refunded in full. */
 export const PAYMENT_REFUNDED_MESSAGE =
   "PayPal took your payment but we couldn't record it, so we refunded it in full. You're not on the roster for this payment. Please try again later or use another method.";
@@ -110,11 +120,13 @@ export const PAYMENT_POLICY_MESSAGES: readonly string[] = [
   PAYMENT_CHECK_FAILED_MESSAGE,
   PAYMENT_REFUSED_MESSAGE,
   PAYMENT_TOO_LARGE_MESSAGE,
+  PAYPAL_UNAVAILABLE_MESSAGE,
   ORDER_NOT_CAPTURABLE_MESSAGE,
   PAYPAL_MISMATCH_MESSAGE,
   CAPTURE_DECLINED_MESSAGE,
   CAPTURE_IN_PROGRESS_MESSAGE,
   CAPTURE_UNCONFIRMED_MESSAGE,
+  CAPTURE_PENDING_MESSAGE,
   PAYMENT_REFUNDED_MESSAGE,
   PAYMENT_UNRECORDED_MESSAGE,
   PAYMENT_RECORD_UNCONFIRMED_MESSAGE,

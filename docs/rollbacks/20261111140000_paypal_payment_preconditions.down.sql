@@ -1,6 +1,7 @@
 -- ROLLBACK for supabase/migrations/20261111140000_paypal_payment_preconditions.sql (task #69).
--- NOT a migration. It drops the check the server asks before creating or capturing a PayPal order, and puts back the
--- order statuses as drizzle 0018_paypal_checkout defines them. No trigger was changed by the migration, so none is
+-- NOT a migration. It drops the check the server asks before creating or capturing a PayPal order and the index that
+-- lets one order per player and game be mid-capture, and puts back the order statuses as drizzle 0018_paypal_checkout
+-- defines them. No trigger was changed by the migration, so none is
 -- restored here.
 -- Roll back the app change first: the server's check fails closed, so with the function gone nobody could pay by
 -- PayPal. With both rolled back, PayPal checkout again moves money for a player the database then refuses to record
@@ -29,6 +30,7 @@ $guard$;
 
 DROP FUNCTION IF EXISTS public.paypal_payment_precondition(text);
 DROP FUNCTION IF EXISTS private_sec.paypal_payment_block(text);
+DROP INDEX IF EXISTS public.paypal_orders_one_capture_per_player_game;
 
 -- The constraint as drizzle 0018_paypal_checkout created it.
 ALTER TABLE public.paypal_orders DROP CONSTRAINT paypal_orders_status_check;

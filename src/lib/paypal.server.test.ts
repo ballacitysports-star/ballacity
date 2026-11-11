@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { paypalPaymentMatches } from "./paypal.server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { captureOrder, paypalPaymentMatches } from "./paypal.server";
 
 const expected = {
   status: "APPROVED",
@@ -46,5 +46,71 @@ describe("paypalPaymentMatches", () => {
   it("rejects an order not in the expected status", () => {
     expect(paypalPaymentMatches({ ...order, status: "CREATED" }, expected)).toBe(false);
     expect(paypalPaymentMatches(order, { ...expected, status: "COMPLETED" })).toBe(false);
+  });
+});
+
+describe("captureOrder (review of task #69)", () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  let captureReply: () => Response;
+
+  beforeEach(() => {
+    calls.length = 0;
+    vi.stubEnv("PAYPAL_CLIENT_ID", "id");
+    vi.stubEnv("PAYPAL_CLIENT_SECRET", "secret");
+    vi.stubEnv("PAYPAL_ENV", "sandbox");
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (url.endsWith("/v1/oauth2/token"))
+        return new Response(JSON.stringify({ access_token: "T" }), { status: 200 });
+      return captureReply();
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  const completed = (captureStatus: string) =>
+    JSON.stringify({
+      id: "ORDER-1",
+      status: "COMPLETED",
+      purchase_units: [
+        {
+          payee: { merchant_id: "HOSTMERCHANT1" },
+          payments: {
+            captures: [
+              {
+                id: "CAPTURE-1",
+                status: captureStatus,
+                amount: { value: "10.00", currency_code: "USD" },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+  it("asks PayPal for the full order in its answer, so the payee is in it", async () => {
+    captureReply = () => new Response(completed("COMPLETED"), { status: 201 });
+    await captureOrder("ORDER-1");
+    const headers = calls[1].init?.headers as Record<string, string>;
+    expect(headers.Prefer).toBe("return=representation");
+  });
+
+  it("returns the capture's own status, not only the order's", async () => {
+    captureReply = () => new Response(completed("PENDING"), { status: 201 });
+    await expect(captureOrder("ORDER-1")).resolves.toMatchObject({
+      status: "COMPLETED",
+      captureId: "CAPTURE-1",
+      captureStatus: "PENDING",
+      payeeMerchantId: "HOSTMERCHANT1",
+    });
+  });
+
+  it("throws when a successful answer cannot be read, so the caller asks PayPal what happened", async () => {
+    captureReply = () => new Response("<html>gateway</html>", { status: 201 });
+    await expect(captureOrder("ORDER-1")).rejects.toThrow();
+    captureReply = () => new Response("{}", { status: 201 });
+    await expect(captureOrder("ORDER-1")).rejects.toThrow();
   });
 });

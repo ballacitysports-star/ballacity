@@ -12,7 +12,8 @@
 --                        enforce_child_game_participation the account may take part in games at all
 --                        addPaidPlayerToRoster            an approved request when the game is request-to-join
 -- Others apply only to a signed-in writer, which the server is not, and checkout skipped them: the guardian rule
--- (20261111100000 already asks it before the money moves), a host's block (enforce_host_block), and joining a game
+-- (20261111100000 already asks it before the money moves), a host's block (enforce_host_block), a declared age
+-- (enforce_child_game_participation's AGE_VERIFICATION_REQUIRED for a player joining themselves), and joining a game
 -- that is over by the clock (the join gate's own check for a player joining themselves).
 --
 --   1. private_sec.paypal_payment_block(game): NULL when the signed-in caller may pay for the game now, else a code.
@@ -22,9 +23,13 @@
 --   2. public.paypal_payment_precondition(game): the API entry point. It runs as the caller, so a game the caller
 --      cannot see through hosted_games' row level security is GAME_NOT_FOUND before anything else is said about it,
 --      then asks 1. Signed-in callers only: PUBLIC, anon and the service role cannot call either function.
+--      It also refuses while money this player moved for the game by PayPal is not recorded yet (PAYMENT_IN_PROGRESS),
+--      so a second order cannot charge them twice.
 --   3. paypal_orders.status gains 'capturing' (a capture is under way: one request at a time), 'refunded_unrecorded'
 --      (captured, could not be recorded, refunded) and 'captured_unrecorded' (captured, could not be recorded, and the
---      refund failed too: the money is with the host and a superadmin has to settle it by hand).
+--      refund failed too: the money is with the host and a superadmin has to settle it by hand). A partial unique
+--      index lets only one order per player and game be 'capturing' at a time, so two orders cannot be captured at
+--      once: the server claims an order by moving it to 'capturing', and a second claim fails.
 -- Deploy order: this migration BEFORE the app. The server's check fails closed, so a published server without these
 -- functions refuses every PayPal checkout.
 -- Rollback: docs/rollbacks/20261111140000_paypal_payment_preconditions.down.sql (guarded). Roll it back before
@@ -36,6 +41,7 @@ BEGIN
      OR to_regprocedure('private_sec.game_payee(text)') IS NULL
      OR to_regprocedure('public.game_payments_allowed(uuid)') IS NULL
      OR to_regprocedure('public.child_game_participation_allowed(uuid)') IS NULL
+     OR to_regprocedure('public.age_verified(uuid)') IS NULL
      OR to_regprocedure('public.is_game_participant(text, uuid)') IS NULL
      OR to_regprocedure('public.game_duration_minutes(text)') IS NULL
      OR to_regclass('public.paypal_orders') IS NULL THEN
@@ -96,6 +102,11 @@ BEGIN
   IF NOT public.game_payments_allowed(_me) THEN
     RETURN 'PAYMENTS_NOT_AVAILABLE';
   END IF;
+  -- enforce_child_game_participation, for a player joining themselves (the server's roster write skips it): a declared
+  -- date of birth.
+  IF NOT public.age_verified(_me) THEN
+    RETURN 'AGE_VERIFICATION_REQUIRED';
+  END IF;
   -- enforce_child_game_participation: the paid place could not be given.
   IF NOT public.child_game_participation_allowed(_me) THEN
     RETURN 'GAME_PARTICIPATION_BLOCKED';
@@ -108,6 +119,20 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.payment_submissions ps
               WHERE ps.game_id = _game_id AND ps.player_id = _me AND ps.status = 'verified') THEN
     RETURN 'ALREADY_PAID';
+  END IF;
+  -- Money this player moved for this game by PayPal that is not recorded yet: captured and still being recorded, or
+  -- held because PayPal has not completed the capture (capturing with a capture id), captured with no record of it, or
+  -- captured and neither recorded nor refunded. An order the server holds for its own capture with nothing captured yet
+  -- is not counted: the capture asks this after holding it, and the unique index below keeps a second one out.
+  IF EXISTS (SELECT 1 FROM public.paypal_orders o
+              WHERE o.game_id = _game_id AND o.player_id = _me
+                AND (o.status = 'captured_unrecorded'
+                     OR (o.status = 'capturing' AND o.capture_id IS NOT NULL)
+                     OR (o.status = 'captured' AND NOT EXISTS (
+                           SELECT 1 FROM public.payment_submissions ps
+                            WHERE ps.game_id = _game_id AND ps.player_id = _me
+                              AND ps.transaction_reference = COALESCE(o.capture_id, o.order_id))))) THEN
+    RETURN 'PAYMENT_IN_PROGRESS';
   END IF;
 
   _approved := EXISTS (SELECT 1 FROM public.join_requests jr
@@ -163,6 +188,9 @@ BEGIN
 END
 $$;
 REVOKE ALL ON FUNCTION private_sec.paypal_payment_block(text) FROM PUBLIC, anon, service_role;
+-- authenticated needs EXECUTE because the invoker wrapper below calls it as the caller. Called directly it skips the
+-- wrapper's visibility check (GAME_NOT_FOUND for a game the caller cannot see), so it relies on private_sec not being
+-- exposed by the API, as every other private_sec helper granted to authenticated does (00_schema_invariants).
 GRANT EXECUTE ON FUNCTION private_sec.paypal_payment_block(text) TO authenticated;
 
 -- ============================================================ 2. the API entry point, as the caller
@@ -192,3 +220,5 @@ ALTER TABLE public.paypal_orders DROP CONSTRAINT paypal_orders_status_check;
 ALTER TABLE public.paypal_orders ADD CONSTRAINT paypal_orders_status_check CHECK (status = ANY (ARRAY[
   'created'::text, 'approved'::text, 'capturing'::text, 'captured'::text, 'failed'::text, 'cancelled'::text,
   'refunded_unrecorded'::text, 'captured_unrecorded'::text]));
+CREATE UNIQUE INDEX paypal_orders_one_capture_per_player_game ON public.paypal_orders (game_id, player_id)
+  WHERE status = 'capturing';

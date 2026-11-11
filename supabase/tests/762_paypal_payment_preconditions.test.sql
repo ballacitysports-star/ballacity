@@ -146,6 +146,16 @@ SELECT t.eq(pg_temp.code('teen', 'g-open'), 'GAME_PARTICIPATION_BLOCKED',
   'a guardian who turned off game participation');
 UPDATE public.child_controls SET game_participation = true WHERE child_user_id = t.id('teen');
 
+-- No declared age (review): enforce_child_game_participation refuses a player who has not given a date of birth when
+-- they join by themselves, and the server's roster write skips that. So it is asked here.
+INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
+VALUES (t.id('nodob'), 'nodob@example.test', now(),
+        jsonb_build_object('display_name', 'Nodob', 'account_type', 'player'));
+SELECT t.ok(NOT public.age_verified(t.id('nodob')) AND public.game_payments_allowed(t.id('nodob'))
+            AND public.child_game_participation_allowed(t.id('nodob')),
+  'setup: an account with no date of birth passes the payment and participation helpers');
+SELECT t.eq(pg_temp.code('nodob', 'g-open'), 'AGE_VERIFICATION_REQUIRED', 'an account with no declared age');
+
 -- Age range.
 SELECT t.eq(pg_temp.code('pa', 'g-age'), 'AGE_REQUIREMENT_NOT_MET', 'a 28-year-old, a game for 30-39');
 SELECT t.eq(pg_temp.code('other', 'g-age'), NULL::text, 'a 33-year-old may pay');
@@ -212,6 +222,11 @@ SELECT t.throws(pg_temp.seat_stmt('teen', 'g-closed'), 'CHILD_GAME_PARTICIPATION
   'GAME_PARTICIPATION_BLOCKED: the roster place would be refused');
 SELECT t.reset();
 UPDATE public.child_controls SET game_participation = true WHERE child_user_id = t.id('teen');
+-- AGE_VERIFICATION_REQUIRED: the player could not take the place themselves; the service role's write would skip it.
+SELECT t.as_user(t.id('nodob'));
+SELECT t.throws(pg_temp.seat_stmt('nodob', 'g-open'), 'AGE_VERIFICATION_REQUIRED',
+  'AGE_VERIFICATION_REQUIRED: the player joining themselves is refused');
+SELECT t.reset();
 -- And where the answer is NULL, both writes go through.
 SELECT t.eq(pg_temp.code('other', 'g-open'), NULL::text, 'setup: other may pay for the open game');
 SELECT t.as_service();
@@ -259,5 +274,49 @@ SELECT t.as_user(t.id('pa'));
 SELECT t.eq(t.changed($q$UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'O-1'$q$), 0,
   'a player still cannot change their own order');
 SELECT t.reset();
+
+-- ---- 8. money already moving for this game (review: charged twice) -----------------------------------------------
+-- The capture holds its own order in 'capturing' and only then asks, so an order in 'capturing' with no capture yet
+-- is not counted (the index below keeps a second one out). Money that moved and is not recorded is.
+DELETE FROM public.paypal_orders;
+SELECT t.eq(pg_temp.code('pa', 'g-open'), NULL::text, 'setup: pa may pay for the open game');
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, status)
+VALUES ('O-2', 'g-open', t.id('pa'), t.id('host'), 1000, 'capturing');
+SELECT t.eq(pg_temp.code('pa', 'g-open'), NULL::text,
+  'an order held for its own capture, nothing captured yet: the capture''s own check still passes');
+UPDATE public.paypal_orders SET capture_id = 'CAP-2' WHERE order_id = 'O-2';
+SELECT t.eq(pg_temp.code('pa', 'g-open'), 'PAYMENT_IN_PROGRESS', 'captured, still being recorded (or PayPal pending)');
+UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'O-2';
+SELECT t.eq(pg_temp.code('pa', 'g-open'), 'PAYMENT_IN_PROGRESS', 'captured with no payment record');
+UPDATE public.paypal_orders SET status = 'captured_unrecorded' WHERE order_id = 'O-2';
+SELECT t.eq(pg_temp.code('pa', 'g-open'), 'PAYMENT_IN_PROGRESS', 'captured, unrecorded, and the refund failed');
+SELECT t.eq(pg_temp.code('pb', 'g-open'), 'ALREADY_PAID', 'another player''s order says nothing about them');
+SELECT t.eq(pg_temp.code('pa', 'g-closed'), NULL::text, 'and it counts only for its own game');
+UPDATE public.paypal_orders SET status = 'refunded_unrecorded' WHERE order_id = 'O-2';
+SELECT t.eq(pg_temp.code('pa', 'g-open'), NULL::text, 'refunded: may pay again');
+UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'O-2';
+INSERT INTO public.payment_submissions (game_id, host_id, player_id, payment_type, transaction_reference, paid_amount,
+                                        paid_at, notes, status, reviewed_at)
+VALUES ('g-open', t.id('host'), t.id('pa'), 'paypal', 'CAP-2', 10, now(), 'Paid with PayPal checkout', 'cancelled',
+        now());
+SELECT t.eq(pg_temp.code('pa', 'g-open'), NULL::text,
+  'captured and recorded, the record no longer verified (cancelled): as for any other payment');
+INSERT INTO public.payment_submissions (game_id, host_id, player_id, payment_type, transaction_reference, paid_amount,
+                                        paid_at, notes, status, reviewed_at)
+VALUES ('g-open', t.id('host'), t.id('pa'), 'paypal', 'CAP-2', 10, now(), 'Paid with PayPal checkout', 'verified',
+        now());
+SELECT t.eq(pg_temp.code('pa', 'g-open'), 'ALREADY_PAID', 'captured and recorded as verified');
+
+-- One order per player and game can be mid-capture: a second claim fails, so the server refuses the second capture.
+INSERT INTO public.paypal_orders (order_id, game_id, player_id, host_id, amount_cents, status)
+VALUES ('O-3', 'g-open', t.id('pa'), t.id('host'), 1000, 'capturing'),
+       ('O-4', 'g-open', t.id('pa'), t.id('host'), 1000, 'created'),
+       ('O-5', 'g-open', t.id('pb'), t.id('host'), 1000, 'capturing'),
+       ('O-6', 'g-closed', t.id('pa'), t.id('host'), 1000, 'capturing');
+SELECT t.throws($q$UPDATE public.paypal_orders SET status = 'capturing' WHERE order_id = 'O-4'$q$,
+  'paypal_orders_one_capture_per_player_game', 'a second order for the same player and game cannot be claimed');
+UPDATE public.paypal_orders SET status = 'captured' WHERE order_id = 'O-3';
+SELECT t.lives($q$UPDATE public.paypal_orders SET status = 'capturing' WHERE order_id = 'O-4'$q$,
+  'once the first is no longer capturing, the next can be claimed');
 
 ROLLBACK;
