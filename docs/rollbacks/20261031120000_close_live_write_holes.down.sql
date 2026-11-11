@@ -30,8 +30,9 @@
 -- Data: nothing is deleted from reviews, reports, payments or rosters. Reviews still held for screening when part 3 runs
 -- stay flagged (hidden): a NOTICE gives their number, and superadmins decide them in Moderation (reviews, hidden only).
 -- The hold bookkeeping table is dropped.
--- Ledger: the 20261031120000 row stays; record the rollback with it. The release preflight pins this migration
--- (pinned_history, PR #294) and will refuse the target until a reviewed forward fix restores a recognized state.
+-- Ledger: the 20261031120000 row stays; record the rollback with it. (Corrected 2026-11-11: main has no release
+-- preflight; the pinned_history check that would refuse this state exists only in the unmerged PR #294. On main,
+-- docs/release/hotfix-287-verify.sql shows the rolled-back part as no longer matching.)
 --
 -- Do it only with the owner's explicit approval, and record it.
 

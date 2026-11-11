@@ -58,8 +58,12 @@ Send Lovable the file's exact text and ask it to apply it with its migration too
 
 - **The record.** Lovable runs it in one transaction and records `sha256(text)` in `drizzle.__drizzle_migrations`. It
   writes no `supabase_migrations` row. It then commits a drizzle copy to the repository.
-- **Why that copy is skipped.** The release preflight's pinned history (#294 follow-up) recognises that copy by hash,
-  so the release replay skips it, the same way it skips #287's.
+- **That copy on `main` (corrected 2026-11-11).** The copy is `drizzle/migrations/0033_hotfix_payment_settings_host_guard.sql`.
+  `main` has no release preflight or pinned history; those exist only in the unmerged #277 and #294. `main`'s replay
+  (`scripts/db-test.mjs`) runs the copy again at its journal time, because `scripts/migration-twins.mjs` skips only the
+  byte-identical pairs it lists. The copy holds the same statements as the file (only comments and the final newline
+  differ). #287's copy, `0032_hotfix_close_write_paths.sql`, is handled the same way. In production, step C recognises
+  the applied text by its drizzle hash.
 - **If the text was changed.** Lovable may strip comments or reformat. If so, the verify step's ledger row reports
   `not recorded`. Do not re-apply. Compare what Lovable ran with the file; the catalog rows still show whether the
   policies are in place.
