@@ -32,10 +32,92 @@ export const PAYMENTS_BLOCKED_MESSAGE =
 export const GUARDIAN_PAYMENT_MESSAGE =
   "A parent or guardian has to approve this game before you can pay. You weren't charged.";
 
+/**
+ * What the player reads for each code public.paypal_payment_precondition returns (supabase/migrations/
+ * 20261111140000_paypal_payment_preconditions.sql). PayPal checkout asks before an order exists and again right before
+ * the capture, so nothing has been charged when one of these is shown.
+ */
+export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
+  SIGN_IN_REQUIRED: "Sign in to pay for this game. You weren't charged.",
+  GAME_NOT_FOUND: "This game isn't available. You weren't charged.",
+  GAME_CANCELLED: "This game was cancelled. You weren't charged.",
+  GAME_COMPLETED: "This game has already ended. You weren't charged.",
+  OWN_GAME: "You host this game, so there's nothing to pay. You weren't charged.",
+  PAYMENT_DESTINATION_INVALID: "This game can't take payments right now. You weren't charged.",
+  PAYMENTS_NOT_AVAILABLE:
+    "Payment coordination isn't available for this account yet. You weren't charged.",
+  GAME_PARTICIPATION_BLOCKED:
+    "A parent or guardian has to allow game participation before you can pay. You weren't charged.",
+  BLOCKED_BY_HOST: "You can't join this host's games. You weren't charged.",
+  ALREADY_PAID: "You've already paid for this game. You weren't charged.",
+  HOST_APPROVAL_REQUIRED:
+    "The host has to approve your request to join before you can pay. You weren't charged.",
+  GUARDIAN_APPROVAL_REQUIRED: GUARDIAN_PAYMENT_MESSAGE,
+  AGE_REQUIREMENT_NOT_MET:
+    "This game has an age requirement, so the host has to approve your request to join first. You weren't charged.",
+  GAME_JOINS_CLOSED: "Joining is closed for this game. You weren't charged.",
+  GAME_FULL: "This game is full. You weren't charged.",
+};
+
+/** The payment check itself failed (or gave an answer the server does not know): checkout refuses. */
+export const PAYMENT_CHECK_FAILED_MESSAGE =
+  "We couldn't check this payment right now. Please try again in a moment. You weren't charged.";
+export const PAYMENT_REFUSED_MESSAGE =
+  "You can't pay for this game right now. You weren't charged.";
+/** paypal_orders.amount_cents above what payment_submissions.paid_amount accepts ($100,000). */
+export const PAYMENT_TOO_LARGE_MESSAGE =
+  "This game's fee is more than checkout can take. You weren't charged.";
+
+/** The message for a precondition code; an unknown code still refuses. */
+export function paymentPreconditionMessage(code: string | null | undefined): string {
+  return (code && PAYMENT_PRECONDITION_MESSAGES[code]) || PAYMENT_REFUSED_MESSAGE;
+}
+
+// ---- capturing an approved PayPal order ---------------------------------------------------------------------------
+/** The order is not one that can be captured (failed, cancelled, or not this player's). */
+export const ORDER_NOT_CAPTURABLE_MESSAGE =
+  "This PayPal checkout can't be completed. Please start again. You weren't charged.";
+/** PayPal's order no longer matches the game's price or payee. */
+export const PAYPAL_MISMATCH_MESSAGE =
+  "This PayPal payment doesn't match the host's current checkout. Please start again. You weren't charged.";
+/** PayPal declined the capture and the order is still uncaptured. */
+export const CAPTURE_DECLINED_MESSAGE =
+  "PayPal couldn't complete the payment. Please try again or use another method. You weren't charged.";
+/** Another request is capturing this order right now. */
+export const CAPTURE_IN_PROGRESS_MESSAGE =
+  "This payment is already being confirmed. Don't pay again: refresh this page in a minute to see it.";
+/** The capture failed and PayPal could not say whether money moved. The order stays flagged for support. */
+export const CAPTURE_UNCONFIRMED_MESSAGE =
+  "We couldn't confirm with PayPal whether this payment went through. Don't pay again: refresh this page in a few minutes, and contact support if it hasn't updated.";
+/** PayPal took the money, it could not be recorded, and it was refunded in full. */
+export const PAYMENT_REFUNDED_MESSAGE =
+  "PayPal took your payment but we couldn't record it, so we refunded it in full. You're not on the roster for this payment. Please try again later or use another method.";
+/** PayPal took the money, it could not be recorded, and the refund failed too. The order is flagged for support. */
+export const PAYMENT_UNRECORDED_MESSAGE =
+  "PayPal took your payment but we couldn't record it, and the automatic refund didn't go through. Don't pay again: we've flagged it, and support will refund or record it.";
+/** An order already captured whose payment record could not be checked just now. */
+export const PAYMENT_RECORD_UNCONFIRMED_MESSAGE =
+  "Your PayPal payment went through, but we couldn't confirm it's recorded yet. Don't pay again: refresh this page in a minute.";
+/** The button's fallback for any other failure: the server may or may not have finished. */
+export const CHECKOUT_UNCONFIRMED_MESSAGE =
+  "We couldn't confirm the PayPal payment. Check this page before paying again.";
+
 /** Messages a payment server function raises for the player to read as they are. */
 export const PAYMENT_POLICY_MESSAGES: readonly string[] = [
   PAYMENTS_BLOCKED_MESSAGE,
   GUARDIAN_PAYMENT_MESSAGE,
+  ...Object.values(PAYMENT_PRECONDITION_MESSAGES),
+  PAYMENT_CHECK_FAILED_MESSAGE,
+  PAYMENT_REFUSED_MESSAGE,
+  PAYMENT_TOO_LARGE_MESSAGE,
+  ORDER_NOT_CAPTURABLE_MESSAGE,
+  PAYPAL_MISMATCH_MESSAGE,
+  CAPTURE_DECLINED_MESSAGE,
+  CAPTURE_IN_PROGRESS_MESSAGE,
+  CAPTURE_UNCONFIRMED_MESSAGE,
+  PAYMENT_REFUNDED_MESSAGE,
+  PAYMENT_UNRECORDED_MESSAGE,
+  PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
 ];
 
 /** The error's message when it is one of PAYMENT_POLICY_MESSAGES, else null. */

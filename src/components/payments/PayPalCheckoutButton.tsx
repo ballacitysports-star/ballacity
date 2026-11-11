@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createGamePayPalOrder, captureGamePayPalOrder } from "@/lib/paypal.functions";
-import { paymentPolicyMessageOf } from "@/lib/payments-policy";
+import { CHECKOUT_UNCONFIRMED_MESSAGE, paymentPolicyMessageOf } from "@/lib/payments-policy";
 
 declare global {
   interface Window {
@@ -66,11 +66,16 @@ export function PayPalCheckoutButton(props: {
             },
             onApprove: async (data: { orderID: string }) => {
               try {
-                await captureGamePayPalOrder({ data: { orderId: data.orderID } });
-                toast.success("Payment confirmed — you're in!");
+                const res = await captureGamePayPalOrder({ data: { orderId: data.orderID } });
+                toast.success(
+                  res.rostered === false
+                    ? "Payment confirmed. The host will confirm your place on the roster."
+                    : "Payment confirmed — you're in!",
+                );
                 props.onPaid();
-              } catch (e: any) {
-                toast.error(e?.message ?? "Could not confirm the payment.");
+              } catch (e) {
+                // Only messages written for the player; never PayPal's own error text.
+                toast.error(paymentPolicyMessageOf(e) ?? CHECKOUT_UNCONFIRMED_MESSAGE);
               }
             },
             onError: (err: unknown) => {

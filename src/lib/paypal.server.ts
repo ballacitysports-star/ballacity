@@ -90,6 +90,8 @@ export type OrderDetails = {
   amountValue: string | null;
   currency: string | null;
   payeeMerchantId: string | null;
+  /** The capture's id once the order has been captured (status COMPLETED), else null. */
+  captureId: string | null;
 };
 
 /** Reads an order without changing it, so it can be checked before capture. */
@@ -104,6 +106,7 @@ export async function getOrder(orderId: string): Promise<OrderDetails> {
     purchase_units?: {
       amount?: { value?: string; currency_code?: string };
       payee?: { merchant_id?: string };
+      payments?: { captures?: { id?: string }[] };
     }[];
   };
   if (!res.ok) throw new Error(json?.message || `PayPal order lookup failed (${res.status}).`);
@@ -113,6 +116,7 @@ export async function getOrder(orderId: string): Promise<OrderDetails> {
     amountValue: unit?.amount?.value ?? null,
     currency: unit?.amount?.currency_code ?? null,
     payeeMerchantId: unit?.payee?.merchant_id ?? null,
+    captureId: unit?.payments?.captures?.[0]?.id ?? null,
   };
 }
 
@@ -126,10 +130,13 @@ export type CaptureResult = {
 
 export async function captureOrder(orderId: string): Promise<CaptureResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
+  const res = await fetch(
+    `${baseUrl()}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    },
+  );
   const json = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) throw new Error(json?.message || `PayPal capture failed (${res.status}).`);
   const unit = json?.purchase_units?.[0];
@@ -141,4 +148,39 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     currency: capture?.amount?.currency_code ?? null,
     payeeMerchantId: unit?.payee?.merchant_id ?? null,
   };
+}
+
+/**
+ * Refunds a capture in full (PayPal Payments v2: POST /v2/payments/captures/{id}/refund, no body = the whole
+ * captured amount). Used when a payment PayPal has taken cannot be recorded. The request id makes a retry for the same
+ * capture return the first refund instead of asking PayPal for a second one. Throws unless PayPal accepted the refund
+ * (COMPLETED, or PENDING while it settles).
+ */
+export async function refundCapture(
+  captureId: string,
+): Promise<{ refundId: string | null; status: string }> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${baseUrl()}/v2/payments/captures/${encodeURIComponent(captureId)}/refund`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "PayPal-Request-Id": `refund-${captureId}`,
+      },
+      body: "{}",
+    },
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    id?: string;
+    status?: string;
+    message?: string;
+  };
+  if (!res.ok) throw new Error(json?.message || `PayPal refund failed (${res.status}).`);
+  const status = String(json?.status ?? "");
+  if (status !== "COMPLETED" && status !== "PENDING") {
+    throw new Error(`PayPal refund not accepted (${status || "no status"}).`);
+  }
+  return { refundId: json.id ?? null, status };
 }

@@ -1,6 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import {
+  CAPTURE_DECLINED_MESSAGE,
+  CAPTURE_IN_PROGRESS_MESSAGE,
+  CAPTURE_UNCONFIRMED_MESSAGE,
+  ORDER_NOT_CAPTURABLE_MESSAGE,
+  PAYMENT_CHECK_FAILED_MESSAGE,
+  PAYMENT_RECORD_UNCONFIRMED_MESSAGE,
+  PAYMENT_REFUNDED_MESSAGE,
+  PAYMENT_TOO_LARGE_MESSAGE,
+  PAYMENT_UNRECORDED_MESSAGE,
+  PAYPAL_MISMATCH_MESSAGE,
+  paymentPreconditionMessage,
+} from "@/lib/payments-policy";
 
 const gameIdSchema = z.object({ gameId: z.string().min(1).max(200) });
 
@@ -47,23 +60,232 @@ async function quoteGamePayPalFee(admin: AdminClient, gameId: string) {
 type PlayerClient = Pick<AdminClient, "rpc">;
 
 /**
- * The guardian rule for paying (enforce_guardian_before_payment), asked as the
- * player through game_payment_guardian_ready. The server records a PayPal
- * payment with the service role, which that trigger lets through because the
- * money has already moved, so this has to run before PayPal is asked to move
- * it. Fails closed: an error or any answer but true refuses.
+ * Every rule the database applies to a PayPal payment and to the roster place it buys, asked as the player through
+ * public.paypal_payment_precondition (20261111140000). The server records the payment and the place with the service
+ * role once PayPal has moved the money, so a rule broken there would take money it then cannot record. This asks
+ * first, before an order exists and again right before the capture. Fails closed: an error, or any answer but NULL,
+ * refuses with a message the player can read (PAYMENT_POLICY_MESSAGES).
  */
-export async function assertGuardianAllowsPayment(player: PlayerClient, gameId: string) {
-  const { data, error } = await player.rpc(
-    "game_payment_guardian_ready" as never,
-    { _game_id: gameId } as never,
-  );
-  if (error)
-    throw new Error("Couldn't check guardian approval. You weren't charged — please try again.");
-  if ((data as unknown) !== true) {
-    const { GUARDIAN_PAYMENT_MESSAGE } = await import("@/lib/payments-policy");
-    throw new Error(GUARDIAN_PAYMENT_MESSAGE);
+export async function assertPaymentPreconditions(player: PlayerClient, gameId: string) {
+  let answer: { data: unknown; error: unknown };
+  try {
+    answer = await player.rpc(
+      "paypal_payment_precondition" as never,
+      { _game_id: gameId } as never,
+    );
+  } catch {
+    throw new Error(PAYMENT_CHECK_FAILED_MESSAGE);
   }
+  if (answer.error) throw new Error(PAYMENT_CHECK_FAILED_MESSAGE);
+  if (answer.data === null) return;
+  throw new Error(paymentPreconditionMessage(typeof answer.data === "string" ? answer.data : null));
+}
+
+/** payment_submissions.paid_amount accepts at most $100,000 (payment_submissions_paid_amount_check). */
+const MAX_AMOUNT_CENTS = 100_000 * 100;
+
+const CAPTURABLE = ["created", "approved"];
+
+/**
+ * Moves an order from one status to another only if it is still in the expected one, so two requests for the same
+ * order cannot overwrite each other (a second capture never turns a captured order into a failed one). True when
+ * exactly this order moved.
+ */
+async function moveOrder(
+  admin: AdminClient,
+  orderId: string,
+  from: string | string[],
+  patch: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const base = admin
+      .from("paypal_orders")
+      .update(patch as never)
+      .eq("order_id", orderId);
+    const scoped = Array.isArray(from) ? base.in("status", from) : base.eq("status", from);
+    const { data, error } = await scoped.select("order_id");
+    return !error && Array.isArray(data) && data.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A payment problem a superadmin has to see: the server log, with a stable tag, and the app's own error reports
+ * (app_error_events, scrubbed of ids). Never throws.
+ */
+async function reportPaymentProblem(tag: string, orderId: string, cause?: unknown) {
+  const detail = cause instanceof Error ? cause.message : cause ? String(cause) : "";
+  console.error(`[paypal] ${tag}`, { orderId, detail });
+  try {
+    const { buildErrorReport } = await import("@/lib/error-report");
+    const { saveErrorReport } = await import("@/lib/error-report.server");
+    await saveErrorReport(
+      buildErrorReport({
+        source: "server",
+        kind: "server_fn",
+        error: new Error(`PAYPAL_${tag.toUpperCase()}${detail ? `: ${detail}` : ""}`),
+        route: "/_serverFn/paypal/capture",
+        signedIn: true,
+      }),
+    );
+  } catch {
+    // reporting never fails the request
+  }
+}
+
+type PayPalServer = typeof import("@/lib/paypal.server");
+type OrderRow = {
+  order_id: string;
+  game_id: string;
+  player_id: string;
+  host_id: string;
+  amount_cents: number;
+  currency: string;
+  status: string;
+  capture_id: string | null;
+};
+
+/**
+ * PayPal has the money and it cannot be recorded: give it back. The order ends as refunded_unrecorded, or, when the
+ * refund fails too, captured_unrecorded, which a superadmin settles by hand. Always throws, and never tells the
+ * player it worked.
+ */
+async function refundUnrecorded(
+  admin: AdminClient,
+  paypal: PayPalServer,
+  orderId: string,
+  captureId: string | null,
+  cause: string,
+  error?: unknown,
+): Promise<never> {
+  await reportPaymentProblem(`captured_unrecorded_${cause}`, orderId, error);
+  let refunded = false;
+  if (captureId) {
+    try {
+      await paypal.refundCapture(captureId);
+      refunded = true;
+    } catch (e) {
+      await reportPaymentProblem("refund_failed", orderId, e);
+    }
+  }
+  const status = refunded ? "refunded_unrecorded" : "captured_unrecorded";
+  const flagged = await moveOrder(admin, orderId, ["capturing", "captured"], {
+    status,
+    capture_id: captureId,
+  });
+  if (!flagged) await reportPaymentProblem(`${status}_status_not_saved`, orderId);
+  throw new Error(refunded ? PAYMENT_REFUNDED_MESSAGE : PAYMENT_UNRECORDED_MESSAGE);
+}
+
+/**
+ * Records a captured payment for an order this request holds in 'capturing': the verified payment submission first,
+ * then the order as captured, then the roster place and the host's notification. If the submission cannot be written
+ * the capture is refunded (refundUnrecorded). Returns whether the player is on the roster.
+ */
+async function recordCapturedPayment(
+  admin: AdminClient,
+  paypal: PayPalServer,
+  order: OrderRow,
+  captureId: string | null,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  // Verified payment submission: the game page's realtime listener and the roster placement below rely on it.
+  let insertError: unknown = null;
+  try {
+    const { error } = await admin.from("payment_submissions").insert({
+      game_id: order.game_id,
+      host_id: order.host_id,
+      player_id: order.player_id,
+      payment_method_id: null,
+      payment_type: "paypal",
+      screenshot_path: null,
+      transaction_reference: captureId ?? order.order_id,
+      paid_amount: order.amount_cents / 100,
+      paid_at: now,
+      notes: "Paid with PayPal checkout",
+      status: "verified",
+      reviewed_at: now,
+    });
+    insertError = error;
+  } catch (e) {
+    insertError = e ?? new Error("insert threw");
+  }
+  if (insertError) {
+    const cause =
+      insertError instanceof Error ? insertError : (insertError as { message?: string }).message;
+    return refundUnrecorded(admin, paypal, order.order_id, captureId, "insert_failed", cause);
+  }
+
+  // The payment is recorded; from here nothing is refunded. A failure is reported for a superadmin to tidy.
+  const marked = await moveOrder(admin, order.order_id, "capturing", {
+    status: "captured",
+    capture_id: captureId,
+    captured_at: now,
+  });
+  if (!marked) await reportPaymentProblem("recorded_order_not_marked", order.order_id);
+
+  let rostered = false;
+  try {
+    const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
+    rostered = (await addPaidPlayerToRoster(order.game_id, order.player_id)).added;
+  } catch (e) {
+    console.error("[paypal] roster placement after payment failed", e);
+  }
+
+  // Notify the host in-app, non-blocking.
+  try {
+    const { error } = await admin.from("notifications").insert({
+      user_id: order.host_id,
+      type: "payment_submitted",
+      title: "PayPal payment received",
+      body: `A player paid $${(order.amount_cents / 100).toFixed(2)} via PayPal checkout.`,
+      link: `/games/${order.game_id}`,
+    });
+    if (error) console.error("[paypal] host notification failed", error.message);
+  } catch (e) {
+    console.error("[paypal] host notification failed", e);
+  }
+  return rostered;
+}
+
+/**
+ * An order already captured. Normally its payment is recorded and this says so. If the record is missing (an order
+ * captured before the record was checked, or one whose record was later removed), it is recorded again, or refunded
+ * when that fails. It never reports success without a record.
+ */
+async function ensureCapturedRecorded(admin: AdminClient, paypal: PayPalServer, order: OrderRow) {
+  const reference = order.capture_id ?? order.order_id;
+  let found: unknown = null;
+  try {
+    const { data, error } = await admin
+      .from("payment_submissions")
+      .select("id")
+      .eq("game_id", order.game_id)
+      .eq("player_id", order.player_id)
+      .eq("transaction_reference", reference)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    found = data;
+  } catch {
+    throw new Error(PAYMENT_RECORD_UNCONFIRMED_MESSAGE);
+  }
+  // Recorded by the request that captured it, which also placed the player on the roster if it could.
+  if (found) return { ok: true as const, already: true as const, rostered: null };
+
+  // Hold the order while the record is written, so two repairs cannot record it twice.
+  if (!(await moveOrder(admin, order.order_id, "captured", { status: "capturing" }))) {
+    throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
+  }
+  await reportPaymentProblem("captured_record_missing_repaired", order.order_id);
+  const rostered: boolean | null = await recordCapturedPayment(
+    admin,
+    paypal,
+    order,
+    order.capture_id,
+  );
+  return { ok: true as const, already: true as const, rostered };
 }
 
 /**
@@ -93,29 +315,17 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => gameIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const { data: allowed } = await (context.supabase.rpc as any)("game_payments_allowed", {
-      _user: context.userId,
-    });
-    if (allowed === false) {
-      const { PAYMENTS_BLOCKED_MESSAGE } = await import("@/lib/payments-policy");
-      throw new Error(PAYMENTS_BLOCKED_MESSAGE);
-    }
-    await assertGuardianAllowsPayment(context.supabase, data.gameId);
+    // Every payment rule, as the player, before PayPal is asked for anything. Also the visibility check: a game the
+    // player cannot see is GAME_NOT_FOUND.
+    await assertPaymentPreconditions(context.supabase, data.gameId);
 
-    // Visibility check as the player; pricing is read with server privileges
-    // so it matches what capture recomputes.
-    const { data: visible } = await context.supabase
-      .from("hosted_games")
-      .select("id")
-      .eq("id", data.gameId)
-      .maybeSingle();
-    if (!visible) throw new Error("Game not found.");
-
+    // Pricing is read with server privileges so it matches what capture recomputes.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const quote = await quoteGamePayPalFee(supabaseAdmin, data.gameId);
     if (!quote) throw new Error("Game not found.");
     if (quote.hostId === context.userId) throw new Error("You host this game.");
     if (quote.amountCents <= 0) throw new Error("This game is free — no payment needed.");
+    if (quote.amountCents > MAX_AMOUNT_CENTS) throw new Error(PAYMENT_TOO_LARGE_MESSAGE);
     if (!quote.merchantId) throw new Error("This host hasn't connected PayPal checkout.");
 
     const { createOrder } = await import("@/lib/paypal.server");
@@ -141,30 +351,34 @@ export const createGamePayPalOrder = createServerFn({ method: "POST" })
   });
 
 /**
- * Captures an approved PayPal order, verifies amount + payee server-side,
- * and records a verified payment submission so the roster flow picks it up.
+ * Captures an approved PayPal order, verifies amount + payee server-side, and records a verified payment submission so
+ * the roster flow picks it up. The order moves created/approved -> capturing -> captured, each step only from the
+ * status it expects. If PayPal takes the money and the payment cannot be recorded, the capture is refunded.
  */
 export const captureGamePayPalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ orderId: z.string().min(3).max(64) }).parse(i))
   .handler(async ({ data, context }) => {
-    const { data: order } = await context.supabase
+    const { data: row, error: readError } = await context.supabase
       .from("paypal_orders")
       .select("*")
       .eq("order_id", data.orderId)
       .maybeSingle();
+    if (readError) throw new Error(PAYMENT_CHECK_FAILED_MESSAGE);
+    const order = row as OrderRow | null;
     if (!order || order.player_id !== context.userId) throw new Error("Order not found.");
-    if (order.status === "captured") return { ok: true as const, already: true as const };
 
-    // Again right before the money moves: a guardian may have declined, been
-    // removed or been suspended since the order was created.
-    await assertGuardianAllowsPayment(context.supabase, order.game_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const paypal = await import("@/lib/paypal.server");
+
+    if (order.status === "captured") return ensureCapturedRecorded(supabaseAdmin, paypal, order);
+    if (order.status === "capturing") throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
+    if (order.status === "refunded_unrecorded") throw new Error(PAYMENT_REFUNDED_MESSAGE);
+    if (order.status === "captured_unrecorded") throw new Error(PAYMENT_UNRECORDED_MESSAGE);
+    if (!CAPTURABLE.includes(order.status)) throw new Error(ORDER_NOT_CAPTURABLE_MESSAGE);
 
     // Re-price from the game rather than trusting the stored order row.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const quote = await quoteGamePayPalFee(supabaseAdmin, order.game_id);
-
-    const { captureOrder, getOrder, paypalPaymentMatches } = await import("@/lib/paypal.server");
     const expected = {
       amountCents: order.amount_cents,
       currency: "USD",
@@ -176,72 +390,74 @@ export const captureGamePayPalOrder = createServerFn({ method: "POST" })
       quote.amountCents === order.amount_cents &&
       order.currency === "USD";
 
-    // Check the approved order before capturing: once captured the money has
-    // moved, so a payee or amount mismatch must stop it here.
-    const pending = await getOrder(data.orderId);
-    if (!orderMatchesGame || !paypalPaymentMatches(pending, { ...expected, status: "APPROVED" })) {
-      await supabaseAdmin
-        .from("paypal_orders")
-        .update({ status: "failed" })
-        .eq("order_id", data.orderId);
-      throw new Error(
-        "This PayPal payment doesn't match the host's current checkout. You weren't charged — please start again.",
-      );
+    // Check the approved order before capturing: once captured the money has moved, so a payee or amount mismatch
+    // must stop it here.
+    const pending = await paypal.getOrder(data.orderId);
+    if (
+      !orderMatchesGame ||
+      !paypal.paypalPaymentMatches(pending, { ...expected, status: "APPROVED" })
+    ) {
+      await moveOrder(supabaseAdmin, data.orderId, CAPTURABLE, { status: "failed" });
+      throw new Error(PAYPAL_MISMATCH_MESSAGE);
     }
 
-    const result = await captureOrder(data.orderId);
+    // Every payment rule again, as the player, right before the money moves: an approval may have been withdrawn, the
+    // game cancelled or filled, or the player paid another way, since the order was created.
+    await assertPaymentPreconditions(context.supabase, order.game_id);
 
-    if (!paypalPaymentMatches(result, { ...expected, status: "COMPLETED" })) {
-      await supabaseAdmin
-        .from("paypal_orders")
-        .update({ status: "failed" })
-        .eq("order_id", data.orderId);
-      throw new Error("PayPal payment could not be verified. No charge was recorded by us.");
+    // One capture at a time: whoever moves the order to 'capturing' captures it.
+    if (!(await moveOrder(supabaseAdmin, data.orderId, CAPTURABLE, { status: "capturing" }))) {
+      throw new Error(CAPTURE_IN_PROGRESS_MESSAGE);
     }
 
-    await supabaseAdmin
-      .from("paypal_orders")
-      .update({
-        status: "captured",
+    let result: Awaited<ReturnType<PayPalServer["captureOrder"]>>;
+    try {
+      result = await paypal.captureOrder(data.orderId);
+    } catch (captureError) {
+      // Did the money move anyway (a timeout after PayPal captured)? Ask PayPal what the order is now.
+      const after = await paypal.getOrder(data.orderId).catch(() => null);
+      if (after && after.status !== "COMPLETED") {
+        await moveOrder(supabaseAdmin, data.orderId, "capturing", { status: order.status });
+        throw new Error(CAPTURE_DECLINED_MESSAGE);
+      }
+      if (!after || !after.captureId) {
+        // Unknown: the order stays 'capturing' for a superadmin, and the player is not told it worked.
+        await reportPaymentProblem("capture_unconfirmed", data.orderId, captureError);
+        throw new Error(CAPTURE_UNCONFIRMED_MESSAGE);
+      }
+      result = { ...after, captureId: after.captureId };
+    }
+
+    if (!paypal.paypalPaymentMatches(result, { ...expected, status: "COMPLETED" })) {
+      if (result.captureId || result.status === "COMPLETED") {
+        // PayPal took money that does not match what was checked: give it back.
+        return refundUnrecorded(
+          supabaseAdmin,
+          paypal,
+          data.orderId,
+          result.captureId,
+          "capture_mismatch",
+        );
+      }
+      await moveOrder(supabaseAdmin, data.orderId, "capturing", { status: "failed" });
+      throw new Error(CAPTURE_DECLINED_MESSAGE);
+    }
+
+    // Keep the capture id on the order before anything else, so a crash from here on leaves it findable.
+    if (
+      !(await moveOrder(supabaseAdmin, data.orderId, "capturing", {
         capture_id: result.captureId,
         captured_at: new Date().toISOString(),
-      })
-      .eq("order_id", data.orderId);
-
-    // Verified payment submission — the game page's realtime listener adds
-    // the player to the roster, same as a host-verified proof.
-    await supabaseAdmin.from("payment_submissions").insert({
-      game_id: order.game_id,
-      host_id: order.host_id,
-      player_id: order.player_id,
-      payment_method_id: null,
-      payment_type: "paypal",
-      screenshot_path: null,
-      transaction_reference: result.captureId ?? data.orderId,
-      paid_amount: order.amount_cents / 100,
-      paid_at: new Date().toISOString(),
-      notes: "Paid with PayPal checkout",
-      status: "verified",
-      reviewed_at: new Date().toISOString(),
-    });
-
-    {
-      const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-      await addPaidPlayerToRoster(order.game_id, order.player_id).catch(() => {});
+      }))
+    ) {
+      await reportPaymentProblem("capture_id_not_saved", data.orderId);
     }
 
-    // Notify the host in-app, non-blocking.
-    try {
-      await supabaseAdmin.from("notifications").insert({
-        user_id: order.host_id,
-        type: "payment_submitted",
-        title: "PayPal payment received",
-        body: `A player paid $${(order.amount_cents / 100).toFixed(2)} via PayPal checkout.`,
-        link: `/games/${order.game_id}`,
-      });
-    } catch (e) {
-      console.error("[paypal] host notification failed", e);
-    }
-
-    return { ok: true as const, already: false as const };
+    const rostered: boolean | null = await recordCapturedPayment(
+      supabaseAdmin,
+      paypal,
+      order,
+      result.captureId,
+    );
+    return { ok: true as const, already: false as const, rostered };
   });
