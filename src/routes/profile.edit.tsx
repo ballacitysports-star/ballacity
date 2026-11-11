@@ -45,6 +45,7 @@ import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
 import { useMyBirthdayLock } from "@/lib/birthday-lock";
 import { LoadingState } from "@/components/ui/loading-state";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () =>
@@ -59,6 +60,7 @@ export const Route = createFileRoute("/profile/edit")({
 
 function EditProfile() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const queryClient = useQueryClient();
   const myOrgs = useMyOrgs();
 
@@ -312,6 +314,7 @@ function EditProfile() {
         <p className="mt-2 page-subtitle">Profile changes are saved to your account.</p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
         >
           Sign in

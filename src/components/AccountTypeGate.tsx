@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 /**
  * Wraps a linked-profile creation flow (team, trainer, gym). Accounts can now
@@ -16,6 +17,7 @@ export function AccountTypeGate({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   if (loading) return null;
   if (user) return <>{children}</>;
 
@@ -31,6 +33,7 @@ export function AccountTypeGate({
         <div className="mt-4 flex gap-2">
           <Link
             to="/auth"
+            search={authSearch}
             className="rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
           >
             Sign in

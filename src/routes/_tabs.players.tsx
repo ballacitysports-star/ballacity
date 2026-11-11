@@ -78,6 +78,7 @@ import {
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import {
   Dialog,
   DialogContent,
@@ -225,6 +226,7 @@ function migrateLegacyPlayersFilters() {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { isParentMode } = useParentMode();
   const profile = useMyProfile(user);
   const hostedGames = useHostedGames();
@@ -779,6 +781,7 @@ function PlayersPage() {
                 ) : (
                   <Link
                     to="/auth"
+                    search={authSearch}
                     className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
                   >
                     Sign in
