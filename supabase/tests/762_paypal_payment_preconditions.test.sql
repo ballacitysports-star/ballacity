@@ -238,7 +238,9 @@ SELECT t.reset();
 -- purpose, change paypal_payment_block to match and then add the new hash here. Two have a second known definition,
 -- from 20261111120000 (minor-safety gates, #405), which may be applied before or after this migration: it refuses a
 -- player or payee with no date of birth, which paypal_payment_block already answers (AGE_VERIFICATION_REQUIRED,
--- PAYMENT_DESTINATION_INVALID).
+-- PAYMENT_DESTINATION_INVALID). enforce_child_game_participation has a third, from 20261111160000 (guarded minors on
+-- open games, #71): a minor with a guardian needs a valid guardian approval for a place in any game, which for a paid
+-- game paypal_payment_block already asks (GUARDIAN_APPROVAL_REQUIRED, through game_payment_guardian_ready).
 SELECT t.ok(md5(pg_get_functiondef(p.oid)) = ANY (w.hashes), 'unchanged: ' || w.fn)
   FROM (VALUES ('enforce_approval_before_payment',  ARRAY['3ffff8c3b95ae10ce43cdc4197cc886a']),
                ('enforce_game_payment_cohort',      ARRAY['aadeafedb16085a27b6e67f46fc4abfa', '1dc979d906a05301645d9a67f42262c5']),
@@ -247,7 +249,8 @@ SELECT t.ok(md5(pg_get_functiondef(p.oid)) = ANY (w.hashes), 'unchanged: ' || w.
                ('payment_submissions_state_guard',  ARRAY['16e42f30df68ac4be5298e1370883c72']),
                ('enforce_game_join_gate',           ARRAY['9d4924a2d53915fca8fa245e15281a25']),
                ('enforce_game_age_requirement',     ARRAY['a978b62c4004040d8388fe5a87803788']),
-               ('enforce_child_game_participation', ARRAY['81eec75a132cc28db4fc4926980e283b', '918954dc17f017a0133454fddecea1c4']),
+               ('enforce_child_game_participation', ARRAY['81eec75a132cc28db4fc4926980e283b', '918954dc17f017a0133454fddecea1c4',
+                                                    '98f6998a6034f5b0263b0793648d8ef7']),
                ('enforce_host_block',               ARRAY['6b1d17279ccbb3238ceecd2bde49ba2d'])) AS w(fn, hashes)
   JOIN pg_proc p ON p.proname = w.fn AND p.pronamespace = 'public'::regnamespace
  ORDER BY w.fn;
