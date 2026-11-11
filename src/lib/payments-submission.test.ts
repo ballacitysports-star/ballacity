@@ -15,6 +15,8 @@ import { createPaymentSubmission } from "./payments";
 import {
   PAYMENTS_AGE_REQUIRED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
+  PAYMENTS_HOST_AGE_REQUIRED_MESSAGE,
+  PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE,
   paymentSubmissionErrorMessage,
 } from "./payments-policy";
 
@@ -41,6 +43,22 @@ describe("paymentSubmissionErrorMessage (20261111120000)", () => {
     );
     expect(msg).toBe(PAYMENTS_AGE_REQUIRED_MESSAGE);
     expect(msg).not.toMatch(/AGE_VERIFICATION_REQUIRED/);
+  });
+
+  it("tells a host what to do when a player or the host has no date of birth", () => {
+    const player = paymentSubmissionErrorMessage(
+      "AGE_VERIFICATION_REQUIRED: this player must add their date of birth before paying for a game.",
+    );
+    expect(player).toBe(PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE);
+    expect(player).toMatch(/turn the claim down/);
+    expect(
+      paymentSubmissionErrorMessage(
+        "AGE_VERIFICATION_REQUIRED: add your date of birth before taking payments.",
+      ),
+    ).toBe(PAYMENTS_HOST_AGE_REQUIRED_MESSAGE);
+    for (const m of [player, PAYMENTS_HOST_AGE_REQUIRED_MESSAGE]) {
+      expect(m).not.toMatch(/AGE_VERIFICATION_REQUIRED/);
+    }
   });
 
   it("explains the cohort refusal without the code", () => {

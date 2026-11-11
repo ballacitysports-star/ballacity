@@ -405,6 +405,10 @@ VALUES (t.id('old-claim'), 'paidrun', t.id('nobday'), t.id('host'), 10, now()),
        (t.id('old-claim2'), 'paidrun2', t.id('nobday'), t.id('host'), 10, now()),
        (t.id('old-claim3'), 'nbpaid', t.id('adult'), t.id('nbhost'), 10, now());
 SET LOCAL session_replication_role = origin;
+-- The host-level read for a host of unknown age, from a player whose claim makes them "involved".
+SELECT t.as_user(t.id('adult'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.get_host_payment_methods(%L)', t.id('nbhost'))), 0,
+  'a player with a claim against a host of unknown age gets none of their handles from the host-level read');
 SELECT t.as_user(t.id('host'));
 SELECT t.throws(format($q$UPDATE public.payment_submissions SET status = 'verified', reviewed_at = now() WHERE id = %L$q$, t.id('old-claim')),
   'AGE_VERIFICATION_REQUIRED', 'the host cannot confirm an earlier claim by an account with no birthday');
