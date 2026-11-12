@@ -43,6 +43,16 @@ async function mockEmptyLists(page: Page) {
   await page.route((url) => tableUrl(url, "host_payment_methods"), empty);
   await page.route((url) => tableUrl(url, "payment_methods"), empty);
   await page.route((url) => tableUrl(url, "game_participants"), empty);
+  // The pay screen reads the host's methods through this RPC, not the table above.
+  // Unanswered, it went to the sandbox, and an answer slower than the screen's 6s
+  // deadline showed Retry instead of the ready screen.
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 }
 
 async function mockPaidSettingsOk(page: Page) {
