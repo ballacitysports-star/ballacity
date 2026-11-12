@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import { BackButton } from "@/components/layout/BackButton";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
@@ -309,6 +310,7 @@ function GameDetail() {
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { isParentMode } = useParentMode();
   const myProfile = useMyProfile(user);
   const { can: canChildFeature } = useMyChildStatus();
@@ -2616,7 +2618,7 @@ function GameDetail() {
               aria-label="Message the host"
               onClick={async () => {
                 if (!user) {
-                  nav({ to: "/auth" });
+                  nav({ to: "/auth", search: authSearch });
                   return;
                 }
                 if (!messagingDecision.allowed) {

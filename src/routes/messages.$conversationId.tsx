@@ -54,6 +54,7 @@ import { MessageAttachment } from "@/components/MessageAttachment";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () =>
@@ -81,6 +82,7 @@ function Thread() {
   const { draft } = Route.useSearch();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { can: canChildFeature } = useMyChildStatus();
   const messagingDecision = canChildFeature("direct_messaging");
   const [msgs, setMsgs] = useState<Message[]>([]);
@@ -340,7 +342,7 @@ function Thread() {
   if (!loading && !user) {
     return (
       <div className="page-shell-narrow pt-10 text-center text-sm">
-        <Link to="/auth" className="text-lime font-bold">
+        <Link to="/auth" search={authSearch} className="text-lime font-bold">
           Sign in to view this chat
         </Link>
       </div>

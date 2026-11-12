@@ -43,6 +43,7 @@ import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChil
 import { FollowRequestsPanel } from "@/components/follow/FollowRequestsPanel";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -603,6 +604,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
 
 function ParentCenterPage() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   // Same device-level sign-out as Settings (see signOut() in @/hooks/use-auth).
   const handleSignOut = async () => {
     try {
@@ -628,6 +630,7 @@ function ParentCenterPage() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-4 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
         >
           Sign in

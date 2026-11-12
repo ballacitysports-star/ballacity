@@ -55,6 +55,7 @@ import {
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;
@@ -67,6 +68,7 @@ const iconFor = (type: string) => {
 
 export function NotificationsPanel() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [items, setItems] = useState<Notification[]>([]);
   const [fetching, setFetching] = useState(true);
   const nav = useNavigate();
@@ -181,6 +183,7 @@ export function NotificationsPanel() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in

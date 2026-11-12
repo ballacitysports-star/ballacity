@@ -9,7 +9,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
 import { classifyOAuthFailure } from "@/lib/oauth-outcome";
-import { sanitizeNextPath } from "@/routes/__root";
+import { sanitizeNextPath } from "@/lib/safe-next-path";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
 import { RolePicker } from "@/components/RolePicker";

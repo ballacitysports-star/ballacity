@@ -50,6 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 export type BookPrefill = {
   date?: string;
@@ -91,6 +92,7 @@ export function BookSessionSheet({
 }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const sessionTypes = useMemo(
     () => org.sessionTypes ?? ["1:1 Coaching", "Group Session", "Assessment"],
     [org.sessionTypes],
@@ -257,7 +259,7 @@ export function BookSessionSheet({
   const submit = async () => {
     if (!user) {
       toast("Sign in to request a session");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearch });
       return;
     }
     if (startTime && !date) {
