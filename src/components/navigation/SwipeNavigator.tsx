@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { useLocation, useRouter } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import { useSwipeNavigation } from "@/hooks/use-swipe-navigation";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,8 +24,12 @@ import { trackTabSelect } from "@/lib/nav-analytics";
 /** Past the threshold the page moves 1:1; a dead end drags at this fraction. */
 const RESISTANCE = 0.28;
 
-/** Spring used to settle back, or to carry the page out on a commit. */
-const SETTLE = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.7 };
+/**
+ * Settle back after release. A CSS transition rather than a framer-motion spring keeps the
+ * animation engine out of the app shell's first download (P3-4); the curve overshoots slightly,
+ * close to the spring this replaced (stiffness 520, damping 42, mass 0.7).
+ */
+const SETTLE = "transform 320ms cubic-bezier(0.22, 1.12, 0.36, 1)";
 
 export function SwipeNavigator({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -78,6 +81,8 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
   const offset = state.active ? (state.intent === "none" ? state.dx * RESISTANCE : state.dx) : 0;
 
   const onTab = isTabPath(pathname, tabs);
+  // With reduced motion nothing follows the finger; the swipe still navigates on release.
+  const x = reducedMotion ? 0 : offset;
 
   return (
     <div
@@ -90,31 +95,30 @@ export function SwipeNavigator({ children }: { children: React.ReactNode }) {
       {/* Edge scrim: darkens the outgoing page as a back gesture progresses,
           matching the depth cue a native push/pop transition gives. */}
       {!onTab && state.active && state.intent === "back" && !reducedMotion && (
-        <motion.div
+        <div
           aria-hidden
           className="pointer-events-none fixed inset-0 z-30 bg-black"
-          initial={{ opacity: 0 }}
-          animate={{
+          style={{
             opacity: Math.max(0, 0.28 - (offset / Math.max(1, window.innerWidth)) * 0.28),
           }}
-          transition={{ duration: 0 }}
         />
       )}
 
-      <motion.div
-        animate={{ x: reducedMotion ? 0 : offset }}
-        transition={state.active ? { duration: 0 } : SETTLE}
+      <div
         style={{
-          // Only promote to its own layer while a gesture is live; a permanent
-          // transform would create a containing block and break `fixed`
-          // descendants such as the bottom bar and any open sheet.
+          // At rest there is no transform at all: a permanent transform would create a
+          // containing block and break `fixed` descendants such as the bottom bar and any
+          // open sheet. While a gesture is live the page follows the finger with no transition;
+          // on release it settles back to rest.
+          transform: x !== 0 ? `translate3d(${x}px, 0, 0)` : undefined,
+          transition: state.active ? "none" : SETTLE,
           willChange: state.active ? "transform" : undefined,
           boxShadow:
             state.active && state.intent === "back" ? "-12px 0 32px rgba(0,0,0,0.35)" : undefined,
         }}
       >
         {children}
-      </motion.div>
+      </div>
     </div>
   );
 }
