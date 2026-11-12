@@ -12,6 +12,7 @@ import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/lib/safe-next-path";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
+import { validateCredentials } from "@/lib/auth-credentials";
 import { RolePicker } from "@/components/RolePicker";
 import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
 import {
@@ -96,6 +97,7 @@ function AuthPage() {
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
   // Never pre-checked: the user must tick each document themselves.
   const [consent, setConsent] = useState(emptyConsentValue);
   const consentOk = allAccepted(consent);
@@ -104,9 +106,11 @@ function AuthPage() {
   const [errors, setErrors] = useState<{
     type: string | null;
     dob: string | null;
+    email: string | null;
+    password: string | null;
     consent: string | null;
     form: string | null;
-  }>({ type: null, dob: null, consent: null, form: null });
+  }>({ type: null, dob: null, email: null, password: null, consent: null, form: null });
   const dobRef = useRef<HTMLSelectElement | null>(null);
   const summaryRef = useRef<HTMLDivElement | null>(null);
 
@@ -246,9 +250,21 @@ function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    setErrors({ type: null, dob: null, consent: null, form: null });
+    setErrors({ type: null, dob: null, email: null, password: null, consent: null, form: null });
     setUnconfirmed(false);
     setNotice(null);
+    // The form is noValidate so messages can be inline and announced, which
+    // means nothing else stops an empty or malformed submit from becoming a
+    // real auth request with blank credentials. Check here, in reading order,
+    // and put focus on the field to fix.
+    const rejectCredentials = (): boolean => {
+      const check = validateCredentials({ email, password });
+      if (check.ok) return false;
+      setErrors((p) => ({ ...p, [check.field]: check.message }));
+      (check.field === "email" ? emailRef : passwordRef).current?.focus();
+      return true;
+    };
+    if (mode === "signin" && rejectCredentials()) return;
     setBusy(true);
     try {
       if (mode === "signup") {
@@ -278,6 +294,7 @@ function AuthPage() {
           dobRef.current?.focus();
           return;
         }
+        if (rejectCredentials()) return;
         if (!consentOk) {
           const message = "Please agree to the Terms of Service and Privacy Policy to continue.";
           setErrors((p) => ({ ...p, consent: message }));
@@ -392,7 +409,7 @@ function AuthPage() {
 
   const switchMode = (nextMode: "signin" | "signup") => {
     setMode(nextMode);
-    setErrors({ type: null, dob: null, consent: null, form: null });
+    setErrors({ type: null, dob: null, email: null, password: null, consent: null, form: null });
     setUnconfirmed(false);
     setNotice(null);
     if (nextMode === "signup") setSignupStep("type");
@@ -907,8 +924,19 @@ function AuthPage() {
                   placeholder="Email"
                   required
                   autoComplete="email"
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? "auth-email-error" : undefined}
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
+                {errors.email ? (
+                  <p
+                    id="auth-email-error"
+                    role="alert"
+                    className="mt-1 text-xs font-semibold text-destructive"
+                  >
+                    {errors.email}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label
@@ -920,6 +948,7 @@ function AuthPage() {
                 <div className="relative">
                   <input
                     id="auth-password"
+                    ref={passwordRef}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -927,7 +956,15 @@ function AuthPage() {
                     required
                     minLength={6}
                     autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                    aria-describedby={mode === "signup" ? "password-hint" : undefined}
+                    aria-invalid={errors.password ? true : undefined}
+                    aria-describedby={
+                      [
+                        errors.password ? "auth-password-error" : null,
+                        mode === "signup" ? "password-hint" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined
+                    }
                     className="w-full rounded-2xl border border-border bg-surface py-3 pl-4 pr-12 text-sm outline-none focus:border-lime"
                   />
                   <button
@@ -944,6 +981,15 @@ function AuthPage() {
                     )}
                   </button>
                 </div>
+                {errors.password ? (
+                  <p
+                    id="auth-password-error"
+                    role="alert"
+                    className="mt-1 text-xs font-semibold text-destructive"
+                  >
+                    {errors.password}
+                  </p>
+                ) : null}
                 {mode === "signup" ? (
                   <p id="password-hint" className="mt-1 text-[11px] text-muted-foreground">
                     At least 6 characters.
