@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   SCRATCH_MARKER,
   existingDatabaseProblems,
@@ -9,6 +11,9 @@ import {
   serverProblems,
   targetProblems,
 } from "./db-test-target.mjs";
+
+// A made-up project ref in Supabase's shape. Nothing here ever connects: the scripts run below get a fake psql.
+const FAKE_REF = "zzzzfakeprojectrefzz";
 
 const ok = (env, db = "ballacity_dbtest") => expect(targetProblems(env, db)).toEqual([]);
 const refused = (env, db = "ballacity_dbtest") =>
@@ -25,7 +30,7 @@ describe("db-test target: environment", () => {
 
   it("refuses remote hosts, including production and pooler hosts", () => {
     for (const h of [
-      "db.cpqihhcqeivbgxqbzatv.supabase.co",
+      `db.${FAKE_REF}.supabase.co`,
       "aws-0-eu-west-1.pooler.supabase.com",
       "10.0.0.5",
       "192.168.1.10",
@@ -44,6 +49,33 @@ describe("db-test target: environment", () => {
     refused({ PGSERVICE: "prod" });
     refused({ PGSERVICEFILE: "/home/me/.pg_service.conf" });
     refused({ PGDATABASE: "host=db.example.com dbname=postgres" });
+  });
+
+  it("refuses an environment wired to a remote database even when PGHOST is local (Lovable's agent workspace)", () => {
+    const remoteUrls = [
+      `postgresql://postgres:secret@db.${FAKE_REF}.supabase.co:5432/postgres`,
+      `postgres://postgres.${FAKE_REF}:secret@aws-0-eu-west-1.pooler.supabase.com:6543/postgres`,
+      "postgresql://localhost,db.example.com/app",
+      "postgresql://localhost/app?host=db.example.com",
+      "postgresql://localhost/app?hostaddr=203.0.113.9",
+      "not a url",
+    ];
+    for (const k of ["DATABASE_URL", "SUPABASE_DB_URL", "POSTGRES_URL"])
+      for (const v of remoteUrls) {
+        refused({ [k]: v });
+        refused({ PGHOST: "127.0.0.1", PGPORT: "54329", [k]: v });
+      }
+    refused({ PGUSER: `postgres.${FAKE_REF}` });
+    refused({ PGHOST: "localhost", PGUSER: `supabase_admin.${FAKE_REF}` });
+    refused({ PGHOST: `db.${FAKE_REF}.supabase.co`, PGUSER: "postgres", PGPASSWORD: "x" });
+  });
+
+  it("accepts a local DATABASE_URL and ordinary local user names", () => {
+    ok({ DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/app" });
+    ok({ DATABASE_URL: "postgres://u@127.0.0.1:54329/app" });
+    ok({ DATABASE_URL: "postgresql:///app?host=/var/run/postgresql" });
+    ok({ DATABASE_URL: "" });
+    for (const u of ["postgres", "runner", "dev.user"]) ok({ PGHOST: "localhost", PGUSER: u });
   });
 
   it("refuses database names that are connection strings, URIs or reserved", () => {
@@ -153,27 +185,74 @@ describe("db-test target: existing databases", () => {
 
 describe("db-test refuses before connecting", () => {
   const script = join(dirname(fileURLToPath(import.meta.url)), "db-test.mjs");
-  const run = (env, args = []) =>
-    spawnSync(process.execPath, [script, ...args], {
+  // A fake psql first on the PATH: it records each call and fails, so no run here reaches any server, and a refusal
+  // can be shown to have sent nothing at all (no SHOW, DROP or CREATE).
+  const shimDir = mkdtempSync(join(tmpdir(), "db-test-guard-"));
+  const callLog = join(shimDir, "psql-calls.log");
+  writeFileSync(join(shimDir, "psql"), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${callLog}"\nexit 1\n`);
+  chmodSync(join(shimDir, "psql"), 0o755);
+  afterAll(() => rmSync(shimDir, { recursive: true, force: true }));
+
+  const run = (env, args = []) => {
+    rmSync(callLog, { force: true });
+    return spawnSync(process.execPath, [script, ...args], {
       encoding: "utf8",
-      env: { PATH: process.env.PATH, ...env },
+      env: { PATH: `${shimDir}:${process.env.PATH}`, ...env },
       timeout: 20_000,
     });
+  };
+  const psqlCalls = () => (existsSync(callLog) ? readFileSync(callLog, "utf8") : "");
 
   it("exits 2 for a remote host without running psql", () => {
-    const r = run({ PGHOST: "db.cpqihhcqeivbgxqbzatv.supabase.co" });
+    const r = run({ PGHOST: `db.${FAKE_REF}.supabase.co`, PGUSER: "postgres", PGPASSWORD: "x" });
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/db-test refused/);
-    expect(r.stderr).not.toMatch(/cpqihhcqeivbgxqbzatv/); // reasons never echo the value
+    expect(r.stderr).not.toMatch(new RegExp(FAKE_REF)); // reasons never echo the value
+    expect(psqlCalls()).toBe("");
+  });
+
+  it("exits 2 for a pooler host with any flags (--replay-only, --keep, --reuse, --db) without running psql", () => {
+    for (const args of [[], ["--replay-only", "--keep"], ["--reuse"], ["--db", "dev_scratch"]]) {
+      const r = run({ PGHOST: "aws-0-eu-west-1.pooler.supabase.com", PGPORT: "6543" }, args);
+      expect(r.status).toBe(2);
+      expect(psqlCalls()).toBe("");
+    }
+  });
+
+  it("exits 2 for a remote DATABASE_URL or a pooler PGUSER next to a local PGHOST, without running psql", () => {
+    for (const env of [
+      {
+        PGHOST: "127.0.0.1",
+        DATABASE_URL: `postgresql://postgres:x@db.${FAKE_REF}.supabase.co/postgres`,
+      },
+      { PGHOST: "127.0.0.1", PGUSER: `postgres.${FAKE_REF}` },
+    ]) {
+      const r = run(env);
+      expect(r.status).toBe(2);
+      expect(r.stderr).not.toMatch(new RegExp(FAKE_REF));
+      expect(psqlCalls()).toBe("");
+    }
   });
 
   it("exits 2 for a connection string passed as --db", () => {
     const r = run({}, ["--db", "host=db.example.com dbname=postgres"]);
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/plain lower-case identifier/);
+    expect(psqlCalls()).toBe("");
   });
 
   it("exits 2 for a service file", () => {
     expect(run({ PGSERVICE: "prod" }).status).toBe(2);
+    expect(psqlCalls()).toBe("");
+  });
+
+  it("control: a local target gets past the guard, and its first query is the read-only identity probe", () => {
+    const r = run({ PGHOST: "127.0.0.1", PGUSER: "postgres" }, ["--db", "dev_scratch"]);
+    expect(r.status).toBe(1); // the fake psql fails, so the run stops at "Cannot connect"
+    expect(r.stderr).toMatch(/Cannot connect to Postgres/);
+    const calls = psqlCalls().trim().split("\n");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/-d postgres .*SELECT coalesce\(host\(inet_server_addr\(\)\)/);
+    expect(calls[0]).not.toMatch(/SHOW|DROP|CREATE/);
   });
 });

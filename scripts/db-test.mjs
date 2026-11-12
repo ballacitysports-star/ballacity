@@ -100,12 +100,8 @@ function migrationOrder() {
 }
 
 // -- scratch database -------------------------------------------------------
-let r = psql("postgres", ["-At", "-c", "SHOW server_version_num"]);
-if (r.status !== 0)
-  fail("Cannot connect to Postgres with psql (check PGHOST/PGUSER/PGPASSWORD).", r.stderr);
-const serverVersion = Number(r.stdout.trim());
-
 // What the server says about itself: local, or a disposable container behind a loopback port; never Supabase-managed.
+// These read-only catalog queries are all a server that is then refused ever receives.
 {
   const probe = psql("postgres", [
     "-At",
@@ -114,7 +110,8 @@ const serverVersion = Number(r.stdout.trim());
     "-c",
     "SELECT coalesce(host(inet_server_addr()), ''), coalesce((SELECT string_agg(rolname, ',') FROM pg_roles WHERE rolname IN ('supabase_admin', 'authenticator')), ''), (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%')",
   ]);
-  if (probe.status !== 0) fail("Could not identify the server.", probe.stderr);
+  if (probe.status !== 0)
+    fail("Cannot connect to Postgres with psql (check PGHOST/PGUSER/PGPASSWORD).", probe.stderr);
   const [serverAddr, roles, postgresUserTables] = probe.stdout.trim().split("|");
   const dbList = psql("postgres", [
     "-At",
@@ -160,6 +157,9 @@ if (existing.status !== 0) fail("Could not look up the scratch database.", exist
     process.exit(2);
   }
 }
+let r = psql("postgres", ["-At", "-c", "SHOW server_version_num"]);
+if (r.status !== 0) fail("Could not read the server version.", r.stderr);
+const serverVersion = Number(r.stdout.trim());
 // Supabase runs Postgres 17, which has a MAINTAIN table privilege that 16 lacks.
 const stripMaintain = serverVersion < 170000;
 

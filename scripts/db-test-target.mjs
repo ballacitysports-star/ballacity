@@ -7,6 +7,9 @@
 //   - PGHOST: unset (the default local socket), an absolute socket directory, or a loopback name/address. Several
 //     hosts (a comma list) are refused: libpq would try each in turn.
 //   - PGHOSTADDR: unset or loopback. PGSERVICE / PGSERVICEFILE: refused (a service can point anywhere).
+//   - DATABASE_URL, SUPABASE_DB_URL, POSTGRES_URL: psql never reads them, but one that names a remote server marks an
+//     environment wired to a real database (Lovable's agent workspace ran this script with production's PG* set), so
+//     it is refused too; likewise a PGUSER in Supabase's pooler form (role.project_ref).
 //   - The database name: a plain identifier (never a conninfo string or a URI, which psql -d would honour), not a
 //     reserved database, at most 63 characters.
 // After connecting, the server must not report a public address (a tunnel elsewhere) and must not be a Supabase-managed
@@ -20,6 +23,9 @@ export const SCRATCH_MARKER = "ballacity db-test scratch database (safe to drop)
 const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const RESERVED_DATABASES = new Set(["postgres", "template0", "template1"]);
 const DB_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
+const DATABASE_URL_VARS = ["DATABASE_URL", "SUPABASE_DB_URL", "POSTGRES_URL"];
+// Supabase's pooler logs in as <role>.<project ref>; a project ref is 20 lower-case letters.
+const POOLER_USER = /^[a-z_][a-z0-9_]*\.[a-z]{20}$/;
 
 function isLoopbackAddress(a) {
   const v = String(a)
@@ -29,6 +35,28 @@ function isLoopbackAddress(a) {
   if (v === "::1" || v === "0:0:0:0:0:0:0:1") return true;
   const m = /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v);
   return !!m && Number(m[1]) === 127 && [m[2], m[3], m[4]].every((x) => Number(x) <= 255);
+}
+
+/** A socket directory or a loopback name/address. */
+function isLocalHost(h) {
+  return h.startsWith("/") || LOOPBACK_NAMES.has(h.toLowerCase()) || isLoopbackAddress(h);
+}
+
+/** Every host a connection URL names (its authority, host= and hostaddr=); null when it does not parse. */
+function urlHosts(value) {
+  try {
+    const url = new URL(value.trim());
+    return [
+      url.hostname,
+      ...url.searchParams.getAll("host"),
+      ...url.searchParams.getAll("hostaddr"),
+    ]
+      .flatMap((h) => decodeURIComponent(h).split(","))
+      .map((h) => h.trim())
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
 }
 
 /** Pure check of the environment and database name. Returns a list of reasons; empty means acceptable. */
@@ -44,7 +72,7 @@ export function targetProblems(env, dbName) {
     const hosts = env.PGHOST.split(",").map((h) => h.trim());
     if (hosts.length > 1) problems.push("PGHOST lists several hosts; use exactly one local host.");
     for (const h of hosts) {
-      if (!(h.startsWith("/") || LOOPBACK_NAMES.has(h.toLowerCase()) || isLoopbackAddress(h)))
+      if (!isLocalHost(h))
         problems.push(`PGHOST is not a local socket directory or loopback host.`);
     }
   }
@@ -53,6 +81,18 @@ export function targetProblems(env, dbName) {
     if (addrs.length > 1 || !addrs.every(isLoopbackAddress))
       problems.push("PGHOSTADDR is not a single loopback address.");
   }
+  for (const k of DATABASE_URL_VARS) {
+    if (!set(k)) continue;
+    const hosts = urlHosts(env[k]);
+    if (!hosts || !hosts.every(isLocalHost))
+      problems.push(
+        `${k} names a server that is not local: this environment is wired to a real database. Unset it.`,
+      );
+  }
+  if (set("PGUSER") && POOLER_USER.test(env.PGUSER.trim()))
+    problems.push(
+      "PGUSER has the form of a Supabase pooler login (role.project_ref): this environment is wired to a real database.",
+    );
   if (set("PGDATABASE") && /[=\s/:@]/.test(env.PGDATABASE))
     problems.push("PGDATABASE looks like a connection string; unset it.");
 
