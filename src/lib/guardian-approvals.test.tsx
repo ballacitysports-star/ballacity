@@ -89,4 +89,10 @@ describe("guardianApprovalError", () => {
       /already in this game/i,
     );
   });
+
+  it("explains a guardian whose account cannot approve (audit F03)", () => {
+    expect(guardianApprovalError(new Error("GUARDIAN_NOT_ELIGIBLE"))).toMatch(
+      /can't approve for a child right now/i,
+    );
+  });
 });
