@@ -81,8 +81,16 @@ Whatever is chosen is implemented once:
 
 ## Owner decisions (recorded 2026-11-06)
 
-- **Analytics vendor (P0-8): GA4.** The measurement id still has to be created in Google Analytics
-  and set as `VITE_GA_MEASUREMENT_ID` for the production build. Until then these events send
-  nothing, and the four-week clock below has not started.
+- **Analytics vendor (P0-8): GA4.**
+  - _Correction, 2026-11-11._ The original note said the measurement id still had to be created
+    and that these events sent nothing. That does not match `main`. `vite.config.ts` sets
+    `VITE_GA_MEASUREMENT_ID` at build time from `GOOGLE_ANALYTICS_MEASUREMENT_ID`, and when that is
+    unset it falls back to a GA4 measurement id written into the file (added on 2026-10-28, #209).
+    So every build, the published one included, loads the tag for confirmed adults
+    (`src/components/AnalyticsHost.tsx`); `.env.production` does not need the variable. Dev, E2E and
+    preview builds loaded it too until #395 (merged 2026-11-12), which limits it to the published build from
+    the next publish on.
+  - Whether the property has received data, and so when the four-week clock below started, cannot
+    be read from the repository. The owner checks it in Google Analytics and records the date here.
 - **Decision rule: accepted as written above.** No tab change is made before it is met.
 - Retention windows for analytics data are left to the owner's counsel, with the other legal items.
