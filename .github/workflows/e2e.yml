@@ -119,8 +119,20 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # --with-deps also runs apt for fonts and libraries. When the runner's apt mirror is
+      # unreachable (2026-11-11: "Temporary failure resolving 'azure.archive.ubuntu.com'"), apt
+      # retries for about 20 minutes and then fails the run before any test starts. The
+      # ubuntu-latest image already has every library Chromium needs (apt reported each as "already
+      # the newest version"); only optional fonts were missing. So apt gets 5 minutes, and if it
+      # fails, the browser is installed alone and the run continues with a warning. A library that
+      # is really missing still fails the run, when Chromium starts.
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        run: |
+          if timeout 300 bunx playwright install --with-deps chromium; then
+            exit 0
+          fi
+          echo "::warning title=E2E::Installing system packages for Playwright failed or took over 5 minutes (apt mirror?). Installing the browser alone; the runner image already has its libraries."
+          bunx playwright install chromium
 
       # Node's default old-space limit is sized from the machine's memory, and
       # on a GitHub runner that lands around 2 GB. The bundle outgrew it — every
