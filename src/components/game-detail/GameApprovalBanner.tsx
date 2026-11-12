@@ -3,12 +3,12 @@ import { playerWaitCopy, type JoinWait } from "@/lib/join-guardian-status";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { JOIN_RESUBMIT_MAX_ATTEMPTS, type JoinRequest } from "@/lib/payments";
 import { formatCooldownLabel } from "@/components/game-detail/GameDetailBits";
+import { useResubmitCooldownMs } from "@/hooks/use-resubmit-cooldown";
 import { type Game } from "@/lib/sample-data";
 import { type PlayerFlowStatus } from "@/lib/game-flow-status";
 
 export type GameApprovalBannerProps = {
   capReached: boolean;
-  cooldownMs: number;
   fee: number;
   game: Game;
   isHost: boolean;
@@ -24,7 +24,6 @@ export type GameApprovalBannerProps = {
 
 export function GameApprovalBanner({
   capReached,
-  cooldownMs,
   fee,
   game,
   isHost,
@@ -37,6 +36,8 @@ export function GameApprovalBanner({
   refreshStatus,
   requiresApproval,
 }: GameApprovalBannerProps) {
+  // Ticks once a second only while a resubmit cooldown runs.
+  const cooldownMs = useResubmitCooldownMs(myReq);
   return (
     <>
       {/* Approval status banner (player view).
