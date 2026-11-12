@@ -30,23 +30,30 @@ type Admin = {
   from: (table: string) => any;
 };
 
+/**
+ * The active age policy, or the default when none is stored. Throws when the lookup fails: a
+ * stored window may be stricter than the default, so the default is never used on a guess.
+ */
 export async function loadAgePolicy(admin: Admin): Promise<AgePolicyConfig> {
-  try {
-    const { data } = await admin
-      .from("app_settings")
-      .select("value")
-      .eq("key", "age_policy")
-      .maybeSingle();
-    return data ? parseAgePolicy((data as { value: unknown }).value) : { ...DEFAULT_AGE_POLICY };
-  } catch {
-    return { ...DEFAULT_AGE_POLICY };
-  }
+  const { data, error } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "age_policy")
+    .maybeSingle();
+  if (error) throw new Error(`age policy lookup failed: ${error.message}`);
+  return data ? parseAgePolicy((data as { value: unknown }).value) : { ...DEFAULT_AGE_POLICY };
 }
 
 /**
  * Decide whether a push may go out to this user right now. Adults always send.
  * Minors inside the curfew are QUEUED, never dropped — the in-app notification
  * row is written by the caller regardless, so nothing is silently lost.
+ *
+ * Fails CLOSED: if any lookup (policy, profile, guardian controls) errors or
+ * throws, this throws rather than guess. A failed profile read must not make a
+ * minor look like an adult, nor a failed controls read hide a guardian's off
+ * switch. Callers hold the push when it throws: deliverPush queues it for the
+ * flush job, and the flush job keeps a queued row waiting and retries.
  */
 export async function curfewGateFor(
   admin: Admin,
@@ -62,6 +69,14 @@ export async function curfewGateFor(
       .eq("child_user_id", userId)
       .maybeSingle(),
   ]);
+  if (!profileRes || profileRes.error) {
+    throw new Error(`profile lookup failed: ${profileRes?.error?.message ?? "no response"}`);
+  }
+  if (!controlsRes || controlsRes.error) {
+    throw new Error(
+      `guardian controls lookup failed: ${controlsRes?.error?.message ?? "no response"}`,
+    );
+  }
 
   const cohort = parseCohort((profileRes?.data as any)?.age_cohort);
   const timezone = ((profileRes?.data as any)?.timezone as string | null) ?? null;
