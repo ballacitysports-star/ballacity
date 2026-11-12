@@ -26,6 +26,7 @@
  */
 import type { Page } from "@playwright/test";
 import { onboardingStatusFor, stubServerFn } from "./server-fn";
+import { answerFixtureGameReads } from "./fixture-games";
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
 const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
@@ -57,6 +58,7 @@ export async function answerSessionChecks(page: Page) {
 /** Answer the session checks, then put the fixture session where the app reads it. */
 export async function restoreSession(page: Page) {
   await answerSessionChecks(page);
+  await answerFixtureGameReads(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
