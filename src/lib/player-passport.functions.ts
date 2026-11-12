@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { computeAthleteProgress, type AthleteProgress } from "@/lib/athlete-xp";
 import { teamAvatarDisplay } from "@/lib/team-avatar";
+import { keepsMinorPrivacyFloor } from "@/lib/minor-privacy-floor";
 
 export type PassportTeam = {
   id: string;
@@ -40,7 +41,6 @@ export type PlayerPassport = {
 };
 
 const EMPTY: PlayerPassport = { teams: [], accolades: [], upcomingRuns: [], progress: null };
-const MINOR_COHORTS = ["child_under_13", "teen_13_15", "teen_16_17"];
 
 /**
  * A player's footprint on the platform for `/players/$userId`: team badges,
@@ -69,7 +69,8 @@ export const getPlayerPassport = createServerFn({ method: "GET" })
     if (blockRes.data === true) return EMPTY;
     if (!profRes.data || profRes.data.suspended_at) return EMPTY;
 
-    const isMinor = MINOR_COHORTS.includes(cohortRes.data as string);
+    // Fails closed: an unknown age or a failed lookup keeps the minor floor (src/lib/minor-privacy-floor.ts).
+    const isMinor = keepsMinorPrivacyFloor(cohortRes.data, Boolean(cohortRes.error));
     const flags = ((flagsRes.data ?? []) as { show_games_played?: boolean | null }[])[0] ?? {};
     const showGames = flags.show_games_played !== false;
 

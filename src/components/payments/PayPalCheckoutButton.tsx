@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createGamePayPalOrder, captureGamePayPalOrder } from "@/lib/paypal.functions";
+import { CHECKOUT_UNCONFIRMED_MESSAGE, paymentPolicyMessageOf } from "@/lib/payments-policy";
 
 declare global {
   interface Window {
@@ -43,6 +44,9 @@ export function PayPalCheckoutButton(props: {
 
   useEffect(() => {
     let cancelled = false;
+    // Why the server refused to start a checkout (say, a guardian has to approve the game first). PayPal reports a
+    // failed createOrder only through onError, with its own generic error.
+    let startRefusal: string | null = null;
     loadSdk(props.clientId, props.merchantId)
       .then(() => {
         if (cancelled || !ref.current || !window.paypal) return;
@@ -51,21 +55,36 @@ export function PayPalCheckoutButton(props: {
           .Buttons({
             style: { layout: "vertical", shape: "pill", label: "pay" },
             createOrder: async () => {
-              const { orderId } = await createGamePayPalOrder({ data: { gameId: props.gameId } });
-              return orderId;
+              startRefusal = null;
+              try {
+                const { orderId } = await createGamePayPalOrder({ data: { gameId: props.gameId } });
+                return orderId;
+              } catch (e) {
+                startRefusal = paymentPolicyMessageOf(e);
+                throw e;
+              }
             },
             onApprove: async (data: { orderID: string }) => {
               try {
-                await captureGamePayPalOrder({ data: { orderId: data.orderID } });
-                toast.success("Payment confirmed — you're in!");
+                const res = await captureGamePayPalOrder({ data: { orderId: data.orderID } });
+                // "You're in" only when the server says the player is on the roster; null means it could not tell.
+                toast.success(
+                  res.rostered === true
+                    ? "Payment confirmed — you're in!"
+                    : res.rostered === false
+                      ? "Payment confirmed. The host will confirm your place on the roster."
+                      : "Payment confirmed. Check the game page for your place on the roster.",
+                );
                 props.onPaid();
-              } catch (e: any) {
-                toast.error(e?.message ?? "Could not confirm the payment.");
+              } catch (e) {
+                // Only messages written for the player; never PayPal's own error text.
+                toast.error(paymentPolicyMessageOf(e) ?? CHECKOUT_UNCONFIRMED_MESSAGE);
               }
             },
             onError: (err: unknown) => {
               console.error("[paypal] button error", err);
-              toast.error("PayPal checkout hit a problem. Try another method.");
+              toast.error(startRefusal ?? "PayPal checkout hit a problem. Try another method.");
+              startRefusal = null;
             },
           })
           .render(ref.current);
@@ -88,10 +107,13 @@ export function PayPalCheckoutButton(props: {
         </span>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
-        No PayPal account? Tap <span className="font-semibold text-foreground">Debit or Credit Card</span> below.
+        No PayPal account? Tap{" "}
+        <span className="font-semibold text-foreground">Debit or Credit Card</span> below.
       </p>
       <div ref={ref} aria-label="Pay with PayPal or card" />
-      {!ready && <div className="py-3 text-center text-xs text-muted-foreground">Loading checkout…</div>}
+      {!ready && (
+        <div className="py-3 text-center text-xs text-muted-foreground">Loading checkout…</div>
+      )}
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
         Goes straight to the host — no proof upload needed.
       </p>

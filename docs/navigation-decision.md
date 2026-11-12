@@ -33,9 +33,12 @@ argument against B.
 
 None that is quantitative.
 
-- **No analytics yet** (as written on 2026-11-06; see the correction under "Owner decisions"). The
-  funnel analytics tag only loads when `VITE_GA_MEASUREMENT_ID` is set. It is not set in
-  `.env.production`, and P0-8 (choosing an analytics vendor) is still open.
+- **GA4 is live, and the clean window starts later.** `vite.config.ts` has baked in the measurement id
+  `G-MEWLGXSWXC` since #209 (2026-10-28), so the tag loads for confirmed adults in production. Until the
+  change that keeps it out of development builds (`AnalyticsHost` does nothing when `import.meta.env.DEV`
+  is true), `vite dev`, the Playwright dev server used by E2E and Lovable's live preview loaded it too
+  and reported to the same property. Count the clean window for this decision from the publish that
+  carries that change; earlier `select_tab` and `open_create` events include test and preview sessions.
 - **Adults only.** Even once the tag is live, it measures confirmed adults only. That is a privacy
   rule in `src/lib/analytics.ts`. Minors, likely the heaviest Reels users, will not appear in the
   numbers. Weigh that when reading them.
@@ -85,7 +88,8 @@ Whatever is chosen is implemented once:
     unset it falls back to a GA4 measurement id written into the file (added on 2026-10-28, #209).
     So every build, the published one included, loads the tag for confirmed adults
     (`src/components/AnalyticsHost.tsx`); `.env.production` does not need the variable. Dev, E2E and
-    preview builds load it too until #395 (open) limits it to the published build.
+    preview builds loaded it too until #395 (merged 2026-11-12), which limits it to the published build from
+    the next publish on.
   - Whether the property has received data, and so when the four-week clock below started, cannot
     be read from the repository. The owner checks it in Google Analytics and records the date here.
 - **Decision rule: accepted as written above.** No tab change is made before it is met.

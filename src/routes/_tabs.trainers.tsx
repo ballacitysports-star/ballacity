@@ -13,6 +13,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
+import { followersDesc, useOrgFollowCounts } from "@/lib/org-follow-counts";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import {
@@ -253,6 +254,8 @@ function TrainersPage() {
   }, []);
 
   const orgs = useAllOrgs();
+  // Real follower counts for the cards and the "Most followers" order (P1-1).
+  const followCounts = useOrgFollowCounts();
 
   // Real ratings and the facility each trainer works at, fetched once for the
   // whole page (not per card).
@@ -334,7 +337,8 @@ function TrainersPage() {
         return byDistance() || a.o.name.localeCompare(b.o.name);
       }
       if (sortBy === "soonest") return a.score - b.score || byDistance();
-      if (sortBy === "followers") return b.o.followers - a.o.followers;
+      if (sortBy === "followers")
+        return followersDesc(followCounts, a.o.id, b.o.id) || byDistance();
       if (sortBy === "rating") return compareByRatingDesc(a.o, b.o) || byDistance();
       if (sortBy === "rate") return compareByRateAsc(a.o, b.o) || byDistance();
       return a.o.name.localeCompare(b.o.name);
@@ -355,6 +359,7 @@ function TrainersPage() {
     maxRate,
     ageGroup,
     ratings,
+    followCounts,
   ]);
 
   const venueOptions = useMemo(() => {
@@ -706,6 +711,7 @@ function TrainersPage() {
                     index={i}
                     search={cardSearch}
                     facility={facilities[o.id] ?? null}
+                    followers={followCounts?.get(o.id)?.followers}
                   />
                   <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
                     {distLabel && (

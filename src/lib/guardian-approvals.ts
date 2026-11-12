@@ -36,10 +36,11 @@ export type GuardianJoinRequest = {
 
 const ERRORS: Record<string, string> = {
   NOT_GUARDIAN: "You're not linked as this child's guardian.",
+  GUARDIAN_NOT_ELIGIBLE:
+    "Your account can't approve for a child right now. Contact support if you think this is a mistake.",
   INVITE_NOT_PENDING: "This invite was already answered.",
   REQUEST_NOT_PENDING: "This request was already answered.",
-  ALREADY_ON_ROSTER:
-    "They're already in this game. Open the game to cancel their spot instead.",
+  ALREADY_ON_ROSTER: "They're already in this game. Open the game to cancel their spot instead.",
   INVITE_NOT_FOUND: "That invite no longer exists.",
   REQUEST_NOT_FOUND: "That request no longer exists.",
   WAIVER_REQUIRED: "Sign the team's waiver for your child first.",

@@ -10,6 +10,9 @@ const listeners = new Set<() => void>();
 let cache: Game[] = [];
 let loaded = false;
 let dbHydrated = false;
+// True once a load from the database has finished. Unlike dbHydrated it stays true while a later re-load runs (after
+// an auth event), so live counts do not drop back to each card's own copy for the length of that re-load.
+let dbLoadedOnce = false;
 let dbHydratePromise: Promise<void> | null = null;
 
 /** Where the first load from the database stands, so a screen can say so. */
@@ -25,6 +28,33 @@ function setLoadStatus(next: HostedGamesLoad) {
   listeners.forEach((l) => l());
 }
 let realtimeAttached = false;
+// Catch-up loads after the hosted_games channel (re)joins: one at a time, with one more run if another join
+// arrives meanwhile, and one right after the first load if the channel joined before that load finished.
+let resyncInFlight = false;
+let resyncAgain = false;
+let resyncAfterFirstLoad = false;
+function resync() {
+  if (!dbLoadedOnce) {
+    resyncAfterFirstLoad = true;
+    return;
+  }
+  if (resyncInFlight) {
+    resyncAgain = true;
+    return;
+  }
+  resyncInFlight = true;
+  fetchAll()
+    .catch(() => {
+      /* keep the cache; the next join or auth event loads again */
+    })
+    .finally(() => {
+      resyncInFlight = false;
+      if (resyncAgain) {
+        resyncAgain = false;
+        resync();
+      }
+    });
+}
 const EMPTY = "[]";
 let snapshotCache = EMPTY;
 
@@ -268,7 +298,12 @@ function ensureDbHydrated() {
   dbHydratePromise = fetchAll()
     .then(() => {
       dbHydrated = true;
+      dbLoadedOnce = true;
       setLoadStatus("ready");
+      if (resyncAfterFirstLoad) {
+        resyncAfterFirstLoad = false;
+        resync();
+      }
     })
     .catch(() => {
       // Keep the local cache, say the load failed, and try again after a pause.
@@ -314,7 +349,11 @@ function ensureRealtime() {
         emit();
       }
     })
-    .subscribe();
+    .subscribe((status) => {
+      // Every join, the first included: changes made before it (since the first load, or while a phone slept or a
+      // laptop was closed) were never delivered, so catch up with a load.
+      if (status === "SUBSCRIBED") resync();
+    });
 
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => {
@@ -679,6 +718,30 @@ export function useHostedGamesStatus(): HostedGamesLoad {
     () => loadStatus,
     () => "loading",
   );
+}
+
+/**
+ * Live player count of one hosted game: hosted_games.joined, which the
+ * game_participants_sync_count trigger sets to the game's participant rows on
+ * every join and leave, and which reaches this store through its hosted_games
+ * realtime channel. Undefined until the store has loaded from the database (a
+ * copy restored from localStorage may be stale) and for a game it does not
+ * hold, so callers keep the count on the game object they already have.
+ *
+ * Reading it never starts a load or a channel; pages that list games already
+ * keep this store live.
+ */
+export function useHostedGameJoined(gameId: string | undefined): number | undefined {
+  const joined = useSyncExternalStore(
+    subscribe,
+    () => {
+      if (!gameId || !dbLoadedOnce) return -1;
+      const game = cache.find((g) => g.id === gameId);
+      return typeof game?.joined === "number" ? game.joined : -1;
+    },
+    () => -1,
+  );
+  return joined < 0 ? undefined : joined;
 }
 
 export function useHostedGames(): Game[] {

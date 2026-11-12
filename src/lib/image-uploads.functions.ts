@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAnimatedImage } from "@/lib/image-animation";
 import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
 import {
   MAX_IMAGE_BYTES,
@@ -8,6 +9,8 @@ import {
   sniffImageMime,
   validateImageMeta,
 } from "@/lib/image-validation";
+
+const ANIMATED_IMAGE_REFUSAL = "Animated pictures can't be uploaded. Use a still photo instead.";
 
 /**
  * Server-side gate for every uploaded image: re-validates type / size /
@@ -42,7 +45,10 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
 
     const failure =
       validateImageMeta({ mime: sniffed, bytes, dimensions }) ??
-      (dimensions ? null : "The file is not a readable JPG, PNG or WEBP image");
+      (dimensions ? null : "The file is not a readable JPG, PNG or WEBP image") ??
+      // F05: the scan sees one frame of an animated PNG or WEBP, and every frame
+      // would be shown. Refuse until frames are scanned (chat does the same).
+      (isAnimatedImage(buffer) ? ANIMATED_IMAGE_REFUSAL : null);
 
     if (failure) {
       await supabaseAdmin.storage.from(bucket).remove([path]);

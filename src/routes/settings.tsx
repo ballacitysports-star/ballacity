@@ -528,7 +528,7 @@ function MyOrgsSection() {
                   <AlertDialogAction
                     disabled={del.isPending}
                     onClick={() => del.mutate(o.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
                   >
                     {del.isPending ? "Deleting…" : "Delete"}
                   </AlertDialogAction>

@@ -14,6 +14,7 @@ import {
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
 import { shareAvailability } from "./share-availability";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 function LoadingRows() {
   return (
@@ -35,6 +36,7 @@ export function MineView({
   onEdit: (m: PlayerAvailability) => void;
   refreshKey: number;
 }) {
+  const authSearch = useAuthSearchHere();
   const [mine, setMine] = useState<PlayerAvailability[] | null>(null);
   const [inbox, setInbox] = useState<AvailabilityContactRequest[] | null>(null);
   const [outbox, setOutbox] = useState<AvailabilityContactRequest[] | null>(null);
@@ -58,6 +60,7 @@ export function MineView({
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in

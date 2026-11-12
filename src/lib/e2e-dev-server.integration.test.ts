@@ -57,11 +57,36 @@ const initialEnv = (pid: number): Record<string, string> =>
 
 let launcher: ChildProcess | undefined;
 let fake: http.Server | undefined;
+// Every launcher this file starts. Each test starts its own, so stopping only the last one left
+// the first launcher and its Vite dev server running after every run (about 400 MB each).
+const launchers: ChildProcess[] = [];
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Stops a launcher and the dev server it started: SIGTERM first, SIGKILL after 10 s. */
+async function stopLauncher(p: ChildProcess): Promise<void> {
+  const servers = p.pid ? childrenOf(p.pid) : [];
+  if (p.exitCode === null && p.signalCode === null) {
+    const exited = new Promise<void>((r) => p.once("exit", () => r()));
+    p.kill("SIGTERM");
+    await Promise.race([exited, new Promise((r) => setTimeout(r, 10_000))]);
+  }
+  for (const pid of [...servers, ...(p.pid ? [p.pid] : [])]) {
+    if (alive(pid)) process.kill(pid, "SIGKILL");
+  }
+}
 
 afterAll(async () => {
-  launcher?.kill("SIGTERM");
+  await Promise.all(launchers.map(stopLauncher));
   await new Promise<void>((r) => (fake ? fake.close(() => r()) : r()));
-});
+}, 30_000);
 
 describe("the launched dev server's server functions use the verified environment", () => {
   it.skipIf(!linux)(
@@ -106,6 +131,7 @@ describe("the launched dev server's server functions use the verified environmen
         },
         stdio: "ignore",
       });
+      launchers.push(launcher);
 
       const base = `http://127.0.0.1:${devPort}`;
       let ready = false;
@@ -194,6 +220,7 @@ describe("the launched dev server's server functions use the verified environmen
         },
         stdio: "ignore",
       });
+      launchers.push(launcher);
       let ready = false;
       for (let i = 0; i < 100 && !ready; i++) {
         try {

@@ -49,7 +49,9 @@ export function useIsGuardianAccount() {
           .eq("parent_user_id", user!.id)
           .neq("status", "revoked"),
       ]);
-      return (p?.account_type as string | null) === "parent" || (managed ?? 0) > 0 || (linked ?? 0) > 0;
+      return (
+        (p?.account_type as string | null) === "parent" || (managed ?? 0) > 0 || (linked ?? 0) > 0
+      );
     },
   });
   return { isGuardian: q.data === true, loading: !!user && q.isLoading };
@@ -64,7 +66,11 @@ export function GuardianProfileCard() {
     enabled: !!user,
     queryFn: async () => {
       const [{ data: p }, { data: ec }] = await Promise.all([
-        supabase.from("profiles").select("display_name, avatar_url").eq("id", user!.id).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("display_name, avatar_url")
+          .eq("id", user!.id)
+          .maybeSingle(),
         supabase.rpc("get_my_emergency_contact"),
       ]);
       const row = Array.isArray(ec) ? ec[0] : ec;
@@ -176,7 +182,7 @@ export function GuardianProfileCard() {
           </p>
         ) : (
           <p className="mt-1 text-sm text-muted-foreground">
-            Add someone coaches can reach if you can't be contacted. Only you can see this.
+            Add a backup contact. It isn't shared with coaches or teams.
           </p>
         )}
       </div>

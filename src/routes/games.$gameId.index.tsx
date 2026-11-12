@@ -1,4 +1,5 @@
 import { VenueHostedAt } from "@/components/venue/VenueBadge";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import { BackButton } from "@/components/layout/BackButton";
 import { ListingVisibilityToggle } from "@/components/listings/ListingVisibilityToggle";
 import { RosterRecruitPanel } from "@/components/players/RosterRecruitPanel";
@@ -69,11 +70,12 @@ import {
   useHostAttendanceStats,
 } from "@/lib/game-lifecycle";
 import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
-import { normalizeGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
+import { viewerGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
+import { rosterPlaceholderCount } from "@/lib/roster-placeholders";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
@@ -301,12 +303,14 @@ function GameDetail() {
   const liveParticipantCount = useLiveParticipantCount(gameId);
   const {
     participants: liveRoster,
+    loading: rosterLoading,
     refetch: refetchRoster,
     removeLocal: removeRosterLocal,
   } = useLiveParticipants(gameId);
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { isParentMode } = useParentMode();
   const myProfile = useMyProfile(user);
   const { can: canChildFeature } = useMyChildStatus();
@@ -396,11 +400,9 @@ function GameDetail() {
     _setReviewsOpen(urlModal === "reviews");
   }, [urlModal]);
 
-  // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
-  // Only starts when there's an active cooldown to avoid unnecessary re-renders.
-  const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
+  // The resubmit cooldown's countdown ticks inside GameApprovalBanner
+  // (useResubmitCooldownMs), so this page does not re-render every second.
   const capReached = joinResubmitCapReached(myReq);
-  const [, setNowTick] = useState(0);
   const [reportGameOpen, setReportGameOpen] = useState(false);
   // Risk-acknowledgment gate state (physical activity safety).
   const [riskAckOpen, setRiskAckOpen] = useState(false);
@@ -409,12 +411,6 @@ function GameDetail() {
     gameId,
     "participant_risk",
   );
-
-  useEffect(() => {
-    if (cooldownMs <= 0) return;
-    const t = setInterval(() => setNowTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [cooldownMs > 0]);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -456,25 +452,18 @@ function GameDetail() {
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
   const canReviewHost = useCanReview(hostReviewId(game));
 
-  // Policy players must be able to read before joining.
+  // Policy players must be able to read before joining. Joining and refunds use
+  // the same reads as the join button and the payment terms, so a visitor who
+  // cannot read the settings row sees the host's real terms, not defaults.
   const viewerPolicy = useMemo<GamePolicy>(
     () =>
-      normalizeGamePolicy({
-        cancellationPolicy: (game?.cancellationPolicy ??
-          undefined) as GamePolicy["cancellationPolicy"],
-        cancellationNotes: game?.cancellationNotes ?? "",
-        minPlayers: game?.minPlayers ?? 0,
-        maxPlayers: game?.maxPlayers ?? 10,
-        allowWaitlist: game?.allowWaitlist ?? true,
-        entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
-        requiresApproval: settings ? !!settings.requires_approval : true,
-        refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
-        lateRefundPct: settings?.late_refund_pct ?? 0,
-        cancelCutoffMin: game?.cancelCutoffMin,
-        refundPolicy: settings?.refund_policy ?? "",
-        gameRules: game?.gameRules ?? "",
+      viewerGamePolicy({
+        game,
+        settings,
+        requiresApproval: publicRequiresApproval,
+        refundTerms,
       }),
-    [game, settings],
+    [game, settings, publicRequiresApproval, refundTerms],
   );
 
   // Host trust: only real signals. Verification comes from the hosting team
@@ -1085,6 +1074,7 @@ function GameDetail() {
           );
           return;
         }
+        const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
         if (cooldownMs > 0) {
           toast.error(`Please wait ${formatCooldownLabel(cooldownMs)} before resubmitting.`);
           return;
@@ -1243,12 +1233,15 @@ function GameDetail() {
       displayName: p.displayName,
       avatarUrl: p.avatarUrl,
     }));
-  // Only show placeholder avatars while the live roster hasn't hydrated yet.
-  // Once `liveParticipantCount` is defined we trust it as the authoritative
-  // count, so a host removal that drops the roster to 0 doesn't leave ghost
-  // avatars behind derived from the stale `game.joined` value.
-  const rosterHydrated = liveParticipantCount !== undefined;
-  const placeholderCount = rosterHydrated ? 0 : Math.max(0, (game.joined ?? 0) - liveRoster.length);
+  // Anonymous chips for places taken by players this viewer cannot name: only the host and the game's own
+  // players can read the roster, and anyone's roster is still loading at first (lib/roster-placeholders).
+  const placeholderCount = rosterPlaceholderCount({
+    takenPlaces: effectiveJoined,
+    viewerHoldsPlace: viewerCountsAsJoined,
+    namedOthers: rosterOthers.length,
+    rosterLoading,
+    canReadRoster: isHost || liveRoster.some((p) => p.userId === meId),
+  });
   const placeholderOthers: RosterEntry[] = Array.from({ length: placeholderCount }, (_, i) => ({
     kind: "player" as const,
     initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
@@ -1632,7 +1625,6 @@ function GameDetail() {
 
         <GameApprovalBanner
           capReached={capReached}
-          cooldownMs={cooldownMs}
           fee={fee}
           game={game}
           isHost={isHost}
@@ -2626,7 +2618,7 @@ function GameDetail() {
               aria-label="Message the host"
               onClick={async () => {
                 if (!user) {
-                  nav({ to: "/auth" });
+                  nav({ to: "/auth", search: authSearch });
                   return;
                 }
                 if (!messagingDecision.allowed) {
@@ -2928,7 +2920,7 @@ function GameDetail() {
               }}
               className={
                 confirmAction === "leave"
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  ? "bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
                   : undefined
               }
             >
@@ -2969,7 +2961,7 @@ function GameDetail() {
                   void handleRemoveParticipant(removeTarget.userId, removeTarget.name);
                 }
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
               Remove player
             </AlertDialogAction>

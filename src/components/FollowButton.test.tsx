@@ -3,8 +3,21 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
+// The page being viewed, which a sign-in link should bring the visitor back to.
+const here = vi.hoisted(() => ({ href: "/player-card/them#reels" }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Link: ({
+    children,
+    to,
+    search,
+  }: {
+    children: ReactNode;
+    to: string;
+    search?: { next?: string };
+  }) => (
+    <a href={search?.next ? `${to}?next=${encodeURIComponent(search.next)}` : to}>{children}</a>
+  ),
+  useLocation: ({ select }: { select: (l: { href: string }) => unknown }) => select(here),
 }));
 
 const auth = { user: { id: "me" } as { id: string } | null };
@@ -60,6 +73,10 @@ describe("FollowButton", () => {
     own.unmount();
     auth.user = null;
     render(<FollowButton userId="them" />);
-    expect(screen.getByRole("link").textContent).toContain("Follow");
+    const link = screen.getByRole("link");
+    expect(link.textContent).toContain("Follow");
+    expect(link.getAttribute("href")).toBe(
+      `/auth?next=${encodeURIComponent("/player-card/them#reels")}`,
+    );
   });
 });

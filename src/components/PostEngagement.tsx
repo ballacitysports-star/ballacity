@@ -23,6 +23,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { supabase } from "@/integrations/supabase/client";
 import { formatWhen } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 type Props = {
   subjectType: EngagementSubjectType;
@@ -32,6 +33,7 @@ type Props = {
 export function PostEngagement({ subjectType, subjectId }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { can: canChildFeature } = useMyChildStatus();
   const commentsDecision = canChildFeature("comments");
   const [body, setBody] = useState("");
@@ -248,7 +250,11 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-border bg-surface/60 p-3 text-center text-xs text-muted-foreground">
-          <Link to="/auth" className="font-semibold text-lime underline-offset-2 hover:underline">
+          <Link
+            to="/auth"
+            search={authSearch}
+            className="font-semibold text-lime underline-offset-2 hover:underline"
+          >
             Sign in
           </Link>{" "}
           to join the discussion.

@@ -1,5 +1,7 @@
 {
   "entryKb": 284.3,
+  "firstPaintKb": 392.4,
   "totalKb": 1369.3,
-  "measuredAt": "2026-11-06"
+  "measuredAt": "2026-11-06",
+  "firstPaintMeasuredAt": "2026-11-10"
 }
