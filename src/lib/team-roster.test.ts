@@ -52,6 +52,14 @@ describe("teamRosterErrorMessage", () => {
     expect(teamRosterErrorMessage(new Error("ALREADY_MEMBER"))).toMatch(/already on the roster/);
     expect(teamRosterErrorMessage(new Error("boom"))).toMatch(/Couldn't update the roster/);
   });
+
+  it("asks an account with no birthday to add one before joining a team (20261111120000)", () => {
+    const msg = teamRosterErrorMessage({
+      message: "AGE_VERIFICATION_REQUIRED: add your date of birth before joining a team.",
+    });
+    expect(msg).toBe("Add your date of birth in your profile before joining a team.");
+    expect(msg).not.toMatch(/AGE_VERIFICATION_REQUIRED/);
+  });
 });
 
 describe("reliability from real activity", () => {

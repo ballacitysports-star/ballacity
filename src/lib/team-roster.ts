@@ -132,6 +132,8 @@ export function teamRosterErrorMessage(err: unknown): string {
   if (raw.includes("WAIVER_REQUIRED")) return "Sign the team's waiver before joining.";
   if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
     return "A parent or guardian must approve this invite first.";
+  if (raw.includes("AGE_VERIFICATION_REQUIRED"))
+    return "Add your date of birth in your profile before joining a team.";
   if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
   if (raw.includes("NOT_A_MEMBER")) return "That player isn't on the roster.";
   if (raw.includes("duplicate key")) return "That player already has a pending invitation.";
@@ -320,7 +322,9 @@ export function useTeamRosterActions(teamId: string) {
       }),
     onSuccess: (inviteId) => {
       invalidate();
-      void import("@/lib/guardian-push.functions").then((m) => m.pingGuardians("team_invite", inviteId));
+      void import("@/lib/guardian-push.functions").then((m) =>
+        m.pingGuardians("team_invite", inviteId),
+      );
     },
   });
 

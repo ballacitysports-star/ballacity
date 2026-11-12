@@ -23,6 +23,37 @@ import {
 export const PAYMENTS_BLOCKED_MESSAGE =
   "Payment coordination isn't available for this account yet.";
 
+/** An account with no date of birth cannot pay for a game (AGE_VERIFICATION_REQUIRED). */
+export const PAYMENTS_AGE_REQUIRED_MESSAGE =
+  "Add your date of birth in your profile before paying for a game.";
+
+/** A host confirming the claim of a player with no date of birth (the claim can still be turned down). */
+export const PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE =
+  "This player needs to add their date of birth before their payment can be confirmed. You can still turn the claim down.";
+
+/** A host with no date of birth confirming a payment on their own game. */
+export const PAYMENTS_HOST_AGE_REQUIRED_MESSAGE =
+  "Add your date of birth in your profile before taking payments.";
+
+/**
+ * A plain sentence for a refused payment claim. The database trigger
+ * `enforce_game_payment_cohort` answers with a code; anything unrecognised
+ * is passed through unchanged.
+ */
+export function paymentSubmissionErrorMessage(raw: string): string {
+  if (raw.includes("AGE_VERIFICATION_REQUIRED")) {
+    // A host confirming another player's claim, or a host whose own account has no birthday.
+    if (raw.includes("this player must add")) return PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE;
+    if (raw.includes("before taking payments")) return PAYMENTS_HOST_AGE_REQUIRED_MESSAGE;
+    return PAYMENTS_AGE_REQUIRED_MESSAGE;
+  }
+  if (raw.includes("PAYMENTS_NOT_AVAILABLE"))
+    return raw.includes("host account")
+      ? "Payment coordination isn't available for this host account yet."
+      : PAYMENTS_BLOCKED_MESSAGE;
+  return raw;
+}
+
 /**
  * A 16-17-year-old with a guardian pays for a game only once a guardian has
  * approved their request for it (enforce_guardian_before_payment). PayPal

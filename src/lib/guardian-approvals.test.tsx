@@ -95,4 +95,14 @@ describe("guardianApprovalError", () => {
       /can't approve for a child right now/i,
     );
   });
+
+  it("explains a child whose account has no date of birth yet (20261111120000)", () => {
+    const msg = guardianApprovalError(
+      new Error(
+        "AGE_VERIFICATION_REQUIRED: your player must add their date of birth before joining a team.",
+      ),
+    );
+    expect(msg).toMatch(/needs a date of birth before they can join a team/i);
+    expect(msg).not.toMatch(/AGE_VERIFICATION_REQUIRED|Something went wrong/);
+  });
 });

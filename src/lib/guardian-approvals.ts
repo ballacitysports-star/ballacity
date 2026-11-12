@@ -46,6 +46,8 @@ const ERRORS: Record<string, string> = {
   WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
   INVITE_EXPIRED: "This invite has expired. Ask the team for a new one.",
   CHILD_ACTIVITY_LOCKED: "Your child's activity is paused, so they can't join right now.",
+  AGE_VERIFICATION_REQUIRED:
+    "Your child's account needs a date of birth before they can join a team. Once it's added, approve again.",
   AUTH_REQUIRED: "Please sign in again.",
 };
 

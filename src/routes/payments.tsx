@@ -17,6 +17,7 @@ import {
 import { UserAvatar } from "@/components/UserAvatar";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { toast } from "sonner";
+import { paymentSubmissionErrorMessage } from "@/lib/payments-policy";
 import { useAuth } from "@/hooks/use-auth";
 import {
   PAYMENT_TYPES,
@@ -66,7 +67,9 @@ function PaymentsHub() {
   const nav = useNavigate();
   const search = Route.useSearch();
   const tab: "methods" | "verify" | "requests" | "unpaid" =
-    search.tab === "verify" || search.tab === "requests" || search.tab === "unpaid" ? search.tab : "methods";
+    search.tab === "verify" || search.tab === "requests" || search.tab === "unpaid"
+      ? search.tab
+      : "methods";
   const setTab = (v: "methods" | "verify" | "requests" | "unpaid") =>
     nav({
       to: "/payments",
@@ -535,7 +538,7 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
       setNote("");
       onReviewed();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(paymentSubmissionErrorMessage(String(e?.message ?? e)));
     } finally {
       setBusy(false);
     }
