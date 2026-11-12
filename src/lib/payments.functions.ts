@@ -60,14 +60,54 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
     // PERMISSION_MATRIX in child-policy.ts) may never record or confirm a
     // payment, even if the client-side gate is bypassed. The database
     // trigger `enforce_game_payment_cohort` is the final backstop.
+    //
+    // SEC-2: a signed-in client may ask the gate only about itself (about
+    // anyone else the database answers a fixed `false`). So the player is
+    // checked with the service role, and only once the server has shown that
+    // the caller hosts this game and the player is already part of it: this
+    // function cannot be used to probe an arbitrary account's age cohort.
+    // Only the host reviews payments (payment_submissions' row security asks
+    // for host_id = auth.uid(), and every read and write below does too).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: game, error: gameErr } = await supabaseAdmin
+      .from("hosted_games")
+      .select("host_id")
+      .eq("id", gameId)
+      .maybeSingle();
+    if (gameErr) throw new Error(gameErr.message);
+    if (!game || game.host_id !== userId) {
+      throw new Error("Only this game's host can review its payments.");
+    }
+    const linked = await Promise.all([
+      supabaseAdmin
+        .from("game_participants")
+        .select("user_id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("user_id", playerId),
+      supabaseAdmin
+        .from("join_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("player_id", playerId)
+        .in("status", ["pending", "approved"]),
+      supabaseAdmin
+        .from("payment_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("player_id", playerId),
+    ]);
+    if (!linked.some((r) => !r.error && (r.count ?? 0) > 0)) {
+      throw new Error("This player isn't part of this game.");
+    }
+
     for (const [party, id] of [
       ["host", userId],
       ["player", playerId],
     ] as const) {
-      const { data: allowed, error: gateErr } = await (supabase.rpc as any)(
-        "game_payments_allowed",
-        { _user: id },
-      );
+      const client = party === "host" ? supabase : supabaseAdmin;
+      const { data: allowed, error: gateErr } = await (client.rpc as any)("game_payments_allowed", {
+        _user: id,
+      });
       if (gateErr) throw new Error(gateErr.message);
       if (allowed === false) {
         throw new Error(

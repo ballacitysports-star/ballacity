@@ -87,6 +87,7 @@ replay, naming both files: commit a migration to one folder only (keep the drizz
 | `790_guarded_minor_open_games.test.sql`        | A minor with a guardian takes a game place only on a request a current guardian approved, open games included (no direct join, deleting the request does not help, the server too); on an open game the guardian alone answers                                                                                |
 | `800_emergency_contact_privacy.test.sql`       | A guardian's emergency contact is theirs: no visitor or signed-in user reads it; `get_my_emergency_contact` returns only the caller's row; nobody overwrites another's; no other function names the columns, no callable one hands out a whole profiles row, no view reads profiles, no publication has them  |
 | `810_team_waivers.test.sql`                    | Team waivers (W1-W17 but W10, an owner question): managers' drafts, edited and deleted as the app does; API roles write only a draft's text, so no manager clears `published_at`, (un)publishes or moves a version, or deletes a signed one (L1-L9); one published per team; signed once, by the function     |
+| `820_helper_oracle_containment.test.sql`       | SEC-2: helper predicates (is_minor, is_guardian_of, is_team_member, shares_team, can_notify, ...) answer a signed-in client only about itself; staff, the service role and definer code get the truth; policies, triggers and the Following feed decide as before                                             |
 
 ## Races
 
