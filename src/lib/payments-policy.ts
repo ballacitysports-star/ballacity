@@ -35,9 +35,13 @@ export const PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE =
 export const PAYMENTS_HOST_AGE_REQUIRED_MESSAGE =
   "Add your date of birth in your profile before taking payments.";
 
+/** A minor with a linked guardian paying before that guardian approved this game. */
+export const PAYMENTS_GUARDIAN_APPROVAL_MESSAGE =
+  "Your parent needs to approve this game before you can pay. Go back to the game and ask them.";
+
 /**
  * A plain sentence for a refused payment claim. The database trigger
- * `enforce_game_payment_cohort` answers with a code; anything unrecognised
+ * `enforce_game_payment_cohort` (and `enforce_guardian_before_payment`) answers with a code; anything unrecognised
  * is passed through unchanged.
  */
 export function paymentSubmissionErrorMessage(raw: string): string {
@@ -47,6 +51,7 @@ export function paymentSubmissionErrorMessage(raw: string): string {
     if (raw.includes("before taking payments")) return PAYMENTS_HOST_AGE_REQUIRED_MESSAGE;
     return PAYMENTS_AGE_REQUIRED_MESSAGE;
   }
+  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED")) return PAYMENTS_GUARDIAN_APPROVAL_MESSAGE;
   if (raw.includes("PAYMENTS_NOT_AVAILABLE"))
     return raw.includes("host account")
       ? "Payment coordination isn't available for this host account yet."

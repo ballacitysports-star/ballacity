@@ -131,10 +131,14 @@ export function LeaveFlowButton({
       } else if (action === "withdraw") {
         await clearPendingSubmissions(gameId);
         await withdrawMyApprovedJoinRequest(gameId);
+        // On an open game a request to the parent stays pending through payment; it goes too, as the game page's own
+        // leave does, so a later join asks the parent again.
+        await cancelMyJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
         void notifyHostOfLeave(gameId, gameTitle);
       } else {
         await withdrawMyApprovedJoinRequest(gameId).catch(() => {});
+        await cancelMyJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
         void notifyHostOfLeave(gameId, gameTitle);
       }

@@ -30,6 +30,26 @@ const rows = {
       created_at: "2026-10-26T11:00:00Z",
       status: "approved",
     },
+    // Task #71: asked on an open game, to the guardian alone.
+    {
+      id: "r-open",
+      game_id: "g-open",
+      player_id: "kid",
+      message: null,
+      created_at: "2026-10-26T12:00:00Z",
+      status: "pending",
+      idempotency_key: "guardian-only:g-open",
+    },
+    // Asked the same way, but the host has since turned approval on: the host answers too.
+    {
+      id: "r-now-queue",
+      game_id: "g-now-queue",
+      player_id: "kid",
+      message: null,
+      created_at: "2026-10-26T13:00:00Z",
+      status: "pending",
+      idempotency_key: "guardian-only:g-now-queue",
+    },
   ],
   team_invites: [],
   teams: [],
@@ -53,8 +73,18 @@ function builder(table: string) {
   return chain;
 }
 
+const policyCalls: unknown[] = [];
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (t: string) => builder(t) },
+  supabase: {
+    from: (t: string) => builder(t),
+    rpc: (name: string, args: { _game_id: string }) => {
+      policyCalls.push([name, args]);
+      return Promise.resolve({
+        data: [{ requires_approval: args._game_id !== "g-open" }],
+        error: null,
+      });
+    },
+  },
 }));
 vi.mock("@/lib/child-safety", () => ({
   useMyChildren: () => ({
@@ -73,13 +103,29 @@ function wrapper({ children }: { children: ReactNode }) {
 describe("useGuardianApprovals", () => {
   it("lists requests the host already approved, and says so", async () => {
     const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
-    await waitFor(() => expect(result.current.requests).toHaveLength(2));
+    await waitFor(() => expect(result.current.requests).toHaveLength(4));
     const statuses = requestFilters.find((f) => f.column === "status");
     expect(statuses?.values).toEqual(["pending", "approved"]);
     expect(result.current.requests.map((r) => [r.id, r.hostApproved])).toEqual([
       ["r-waiting", false],
       ["r-host-yes", true],
+      ["r-open", false],
+      ["r-now-queue", false],
     ]);
+  });
+
+  it("says when the guardian's answer is the only one needed (an open game, task #71)", async () => {
+    const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
+    await waitFor(() => expect(result.current.requests).toHaveLength(4));
+    expect(result.current.requests.map((r) => [r.id, r.guardianOnly])).toEqual([
+      ["r-waiting", false],
+      ["r-host-yes", false],
+      ["r-open", true],
+      ["r-now-queue", false],
+    ]);
+    // The public join policy is read only for the requests sent to the guardian alone.
+    expect(policyCalls).toContainEqual(["get_game_join_policy", { _game_id: "g-open" }]);
+    expect(policyCalls).not.toContainEqual(["get_game_join_policy", { _game_id: "g1" }]);
   });
 });
 

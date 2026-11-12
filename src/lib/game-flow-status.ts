@@ -107,8 +107,15 @@ export function computePlayerFlowStatus(input: {
   const isPaid = !!settings && Number(settings.entry_fee ?? 0) > 0;
   const latest = submissions[0] ?? null;
 
-  if (joinRequest?.status === "rejected") return "rejected";
-  if (joinRequest?.status === "pending") return "requested";
+  // On an open game (requires_approval false) the host never answers a request: a guarded minor's request to their
+  // parent stays "pending" (or "rejected" after the parent's no) while they pay and join. Once a payment is under way,
+  // or they are on the roster, that request no longer says where they stand, so the payment and the roster do.
+  const openGame = !!settings && settings.requires_approval === false;
+  const underWay = isJoined || (!!latest && latest.status !== "rejected");
+  const requestDecides = !(openGame && underWay);
+
+  if (requestDecides && joinRequest?.status === "rejected") return "rejected";
+  if (requestDecides && joinRequest?.status === "pending") return "requested";
 
   const approved = joinRequest?.status === "approved";
 
