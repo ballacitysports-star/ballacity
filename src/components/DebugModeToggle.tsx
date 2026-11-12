@@ -1,7 +1,13 @@
 import { Bug } from "lucide-react";
 import { useDebugMode } from "@/lib/debug-mode";
 
+// Developer aid for spotting SSR vs client differences. Never ship it to end users.
 export function DebugModeToggle() {
+  if (!import.meta.env.DEV) return null;
+  return <DebugModeToggleButton />;
+}
+
+function DebugModeToggleButton() {
   const [on, setOn] = useDebugMode();
   return (
     <button
