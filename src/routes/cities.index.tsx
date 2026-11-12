@@ -9,6 +9,7 @@ import { formatWhen } from "@/lib/format";
 import { LAUNCH_CITIES, cityBySlug, cityLabel, distanceKm } from "@/lib/launch-cities";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const CITY_KEY = "bc.publicFeedCity";
 const DEFAULT_CITY = LAUNCH_CITIES[0];
@@ -98,6 +99,7 @@ function PublicFeed() {
   const { citySlug, listings: all } = Route.useLoaderData();
   const { city: cityParam, sport } = Route.useSearch();
   const navigate = useNavigate({ from: "/cities/" });
+  const authSearch = useAuthSearchHere();
   const city = cityBySlug(citySlug) ?? DEFAULT_CITY;
   const [locating, setLocating] = useState(false);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -321,6 +323,7 @@ function PublicFeed() {
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/auth"
+              search={authSearch}
               className="inline-flex min-h-11 items-center rounded-full bg-lime px-5 text-sm font-bold text-primary-foreground"
             >
               Sign up or sign in

@@ -195,6 +195,18 @@ export const EDITABLE_PROFILE_FIELDS = [
   "search_radius_mi",
 ] as const;
 
+/**
+ * The profile columns superadminUserDetail returns: what the user sheet in UsersTab shows (the name, the editable
+ * fields, the suspension state). Named rather than `*`, so private columns (a birthday, a guardian's emergency
+ * contact, anything added later) do not reach the superadmin's browser through this response.
+ */
+export const USER_DETAIL_PROFILE_COLUMNS = [
+  "id",
+  ...EDITABLE_PROFILE_FIELDS,
+  "suspended_at",
+  "suspended_reason",
+] as const;
+
 export async function countRows(admin: any, table: string, apply?: (q: any) => any) {
   let q = admin.from(table).select("*", { count: "exact", head: true });
   if (apply) q = apply(q);

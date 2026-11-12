@@ -78,6 +78,7 @@ import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow"
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
@@ -139,6 +140,7 @@ function ProfileRoute() {
 }
 
 function PlayerProfile() {
+  const authSearch = useAuthSearchHere();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
@@ -436,6 +438,7 @@ function PlayerProfile() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
         >
           Sign in

@@ -9,8 +9,9 @@
  */
 export function manualChunks(id: string): string | undefined {
   if (!id.includes("node_modules")) return;
-  if (/[\\/]node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/.test(id))
-    return "vendor-motion";
+  // framer-motion is deliberately not forced into one chunk: the shell imports MotionConfig,
+  // so a single "vendor-motion" chunk put the whole animation engine (47 kB gzip) on every
+  // first paint. Left to Rollup, the shell keeps only the config modules (P3-4).
   if (/[\\/]node_modules[\\/]zod[\\/]/.test(id)) return "vendor-zod";
   if (/[\\/]node_modules[\\/]@supabase[\\/](realtime-js|storage-js|functions-js|phoenix)/.test(id))
     return "vendor-supabase-extras";

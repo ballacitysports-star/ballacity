@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { isManagedUser } from "@/lib/managed-children";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 export const Route = createFileRoute("/account/security")({
   head: () =>
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/account/security")({
 
 function AccountSecurityPage() {
   const nav = useNavigate();
+  const authSearch = useAuthSearchHere();
   const [user, setUser] = useState<User | null>(null);
   const [checked, setChecked] = useState(false);
   const [email, setEmail] = useState("");
@@ -105,6 +107,7 @@ function AccountSecurityPage() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
         >
           Go to sign in

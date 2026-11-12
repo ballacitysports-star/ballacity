@@ -9,6 +9,7 @@ import {
   buildOrFilter,
   countRows,
   EDITABLE_PROFILE_FIELDS,
+  USER_DETAIL_PROFILE_COLUMNS,
 } from "@/lib/superadmin.server";
 import {
   MONETIZATION_SETTING_KEY,
@@ -209,7 +210,11 @@ export const superadminUserDetail = createServerFn({ method: "POST" })
       { data: subs },
       { data: authUser },
     ] = await Promise.all([
-      admin.from("profiles").select("*").eq("id", uid).maybeSingle(),
+      admin
+        .from("profiles")
+        .select(USER_DETAIL_PROFILE_COLUMNS.join(", "))
+        .eq("id", uid)
+        .maybeSingle(),
       admin.from("user_roles").select("role").eq("user_id", uid),
       admin.from("teams").select("id, name, kind, handle, hidden_at").eq("owner_id", uid),
       admin.from("trainer_orgs").select("id, name, handle, hidden_at").eq("owner_id", uid),

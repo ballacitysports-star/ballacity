@@ -23,6 +23,7 @@ import { ListSkeleton } from "@/components/ui/loading-state";
 import { FamilyInboxSection } from "@/components/child/FamilyInboxSection";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { BackButton } from "@/components/layout/BackButton";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -53,6 +54,7 @@ function MessagesInboxGate() {
 
 function MessagesInbox() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { tab: tabRaw } = Route.useSearch();
   const top: TopTab = tabRaw === "alerts" ? "alerts" : "messages";
   const nav = Route.useNavigate();
@@ -140,6 +142,7 @@ function MessagesInbox() {
         <h1 className="page-title mb-2">Sign in to your inbox</h1>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in

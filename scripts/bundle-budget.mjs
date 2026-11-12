@@ -6,11 +6,14 @@
  *   node scripts/bundle-budget.mjs [assetsDir] --update   # write the measured sizes as the baseline
  *
  * Sizes are gzip (level 9) of every .js file in the client assets directory:
- *   entry    the chunk every other chunk imports from (the app shell)
- *   largest  the biggest chunk other than the entry
- *   total    all client JS
+ *   entry       the chunk every other chunk imports from (the app shell)
+ *   firstPaint  the entry plus every chunk it imports statically: what every page downloads
+ *               before it can render (a vendor chunk the shell imports counts here, which the
+ *               entry size alone missed)
+ *   largest     the biggest chunk other than the entry
+ *   total       all client JS
  *
- * Fails when entry or total grows more than 5 percent over build/bundle-baseline.json,
+ * Fails when entry, firstPaint or total grows more than 5 percent over build/bundle-baseline.json,
  * or a hard limit from the Phase 0 plan (section 9.2) is broken: any chunk other than
  * the entry over 150 kB, or total over 1.5 MB. The plan's entry limit (250 kB) is not
  * met yet, so it is reported, not enforced; the ratchet keeps the entry from growing
@@ -25,6 +28,20 @@ export const BASELINE_FILE = "build/bundle-baseline.json";
 export const LIMITS = { entryKb: 250, chunkKb: 150, totalKb: 1500, growth: 0.05 };
 
 const IMPORT_RE = /(?:from\s*|import\s*\(\s*)["']\.\/([^"']+\.js)["']/g;
+/** Static imports only: `from "./x.js"` and a bare `import "./x.js"`, never `import("./x.js")`. */
+const STATIC_IMPORT_RE = /(?:\bfrom\s*|\bimport\s*)["']\.\/([^"']+\.js)["']/g;
+
+/** The chunk and every chunk it imports statically, transitively. */
+export function staticClosure(start, sources) {
+  const seen = new Set();
+  const visit = (name) => {
+    if (seen.has(name) || sources[name] === undefined) return;
+    seen.add(name);
+    for (const m of sources[name].matchAll(STATIC_IMPORT_RE)) visit(m[1]);
+  };
+  visit(start);
+  return [...seen];
+}
 
 /** Which chunks each chunk imports, by file name. */
 export function importCounts(sources) {
@@ -46,8 +63,16 @@ export function measure(chunks) {
   const kb = (bytes) => Math.round((bytes / 1024) * 10) / 10;
   const others = names.filter((n) => n !== entry);
   const largestName = others.sort((a, b) => chunks[b].gzipBytes - chunks[a].gzipBytes)[0] ?? null;
+  const firstPaintFiles = staticClosure(
+    entry,
+    Object.fromEntries(names.map((n) => [n, chunks[n].source])),
+  );
   return {
     entry: { file: entry, kb: kb(chunks[entry].gzipBytes) },
+    firstPaint: {
+      kb: kb(firstPaintFiles.reduce((s, n) => s + chunks[n].gzipBytes, 0)),
+      files: firstPaintFiles.length,
+    },
     largest: largestName ? { file: largestName, kb: kb(chunks[largestName].gzipBytes) } : null,
     totalKb: kb(names.reduce((s, n) => s + chunks[n].gzipBytes, 0)),
     files: names.length,
@@ -62,6 +87,11 @@ export function judge(m, baseline, limits = LIMITS) {
   if (baseline && grew(m.entry.kb, baseline.entryKb)) {
     failures.push(
       `entry chunk grew from ${baseline.entryKb} kB to ${m.entry.kb} kB gzip (more than ${limits.growth * 100}%)`,
+    );
+  }
+  if (baseline?.firstPaintKb && m.firstPaint && grew(m.firstPaint.kb, baseline.firstPaintKb)) {
+    failures.push(
+      `first-paint JS (the entry and the chunks it imports up front) grew from ${baseline.firstPaintKb} kB to ${m.firstPaint.kb} kB gzip (more than ${limits.growth * 100}%)`,
     );
   }
   if (baseline && grew(m.totalKb, baseline.totalKb)) {
@@ -106,11 +136,12 @@ function main(argv) {
     return 1;
   }
   console.log(
-    `Bundle: entry ${m.entry.kb} kB (${m.entry.file}), largest other ${m.largest?.kb ?? 0} kB (${m.largest?.file ?? "-"}), total ${m.totalKb} kB gzip across ${m.files} files`,
+    `Bundle: entry ${m.entry.kb} kB (${m.entry.file}), first paint ${m.firstPaint.kb} kB across ${m.firstPaint.files} file(s), largest other ${m.largest?.kb ?? 0} kB (${m.largest?.file ?? "-"}), total ${m.totalKb} kB gzip across ${m.files} files`,
   );
   if (update) {
     const baseline = {
       entryKb: m.entry.kb,
+      firstPaintKb: m.firstPaint.kb,
       totalKb: m.totalKb,
       measuredAt: new Date().toISOString().slice(0, 10),
     };

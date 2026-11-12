@@ -9,11 +9,17 @@ const { askSupportAssistant, toast } = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children, onClick, className }: any) => (
-    <a href={to} onClick={onClick} className={className}>
+  Link: ({ to, search, children, onClick, className }: any) => (
+    <a
+      href={search?.next ? `${to}?next=${encodeURIComponent(search.next)}` : to}
+      onClick={onClick}
+      className={className}
+    >
       {children}
     </a>
   ),
+  useLocation: ({ select }: { select: (l: { href: string }) => unknown }) =>
+    select({ href: "/trainers/t1?view=book" }),
 }));
 vi.mock("@/lib/support/support.functions", () => ({ askSupportAssistant }));
 vi.mock("sonner", () => ({ toast }));
@@ -50,7 +56,10 @@ describe("signed out: written answers only", () => {
   it("offers a sign-in, no chat box, and the quick answers", () => {
     render(<SupportPanel signedIn={false} />);
     expect(screen.queryByLabelText(/ask ballacity help/i)).toBeNull();
-    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/auth");
+    // Signing in from here comes back to the page the visitor was reading.
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe(
+      `/auth?next=${encodeURIComponent("/trainers/t1?view=book")}`,
+    );
     for (const t of SUPPORT_TOPICS)
       expect(screen.getByRole("button", { name: t.title })).toBeTruthy();
     expect(askSupportAssistant).not.toHaveBeenCalled();

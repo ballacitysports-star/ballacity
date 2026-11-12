@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/LeaveFlowButton", () => ({ LeaveFlowButton: () => null }));
 vi.mock("@/components/game-detail/GameDetailBits", () => ({ formatCooldownLabel: () => "" }));
-vi.mock("@/lib/payments", () => ({ JOIN_RESUBMIT_MAX_ATTEMPTS: 3 }));
+vi.mock("@/lib/payments", () => ({
+  JOIN_RESUBMIT_MAX_ATTEMPTS: 3,
+  joinResubmitCooldownRemainingMs: () => 0,
+}));
 
 const { GameApprovalBanner } = await import("./GameApprovalBanner");
 const { guardedOpenCopy } = await import("@/lib/guarded-open-join");
@@ -16,7 +19,6 @@ afterEach(cleanup);
 
 const base = {
   capReached: false,
-  cooldownMs: 0,
   fee: 0,
   game: { id: "g1", title: "Run" } as never,
   isHost: false,
