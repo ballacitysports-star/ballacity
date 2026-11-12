@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
 
 /**
  * E2E: the pay screen must fetch host payment options exclusively via
@@ -25,14 +26,6 @@ const ENTRY_FEE = 15;
 
 function urlIncludes(url: string | URL, needle: string) {
   return String(url).includes(needle);
-}
-
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
 }
 
 async function mockEmptyLists(page: Page) {

@@ -15,10 +15,13 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => inputSchema.parse(d))
   .handler(async ({ data, context }) => {
     const callerId = context.userId;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.user_id !== callerId) {
       // Verify the caller has a legitimate relationship with the target user
-      // before sending them an in-app notification.
-      const { data: allowed, error: relErr } = await context.supabase.rpc("can_notify" as any, {
+      // before sending them an in-app notification. Asked with the service
+      // role: `_caller` is the verified session user, and the database gives
+      // a signed-in client a fixed answer for this two-party helper (SEC-2).
+      const { data: allowed, error: relErr } = await supabaseAdmin.rpc("can_notify" as any, {
         _caller: callerId,
         _target: data.user_id,
       });
@@ -26,7 +29,6 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
       if (!allowed) throw new Error("Not authorized to notify this user");
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: data.user_id,
       type: data.type,
