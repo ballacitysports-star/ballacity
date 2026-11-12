@@ -78,10 +78,12 @@ import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow"
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
+import { isGuardianOnlyRequest, listablePlayerRequests } from "@/lib/guarded-open-join";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -138,6 +140,7 @@ function ProfileRoute() {
 }
 
 function PlayerProfile() {
+  const authSearch = useAuthSearchHere();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
@@ -257,7 +260,12 @@ function PlayerProfile() {
           filter: `host_id=eq.${profileUser.id}`,
         },
         (payload) => {
-          applyPayload(payload as any, "host");
+          // A guarded minor's request to their guardian on an open game is not the host's to answer: the refresh
+          // below decides whether it shows, so it does not flash into the list first.
+          if (
+            !isGuardianOnlyRequest((payload as { new?: { idempotency_key?: string | null } }).new)
+          )
+            applyPayload(payload as any, "host");
           refreshRequests({ silent: true });
         },
       )
@@ -276,12 +284,17 @@ function PlayerProfile() {
     return m;
   }, [hosted]);
 
-  const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
+  // A request to the parent on an open game stays pending once the child is in; leave it out then.
+  const listedMine = useMemo(
+    () => listablePlayerRequests(myRequests, joinedGameIds),
+    [myRequests, joinedGameIds],
+  );
+  const allRequests = useMemo(() => [...listedMine, ...hostRequests], [listedMine, hostRequests]);
   const filteredRequests = useMemo(() => {
     if (requestFilter === "all") return allRequests;
     if (requestFilter === "host") return hostRequests;
-    return myRequests;
-  }, [requestFilter, allRequests, hostRequests, myRequests]);
+    return listedMine;
+  }, [requestFilter, allRequests, hostRequests, listedMine]);
   const pendingRequests = filteredRequests.filter((r) => r.status === "pending");
   const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
@@ -425,6 +438,7 @@ function PlayerProfile() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
         >
           Sign in

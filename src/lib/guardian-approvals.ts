@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyChildren } from "@/lib/child-safety";
+import { isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 
 export type GuardianTeamInvite = {
   id: string;
@@ -32,19 +33,24 @@ export type GuardianJoinRequest = {
   createdAt: string;
   /** The host already said yes; the child is waiting only on the guardian. */
   hostApproved: boolean;
+  /** The game is open (no host approval): the guardian's answer is the only one needed. */
+  guardianOnly: boolean;
 };
 
 const ERRORS: Record<string, string> = {
   NOT_GUARDIAN: "You're not linked as this child's guardian.",
+  GUARDIAN_NOT_ELIGIBLE:
+    "Your account can't approve for a child right now. Contact support if you think this is a mistake.",
   INVITE_NOT_PENDING: "This invite was already answered.",
   REQUEST_NOT_PENDING: "This request was already answered.",
-  ALREADY_ON_ROSTER:
-    "They're already in this game. Open the game to cancel their spot instead.",
+  ALREADY_ON_ROSTER: "They're already in this game. Open the game to cancel their spot instead.",
   INVITE_NOT_FOUND: "That invite no longer exists.",
   REQUEST_NOT_FOUND: "That request no longer exists.",
   WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
   INVITE_EXPIRED: "This invite has expired. Ask the team for a new one.",
   CHILD_ACTIVITY_LOCKED: "Your child's activity is paused, so they can't join right now.",
+  AGE_VERIFICATION_REQUIRED:
+    "Your child's account needs a date of birth before they can join a team. Once it's added, approve again.",
   AUTH_REQUIRED: "Please sign in again.",
 };
 
@@ -75,7 +81,7 @@ export function useGuardianApprovals() {
           .order("created_at", { ascending: false }),
         supabase
           .from("join_requests")
-          .select("id, game_id, player_id, message, created_at, status")
+          .select("id, game_id, player_id, message, created_at, status, idempotency_key")
           .in("player_id", ids)
           // A host who answers first must not hide the request from the guardian.
           .in("status", ["pending", "approved"])
@@ -95,6 +101,19 @@ export function useGuardianApprovals() {
           ? supabase.from("hosted_games").select("id, title, date").in("id", gameIds)
           : Promise.resolve({ data: [] as { id: string; title: string; date: string }[] }),
       ]);
+      // A request sent to the guardian alone is only theirs to answer while the game stays open; the public join
+      // policy says whether it still is (the host may have turned approval on since).
+      const guardianOnlyGames = [
+        ...new Set((req.data ?? []).filter(isGuardianOnlyRequest).map((r) => r.game_id)),
+      ];
+      const openGames = new Set<string>();
+      await Promise.all(
+        guardianOnlyGames.map(async (id) => {
+          const { data } = await supabase.rpc("get_game_join_policy", { _game_id: id });
+          const row = Array.isArray(data) ? data[0] : data;
+          if (row && row.requires_approval === false) openGames.add(id);
+        }),
+      );
       const teamName = new Map((teams.data ?? []).map((t) => [t.id, t.name]));
       const game = new Map((games.data ?? []).map((g) => [g.id, g]));
 
@@ -119,6 +138,8 @@ export function useGuardianApprovals() {
         message: r.message ?? null,
         createdAt: r.created_at,
         hostApproved: r.status === "approved",
+        guardianOnly:
+          r.status === "pending" && isGuardianOnlyRequest(r) && openGames.has(r.game_id),
       }));
       return { invites, requests };
     },

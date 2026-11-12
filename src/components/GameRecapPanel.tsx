@@ -68,7 +68,7 @@ export function ReelManageRow({ reel, onChanged }: { reel: RecapSummary; onChang
           <button
             onClick={handleDelete}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-full bg-destructive-strong px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
           >
             {busy === "delete" ? (
               <Loader2 className="h-3 w-3 animate-spin" />

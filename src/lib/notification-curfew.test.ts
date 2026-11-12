@@ -231,7 +231,14 @@ describe("notificationCurfewDecision", () => {
 
 type Row = Record<string, unknown> | null;
 
-function fakeAdmin(rows: { settings?: Row; profile?: Row; controls?: Row; throwOn?: string }) {
+function fakeAdmin(rows: {
+  settings?: Row;
+  profile?: Row;
+  controls?: Row;
+  throwOn?: string;
+  /** This table's read answers with an error, as supabase-js does (it does not throw). */
+  errorOn?: string;
+}) {
   const table = (name: string) => {
     if (rows.throwOn === name) {
       throw new Error(`boom: ${name}`);
@@ -245,7 +252,10 @@ function fakeAdmin(rows: { settings?: Row; profile?: Row; controls?: Row; throwO
     const builder: any = {
       select: () => builder,
       eq: () => builder,
-      maybeSingle: async () => ({ data, error: null }),
+      maybeSingle: async () =>
+        rows.errorOn === name
+          ? { data: null, error: { message: `${name} unavailable` } }
+          : { data, error: null },
     };
     return builder;
   };
@@ -268,8 +278,11 @@ describe("loadAgePolicy", () => {
     expect(await loadAgePolicy(fakeAdmin({}))).toEqual(DEFAULT_AGE_POLICY);
   });
 
-  it("falls back to the default policy when the lookup throws", async () => {
-    expect(await loadAgePolicy(fakeAdmin({ throwOn: "app_settings" }))).toEqual(DEFAULT_AGE_POLICY);
+  it("never falls back to the default on a failed lookup: a stored window may be stricter", async () => {
+    await expect(loadAgePolicy(fakeAdmin({ throwOn: "app_settings" }))).rejects.toThrow();
+    await expect(loadAgePolicy(fakeAdmin({ errorOn: "app_settings" }))).rejects.toThrow(
+      /age policy lookup failed/,
+    );
   });
 });
 
@@ -346,6 +359,32 @@ describe("curfewGateFor", () => {
   it("treats a missing profile as unknown age and still sends", async () => {
     const gate = await curfewGateFor(fakeAdmin({}), "u7", night);
     expect(gate).toEqual({ action: "send" });
+  });
+
+  describe("fails closed: a lookup that fails is never read as 'adult' or 'no controls'", () => {
+    // A minor at 2am, inside quiet hours, with a guardian who switched notifications off.
+    const minorAtNight = {
+      profile: { age_cohort: "teen_13_15", timezone: "America/New_York" },
+      controls: { notifications: false },
+    };
+
+    it.each(["profiles", "child_controls", "app_settings"])(
+      "throws when the %s read answers with an error",
+      async (table) => {
+        await expect(
+          curfewGateFor(fakeAdmin({ ...minorAtNight, errorOn: table }), "u9", night),
+        ).rejects.toThrow(/lookup failed/);
+      },
+    );
+
+    it.each(["profiles", "child_controls", "app_settings"])(
+      "throws when the %s read throws",
+      async (table) => {
+        await expect(
+          curfewGateFor(fakeAdmin({ ...minorAtNight, throwOn: table }), "u9", night),
+        ).rejects.toThrow();
+      },
+    );
   });
 
   it("uses the stored policy window rather than the hard-coded default", async () => {

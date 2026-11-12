@@ -33,6 +33,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -75,6 +76,9 @@
 
   --destructive: oklch(0.62 0.24 25); /* IG heart red */
   --destructive-foreground: oklch(0.99 0 0);
+  /* Red behind white text (destructive buttons, "Full" pills): 4.8:1 for WCAG AA, where --destructive is 4.0:1.
+     Red text keeps --destructive, which reads 5.1:1 on black. */
+  --destructive-strong: oklch(0.57 0.24 25);
 
   --success: oklch(0.72 0.17 155);
   --success-foreground: oklch(0.14 0 0);
@@ -559,14 +563,51 @@ button:disabled,
     animation-delay: var(--enter-delay, 0ms);
     transform-origin: left center;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .enter-up,
-    .enter-fade,
-    .enter-pop,
-    .float-soft,
-    .grow-x {
-      animation: none;
-    }
+}
+
+/* "Reduce motion" stops the CSS animations that this file and the Tailwind
+   animate-* utilities start, all but the spinner.
+
+   That is the five animations above, Tailwind's animate-pulse (skeletons,
+   live dots) and animate-bounce, and tw-animate-css, which has no
+   reduced-motion rule of its own: animate-in / animate-out (how every dialog,
+   sheet, popover, menu, select and tooltip enters and leaves), the accordion
+   height animations, and the one-time-code caret blink.
+
+   `animation: none` leaves each element as it is at rest, which is the
+   visible state: the enter keyframes only say where an element comes from,
+   and the pulse and the caret rest at full opacity (a steady caret still
+   marks the active slot, which also has a ring). When something closes,
+   Radix reads the computed animation-name, finds `none`, and unmounts it at
+   once instead of waiting for an exit animation, so dialogs still open and
+   close; they cut instead of fading.
+
+   animate-spin keeps turning: it says work is in progress, and a spinner that
+   stops reads as a hung page. New code should prefer motion-safe: on the
+   class itself; reduced-motion.test.ts fails on any animate-* class that is
+   not motion-safe:, not switched off here, and not allowlisted, and on any
+   animation this file starts that is not listed here or allowlisted. A class
+   with Tailwind's important modifier (!) beats this block, so it has to be
+   motion-safe:.
+
+   Unlayered on purpose, like the focus ring and the iOS zoom fix above. The
+   state variants (data-[state=open]:animate-in) live in @layer utilities with
+   more specificity than these attribute selectors; an unlayered rule beats
+   any layered one without !important. [class*=…] rather than .animate-in so
+   that every variant of the class is matched. */
+@media (prefers-reduced-motion: reduce) {
+  .enter-up,
+  .enter-fade,
+  .enter-pop,
+  .float-soft,
+  .grow-x,
+  [class*="animate-pulse"],
+  [class*="animate-bounce"],
+  [class*="animate-in"],
+  [class*="animate-out"],
+  [class*="animate-accordion-"],
+  [class*="animate-caret-blink"] {
+    animation: none;
   }
 }
 

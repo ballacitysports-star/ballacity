@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Clock, Loader2, UserCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFollow } from "@/lib/follows";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 type Props = {
   userId: string;
@@ -16,6 +17,7 @@ type Props = {
  */
 export function FollowButton({ userId, size = "md", className = "" }: Props) {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const follow = useFollow(userId);
   const isSelf = user?.id === userId;
 
@@ -31,6 +33,7 @@ export function FollowButton({ userId, size = "md", className = "" }: Props) {
     return (
       <Link
         to="/auth"
+        search={authSearch}
         className={`${base} border border-border text-foreground hover:border-lime ${className}`}
       >
         <UserPlus className={icon} /> Follow

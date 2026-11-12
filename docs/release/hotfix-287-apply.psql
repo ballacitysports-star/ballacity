@@ -4,7 +4,8 @@
 -- Nothing is applied if the migration file is not the reviewed text (sha256 below), if the ledger already has the
 -- version (primary key), if a lock is not granted within 5 s, or on any other error.
 -- The ledger row follows the release template (version; name = the file stem; statements = ARRAY[file text]), which
--- is what the release preflight's pinned_history check (PR #294) expects for this version.
+-- is what docs/release/hotfix-287-verify.sql compares with the file text (statements[1]). (Corrected 2026-11-11: the
+-- release preflight's pinned_history check that also expects it exists only in the unmerged PR #294.)
 \set ON_ERROR_STOP on
 \set content `cat supabase/migrations/20261031120000_close_live_write_holes.sql`
 -- psql's backquote expansion drops the file's one trailing newline; add it back to compare with the file's sha256.

@@ -10,6 +10,7 @@ import {
   subscribeToMyTrainerRequests,
   type TrainerSessionRequest,
 } from "@/lib/trainer-requests";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 function useMyTrainerRequest(trainerId: string) {
   const { user } = useAuth();
@@ -45,6 +46,7 @@ export function TrainerActions({
 }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [bookOpen, setBookOpen] = useState(false);
   const { row, refresh } = useMyTrainerRequest(org.id);
   const venueOffered =
@@ -57,7 +59,7 @@ export function TrainerActions({
   const requireAuth = () => {
     if (!user) {
       toast("Sign in to continue");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearch });
       return false;
     }
     return true;

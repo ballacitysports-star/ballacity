@@ -49,6 +49,20 @@ BEGIN
   RETURN rid;
 END $$;
 
+-- A minor asks to join and their guardian approves (the host does not answer): since 20261111160000 a minor with a
+-- guardian takes a place in any game, an instant-join one included, only on a request their guardian approved.
+CREATE FUNCTION pg_temp.guardian_ok(_game text, _player text) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE rid uuid := t.id('req-' || _game || '-' || _player);
+BEGIN
+  PERFORM t.as_user(t.id(_player));
+  INSERT INTO public.join_requests (id, game_id, player_id, host_id, idempotency_key)
+  VALUES (rid, _game, t.id(_player), t.id('host'), 'g-' || _game || '-' || _player);
+  PERFORM t.as_user(t.id('guardian'));
+  PERFORM public.guardian_approve_join_request(rid, true);
+  PERFORM t.reset();
+  RETURN rid;
+END $$;
+
 -- ---- instant-join games ----------------------------------------------------
 SELECT t.as_user(t.id('adult'));
 SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('adult')),
@@ -160,8 +174,16 @@ SELECT t.reset();
 
 -- ---- a minor, and what their guardian has set ------------------------------
 SELECT t.as_user(t.id('teenmid'));
+SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('teenmid')),
+  'GUARDIAN_APPROVAL_REQUIRED', 'a teen with a guardian cannot join an instant-join game with no request their guardian approved');
+SELECT t.reset();
+-- If the gate ever let that join through, take the place back so the rest of the file still runs (a guardian cannot
+-- approve for a child already on the roster).
+DELETE FROM public.game_participants WHERE game_id = 'open' AND user_id = t.id('teenmid');
+SELECT pg_temp.guardian_ok('open', 'teenmid');
+SELECT t.as_user(t.id('teenmid'));
 SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('teenmid')),
-  'a teen with a guardian joins an instant-join game when nothing is switched off');
+  'a teen with a guardian joins an instant-join game on the guardian''s approval when nothing is switched off');
 SELECT t.reset();
 DELETE FROM public.game_participants WHERE user_id = t.id('teenmid');
 
@@ -200,10 +222,10 @@ SELECT t.reset();
 UPDATE public.parental_consents SET status = 'approved', revoked_at = NULL WHERE child_user_id = t.id('teenmid');
 
 -- A minor with a guardian cannot skip the host's approval, or the guardian's, by
--- writing the roster row themselves with no request.
+-- writing the roster row themselves with no request. The guardian's gate answers first (20261111160000).
 SELECT t.as_user(t.id('teenmid'));
 SELECT t.throws(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'approval', t.id('teenmid')),
-  'GAME_APPROVAL_REQUIRED', 'a minor cannot skip the host''s approval with no request');
+  'GUARDIAN_APPROVAL_REQUIRED', 'a minor cannot skip the guardian''s and the host''s approval with no request');
 SELECT t.reset();
 
 -- Host-approved, but the guardian has not approved this request yet.
@@ -220,9 +242,10 @@ SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) V
 SELECT t.reset();
 
 -- Under 13: off until the guardian turns it on, and consent still applies.
+SELECT pg_temp.guardian_ok('open', 'kidyoung');
 SELECT t.as_user(t.id('kidyoung'));
 SELECT t.lives(format('INSERT INTO public.game_participants (game_id, user_id) VALUES (%L, %L)', 'open', t.id('kidyoung')),
-  'an under-13 whose guardian turned joining on can join an instant-join game');
+  'an under-13 whose guardian turned joining on can join an instant-join game they approved');
 SELECT t.reset();
 DELETE FROM public.game_participants WHERE user_id = t.id('kidyoung');
 UPDATE public.child_controls SET game_participation = false WHERE child_user_id = t.id('kidyoung');

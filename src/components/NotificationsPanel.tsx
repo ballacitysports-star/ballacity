@@ -47,9 +47,15 @@ import { resolveNotificationTarget } from "@/lib/deep-links";
 import { useNotificationActorId, usePrefetchNotificationActors } from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  loadPushDeliveryIssues,
+  type DeliveryIssue,
+  type DeliveryLogReader,
+} from "@/lib/push-delivery";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;
@@ -62,6 +68,7 @@ const iconFor = (type: string) => {
 
 export function NotificationsPanel() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [items, setItems] = useState<Notification[]>([]);
   const [fetching, setFetching] = useState(true);
   const nav = useNavigate();
@@ -176,6 +183,7 @@ export function NotificationsPanel() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in
@@ -470,12 +478,8 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="micro-label text-muted-foreground text-center">
-            In-app
-          </div>
-          <div className="micro-label text-muted-foreground text-center">
-            Push
-          </div>
+          <div className="micro-label text-muted-foreground text-center">In-app</div>
+          <div className="micro-label text-muted-foreground text-center">Push</div>
           {categories.map((cat) => (
             <PrefRow key={cat} category={cat} prefs={prefs} />
           ))}
@@ -577,9 +581,7 @@ function PushPrompt() {
 }
 
 function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
-  const [failures, setFailures] = useState<
-    Array<{ id: string; created_at: string; error: string | null; notification_id: string | null }>
-  >([]);
+  const [failures, setFailures] = useState<DeliveryIssue[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -595,25 +597,11 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
     if (!userId) return;
     let cancelled = false;
     const load = async () => {
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data } = await supabase
-        .from("notification_delivery_log" as any)
-        .select("id, created_at, error, notification_id, status, channel")
-        .eq("user_id", userId)
-        .eq("channel", "push")
-        .in("status", ["failed", "skipped"])
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (!cancelled)
-        setFailures(
-          ((data ?? []) as any[]).map((r) => ({
-            id: r.id,
-            created_at: r.created_at,
-            error: r.error,
-            notification_id: r.notification_id,
-          })),
-        );
+      // Failed or skipped pushes from the last 7 days, without the ones held for a minor's quiet
+      // hours (or a settings check) and the ones dropped as expired: those are not a problem.
+      // "No subscribers" stays: it prompts the member to turn push on.
+      const rows = await loadPushDeliveryIssues(supabase as unknown as DeliveryLogReader, userId);
+      if (!cancelled) setFailures(rows);
     };
     load();
     const channel = supabase

@@ -65,7 +65,7 @@ export function PaymentRequiredBanner({
           onClick={() => navigate({ to: "/games/$gameId/pay", params: { gameId } })}
           className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold ${
             isRejected
-              ? "bg-destructive text-destructive-foreground"
+              ? "bg-destructive-strong text-destructive-foreground"
               : "bg-lime-gradient text-primary-foreground glow-lime"
           }`}
         >

@@ -3,12 +3,12 @@ import { playerWaitCopy, type JoinWait } from "@/lib/join-guardian-status";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { JOIN_RESUBMIT_MAX_ATTEMPTS, type JoinRequest } from "@/lib/payments";
 import { formatCooldownLabel } from "@/components/game-detail/GameDetailBits";
+import { useResubmitCooldownMs } from "@/hooks/use-resubmit-cooldown";
 import { type Game } from "@/lib/sample-data";
 import { type PlayerFlowStatus } from "@/lib/game-flow-status";
 
 export type GameApprovalBannerProps = {
   capReached: boolean;
-  cooldownMs: number;
   fee: number;
   game: Game;
   isHost: boolean;
@@ -18,13 +18,14 @@ export type GameApprovalBannerProps = {
   myHoldLabel: string | null;
   myReq: JoinRequest | null;
   myWait: JoinWait | null;
+  /** A guarded minor on an open game: asking their parent, declined, or cleared to join or pay. */
+  guardedOpen?: { title: string; body: string } | null;
   refreshStatus: () => Promise<void>;
   requiresApproval: boolean;
 };
 
 export function GameApprovalBanner({
   capReached,
-  cooldownMs,
   fee,
   game,
   isHost,
@@ -34,9 +35,12 @@ export function GameApprovalBanner({
   myHoldLabel,
   myReq,
   myWait,
+  guardedOpen = null,
   refreshStatus,
   requiresApproval,
 }: GameApprovalBannerProps) {
+  // Ticks once a second only while a resubmit cooldown runs.
+  const cooldownMs = useResubmitCooldownMs(myReq);
   return (
     <>
       {/* Approval status banner (player view).
@@ -64,6 +68,20 @@ export function GameApprovalBanner({
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {!isHost && !myWait && guardedOpen && (
+        <div
+          className="rounded-2xl border border-coral/40 bg-coral/10 p-4 flex items-start gap-3"
+          role="status"
+          aria-live="polite"
+          data-testid="guarded-open-join"
+        >
+          <Clock className="h-5 w-5 shrink-0 mt-0.5 text-coral" />
+          <div className="min-w-0">
+            <div className="font-display text-sm font-bold">{guardedOpen.title}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">{guardedOpen.body}</p>
           </div>
         </div>
       )}

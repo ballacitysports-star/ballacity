@@ -89,6 +89,12 @@ export async function planGuardianApprovalPush(
     });
     if (!inv || inv.invited_by !== input.callerId) return NOTHING;
     if (inv.status !== "pending" || inv.guardian_approved_at) return NOTHING;
+    // Written while a block stood between the manager and the child: it does not exist for the
+    // child or their guardians (team_invite_suppressions), so nobody is told.
+    const held = await one<{ invite_id: string }>(admin, "team_invite_suppressions", "invite_id", {
+      invite_id: input.id,
+    });
+    if (held) return NOTHING;
     const team = await one<{ name: string | null }>(admin, "teams", "name", { id: inv.team_id });
     childId = inv.invitee_id;
     what = `was invited to join ${team?.name?.trim() || "a team"}`;

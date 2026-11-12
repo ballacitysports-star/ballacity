@@ -35,9 +35,90 @@ describe("scrubbing (P0-8: no personal data)", () => {
     expect(out).toContain("https://x.supabase.co/rest/v1/profiles");
   });
 
+  it("removes the input values Postgres repeats in its errors, keeping the failure readable", () => {
+    expect(scrubMessage('invalid input syntax for type uuid: "jane-smith-1990"')).toBe(
+      'invalid input syntax for type uuid: "[value]"',
+    );
+    expect(scrubMessage('invalid input value for enum sport: "Janes Hoops"')).toBe(
+      'invalid input value for enum sport: "[value]"',
+    );
+    // A value with a space: the older token rule alone would keep "Smith".
+    const dup = scrubMessage(
+      'duplicate key value violates unique constraint "teams_name_key" Key (name)=(Jane Smith) already exists.',
+    );
+    expect(dup).not.toMatch(/Jane|Smith/);
+    expect(dup).toContain('violates unique constraint "teams_name_key"');
+    // Values holding brackets or quotes of their own are removed whole.
+    for (const raw of [
+      'duplicate key value violates unique constraint "t_key" Key (name)=(Jane (JJ) Smith) already exists.',
+      'violates foreign key constraint "y" Key (owner)=(Jane (JJ) Smith) is not present in table "p".',
+      "conflicts with existing key (slot)=(Jane (JJ) Smith).",
+      // A PostgREST error thrown as a plain object reaches the report as JSON, details included.
+      JSON.stringify({ code: "23505", details: "Key (name)=(Jane (JJ) Smith).", hint: null }),
+      'invalid input syntax for type uuid: "Jane "JJ" Smith"',
+    ]) {
+      expect(scrubMessage(raw), raw).not.toMatch(/Jane|JJ|Smith/);
+    }
+    const row = scrubMessage(
+      'null value in column "city" violates not-null constraint Failing row contains (7, Jane Smith, null).',
+    );
+    expect(row).not.toMatch(/Jane/);
+    expect(row).toContain("violates not-null constraint Failing row contains ([values])");
+  });
+
+  it("removes a row cut short by a cap, and a key on an expression (P0-8 review)", () => {
+    const PERSONAL = /Jordan|Alvarez|555-123-4567|Elm Street|peanuts|t-hawks/i;
+    // A PostgREST error thrown as is, whose row runs past MESSAGE_MAX.
+    const longRow = {
+      code: "23502",
+      details:
+        "Failing row contains (3f0c2a8e-1111-4222-8333-944455556666, Jordan Alvarez, 2012-05-04, " +
+        "555-123-4567, 14 Elm Street Springfield, Coach notes: very strong left hand, mother Maria " +
+        `Alvarez prefers texts, allergic to peanuts, ${"x".repeat(250)}, null).`,
+      hint: null,
+      message:
+        'null value in column "team_id" of relation "roster_entries" violates not-null constraint',
+    };
+    const report = buildErrorReport({ source: "server", kind: "server_fn", error: longRow });
+    expect(report.message).not.toMatch(PERSONAL);
+    expect(report.message).toBe(
+      'null value in column "team_id" of relation "roster_entries" violates not-null constraint ' +
+        "(23502) Failing row contains ([values])",
+    );
+    // A unique index on an expression: the key list has brackets of its own.
+    const exprKey = {
+      code: "23505",
+      details: "Key (team_id, lower(name::text))=(t-hawks-1a2b, jordan alvarez) already exists.",
+      hint: null,
+      message: 'duplicate key value violates unique constraint "roster_name_unique"',
+    };
+    const dup = buildErrorReport({ source: "server", kind: "server_fn", error: exprKey }).message;
+    expect(dup).not.toMatch(PERSONAL);
+    expect(dup).toContain('violates unique constraint "roster_name_unique" (23505)');
+    expect(dup).toContain("=([value]) already exists.");
+    for (const raw of [
+      "Key (team_id, lower(name::text))=(t-hawks-1a2b, jordan alvarez) already exists.",
+      'violates foreign key constraint "y" Key (lower(owner))=(Jordan Alvarez) is not present in table "p".',
+      // A row longer than the part that is scrubbed, cut before its closing bracket.
+      `Failing row contains (7, Jordan Alvarez, ${"x".repeat(25_000)}, 555-123-4567)`,
+      // A value with a line break of its own.
+      "Failing row contains (7, Jordan\nAlvarez, 14 Elm Street, allergic to peanuts).",
+    ]) {
+      expect(scrubMessage(raw), raw.slice(0, 80)).not.toMatch(PERSONAL);
+    }
+  });
+
   it("caps the message and never sends an empty one", () => {
     expect(scrubMessage("x".repeat(2000)).length).toBe(MESSAGE_MAX);
     expect(scrubMessage("   ")).toBe("Unknown error");
+  });
+
+  it("scrubs a very long message quickly: only the start is read", () => {
+    // Without the bound, the Postgres value rules take seconds on this (they rescan per match).
+    const started = Date.now();
+    const out = scrubMessage("Key (a)=(".repeat(50_000));
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(out.length).toBeLessThanOrEqual(MESSAGE_MAX);
   });
 
   it("keeps the path only, with ids masked", () => {
@@ -123,9 +204,18 @@ describe("saving on the server", () => {
   it("caps reports per minute per server instance", () => {
     const t = Date.now() + 10 * 60_000;
     let allowed = 0;
-    for (let i = 0; i < REPORTS_PER_MINUTE + 5; i += 1) if (allowReport(t)) allowed += 1;
+    for (let i = 0; i < REPORTS_PER_MINUTE + 5; i += 1) if (allowReport("server", t)) allowed += 1;
     expect(allowed).toBe(REPORTS_PER_MINUTE);
-    expect(allowReport(t + 61_000)).toBe(true);
+    expect(allowReport("server", t + 61_000)).toBe(true);
+  });
+
+  it("keeps a budget per source: browser reports never use up the server's", () => {
+    const t = Date.now() + 20 * 60_000;
+    let client = 0;
+    for (let i = 0; i < REPORTS_PER_MINUTE + 5; i += 1) if (allowReport("client", t)) client += 1;
+    expect(client).toBe(REPORTS_PER_MINUTE);
+    expect(allowReport("client", t)).toBe(false);
+    expect(allowReport("server", t)).toBe(true);
   });
 
   it("inserts only the scrubbed fields, and never throws", async () => {

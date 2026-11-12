@@ -1,5 +1,6 @@
 -- A coach cannot put a minor on a roster by writing the row. A minor joins through
--- an invite their guardian approves; the coach can still add an adult directly.
+-- an invite their guardian approves. Since 20261111120000 a coach writes nobody onto
+-- the roster directly, an adult included: everyone joins by invite.
 BEGIN;
 
 SELECT t.person('coach', 35), t.person('guardian', 41), t.person('adult', 29),
@@ -10,8 +11,8 @@ SELECT t.guardian('guardian', 'kidyoung');
 SELECT t.team('squad', 'coach');
 
 SELECT t.as_user(t.id('coach'));
-SELECT t.lives(format('INSERT INTO public.team_members (team_id, user_id, role) VALUES (%L, %L, ''player'')', 'squad', t.id('adult')),
-  'a coach can add an adult directly');
+SELECT t.throws(format('INSERT INTO public.team_members (team_id, user_id, role) VALUES (%L, %L, ''player'')', 'squad', t.id('adult')),
+  'row-level security', 'a coach cannot add an adult by writing the row either (20261111120000)');
 SELECT t.throws(format('INSERT INTO public.team_members (team_id, user_id, role) VALUES (%L, %L, ''player'')', 'squad', t.id('teenmid')),
   'row-level security', 'a coach cannot add a 14 year old by writing the row');
 SELECT t.throws(format('INSERT INTO public.team_members (team_id, user_id, role) VALUES (%L, %L, ''player'')', 'squad', t.id('teenold')),

@@ -1,8 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { validateImageMeta } from "@/lib/image-validation";
+import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
-import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import {
+  PAYMENTS_AGE_REQUIRED_MESSAGE,
+  PAYMENTS_BLOCKED_MESSAGE,
+  paymentSubmissionErrorMessage,
+} from "@/lib/payments-policy";
 
 export type PaymentType =
   "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
@@ -52,6 +57,8 @@ export type JoinRequest = {
   last_rejected_at?: string | null;
   /** Set when a guardian has approved this request for a minor. */
   guardian_approved_at?: string | null;
+  /** Stable per player and game; `guardian-only:` marks a request only a guardian answers (see guarded-open-join). */
+  idempotency_key?: string | null;
 };
 
 export const JOIN_RESUBMIT_COOLDOWN_MS = 15 * 60 * 1000;
@@ -414,12 +421,16 @@ export async function createPaymentSubmission(input: {
   const { data: allowed } = await (supabase.rpc as any)("game_payments_allowed", {
     _user: u.user.id,
   });
-  if (allowed === false) throw new Error(PAYMENTS_BLOCKED_MESSAGE);
+  if (allowed === false) {
+    // No date of birth on file is the one refusal the player can fix themselves: say so.
+    const { data: verified } = await supabase.rpc("age_verified", { _user: u.user.id });
+    throw new Error(verified === false ? PAYMENTS_AGE_REQUIRED_MESSAGE : PAYMENTS_BLOCKED_MESSAGE);
+  }
   const { error } = await supabase.from("payment_submissions").insert({
     ...input,
     player_id: u.user.id,
   });
-  if (error) throw error;
+  if (error) throw new Error(paymentSubmissionErrorMessage(error.message ?? ""));
 }
 
 export async function listMySubmissionsForGame(gameId: string): Promise<PaymentSubmission[]> {
@@ -734,7 +745,31 @@ export async function listHostJoinRequests(
   if (status) q = q.eq("status", status);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as JoinRequest[];
+  return withoutGuardianOnly((data ?? []) as JoinRequest[]);
+}
+
+/**
+ * Leaves out the requests a host does not answer: a guarded minor's request to their guardian on a game that is
+ * open (requires_approval false). One read of the settings, and only when such a request is in the list. If the
+ * read fails the requests are kept: showing the host one too many is harmless, hiding one they must answer is not.
+ */
+export async function withoutGuardianOnly<
+  T extends { game_id: string; idempotency_key?: string | null },
+>(rows: T[]): Promise<T[]> {
+  const gameIds = [...new Set(rows.filter(isGuardianOnlyRequest).map((r) => r.game_id))];
+  if (gameIds.length === 0) return rows;
+  const { data, error } = await supabase
+    .from("game_payment_settings")
+    .select("game_id, requires_approval")
+    .in("game_id", gameIds);
+  if (error) return rows;
+  const requires = new Map(
+    ((data ?? []) as { game_id: string; requires_approval: boolean | null }[]).map((s) => [
+      s.game_id,
+      s.requires_approval,
+    ]),
+  );
+  return rows.filter((r) => hostAnswersRequest(r, requires.get(r.game_id)));
 }
 
 export async function listMyJoinRequests(

@@ -10,11 +10,15 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 import {
   entityFollowErrorMessage,
   followEntity,
+  getEntityFollowCounts,
   getEntityFollowState,
   unfollowEntity,
 } from "./entity-follows";
 
-beforeEach(() => rpc.mockReset());
+// A block body: vitest runs a function returned from beforeEach as teardown.
+beforeEach(() => {
+  rpc.mockReset();
+});
 
 describe("entityFollowErrorMessage", () => {
   it("explains a consent lock", () => {
@@ -59,5 +63,59 @@ describe("entity follow calls", () => {
       following: false,
       followers: 0,
     });
+  });
+});
+
+describe("entity follow counts for a list (P1-1)", () => {
+  it("asks once for the whole list and maps the rows by id", async () => {
+    rpc.mockResolvedValue({
+      data: [
+        { id: "a", followers: 3, following: true },
+        { id: "b", followers: 0, following: false },
+      ],
+      error: null,
+    });
+    const counts = await getEntityFollowCounts("team", ["a", "b", "hidden"]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("entity_follow_counts", {
+      _kind: "team",
+      _ids: ["a", "b", "hidden"],
+    });
+    expect(counts.get("a")).toEqual({ followers: 3, following: true });
+    expect(counts.get("b")).toEqual({ followers: 0, following: false });
+    expect(counts.has("hidden")).toBe(false);
+  });
+
+  it("asks in calls of at most 200 ids (the database's cap) and counts every id", async () => {
+    rpc.mockImplementation((_fn: string, args: { _ids: string[] }) =>
+      Promise.resolve({
+        data: args._ids.map((id) => ({ id, followers: 1, following: false })),
+        error: null,
+      }),
+    );
+    const ids = Array.from({ length: 450 }, (_, i) => `t${i}`);
+    const counts = await getEntityFollowCounts("team", ids);
+    expect(rpc.mock.calls.map((c) => (c[1] as { _ids: string[] })._ids.length)).toEqual([
+      200, 200, 50,
+    ]);
+    expect(counts.size).toBe(450);
+    expect(counts.get("t449")).toEqual({ followers: 1, following: false });
+  });
+
+  it("makes no call for no ids", async () => {
+    expect((await getEntityFollowCounts("team", [])).size).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("fails as a whole when one batch is refused, so no card shows a wrong number", async () => {
+    rpc
+      .mockResolvedValueOnce({ data: [{ id: "t0", followers: 2, following: false }], error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: "NOT_SIGNED_IN" } });
+    await expect(
+      getEntityFollowCounts(
+        "team",
+        Array.from({ length: 201 }, (_, i) => `t${i}`),
+      ),
+    ).rejects.toThrow("Sign in to follow");
   });
 });
