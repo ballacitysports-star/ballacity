@@ -191,6 +191,10 @@ import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
 import {
+  ParentApprovalNotice,
+  consentBlocksNewJoin,
+} from "@/components/game-detail/ParentApprovalNotice";
+import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
   asksParent,
@@ -322,7 +326,7 @@ function GameDetail() {
   const authSearch = useAuthSearchHere();
   const { isParentMode } = useParentMode();
   const myProfile = useMyProfile(user);
-  const { can: canChildFeature } = useMyChildStatus();
+  const { can: canChildFeature, state: childPolicyState } = useMyChildStatus();
   const participationDecision = canChildFeature("game_participation");
   const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
@@ -915,6 +919,11 @@ function GameDetail() {
   // Only surface "payment pending" once approval is cleared, so players
   // don't see a payment-pending state before they've been approved.
   const isPending = isRequestPending || (approvalCleared && isPaymentPending);
+  const alreadyInFlow = joined || isPending || isConfirmed;
+  const parentBlocksNewJoin = consentBlocksNewJoin({
+    alreadyInFlow,
+    participation: participationDecision,
+  });
 
   // The viewer counts as a roster player only when:
   //  - they're not the host (hosts run the game, they don't take a player slot), AND
@@ -2703,6 +2712,14 @@ function GameDetail() {
           {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
           )}
+          {/* The join button below stays disabled; say why, and where a minor asks a parent. */}
+          {!isParentMode && !isHost && parentBlocksNewJoin && (
+            <ParentApprovalNotice
+              reason={participationDecision.reason}
+              consentState={childPolicyState}
+              className="mb-2"
+            />
+          )}
           {ageNotice && !isConfirmed && !isApproved && (
             <p className="mb-2 text-[11px] font-medium text-muted-foreground" role="status">
               🎂 {ageNotice}
@@ -2762,24 +2779,22 @@ function GameDetail() {
                 // block NEW joins, but keep leave/cancel and payment actions live.
                 const lockedForNewJoin =
                   gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
-                const alreadyInFlow = joined || isPending || isConfirmed;
                 // A parent/guardian must approve this account before a NEW
-                // join; leaving/withdrawing a join made before consent was
-                // revoked stays available.
-                const consentBlocksNewJoin = !alreadyInFlow && !participationDecision.allowed;
+                // join (parentBlocksNewJoin); leaving/withdrawing a join made
+                // before consent was revoked stays available.
                 const canJoinAction = alreadyInFlow || spotsLeft > 0;
                 const waitlistCta =
                   spotsLeft <= 0 &&
                   !alreadyInFlow &&
                   !lockedForNewJoin &&
-                  !consentBlocksNewJoin &&
+                  !parentBlocksNewJoin &&
                   viewerGate.waitlistOpen;
                 const buttonDisabled =
                   requesting ||
                   processing ||
                   (!canJoinAction && !waitlistCta) ||
                   lockedForNewJoin ||
-                  consentBlocksNewJoin;
+                  parentBlocksNewJoin;
                 const hasPaymentAttempt =
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
@@ -2856,7 +2871,7 @@ function GameDetail() {
                   <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={() => {
-                      if (consentBlocksNewJoin) {
+                      if (parentBlocksNewJoin) {
                         toast.error(
                           participationDecision.reason ||
                             "A parent or guardian must approve this account first.",
@@ -2898,7 +2913,7 @@ function GameDetail() {
                           ? "bg-surface border border-coral/40 text-coral"
                           : joined
                             ? "bg-surface border border-lime/40 text-lime"
-                            : lockedForNewJoin || spotsLeft <= 0 || consentBlocksNewJoin
+                            : lockedForNewJoin || spotsLeft <= 0 || parentBlocksNewJoin
                               ? "bg-surface border border-border text-muted-foreground"
                               : "bg-lime-gradient text-primary-foreground glow-lime"
                     }`}
@@ -2918,7 +2933,7 @@ function GameDetail() {
                       <>
                         <Check className="h-4 w-4" /> You're in · Tap to leave
                       </>
-                    ) : consentBlocksNewJoin ? (
+                    ) : parentBlocksNewJoin ? (
                       <>
                         <Lock className="h-4 w-4" /> Parent approval needed
                       </>
