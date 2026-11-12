@@ -23,6 +23,27 @@ import {
 export const PAYMENTS_BLOCKED_MESSAGE =
   "Payment coordination isn't available for this account yet.";
 
+/**
+ * A 16-17-year-old with a guardian pays for a game only once a guardian has
+ * approved their request for it (enforce_guardian_before_payment). PayPal
+ * checkout asks before any money moves, so this also tells them nothing was
+ * charged.
+ */
+export const GUARDIAN_PAYMENT_MESSAGE =
+  "A parent or guardian has to approve this game before you can pay. You weren't charged.";
+
+/** Messages a payment server function raises for the player to read as they are. */
+export const PAYMENT_POLICY_MESSAGES: readonly string[] = [
+  PAYMENTS_BLOCKED_MESSAGE,
+  GUARDIAN_PAYMENT_MESSAGE,
+];
+
+/** The error's message when it is one of PAYMENT_POLICY_MESSAGES, else null. */
+export function paymentPolicyMessageOf(e: unknown): string | null {
+  const message = e instanceof Error ? e.message : null;
+  return message && PAYMENT_POLICY_MESSAGES.includes(message) ? message : null;
+}
+
 /** Can this member see and use payment coordination at all? */
 export function paymentsFeatureDecision(
   subject: (PolicySubject & { controls?: ChildControls | null }) | null,
