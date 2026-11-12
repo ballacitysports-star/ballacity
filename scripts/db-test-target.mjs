@@ -7,9 +7,10 @@
 //   - PGHOST: unset (the default local socket), an absolute socket directory, or a loopback name/address. Several
 //     hosts (a comma list) are refused: libpq would try each in turn.
 //   - PGHOSTADDR: unset or loopback. PGSERVICE / PGSERVICEFILE: refused (a service can point anywhere).
-//   - DATABASE_URL, SUPABASE_DB_URL, POSTGRES_URL: psql never reads them, but one that names a remote server marks an
-//     environment wired to a real database (Lovable's agent workspace ran this script with production's PG* set), so
-//     it is refused too; likewise a PGUSER in Supabase's pooler form (role.project_ref).
+//   - DATABASE_URL, SUPABASE_DB_URL, POSTGRES_URL, and any other variable whose value is a postgres:// URL (DB_URL,
+//     LOVABLE_DB_MIGRATION_URL, ...): psql never reads them, but one that names a remote server marks an environment
+//     wired to a real database (Lovable's agent workspace ran this script with production's PG* set), so it is
+//     refused too; likewise a PGUSER in Supabase's pooler form (role.project_ref).
 //   - The database name: a plain identifier (never a conninfo string or a URI, which psql -d would honour), not a
 //     reserved database, at most 63 characters.
 // After connecting, the server must not report a public address (a tunnel elsewhere) and must not be a Supabase-managed
@@ -24,6 +25,7 @@ const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const RESERVED_DATABASES = new Set(["postgres", "template0", "template1"]);
 const DB_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 const DATABASE_URL_VARS = ["DATABASE_URL", "SUPABASE_DB_URL", "POSTGRES_URL"];
+const POSTGRES_URL_VALUE = /^\s*postgres(?:ql)?:\/\//i;
 // Supabase's pooler logs in as <role>.<project ref>; a project ref is 20 lower-case letters.
 const POOLER_USER = /^[a-z_][a-z0-9_]*\.[a-z]{20}$/;
 
@@ -81,7 +83,13 @@ export function targetProblems(env, dbName) {
     if (addrs.length > 1 || !addrs.every(isLoopbackAddress))
       problems.push("PGHOSTADDR is not a single loopback address.");
   }
-  for (const k of DATABASE_URL_VARS) {
+  // The named variables, plus any other variable holding a Postgres URL (Lovable's tooling also sets DB_URL and
+  // LOVABLE_DB_MIGRATION_URL; the name does not matter, the value does).
+  const urlVars = new Set(DATABASE_URL_VARS);
+  for (const [k, v] of Object.entries(env)) {
+    if (typeof v === "string" && POSTGRES_URL_VALUE.test(v)) urlVars.add(k);
+  }
+  for (const k of [...urlVars].sort()) {
     if (!set(k)) continue;
     const hosts = urlHosts(env[k]);
     if (!hosts || !hosts.every(isLocalHost))

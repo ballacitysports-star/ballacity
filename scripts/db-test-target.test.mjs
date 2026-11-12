@@ -65,6 +65,18 @@ describe("db-test target: environment", () => {
         refused({ [k]: v });
         refused({ PGHOST: "127.0.0.1", PGPORT: "54329", [k]: v });
       }
+    // Any other variable holding a remote postgres:// URL, whatever its name (Lovable's tooling sets DB_URL and
+    // LOVABLE_DB_MIGRATION_URL).
+    for (const k of ["DB_URL", "LOVABLE_DB_MIGRATION_URL", "SOME_OTHER_PG_URL"])
+      for (const v of remoteUrls.filter((u) => /^postgres/.test(u)))
+        refused({ PGHOST: "127.0.0.1", PGPORT: "54329", [k]: v });
+    ok({
+      PGHOST: "127.0.0.1",
+      PGPORT: "54329",
+      LOVABLE_DB_MIGRATION_URL: "postgresql://u@localhost/app",
+    });
+    // A variable that is not a postgres URL is not a database setting.
+    ok({ PGHOST: "127.0.0.1", PGPORT: "54329", SITE_URL: "https://ballacity.example" });
     refused({ PGUSER: `postgres.${FAKE_REF}` });
     refused({ PGHOST: "localhost", PGUSER: `supabase_admin.${FAKE_REF}` });
     refused({ PGHOST: `db.${FAKE_REF}.supabase.co`, PGUSER: "postgres", PGPASSWORD: "x" });
