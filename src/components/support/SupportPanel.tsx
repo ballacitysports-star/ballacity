@@ -26,6 +26,7 @@ import {
 } from "@/lib/support/triage";
 import { EMERGENCY_NOTICE } from "@/lib/safety";
 import { SUPPORT_EMAIL } from "@/lib/trust";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const chip =
   "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold hover:bg-background";
@@ -134,6 +135,7 @@ export function SupportPanel({
   onNavigate?: () => void;
 }) {
   const ask = useServerFn(askSupportAssistant);
+  const authSearch = useAuthSearchHere();
   const { messages, topicId } = useSupportState();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -220,7 +222,8 @@ export function SupportPanel({
                 </p>
                 {!signedIn ? (
                   <Link
-                    to={"/auth" as never}
+                    to="/auth"
+                    search={authSearch}
                     onClick={onNavigate}
                     className="mt-3 inline-flex min-h-10 items-center rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground"
                   >

@@ -131,6 +131,10 @@ export function useLiveParticipants(gameId: string | undefined): {
             if (prev.some((p) => p.userId === row.user_id)) return prev;
             return [...prev, toParticipant(row, profiles.get(row.user_id))];
           });
+          // The viewer just took a place: the rows that row-level security hid from them until now
+          // (only the host and the game's own players can read the roster) are readable, so load it all.
+          const { data: auth } = await supabase.auth.getSession();
+          if (!cancelled && auth.session?.user.id === row.user_id) void reloadRef.current();
         },
       )
       .on(

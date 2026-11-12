@@ -31,6 +31,7 @@ import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
+import { sanitizeNextPath } from "@/lib/safe-next-path";
 import {
   type AccountType,
   type SetupId,
@@ -465,22 +466,6 @@ const TAB_PATHS = [
   "/reels",
   "/highlights",
 ];
-
-/**
- * Same-origin, safe next-path filter used by both the auth redirect
- * (to preserve the user's destination) and the /auth page (to bounce
- * back after sign-in). Rejects anything that could loop back through
- * the sign-in flow itself.
- */
-export function sanitizeNextPath(raw: unknown): string | undefined {
-  if (typeof raw !== "string" || raw.length === 0) return undefined;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
-  const pathOnly = raw.split(/[?#]/)[0] ?? "";
-  if (pathOnly === "/") return undefined;
-  if (pathOnly === "/auth" || pathOnly.startsWith("/auth/")) return undefined;
-  if (pathOnly === "/reset-password" || pathOnly.startsWith("/reset-password/")) return undefined;
-  return raw;
-}
 
 function AuthLoadingFallback({ pending }: { pending: boolean }) {
   const [showRetry, setShowRetry] = useState(false);

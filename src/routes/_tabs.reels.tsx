@@ -440,7 +440,7 @@ function ReelCard({
                 }
               }}
               disabled={manageBusy !== null}
-              className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-destructive-strong px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
             >
               {manageBusy === "delete" ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -708,7 +708,8 @@ function ReelsPage() {
   const { children: guardianChildren, isFetched: guardianChildrenLoaded } = useMyChildren();
   const subjectChild = childParam
     ? (guardianChildren.find(
-        (c) => c.childUserId === childParam &&
+        (c) =>
+          c.childUserId === childParam &&
           (c.cohort === "child_under_13" || c.cohort === "teen_13_15"),
       ) ?? null)
     : null;
@@ -1394,8 +1395,9 @@ function ReelsPage() {
             <p className="micro-label text-lime">Family post</p>
             <p className="mt-1 text-xs font-semibold">A clip of {subjectChild.displayName}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Guardian only by default. You can share it with your child's verified team and coaches after upload. It is never shown on the highlights feed, on a profile, or to
-              other members. Every clip is analysed by AI, which you control in the Parent Center.
+              Guardian only by default. You can share it with your child's verified team and coaches
+              after upload. It is never shown on the highlights feed, on a profile, or to other
+              members. Every clip is analysed by AI, which you control in the Parent Center.
             </p>
           </div>
         )}
@@ -1406,7 +1408,10 @@ function ReelsPage() {
           </p>
         )}
 
-        <ReelPrivacyPanel cohort={subjectChild ? subjectChild.cohort : myCohort} familyPost={!!subjectChild} />
+        <ReelPrivacyPanel
+          cohort={subjectChild ? subjectChild.cohort : myCohort}
+          familyPost={!!subjectChild}
+        />
 
         <AiDisclosureNotice />
 

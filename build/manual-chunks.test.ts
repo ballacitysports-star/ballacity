@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { manualChunks } from "./manual-chunks";
 
 const nm = (pkg: string, file = "index.js") => `/repo/node_modules/${pkg}/dist/${file}`;
@@ -31,7 +32,6 @@ describe("manualChunks", () => {
   });
 
   it("splits the other heavy libraries as before", () => {
-    expect(manualChunks(nm("framer-motion"))).toBe("vendor-motion");
     expect(manualChunks(nm("zod"))).toBe("vendor-zod");
     expect(manualChunks(nm("@supabase/storage-js"))).toBe("vendor-supabase-extras");
     expect(manualChunks(nm("@radix-ui/react-dialog"))).toBe("vendor-ui");
@@ -41,5 +41,23 @@ describe("manualChunks", () => {
   it("handles Windows-style paths", () => {
     expect(manualChunks("C:\\repo\\node_modules\\clsx\\dist\\clsx.mjs")).toBe("vendor-shared");
     expect(manualChunks("C:\\repo\\node_modules\\recharts\\es6\\index.js")).toBe("vendor-charts");
+  });
+
+  it("leaves framer-motion to Rollup, so the app shell does not download the animation engine", () => {
+    // As one forced chunk, every page loaded all of framer-motion (47 kB gzip) before first
+    // paint, because the shell imports MotionConfig. Left to Rollup, the shell keeps only the
+    // small config modules and the engine travels with the routes that animate (P3-4).
+    for (const pkg of ["framer-motion", "motion-dom", "motion-utils"]) {
+      expect(manualChunks(nm(pkg))).toBeUndefined();
+    }
+  });
+
+  it("keeps the shell's framer-motion use to MotionConfig", () => {
+    const root = readFileSync("src/routes/__root.tsx", "utf8");
+    expect(root.match(/import \{([^}]*)\} from "framer-motion"/)?.[1].trim()).toBe("MotionConfig");
+    // The swipe wrapper around every page animates with CSS, not framer-motion.
+    expect(readFileSync("src/components/navigation/SwipeNavigator.tsx", "utf8")).not.toMatch(
+      /from "framer-motion"/,
+    );
   });
 });

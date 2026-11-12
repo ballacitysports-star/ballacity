@@ -49,6 +49,7 @@ import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
+import { KidsUpcomingSection } from "@/components/home/KidsUpcomingSection";
 import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
 import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
 import {
@@ -583,6 +584,7 @@ function Feed() {
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
       {tab !== "archive" && <NeedsActionStrip />}
+      {tab !== "archive" && <KidsUpcomingSection className="mb-4" />}
       {tab !== "archive" && eventsOn && (
         <FeedTypeChips value={feedType} onChange={setFeedType} venueEventsOn={venueEventsOn} />
       )}

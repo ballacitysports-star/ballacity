@@ -3,6 +3,7 @@ import { UserCog, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { useMyProfiles, useSwitchProfile, type AccountProfile } from "@/lib/account-profiles";
 import { availabilityGateMessage, type AvailabilityGateReason } from "@/lib/availability-gate";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 /**
  * Inline explanation of why the viewer can't post availability yet, with the
@@ -20,6 +21,7 @@ export function AvailabilityRequiredNotice({
 }) {
   const { profiles } = useMyProfiles();
   const switcher = useSwitchProfile();
+  const authSearch = useAuthSearchHere();
   if (!reason) return null;
 
   const playerProfile: AccountProfile | undefined = profiles.find((p) => p.kind === "player");
@@ -49,6 +51,7 @@ export function AvailabilityRequiredNotice({
             {reason === "signed_out" && (
               <Link
                 to="/auth"
+                search={authSearch}
                 className="rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
               >
                 Sign in

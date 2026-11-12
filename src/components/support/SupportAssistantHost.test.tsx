@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: ({ select }: any) => select({ location: { pathname: state.pathname } }),
+  useLocation: ({ select }: { select: (l: { href: string }) => unknown }) =>
+    select({ href: state.pathname }),
   Link: ({ to, children, onClick, className }: any) => (
     <a href={to} onClick={onClick} className={className}>
       {children}

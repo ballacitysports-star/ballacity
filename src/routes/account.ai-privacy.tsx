@@ -118,7 +118,7 @@ function AnalysisCard({
               type="button"
               disabled={busy !== null}
               onClick={() => void run("video", () => onDeleteVideo(item.reelId))}
-              className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-destructive-strong px-3 py-1.5 text-xs font-semibold text-destructive-foreground disabled:opacity-50"
             >
               {busy === "video" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -188,7 +188,7 @@ export function RequestStatusPanel({
                 handleCancel();
               }}
               disabled={cancelling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
               {cancelling && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
               {cancelling ? "Cancelling…" : `Cancel ${kindLabel}`}
