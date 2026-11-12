@@ -69,7 +69,7 @@ import {
   useHostAttendanceStats,
 } from "@/lib/game-lifecycle";
 import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
-import { normalizeGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
+import { viewerGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
@@ -450,25 +450,18 @@ function GameDetail() {
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
   const canReviewHost = useCanReview(hostReviewId(game));
 
-  // Policy players must be able to read before joining.
+  // Policy players must be able to read before joining. Joining and refunds use
+  // the same reads as the join button and the payment terms, so a visitor who
+  // cannot read the settings row sees the host's real terms, not defaults.
   const viewerPolicy = useMemo<GamePolicy>(
     () =>
-      normalizeGamePolicy({
-        cancellationPolicy: (game?.cancellationPolicy ??
-          undefined) as GamePolicy["cancellationPolicy"],
-        cancellationNotes: game?.cancellationNotes ?? "",
-        minPlayers: game?.minPlayers ?? 0,
-        maxPlayers: game?.maxPlayers ?? 10,
-        allowWaitlist: game?.allowWaitlist ?? true,
-        entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
-        requiresApproval: settings ? !!settings.requires_approval : true,
-        refundRule: (settings?.refund_rule ?? undefined) as GamePolicy["refundRule"],
-        lateRefundPct: settings?.late_refund_pct ?? 0,
-        cancelCutoffMin: game?.cancelCutoffMin,
-        refundPolicy: settings?.refund_policy ?? "",
-        gameRules: game?.gameRules ?? "",
+      viewerGamePolicy({
+        game,
+        settings,
+        requiresApproval: publicRequiresApproval,
+        refundTerms,
       }),
-    [game, settings],
+    [game, settings, publicRequiresApproval, refundTerms],
   );
 
   // Host trust: only real signals. Verification comes from the hosting team
