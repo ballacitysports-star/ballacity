@@ -49,7 +49,7 @@ import {
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
-import { usePayPalCheckoutConfig } from "@/hooks/use-paypal-checkout-config";
+import { payOptionsView, usePayPalCheckoutConfig } from "@/hooks/use-paypal-checkout-config";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -206,13 +206,15 @@ function PayPage() {
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  // PayPal checkout config is optional and loads on its own; it never holds the pay UI.
-  const paypalCfg = usePayPalCheckoutConfig(hasGame ? gameId : undefined);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
   const [fetchAttempt, setFetchAttempt] = useState(0);
+  // PayPal checkout config loads on its own, with its own deadline, and Retry re-asks for it too. It holds the
+  // screen only when there is nothing else to offer (see the empty state below).
+  const paypal = usePayPalCheckoutConfig(hasGame ? gameId : undefined, undefined, fetchAttempt);
+  const paypalCfg = paypal.config;
   const [fetchTimedOut, setFetchTimedOut] = useState(false);
   const stage: "auth" | "lookup" | "fetch" | "ready" = loading
     ? "auth"
@@ -660,7 +662,15 @@ function PayPage() {
             Retry
           </button>
         </div>
-      ) : (!settings || methods.length === 0) && !paypalCfg ? (
+      ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
+        "loading" ? (
+        // No other method to offer: wait for PayPal (up to its deadline) before saying the host has none, or a
+        // PayPal-only host's players would be told to arrange payment directly.
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
+        "empty" ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
