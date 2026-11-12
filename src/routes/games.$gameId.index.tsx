@@ -89,10 +89,7 @@ import {
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  getGamePaymentSettings,
-  listMySubmissionsForGame,
   deleteMyPendingSubmission,
-  getMyJoinRequest,
   createJoinRequest,
   cancelMyJoinRequest,
   withdrawMyApprovedJoinRequest,
@@ -105,6 +102,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
+import { loadGameViewerStatus } from "@/lib/game-viewer-status";
 import {
   formatHoldRemaining,
   holdExpiresAt,
@@ -522,11 +520,15 @@ function GameDetail() {
     if (!game) return;
     if (leavingRef.current) return;
     try {
-      const [s, subs, req] = await Promise.all([
-        getGamePaymentSettings(game.id),
-        listMySubmissionsForGame(game.id),
-        getMyJoinRequest(game.id),
-      ]);
+      // The settings decide the join button, so they land as soon as they arrive;
+      // the viewer's own rows are not waited for (see loadGameViewerStatus).
+      const {
+        settings: s,
+        subs,
+        req,
+      } = await loadGameViewerStatus(game.id, (early) => {
+        if (!leavingRef.current) setSettings(early);
+      });
       if (leavingRef.current) return;
       setSettings(s);
       setMySubs(subs);

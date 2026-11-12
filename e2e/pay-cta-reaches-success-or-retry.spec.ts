@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
@@ -8,8 +9,8 @@ import { test, expect, type Page } from "@playwright/test";
  *
  * Covers both branches:
  *   1. Happy path — backend responds fast, pay screen renders ready.
- *   2. Backend hang — game_payment_settings never resolves; within the
- *      client's 8s timeout the retry UI appears.
+ *   2. Backend hang — game_payment_settings never resolves on the pay screen;
+ *      within the client's timeout the retry UI appears.
  *
  * Auto-skips when no signed-in Supabase session is available in env.
  */
@@ -30,14 +31,6 @@ const OUTCOME_TIMEOUT_MS = 15_000;
 
 function tableUrl(url: string | URL, table: string) {
   return String(url).includes(`/rest/v1/${table}`);
-}
-
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
 }
 
 async function mockEmptyLists(page: Page) {
@@ -81,16 +74,28 @@ async function mockPaidSettingsOk(page: Page) {
   );
 }
 
-/** Hang the game_payment_settings GET indefinitely to force the client timeout. */
-async function mockPaidSettingsHang(page: Page) {
+/**
+ * Hang the game_payment_settings GET indefinitely, once `hang()` is called, to
+ * force the pay screen's client timeout. The game page reads the same row to
+ * decide its button (approval, fee), and with no answer it rightly falls back to
+ * "Request Spot", so the settings answer there and hang only on the pay screen.
+ */
+async function mockPaidSettingsHangOnPay(page: Page) {
+  let hanging = false;
+  await mockPaidSettingsOk(page);
   await page.route(
     (url) => tableUrl(url, "game_payment_settings"),
     async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      if (route.request().method() !== "GET" || !hanging) return route.fallback();
       // Never fulfill — Playwright releases pending routes on context close.
       await new Promise(() => {});
     },
   );
+  return {
+    hang: () => {
+      hanging = true;
+    },
+  };
 }
 
 /**
@@ -99,6 +104,13 @@ async function mockPaidSettingsHang(page: Page) {
  * Returns which outcome occurred so the caller can assert on it.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
+  // First the pay screen itself (its fee card renders with the payment options
+  // section). Until then "Loading payment options…" is not in the page at all,
+  // so the "hidden" wait below would count a screen that has not rendered yet
+  // as ready.
+  await expect(page.getByText("Entry fee", { exact: true })).toBeVisible({
+    timeout: OUTCOME_TIMEOUT_MS,
+  });
   const ready = page
     .getByText(/loading payment options/i)
     .first()
@@ -112,9 +124,7 @@ async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
   return await Promise.race([ready, retry]);
 }
 
-test("Pay CTA reaches the ready pay screen when the backend responds", async ({
-  browser,
-}) => {
+test("Pay CTA reaches the ready pay screen when the backend responds", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
@@ -139,13 +149,11 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({
   await ctx.close();
 });
 
-test("Pay CTA surfaces retry affordance when the payment service hangs", async ({
-  browser,
-}) => {
+test("Pay CTA surfaces retry affordance when the payment service hangs", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await mockPaidSettingsHang(page);
+  const settings = await mockPaidSettingsHangOnPay(page);
   await mockEmptyLists(page);
   await restoreSession(page);
 
@@ -153,6 +161,7 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  settings.hang();
   await cta.click();
 
   await page.waitForURL((u) => u.pathname === `/games/${GAME_ID}/pay`, {
@@ -161,9 +170,7 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("retry");
-  await expect(
-    page.getByText(/couldn't reach the payment service/i).first(),
-  ).toBeVisible();
+  await expect(page.getByText(/couldn't reach the payment service/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^retry$/i }).first()).toBeVisible();
 
   await ctx.close();

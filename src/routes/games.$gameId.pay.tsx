@@ -49,7 +49,7 @@ import {
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
-import { getPayPalCheckoutConfig } from "@/lib/paypal.functions";
+import { usePayPalCheckoutConfig } from "@/hooks/use-paypal-checkout-config";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -62,7 +62,8 @@ import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
 // joinGame no longer called here — player is added to roster only after host verifies payment.
-import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
+import { useHostedGames } from "@/lib/hosted-games-store";
+import { useGameLookup } from "@/hooks/use-game-lookup";
 import { useIsJoined } from "@/lib/games-store";
 import { hasPaymentIn, showFilledUpWarning } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
@@ -177,7 +178,12 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 function PayPage() {
   const { gameId, game: loaderGame } = Route.useLoaderData();
   const hostedGames = useHostedGames();
-  const [remoteGame, setRemoteGame] = useState<typeof loaderGame>(null);
+  // A boolean, not the list: useHostedGames() returns a new array every render.
+  const inLiveList = hostedGames.some((g) => g.id === gameId);
+  const { remoteGame, lookupDone: lookupTimedOut } = useGameLookup(
+    gameId,
+    !!loaderGame || inLiveList,
+  );
   const game = useMemo(
     () => hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null,
     [hostedGames, remoteGame, loaderGame, gameId],
@@ -200,12 +206,12 @@ function PayPage() {
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
+  // PayPal checkout config is optional and loads on its own; it never holds the pay UI.
+  const paypalCfg = usePayPalCheckoutConfig(hasGame ? gameId : undefined);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
-  const [lookupTimedOut, setLookupTimedOut] = useState(false);
   const [fetchAttempt, setFetchAttempt] = useState(0);
   const [fetchTimedOut, setFetchTimedOut] = useState(false);
   const stage: "auth" | "lookup" | "fetch" | "ready" = loading
@@ -262,32 +268,6 @@ function PayPage() {
   }, [gameId, userId]);
 
   useEffect(() => {
-    if (loaderGame || hostedGames.some((g) => g.id === gameId)) {
-      setLookupTimedOut(true);
-      return;
-    }
-
-    let cancelled = false;
-    setLookupTimedOut(false);
-    setRemoteGame(null);
-    const timeout = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000));
-    Promise.race([fetchHostedGame(gameId), timeout])
-      .then((found) => {
-        if (!cancelled) setRemoteGame(found ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setRemoteGame(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLookupTimedOut(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, hostedGames, loaderGame]);
-
-  useEffect(() => {
     if (!hasGame) return;
     let cancelled = false;
     setFetching(true);
@@ -316,16 +296,6 @@ function PayPage() {
           setMethods(all);
         } else {
           setMethods([]);
-        }
-
-        // PayPal checkout config is optional; failure never blocks the pay UI.
-        try {
-          const cfg = await getPayPalCheckoutConfig({ data: { gameId } });
-          if (!cancelled && cfg.clientId && cfg.merchantId) {
-            setPaypalCfg({ clientId: cfg.clientId, merchantId: cfg.merchantId });
-          }
-        } catch {
-          /* PayPal not configured — one-tap buttons remain */
         }
 
         // Payment settings + host payment methods are the critical path for
