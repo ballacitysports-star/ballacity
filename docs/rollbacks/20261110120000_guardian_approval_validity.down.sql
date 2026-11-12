@@ -11,6 +11,11 @@ BEGIN
   IF current_setting('app.confirm_guardian_approval_rollback', true) IS DISTINCT FROM 'yes' THEN
     RAISE EXCEPTION 'Refusing to run: this reopens forged and stale guardian approvals for minors. Set app.confirm_guardian_approval_rollback=yes for the session to proceed deliberately.';
   END IF;
+  -- 20261111100000 (PayPal checkout follows the guardian rule) calls guardian_approval_valid. Dropping it first would
+  -- make every PayPal checkout fail closed, for adults too; roll that migration back first.
+  IF to_regprocedure('public.game_payment_guardian_ready(text)') IS NOT NULL THEN
+    RAISE EXCEPTION 'Refusing to run: 20261111100000_paypal_guardian_rule depends on this migration. Roll it back first (docs/rollbacks/20261111100000_paypal_guardian_rule.down.sql).';
+  END IF;
 END
 $guard$;
 
