@@ -884,6 +884,89 @@ describe("PayPal request ids and the capture read after a lost answer (F04 port)
   });
 });
 
+describe("only a COMPLETED capture is a verified payment (audit F04, #291 on main)", () => {
+  const nothingRecorded = () => {
+    expect(h.submissions).toEqual([]);
+    expect(h.rostered).toEqual([]);
+    expect(h.paypal.refunded).toEqual([]);
+  };
+
+  for (const captureStatus of ["DECLINED", "FAILED"]) {
+    it(`a ${captureStatus} capture in an order PayPal calls COMPLETED: the order fails, nothing is recorded`, async () => {
+      h.captureOrder = async () => ({ ...details("COMPLETED", "CAPTURE-1"), captureStatus });
+      await expect(capture()).rejects.toThrow(CAPTURE_DECLINED_MESSAGE);
+      nothingRecorded();
+      expect(order()).toMatchObject({ status: "failed", capture_id: "CAPTURE-1" });
+    });
+  }
+
+  it("a capture with no status of its own is held, not recorded", async () => {
+    h.captureOrder = async () => ({ ...details("COMPLETED", "CAPTURE-1"), captureStatus: null });
+    await expect(capture()).rejects.toThrow(CAPTURE_PENDING_MESSAGE);
+    nothingRecorded();
+    expect(order()).toMatchObject({ status: "capturing", capture_id: "CAPTURE-1" });
+  });
+
+  it("the capture read after a lost answer is PENDING: held, not recorded", async () => {
+    h.captureOrder = async () => {
+      throw new Error("socket hang up");
+    };
+    h.getOrder = async (n) =>
+      n === 1
+        ? details("APPROVED")
+        : { ...details("COMPLETED", "CAPTURE-LATE"), captureStatus: "PENDING" };
+    await expect(capture()).rejects.toThrow(CAPTURE_PENDING_MESSAGE);
+    nothingRecorded();
+    expect(order()).toMatchObject({ status: "capturing", capture_id: "CAPTURE-LATE" });
+  });
+
+  it("a late capture an earlier attempt left PENDING is held, not recorded", async () => {
+    h.getOrder = async () => ({
+      ...details("COMPLETED", "CAPTURE-LATE"),
+      captureStatus: "PENDING",
+    });
+    await expect(capture()).rejects.toThrow(CAPTURE_PENDING_MESSAGE);
+    expect(h.paypal.captured).toBe(0);
+    nothingRecorded();
+    expect(order()).toMatchObject({ status: "capturing", capture_id: "CAPTURE-LATE" });
+  });
+
+  it("a late capture an earlier attempt left DECLINED fails the order, nothing recorded", async () => {
+    h.getOrder = async () => ({
+      ...details("APPROVED", "CAPTURE-LATE"),
+      captureStatus: "DECLINED",
+    });
+    await expect(capture()).rejects.toThrow(CAPTURE_DECLINED_MESSAGE);
+    expect(h.paypal.captured).toBe(0);
+    nothingRecorded();
+    expect(order()).toMatchObject({ status: "failed", capture_id: "CAPTURE-LATE" });
+  });
+
+  it("a retry of an order held with a PENDING capture captures and records nothing", async () => {
+    h.captureOrder = async () => ({
+      ...details("COMPLETED", "CAPTURE-1"),
+      captureStatus: "PENDING",
+    });
+    await expect(capture()).rejects.toThrow(CAPTURE_PENDING_MESSAGE);
+    h.captureOrder = null;
+    await expect(capture()).rejects.toThrow(CAPTURE_IN_PROGRESS_MESSAGE);
+    expect(h.paypal.captured).toBe(1);
+    nothingRecorded();
+  });
+
+  it("control: a COMPLETED capture is recorded once, and a retry of it records nothing more", async () => {
+    await expect(capture()).resolves.toMatchObject({ ok: true, already: false });
+    await expect(capture()).resolves.toMatchObject({ ok: true, already: true });
+    expect(h.paypal.captured).toBe(1);
+    expect(h.submissions).toHaveLength(1);
+    expect(h.submissions[0]).toMatchObject({
+      status: "verified",
+      transaction_reference: "CAPTURE-1",
+    });
+    expect(h.rostered).toEqual([PLAYER]);
+  });
+});
+
 describe("a capture PayPal finishes after the attempt stopped waiting (re-review)", () => {
   const lostAnswer = async () => {
     throw new Error("socket hang up");
