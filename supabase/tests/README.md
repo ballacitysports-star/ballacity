@@ -12,8 +12,18 @@ bun run test:db -- --keep         # leave the scratch database behind to poke at
 ```
 
 It needs `psql` and a Postgres you can connect to as a **superuser** through the usual `PGHOST`, `PGPORT`,
-`PGUSER` and `PGPASSWORD`. It creates and drops its own database (`ballacity_dbtest`), so it never touches
-anything else on that server. Supabase runs Postgres 17; 16 also works.
+`PGUSER` and `PGPASSWORD`. Supabase runs Postgres 17; 16 also works.
+
+It only ever runs against a local, throwaway Postgres (audit F16, `scripts/db-test-target.mjs`). Before it connects,
+`PGHOST` must be a socket directory or a loopback host, `PGHOSTADDR` loopback if set, and `PGSERVICE` /
+`PGSERVICEFILE` unset; a `DATABASE_URL`, `SUPABASE_DB_URL` or `POSTGRES_URL` naming a remote server, or a `PGUSER` in
+Supabase's pooler form (`role.project_ref`), is refused too, since it marks an environment wired to a real database.
+Those refusals start no `psql` at all. After connecting, and before anything but read-only catalog queries, a server
+that reports a public address or carries Supabase's `supabase_admin` or `authenticator` role is refused, and it
+creates, drops or reuses only a database it marked itself (`ballacity_dbtest` by default, or `--db <name>`). A refusal exits with code 2 and says why; there is no override.
+
+One-time step: a `ballacity_dbtest` created before this guard has no marker and is refused. If it really is
+disposable, drop it yourself (`psql -c 'drop database ballacity_dbtest'`) and run again.
 
 ## What it replays
 
