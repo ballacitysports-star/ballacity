@@ -3,7 +3,8 @@
 -- enforce_guardian_before_payment as 20261110120000 defines it (the trigger behaves the same either way).
 -- Roll back the app change first: the server's check fails closed, so with the function gone nobody could pay by
 -- PayPal. With both rolled back, a child who needs a guardian's approval can again pay by PayPal checkout without one.
--- Run this before 20261110120000's rollback, never after (each guard below enforces its half of that order).
+-- Run this before 20261110120000's rollback, never after, and after 20261111140000's (each guard below enforces its
+-- half of that order).
 -- It refuses to run unless:
 --     PGOPTIONS="-c app.confirm_paypal_guardian_rollback=yes" psql ... -f <this file>
 BEGIN;
@@ -16,6 +17,11 @@ BEGIN
   -- migration's, never after: its own rollback refuses while this migration is applied.
   IF to_regprocedure('private_sec.guardian_approval_valid(uuid, uuid)') IS NULL THEN
     RAISE EXCEPTION 'Refusing to run: 20261110120000_guardian_approval_validity is no longer applied, and the trigger this restores calls its guardian_approval_valid.';
+  END IF;
+  -- 20261111140000's payment check calls game_payment_guardian_ready, which this drops. Roll that one back first.
+  IF to_regprocedure('private_sec.paypal_payment_block(text)') IS NOT NULL
+     OR to_regprocedure('public.paypal_payment_precondition(text)') IS NOT NULL THEN
+    RAISE EXCEPTION 'Refusing to run: 20261111140000_paypal_payment_preconditions is still applied and calls game_payment_guardian_ready. Run its rollback first.';
   END IF;
 END
 $guard$;

@@ -2,14 +2,17 @@
  * Audit F03 follow-up: PayPal checkout follows the guardian rule.
  *
  * The server records a PayPal payment with the service role, which the payment
- * trigger lets through (the money has already moved by then). So the server asks
- * game_payment_guardian_ready, as the player, before creating an order and again
- * before capturing it. These run the real server functions with PayPal and the
- * database faked. A server function is its handler here: validate, then run.
+ * trigger lets through (the money has already moved by then). So the server asks,
+ * as the player, before creating an order and again before capturing it. Since
+ * task #69 the guardian rule is one of the rules paypal_payment_precondition asks
+ * (it calls game_payment_guardian_ready), answered as GUARDIAN_APPROVAL_REQUIRED.
+ * These run the real server functions with PayPal and the database faked. A server
+ * function is its handler here: validate, then run.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GUARDIAN_PAYMENT_MESSAGE,
+  PAYMENT_CHECK_FAILED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
   paymentPolicyMessageOf,
 } from "./payments-policy";
@@ -18,7 +21,7 @@ const PLAYER = "11111111-1111-4111-8111-111111111111";
 const HOST = "22222222-2222-4222-8222-222222222222";
 
 const h = vi.hoisted(() => ({
-  guardian: { data: true as unknown, error: null as null | { message: string } },
+  guardian: { data: null as unknown, error: null as null | { message: string } },
   playerRpcs: [] as { name: string; args: unknown }[],
   order: null as null | Record<string, unknown>,
   inserted: [] as { table: string; row: unknown }[],
@@ -73,12 +76,25 @@ vi.mock("@/integrations/supabase/client.server", () => {
             h.inserted.push({ table, row });
             return { error: null };
           },
-          update: (row: unknown) => ({
-            eq: async () => {
-              h.updated.push({ table, row });
-              return { error: null };
-            },
-          }),
+          update: (row: unknown) => {
+            const q = {
+              eq: () => q,
+              in: () => q,
+              select: async () => {
+                h.updated.push({ table, row });
+                return { data: [{}], error: null };
+              },
+            };
+            return q;
+          },
+          select: () => {
+            const q = {
+              eq: () => q,
+              limit: () => q,
+              maybeSingle: async () => ({ data: { id: "recorded" }, error: null }),
+            };
+            return q;
+          },
         };
       },
     },
@@ -92,6 +108,7 @@ vi.mock("@/lib/paypal.server", () => {
     currency: "USD",
     payeeMerchantId: "HOSTMERCHANT1",
     captureId: "CAPTURE-1",
+    captureStatus: "COMPLETED",
   });
   return {
     createOrder: async () => {
@@ -100,7 +117,8 @@ vi.mock("@/lib/paypal.server", () => {
     },
     getOrder: async () => {
       h.paypal.looked += 1;
-      return paid("APPROVED");
+      // An approved order lists no capture yet.
+      return { ...paid("APPROVED"), captureId: null, captureStatus: null };
     },
     captureOrder: async () => {
       h.paypal.captured += 1;
@@ -126,8 +144,7 @@ function playerClient() {
   return {
     rpc: async (name: string, args: unknown) => {
       h.playerRpcs.push({ name, args });
-      if (name === "game_payments_allowed") return { data: true, error: null };
-      if (name === "game_payment_guardian_ready") return h.guardian;
+      if (name === "paypal_payment_precondition") return h.guardian;
       return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
     from: (table: string) => (table === "paypal_orders" ? q(h.order) : q({ id: "g1" })),
@@ -141,7 +158,7 @@ const captureFn = captureGamePayPalOrder as unknown as Call<{ orderId: string }>
 const context = () => ({ userId: PLAYER, supabase: playerClient() });
 
 beforeEach(() => {
-  h.guardian = { data: true, error: null };
+  h.guardian = { data: null, error: null };
   h.playerRpcs = [];
   h.order = {
     order_id: "ORDER-1",
@@ -162,7 +179,7 @@ const payments = () => h.inserted.filter((i) => i.table === "payment_submissions
 
 describe("starting a PayPal checkout", () => {
   it("refuses a player who still needs a guardian's approval, before PayPal is asked", async () => {
-    h.guardian = { data: false, error: null };
+    h.guardian = { data: "GUARDIAN_APPROVAL_REQUIRED", error: null };
     await expect(createOrderFn({ data: { gameId: "g1" }, context: context() })).rejects.toThrow(
       GUARDIAN_PAYMENT_MESSAGE,
     );
@@ -173,7 +190,7 @@ describe("starting a PayPal checkout", () => {
   it("asks as the player, for this game", async () => {
     await createOrderFn({ data: { gameId: "g1" }, context: context() });
     expect(h.playerRpcs).toContainEqual({
-      name: "game_payment_guardian_ready",
+      name: "paypal_payment_precondition",
       args: { _game_id: "g1" },
     });
   });
@@ -181,7 +198,7 @@ describe("starting a PayPal checkout", () => {
   it("fails closed when the check itself fails", async () => {
     h.guardian = { data: null, error: { message: "timeout" } };
     await expect(createOrderFn({ data: { gameId: "g1" }, context: context() })).rejects.toThrow(
-      /Couldn't check guardian approval/,
+      PAYMENT_CHECK_FAILED_MESSAGE,
     );
     expect(h.paypal.created).toBe(0);
   });
@@ -197,11 +214,11 @@ describe("starting a PayPal checkout", () => {
 
 describe("capturing an approved PayPal order", () => {
   it("does not move the money once the approval is gone (declined, guardian removed or suspended)", async () => {
-    h.guardian = { data: false, error: null };
+    h.guardian = { data: "GUARDIAN_APPROVAL_REQUIRED", error: null };
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).rejects.toThrow(
       GUARDIAN_PAYMENT_MESSAGE,
     );
-    expect(h.paypal.looked).toBe(0);
+    // Asked right before the capture (task #69), after PayPal's read-only order lookup.
     expect(h.paypal.captured).toBe(0);
     expect(payments()).toEqual([]);
     expect(h.rostered).toEqual([]);
@@ -210,7 +227,7 @@ describe("capturing an approved PayPal order", () => {
   it("fails closed when the check itself fails", async () => {
     h.guardian = { data: null, error: { message: "timeout" } };
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).rejects.toThrow(
-      /Couldn't check guardian approval/,
+      PAYMENT_CHECK_FAILED_MESSAGE,
     );
     expect(h.paypal.captured).toBe(0);
     expect(payments()).toEqual([]);
@@ -220,9 +237,10 @@ describe("capturing an approved PayPal order", () => {
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).resolves.toEqual({
       ok: true,
       already: false,
+      rostered: true,
     });
     expect(h.playerRpcs).toEqual([
-      { name: "game_payment_guardian_ready", args: { _game_id: "g-order" } },
+      { name: "paypal_payment_precondition", args: { _game_id: "g-order" } },
     ]);
     expect(h.paypal.captured).toBe(1);
     expect(payments()).toHaveLength(1);
@@ -231,10 +249,12 @@ describe("capturing an approved PayPal order", () => {
 
   it("an order already captured is not asked about again", async () => {
     h.order = { ...h.order, status: "captured" };
-    h.guardian = { data: false, error: null };
+    h.guardian = { data: "GUARDIAN_APPROVAL_REQUIRED", error: null };
     await expect(captureFn({ data: { orderId: "ORDER-1" }, context: context() })).resolves.toEqual({
       ok: true,
       already: true,
+      // This fake finds a row for every read, the roster included.
+      rostered: true,
     });
     expect(h.paypal.captured).toBe(0);
   });
