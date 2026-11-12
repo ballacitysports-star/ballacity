@@ -45,7 +45,7 @@ export function SpotsPill({
       : `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left`;
   const cls =
     urgency === "full"
-      ? "rounded-full bg-destructive px-2.5 py-0.5 micro-label text-destructive-foreground"
+      ? "rounded-full bg-destructive-strong px-2.5 py-0.5 micro-label text-destructive-foreground"
       : urgency === "critical"
         ? "rounded-full bg-coral-strong px-2.5 py-0.5 text-[11px] font-bold text-white motion-safe:animate-pulse"
         : urgency === "low"

@@ -33,6 +33,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -75,6 +76,9 @@
 
   --destructive: oklch(0.62 0.24 25); /* IG heart red */
   --destructive-foreground: oklch(0.99 0 0);
+  /* Red behind white text (destructive buttons, "Full" pills): 4.8:1 for WCAG AA, where --destructive is 4.0:1.
+     Red text keeps --destructive, which reads 5.1:1 on black. */
+  --destructive-strong: oklch(0.57 0.24 25);
 
   --success: oklch(0.72 0.17 155);
   --success-foreground: oklch(0.14 0 0);
