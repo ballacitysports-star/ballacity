@@ -33,8 +33,12 @@ argument against B.
 
 None that is quantitative.
 
-- **No analytics yet.** The funnel analytics tag only loads when `VITE_GA_MEASUREMENT_ID` is set.
-  It is not set in `.env.production`, and P0-8 (choosing an analytics vendor) is still open.
+- **GA4 is live, and the clean window starts later.** `vite.config.ts` has baked in the measurement id
+  `G-MEWLGXSWXC` since #209 (2026-10-28), so the tag loads for confirmed adults in production. Until the
+  change that keeps it out of development builds (`AnalyticsHost` does nothing when `import.meta.env.DEV`
+  is true), `vite dev`, the Playwright dev server used by E2E and Lovable's live preview loaded it too
+  and reported to the same property. Count the clean window for this decision from the publish that
+  carries that change; earlier `select_tab` and `open_create` events include test and preview sessions.
 - **Adults only.** Even once the tag is live, it measures confirmed adults only. That is a privacy
   rule in `src/lib/analytics.ts`. Minors, likely the heaviest Reels users, will not appear in the
   numbers. Weigh that when reading them.
