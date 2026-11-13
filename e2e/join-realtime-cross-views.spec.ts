@@ -1,4 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { ensureNotJoined, joinCta, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
 
 /**
  * E2E: joining a game from the game-detail view must propagate in real time
@@ -29,7 +31,8 @@ const GAME_TITLE_RE = /./; // matched loosely; we assert by role and badges
 async function restoreSession(ctx: BrowserContext, page: Page) {
   if (COOKIES_JSON) {
     try {
-      const cookies = JSON.parse(COOKIES_JSON).map((c: any) => ({
+      const saved = JSON.parse(COOKIES_JSON) as Parameters<BrowserContext["addCookies"]>[0];
+      const cookies = saved.map((c) => ({
         ...c,
         url: "http://localhost:8080",
       }));
@@ -62,27 +65,39 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
   await boot.close();
 
   const detailPage = await ctx.newPage();
+  await stubRiskAcknowledged(detailPage);
   const feedPage = await ctx.newPage();
   const profilePage = await ctx.newPage();
 
   try {
-    // Land each surface on the target game BEFORE the join, so realtime is
-    // the mechanism under test (not a fresh page load).
+    // Start un-joined: if a prior run left this account on the roster, leave
+    // first, before the other surfaces load their baselines.
+    await detailPage.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
+    await ensureNotJoined(detailPage);
+
+    // Land each other surface BEFORE the join, so realtime is the mechanism
+    // under test (not a fresh page load).
+    // The feed is filtered to this game's title so its card is on screen.
+    const title = (
+      await detailPage.getByRole("heading", { level: 1 }).first().textContent()
+    )?.trim();
+    expect(title, "game page should name the game").toBeTruthy();
     await Promise.all([
-      detailPage.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" }),
-      feedPage.goto("/feed", { waitUntil: "domcontentloaded" }),
+      feedPage.goto(`/feed?q=${encodeURIComponent(title!)}`, { waitUntil: "domcontentloaded" }),
       profilePage.goto("/profile", { waitUntil: "domcontentloaded" }),
     ]);
 
     // --- Baseline: viewer is NOT joined on any surface ---
-    const joinCta = detailPage.getByRole("button", { name: /join run|you're in|full/i }).first();
-    await expect(joinCta).toBeVisible({ timeout: 15_000 });
-    await expect(joinCta).toContainText(/join run/i);
+    await expect(joinCta(detailPage)).toBeVisible({ timeout: 15_000 });
 
-    // Feed card for this game shouldn't show a "Joined" pill yet. Cards
-    // link to /games/<id> — locate by href.
-    const feedCard = feedPage.locator(`a[href*="/games/${GAME_ID}"]`).first();
-    // Card may not be in view depending on filters; only assert if present.
+    // Feed card for this game shouldn't show a "Joined" pill yet. Cards link
+    // to /games/<id> and carry the title as a heading; the "Needs you now"
+    // row that appears once joined links there too, but has no heading.
+    const feedCard = feedPage
+      .locator(`a[href="/games/${GAME_ID}"]`)
+      .filter({ has: feedPage.getByRole("heading", { level: 3 }) })
+      .first();
+    await expect(feedCard).toBeVisible({ timeout: 15_000 });
     const feedCardCount = await feedCard.count();
     if (feedCardCount > 0) {
       await expect(feedCard).not.toContainText(/^Joined$/i);
@@ -92,13 +107,9 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     const profileCardBefore = profilePage.locator(`a[href*="/games/${GAME_ID}"]`);
     expect(await profileCardBefore.count()).toBe(0);
 
-    // --- Action: join from the detail page ---
-    await joinCta.click();
-
+    // --- Action: join from the detail page (through "Join this run?") ---
     // Detail page flips locally (same tab, sync store update).
-    await expect(
-      detailPage.getByRole("button", { name: /you're in · tap to leave/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await joinFreeRun(detailPage);
 
     // --- Realtime propagation to other tabs ---
     // Feed: the "Joined" badge is rendered inside the card image overlay.
@@ -112,14 +123,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     });
 
     // --- Reverse: leave and confirm state clears everywhere ---
-    await detailPage
-      .getByRole("button", { name: /you're in · tap to leave/i })
-      .first()
-      .click();
-
-    await expect(detailPage.getByRole("button", { name: /join run/i }).first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await leaveFreeRun(detailPage);
 
     await expect
       .poll(async () => await profilePage.locator(`a[href*="/games/${GAME_ID}"]`).count(), {

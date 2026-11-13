@@ -270,6 +270,21 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     } else {
       try {
         const now = Date.now();
+        // hosted_games.joined is the game's participant count: the
+        // game_participants_sync_count trigger recounts it on every join and
+        // leave, and every card, the map and the pay page read it. g1 is the
+        // game the realtime specs really join and leave, so seed what its roster
+        // holds. A fixed 8 over an empty roster made the first join recount to
+        // 1 and the "N spots" pill jump from 2 to 9 instead of dropping by one.
+        const { count: g1Roster, error: g1CountErr } = await admin
+          .from("game_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("game_id", "g1");
+        if (g1CountErr) {
+          console.warn(
+            `[e2e global-setup] Could not count g1's roster (${g1CountErr.message}); seeding joined = 0.`,
+          );
+        }
         const rows = [
           {
             id: "g1",
@@ -281,7 +296,7 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
             location: "Tompkins Square Courts",
             neighborhood: "East Village",
             max_players: 10,
-            joined: 8,
+            joined: g1Roster ?? 0,
             skill: "Intermediate",
             price: 0,
             indoor: false,

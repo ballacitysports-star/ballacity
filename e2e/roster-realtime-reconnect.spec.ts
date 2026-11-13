@@ -1,4 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { ensureNotJoined, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
 
 /**
  * E2E: roster + participant count stay in sync across two clients through
@@ -32,7 +34,8 @@ const GAME_ID = "g1";
 async function restoreSession(ctx: BrowserContext, page: Page) {
   if (COOKIES_JSON) {
     try {
-      const cookies = JSON.parse(COOKIES_JSON).map((c: any) => ({
+      const saved = JSON.parse(COOKIES_JSON) as Parameters<BrowserContext["addCookies"]>[0];
+      const cookies = saved.map((c) => ({
         ...c,
         url: "http://localhost:8080",
       }));
@@ -64,48 +67,6 @@ function joinedFromHeader(text: string | null): number | null {
   return m ? Number(m[1]) : null;
 }
 
-async function ensureLeft(bDetail: Page) {
-  const leaveCta = bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first();
-  if ((await leaveCta.count()) > 0 && (await leaveCta.isVisible().catch(() => false))) {
-    await leaveCta.click();
-    // Leave shows a "Leave this game?" confirmation dialog with a Leave button.
-    const confirmLeave = bDetail.getByRole("button", { name: /^leave( game)?$/i }).first();
-    if (await confirmLeave.isVisible().catch(() => false)) {
-      await confirmLeave.click();
-    }
-    await expect(bDetail.getByRole("button", { name: /join run/i }).first()).toBeVisible({
-      timeout: 10_000,
-    });
-  }
-}
-
-async function performJoin(page: Page) {
-  const joinCta = page.getByRole("button", { name: /join run/i }).first();
-  await expect(joinCta).toBeVisible({ timeout: 15_000 });
-  await joinCta.click();
-  // Confirmation dialog: "Join this game?" → "Join game"
-  const confirm = page.getByRole("button", { name: /^join game$/i }).first();
-  await expect(confirm).toBeVisible({ timeout: 5_000 });
-  await confirm.click();
-  await expect(page.getByRole("button", { name: /you're in · tap to leave/i }).first()).toBeVisible(
-    { timeout: 10_000 },
-  );
-}
-
-async function performLeave(page: Page) {
-  await page
-    .getByRole("button", { name: /you're in · tap to leave/i })
-    .first()
-    .click();
-  const confirmLeave = page.getByRole("button", { name: /^leave( game)?$/i }).first();
-  if (await confirmLeave.isVisible().catch(() => false)) {
-    await confirmLeave.click();
-  }
-  await expect(page.getByRole("button", { name: /join run/i }).first()).toBeVisible({
-    timeout: 10_000,
-  });
-}
-
 test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ browser }) => {
   // --- Device A: passive observer ---
   const deviceA = await browser.newContext();
@@ -120,12 +81,15 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
   await restoreSession(deviceB, bootB);
   await bootB.close();
   const bDetail = await deviceB.newPage();
+  await stubRiskAcknowledged(bDetail);
 
   try {
-    await Promise.all([
-      aDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" }),
-      bDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" }),
-    ]);
+    // Make sure B starts un-joined (a prior run may have left this account on
+    // the roster) before A reads its baseline.
+    await bDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
+    await ensureNotJoined(bDetail);
+
+    await aDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
 
     // Wait for A's roster to hydrate.
     await expect(aDetail.getByText(/Roster \(\d+\/\d+\)/).first()).toBeVisible({
@@ -135,11 +99,8 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
     const baseline = joinedFromHeader(baselineHeader);
     expect(baseline).not.toBeNull();
 
-    // Make sure B starts un-joined.
-    await ensureLeft(bDetail);
-
     // ============ Step 1: INSERT propagates A ←— B ============
-    await performJoin(bDetail);
+    await joinFreeRun(bDetail);
 
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
@@ -149,7 +110,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
       .toBe((baseline ?? 0) + 1);
 
     // ============ Step 2: DELETE propagates A ←— B (both online) ============
-    await performLeave(bDetail);
+    await leaveFreeRun(bDetail);
 
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
@@ -168,7 +129,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
 
     // Verify A truly lost its websocket by making B change state; A must NOT
     // see the update while offline.
-    await performJoin(bDetail);
+    await joinFreeRun(bDetail);
 
     // Give the realtime event time to arrive (or not) on A.
     await aDetail.waitForTimeout(2_500);
@@ -190,7 +151,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
       .toBe((baseline ?? 0) + 1);
 
     // Cleanup: leave from B while both online, and confirm A tracks it too.
-    await performLeave(bDetail);
+    await leaveFreeRun(bDetail);
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
         timeout: 20_000,
