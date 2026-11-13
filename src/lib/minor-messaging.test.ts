@@ -78,16 +78,47 @@ describe("parseMinorMessagingBlock", () => {
       parseMinorMessagingBlock({ message: "MINOR_MESSAGING_BLOCKED:messaging_off:other" }),
     ).toEqual({ reason: "messaging_off", side: "other" });
   });
+
+  it("reads the neutral code the database sends for any restriction on the recipient", () => {
+    expect(
+      parseMinorMessagingBlock(
+        "invalid request: MINOR_MESSAGING_BLOCKED:recipient_restricted:other (SQLSTATE P0001)",
+      ),
+    ).toEqual({ reason: "recipient_restricted", side: "other" });
+  });
 });
 
 describe("minorMessagingMessage", () => {
-  it("tells a host messaging a requester that the player must be in their game", () => {
-    // The case that prompted this: a host who simply needs the player to join.
-    const msg = minorMessagingMessage(
-      "MINOR_MESSAGING_BLOCKED:teen_needs_shared_game:other",
-      "game_player",
-    )!;
-    expect(msg).toMatch(/their spot in your game is confirmed/i);
+  it("tells the sender only that the recipient can't be messaged, never why", () => {
+    // SEC-2b: the reason would tell a stranger the recipient's age band, their
+    // guardian's settings or their own privacy choice.
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:recipient_restricted:other")).toBe(
+      "This player can't receive messages from you right now.",
+    );
+    expect(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:recipient_restricted:other", "host"),
+    ).toBe("This host can't receive messages from you right now.");
+    expect(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:recipient_restricted:other", "chat"),
+    ).toBe("This person can't receive messages from you right now.");
+  });
+
+  it("says the same for every rule about the recipient, from any database", () => {
+    // An older database still names the recipient's rule; the app does not repeat it.
+    for (const to of RECIPIENTS) {
+      const neutral = minorMessagingMessage(
+        "MINOR_MESSAGING_BLOCKED:recipient_restricted:other",
+        to,
+      );
+      for (const code of ALL_CODES) {
+        const msg = minorMessagingMessage(`MINOR_MESSAGING_BLOCKED:${code}:other`, to)!;
+        expect(msg, `${code}:other -> ${to}`).toBe(neutral);
+        // Only the noun for a guardian recipient may say "guardian".
+        expect(msg.replace("parent or guardian", "")).not.toMatch(
+          /guardian|under 13|teammates|game|turned off/i,
+        );
+      }
+    }
   });
 
   it("tells a player messaging a host to wait for their spot, not for themselves", () => {
@@ -122,25 +153,22 @@ describe("minorMessagingMessage", () => {
     }
   });
 
-  it("names the person being messaged when the restriction is theirs", () => {
-    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off:other", "host")).toBe(
-      "This host's parent or guardian has turned off direct messages.",
-    );
+  it("names the person being messaged, not their rule", () => {
     expect(
-      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:guardian_only:other", "team_leader"),
-    ).toBe("This team leader can only be messaged by their parent or guardian.");
-    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:messaging_off:other", "chat")).toBe(
-      "This person's parent or guardian has turned off direct messages.",
-    );
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:recipient_restricted:other", "team_leader"),
+    ).toBe("This team leader can't receive messages from you right now.");
+    expect(
+      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:recipient_restricted:other", "game_player"),
+    ).toBe("This player can't receive messages from you right now.");
   });
 
-  it("only suggests adding to a team when the viewer is messaging a player", () => {
-    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only:other")).toMatch(
+  it("only suggests adding to a team when an older database names the rule for a player", () => {
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only")).toMatch(
       /Add them to your team/,
     );
-    expect(
-      minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only:other", "host"),
-    ).not.toMatch(/Add them/);
+    expect(minorMessagingMessage("MINOR_MESSAGING_BLOCKED:teammates_only", "host")).not.toMatch(
+      /Add them/,
+    );
   });
 
   it("never tells anyone but a host to wait for a player to join their games", () => {
@@ -207,6 +235,16 @@ describe("describeMessagingError", () => {
     expect(describeMessagingError(new Error("MINOR_MESSAGING_BLOCKED:guardian_only"))).toMatch(
       /parent or guardian/i,
     );
+  });
+
+  it("gives the neutral line for a refusal about the recipient", () => {
+    expect(
+      describeMessagingError(
+        new Error("MINOR_MESSAGING_BLOCKED:recipient_restricted:other"),
+        "Couldn't open chat",
+        "host",
+      ),
+    ).toBe("This host can't receive messages from you right now.");
   });
 
   it("passes other errors through unchanged", () => {

@@ -22,10 +22,12 @@ import {
 type Blocked = { childId: string; childName: string; guardianId: string | null; reason: string };
 
 /**
- * Opens a DM with a player; when the database refuses because the player is a
- * minor, offers to message their guardian instead. The guardian is only
- * resolvable when they have authorised contact (public_minor_guardian), so a
- * guardian's identity is never revealed without their opt-in.
+ * Opens a DM with a player; when the database refuses because of the player's
+ * account, offers to message their guardian instead. The refusal never says
+ * why (it is the same for a minor's rules and an adult's own settings), and
+ * the guardian is only resolvable when they have authorised contact
+ * (public_minor_guardian), so neither the player's age nor a guardian's
+ * identity is revealed without that opt-in.
  */
 export function useMessageOrGuardian() {
   const navigate = useNavigate();
@@ -79,10 +81,10 @@ export function useMessageOrGuardian() {
         <AlertDialogHeader>
           <AlertDialogTitle>Direct messaging is restricted</AlertDialogTitle>
           <AlertDialogDescription>
-            {blocked?.reason}{" "}
+            {blocked?.reason}
             {blocked?.guardianId
-              ? `You can message ${blocked.childName}'s parent or guardian instead.`
-              : `${blocked?.childName}'s guardian hasn't enabled contact requests yet.`}
+              ? ` You can message ${blocked.childName}'s parent or guardian instead.`
+              : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
