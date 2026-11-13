@@ -1,3 +1,4 @@
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -136,6 +137,7 @@ test("well-formed invite → Request to join succeeds and shows pending UI with 
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Land directly on the game with a well-formed, non-expired invite.
