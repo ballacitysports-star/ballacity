@@ -146,8 +146,13 @@ async function assertPayScreenRendered(page: Page, gameId: string) {
   await page.waitForURL((u) => u.pathname === `/games/${gameId}/pay`, { timeout: 10_000 });
   // Must NOT show the not-found fallback.
   await expect(page.getByText(/game not found/i)).toHaveCount(0);
-  // Title heading is rendered on the pay screen.
-  await expect(page.locator("h1").first()).toBeVisible({ timeout: 10_000 });
+  // The URL changes before the pay screen replaces the game page: the router
+  // still has to load the pay route's code. Any h1 matched the game page's own
+  // title in that window, so the checks after this one started early and could
+  // time out (seen once in 160 runs). Wait for the pay screen's fee card, which
+  // only the pay screen renders.
+  await expect(page.getByText("Entry fee", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("h1").first()).toBeVisible();
 }
 
 test("Pay host button on a custom (sample) game routes to the pay screen", async ({ browser }) => {
