@@ -202,8 +202,11 @@ SELECT t.as_user(t.id('adultsubj'));
 SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('adultsubj'))), 1, 'an adult subject: their own attendance');
 -- Two adult-authored reviews (the historical one and the one written in section 1); the minor-authored one is not counted.
 SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('adultsubj'))), 2, 'an adult subject: counts the adult-authored reviews, not the hidden minor-authored one');
+SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('adultsubj'))), 1, 'an adult subject: their own trait counts still work (adult-authored review only)');
 SELECT t.as_user(t.id('stranger'));
-SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('adultsubj'))), 1, 'an adult subject: trait counts still work (adult-authored review only)');
+-- Since 20261113120000 (SEC-2b) the trait counts, like the statistics, depend only on who asks.
+SELECT t.eq((SELECT respectful + communicative + fair_play + positive + on_time FROM public.player_trait_counts(t.id('adultsubj'))), 0,
+  'an adult subject: zero trait counts for a member as well (no age signal)');
 SELECT t.as_user(t.id('guardian8'));
 SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('teen14'))), 0, 'a guardian of a different child: zero');
 SELECT t.as_user(t.id('teen14'));
@@ -362,12 +365,10 @@ INSERT INTO public.game_participants (game_id, user_id, attended) VALUES ('g-tee
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq((SELECT marked + attended + completed_games FROM public.host_attendance_stats(t.id('teen17'))), 0, 'host stats about a 16-17 host, asked by a member: zeros');
--- Since 20261113120000 (SEC-2b) a member sees an adult host's numbers only when the host's profile is visible to members.
-SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 0, 'an adult host with a private profile: zeros for a member');
-SELECT t.reset();
-UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id = t.id('adultrev');
-SELECT t.as_user(t.id('stranger'));
-SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 1, 'an adult host with a members-visible profile: unchanged for a member (control)');
+-- adultrev keeps the sign-up default ('private' profile); since 20261113120000 (SEC-2b) a member's numbers come from the host's public,
+-- unhidden games only, and g-rv is one of those.
+SELECT t.eq(private_sec.profile_visibility_of(t.id('adultrev')), 'private', 'fixture: the adult host has the sign-up default, a private profile');
+SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 1, 'an adult host''s public game still counts for a member (control)');
 SELECT t.as_user(t.id('teen17'));
 SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('teen17'))), 1, 'the 16-17 host sees their own');
 SELECT t.as_anon();

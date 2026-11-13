@@ -7,7 +7,8 @@ SELECT t.guardian('parent', 'teenmid');
 -- Adults who review their followers.
 UPDATE public.privacy_preferences SET require_follow_approval = true
  WHERE user_id IN (t.id('alice'), t.id('carol'), t.id('dave'));
--- Sign-up starts every fixture private, and a profile the caller cannot see cannot be followed (20261113120000): make them visible.
+-- Every account starts 'private' (the sign-up default, real sign-up included), and since 20261113120000 a profile the caller cannot see is
+-- always asked rather than followed (830 covers that). These tests are about blocks across visible profiles: make them visible.
 UPDATE public.privacy_preferences SET profile_visibility = 'public'
  WHERE user_id IN (t.id('alice'), t.id('bob'), t.id('carol'), t.id('dave'), t.id('eve'));
 UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id IN (t.id('teenmid'), t.id('teenold'));
@@ -15,6 +16,8 @@ UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_
 -- ============================================================ blocks
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('alice'), t.id('bob'));
 
+-- The refusal still tells bob that a block stands (alice's profile is visible to him); only the name of the error changed (accepted residual,
+-- see the header of 20261113120000).
 SELECT t.as_user(t.id('bob'));
 SELECT t.throws(format('SELECT public.request_follow(%L)', t.id('alice')),
   'INVALID_FOLLOW_TARGET', 'someone who was blocked cannot ask to follow the person who blocked them (and gets the same error as for a missing account, SEC-2b)');

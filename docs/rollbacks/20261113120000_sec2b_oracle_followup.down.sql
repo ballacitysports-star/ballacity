@@ -4,9 +4,10 @@
 --     (under 13 / 13-15), their guardian's messaging control, and an adult's own allow_messages setting ('nobody' vs 'shared');
 --   * through player_activity_stats: an adult's whole activity (private and hidden games, late cancellations, hidden teams), and that anyone
 --     who gets zeros is not a confirmed adult;
---   * through request_follow: whether an id exists, whether a block stands between them (FOLLOW_BLOCKED), and minor-or-not for accounts whose
---     profile they cannot see ('requested' / 'following');
---   * through host_attendance_stats: a private-profile adult host's private and hidden games.
+--   * through request_follow: a block named as such (FOLLOW_BLOCKED), and minor-or-not for accounts whose profile they cannot see
+--     ('requested' / 'following'); such accounts are again followed at once, without a request;
+--   * through host_attendance_stats: an adult host's private and hidden games;
+--   * through player_trait_counts: an adult's review traits (AI-derived included), and that anyone who gets zeros is not a confirmed adult.
 -- It puts back, byte for byte, the definitions in force on main before the migration (md5(pg_get_functiondef)):
 --   public.create_direct_conversation(uuid, text): cbf648a5ca29740af7ca916631351ce1
 --   public.minor_messaging_block_me(uuid): fa778b4b33c2d0b5320ec8a4fc0b9d76
@@ -14,10 +15,13 @@
 --   public.player_activity_stats(uuid): 8dae1e12c3612739f31a2a04475a0b4a
 --   public.request_follow(uuid): 33b706688c43aaaa18e2af7e79d9af06
 --   public.host_attendance_stats(uuid): 5e7c94e22cb6ba69a769142c0f68b07d
--- and drops private_sec.direct_message_refusal(uuid, uuid). CREATE OR REPLACE keeps owners, grants and comments. No row is written.
+--   public.player_trait_counts(uuid): 0e1d7c44b6c5cb9f4754dc55e5fd482f
+-- gives EXECUTE on public.minor_messaging_block_me(uuid) back to authenticated (the same grants as before; the ACL lists them in another
+-- order), and drops private_sec.direct_message_refusal(uuid, uuid). CREATE OR REPLACE keeps owners, grants and comments. Requests that
+-- request_follow filed while the migration was in force stay; the people asked approve or decline them as usual. No row is written.
 -- The app change that shipped with the migration works either way and stays: with the old definitions the app again shows its per-reason
 -- lines for ':self' and its one neutral line for every ':other' reason.
--- It stops, changing nothing, if any of the seven functions no longer has the definition the migration gave it (a later migration changed
+-- It stops, changing nothing, if any of the eight functions no longer has the definition the migration gave it (a later migration changed
 -- it): a person needs to look first.
 -- It refuses to run unless the session sets the confirmation first:
 --     SET app.confirm_sec2b_oracle_followup_rollback = 'yes';
@@ -25,12 +29,12 @@
 BEGIN;
 DO $guard$
 DECLARE
-  _want jsonb := '{"public.create_direct_conversation(uuid,text)": "1f2a487470a181e3115edabd02724107", "public.minor_messaging_block_me(uuid)": "6e0b822e983718277f8be21579edfc7a", "public.enforce_minor_messaging()": "3be7540efc3cba5559a5a7bc91fff27d", "public.player_activity_stats(uuid)": "fe1ee678e641edfac01e427c46ab03e4", "public.request_follow(uuid)": "82a0fb9efece479e01b811dd7baad19b", "public.host_attendance_stats(uuid)": "076d33088094b57bedbc0277480857c6", "private_sec.direct_message_refusal(uuid,uuid)": "37b99aea414a32f3e5f06ac1b1fa4391"}'::jsonb;
+  _want jsonb := '{"public.create_direct_conversation(uuid,text)": "1f2a487470a181e3115edabd02724107", "public.minor_messaging_block_me(uuid)": "6e0b822e983718277f8be21579edfc7a", "public.enforce_minor_messaging()": "3be7540efc3cba5559a5a7bc91fff27d", "public.player_activity_stats(uuid)": "fe1ee678e641edfac01e427c46ab03e4", "public.request_follow(uuid)": "f6d6e293192a8945d8e51189b8467e58", "public.host_attendance_stats(uuid)": "47121bdc9251be9f3ff3cafd98696b00", "public.player_trait_counts(uuid)": "49c1b3d08a6bd69468b1f41275b4a1ef", "private_sec.direct_message_refusal(uuid,uuid)": "37b99aea414a32f3e5f06ac1b1fa4391"}'::jsonb;
   _k text;
   _got text;
 BEGIN
   IF current_setting('app.confirm_sec2b_oracle_followup_rollback', true) IS DISTINCT FROM 'yes' THEN
-    RAISE EXCEPTION 'Refusing to run: this lets every signed-in account learn again whether anyone is a minor, their age band, their guardian''s messaging control, an adult''s full game history and whether someone blocked them. Set app.confirm_sec2b_oracle_followup_rollback=yes for the session to proceed deliberately.';
+    RAISE EXCEPTION 'Refusing to run: this lets every signed-in account learn again whether anyone is a minor, their age band, their guardian''s messaging control, an adult''s full game history and review traits, and whether someone blocked them. Set app.confirm_sec2b_oracle_followup_rollback=yes for the session to proceed deliberately.';
   END IF;
   FOR _k IN SELECT jsonb_object_keys(_want) LOOP
     SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = to_regprocedure(_k);
@@ -266,6 +270,38 @@ BEGIN
 END
 $function$
 ;
+
+CREATE OR REPLACE FUNCTION public.player_trait_counts(_user uuid)
+ RETURNS TABLE(respectful integer, communicative integer, fair_play integer, positive integer, on_time integer)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT (auth.uid() IS NULL OR COALESCE(public.age_cohort_of(_user) = 'adult', false)) THEN
+    RETURN QUERY SELECT 0, 0, 0, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Counts the AI-detected traits and the tags the reviewer picked; only reviews that may be published.
+  RETURN QUERY
+  SELECT
+    count(*) FILTER (WHERE 'respectful' = ANY (a.traits) OR 'respectful' = ANY (r.tags))::int,
+    count(*) FILTER (WHERE 'communicative' = ANY (a.traits) OR 'communicative' = ANY (r.tags))::int,
+    count(*) FILTER (WHERE 'fairPlay' = ANY (a.traits) OR 'fairPlay' = ANY (r.tags))::int,
+    count(*) FILTER (WHERE 'positive' = ANY (a.traits) OR 'positive' = ANY (r.tags))::int,
+    count(*) FILTER (WHERE 'onTime' = ANY (a.traits) OR 'onTime' = ANY (r.tags))::int
+  FROM public.reviews r
+  LEFT JOIN public.review_ai_analysis a ON a.review_id = r.id
+  WHERE r.reviewee_kind = 'player' AND r.reviewee_id = _user::text
+    AND NOT r.flagged AND NOT r.is_private AND NOT COALESCE(a.mismatch, false)
+    AND private_sec.review_is_publishable(r.id);
+END
+$function$
+;
+
+-- minor_messaging_block_me was callable by signed-in accounts before the migration.
+GRANT EXECUTE ON FUNCTION public.minor_messaging_block_me(uuid) TO authenticated;
 
 -- Nothing calls it any more.
 DROP FUNCTION private_sec.direct_message_refusal(uuid, uuid);

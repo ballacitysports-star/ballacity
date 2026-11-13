@@ -77,15 +77,17 @@ SELECT t.throws(format('SELECT public.minor_messaging_block_reason(%L, %L)', t.i
   'permission denied', 'minor_messaging_block_reason: likewise');
 SELECT t.throws(format('SELECT public.minor_messaging_allowed(%L, %L)', t.id('adultone'), t.id('teenone')),
   'permission denied', 'minor_messaging_allowed: likewise');
-SELECT t.eq(public.minor_messaging_block_me(t.id('teenone')), 'recipient_restricted:other',
-  'minor_messaging_block_me: a stranger is told only that they cannot message the guardian-only teen, not why (SEC-2b)');
-SELECT t.ok(public.minor_messaging_block_me(t.id('adultone')) IS NULL,
-  'minor_messaging_block_me: and that nothing blocks messaging an adult');
+-- Since 20261113120000 (SEC-2b) minor_messaging_block_me is service-role only: nothing in the app calls it, and create_direct_conversation
+-- (which answers 'recipient_restricted:other' for every refusal about the other person) is the one way to ask.
+SELECT t.throws(format('SELECT public.minor_messaging_block_me(%L)', t.id('teenone')),
+  'permission denied', 'minor_messaging_block_me: a signed-in stranger cannot call it');
 SELECT t.reset();
 
 SELECT t.as_user(t.id('parentone'));
-SELECT t.ok(public.minor_messaging_block_me(t.id('teenone')) IS NULL,
-  'minor_messaging_block_me: a guardian may message their own teen');
+SELECT t.throws(format('SELECT public.minor_messaging_block_me(%L)', t.id('teenone')),
+  'permission denied', 'minor_messaging_block_me: nor can a guardian');
+SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('teenone')),
+  'create_direct_conversation: the guardian may still message their own teen');
 SELECT t.reset();
 
 SELECT t.as_anon();

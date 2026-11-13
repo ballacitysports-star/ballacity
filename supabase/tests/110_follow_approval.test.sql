@@ -18,8 +18,10 @@ SELECT t.guardian('guardian', 'kidok');
 
 -- An adult who turns approval on.
 UPDATE public.privacy_preferences SET require_follow_approval = true WHERE user_id = t.id('privateadult');
--- Sign-up starts every fixture with a private profile; a profile the caller cannot see cannot be followed (20261113120000, SEC-2b).
--- Model the accounts people find: adults public, teens members-visible, and an under-13 whose guardian made the profile public.
+-- Every account starts 'private': handle_new_user stores the default before any birthday is known, as real sign-up does, and the age
+-- re-clamp never raises it. Since 20261113120000 (SEC-2b) a profile the caller cannot see is always asked, never followed at once (830 covers
+-- that, for adults with the default too). This file is about the approval rules for profiles people can see, so the followed accounts are
+-- made visible: adults public, teens members-visible, and an under-13 whose guardian made the profile public.
 UPDATE public.privacy_preferences SET profile_visibility = 'public' WHERE user_id IN (t.id('openadult'), t.id('privateadult'));
 UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id IN (t.id('teenyoung'), t.id('teenold'));
 UPDATE public.child_controls SET public_profile = true, public_profile_authorized_by = t.id('guardian') WHERE child_user_id = t.id('kidok');

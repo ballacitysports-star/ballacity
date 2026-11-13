@@ -5,7 +5,8 @@
  * only (games attended, no-shows, hosted totals, review averages) and never
  * PII. It answers only the person themselves, their verified guardian and the
  * server; anyone else gets the same zero row for every account (SEC-2b), so
- * the app asks it only about the signed-in user.
+ * the app asks it only about the signed-in user. `player_trait_counts` follows
+ * the same rule.
  * Reliability is derived here so every surface — profile header, player card,
  * badge list — reports the same number.
  */
