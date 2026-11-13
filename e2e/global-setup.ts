@@ -20,6 +20,11 @@
 import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import {
+  LEGAL_DOCUMENT_LIST,
+  effectiveVersion,
+  type PublishedLegalDocument,
+} from "../src/lib/legal-documents";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
@@ -130,6 +135,33 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     // child-safety policies the fixture flows exercise.
     const ADULT_BIRTHDAY = "1990-05-04";
 
+    // The current Terms and Privacy versions, as the app computes them (a published
+    // legal_documents row, else the bundled version). An account that has not accepted a
+    // material version gets the full-screen LegalReacceptGate on every signed-in page, which
+    // covers whatever a spec is trying to click. The shared sandbox's fixtures accepted long
+    // ago; a fresh database (e2e/local-stack) has no consent rows at all. So record the
+    // acceptance a user would give by ticking the gate. ignoreDuplicates leaves existing rows
+    // untouched.
+    let published: PublishedLegalDocument[] = [];
+    {
+      const { data, error } = await admin
+        .from("legal_documents")
+        .select(
+          "id, document_type, title, version, content, summary, requires_reacceptance, effective_date, published, published_at, archived_at",
+        )
+        .not("published_at", "is", null)
+        .order("effective_date", { ascending: false });
+      if (error) {
+        console.warn(
+          `[e2e global-setup] Could not read published legal documents (${error.message}); using the bundled versions.`,
+        );
+      } else published = (data ?? []) as PublishedLegalDocument[];
+    }
+    const currentLegal = LEGAL_DOCUMENT_LIST.map((doc) => ({
+      document_type: doc.type,
+      document_version: effectiveVersion(doc.type, published).version,
+    }));
+
     async function upsertAccount(acct: {
       email: string;
       password: string;
@@ -187,6 +219,16 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
           if (bErr) {
             console.warn(
               `[e2e global-setup] Could not set birthday for ${acct.email}: ${bErr.message}`,
+            );
+          }
+          const { error: cErr } = await admin.from("legal_consents").upsert(
+            currentLegal.map((c) => ({ ...c, user_id: id })),
+            { onConflict: "user_id,document_type,document_version", ignoreDuplicates: true },
+          );
+          if (cErr) {
+            console.warn(
+              `[e2e global-setup] Could not record legal acceptance for ${acct.email}: ${cErr.message}. ` +
+                "Signed-in specs may be blocked by the legal re-accept dialog.",
             );
           }
         }

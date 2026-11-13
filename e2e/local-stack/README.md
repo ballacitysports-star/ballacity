@@ -70,5 +70,7 @@ host>-auth-token`, i.e. `sb-127-auth-token`, and global setup injects it under
 ## Fixture data
 
 Global setup seeds the fixture accounts and the `g1`/`g2` games whenever
-`SUPABASE_SERVICE_ROLE_KEY` is set, which `env.sh` does. Each `up` starts from an empty database,
-so a run never inherits another run's rows.
+`SUPABASE_SERVICE_ROLE_KEY` is set, which `env.sh` does. It also records each fixture account's
+acceptance of the current Terms and Privacy versions: on a fresh database they have none, and the
+legal re-accept dialog would otherwise cover every signed-in page. Each `up` starts from an empty
+database, so a run never inherits another run's rows.
