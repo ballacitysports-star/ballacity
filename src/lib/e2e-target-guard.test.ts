@@ -553,6 +553,70 @@ describe("local fixture workflows", () => {
     },
   );
 
+  // e2e/local-stack: global setup injects the fixture session, and every spec worker re-runs
+  // the guard with it in the environment. A local GoTrue signs it with the loopback API URL as
+  // issuer and no project ref, and supabase-js stores it under sb-127-auth-token.
+  const localSession = (iss: string, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ access_token: key({ iss, role: "authenticated", sub: "u1", ...extra }) });
+
+  it.each([
+    ["http://127.0.0.1:54321/auth/v1", "sb-127-auth-token"],
+    ["http://localhost:54321/auth/v1", "sb-localhost-auth-token"],
+    ["http://[::1]:54321/auth/v1", "sb-127-auth-token"],
+  ])("accepts a session issued by a local Supabase (%s, %s) on a local target", (iss, sk) => {
+    const env = local({
+      SUPABASE_PROJECT_ID: "127",
+      VITE_SUPABASE_PROJECT_ID: "127",
+      ...demoKeys,
+      LOVABLE_BROWSER_SUPABASE_SESSION_JSON: localSession(iss),
+      LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: sk,
+    });
+    expect(assertSafeE2eTarget(env)).toEqual({ kind: "local" });
+  });
+
+  it("refuses a locally issued session or local storage key on a remote target", () => {
+    expect(
+      reasonsOf(
+        sandboxEnv({
+          LOVABLE_BROWSER_SUPABASE_SESSION_JSON: localSession("http://127.0.0.1:54321/auth/v1"),
+        }),
+      ),
+    ).toContain("issued by a local Supabase, but the target is not local");
+    expect(
+      reasonsOf(sandboxEnv({ LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: "sb-127-auth-token" })),
+    ).toContain("does not match sb-<ref>-auth-token");
+  });
+
+  it.each([
+    "https://evil.example/auth/v1",
+    "http://localhost.evil.test:54321/auth/v1",
+    "http://10.0.0.5:54321/auth/v1",
+    "not a url",
+  ])("refuses a session whose issuer %s is neither loopback nor a project", (iss) => {
+    expect(
+      reasonsOf(local({ LOVABLE_BROWSER_SUPABASE_SESSION_JSON: localSession(iss) })),
+    ).toContain("its project cannot be identified");
+  });
+
+  it("does not let a loopback issuer hide a project ref claim in the session", () => {
+    const env = local({
+      LOVABLE_BROWSER_SUPABASE_SESSION_JSON: localSession("http://127.0.0.1:54321/auth/v1", {
+        ref: PROD,
+      }),
+    });
+    expect(reasonsOf(env)).toContain("PRODUCTION");
+  });
+
+  it("still reads a project reference in the storage key of a local run", () => {
+    const text = reasonsOf(
+      local({ LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: `sb-${PROD}-auth-token` }),
+    );
+    expect(text).toContain("PRODUCTION");
+    expect(
+      reasonsOf(local({ LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: "sb-a b-auth-token" })),
+    ).toContain("does not match");
+  });
+
   it("still blocks a local target that sets only one of the two URLs", () => {
     expect(reasonsOf(local({ VITE_SUPABASE_URL: undefined }))).toContain(
       "VITE_SUPABASE_URL is not set",

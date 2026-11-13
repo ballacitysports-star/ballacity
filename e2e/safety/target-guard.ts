@@ -51,8 +51,8 @@ export class E2eTargetError extends Error {
         ...reasons.map((r) => `  - ${r}`),
         "",
         "To run E2E, point BOTH the test process and the dev server at one of:",
-        "  1. A local Supabase (`supabase start`): SUPABASE_URL / VITE_SUPABASE_URL=http://127.0.0.1:54321",
-        "     with the local keys from `supabase status`.",
+        "  1. A local Supabase (`node e2e/local-stack/stack.mjs up`, or `supabase start`):",
+        "     SUPABASE_URL / VITE_SUPABASE_URL=http://127.0.0.1:54321 with that stack's local keys.",
         "  2. The designated E2E sandbox project: set SUPABASE_URL, VITE_SUPABASE_URL,",
         "     SUPABASE_PROJECT_ID, VITE_SUPABASE_PROJECT_ID and the matching publishable key",
         "     (and, to seed fixtures, the service-role key) for that project, and serve the",
@@ -135,12 +135,41 @@ export function refFromStorageKey(key: string): string | null {
   return m ? normalizeRef(m[1]) : null;
 }
 
-function refFromInjectedSession(env: Env): string | null | undefined {
+/**
+ * True when an access token was issued by a Supabase on a loopback host: its issuer is
+ * `http://127.0.0.1:<port>/auth/v1` (or localhost / ::1) and it carries no project `ref` claim.
+ * A local Supabase signs its sessions that way, so they name no project; this is how such a
+ * session is told apart from one the guard simply cannot read.
+ */
+export function issuedByLocalSupabase(token: string): boolean {
+  const p = decodePayload(token);
+  if (!p || (typeof p.ref === "string" && p.ref.trim())) return false;
+  return typeof p.iss === "string" && refFromSupabaseUrl(p.iss) === "local";
+}
+
+/**
+ * `sb-<label>-auth-token` where the label is a local instance's own name, as supabase-js
+ * derives it from a loopback API host (`sb-127-auth-token`, `sb-localhost-auth-token`).
+ * Never a project reference: a 20-character reference is read by refFromStorageKey instead.
+ */
+export function localLabelFromStorageKey(key: string): string | null {
+  const m = /^sb-([a-z0-9_-]{1,32})-auth-token$/i.exec(key.trim());
+  if (!m) return null;
+  const label = m[1].toLowerCase();
+  return REF_SHAPE.test(label) ? null : label;
+}
+
+type SessionIdentity = { ref: string } | { local: true } | null | undefined;
+
+function refFromInjectedSession(env: Env): SessionIdentity {
   const raw = env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
   if (!present(raw)) return undefined;
   try {
     const s = JSON.parse(raw) as { access_token?: unknown };
-    return typeof s.access_token === "string" ? refFromJwt(s.access_token) : null;
+    if (typeof s.access_token !== "string") return null;
+    const ref = refFromJwt(s.access_token);
+    if (ref) return { ref };
+    return issuedByLocalSupabase(s.access_token) ? { local: true } : null;
   } catch {
     return null;
   }
@@ -275,16 +304,27 @@ export function resolveE2eTarget(
   }
 
   // --- A pre-injected browser session names its project too ---
+  // A local Supabase's session names no project: its issuer is the loopback API URL and its
+  // storage key carries the local label (sb-127-auth-token). Both are accepted ONLY when the
+  // URLs above already made this a local target; on any other target they are refused.
   const session = refFromInjectedSession(env);
   if (session === null) {
     reasons.push(
       "LOVABLE_BROWSER_SUPABASE_SESSION_JSON is set but its project cannot be identified.",
     );
-  } else if (session) claimed.push({ source: "injected browser session (issuer)", ref: session });
+  } else if (session && "local" in session) {
+    if (!localTarget)
+      reasons.push(
+        "LOVABLE_BROWSER_SUPABASE_SESSION_JSON was issued by a local Supabase, but the target is not local.",
+      );
+  } else if (session)
+    claimed.push({ source: "injected browser session (issuer)", ref: session.ref });
   if (present(env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY)) {
-    const ref = refFromStorageKey(env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY!);
+    const key = env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY!;
+    const ref = refFromStorageKey(key);
     if (ref) claimed.push({ source: "injected storage key", ref });
-    else reasons.push("LOVABLE_BROWSER_SUPABASE_STORAGE_KEY does not match sb-<ref>-auth-token.");
+    else if (!(localTarget && localLabelFromStorageKey(key)))
+      reasons.push("LOVABLE_BROWSER_SUPABASE_STORAGE_KEY does not match sb-<ref>-auth-token.");
   }
 
   // 1. Production anywhere is final.

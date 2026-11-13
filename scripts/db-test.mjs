@@ -18,11 +18,12 @@
 //
 // Why two migration folders: supabase/migrations holds ours, drizzle/migrations
 // holds the ones Lovable writes and applies itself. The live schema is both
-// together, so they are replayed together in timestamp order (a drizzle entry's
-// time is `when` in its journal; at the same instant ours goes first).
+// together, so they are replayed together in timestamp order; see
+// scripts/migration-order.mjs, which e2e/local-stack shares.
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { dedupeMigrations } from "./migration-twins.mjs";
+import { migrationOrder } from "./migration-order.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -72,31 +73,6 @@ function fail(message, detail) {
   if (detail) console.error(detail.trim().split("\n").slice(-12).join("\n"));
   cleanup();
   process.exit(1);
-}
-
-function migrationOrder() {
-  const rows = [];
-  for (const file of readdirSync(join(root, "supabase/migrations"))) {
-    if (file.endsWith(".sql")) {
-      rows.push({
-        key: `${file.slice(0, 14)}a${file}`,
-        path: join(root, "supabase/migrations", file),
-        name: file,
-      });
-    }
-  }
-  const journal = JSON.parse(
-    readFileSync(join(root, "drizzle/migrations/meta/_journal.json"), "utf8"),
-  );
-  for (const entry of journal.entries) {
-    const stamp = new Date(entry.when).toISOString().replace(/\D/g, "").slice(0, 14);
-    rows.push({
-      key: `${stamp}b${entry.tag}`,
-      path: join(root, "drizzle/migrations", `${entry.tag}.sql`),
-      name: `${entry.tag}.sql`,
-    });
-  }
-  return rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
 // -- scratch database -------------------------------------------------------
@@ -309,7 +285,7 @@ try {
     // -- replay -------------------------------------------------------------
     let migrations;
     try {
-      const order = dedupeMigrations(migrationOrder());
+      const order = dedupeMigrations(migrationOrder(root));
       migrations = order.replay;
       if (order.skipped.length > 0)
         console.log(
