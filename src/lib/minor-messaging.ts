@@ -10,19 +10,28 @@
  * none of that.
  *
  * `create_direct_conversation` (and the send-time trigger) raise
- * `MINOR_MESSAGING_BLOCKED:<code>:<side>`. The code names the rule; the side
- * says whose restriction it is — `self` when it is the sender's own account
- * (a teen messaging a host), `other` when it is the recipient's (a host
- * messaging a teen). Older databases send only the code.
+ * `MINOR_MESSAGING_BLOCKED:<code>:<side>`. The side says whose restriction it
+ * is — `self` when it is the sender's own account (a teen messaging a host),
+ * `other` when it is the recipient's (a host messaging a teen).
  *
- * What to say depends on both, and on who is being messaged: "once they've
- * joined one of your games" is right for a host messaging a player and wrong,
- * read the other way, for a player messaging that host.
+ * A `self` code names the rule, because it is about the sender's own account.
+ * Anything about the recipient is one neutral code,
+ * `recipient_restricted:other` (SEC-2b, migration 20261113120000): the reason
+ * would tell a stranger the recipient's age band, their guardian's settings or
+ * their own privacy choice, so the database no longer says which rule it was,
+ * and an adult who accepts no new messages gets the same answer as a minor.
+ * The app shows one line for it, and does the same for any older `:other`
+ * code. Older databases send only the code, with no side.
+ *
+ * What to say for the sender's own shared-game rule depends on who is being
+ * messaged: "once your spot is confirmed" is right for a player messaging a
+ * host and wrong, read the other way, for a host messaging that player.
  */
 
 export const MINOR_MESSAGING_PREFIX = "MINOR_MESSAGING_BLOCKED:";
 
 export type MinorMessagingReason =
+  | "recipient_restricted"
   | "messaging_off"
   | "guardian_only"
   | "teammates_only"
@@ -47,6 +56,7 @@ export type MessagingRecipient =
   "player" | "game_player" | "host" | "team_leader" | "guardian" | "chat";
 
 const KNOWN: ReadonlySet<string> = new Set<MinorMessagingReason>([
+  "recipient_restricted",
   "messaging_off",
   "guardian_only",
   "teammates_only",
@@ -84,11 +94,17 @@ function sharedGameMessage(side: MinorMessagingSide | null, to: MessagingRecipie
   }
 }
 
+/** The one line for any refusal about the recipient: it never says why. */
+function recipientRestricted(to: MessagingRecipient): string {
+  return `${capitalize(NOUN[to])} can't receive messages from you right now.`;
+}
+
 function describe(
   reason: MinorMessagingReason,
   side: MinorMessagingSide | null,
   to: MessagingRecipient,
 ): string {
+  if (reason === "recipient_restricted" || side === "other") return recipientRestricted(to);
   if (reason === "child_needs_shared_game" || reason === "teen_needs_shared_game") {
     return sharedGameMessage(side, to);
   }
@@ -104,7 +120,7 @@ function describe(
         return "Players under 13 can only message their own parent or guardian.";
     }
   }
-  // The recipient's restriction, or an older database that did not say whose.
+  // An older database that did not say whose restriction it is.
   const who = capitalize(NOUN[to]);
   switch (reason) {
     case "messaging_off":

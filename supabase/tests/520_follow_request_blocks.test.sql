@@ -7,27 +7,31 @@ SELECT t.guardian('parent', 'teenmid');
 -- Adults who review their followers.
 UPDATE public.privacy_preferences SET require_follow_approval = true
  WHERE user_id IN (t.id('alice'), t.id('carol'), t.id('dave'));
+-- Sign-up starts every fixture private, and a profile the caller cannot see cannot be followed (20261113120000): make them visible.
+UPDATE public.privacy_preferences SET profile_visibility = 'public'
+ WHERE user_id IN (t.id('alice'), t.id('bob'), t.id('carol'), t.id('dave'), t.id('eve'));
+UPDATE public.privacy_preferences SET profile_visibility = 'members' WHERE user_id IN (t.id('teenmid'), t.id('teenold'));
 
 -- ============================================================ blocks
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('alice'), t.id('bob'));
 
 SELECT t.as_user(t.id('bob'));
 SELECT t.throws(format('SELECT public.request_follow(%L)', t.id('alice')),
-  'FOLLOW_BLOCKED', 'someone who was blocked cannot ask to follow the person who blocked them');
+  'INVALID_FOLLOW_TARGET', 'someone who was blocked cannot ask to follow the person who blocked them (and gets the same error as for a missing account, SEC-2b)');
 SELECT t.reset();
 SELECT t.eq((SELECT count(*)::int FROM public.follow_requests WHERE requester_id = t.id('bob')), 0,
   'and no request was written');
 
 SELECT t.as_user(t.id('alice'));
 SELECT t.throws(format('SELECT public.request_follow(%L)', t.id('bob')),
-  'FOLLOW_BLOCKED', 'nor can the person who blocked them, while the block stands');
+  'INVALID_FOLLOW_TARGET', 'nor can the person who blocked them, while the block stands');
 SELECT t.reset();
 
 -- An account that does not review followers: the direct follow is refused by the same check.
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('eve'), t.id('bob'));
 SELECT t.as_user(t.id('bob'));
 SELECT t.throws(format('SELECT public.request_follow(%L)', t.id('eve')),
-  'FOLLOW_BLOCKED', 'a direct follow across a block is refused too');
+  'INVALID_FOLLOW_TARGET', 'a direct follow across a block is refused too');
 SELECT t.reset();
 
 -- A pending request disappears when either side blocks.

@@ -77,8 +77,8 @@ SELECT t.throws(format('SELECT public.minor_messaging_block_reason(%L, %L)', t.i
   'permission denied', 'minor_messaging_block_reason: likewise');
 SELECT t.throws(format('SELECT public.minor_messaging_allowed(%L, %L)', t.id('adultone'), t.id('teenone')),
   'permission denied', 'minor_messaging_allowed: likewise');
-SELECT t.ok(public.minor_messaging_block_me(t.id('teenone')) IS NOT NULL,
-  'minor_messaging_block_me: a stranger is told they cannot message a guardian-only teen');
+SELECT t.eq(public.minor_messaging_block_me(t.id('teenone')), 'recipient_restricted:other',
+  'minor_messaging_block_me: a stranger is told only that they cannot message the guardian-only teen, not why (SEC-2b)');
 SELECT t.ok(public.minor_messaging_block_me(t.id('adultone')) IS NULL,
   'minor_messaging_block_me: and that nothing blocks messaging an adult');
 SELECT t.reset();
@@ -98,7 +98,7 @@ SELECT t.as_user(t.id('adultone'));
 SELECT t.lives(format('SELECT public.create_direct_conversation(%L)', t.id('adulttwo')),
   'create_direct_conversation: two adults still open a conversation');
 SELECT t.throws(format('SELECT public.create_direct_conversation(%L)', t.id('teenone')),
-  'guardian_only', 'create_direct_conversation: and the teen''s guardian-only control still holds');
+  'MINOR_MESSAGING_BLOCKED:recipient_restricted:other', 'create_direct_conversation: and the teen''s guardian-only control still holds (neutral code, SEC-2b)');
 SELECT t.reset();
 
 -- ============================================================ 3. user_roles
