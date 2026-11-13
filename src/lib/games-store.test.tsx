@@ -21,7 +21,10 @@ const toastError = vi.fn();
 function table() {
   return {
     select: () => ({
-      eq: async () => ({ data: server.roster.map((game_id) => ({ game_id })), error: null }),
+      eq: async () => ({
+        data: server.roster.map((game_id) => ({ id: `row-${game_id}`, game_id })),
+        error: null,
+      }),
     }),
     insert: async (row: unknown) => {
       server.inserted.push(row);
@@ -31,8 +34,20 @@ function table() {
   };
 }
 
-const channel: { on: () => typeof channel; subscribe: () => typeof channel } = {
-  on: () => channel,
+type RosterPayload = { eventType: string; new?: unknown; old?: unknown };
+const realtime = {
+  handlers: [] as Array<(p: RosterPayload) => void>,
+  authListener: null as null | ((event: string, session: unknown) => void),
+};
+
+const channel: {
+  on: (type: string, filter: unknown, cb: (p: RosterPayload) => void) => typeof channel;
+  subscribe: () => typeof channel;
+} = {
+  on: (_type, _filter, cb) => {
+    realtime.handlers.push(cb);
+    return channel;
+  },
   subscribe: () => channel,
 };
 
@@ -40,7 +55,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       getUser: async () => ({ data: { user: server.userId ? { id: server.userId } : null } }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+      onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+        realtime.authListener = cb;
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
     },
     from: () => table(),
     channel: () => channel,
@@ -61,6 +79,8 @@ beforeEach(() => {
   server.insertError = null;
   server.inserted = [];
   toastError.mockReset();
+  realtime.handlers = [];
+  realtime.authListener = null;
 });
 
 describe("joinGame", () => {
@@ -132,5 +152,56 @@ describe("saved joined games", () => {
       await joinGame("fresh");
     });
     await waitFor(() => expect(result.current).toContain("fresh"));
+  });
+});
+
+describe("realtime roster changes from another device", () => {
+  async function mountWithRealtime(roster: string[]) {
+    server.roster = roster;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(result.current).toEqual([...roster].sort()));
+    expect(realtime.handlers).toHaveLength(1);
+    const fire = (p: RosterPayload) => act(() => realtime.handlers[0]!(p));
+    return { result, fire };
+  }
+
+  it("subscribes on a page that mounts after the session was restored", async () => {
+    // Such a page gets no SIGNED_IN, only INITIAL_SESSION for a session it already has.
+    server.roster = ["g1"];
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    act(() => realtime.authListener?.("INITIAL_SESSION", { user: { id: "u1" } }));
+    await waitFor(() => expect(result.current).toEqual(["g1"]));
+    expect(realtime.handlers).toHaveLength(1);
+  });
+
+  it("drops a game left on another device, though the DELETE carries only the row id", async () => {
+    const { result, fire } = await mountWithRealtime(["g1", "g2"]);
+    // What Realtime delivers for a DELETE on a table with row-level security.
+    fire({ eventType: "DELETE", old: { id: "row-g1" }, new: {} });
+    expect(result.current).toEqual(["g2"]);
+    expect(JSON.parse(window.localStorage.getItem("openrun.joinedGameIds.v1") ?? "[]")).toEqual([
+      "g2",
+    ]);
+  });
+
+  it("drops a game joined and then left on another device", async () => {
+    const { result, fire } = await mountWithRealtime([]);
+    fire({
+      eventType: "INSERT",
+      old: {},
+      new: { id: "row-new", game_id: "g9", user_id: "u1" },
+    });
+    expect(result.current).toEqual(["g9"]);
+    fire({ eventType: "DELETE", old: { id: "row-new" }, new: {} });
+    expect(result.current).toEqual([]);
+  });
+
+  it("ignores another player's row being deleted", async () => {
+    // DELETE events are not filtered by user_id, so other players' leaves arrive too.
+    const { result, fire } = await mountWithRealtime(["g1"]);
+    fire({ eventType: "DELETE", old: { id: "someone-elses-row" }, new: {} });
+    expect(result.current).toEqual(["g1"]);
   });
 });
