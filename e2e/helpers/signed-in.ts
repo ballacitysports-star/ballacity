@@ -20,12 +20,14 @@
  * shape: a different pay test times out each run, while the test running beside
  * it on the other worker is also 2.7-5x slower than its median.
  *
- * So answer these three from the session the spec already holds. The payment
- * and game reads each spec cares about still go where the spec sends them, and
- * the database still sees the real access token on every read that does reach it.
+ * So answer these three from the session the spec already holds. restoreSession
+ * also answers the g1/g2 game lookups (see fixture-games.ts). The payment reads
+ * each spec cares about still go where the spec sends them, and the database
+ * still sees the real access token on every read that does reach it.
  */
 import type { Page } from "@playwright/test";
 import { onboardingStatusFor, stubServerFn } from "./server-fn";
+import { answerFixtureGameReads } from "./fixture-games";
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
 const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
@@ -57,6 +59,7 @@ export async function answerSessionChecks(page: Page) {
 /** Answer the session checks, then put the fixture session where the app reads it. */
 export async function restoreSession(page: Page) {
   await answerSessionChecks(page);
+  await answerFixtureGameReads(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

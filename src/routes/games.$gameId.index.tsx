@@ -15,7 +15,7 @@ import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { getPublicGameSeo } from "@/lib/city-pages.functions";
-import { gamePageHead } from "@/lib/game-head";
+import { gamePageHead, loadGameSeoWithin } from "@/lib/game-head";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Share2,
@@ -229,9 +229,9 @@ export const Route = createFileRoute("/games/$gameId/")({
   },
 
   loader: async ({ params }) => {
-    // Public facts for the page head. A failed read must not break the page:
-    // the head falls back to a generic, noindex description.
-    const seo = await getPublicGameSeo({ data: { id: params.gameId } }).catch(() => null);
+    // Public facts for the page head. A failed or slow read must not break the page:
+    // the head falls back to a generic, noindex description (see loadGameSeoWithin).
+    const seo = await loadGameSeoWithin(() => getPublicGameSeo({ data: { id: params.gameId } }));
     return { gameId: params.gameId, seo };
   },
   head: ({ loaderData, params }) => gamePageHead(params.gameId, loaderData?.seo ?? null),

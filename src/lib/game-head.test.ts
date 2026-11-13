@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { gamePageHead } from "@/lib/game-head";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { gamePageHead, loadGameSeoWithin } from "@/lib/game-head";
 import { toPublicGameSeo, type CityGameRow } from "@/lib/city-seo";
 
 const NOW = new Date("2026-10-08T12:00:00Z");
@@ -133,5 +133,42 @@ describe("signed-out metadata for an eligible adult-only game", () => {
     expect(ld).toMatchObject({ "@type": "SportsEvent", name: SECRET.title, sport: SECRET.sport });
     const image = head.meta.find((m) => m.property === "og:image")!.content;
     expect(decodeURIComponent(image)).toContain("Lacrosse");
+  });
+});
+
+describe("loadGameSeoWithin", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns the facts when the read answers in time", async () => {
+    const seo = { title: "Run" } as never;
+    await expect(loadGameSeoWithin(async () => seo, 1000)).resolves.toBe(seo);
+  });
+
+  it("returns null when the read fails", async () => {
+    await expect(
+      loadGameSeoWithin(() => Promise.reject(new Error("503")), 1000),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null at the deadline when the read never answers", async () => {
+    vi.useFakeTimers();
+    const pending = loadGameSeoWithin(() => new Promise(() => {}), 3000);
+    let settled: unknown = "pending";
+    void pending.then((v) => (settled = v));
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(settled).toBe("pending");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBeNull();
+  });
+
+  it("keeps a late answer out: the deadline's null stands", async () => {
+    vi.useFakeTimers();
+    let answer: (v: unknown) => void = () => {};
+    const pending = loadGameSeoWithin(() => new Promise((r) => (answer = r as never)), 100);
+    await vi.advanceTimersByTimeAsync(100);
+    answer({ title: "late" });
+    await expect(pending).resolves.toBeNull();
   });
 });

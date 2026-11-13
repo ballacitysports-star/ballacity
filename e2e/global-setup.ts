@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { fixtureGameRows } from "./helpers/fixture-games";
 import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
   assertSafeE2eTarget,
@@ -227,46 +228,8 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       );
     } else {
       try {
-        const now = Date.now();
-        const rows = [
-          {
-            id: "g1",
-            host_id: gamesHostId,
-            sport: "Basketball",
-            title: "Friday Night Run · 5v5 Full Court",
-            date: new Date(now + 3 * 3600_000).toISOString(),
-            duration: "120 min",
-            location: "Tompkins Square Courts",
-            neighborhood: "East Village",
-            max_players: 10,
-            joined: 8,
-            skill: "Intermediate",
-            price: 0,
-            indoor: false,
-            is_private: false,
-            description:
-              "Competitive but chill. We rotate teams every game to 11. Bring a light + dark shirt.",
-            host_snapshot: { name: "Marcus Lee", username: "@marcus", avatar: "ML", rating: 4.9 },
-          },
-          {
-            id: "g2",
-            host_id: gamesHostId,
-            sport: "Soccer",
-            title: "Sunday Sunset 7v7",
-            date: new Date(now + 22 * 3600_000).toISOString(),
-            duration: "90 min",
-            location: "Pier 40 Turf",
-            neighborhood: "West Side",
-            max_players: 14,
-            joined: 11,
-            skill: "All Levels",
-            price: 8,
-            indoor: false,
-            is_private: false,
-            description: "Mixed-gender, all levels. $8 covers turf rental. Cleats recommended.",
-            host_snapshot: { name: "Ana García", username: "@anagk", avatar: "AG", rating: 4.8 },
-          },
-        ];
+        // Same rows the pay and game-page specs answer locally (helpers/fixture-games.ts).
+        const rows = fixtureGameRows(gamesHostId);
         // Never overwrite a game this suite did not create. The ids are fixed and
         // short, so a project that already has a real "g1" must keep it: only
         // rows that are absent, or already owned by the fixture host, are written.
