@@ -198,6 +198,7 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
+import { payHostLinkShown } from "@/lib/pay-entry-gate";
 import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
@@ -2840,8 +2841,18 @@ function GameDetail() {
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
                   spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
-                const paymentAction =
-                  isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow && !parentAsk;
+                // The paid CTA is a link straight to /pay, so handleJoin's checks never run for it: a locked game or a
+                // consent-blocked account gets the disabled button below instead ("Signup closed", "Parent approval
+                // needed"), as on the button path. The pay page asks again (payEntryView) for a direct visit.
+                const paymentAction = payHostLinkShown({
+                  isPaid,
+                  paymentCleared,
+                  approvalCleared,
+                  canEnterPaymentFlow,
+                  parentAsk: !!parentAsk,
+                  lockedForNewJoin,
+                  consentBlocksNewJoin,
+                });
                 const paymentSearch: { invite?: true; from?: string } = {};
                 if (isInvite) paymentSearch.invite = true;
                 if (inviteFrom) paymentSearch.from = inviteFrom;
