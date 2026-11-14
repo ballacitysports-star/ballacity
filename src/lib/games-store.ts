@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
 const joined = new Set<string>();
+// Which game each of the viewer's roster rows is for, by row id. Realtime
+// delivers a DELETE with only the primary key in `old` (the table has row-level
+// security, and DELETE events are not filtered by user_id either), so the row id
+// is all a leave on another device tells us; this map turns it into the game.
+const rowGame = new Map<string, string>();
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
 let loaded = false;
@@ -62,10 +67,14 @@ function subscribe(cb: () => void) {
 async function hydrateFromDb(userId: string) {
   const { data, error } = await supabase
     .from("game_participants")
-    .select("game_id")
+    .select("id, game_id")
     .eq("user_id", userId);
   if (error) return;
   lastHydratedAt = Date.now();
+  rowGame.clear();
+  (data ?? []).forEach((r) => {
+    if (r.id) rowGame.set(r.id, r.game_id);
+  });
   // The database is the truth. A game the host removed us from, or that we left
   // on another device, while this one was offline would otherwise read "joined"
   // for good: the saved list only ever grew. Joins still being written stay.
@@ -83,47 +92,80 @@ function ensureHydrated() {
   hydratingPromise = (async () => {
     const { data } = await supabase.auth.getUser();
     currentUserId = data.user?.id ?? null;
-    if (currentUserId) await hydrateFromDb(currentUserId);
+    if (currentUserId) {
+      // Subscribe as soon as we know who is signed in. Waiting for an auth event
+      // is not enough: a page that mounts after the session was restored only
+      // gets INITIAL_SESSION, so the channel was never opened there.
+      attachRealtime(currentUserId);
+      await hydrateFromDb(currentUserId);
+    }
     hydrated = true;
   })().catch(() => {
     hydratingPromise = null;
   });
 }
 
+type RosterChange = {
+  eventType: string;
+  new?: { id?: string; game_id?: string; user_id?: string } | null;
+  old?: { id?: string; game_id?: string; user_id?: string } | null;
+};
+
+/**
+ * Apply one `game_participants` change from realtime. An INSERT carries the
+ * whole row. A DELETE carries only `{ id }`, and arrives for every player's
+ * row, not just the viewer's (the user_id filter does not apply to deletes), so
+ * it is resolved through `rowGame` and ignored when the row is not one of ours.
+ */
+function applyRosterChange(payload: RosterChange) {
+  if (payload.eventType === "INSERT") {
+    const row = payload.new;
+    if (!row?.game_id) return;
+    if (currentUserId && row.user_id && row.user_id !== currentUserId) return;
+    if (row.id) rowGame.set(row.id, row.game_id);
+    joined.add(row.game_id);
+  } else if (payload.eventType === "DELETE") {
+    const old = payload.old ?? {};
+    if (currentUserId && old.user_id && old.user_id !== currentUserId) return;
+    const gameId = old.game_id ?? (old.id ? rowGame.get(old.id) : undefined);
+    if (!gameId) return;
+    if (old.id) rowGame.delete(old.id);
+    joined.delete(gameId);
+  } else {
+    return;
+  }
+  saveJoinedGames();
+  emit();
+}
+
+let channel: ReturnType<typeof supabase.channel> | null = null;
+let channelUserId: string | null = null;
+
+/** Open (or move) the viewer's roster channel. A no-op when it is already open for them. */
+function attachRealtime(userId: string) {
+  if (!realtimeAttached || (channel && channelUserId === userId)) return;
+  if (channel) supabase.removeChannel(channel);
+  channelUserId = userId;
+  channel = supabase
+    .channel(`game_participants:me:${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "game_participants",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => applyRosterChange(payload),
+    )
+    .subscribe();
+}
+
 function ensureRealtime() {
   if (realtimeAttached || typeof window === "undefined") return;
   realtimeAttached = true;
 
-  let channel: ReturnType<typeof supabase.channel> | null = null;
-
-  const attach = (userId: string) => {
-    if (channel) supabase.removeChannel(channel);
-    channel = supabase
-      .channel(`game_participants:me:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "game_participants",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const row = payload.new as { game_id: string };
-            joined.add(row.game_id);
-          } else if (payload.eventType === "DELETE") {
-            const row = payload.old as { game_id: string };
-            joined.delete(row.game_id);
-          }
-          saveJoinedGames();
-          emit();
-        },
-      )
-      .subscribe();
-  };
-
-  if (currentUserId) attach(currentUserId);
+  if (currentUserId) attachRealtime(currentUserId);
 
   // A phone that was in a pocket missed realtime events; check the roster again
   // when the app comes back (at most every 30 seconds).
@@ -136,22 +178,28 @@ function ensureRealtime() {
   }
 
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+    if (event === "INITIAL_SESSION") {
+      // The session this page started with; ensureHydrated loads its roster.
+      if (session?.user?.id) attachRealtime(session.user.id);
+    } else if (event === "SIGNED_IN" || event === "USER_UPDATED") {
       const uid = session?.user?.id ?? null;
-      if (uid && uid !== currentUserId) {
+      if (!uid) return;
+      if (uid !== currentUserId) {
         currentUserId = uid;
         hydrated = false;
         hydratingPromise = null;
         ensureHydrated();
-        attach(uid);
       }
+      attachRealtime(uid);
     } else if (event === "SIGNED_OUT") {
       currentUserId = null;
       if (channel) {
         supabase.removeChannel(channel);
         channel = null;
+        channelUserId = null;
       }
       joined.clear();
+      rowGame.clear();
       saveJoinedGames();
       emit();
     }

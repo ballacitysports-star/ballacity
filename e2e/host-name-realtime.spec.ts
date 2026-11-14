@@ -8,6 +8,7 @@ import {
   throttleProfileReads,
   watchForForbidden,
 } from "./helpers/seeded-host-game";
+import { feedGameCard } from "./helpers/realtime-counters";
 
 /**
  * E2E: while the detail page and feed card are mounted, force the refetches a
@@ -79,10 +80,7 @@ test("realtime refetches never flicker the host name off display_name", async ({
 
   // Same again on the feed card.
   await page.goto("/feed");
-  const card = page
-    .locator('article, [data-testid="game-card"]')
-    .filter({ hasText: game.title })
-    .first();
+  const card = feedGameCard(page, game.title);
   await card.waitFor({ state: "visible", timeout: 15_000 });
   await expect(card).toContainText(displayName);
 

@@ -110,7 +110,7 @@ import {
   usePaymentHoldSweep,
 } from "@/lib/payment-hold";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
-import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { refreshMyFlowStatus, useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { useHasActiveGuardian } from "@/lib/use-has-guardian";
@@ -1092,8 +1092,11 @@ function GameDetail() {
         toast.error(e.message ?? "Could not leave.");
       } finally {
         leavingRef.current = false;
-        // Single reconcile pass now that all deletes have committed.
+        // Single reconcile pass now that all deletes have committed. The
+        // status strip and banner read the shared flow status, which otherwise
+        // waits on realtime, and a DELETE event does not say which game it was.
         void refreshStatus();
+        refreshMyFlowStatus(game.id);
         void refetchRoster();
       }
       return;
@@ -1108,6 +1111,7 @@ function GameDetail() {
       try {
         if (latestSub?.status === "pending") await deleteMyPendingSubmission(latestSub.id);
         if (prevReq?.status === "pending") await cancelMyJoinRequest(game.id);
+        refreshMyFlowStatus(game.id);
         toast("Request canceled.");
       } catch (e: any) {
         setMyReq(prevReq);

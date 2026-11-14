@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 // A stand-in for the realtime client that behaves like the real one: asking for a topic that is
 // already in use returns the existing channel, and adding a postgres_changes listener to a
@@ -52,18 +52,24 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+const reads = vi.hoisted(() => ({ requests: 0 }));
+
 vi.mock("@/lib/payments", () => ({
   getGamePaymentSettings: async () => null,
-  getMyJoinRequest: async () => null,
+  getMyJoinRequest: async () => {
+    reads.requests += 1;
+    return null;
+  },
   listMySubmissionsForGame: async () => [],
 }));
 
-import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { refreshMyFlowStatus, useMyFlowStatus } from "@/lib/game-flow-status";
 
 const GAME = "host-mvli8ois-0sa6";
 
 afterEach(() => {
   cleanup();
+  reads.requests = 0;
   realtime.channels.clear();
   realtime.topics.length = 0;
 });
@@ -87,5 +93,24 @@ describe("useMyFlowStatus realtime channel", () => {
     await waitFor(() => expect(realtime.topics.length).toBe(2));
     expect(second.result.current.loading).toBeDefined();
     expect(new Set(realtime.topics).size).toBe(2);
+  });
+});
+
+describe("refreshMyFlowStatus", () => {
+  it("re-reads the status of every mounted hook for that game, and only that game", async () => {
+    // The game page calls it after the viewer leaves or withdraws: the strip
+    // and banner must not wait on realtime to stop saying "You're in!".
+    const a = renderHook(() => useMyFlowStatus(GAME));
+    const other = renderHook(() => useMyFlowStatus("host-otherxx-game"));
+    await waitFor(() => expect(reads.requests).toBe(2));
+
+    act(() => refreshMyFlowStatus(GAME));
+    await waitFor(() => expect(reads.requests).toBe(3));
+
+    a.unmount();
+    other.unmount();
+    act(() => refreshMyFlowStatus(GAME));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads.requests).toBe(3);
   });
 });
