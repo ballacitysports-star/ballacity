@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: on the game view (`/games/:gameId`), a player creates a join
@@ -57,6 +58,11 @@ test("join request → host approval arrives via realtime and status flips live"
   const page = await ctx.newPage();
 
   // ---- REST mocks ----
+  // The "Before you join" risk acknowledgment is its own gate (unit-tested in
+  // src/lib/safety.test.ts); serve it as given so "Request Spot" goes straight
+  // to the request this spec is about.
+  await stubRiskAcknowledged(page);
+
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
     async (route: PWRoute) => {
@@ -131,11 +137,16 @@ test("join request → host approval arrives via realtime and status flips live"
           /* ignore */
         }
         joinPost = { body: parsed };
+        // createJoinRequest reads the insert back with `.single()`, which asks
+        // PostgREST for one object (Accept: application/vnd.pgrst.object+json).
+        // Answer the way PostgREST does: an array would reach the page as the
+        // request itself and render as neither pending nor approved.
+        const wantsObject = (req.headers()["accept"] ?? "").includes("vnd.pgrst.object");
         await route.fulfill({
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row("pending")]),
+          body: JSON.stringify(wantsObject ? row("pending") : [row("pending")]),
         });
         return;
       }
