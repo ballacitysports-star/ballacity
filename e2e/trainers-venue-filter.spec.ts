@@ -9,8 +9,12 @@ import {
 /**
  * E2E: the trainers page venue filter (chip + radius slider) writes to the
  * URL, narrows the visible feed, and is preserved when navigating to a
- * trainer profile and back. Also verifies the sticky venue reaches the
- * booking sheet trigger on the profile.
+ * trainer profile and back. Also checks that the profile reached through a
+ * venue-filtered card focuses that venue and still opens the booking sheet.
+ *
+ * The booking sheet itself has no venue: it asks only for a session type,
+ * date, time and duration, and BookPrefill.venue (which the profile fills in)
+ * is not read by it. So nothing here claims the venue reaches the sheet.
  *
  * The directory is fixed (two coaches at two venues, see
  * helpers/misc-trainer-directory.ts) so the filter always has something to
@@ -105,7 +109,7 @@ test("venue filter narrows feed and persists across profile navigation", async (
   await expect(venueChip(page, NORTHSIDE_COACH.venue)).not.toHaveClass(/border-lime/);
 });
 
-test("book session sheet opens with sticky venue from the feed", async ({ page }) => {
+test("book session sheet opens from a venue-filtered trainer profile", async ({ page }) => {
   await page.goto("/trainers", { waitUntil: "domcontentloaded" });
   await expect(resultCount(page)).toHaveText("2 results", { timeout: 20_000 });
 
@@ -117,10 +121,15 @@ test("book session sheet opens with sticky venue from the feed", async ({ page }
   await page.waitForURL(new RegExp(`/trainers/${HARBOR_COACH.id}(?:[?#]|$)`), {
     timeout: 10_000,
   });
-  await expect(page).toHaveURL(/[?&]venue=/);
+  expect(new URL(page.url()).searchParams.get("venue")).toBe(HARBOR_COACH.venue);
+  // The profile focuses the venue the feed was filtered to (its venue list is
+  // on the Experience tab).
+  await page.getByRole("button", { name: /^Experience/ }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: HARBOR_COACH.venue })).toHaveClass(
+    /border-lime/,
+  );
 
-  // Open the booking sheet from the trainer profile's floating CTA. The sticky
-  // venue selection is what the profile passes in as `prefill`.
+  // The booking sheet still opens from the trainer profile's floating CTA.
   await page.getByRole("button", { name: /Book session/i }).click();
   await expect(page.getByRole("dialog", { name: "Book a session" })).toBeVisible({
     timeout: 5_000,
