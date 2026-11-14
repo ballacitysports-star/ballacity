@@ -44,9 +44,15 @@ export type PostAuthDestinationInput = {
  * explicitly asked for (`next`), which it keeps.
  *
  * A page asked for before a Google/Apple round trip (`savedNext`) is the same
- * request as `next`: the provider's return to `/auth` often drops the query, and
- * the root's sign-in listener honours the stash, so this must agree with it or
- * the full-page `leave()` from `/auth` overrides it with the feed.
+ * request as `next`. The usual return keeps `next`: a redirect sign-in comes
+ * back to the site root (`redirect_uri` is the origin), not to `/auth`, and a
+ * popup sign-in finishes on the `/auth?next=…` page it started from. So `/auth`
+ * sees a stash without `next` only when it loads without the query while one is
+ * stashed: an in-app browser that strips it, or a stash left by an earlier
+ * attempt in this tab. Either way the root's sign-in listener honours the stash
+ * (for any SIGNED_IN), so this must agree with it, or the full-page `leave()`
+ * from `/auth` and the listener's navigation send the member to different
+ * places and whichever runs last wins.
  */
 export function postAuthDestination(input: PostAuthDestinationInput): string {
   const { needsAccountType, startDestination, lastVisited, referrer } = input;

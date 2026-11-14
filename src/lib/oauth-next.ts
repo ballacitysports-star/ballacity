@@ -38,3 +38,31 @@ export function clearOAuthNext(): void {
     /* sessionStorage unavailable */
   }
 }
+
+/**
+ * The stash as one `/auth` page sees it: read once, when the page mounts, and
+ * changed after that only through this object.
+ *
+ * `/auth` decides where to go from several callbacks for one sign-in (the
+ * session check, the auth listener, a fresh user), and the root's SIGNED_IN
+ * listener removes the stash from storage when it uses it, which can happen
+ * between two of them. Reading storage per call let a later call find it gone
+ * and send the member to the feed while an earlier one sent them to the page
+ * they asked for; the last full-page navigation won.
+ */
+export function oauthNextForPage() {
+  let value = readOAuthNext();
+  return {
+    /** The page this sign-in should go to, if one was stashed. */
+    get: (): string | undefined => value,
+    /** The Google/Apple button on this page stashes (or clears) a new one. */
+    stash(next: string | undefined) {
+      stashOAuthNext(next);
+      value = readOAuthNext();
+    },
+    /** Used: remove it from storage so a later sign-in in this tab cannot go there. */
+    used() {
+      clearOAuthNext();
+    },
+  };
+}
