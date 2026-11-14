@@ -69,6 +69,9 @@ import { useIsJoined } from "@/lib/games-store";
 import { hasPaymentIn, showFilledUpWarning } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { useJoinGate } from "@/lib/live-status";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { payEntryBlock } from "@/lib/pay-entry-gate";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -200,6 +203,11 @@ function PayPage() {
   const liveCount = useLiveParticipantCount(game?.id);
   // The viewer's own place (their game_participants rows, kept live by games-store).
   const viewerHoldsPlace = useIsJoined(gameId);
+  // The game page's checks for a new join (lockedForNewJoin, consentBlocksNewJoin) never ran for a player who came
+  // here by its Pay Host link, an invite or a bookmark; payEntryBlock asks them again before any payment is offered.
+  // No roster count: a full game keeps its "just filled up" warning below.
+  const joinGate = useJoinGate(game);
+  const { can: canChildFeature, status: childStatus } = useMyChildStatus();
 
   const maxPlayers = game?.maxPlayers ?? 0;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
@@ -482,6 +490,15 @@ function PayPage() {
   const approvalGateActive = requiresApproval && !isApproved;
 
   const hasSubmission = mySubs.length > 0;
+  const entryBlock = payEntryBlock({
+    holdsPlace: viewerHoldsPlace,
+    paymentIn: hasPaymentIn(mySubs),
+    approved: isApproved,
+    gate: joinGate,
+    participation: canChildFeature("game_participation"),
+    payments: canChildFeature("game_payments"),
+    ageUnknown: childStatus?.cohort === "unknown",
+  });
   const justFilledDuringPay = showFilledUpWarning({
     liveCount,
     spotsLeft,
@@ -493,6 +510,7 @@ function PayPage() {
   const showStepper =
     !hasSubmission &&
     !approvalGateActive &&
+    !entryBlock &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -647,6 +665,31 @@ function PayPage() {
                 navigateTo={`/games/${game.id}`}
               />
             )}
+          </div>
+        </div>
+      ) : entryBlock ? (
+        <div
+          className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
+          role="status"
+          aria-live="polite"
+          data-testid="pay-entry-blocked"
+          data-block={entryBlock.kind}
+        >
+          <div className="flex items-center gap-2 font-display text-sm font-bold">
+            <AlertCircle className="h-4 w-4 text-coral" /> You can't pay for this game
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{entryBlock.message}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Don't send the host any money for it.
+          </p>
+          <div className="mt-3">
+            <Link
+              to="/games/$gameId"
+              params={{ gameId: game.id }}
+              className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+            >
+              Back to game
+            </Link>
           </div>
         </div>
       ) : fetching ? (
