@@ -30,6 +30,13 @@ async function openSignedOutAuthPage(browser: Browser, path = "/auth") {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await page.goto(path, { waitUntil: "domcontentloaded" });
+  // The root renders a "Loading…" placeholder until the client app has booted.
+  // On the first page of a run the dev server compiles every module on request,
+  // which takes longer than the default 5s assertion wait (the same test then
+  // passes in about a second), so wait for the sign-in form itself first.
+  await expect(page.getByRole("button", { name: /google/i }).first()).toBeVisible({
+    timeout: 30_000,
+  });
   return { context, page };
 }
 
