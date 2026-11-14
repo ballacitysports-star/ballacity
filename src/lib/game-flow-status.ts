@@ -146,7 +146,7 @@ export function isGameId(id: string | null | undefined): id is string {
 }
 
 async function fetchFlowInputs(gameId: string, userId: string) {
-  const [settings, joinRequest, submissions, isJoined] = await Promise.all([
+  const [settings, joinRequest, submissions, participantRowId] = await Promise.all([
     getGamePaymentSettings(gameId).catch(() => null),
     getMyJoinRequest(gameId).catch(() => null),
     listMySubmissionsForGame(gameId).catch(() => [] as PaymentSubmission[]),
@@ -154,17 +154,54 @@ async function fetchFlowInputs(gameId: string, userId: string) {
       try {
         const res = await supabase
           .from("game_participants")
-          .select("user_id")
+          .select("id")
           .eq("game_id", gameId)
           .eq("user_id", userId)
           .maybeSingle();
-        return !!res.data;
+        return (res.data as { id?: string } | null)?.id ?? null;
       } catch {
-        return false;
+        return null;
       }
     })(),
   ]);
-  return { settings, joinRequest, submissions, isJoined };
+  // Ids of the viewer's own rows for this game, so a realtime DELETE (which
+  // carries only the row id) can be recognised as one of them.
+  const rowIds = [joinRequest?.id, participantRowId, ...submissions.map((s) => s.id)].filter(
+    (id): id is string => typeof id === "string",
+  );
+  return { settings, joinRequest, submissions, isJoined: participantRowId !== null, rowIds };
+}
+
+/** Does this realtime change concern the viewer's rows for `gameId`? */
+export function flowChangeConcernsGame(
+  payload: { eventType?: string; new?: unknown; old?: unknown },
+  gameId: string,
+  knownRowIds: ReadonlySet<string>,
+): boolean {
+  // supabase-js hands a DELETE an empty `new` ({}), not null, and the `old` of
+  // a table with row-level security holds only the primary key. So read the
+  // row the event is about, and fall back to recognising its id.
+  const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as {
+    id?: string;
+    game_id?: string;
+  } | null;
+  if (!row) return false;
+  if (row.game_id !== undefined) return row.game_id === gameId;
+  return !!row.id && knownRowIds.has(row.id);
+}
+
+// Mounted hooks by game, so the page can ask them to re-read after it changes
+// the viewer's rows itself (see refreshMyFlowStatus).
+const flowReloaders = new Map<string, Set<() => void>>();
+
+/**
+ * Re-read the viewer's flow status for `gameId` in every mounted
+ * useMyFlowStatus. Call after the viewer's own action changed their request,
+ * payment or roster rows (leaving, withdrawing): realtime may be slow, or, for
+ * a DELETE, carry too little to tell which game it was for.
+ */
+export function refreshMyFlowStatus(gameId: string): void {
+  flowReloaders.get(gameId)?.forEach((reload) => reload());
 }
 
 // The realtime client hands back the existing channel when a topic is already in use, and adding
@@ -212,14 +249,24 @@ export function useMyFlowStatus(gameId: string | undefined): {
       return;
     }
     let cancelled = false;
+    const knownRowIds = new Set<string>();
     const reload = async () => {
       const inputs = await fetchFlowInputs(gameId, userId);
       if (cancelled) return;
+      // Keep ids seen earlier too: a DELETE arrives after the row is gone.
+      inputs.rowIds.forEach((id) => knownRowIds.add(id));
       setSettings(inputs.settings);
       setStatus(computePlayerFlowStatus(inputs));
       setLoading(false);
     };
     void reload();
+    const reloadNow = () => void reload();
+    const reloaders = flowReloaders.get(gameId) ?? new Set<() => void>();
+    reloaders.add(reloadNow);
+    flowReloaders.set(gameId, reloaders);
+    const onChange = (p: { eventType?: string; new?: unknown; old?: unknown }) => {
+      if (flowChangeConcernsGame(p, gameId, knownRowIds)) void reload();
+    };
 
     const chan = supabase
       .channel(`flow-status:${gameId}:${userId}:${++flowChannelSeq}`)
@@ -231,10 +278,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
           table: "join_requests",
           filter: `player_id=eq.${userId}`,
         },
-        (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
-        },
+        onChange,
       )
       .on(
         "postgres_changes",
@@ -244,10 +288,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
           table: "payment_submissions",
           filter: `player_id=eq.${userId}`,
         },
-        (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
-        },
+        onChange,
       )
       .on(
         "postgres_changes",
@@ -257,15 +298,14 @@ export function useMyFlowStatus(gameId: string | undefined): {
           table: "game_participants",
           filter: `user_id=eq.${userId}`,
         },
-        (p) => {
-          const row = (p.new ?? p.old) as { game_id?: string };
-          if (row?.game_id === gameId) void reload();
-        },
+        onChange,
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      reloaders.delete(reloadNow);
+      if (reloaders.size === 0) flowReloaders.delete(gameId);
       try {
         supabase.removeChannel(chan);
       } catch {
