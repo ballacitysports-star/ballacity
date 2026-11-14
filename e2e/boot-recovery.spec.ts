@@ -1,4 +1,32 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import {
+  BOOT_PROGRESS_GRACE_MS,
+  BOOT_TIMEOUT_MS,
+  BOOT_WATCHDOG_DEV_OPT_IN,
+} from "../src/lib/boot-watchdog";
+
+/**
+ * The boot watchdog (src/lib/boot-watchdog.ts) is an inline script that
+ * recovers a page whose client never boots: one automatic reload, then a panel
+ * with recovery actions.
+ *
+ * E2E runs against the development server, where the watchdog is off so the
+ * Lovable preview is never reloaded while Vite compiles. The recovery tests opt
+ * in before the document's own scripts run, on every navigation including the
+ * watchdog's reload, so they exercise the same script production ships.
+ */
+async function enableBootWatchdog(page: Page) {
+  await page.addInitScript((flag) => {
+    (window as unknown as Record<string, unknown>)[flag] = true;
+  }, BOOT_WATCHDOG_DEV_OPT_IN);
+}
+
+/**
+ * A dead page is given the full budget on both loads (the budget is not
+ * shortened after a retry, see the watchdog), plus the one-second polling
+ * tick each time, before the panel appears.
+ */
+const RECOVERY_PANEL_TIMEOUT = 2 * (BOOT_TIMEOUT_MS + BOOT_PROGRESS_GRACE_MS + 1_000) + 10_000;
 
 test("the app boots with the dependency-free OG image endpoint", async ({ page, request }) => {
   const rootResponse = await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -16,6 +44,7 @@ test("the app boots with the dependency-free OG image endpoint", async ({ page, 
 });
 
 test("failed client boot reloads once, then shows recovery actions", async ({ page }) => {
+  await enableBootWatchdog(page);
   let documentRequests = 0;
   page.on("request", (request) => {
     if (request.isNavigationRequest()) documentRequests += 1;
@@ -31,14 +60,19 @@ test("failed client boot reloads once, then shows recovery actions", async ({ pa
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("We could not finish loading")).toBeVisible({ timeout: 22_000 });
+  await expect(page.getByText("We could not finish loading")).toBeVisible({
+    timeout: RECOVERY_PANEL_TIMEOUT,
+  });
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in again" })).toHaveAttribute("href", "/auth");
   await expect(page.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/");
   expect(documentRequests, "the watchdog must perform only one automatic reload").toBe(2);
 });
 
-test("a silently stalled startup module reloads once, then becomes actionable", async ({ page }) => {
+test("a silently stalled startup module reloads once, then becomes actionable", async ({
+  page,
+}) => {
+  await enableBootWatchdog(page);
   let documentRequests = 0;
   page.on("request", (request) => {
     if (request.isNavigationRequest()) documentRequests += 1;
@@ -50,12 +84,15 @@ test("a silently stalled startup module reloads once, then becomes actionable", 
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("We could not finish loading")).toBeVisible({ timeout: 42_000 });
+  await expect(page.getByText("We could not finish loading")).toBeVisible({
+    timeout: RECOVERY_PANEL_TIMEOUT,
+  });
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   expect(documentRequests, "a silent startup stall must reload at most once").toBe(2);
 });
 
 test("slow client boot is not interrupted by an automatic reload", async ({ page }) => {
+  await enableBootWatchdog(page);
   let documentRequests = 0;
   page.on("request", (request) => {
     if (request.isNavigationRequest()) documentRequests += 1;
