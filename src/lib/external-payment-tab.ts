@@ -14,28 +14,69 @@
  * a new tab AND sent this tab to it as well, taking the player off the proof
  * form they were told to come back to.
  *
- * So open the tab without the feature, which makes null mean what the fallback
- * assumes, and cut the new tab's link back to this page (`opener = null`)
- * before it has loaded anything, which is what "noopener" was there for.
+ * So the tab is opened empty and without either feature, which makes null mean
+ * what the fallback assumes. Then, before it loads anything, its link back to
+ * this page is cut (`opener = null`, what "noopener" was for), and it is sent
+ * to the payment link by a `rel="noreferrer"` link clicked inside it, so the
+ * payment site gets no Referer naming BallaCity (what "noreferrer" was for).
+ * The fallback in this tab follows such a link too.
+ *
+ * Checked in Chromium: the new tab reaches the link with no Referer and no
+ * opener, this tab stays put, and the result is "new-tab".
  */
-type Opener = {
-  open: (url: string, target: string) => { opener: unknown } | null;
-  location: { assign: (url: string) => void };
+type LinkDocument = {
+  createElement: (tag: "a") => {
+    href: string;
+    rel: string;
+    click: () => void;
+    remove: () => void;
+  };
+  body: { appendChild: (node: never) => unknown } | null;
 };
+
+type Opener = {
+  open: (
+    url: string,
+    target: string,
+  ) => {
+    opener: unknown;
+    document: LinkDocument;
+    location: { replace: (url: string) => void };
+  } | null;
+  document: LinkDocument;
+};
+
+/** Navigate `doc`'s window to `url` without sending a Referer. */
+function followWithoutReferrer(doc: LinkDocument, url: string) {
+  const a = doc.createElement("a");
+  a.href = url;
+  a.rel = "noreferrer";
+  doc.body?.appendChild(a as never);
+  a.click();
+  a.remove();
+}
 
 export function openExternalPaymentTab(
   url: string,
   win: Opener = window as unknown as Opener,
 ): "new-tab" | "this-tab" {
-  const tab = win.open(url, "_blank");
-  if (tab) {
-    try {
-      tab.opener = null;
-    } catch {
-      /* some browsers make opener read-only for a cross-origin tab; it has none then */
-    }
-    return "new-tab";
+  // An empty tab: the payment link must not load before opener is cut.
+  const tab = win.open("", "_blank");
+  if (!tab) {
+    followWithoutReferrer(win.document, url);
+    return "this-tab";
   }
-  win.location.assign(url);
-  return "this-tab";
+  try {
+    tab.opener = null;
+  } catch {
+    /* some browsers make opener read-only; then it is already null */
+  }
+  try {
+    followWithoutReferrer(tab.document, url);
+  } catch {
+    // The empty tab's document is out of reach (it should share this page's
+    // origin). Still take it to the link, Referer or not, not leave it blank.
+    tab.location.replace(url);
+  }
+  return "new-tab";
 }
