@@ -55,6 +55,7 @@ import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 import { AnalyticsHost } from "@/components/AnalyticsHost";
 import { isChatThreadPath } from "@/lib/chat-layout";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
+import { isIdentitySwitchInProgress } from "@/lib/managed-session";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 import { BOOT_WATCHDOG_RETRY_KEY, bootWatchdogInlineScript } from "@/lib/boot-watchdog";
@@ -485,6 +486,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
     if (pathname === "/auth") {
       logAuthGateDecision("auth-route-skip", { pathname, loading, hasUser: false });
+      return;
+    }
+    // A guardian <-> managed-child switch in this tab signs one session out
+    // before the other is in, and always ends in its own full page load (see
+    // managed-session.ts). Sending the tab to /auth in that gap mounted the
+    // sign-in page, which then forwarded the restored guardian to `next` (the
+    // page the child had open) instead of the Parent Center, racing the
+    // switch's own navigation and usually winning.
+    if (isIdentitySwitchInProgress()) {
+      logAuthGateDecision("identity-switch-skip", { pathname, loading, hasUser: false });
       return;
     }
 
