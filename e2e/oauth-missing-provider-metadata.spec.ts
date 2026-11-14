@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { emitSignedIn, expectAccountTypePickerInPlace } from "./helpers/oauth-signin";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -55,25 +56,6 @@ async function stubBackend(page: Page, serverProvider: "google" | "apple") {
     }
     await route.fallback();
   });
-
-  // Intercept the TanStack server-fn dispatch (`/n/…`) for onboarding status
-  // and return a payload that mirrors the admin-API path: the caller has no
-  // client provider metadata, but the backend still classifies them as social
-  // and requiring onboarding.
-  await page.route(/\/n\/.*onboarding.*/i, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        result: {
-          needsOnboarding: true,
-          isSocial: true,
-          provider: serverProvider,
-          accountType: null,
-        },
-      }),
-    });
-  });
 }
 
 async function primeStorage(page: Page) {
@@ -91,30 +73,6 @@ async function primeStorage(page: Page) {
   );
 }
 
-async function stripProviderMetadata(page: Page) {
-  await page.evaluate(async () => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient }).supabase;
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    if (!session) throw new Error("no session in test context");
-    const strippedAppMeta = { ...(session.user.app_metadata ?? {}) };
-    delete (strippedAppMeta as { provider?: unknown }).provider;
-    const patched = {
-      ...session,
-      user: { ...session.user, app_metadata: strippedAppMeta },
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const authAny = supabase.auth as any;
-    authAny.getSession = async () => ({ data: { session: patched }, error: null });
-    const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
-    if (typeof emit !== "function") {
-      throw new Error("Supabase auth emit hook missing");
-    }
-    await emit.call(supabase.auth, "SIGNED_IN", patched, false);
-  });
-}
-
 test.describe("OAuth return with missing provider metadata", () => {
   for (const provider of PROVIDERS) {
     test(`${provider}: backend guard routes user to onboarding with state preserved`, async ({
@@ -126,7 +84,11 @@ test.describe("OAuth return with missing provider metadata", () => {
         await stubBackend(page, provider);
         await primeStorage(page);
         await page.goto("/", { waitUntil: "domcontentloaded" });
-        await stripProviderMetadata(page);
+        // Raise the OAuth return only once the app shell (and its sign-in
+        // listener) is up; the gate holds the member at the picker meanwhile.
+        await expectAccountTypePickerInPlace(page);
+        // No `app_metadata.provider` on the session the listener sees.
+        await emitSignedIn(page, { provider: null });
 
         await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
           timeout: 15_000,
