@@ -28,13 +28,23 @@ const ALL_SPORTS: Sport[] = [
   "Volleyball",
 ];
 
-export type DirectoryCoach = { id: string; name: string; venue: string };
+export type LatLng = { lat: number; lng: number };
+
+export type DirectoryCoach = { id: string; name: string; venue: string; geo: LatLng };
+
+/**
+ * A viewer location in Springfield, IL. Both venues below are a few km from it,
+ * well inside the bookmark spec's 25-mile radius, so only the venue filter can
+ * hide a coach there, never the radius.
+ */
+export const SPRINGFIELD_VIEWER: LatLng = { lat: 39.7817, lng: -89.6501 };
 
 /** Filtered to by the specs. The chip shows the part before the first comma. */
 export const HARBOR_COACH: DirectoryCoach = {
   id: "3c1d4a52-6b7e-4f80-9a1b-2c3d4e5f6a71",
   name: "Harbor Skills Lab",
   venue: "Harbor Fieldhouse, 12 Pier Rd, Springfield",
+  geo: { lat: 39.8017, lng: -89.6436 },
 };
 
 /** The coach the venue filter must hide. */
@@ -42,6 +52,7 @@ export const NORTHSIDE_COACH: DirectoryCoach = {
   id: "3c1d4a52-6b7e-4f80-9a1b-2c3d4e5f6a72",
   name: "Northside Hoops Coaching",
   venue: "Northside Rec Center, 400 Elm St, Springfield",
+  geo: { lat: 39.8317, lng: -89.6401 },
 };
 
 /** No fixture account owns these, so the profile shows the visitor's "Book session" bar. */
@@ -79,7 +90,7 @@ function coachRow(coach: DirectoryCoach, createdAt: string) {
     formats: [],
     venues: [coach.venue.split(",")[0]],
     venue_addresses: [coach.venue],
-    venue_geo: [],
+    venue_geo: [{ address: coach.venue, placeId: `e2e-${coach.id}`, ...coach.geo }],
     primary_venue: coach.venue,
     cadence: "Weekly",
     cadences: ["Weekly"],
