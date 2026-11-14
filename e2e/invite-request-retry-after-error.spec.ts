@@ -1,3 +1,5 @@
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -123,18 +125,14 @@ test("failed first join request can be retried and lands on pending UI with invi
           return;
         }
         retrySucceeded = true;
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
-        });
+        await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
@@ -183,11 +181,22 @@ test("failed first join request can be retried and lands on pending UI with invi
     2,
   );
 
-  // Both POSTs carried the right identifiers.
+  // Both POSTs carried the right identifiers, and no status: the server sets
+  // every new request to 'pending' whatever is sent (validate_join_request on
+  // INSERT), and createJoinRequest in src/lib/payments.ts sends none. Pinning
+  // that here catches the client starting to send one again.
+  //
+  // Both attempts use the per-game idempotency key `join:<game_id>`, which is
+  // what makes the retry safe: had the first insert reached the database, the
+  // retry would hit the (player_id, idempotency_key) unique index and get the
+  // existing row back instead of a second request. A key built per attempt
+  // (a random id, a timestamp) would break that and fail here.
   for (const p of joinPosts) {
     expect(p.body?.game_id).toBe(GAME_ID);
     expect(p.body?.host_id).toBe(FAKE_HOST_ID);
-    expect(p.body?.status).toBe("pending");
+    expect(p.body?.player_id).toBe(userId);
+    expect(p.body?.status, "the client must not send a join request status").toBeUndefined();
+    expect(p.body?.idempotency_key).toBe(`join:${GAME_ID}`);
   }
 
   // Invite params preserved on the final URL.

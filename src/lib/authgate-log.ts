@@ -49,6 +49,7 @@ export function isAuthGateDebugEnabled(): boolean {
 export type AuthGateDecision =
   | "public-skip"
   | "auth-route-skip"
+  | "identity-switch-skip"
   | "user-present"
   | "verify-start"
   | "verify-hydrated-late"

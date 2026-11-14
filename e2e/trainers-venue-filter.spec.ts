@@ -1,13 +1,25 @@
 import { test, expect, type Page } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
+import {
+  HARBOR_COACH,
+  NORTHSIDE_COACH,
+  stubTrainerDirectory,
+} from "./helpers/misc-trainer-directory";
 
 /**
  * E2E: the trainers page venue filter (chip + radius slider) writes to the
  * URL, narrows the visible feed, and is preserved when navigating to a
- * trainer profile and back. Also verifies the sticky venue reaches the
- * booking sheet trigger on the profile.
+ * trainer profile and back. Also checks that the profile reached through a
+ * venue-filtered card focuses that venue and still opens the booking sheet.
  *
- * Skips when no signed-in Supabase session is available OR when the seeded
- * trainer data has no venue-tagged coaches (the filter has nothing to test).
+ * The booking sheet itself has no venue: it asks only for a session type,
+ * date, time and duration, and BookPrefill.venue (which the profile fills in)
+ * is not read by it. So nothing here claims the venue reaches the sheet.
+ *
+ * The directory is fixed (two coaches at two venues, see
+ * helpers/misc-trainer-directory.ts) so the filter always has something to
+ * narrow, whatever trainers the backend holds. Skips only when no signed-in
+ * Supabase session is available.
  */
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
@@ -18,97 +30,108 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
+test.beforeEach(async ({ page }) => {
+  await stubTrainerDirectory(page);
+  await restoreSession(page);
+});
+
+/** "2 results" above the list. */
+const resultCount = (page: Page) => page.getByText(/^\d+ results?$/);
+
+const filterSheet = (page: Page) => page.getByRole("dialog", { name: "Filter trainers" });
+
+/** The venue chip shows the address up to the first comma; its title is the full address. */
+const venueChip = (page: Page, address: string) =>
+  filterSheet(page).getByRole("button", { name: address.split(",")[0] });
+
+const coachCard = (page: Page, name: string) => page.getByRole("link", { name: new RegExp(name) });
+
+async function openFilters(page: Page) {
+  await page.getByRole("button", { name: "Filters" }).click();
+  await expect(filterSheet(page)).toBeVisible();
 }
 
-async function openFiltersAndPickVenue(page: Page): Promise<string | null> {
-  await page.getByRole("button", { name: "Filters" }).click();
-  const anyVenue = page.getByRole("button", { name: "Any venue" });
-  await anyVenue.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
-  // Venue chips are siblings of "Any venue" and carry a `title` attribute
-  // equal to the full address.
-  const venueChips = page.locator('button[title]').filter({ hasNot: page.locator("nothing") });
-  const count = await venueChips.count();
-  for (let i = 0; i < count; i++) {
-    const chip = venueChips.nth(i);
-    const title = await chip.getAttribute("title");
-    if (!title) continue;
-    // Skip anything that isn't a trainer-venue chip (they all have long addresses).
-    if (title.length < 5) continue;
-    await chip.click();
-    return title;
-  }
-  return null;
+async function closeFilters(page: Page) {
+  await filterSheet(page).getByRole("button", { name: "Show results" }).click();
+  await expect(filterSheet(page)).toBeHidden();
+}
+
+async function pickHarborVenue(page: Page) {
+  await openFilters(page);
+  await venueChip(page, HARBOR_COACH.venue).click();
+  await expect(page).toHaveURL(/[?&]venue=/, { timeout: 5_000 });
 }
 
 test("venue filter narrows feed and persists across profile navigation", async ({ page }) => {
-  await restoreSession(page);
   await page.goto("/trainers", { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle").catch(() => {});
 
-  // Baseline result count.
-  const resultsLabel = page.locator("text=/^\\d+ results?$/").first();
-  await resultsLabel.waitFor({ timeout: 10_000 }).catch(() => {});
-  const baselineText = (await resultsLabel.textContent().catch(() => "")) ?? "";
-  const baseline = Number(baselineText.match(/^(\d+)/)?.[1] ?? "0");
+  // Baseline: both coaches.
+  await expect(resultCount(page)).toHaveText("2 results", { timeout: 20_000 });
+  await expect(coachCard(page, NORTHSIDE_COACH.name)).toBeVisible();
 
-  const venue = await openFiltersAndPickVenue(page);
-  test.skip(!venue, "No trainer venue chips present in seeded data.");
-
-  // URL reflects the filter.
-  await expect(page).toHaveURL(/[?&]venue=/, { timeout: 5_000 });
-  const filteredText = (await resultsLabel.textContent().catch(() => "")) ?? "";
-  const filtered = Number(filteredText.match(/^(\d+)/)?.[1] ?? "0");
-  expect(filtered, "filtered feed count should be <= baseline").toBeLessThanOrEqual(baseline);
+  await pickHarborVenue(page);
+  expect(new URL(page.url()).searchParams.get("venue")).toBe(HARBOR_COACH.venue);
 
   // Distance slider writes radius to the URL.
-  const slider = page.getByRole("slider", { name: "Distance radius" });
+  const slider = filterSheet(page).getByRole("slider", { name: "Distance radius" });
   await slider.focus();
   for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/[?&]radius=[1-9]/, { timeout: 5_000 });
-  // Reset radius so it doesn't hide all trainers on this dataset.
+  await expect(page).toHaveURL(/[?&]radius=5(?!\d)/, { timeout: 5_000 });
+  // Reset radius so it doesn't hide trainers that have no measured distance.
   for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowLeft");
+  await expect(page).not.toHaveURL(/[?&]radius=[1-9]/, { timeout: 5_000 });
+  await closeFilters(page);
 
-  // Navigate into a trainer profile — the ?venue= param must ride along.
-  const firstCard = page.locator('a[href*="/trainers/"]').first();
-  await firstCard.waitFor({ timeout: 5_000 });
-  await firstCard.click();
-  await page.waitForURL(/\/trainers\/[^/?#]+/, { timeout: 10_000 });
-  await expect(page, "venue param must persist onto profile URL").toHaveURL(/[?&]venue=/);
+  // The filter narrowed the feed to the coach at that venue.
+  await expect(resultCount(page)).toHaveText("1 result");
+  await expect(coachCard(page, NORTHSIDE_COACH.name)).toHaveCount(0);
 
-  // Back-link on the profile preserves the venue selection.
-  await page.getByRole("link", { name: "Back to trainers" }).click();
-  await page.waitForURL(/\/trainers(?:[/?#]|$)/, { timeout: 10_000 });
-  await expect(page, "venue param must persist back to the feed").toHaveURL(/[?&]venue=/);
+  // Navigate into the trainer profile: the ?venue= param must ride along.
+  await coachCard(page, HARBOR_COACH.name).click();
+  await page.waitForURL(new RegExp(`/trainers/${HARBOR_COACH.id}(?:[?#]|$)`), {
+    timeout: 10_000,
+  });
+  expect(new URL(page.url()).searchParams.get("venue"), "venue must persist onto profile").toBe(
+    HARBOR_COACH.venue,
+  );
+
+  // The profile's back control returns to the feed with the venue selection.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.waitForURL(/\/trainers(?:[?#]|$)/, { timeout: 10_000 });
+  expect(new URL(page.url()).searchParams.get("venue"), "venue must persist back").toBe(
+    HARBOR_COACH.venue,
+  );
+  await expect(resultCount(page)).toHaveText("1 result");
 
   // Filter chip for the venue is still marked active (lime border).
-  await page.getByRole("button", { name: "Filters" }).click();
-  const activeVenueChip = page.locator(`button[title=${JSON.stringify(venue)}]`);
-  await expect(activeVenueChip).toHaveClass(/border-lime/);
+  await openFilters(page);
+  await expect(venueChip(page, HARBOR_COACH.venue)).toHaveClass(/border-lime/);
+  await expect(venueChip(page, NORTHSIDE_COACH.venue)).not.toHaveClass(/border-lime/);
 });
 
-test("book session sheet opens with sticky venue from the feed", async ({ page }) => {
-  await restoreSession(page);
+test("book session sheet opens from a venue-filtered trainer profile", async ({ page }) => {
   await page.goto("/trainers", { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await expect(resultCount(page)).toHaveText("2 results", { timeout: 20_000 });
 
-  const venue = await openFiltersAndPickVenue(page);
-  test.skip(!venue, "No trainer venue chips present in seeded data.");
+  await pickHarborVenue(page);
+  await closeFilters(page);
 
-  // Trainer cards that offer this venue also expose a "Request" action.
-  const firstProfileLink = page.locator('a[href*="/trainers/"]').first();
-  await firstProfileLink.click();
-  await page.waitForURL(/\/trainers\/[^/?#]+/, { timeout: 10_000 });
-  await expect(page).toHaveURL(/[?&]venue=/);
+  // The card of a trainer who offers this venue carries it into the profile.
+  await coachCard(page, HARBOR_COACH.name).click();
+  await page.waitForURL(new RegExp(`/trainers/${HARBOR_COACH.id}(?:[?#]|$)`), {
+    timeout: 10_000,
+  });
+  expect(new URL(page.url()).searchParams.get("venue")).toBe(HARBOR_COACH.venue);
+  // The profile focuses the venue the feed was filtered to (its venue list is
+  // on the Experience tab).
+  await page.getByRole("button", { name: /^Experience/ }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: HARBOR_COACH.venue })).toHaveClass(
+    /border-lime/,
+  );
 
-  // Open the booking sheet from the trainer profile's floating CTA.
+  // The booking sheet still opens from the trainer profile's floating CTA.
   await page.getByRole("button", { name: /Book session/i }).click();
-  // Sheet renders (Radix dialog role) — sticky venue selection is what
-  // TrainerActions/profile pass in as `prefill`.
-  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("dialog", { name: "Book a session" })).toBeVisible({
+    timeout: 5_000,
+  });
 });

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
@@ -24,9 +25,11 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const ENTRY_FEE = 10;
-// Client-side pay-page timeout is 8s; give it a comfortable margin.
+// The pay screen gives up on its reads after 6s (withTimeout in
+// src/routes/games.$gameId.pay.tsx, and PAYPAL_CONFIG_DEADLINE_MS for the PayPal
+// config); give it a comfortable margin.
 const OUTCOME_TIMEOUT_MS = 15_000;
 
 function tableUrl(url: string | URL, table: string) {
@@ -43,6 +46,19 @@ async function mockEmptyLists(page: Page) {
   await page.route((url) => tableUrl(url, "host_payment_methods"), empty);
   await page.route((url) => tableUrl(url, "payment_methods"), empty);
   await page.route((url) => tableUrl(url, "game_participants"), empty);
+  // The pay screen reads the host's methods through this RPC, not the table
+  // above. Unanswered, it asked the real database for the real g2 host's
+  // methods: what the "ready" screen showed, and how fast, depended on that.
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+  // The game: served, hosted by the same mocked host as the settings above,
+  // rather than read from whatever g2 row the target database holds.
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 }
 
 async function mockPaidSettingsOk(page: Page) {
@@ -99,29 +115,29 @@ async function mockPaidSettingsHangOnPay(page: Page) {
 }
 
 /**
- * Wait for the pay screen to resolve to EITHER the ready state (loading gone,
- * no "Game not found") OR the retry/error state (Retry button visible).
- * Returns which outcome occurred so the caller can assert on it.
+ * Wait for the pay screen to settle, then say whether it settled READY (no
+ * "Loading payment options…", no Retry) or on the RETRY/error state.
+ *
+ * It used to race two waiters: "loading text hidden" (=> ready) against "Retry
+ * visible" (=> retry). But the Retry state replaces the loading box in a single
+ * render, so on a hang BOTH waiters are satisfied by the same DOM change, and
+ * which promise settled first was down to polling order. Locally "retry" usually
+ * won; in CI the same hang came back "ready" (run 43519522840: Expected "retry",
+ * Received "ready"). So wait for the one thing both outcomes share, the loading
+ * box being gone, and only then look at which state the screen is in.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
   // First the pay screen itself (its fee card renders with the payment options
   // section). Until then "Loading payment options…" is not in the page at all,
-  // so the "hidden" wait below would count a screen that has not rendered yet
-  // as ready.
+  // so the wait below would count a screen that has not rendered yet as settled.
   await expect(page.getByText("Entry fee", { exact: true })).toBeVisible({
     timeout: OUTCOME_TIMEOUT_MS,
   });
-  const ready = page
-    .getByText(/loading payment options/i)
-    .first()
-    .waitFor({ state: "hidden", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "ready" as const);
-  const retry = page
-    .getByRole("button", { name: /^retry$/i })
-    .first()
-    .waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS })
-    .then(() => "retry" as const);
-  return await Promise.race([ready, retry]);
+  await expect(page.getByText(/loading payment options/i)).toHaveCount(0, {
+    timeout: OUTCOME_TIMEOUT_MS,
+  });
+  const retryShown = await page.getByRole("button", { name: /^retry$/i }).count();
+  return retryShown > 0 ? "retry" : "ready";
 }
 
 test("Pay CTA reaches the ready pay screen when the backend responds", async ({ browser }) => {
@@ -145,6 +161,15 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({ 
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("ready");
   await expect(page.getByText(/game not found/i)).toHaveCount(0);
+  // "Ready" above only means no loading box and no Retry, which an error screen
+  // would satisfy too. So also see the ready screen itself: the host's methods
+  // come back empty, so it says the host has none (or, if the target has PayPal
+  // set up for checkout, offers it above "Or pay another way").
+  await expect(
+    page.getByText(
+      /^(host hasn't set up payment yet|or pay another way|how do you want to pay\?)$/i,
+    ),
+  ).toBeVisible();
 
   await ctx.close();
 });

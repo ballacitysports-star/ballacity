@@ -1,4 +1,11 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import {
+  PAY_FIXTURE_HOST_ID,
+  anyRealtimeChannelJoined,
+  blockRealtime,
+  payFixtureGameRow,
+  serveFixtureGame,
+} from "./helpers/pay-fixtures";
 
 /**
  * E2E: the pay page must still flip from the approval gate to the payment
@@ -19,7 +26,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
 
@@ -49,12 +56,11 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  // Block realtime at the network layer — WebSocket handshakes to
-  // /realtime/v1/websocket start as HTTP upgrades and can be aborted here.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // Block realtime: every realtime WebSocket is closed as it opens. (page.route
+  // never sees WebSockets, so aborting "/realtime/" there blocked nothing and
+  // the channels joined; see helpers/pay-fixtures.ts.)
+  await blockRealtime(page);
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
@@ -155,16 +161,16 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
   // Approval gate visible, picker not.
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
+  // The gate renders as soon as the settings say approval is required, before
+  // the page has read the player's own request. Approving before that first
+  // read lands would let the initial load, not the poll, show "approved".
+  await expect(gate).toContainText(/your request to join is pending/i);
   await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // Sanity: realtime is truly blocked — no active realtime channel should be
   // in the SUBSCRIBED state (subscribe attempts should fail on the aborted
   // WebSocket upgrade). We still allow the channel object to exist.
-  const anySubscribed = await page.evaluate(async () => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const chans = mod.supabase.getChannels();
-    return chans.some((c: any) => c.state === "joined" || c.state === "SUBSCRIBED");
-  });
+  const anySubscribed = await anyRealtimeChannelJoined(page);
   expect(anySubscribed, "no realtime channel should be joined when WS is blocked").toBe(false);
 
   const getsBeforeApproval = joinGets;

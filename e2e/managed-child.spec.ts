@@ -23,6 +23,14 @@ const PUBLISHABLE_KEY =
 
 const CHILD_FIRST = "Eetwoemanaged";
 
+/**
+ * How many managed children one guardian may have (MAX_MANAGED in
+ * src/lib/managed-children.functions.ts, a server-function module the spec
+ * cannot import). More matching cards than this means the card locator is
+ * matching something else, not that there is more to clean up.
+ */
+const MAX_MANAGED = 10;
+
 test.describe("Add your child form", () => {
   test("needs a name, a birthday and the guardian's confirmation — not a sport", async ({
     page,
@@ -124,7 +132,18 @@ test.describe("managed child, end to end", () => {
   const childCard = (page: Page, first: string) =>
     page.locator('button[id^="child-tab-"]', { hasText: new RegExp(first) });
 
-  async function deleteChild(page: Page) {
+  /**
+   * Delete every test child this guardian has, not just one.
+   *
+   * The project is shared and a run can stop between "add" and "delete" (a
+   * failed step, a cancelled job), leaving a child behind. Deleting only the
+   * first match used to leave the rest for good: with two or more left over,
+   * the card locator matched several buttons, `appears` failed on the strict
+   * match, and cleanup returned without deleting anything, so leftovers only
+   * ever grew (eight in CI by 2026-11-13) — and the guardian's managed-child
+   * limits refuse new children once enough pile up.
+   */
+  async function deleteTestChildren(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
     // Still inside the child's profile (a step failed mid-way)? The banner is
     // on every page there; go back to the guardian first.
@@ -133,19 +152,38 @@ test.describe("managed child, end to end", () => {
       await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }
-    // The roster loads after the page; wait for it rather than sampling once.
-    const tab = childCard(page, CHILD_FIRST);
-    if (!(await appears(tab, 15_000))) return;
-    await tab.click();
-    page.once("dialog", (d) => void d.accept(CHILD_FIRST));
-    await page
-      .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
-      .click();
-    await expect(tab).toBeHidden({ timeout: 20_000 });
+    // The roster loads after the page; wait until it has settled (some child
+    // card, or the empty state) rather than sampling once.
+    const roster = page
+      .locator('button[id^="child-tab-"]')
+      .first()
+      .or(page.getByText("No children yet", { exact: true }));
+    await expect(roster).toBeVisible({ timeout: 20_000 });
+    const cards = childCard(page, CHILD_FIRST);
+    const leftovers = await cards.count();
+    expect(
+      leftovers,
+      `${leftovers} "${CHILD_FIRST}" cards, more than a guardian can have: the card locator matches something else`,
+    ).toBeLessThanOrEqual(MAX_MANAGED);
+    // Each leftover is a real delete round trip: budget for it.
+    if (leftovers > 0) test.setTimeout(test.info().timeout + leftovers * 20_000);
+    for (let left = leftovers; left > 0; left -= 1) {
+      await cards.first().click();
+      page.once("dialog", (d) => void d.accept(CHILD_FIRST));
+      await page
+        .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
+        .click();
+      await expect(cards).toHaveCount(left - 1, { timeout: 20_000 });
+    }
   }
 
   test("add, switch in, switch back, delete", async ({ page }) => {
     await signInAs(page, "host");
+    // Start from a guardian with no test child, so the one created below is
+    // the only card that can match.
+    await deleteTestChildren(page);
+    let flowFailed = false;
+    let flowError: unknown;
     try {
       await page.goto("/players/add?from=parent", { waitUntil: "domcontentloaded" });
       await page.locator("#first-name").fill(CHILD_FIRST);
@@ -187,8 +225,23 @@ test.describe("managed child, end to end", () => {
       await page.getByRole("button", { name: /^back to /i }).click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
       await expect(page.getByText(/managing .*'s profile/i)).toHaveCount(0);
-    } finally {
-      await deleteChild(page);
+    } catch (error) {
+      flowFailed = true;
+      flowError = error;
     }
+    try {
+      await deleteTestChildren(page);
+    } catch (cleanupError) {
+      // When the flow passed, a failed cleanup fails the test. When the flow
+      // already failed, its error is the one to report, so the cleanup error
+      // is attached as an annotation instead; the next run's opening cleanup
+      // removes whatever was left.
+      if (!flowFailed) throw cleanupError;
+      test.info().annotations.push({
+        type: "cleanup-failed",
+        description: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+    if (flowFailed) throw flowError;
   });
 });

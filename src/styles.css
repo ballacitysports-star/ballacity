@@ -394,6 +394,17 @@ button:disabled,
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
 
+/* A horizontal scroller (a chip row) that runs to the screen edge from inside a
+   page shell: it bleeds out past the shell's gutter and pads itself back in so
+   the first chip still lines up with the content. The bleed is 1rem, but never
+   more than the gutter, which is 4vw below 400px wide (12.8px at 320px). A
+   fixed -mx-4 there pushed the row 3px past the screen and the whole page
+   scrolled sideways. page-shell.test.ts checks it against every shell. */
+@utility bleed-x-gutter {
+  margin-inline: calc(-1 * min(1rem, 4vw));
+  padding-inline: min(1rem, 4vw);
+}
+
 /* Long-form reading — legal documents, policies, guidelines. Narrower than
    `content` on purpose: past roughly 75 characters a line gets hard to track
    back from, so prose wants a tighter measure than a page of cards does. */

@@ -26,9 +26,11 @@ test("adult host reaches the Parent Center from Settings", async ({ page }) => {
   await link.click();
 
   await expect(page).toHaveURL(/\/parent/, { timeout: 20_000 });
-  await expect(
-    page.getByRole("heading", { name: /Your child’s account|Your child's account/i }),
-  ).toBeVisible({ timeout: 20_000 });
+  // The Parent Center's own page (it opens on "Your family" since the Guardian
+  // Dashboard moved into it), not the signed-out "Parent Center" prompt.
+  await expect(page.getByRole("heading", { level: 1, name: "Your family" })).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("Parent Center offers the invite-a-minor form to a guardian", async ({ page }) => {
@@ -47,9 +49,10 @@ test("Parent Center shows no linked children for a fresh fixture guardian", asyn
   await signInAs(page, "player2");
 
   await page.goto("/parent", { waitUntil: "domcontentloaded" });
-  await expect(
-    page.getByText(/No linked child accounts|Loading…/i).first(),
-  ).toBeVisible({ timeout: 20_000 });
+  // Settled, not just mounted: the roster finished loading and is empty.
+  await expect(page.getByText("No children yet", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("a child account is steered to the consent flow, not the guardian surface", async ({
@@ -75,10 +78,15 @@ test("a pending child sees the waiting state and can re-check status", async ({ 
   await signInAs(page, "player");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Waiting for your parent or guardian/i)).toBeVisible({
+  // The consent banner (ChildConsentGate) explains the locked features; while
+  // a request is pending its action re-checks status rather than starting over.
+  await expect(page.getByText(/Parent approval needed/i).first()).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByRole("link", { name: /Start approval|Check status/i })).toBeVisible();
+  const recheck = page.getByRole("link", { name: "Check status", exact: true });
+  await expect(recheck).toBeVisible();
+  await expect(recheck).toHaveAttribute("href", "/onboarding/child");
+  await expect(page.getByRole("link", { name: "Start approval" })).toHaveCount(0);
 });
 
 test("guardian safety pages stay public and reachable while signed in", async ({ page }) => {
