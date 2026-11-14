@@ -30,6 +30,13 @@ async function openSignedOutAuthPage(browser: Browser, path = "/auth") {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await page.goto(path, { waitUntil: "domcontentloaded" });
+  // The root renders a "Loading…" placeholder until the client app has booted.
+  // On the first page of a run the dev server compiles every module on request,
+  // which takes longer than the default 5s assertion wait (the same test then
+  // passes in about a second), so wait for the sign-in form itself first.
+  await expect(page.getByRole("button", { name: /google/i }).first()).toBeVisible({
+    timeout: 30_000,
+  });
   return { context, page };
 }
 
@@ -77,9 +84,11 @@ test.describe("OAuth vendor rejection", () => {
     }) => {
       const { context, page } = await openSignedOutAuthPage(browser);
       try {
-
         // Switch to signup mode.
-        await page.getByRole("button", { name: /create( an)? account|sign ?up/i }).first().click();
+        await page
+          .getByRole("button", { name: /create( an)? account|sign ?up/i })
+          .first()
+          .click();
 
         // Pick the "player" account type on the picker.
         const playerCard = page
@@ -89,10 +98,19 @@ test.describe("OAuth vendor rejection", () => {
         await playerCard.click();
 
         // Advance to the form step (Continue button on the picker).
-        await page.getByRole("button", { name: /^continue$/i }).first().click();
+        await page
+          .getByRole("button", { name: /^continue$/i })
+          .first()
+          .click();
 
         const button = providerButton(page, provider);
         await expect(button).toBeVisible();
+
+        // Signing up (with a provider too) needs the member's own agreement to
+        // the published Terms and Privacy Policy first; without it the button
+        // stops at "Please agree…" and never reaches the provider.
+        await page.getByRole("checkbox", { name: /Terms of Service/ }).check();
+        await page.getByRole("checkbox", { name: /Privacy Policy/ }).check();
 
         await stubOAuth(page, {
           error: { message: "failed to sign in with vendor" },
@@ -105,7 +123,9 @@ test.describe("OAuth vendor rejection", () => {
 
         // Still on /auth, still in signup form (email field is present).
         await expect(page).toHaveURL(/\/auth(?:\?.*)?$/);
-        await expect(page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first()).toBeVisible();
+        await expect(
+          page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first(),
+        ).toBeVisible();
 
         const state = await page.evaluate(
           ([pendingKey, providerKey]) => ({

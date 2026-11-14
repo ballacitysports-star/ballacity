@@ -69,6 +69,20 @@ async function installLoaderFlashObserver(page: Page) {
   }, LOADER_TEXTS);
 }
 
+/**
+ * Wait for the signed-in home itself: the real feed, whose header links to the
+ * member's profile. The bottom bar alone is not enough: while the session is
+ * still loading the gate shows the signed-out preview of `/feed`, bar included,
+ * and then the sign-in loader — part of the first load, not a route change.
+ */
+async function waitForSignedInHome(page: Page) {
+  await expect(page.getByRole("link", { name: "Your profile" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel("Home", { exact: true }).first()).toBeVisible();
+  for (const needle of LOADER_TEXTS) {
+    await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
+  }
+}
+
 async function readFlashes(page: Page) {
   return page.evaluate(() => window.__authLoaderFlashes ?? []);
 }
@@ -79,10 +93,7 @@ for (const provider of ["google", "apple"] as const) {
 
     // Land on the signed-in home first; the initial loader here is expected.
     await page.goto("/feed", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
-    for (const needle of LOADER_TEXTS) {
-      await expect(page.getByText(needle)).toHaveCount(0, { timeout: 20_000 });
-    }
+    await waitForSignedInHome(page);
 
     // Only now start watching — everything after this is a route change.
     await installLoaderFlashObserver(page);
@@ -110,7 +121,7 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
   await restoreOAuthSession(page, "google");
 
   await page.goto("/feed", { waitUntil: "domcontentloaded" });
-  await expect(page.getByLabel("Home")).toBeVisible({ timeout: 20_000 });
+  await waitForSignedInHome(page);
 
   await installLoaderFlashObserver(page);
 

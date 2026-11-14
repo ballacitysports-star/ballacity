@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { toJSONAsync } from "seroval";
+import { emitSignedIn, expectAccountTypePickerInPlace } from "./helpers/oauth-signin";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -25,41 +26,15 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
+// `/notifications` is no longer a page of its own: alerts live in the Inbox
+// (`/messages`), and the old path redirects there.
+const PROTECTED_ROUTES = ["/feed", "/profile", "/messages"] as const;
 const PROVIDERS = ["google", "apple"] as const;
 
 async function stubNullAccountType(page: Page) {
   // The root gate asks the server first (getOnboardingStatus reads the profile
   // server-side), so the table stub below only covers its client fallback.
   await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, "email"));
-  // The gate asks the server first (`getOnboardingStatus`) and only falls back
-  // to PostgREST when that call fails, so both layers must report "no type".
-  // Server-fn addresses are base64-encoded ({file, export}), so decode the
-  // path segment instead of pattern-matching the raw URL.
-  await page.route("**/_serverFn/**", async (route) => {
-    const segment = new URL(route.request().url()).pathname.split("/_serverFn/")[1] ?? "";
-    let decoded = "";
-    try {
-      decoded = Buffer.from(decodeURIComponent(segment), "base64").toString("utf8");
-    } catch {
-      decoded = "";
-    }
-    if (!decoded.includes("getOnboardingStatus")) {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        needsOnboarding: true,
-        isSocial: false,
-        provider: "email",
-        accountType: null,
-      }),
-    });
-  });
-
   // The root gate hits `/rest/v1/profiles?select=account_type&id=eq.<uid>`.
   // Force every read of that column to return NULL so the redirect logic runs
   // even for users who actually have a type in the real DB.
@@ -125,22 +100,15 @@ test.describe("null account_type → account-type setup", () => {
         // decision (mirrors the OAuth callback returning to `window.location.origin`).
         await page.goto("/", { waitUntil: "domcontentloaded" });
 
+        // The app shell registers its sign-in listener when it mounts, after
+        // hydration; the gate holding the member at the picker shows it is up.
+        await expectAccountTypePickerInPlace(page);
+
         // Simulate the provider callback firing a SIGNED_IN event on the
         // existing Supabase client. Every provider that lands back in-app
         // takes this path — this is the exact hook the OAuth return relies on.
-        await page.evaluate(async (providerId) => {
-          const mod = await import("/src/integrations/supabase/client.ts");
-          const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-            .supabase;
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const authAny = supabase.auth as any;
-          const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
-          if (typeof emit === "function") {
-            await emit.call(supabase.auth, "SIGNED_IN", session, false);
-          }
+        await emitSignedIn(page);
+        await page.evaluate((providerId) => {
           // Tag the run so we can confirm the provider we simulated.
           (window as unknown as { __simulatedProvider?: string }).__simulatedProvider = providerId;
         }, provider);

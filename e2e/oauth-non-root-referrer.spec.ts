@@ -60,7 +60,9 @@ async function primeAndLandOnAuth(page: Page) {
   await page.waitForURL(/\/auth(?:[?#/].*)?$/, { timeout: 15_000 });
 
   const referrer = await page.evaluate(() => document.referrer);
-  expect(referrer.replace(/^https?:\/\/[^/]+/, "")).toBe(REFERRER_PATH);
+  // The Discover page writes its filter defaults into its own URL
+  // (`/players?q=&sport=…`), so the referrer carries them; the page is what counts.
+  expect(new URL(referrer).pathname).toBe(REFERRER_PATH);
 }
 
 async function emitOAuthSignedIn(page: Page, provider: string) {
