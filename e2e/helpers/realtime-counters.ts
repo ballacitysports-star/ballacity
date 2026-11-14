@@ -51,3 +51,16 @@ export async function readMapSpotsLeft(page: Page, gameId: string): Promise<numb
   const m = text.match(/(\d+)\s+spots?/);
   return m ? Number(m[1]) : null;
 }
+
+/**
+ * The feed card for the game titled `title`: a link carrying the title as its
+ * heading. Feed cards are links, not `article`s, and have no
+ * `data-testid="game-card"`; the "Needs you now" row also links to the game
+ * but has no heading, so it is not matched.
+ */
+export function feedGameCard(page: Page, title: string): Locator {
+  return page
+    .getByRole("link")
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) })
+    .first();
+}
