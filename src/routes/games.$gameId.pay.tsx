@@ -50,6 +50,7 @@ import {
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
 import { payOptionsView, usePayPalCheckoutConfig } from "@/hooks/use-paypal-checkout-config";
+import { openExternalPaymentTab } from "@/lib/external-payment-tab";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -124,8 +125,7 @@ function launchExternalPayment(url: string, copyText?: string | null) {
       .then(() => toast.success(`Copied ${copyText}`))
       .catch(() => {});
   }
-  const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
-  if (!externalWindow) window.location.assign(url);
+  openExternalPaymentTab(url);
 }
 
 function feeLabel(fee: number | null | undefined) {
