@@ -1,6 +1,6 @@
 import { expectOnDiscovery } from "./helpers/invite-discovery";
 import { fulfillRows } from "./helpers/invite-postgrest";
-import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -8,7 +8,9 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  * deep-link with a malformed `exp` param (non-numeric, negative, zero, NaN)
  * must be blocked — the app shows the expired error state, surfaces a toast,
  * routes safely to the /discover fallback, and never POSTs to
- * /rest/v1/join_requests.
+ * /rest/v1/join_requests. The viewer has not acknowledged the game's risks yet,
+ * and the refusal comes first: the "Before you join" dialog never opens and no
+ * acknowledgment is recorded.
  *
  * Complements `invite-malformed-exp.spec.ts` (which only asserts the banner
  * on a free/no-approval game) by exercising the CTA guard end-to-end on an
@@ -107,7 +109,10 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await installMocks(page, () => {
       joinPostFired = true;
     });
-    await stubRiskAcknowledged(page);
+    // The acknowledgment is due, so the dialog would open if the page asked
+    // for it before checking the invite's expiry.
+    const riskAck = await mockRiskNotAcknowledged(page);
+    const riskDialogSeen = await watchRiskDialog(page);
     await restoreSession(page);
 
     await page.goto(
@@ -131,9 +136,13 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await expect(cta).toBeVisible({ timeout: 10_000 });
     await cta.click();
 
-    // Guard fires: toast surfaces + navigation to /discover fallback.
+    // Guard fires: toast surfaces + navigation to /discover fallback, without
+    // the risk dialog opening first.
     const toast = page.getByText(/invite has expired/i).first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
+    expect(await riskDialogSeen(), "the risk dialog must not open for a refused request").toBe(
+      false,
+    );
     // /discover redirects to /feed, where discovery lives now.
     await expectOnDiscovery(page);
 
@@ -141,6 +150,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await page.waitForTimeout(500);
     expect(joinPostFired, "join_requests POST must NOT fire for a malformed-exp invite").toBe(
       false,
+    );
+    expect(riskAck.writes, "no risk acknowledgment may be recorded for a refused request").toEqual(
+      [],
     );
 
     await ctx.close();

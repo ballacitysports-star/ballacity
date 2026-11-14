@@ -1,6 +1,6 @@
 import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { fulfillRows } from "./helpers/invite-postgrest";
-import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -15,6 +15,9 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  * assert:
  *   - a Sonner error toast renders ("invalid or has been tampered with"),
  *   - no POST to /rest/v1/join_requests is ever made,
+ *   - the "Before you join" risk dialog never opens and no acknowledgment is
+ *     recorded, although the viewer has not acknowledged this game yet: a
+ *     refused request must not ask for (and store) consent first,
  *   - the tampered/missing invite params still stick on the URL (the app
  *     doesn't silently rewrite them).
  *
@@ -137,7 +140,10 @@ async function runTamperedCase(
   await installMocks(page, () => {
     joinPostFired = true;
   });
-  await stubRiskAcknowledged(page);
+  // The acknowledgment is due, so the dialog would open if the page asked for
+  // it before checking the link.
+  const riskAck = await mockRiskNotAcknowledged(page);
+  const riskDialogSeen = await watchRiskDialog(page);
   await restoreSession(page);
   await seedInvite(page, userId, notifTitle, link);
 
@@ -164,6 +170,12 @@ async function runTamperedCase(
   // Give any (illegitimate) network fire a chance to land before asserting no POST.
   await page.waitForTimeout(500);
   expect(joinPostFired, "join_requests POST must NOT fire for a tampered invite").toBe(false);
+
+  // Refused before the risk acknowledgment: no dialog, nothing recorded.
+  expect(await riskDialogSeen(), "the risk dialog must not open for a refused request").toBe(false);
+  expect(riskAck.writes, "no risk acknowledgment may be recorded for a refused request").toEqual(
+    [],
+  );
 
   // URL still reflects the tampered/missing invite params — the app didn't
   // silently rewrite the link.

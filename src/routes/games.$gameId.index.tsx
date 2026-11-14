@@ -42,6 +42,16 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
 import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+import {
+  GAME_FULL_MESSAGE,
+  INVITE_EXPIRED_MESSAGE,
+  INVITE_TAMPERED_MESSAGE,
+  NO_REQUEST_HOST_MESSAGE,
+  joinPreflightRefusal,
+  joinTapStep,
+  type JoinPreflightInput,
+  type JoinRefusal,
+} from "@/lib/join-preflight";
 import { ShieldAlert } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import {
@@ -949,7 +959,7 @@ function GameDetail() {
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
-      toast.error("This invite has expired. Browse open games instead.");
+      toast.error(INVITE_EXPIRED_MESSAGE);
       nav({ to: "/discover" });
       return;
     }
@@ -967,12 +977,12 @@ function GameDetail() {
         return;
       }
       if (spotsLeft <= 0) {
-        toast.error("This game is full.");
+        toast.error(GAME_FULL_MESSAGE);
         return;
       }
       const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
       if (!requestHostId) {
-        toast.error("This host can't take requests yet.");
+        toast.error(NO_REQUEST_HOST_MESSAGE);
         return;
       }
       if (myReq?.status === "rejected") {
@@ -1129,7 +1139,7 @@ function GameDetail() {
     }
 
     if (spotsLeft <= 0) {
-      toast.error("This game is full.");
+      toast.error(GAME_FULL_MESSAGE);
       return;
     }
     // Approval gate takes priority over payment: on games that require
@@ -1139,14 +1149,14 @@ function GameDetail() {
       // still get request-to-join, so fall back to the game's host id.
       const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
       if (!requestHostId) {
-        toast.error("This host can't take requests yet.");
+        toast.error(NO_REQUEST_HOST_MESSAGE);
         return;
       }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
       // has been tampered with — refuse to send the request.
       if (isInvite && (!inviteFrom || inviteFrom !== requestHostId)) {
-        toast.error("This invite link is invalid or has been tampered with.");
+        toast.error(INVITE_TAMPERED_MESSAGE);
         return;
       }
       // Client-side gate on resubmit: mirror the DB trigger so the user gets
@@ -1263,18 +1273,55 @@ function GameDetail() {
     }
   };
 
+  // Refusals a new join runs into before anything is written (src/lib/join-preflight.ts).
+  const joinPreflight: JoinPreflightInput = {
+    inviteExpired,
+    locked: gate.locked,
+    lockedReason: gate.reason,
+    spotsLeft,
+    asksParent: !!parentAsk,
+    goesToPayment: isPaid && !paymentCleared && approvalCleared,
+    asksHost: requiresApproval && !isApproved,
+    requestHostId: settings?.host_id ?? game.hostUserId ?? null,
+    isInvite: !!isInvite,
+    inviteFrom,
+  };
+  const refuseJoin = (refusal: JoinRefusal) => {
+    toast.error(refusal.message);
+    if (refusal.kind === "invite_expired") nav({ to: refusal.redirectTo });
+  };
+
   // Physical-activity risk acknowledgment gate. Players see it once per
   // acknowledgment version per game; hosts and confirmed players skip it.
   const handleJoin = async (preselectedPosition?: string) => {
-    const gate = needsRiskAcknowledgment({
-      signedIn: !!user,
-      isHost,
-      // Taking back a pending request or payment is not joining: never ask for
-      // the risk acknowledgment in front of it.
-      alreadyJoined: viewerCountsAsJoined || isPending,
-      acknowledgedVersion: riskAckVersion ?? null,
-    });
-    if (gate) {
+    const needsAck = (acknowledgedVersion: string | null) =>
+      needsRiskAcknowledgment({
+        signedIn: !!user,
+        isHost,
+        // Taking back a pending request or payment is not joining: never ask for
+        // the risk acknowledgment in front of it.
+        alreadyJoined: viewerCountsAsJoined || isPending,
+        acknowledgedVersion,
+      });
+    let needsRiskAck = needsAck(riskAckVersion ?? null);
+    if (needsRiskAck && riskAckVersion === undefined) {
+      // The acknowledgment read has not answered yet (a tap right after the
+      // page opened). Wait for it instead of asking a player who already
+      // acknowledged; if it fails, the dialog shows as before.
+      setProcessing(true);
+      try {
+        const { data } = await refetchRiskAck({ cancelRefetch: false });
+        needsRiskAck = needsAck(data ?? null);
+      } finally {
+        setProcessing(false);
+      }
+    }
+    const step = joinTapStep({ ...joinPreflight, needsRiskAck });
+    if (step.step === "refuse") {
+      refuseJoin(step.refusal);
+      return;
+    }
+    if (step.step === "acknowledge") {
       pendingJoinPositionRef.current = preselectedPosition ?? null;
       setRiskAckOpen(true);
       return;
@@ -2889,6 +2936,12 @@ function GameDetail() {
                         return;
                       }
                       if (wantsFreeJoin) {
+                        // Refuse before "Join this run?" too, not after it.
+                        const refusal = joinPreflightRefusal(joinPreflight);
+                        if (refusal) {
+                          refuseJoin(refusal);
+                          return;
+                        }
                         setConfirmAction("join");
                         return;
                       }
