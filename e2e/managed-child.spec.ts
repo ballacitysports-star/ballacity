@@ -124,7 +124,18 @@ test.describe("managed child, end to end", () => {
   const childCard = (page: Page, first: string) =>
     page.locator('button[id^="child-tab-"]', { hasText: new RegExp(first) });
 
-  async function deleteChild(page: Page) {
+  /**
+   * Delete every test child this guardian has, not just one.
+   *
+   * The project is shared and a run can stop between "add" and "delete" (a
+   * failed step, a cancelled job), leaving a child behind. Deleting only the
+   * first match used to leave the rest for good: with two or more left over,
+   * the card locator matched several buttons, `appears` failed on the strict
+   * match, and cleanup returned without deleting anything, so leftovers only
+   * ever grew (eight in CI by 2026-11-13) — and the guardian's managed-child
+   * limits refuse new children once enough pile up.
+   */
+  async function deleteTestChildren(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
     // Still inside the child's profile (a step failed mid-way)? The banner is
     // on every page there; go back to the guardian first.
@@ -133,19 +144,32 @@ test.describe("managed child, end to end", () => {
       await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }
-    // The roster loads after the page; wait for it rather than sampling once.
-    const tab = childCard(page, CHILD_FIRST);
-    if (!(await appears(tab, 15_000))) return;
-    await tab.click();
-    page.once("dialog", (d) => void d.accept(CHILD_FIRST));
-    await page
-      .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
-      .click();
-    await expect(tab).toBeHidden({ timeout: 20_000 });
+    // The roster loads after the page; wait until it has settled (some child
+    // card, or the empty state) rather than sampling once.
+    const roster = page
+      .locator('button[id^="child-tab-"]')
+      .first()
+      .or(page.getByText("No children yet", { exact: true }));
+    await expect(roster).toBeVisible({ timeout: 20_000 });
+    const cards = childCard(page, CHILD_FIRST);
+    // Bounded by the guardian's managed-child cap (MAX_MANAGED = 10).
+    for (let left = await cards.count(); left > 0 && left <= 10; left -= 1) {
+      // Each leftover is a real delete round trip: budget for it.
+      test.setTimeout(test.info().timeout + 20_000);
+      await cards.first().click();
+      page.once("dialog", (d) => void d.accept(CHILD_FIRST));
+      await page
+        .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
+        .click();
+      await expect(cards).toHaveCount(left - 1, { timeout: 20_000 });
+    }
   }
 
   test("add, switch in, switch back, delete", async ({ page }) => {
     await signInAs(page, "host");
+    // Start from a guardian with no test child, so the one created below is
+    // the only card that can match.
+    await deleteTestChildren(page);
     try {
       await page.goto("/players/add?from=parent", { waitUntil: "domcontentloaded" });
       await page.locator("#first-name").fill(CHILD_FIRST);
@@ -188,7 +212,7 @@ test.describe("managed child, end to end", () => {
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
       await expect(page.getByText(/managing .*'s profile/i)).toHaveCount(0);
     } finally {
-      await deleteChild(page);
+      await deleteTestChildren(page);
     }
   });
 });

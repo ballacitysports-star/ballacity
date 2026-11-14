@@ -95,3 +95,19 @@ describe("per-user client state", () => {
     expect(PER_USER_STORAGE_KEYS).not.toContain("openrun.blockedUsers.v1");
   });
 });
+
+describe("the root sign-in gate during a switch", () => {
+  const root = readFileSync(new URL("../routes/__root.tsx", import.meta.url), "utf8");
+
+  it("does not send the switching tab to /auth between signing one session out and the next in", () => {
+    // Otherwise the sign-in page mounts mid-switch and forwards the restored
+    // guardian to `next` (the page the child had open), racing the switch's own
+    // navigation to the Parent Center.
+    const gate = root.indexOf('logAuthGateDecision("auth-route-skip"');
+    const verify = root.indexOf("setVerifying(true);", gate);
+    const skip = root.indexOf("if (isIdentitySwitchInProgress())", gate);
+    expect(gate).toBeGreaterThan(0);
+    expect(skip).toBeGreaterThan(gate);
+    expect(skip).toBeLessThan(verify);
+  });
+});
