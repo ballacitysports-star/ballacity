@@ -44,6 +44,26 @@ let lastHydratedAt = 0;
 const REHYDRATE_AFTER_MS = 30_000;
 const EMPTY_SNAPSHOT = "[]";
 
+/**
+ * Whether the viewer's places have been read from the database since this page (or this account) started: until then
+ * `joined` is only what this browser saved, which can be stale either way. 'error' when that first read failed; a
+ * later refresh that fails keeps the last answer. The pay page waits for 'ready' before it tells a player that only a
+ * place would let them pay that they cannot (src/lib/pay-entry-gate.ts).
+ */
+export type RosterLoadState = "loading" | "ready" | "error";
+let rosterLoad: RosterLoadState = "loading";
+
+function setRosterLoad(next: RosterLoadState) {
+  if (rosterLoad === next) return;
+  rosterLoad = next;
+  emit();
+}
+
+/** A failed read of the roster: an error only if it had never loaded. */
+function rosterLoadFailed() {
+  if (rosterLoad !== "ready") setRosterLoad("error");
+}
+
 function loadJoinedGames() {
   if (loaded || typeof window === "undefined") return false;
   loaded = true;
@@ -97,7 +117,12 @@ async function hydrateFromDb(userId: string) {
     .from("game_participants")
     .select("id, game_id")
     .eq("user_id", userId);
-  if (error) return;
+  if (error) {
+    if (userId === currentUserId) rosterLoadFailed();
+    return;
+  }
+  // An answer for an account that is no longer the signed-in one (signed out, or switched while the read was out).
+  if (userId !== currentUserId) return;
   lastHydratedAt = Date.now();
   const rows = data ?? [];
   const rowIds = new Set(rows.map((r) => r.id));
@@ -120,14 +145,20 @@ async function hydrateFromDb(userId: string) {
     if (settled(id)) joined.add(id);
   });
   saveJoinedGames();
+  rosterLoad = "ready";
   emit();
 }
 
 function ensureHydrated() {
   if (hydrated || typeof window === "undefined" || hydratingPromise) return;
   hydratingPromise = (async () => {
-    const { data } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
     currentUserId = data.user?.id ?? null;
+    if (!currentUserId) {
+      // No signed-in account: no places. Unless asking who is signed in failed, which says nothing about the roster.
+      if (error) rosterLoadFailed();
+      else setRosterLoad("ready");
+    }
     if (currentUserId) {
       // Subscribe as soon as we know who is signed in. Waiting for an auth event
       // is not enough: a page that mounts after the session was restored only
@@ -138,7 +169,22 @@ function ensureHydrated() {
     hydrated = true;
   })().catch(() => {
     hydratingPromise = null;
+    rosterLoadFailed();
   });
+}
+
+/** Read the viewer's places again after a failed first read (the pay page's Retry). */
+export function retryRosterLoad() {
+  if (typeof window === "undefined") return;
+  if (rosterLoad === "error") setRosterLoad("loading");
+  if (currentUserId) {
+    void hydrateFromDb(currentUserId);
+    return;
+  }
+  // Asking who is signed in failed (or nobody is): ask again.
+  hydrated = false;
+  hydratingPromise = null;
+  ensureHydrated();
 }
 
 type RosterChange = {
@@ -226,6 +272,7 @@ function ensureRealtime() {
         currentUserId = uid;
         hydrated = false;
         hydratingPromise = null;
+        setRosterLoad("loading");
         ensureHydrated();
       }
       attachRealtime(uid);
@@ -241,6 +288,7 @@ function ensureRealtime() {
       rowLearnedAt.clear();
       gameChangedAt.clear();
       saveJoinedGames();
+      rosterLoad = "loading";
       emit();
     }
   });
@@ -349,6 +397,18 @@ export function isJoined(id: string): boolean {
 export function useIsJoined(id: string): boolean {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
   return useMemo(() => JSON.parse(snapshot).includes(id), [id, snapshot]);
+}
+
+/** Whether the viewer's places (useIsJoined) have been read from the database yet. See RosterLoadState. */
+export function useRosterLoadState(): RosterLoadState {
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      getSnapshot();
+      return rosterLoad;
+    },
+    () => "loading",
+  );
 }
 
 export function useJoinedGameIds(): string[] {
