@@ -56,6 +56,8 @@ import { AnalyticsHost } from "@/components/AnalyticsHost";
 import { isChatThreadPath } from "@/lib/chat-layout";
 import { useManagedSessionWatcher } from "@/hooks/use-managed-session";
 import { isIdentitySwitchInProgress } from "@/lib/managed-session";
+import { useIdentitySwitchHold } from "@/hooks/use-identity-switch-hold";
+import { decideAuthGateStep } from "@/lib/authgate-decision";
 import { ManagedSessionBanner } from "@/components/ManagedSessionBanner";
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 import { BOOT_WATCHDOG_RETRY_KEY, bootWatchdogInlineScript } from "@/lib/boot-watchdog";
@@ -452,6 +454,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Guardian ⇄ managed-child switching: reload tabs whose identity changed,
   // and restore a parked guardian if the child's session disappears.
   useManagedSessionWatcher();
+  const holdForIdentitySwitch = useIdentitySwitchHold();
   // Delivers due pre-game reminders for the signed-in player.
   useGameReminderFlush();
 
@@ -466,7 +469,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (loading) {
+    const step = decideAuthGateStep({
+      loading,
+      hasUser: !!user,
+      isPublic,
+      pathname,
+      holdForIdentitySwitch,
+    });
+    if (step === "wait-for-auth") {
       logAuthGateDecision("verify-start", {
         pathname,
         loading,
@@ -475,17 +485,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    if (user) {
+    if (step === "user-present") {
       logAuthGateDecision("user-present", { pathname, loading, hasUser: true });
       setVerifying(false);
       return;
     }
-    if (isPublic) {
-      logAuthGateDecision("public-skip", { pathname, loading, hasUser: false });
-      return;
-    }
-    if (pathname === "/auth") {
-      logAuthGateDecision("auth-route-skip", { pathname, loading, hasUser: false });
+    if (step === "public-skip" || step === "auth-route-skip") {
+      logAuthGateDecision(step, { pathname, loading, hasUser: false });
       return;
     }
     // A guardian <-> managed-child switch in this tab signs one session out
@@ -493,8 +499,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // managed-session.ts). Sending the tab to /auth in that gap mounted the
     // sign-in page, which then forwarded the restored guardian to `next` (the
     // page the child had open) instead of the Parent Center, racing the
-    // switch's own navigation and usually winning.
-    if (isIdentitySwitchInProgress()) {
+    // switch's own navigation and usually winning. `holdForIdentitySwitch` is a
+    // dependency, so this re-runs (and verifies) when the switch ends, or when
+    // it overruns its allowance without navigating.
+    if (step === "identity-switch-skip") {
       logAuthGateDecision("identity-switch-skip", { pathname, loading, hasUser: false });
       return;
     }
@@ -505,7 +513,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       pathname,
       loading,
       hasUser: false,
-      extra: { phase: "second-chance-getSession" },
+      extra: {
+        phase: "second-chance-getSession",
+        // Still set here only when a switch overran IDENTITY_SWITCH_MAX_HOLD_MS.
+        identitySwitchOverran: isIdentitySwitchInProgress(),
+      },
     });
     const t0 = performance.now();
     const attemptRedirect = async () => {
@@ -619,7 +631,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loading, user, isPublic, router, pathname]);
+  }, [loading, user, isPublic, router, pathname, holdForIdentitySwitch]);
 
   // Age-verification gate: no authenticated member reaches ordinary
   // onboarding, the feed, or any protected route until the SERVER has
