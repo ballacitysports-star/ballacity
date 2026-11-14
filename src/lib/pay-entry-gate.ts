@@ -136,9 +136,12 @@ export function checkStateOf<T>(query: {
 }
 
 export type PayEntryView =
-  /** A minor-safety check has not answered yet: show the loading card, never the handles. */
+  /**
+   * A minor-safety check, or the viewer's own flow state a block hangs on, has not answered yet: show the loading
+   * card, never the handles (and never a block the answer could lift).
+   */
   | { kind: "checking" }
-  /** A minor-safety check failed before answering: show a retry, never the handles. */
+  /** One of those failed before answering: show a retry, never the handles. */
   | { kind: "check_failed" }
   /**
    * 'replace': the block card takes the place of every payment option.
@@ -170,10 +173,27 @@ const CLAIM_STILL_RECORDED: ReadonlySet<PayEntryBlockKind> = new Set<PayEntryBlo
  * What the pay page shows in place of (or above) its payment options. Fails closed: while the child-status policy or
  * the guardian check has not answered, nothing that lets money move is shown.
  */
+/**
+ * Whether a block was decided by the viewer's own flow state (their place, a payment in, the host's approval): a lock
+ * other than a cancelled game, which every viewer gets, or the participation block, which a place lifts. Those inputs
+ * only ever lift a block, so a block that is none of these stands whatever they turn out to be.
+ */
+function dependsOnFlow(block: PayEntryBlock): boolean {
+  if (block.kind === "participation") return true;
+  return block.kind === "locked" && block.joinState !== "cancelled";
+}
+
 export function payEntryView(input: {
   holdsPlace: boolean;
   paymentIn: boolean;
   approved: boolean;
+  /**
+   * Whether holdsPlace, paymentIn and approved are known: the viewer's request and payments for this game have been
+   * read, and the roster store has loaded their places. 'loading' while any is still out, 'error' when a read failed
+   * with nothing loaded. Until 'ready' the three count as false, and a block they could lift shows as 'checking' (or
+   * 'check_failed'), never as "You can't pay for this game" to a player who may well be approved or on the roster.
+   */
+  flow: "loading" | "error" | "ready";
   gate: PayEntryInput["gate"];
   /** useMyChildStatus(): the two policy decisions and whether the age is unknown, once the status has loaded. */
   child: CheckState<{
@@ -194,10 +214,13 @@ export function payEntryView(input: {
   const { child, guardian } = input;
   if (child.state === "error" || guardian.state === "error") return { kind: "check_failed" };
   if (child.state === "loading" || guardian.state === "loading") return { kind: "checking" };
+  // Until the flow state is known it counts as nothing (fail closed): those inputs only lift blocks, so a viewer with
+  // no block now has none whatever they turn out to be, and an account-level block shows at once.
+  const flowKnown = input.flow === "ready";
   const block = payEntryBlock({
-    holdsPlace: input.holdsPlace,
-    paymentIn: input.paymentIn,
-    approved: input.approved,
+    holdsPlace: flowKnown && input.holdsPlace,
+    paymentIn: flowKnown && input.paymentIn,
+    approved: flowKnown && input.approved,
     gate: input.gate,
     participation: child.value.participation,
     payments: child.value.payments,
@@ -205,6 +228,9 @@ export function payEntryView(input: {
     guardianReady: guardian.value,
   });
   if (!block) return { kind: "clear" };
+  if (!flowKnown && dependsOnFlow(block)) {
+    return input.flow === "error" ? { kind: "check_failed" } : { kind: "checking" };
+  }
   const warn = input.paymentStarted && input.onProofStep && CLAIM_STILL_RECORDED.has(block.kind);
   return {
     kind: "blocked",
@@ -227,12 +253,41 @@ export function blockOutranksApproval(block: PayEntryBlock, requestPending: bool
 }
 
 /**
+ * A game no new payment can be for, whoever the viewer is: a cancelled game, or an ended one for anyone without a
+ * place (enforce_game_join_gate, paypal_payment_precondition's GAME_CANCELLED / GAME_COMPLETED). payEntryBlock blocks
+ * these whatever the viewer's request or payments say; the game page uses it so its Pay Host link agrees.
+ */
+export function gameTakesNoPayment(joinState: JoinState, holdsPlace: boolean): boolean {
+  return joinState === "cancelled" || (joinState === "completed" && !holdsPlace);
+}
+
+/**
+ * Whether the pay page offers PayPal checkout. paypal_payment_precondition refuses an ended game to every player,
+ * rostered or not (GAME_COMPLETED), and a cancelled one (GAME_CANCELLED), so a PayPal button there could only fail at
+ * order creation. A rostered player who still owes for an ended game keeps the host's manual methods.
+ */
+export function payPalOffered(joinState: JoinState): boolean {
+  return joinState !== "completed" && joinState !== "cancelled";
+}
+
+/**
  * The game page's paid CTA: a link to /games/<id>/pay. It is a link only for a viewer the button path would also let
  * through. A locked game or a consent-blocked account falls through to the disabled button ("Signup closed", "In
  * progress", "Game ended", "Parent approval needed"); lockedForNewJoin already exempts a viewer on the roster, with a
- * request or payment pending, confirmed or approved, so they keep their link.
+ * request or payment pending, confirmed or approved, so they keep their link, except on a game that takes no payment
+ * at all (gameTakesNoPayment), where the pay page would only show its block card. A pending payment's "View status"
+ * link stays there: the pay page shows that payment's timeline, and the button would open the same page anyway.
  */
 export function payHostLinkShown(input: {
+  /** The game's join state (useJoinGate(game).joinState). */
+  joinState: JoinState;
+  /** The viewer is on the roster. */
+  holdsPlace: boolean;
+  /**
+   * A payment of theirs waits on the host: the link reads "Payment pending · View status" and opens the status
+   * timeline (withdraw, dispute), not a way to pay, so it stays even on a game that takes no payment.
+   */
+  paymentPending: boolean;
   isPaid: boolean;
   paymentCleared: boolean;
   approvalCleared: boolean;
@@ -242,6 +297,7 @@ export function payHostLinkShown(input: {
   consentBlocksNewJoin: boolean;
 }): boolean {
   return (
+    (input.paymentPending || !gameTakesNoPayment(input.joinState, input.holdsPlace)) &&
     input.isPaid &&
     !input.paymentCleared &&
     input.approvalCleared &&

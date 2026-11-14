@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
-import { stubServerFn } from "./helpers/server-fn";
+import { serverFnId, stubServerFn } from "./helpers/server-fn";
 import {
   PAY_FIXTURE_HOST_ID,
   blockRealtime,
@@ -16,8 +16,9 @@ import {
  * is the only safeguard before money moves. Every read that decides it is answered here, so nothing depends on the
  * data where the spec runs:
  *   - the game row (serveFixtureGame), the host's settings and methods, the viewer's request, payments and place;
- *   - the account's child status (restoreSession answers it for the fixture adult) and the guardian check
- *     (game_payment_guardian_ready, answered true: an adult);
+ *   - the account's child status (restoreSession answers it for the fixture adult; the approved-viewer test asks the
+ *     real getMyChildStatus server function instead, so a regression there that would hold every payment fails here)
+ *     and the guardian check (game_payment_guardian_ready, answered true: an adult);
  *   - the PayPal checkout config (a server function, answered with a config) and PayPal's SDK script (a stand-in that
  *     draws nothing), so a PayPal button would be drawn if the page offered one. "No PayPal" below therefore means the
  *     page held it back, not that PayPal was not set up.
@@ -54,7 +55,13 @@ async function fulfillJson(route: Route, body: unknown) {
 
 async function mockPayScreen(
   page: Page,
-  opts: { game: Record<string, unknown>; requiresApproval: boolean; request: string | null },
+  opts: {
+    game: Record<string, unknown>;
+    requiresApproval: boolean;
+    request: string | null;
+    /** When set, the viewer's join request is answered only once it resolves. */
+    requestGate?: Promise<void>;
+  },
 ) {
   const now = new Date().toISOString();
   await page.route(
@@ -109,6 +116,7 @@ async function mockPayScreen(
     (u) => isTable(u, "join_requests"),
     async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
+      if (opts.requestGate) await opts.requestGate;
       await fulfillJson(
         route,
         opts.request
@@ -227,20 +235,54 @@ test("a cancelled game: even a host-approved viewer gets the block card", async 
   await ctx.close();
 });
 
-test("a host-closed paid game: a host-approved viewer still gets the payment options", async ({
+test("a host-closed paid game: a host-approved viewer still gets the payment options, and is never told they can't pay while their request loads", async ({
   browser,
 }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
+  // Hold the viewer's join request: until it lands the page cannot know the host approved them.
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => (releaseRequest = resolve));
   await mockPayScreen(page, {
     game: { joins_closed: true },
     requiresApproval: true,
     request: "approved",
+    requestGate,
+  });
+  // Record the block card if it is ever drawn, however briefly.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __payBlockSeen?: boolean };
+    w.__payBlockSeen = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="pay-entry-blocked"]')) w.__payBlockSeen = true;
+    }).observe(document, { childList: true, subtree: true });
   });
 
   await restoreSession(page);
+  // The real child-status check (restoreSession stubbed it): the pay page offers nothing until it answers.
+  await page.route("**/_serverFn/**", async (route) => {
+    if (!serverFnId(route.request().url()).includes("getMyChildStatus")) return route.fallback();
+    await route.continue();
+  });
+  const childStatus = page.waitForResponse(
+    (r) => r.url().includes("/_serverFn/") && serverFnId(r.url()).includes("getMyChildStatus"),
+  );
+  const guardianCheck = page.waitForResponse((r) =>
+    r.url().includes("/rest/v1/rpc/game_payment_guardian_ready"),
+  );
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
+  const childResponse = await childStatus;
+  expect(childResponse.ok(), "the real getMyChildStatus answers for the fixture adult").toBe(true);
+  expect(await childResponse.text()).toContain("adult");
+  await guardianCheck;
+
+  // Every other check has answered; only the request is out. The page waits, it does not say "you can't pay".
+  await expect(page.getByText("Loading payment options…")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+
+  releaseRequest();
   // The server lets an approved player through a host-closed game (enforce_game_join_gate,
   // paypal_payment_precondition), so the page offers every method.
   await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Venmo` })).toBeVisible({
@@ -251,6 +293,10 @@ test("a host-closed paid game: a host-approved viewer still gets the payment opt
   await expect(page.getByText(/paypal or card/i)).toBeVisible();
   await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
   await expect(page.getByTestId("approval-required-gate")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => (window as unknown as { __payBlockSeen?: boolean }).__payBlockSeen),
+    "the block card was never drawn",
+  ).toBe(false);
 
   await ctx.close();
 });

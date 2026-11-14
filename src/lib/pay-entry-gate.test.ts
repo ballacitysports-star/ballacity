@@ -3,8 +3,10 @@ import {
   blockOutranksApproval,
   checkStateOf,
   payEntryBlock,
+  gameTakesNoPayment,
   payEntryView,
   payHostLinkShown,
+  payPalOffered,
   PARTICIPATION_BLOCKED_FALLBACK,
   type PayEntryInput,
 } from "./pay-entry-gate";
@@ -264,6 +266,48 @@ describe("payEntryBlock", () => {
   });
 });
 
+describe("payEntryBlock: the viewer's flow state only ever lifts a block", () => {
+  // payEntryView relies on this to show 'clear' (and account-level blocks) before that state has loaded.
+  it("never blocks a viewer in the flow whom it lets through as a fresh viewer, nor changes an account-level block", () => {
+    const states: JoinState[] = [
+      "open",
+      "cancelled",
+      "completed",
+      "in_progress",
+      "closed_by_host",
+      "closed_cutoff",
+    ];
+    const participations = [allowed, { allowed: false, reason: "off" }];
+    for (const state of states) {
+      for (const participation of participations) {
+        for (const guardianReady of [true, false]) {
+          const asFresh = payEntryBlock(
+            input({
+              gate: state === "open" ? open : gateFor(state),
+              participation,
+              guardianReady,
+            }),
+          );
+          for (const c of [...inFlowCases, { holdsPlace: true, paymentIn: true, approved: true }]) {
+            const inFlow = payEntryBlock(
+              input({
+                ...c,
+                gate: state === "open" ? open : gateFor(state),
+                participation,
+                guardianReady,
+              }),
+            );
+            if (!asFresh) expect(inFlow).toBeNull();
+            if (asFresh && (asFresh.kind === "guardian" || asFresh.joinState === "cancelled")) {
+              expect(inFlow).toEqual(asFresh);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
 describe("checkStateOf", () => {
   it("prefers data, then an error, else loading", () => {
     expect(checkStateOf({ data: false, isError: true })).toEqual({ state: "ready", value: false });
@@ -280,6 +324,7 @@ describe("payEntryView", () => {
   const ready = (value: boolean) => ({ state: "ready" as const, value });
   const base = {
     ...fresh,
+    flow: "ready" as const,
     gate: open,
     child: readyChild,
     guardian: ready(true),
@@ -314,6 +359,102 @@ describe("payEntryView", () => {
       expect(
         payEntryView({ ...base, child: { state: "loading" }, guardian: { state: "error" } }).kind,
       ).toBe("check_failed");
+    });
+  });
+
+  describe("waits for the viewer's own flow state before a block it could lift", () => {
+    const participationOff = {
+      state: "ready" as const,
+      value: {
+        participation: { allowed: false, reason: "off" },
+        payments: allowed,
+        ageUnknown: false,
+      },
+    };
+
+    it("approved not yet known on closed_by_host: 'checking', not blocked", () => {
+      // The request has not been read yet, so approved is still false.
+      expect(payEntryView({ ...base, gate: gateFor("closed_by_host"), flow: "loading" })).toEqual({
+        kind: "checking",
+      });
+    });
+
+    it("does not trust in-flow values that are not known yet: still 'checking', never clear", () => {
+      for (const c of inFlowCases) {
+        expect(
+          payEntryView({ ...base, ...c, gate: gateFor("closed_by_host"), flow: "loading" }),
+        ).toEqual({ kind: "checking" });
+      }
+    });
+
+    it("waits on every lock a place, a payment or an approval could lift", () => {
+      for (const state of ["in_progress", "closed_cutoff", "completed"] as const) {
+        expect(payEntryView({ ...base, gate: gateFor(state), flow: "loading" })).toEqual({
+          kind: "checking",
+        });
+      }
+      expect(payEntryView({ ...base, child: participationOff, flow: "loading" })).toEqual({
+        kind: "checking",
+      });
+    });
+
+    it("is 'check_failed' when the request, payments or roster read failed", () => {
+      expect(payEntryView({ ...base, gate: gateFor("closed_by_host"), flow: "error" })).toEqual({
+        kind: "check_failed",
+      });
+      expect(payEntryView({ ...base, child: participationOff, flow: "error" })).toEqual({
+        kind: "check_failed",
+      });
+    });
+
+    it("says an account-level block or a cancelled game at once", () => {
+      expect(
+        payEntryView({ ...base, approved: true, gate: gateFor("cancelled"), flow: "loading" }),
+      ).toMatchObject({ kind: "blocked", block: { kind: "locked", joinState: "cancelled" } });
+      expect(
+        payEntryView({
+          ...base,
+          flow: "error",
+          child: {
+            state: "ready",
+            value: {
+              participation: allowed,
+              payments: { allowed: false, level: "blocked", reason: null },
+              ageUnknown: false,
+            },
+          },
+        }),
+      ).toMatchObject({ kind: "blocked", block: { kind: "payments" } });
+      expect(payEntryView({ ...base, guardian: ready(false), flow: "loading" })).toMatchObject({
+        kind: "blocked",
+        block: { kind: "guardian" },
+      });
+    });
+
+    it("is clear on an open game while the flow state loads: those inputs only ever lift a block", () => {
+      expect(payEntryView({ ...base, flow: "loading" })).toEqual({ kind: "clear" });
+      expect(payEntryView({ ...base, flow: "error" })).toEqual({ kind: "clear" });
+    });
+
+    it("decides once the flow state is known", () => {
+      expect(
+        payEntryView({ ...base, approved: true, gate: gateFor("closed_by_host"), flow: "ready" }),
+      ).toEqual({ kind: "clear" });
+      expect(
+        payEntryView({ ...base, gate: gateFor("closed_by_host"), flow: "ready" }),
+      ).toMatchObject({ kind: "blocked", block: { kind: "locked" } });
+    });
+
+    it("never warns above the proof form before the flow state is known", () => {
+      expect(
+        payEntryView({
+          ...base,
+          gate: gateFor("closed_cutoff"),
+          flow: "loading",
+          paymentStarted: true,
+          onProofStep: true,
+        }),
+      ).toEqual({ kind: "checking" });
     });
   });
 
@@ -442,8 +583,51 @@ describe("blockOutranksApproval", () => {
   });
 });
 
+describe("gameTakesNoPayment", () => {
+  it("is a cancelled game for everyone and an ended one for a viewer without a place", () => {
+    expect(gameTakesNoPayment("cancelled", false)).toBe(true);
+    expect(gameTakesNoPayment("cancelled", true)).toBe(true);
+    expect(gameTakesNoPayment("completed", false)).toBe(true);
+    expect(gameTakesNoPayment("completed", true)).toBe(false);
+    for (const state of ["open", "in_progress", "closed_by_host", "closed_cutoff"] as const) {
+      expect(gameTakesNoPayment(state, false)).toBe(false);
+    }
+  });
+
+  it("agrees with payEntryBlock for a host-approved viewer with a payment in", () => {
+    for (const state of ["cancelled", "completed"] as const) {
+      for (const holdsPlace of [false, true]) {
+        const block = payEntryBlock(
+          input({ holdsPlace, paymentIn: true, approved: true, gate: gateFor(state) }),
+        );
+        expect(!!block).toBe(gameTakesNoPayment(state, holdsPlace));
+      }
+    }
+  });
+});
+
+describe("payPalOffered", () => {
+  it("is not offered on an ended or cancelled game (paypal_payment_precondition refuses every player)", () => {
+    expect(payPalOffered("completed")).toBe(false);
+    expect(payPalOffered("cancelled")).toBe(false);
+  });
+
+  it("is offered wherever the server can still take it", () => {
+    for (const state of ["open", "in_progress", "closed_by_host", "closed_cutoff"] as const) {
+      expect(payPalOffered(state)).toBe(true);
+    }
+  });
+
+  it("leaves a rostered player on an ended game a way to pay: the page clears them, PayPal aside", () => {
+    expect(payEntryBlock(input({ holdsPlace: true, gate: gateFor("completed") }))).toBeNull();
+  });
+});
+
 describe("payHostLinkShown (the game page's paid CTA)", () => {
   const link = {
+    joinState: "open" as JoinState,
+    holdsPlace: false,
+    paymentPending: false,
     isPaid: true,
     paymentCleared: false,
     approvalCleared: true,
@@ -463,6 +647,27 @@ describe("payHostLinkShown (the game page's paid CTA)", () => {
 
   it("is the disabled button for a consent-blocked new viewer", () => {
     expect(payHostLinkShown({ ...link, consentBlocksNewJoin: true })).toBe(false);
+  });
+
+  it("is not a link on a cancelled game, even for a host-approved viewer or one on the roster", () => {
+    expect(payHostLinkShown({ ...link, joinState: "cancelled" })).toBe(false);
+    expect(payHostLinkShown({ ...link, joinState: "cancelled", holdsPlace: true })).toBe(false);
+  });
+
+  it("is not a link on an ended game for a viewer without a place", () => {
+    expect(payHostLinkShown({ ...link, joinState: "completed" })).toBe(false);
+    expect(payHostLinkShown({ ...link, joinState: "completed", holdsPlace: true })).toBe(true);
+  });
+
+  it("keeps a pending payment's 'View status' link on a game that takes no payment", () => {
+    expect(payHostLinkShown({ ...link, joinState: "cancelled", paymentPending: true })).toBe(true);
+    expect(payHostLinkShown({ ...link, joinState: "completed", paymentPending: true })).toBe(true);
+  });
+
+  it("keeps the link on a lock the host's approval lifts (the lockedForNewJoin exemptions decide)", () => {
+    for (const joinState of ["in_progress", "closed_by_host", "closed_cutoff"] as const) {
+      expect(payHostLinkShown({ ...link, joinState })).toBe(true);
+    }
   });
 
   it("keeps the existing conditions", () => {

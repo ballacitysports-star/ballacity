@@ -198,7 +198,7 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
-import { payHostLinkShown } from "@/lib/pay-entry-gate";
+import { gameTakesNoPayment, payHostLinkShown } from "@/lib/pay-entry-gate";
 import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
@@ -2817,8 +2817,14 @@ function GameDetail() {
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
+                // An approval does not reopen a cancelled game, or an ended one to a player without a place: the
+                // server refuses them a place and PayPal refuses the payment (gameTakesNoPayment).
                 const lockedForNewJoin =
-                  gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
+                  gate.locked &&
+                  !joined &&
+                  !isPending &&
+                  !isConfirmed &&
+                  (!isApproved || gameTakesNoPayment(gate.joinState, joined));
                 const alreadyInFlow = joined || isPending || isConfirmed;
                 // A parent/guardian must approve this account before a NEW
                 // join; leaving/withdrawing a join made before consent was
@@ -2845,6 +2851,9 @@ function GameDetail() {
                 // consent-blocked account gets the disabled button below instead ("Signup closed", "Parent approval
                 // needed"), as on the button path. The pay page asks again (payEntryView) for a direct visit.
                 const paymentAction = payHostLinkShown({
+                  joinState: gate.joinState,
+                  holdsPlace: joined,
+                  paymentPending: latestSub?.status === "pending",
                   isPaid,
                   paymentCleared,
                   approvalCleared,
@@ -3002,7 +3011,9 @@ function GameDetail() {
                           ? "In progress"
                           : gate.joinState === "completed"
                             ? "Game ended"
-                            : "Signup closed"}
+                            : gate.joinState === "cancelled"
+                              ? "Cancelled"
+                              : "Signup closed"}
                       </>
                     ) : spotsLeft <= 0 ? (
                       <>
