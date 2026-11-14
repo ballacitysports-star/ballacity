@@ -60,15 +60,39 @@ test("signing out clears the session and protected routes redirect back to /auth
 }) => {
   await signInAs(page, "player");
   await page.goto("/settings", { waitUntil: "domcontentloaded" });
+
+  // Sign out ends with a full page load of /auth (settings.tsx sets
+  // window.location.href once the session is cleared). The auth store's
+  // SIGNED_OUT gate can push /auth client-side first, so the URL alone says
+  // nothing about whether that load is still to come; navigating while it is
+  // pending aborts one of the two (net::ERR_ABORTED). So wait for that document
+  // request and for the new document it delivers: a client-side route change
+  // fires no DOMContentLoaded, and /settings already fired its own.
+  const signedOutRequest = page.waitForRequest(
+    (req) =>
+      req.isNavigationRequest() &&
+      req.frame() === page.mainFrame() &&
+      new URL(req.url()).pathname === "/auth",
+    { timeout: 20_000 },
+  );
+  const signedOutDocument = page.waitForEvent("domcontentloaded", { timeout: 20_000 });
   await page.getByRole("button", { name: /^Sign out$/ }).click();
+  await signedOutRequest;
+  await signedOutDocument;
+  expect(new URL(page.url()).pathname).toBe("/auth");
 
-  await page.waitForURL(/\/(auth)?(\?|#|$)/, { timeout: 20_000 }).catch(() => {});
-
-  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  // A protected page sends the signed-out visitor to /auth and back again
+  // after sign-in. (/feed is no longer one: signed out it is a public sample
+  // preview, see SIGNED_OUT_PREVIEW_TABS in src/lib/public-paths.ts.)
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/auth(\?|$)/, { timeout: 20_000 });
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
+  expect(url.searchParams.get("next")).toMatch(/^\/settings(?:\?|$)/);
+
+  // And a tab page no longer shows the member's feed: the session is gone.
+  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Sample preview.")).toBeVisible({ timeout: 20_000 });
 });
 
 test("two fixture accounts hold independent sessions side by side", async ({ browser }) => {
