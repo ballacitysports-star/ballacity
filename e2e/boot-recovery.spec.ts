@@ -91,21 +91,44 @@ test("a silently stalled startup module reloads once, then becomes actionable", 
   expect(documentRequests, "a silent startup stall must reload at most once").toBe(2);
 });
 
+/**
+ * How long the slow-boot test holds back the client entry module: most of the
+ * watchdog's budget, but short of it, so the stall alone can never trip it.
+ * The rest of the boot (the dev server's module graph, then hydration) then
+ * finishes near or past the budget; on a cold dev server it runs well past it,
+ * where only the watchdog's progress checks keep the page from being reloaded.
+ */
+const SLOW_ENTRY_STALL_MS = BOOT_TIMEOUT_MS - 2_000;
+
+/**
+ * What a healthy boot may take once the entry module arrives, on a slow CI
+ * runner against the development server. The plain boot test above allows the
+ * same 30s.
+ */
+const COLD_BOOT_ALLOWANCE_MS = 30_000;
+
 test("slow client boot is not interrupted by an automatic reload", async ({ page }) => {
+  const bootDeadline = SLOW_ENTRY_STALL_MS + COLD_BOOT_ALLOWANCE_MS;
+  test.setTimeout(bootDeadline + 30_000);
   await enableBootWatchdog(page);
   let documentRequests = 0;
   page.on("request", (request) => {
     if (request.isNavigationRequest()) documentRequests += 1;
   });
 
+  let entryStalled = false;
   await page.route("**/virtual:tanstack-start-dev-client-entry", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 10_000));
+    entryStalled = true;
+    await new Promise((resolve) => setTimeout(resolve, SLOW_ENTRY_STALL_MS));
     await route.continue();
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /ballaCity/i }).first()).toBeVisible({
-    timeout: 18_000,
-  });
+  await expect
+    .poll(() => page.evaluate(() => window.__openrun_booted === true), { timeout: bootDeadline })
+    .toBe(true);
+  expect(entryStalled, "the client entry module must have been held back").toBe(true);
+  // Booted, so the watchdog has stopped: any reload it made has already happened.
   expect(documentRequests, "a slow but healthy startup must not be reloaded").toBe(1);
+  await expect(page.getByRole("heading", { name: /ballaCity/i }).first()).toBeVisible();
 });
