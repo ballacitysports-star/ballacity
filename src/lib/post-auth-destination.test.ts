@@ -159,3 +159,58 @@ describe("postAuthDestination with a setup chosen at sign-up", () => {
     );
   });
 });
+
+/**
+ * Regression: a returning member who tapped Google/Apple on `/auth?next=/trainers`
+ * comes back to `/auth` without the query. The button stashed the page
+ * (`openrun:oauth-next`) and the root's SIGNED_IN listener navigates there, but
+ * `/auth` ignored the stash and its full-page redirect sent the member to the feed.
+ */
+describe("postAuthDestination with a page stashed before a Google/Apple round trip", () => {
+  const base = { needsAccountType: false, lastVisited: "/games/42", referrer: "/players" };
+
+  it("returns a returning member to the stashed page when the return dropped next", () => {
+    expect(postAuthDestination({ ...base, next: undefined, savedNext: "/trainers?src=x" })).toBe(
+      "/trainers?src=x",
+    );
+  });
+
+  it("puts the stashed page ahead of a setup chosen at sign-up, like next", () => {
+    expect(
+      postAuthDestination({
+        ...base,
+        next: undefined,
+        savedNext: "/trainers",
+        startDestination: "/orgs/create",
+      }),
+    ).toBe("/trainers");
+  });
+
+  it("lets an explicit next win over the stash", () => {
+    expect(postAuthDestination({ ...base, next: "/games/7", savedNext: "/trainers" })).toBe(
+      "/games/7",
+    );
+  });
+
+  it("still sends an account with no type to the picker first", () => {
+    expect(
+      postAuthDestination({
+        ...base,
+        needsAccountType: true,
+        next: undefined,
+        savedNext: "/trainers",
+      }),
+    ).toBe(ACCOUNT_TYPE_ROUTE);
+  });
+
+  it("honours a stashed account-setup escape for an account with no type", () => {
+    expect(
+      postAuthDestination({
+        ...base,
+        needsAccountType: true,
+        next: undefined,
+        savedNext: "/parent/consent/abc123",
+      }),
+    ).toBe("/parent/consent/abc123");
+  });
+});
