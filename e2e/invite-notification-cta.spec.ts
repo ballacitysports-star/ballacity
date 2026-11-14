@@ -52,8 +52,16 @@ test("tapping an invite notification opens the game with preserved invite params
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  // Free, no-approval settings, so the copy does not depend on the seeded data
-  // of whichever Supabase project the run targets.
+  // The banner copy below comes from these mocked settings, not from g1's real
+  // row, on purpose. This spec checks that a tapped invite lands on the game
+  // with its params and that the banner names the CTA the settings call for.
+  // g1's real settings row lives in a shared backend (the hosted sandbox in
+  // CI) where other specs and seeds can change its fee or approval step, which
+  // would flip the expected label without anything being wrong with invites.
+  // g1's real row is still read end to end by the realtime join specs
+  // (join-cross-device-*, join-realtime-cross-views), which tap the same
+  // "Join Run" CTA without mocking settings.
+  // Free, no-approval settings → the CTA is "Join Run".
   await page.route(
     (url) => String(url).includes("/rest/v1/game_payment_settings"),
     async (route) => {

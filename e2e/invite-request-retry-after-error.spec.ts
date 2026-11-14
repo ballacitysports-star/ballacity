@@ -181,19 +181,23 @@ test("failed first join request can be retried and lands on pending UI with invi
     2,
   );
 
-  // Both POSTs carried the right identifiers. The client no longer sends a
-  // status: the column defaults to 'pending' in the database (as in
-  // invite-request-happy-path / invite-request-to-join), so a status, if sent,
-  // must still be 'pending'. The retry is the same request, so it reuses the
-  // first attempt's idempotency key.
+  // Both POSTs carried the right identifiers, and no status: the server sets
+  // every new request to 'pending' whatever is sent (validate_join_request on
+  // INSERT), and createJoinRequest in src/lib/payments.ts sends none. Pinning
+  // that here catches the client starting to send one again.
+  //
+  // Both attempts use the per-game idempotency key `join:<game_id>`, which is
+  // what makes the retry safe: had the first insert reached the database, the
+  // retry would hit the (player_id, idempotency_key) unique index and get the
+  // existing row back instead of a second request. A key built per attempt
+  // (a random id, a timestamp) would break that and fail here.
   for (const p of joinPosts) {
     expect(p.body?.game_id).toBe(GAME_ID);
     expect(p.body?.host_id).toBe(FAKE_HOST_ID);
     expect(p.body?.player_id).toBe(userId);
-    if (p.body?.status !== undefined) expect(p.body.status).toBe("pending");
+    expect(p.body?.status, "the client must not send a join request status").toBeUndefined();
+    expect(p.body?.idempotency_key).toBe(`join:${GAME_ID}`);
   }
-  expect(joinPosts[0]!.body?.idempotency_key).toBeTruthy();
-  expect(joinPosts[1]!.body?.idempotency_key).toBe(joinPosts[0]!.body?.idempotency_key);
 
   // Invite params preserved on the final URL.
   const finalUrl = new URL(page.url());

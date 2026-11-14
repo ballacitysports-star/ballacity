@@ -9,13 +9,15 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  *
  * Flow:
  *   1. Land on /games/$gameId with a well-formed, non-expired invite.
- *   2. Delay the POST /rest/v1/join_requests response by ~1.5s.
+ *   2. Hold the POST /rest/v1/join_requests response until the test releases
+ *      it, so every in-flight check runs while the request is really open
+ *      (not inside a fixed delay that a slow runner could outlast).
  *   3. Click the CTA, then click it again immediately (before the first
  *      response resolves).
- *   4. Assert only ONE POST reaches the network.
- *   5. After the response resolves, the pending UI must render. (The CTA
- *      flips to "Request pending" optimistically on the tap and stays
- *      disabled while the request is in flight.)
+ *   4. While it is held: the CTA reads "Request pending" (optimistic) and is
+ *      disabled, and a third tap sends nothing.
+ *   5. Release the response: the pending UI renders, and only ONE POST ever
+ *      reached the network.
  *
  * Auto-skips without a restored Supabase session.
  */
@@ -32,7 +34,6 @@ const GAME_ID = "g2";
 const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const FUTURE_MS = Date.now() + 24 * 60 * 60 * 1000;
 const INVITE_URL = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${FUTURE_MS}`;
-const POST_DELAY_MS = 1_500;
 
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -95,6 +96,12 @@ test("double-tapping Request to join while the first POST is in flight blocks th
 
   const joinPosts: Array<{ body: any; at: number }> = [];
   let firstPostResolvedAt = 0;
+  // The test opens this gate once its in-flight checks are done; until then
+  // every join_requests POST stays unanswered.
+  let releasePost!: () => void;
+  const postGate = new Promise<void>((resolve) => {
+    releasePost = resolve;
+  });
   const pendingRow = () => ({
     id: "mock-join-id",
     game_id: GAME_ID,
@@ -128,8 +135,8 @@ test("double-tapping Request to join while the first POST is in flight blocks th
           /* ignore */
         }
         joinPosts.push({ body: parsed, at: Date.now() });
-        // Hold the response so the second tap happens while the first is in flight.
-        await new Promise((r) => setTimeout(r, POST_DELAY_MS));
+        // Hold the response so the later taps happen while the first is in flight.
+        await postGate;
         firstPostResolvedAt = Date.now();
         await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
@@ -167,8 +174,9 @@ test("double-tapping Request to join while the first POST is in flight blocks th
     .poll(() => joinPosts.length, { timeout: 5_000, message: "first POST never fired" })
     .toBeGreaterThanOrEqual(1);
 
-  // The in-flight response must not have resolved yet.
-  expect(firstPostResolvedAt, "first POST resolved before we could double-tap").toBe(0);
+  // The response is held until released below, so these checks all run while
+  // the request is in flight.
+  expect(firstPostResolvedAt).toBe(0);
   // The CTA already reads "Request pending" (optimistic) but stays disabled
   // until the server answers, so a tap now can neither re-send nor cancel.
   await expect(cta).toHaveAccessibleName(/^request pending/i);
@@ -179,11 +187,14 @@ test("double-tapping Request to join while the first POST is in flight blocks th
     /* ignore */
   });
 
-  // Wait for the first POST to resolve; the pending UI must still be shown
-  // with the server's row (the page flips to it optimistically on the tap).
-  await expect
-    .poll(() => firstPostResolvedAt, { timeout: POST_DELAY_MS + 5_000 })
-    .toBeGreaterThan(0);
+  // Still the one held POST after the extra taps.
+  await page.waitForTimeout(500);
+  expect(joinPosts.length, "a tap while in flight sent another join_requests POST").toBe(1);
+
+  // Release the response; the pending UI must still be shown with the
+  // server's row (the page flips to it optimistically on the tap).
+  releasePost();
+  await expect.poll(() => firstPostResolvedAt, { timeout: 5_000 }).toBeGreaterThan(0);
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 5_000,
   });
