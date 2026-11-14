@@ -14,6 +14,9 @@ const server = {
   roster: [] as string[],
   insertError: null as { code?: string; message: string } | null,
   inserted: [] as unknown[],
+  // When set, the roster read waits for it, and answers with the roster as it
+  // was when the read started (as a real query would).
+  rosterGate: null as Promise<void> | null,
 };
 
 const toastError = vi.fn();
@@ -21,15 +24,22 @@ const toastError = vi.fn();
 function table() {
   return {
     select: () => ({
-      eq: async () => ({
-        data: server.roster.map((game_id) => ({ id: `row-${game_id}`, game_id })),
-        error: null,
+      eq: async () => {
+        const data = server.roster.map((game_id) => ({ id: `row-${game_id}`, game_id }));
+        if (server.rosterGate) await server.rosterGate;
+        return { data, error: null };
+      },
+    }),
+    insert: (row: { game_id: string }) => ({
+      select: () => ({
+        single: async () => {
+          server.inserted.push(row);
+          return server.insertError
+            ? { data: null, error: server.insertError }
+            : { data: { id: `row-${row.game_id}` }, error: null };
+        },
       }),
     }),
-    insert: async (row: unknown) => {
-      server.inserted.push(row);
-      return { error: server.insertError };
-    },
     delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
   };
 }
@@ -78,6 +88,7 @@ beforeEach(() => {
   server.roster = [];
   server.insertError = null;
   server.inserted = [];
+  server.rosterGate = null;
   toastError.mockReset();
   realtime.handlers = [];
   realtime.authListener = null;
@@ -198,10 +209,48 @@ describe("realtime roster changes from another device", () => {
     expect(result.current).toEqual([]);
   });
 
-  it("ignores another player's row being deleted", async () => {
-    // DELETE events are not filtered by user_id, so other players' leaves arrive too.
+  it("ignores a DELETE for a row it does not know", async () => {
     const { result, fire } = await mountWithRealtime(["g1"]);
-    fire({ eventType: "DELETE", old: { id: "someone-elses-row" }, new: {} });
+    fire({ eventType: "DELETE", old: { id: "unknown-row" }, new: {} });
     expect(result.current).toEqual(["g1"]);
+  });
+
+  it("drops a game joined here and left on another device, with no INSERT echo", async () => {
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(realtime.handlers).toHaveLength(1));
+    await act(async () => {
+      await store.joinGame("g5");
+    });
+    expect(result.current).toEqual(["g5"]);
+    // The channel missed the INSERT; the leave elsewhere names only the row id.
+    act(() => realtime.handlers[0]!({ eventType: "DELETE", old: { id: "row-g5" }, new: {} }));
+    expect(result.current).toEqual([]);
+  });
+
+  it("keeps what realtime taught it while an older roster read was out", async () => {
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    server.roster = [];
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(realtime.handlers).toHaveLength(1));
+    // Joined on another device after the read started: the read will not have it.
+    act(() =>
+      realtime.handlers[0]!({
+        eventType: "INSERT",
+        old: {},
+        new: { id: "row-late", game_id: "g7", user_id: "u1" },
+      }),
+    );
+    expect(result.current).toEqual(["g7"]);
+    await act(async () => {
+      release();
+      await server.rosterGate;
+    });
+    // The older answer neither takes the game away nor forgets its row.
+    await waitFor(() => expect(result.current).toEqual(["g7"]));
+    act(() => realtime.handlers[0]!({ eventType: "DELETE", old: { id: "row-late" }, new: {} }));
+    expect(result.current).toEqual([]);
   });
 });

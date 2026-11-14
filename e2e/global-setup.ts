@@ -243,7 +243,26 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       }
     }
 
-    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+    const accountIds = new Map<string, string | null>();
+    for (const acct of TEST_ACCOUNTS) accountIds.set(acct.key, await upsertAccount(acct));
+
+    // player-orgs-realtime opens player2's profile to members for the length of
+    // the test and puts it back in a finally. A run killed in between would
+    // leave it open on the shared fixture for good, so put it back every run:
+    // 'private' is what the account was created with (handle_new_user stores
+    // default_profile_visibility_for, and the cohort is unknown until the
+    // birthday above exists).
+    const player2Id = accountIds.get("player2");
+    if (player2Id) {
+      const { error: visErr } = await admin
+        .from("privacy_preferences")
+        .upsert({ user_id: player2Id, profile_visibility: "private" }, { onConflict: "user_id" });
+      if (visErr) {
+        console.warn(
+          `[e2e global-setup] Could not reset player2's profile visibility: ${visErr.message}`,
+        );
+      }
+    }
 
     // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
     // hardcodes as a lightweight fixture game.
@@ -276,6 +295,13 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // game the realtime specs really join and leave, so seed what its roster
         // holds. A fixed 8 over an empty roster made the first join recount to
         // 1 and the "N spots" pill jump from 2 to 9 instead of dropping by one.
+        //
+        // g1 starts a day out. Leaving inside a game's cancel cutoff (2 hours
+        // by default) records a late cancellation against the player, and the
+        // realtime specs leave g1 on every run: at 3 hours out, any spec that
+        // ran more than an hour after this seed recorded one against the shared
+        // fixture player. leaveFreeRun (e2e/helpers/realtime-join.ts) fails if
+        // it is ever offered only "Leave anyway". No spec reads g1's start time.
         const { count: g1Roster, error: g1CountErr } = await admin
           .from("game_participants")
           .select("id", { count: "exact", head: true })
@@ -291,7 +317,7 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
             host_id: gamesHostId,
             sport: "Basketball",
             title: "Friday Night Run · 5v5 Full Court",
-            date: new Date(now + 3 * 3600_000).toISOString(),
+            date: new Date(now + 24 * 3600_000).toISOString(),
             duration: "120 min",
             location: "Tompkins Square Courts",
             neighborhood: "East Village",

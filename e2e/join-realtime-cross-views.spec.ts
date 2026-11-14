@@ -26,7 +26,6 @@ test.skip(
 
 // Free, no-approval sample game (see src/lib/sample-data.ts → g1).
 const GAME_ID = "g1";
-const GAME_TITLE_RE = /./; // matched loosely; we assert by role and badges
 
 async function restoreSession(ctx: BrowserContext, page: Page) {
   if (COOKIES_JSON) {
@@ -98,10 +97,8 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
       .filter({ has: feedPage.getByRole("heading", { level: 3 }) })
       .first();
     await expect(feedCard).toBeVisible({ timeout: 15_000 });
-    const feedCardCount = await feedCard.count();
-    if (feedCardCount > 0) {
-      await expect(feedCard).not.toContainText(/^Joined$/i);
-    }
+    // The badge is its own element reading exactly "Joined".
+    await expect(feedCard.getByText(/^Joined$/)).toHaveCount(0);
 
     // Profile "Upcoming" list shouldn't include the game yet.
     const profileCardBefore = profilePage.locator(`a[href*="/games/${GAME_ID}"]`);
@@ -113,9 +110,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
 
     // --- Realtime propagation to other tabs ---
     // Feed: the "Joined" badge is rendered inside the card image overlay.
-    if (feedCardCount > 0) {
-      await expect(feedCard.getByText(/^Joined$/).first()).toBeVisible({ timeout: 15_000 });
-    }
+    await expect(feedCard.getByText(/^Joined$/).first()).toBeVisible({ timeout: 15_000 });
 
     // Profile: the game must appear in the upcoming list via realtime.
     await expect(profilePage.locator(`a[href*="/games/${GAME_ID}"]`).first()).toBeVisible({
@@ -132,9 +127,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
       })
       .toBe(0);
 
-    if (feedCardCount > 0) {
-      await expect(feedCard.getByText(/^Joined$/)).toHaveCount(0, { timeout: 15_000 });
-    }
+    await expect(feedCard.getByText(/^Joined$/)).toHaveCount(0, { timeout: 15_000 });
   } finally {
     await ctx.close();
   }

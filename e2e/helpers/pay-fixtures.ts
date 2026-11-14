@@ -10,9 +10,17 @@
  *    Specs that answered `hosted_games` with `[]` ("no hosted game overrides")
  *    therefore rendered "Game not found." and never reached the pay screen;
  *    the ones that left it unanswered depended on the row global-setup seeds
- *    being present and fast. `serveFixtureGame` answers the lookup with a row
- *    the spec owns, hosted by the same mocked host as the spec's payment
- *    settings, so no spec depends on what data exists where it runs.
+ *    being present and fast. `serveFixtureGame` answers the game's REST reads
+ *    with a row the spec owns, hosted by the same mocked host as the spec's
+ *    payment settings, so what the pay screen shows for the game does not
+ *    depend on the g2 row where it runs.
+ *
+ *    That is all it isolates. Some reads still reach the real backend for "g2":
+ *    the PayPal checkout config (a server function, which runs on the server
+ *    where page.route cannot see it), the `get_game_refund_terms` RPC unless a
+ *    spec answers it, and, in specs that do not block realtime, the live
+ *    `hosted_games` channel, which would patch the store if g2 really changed.
+ *    None of them decides what these specs assert today.
  *
  * 2. Blocking realtime. `page.route` only sees HTTP requests; Playwright never
  *    passes a WebSocket through it (WebSockets have their own
@@ -58,17 +66,34 @@ export function payFixtureGameRow(
   };
 }
 
+/** Query parameters that shape a PostgREST read rather than filter it. */
+const NON_FILTER_PARAMS = new Set(["select", "order", "limit", "offset"]);
+
 /**
- * Answer `hosted_games` reads with `row`: the by-id lookup the pay page makes
- * (`id=eq.<id>`), and the list the hosted-games store loads. A by-id lookup of
- * any other game gets no row. Install before the page loads.
+ * Which `hosted_games` GETs get `row` back: the by-id lookup the game and pay
+ * pages make (`id=eq.<id>`), and the hosted-games store's list of every game
+ * (`hidden_at=is.null` and no other filter; src/lib/hosted-games-store.ts).
+ * Any other read (another game's id, an organization's games, the hidden list)
+ * gets none, so the row cannot turn up where the real query would not return it.
+ */
+export function fixtureGameAnswers(url: string, id: string): boolean {
+  const params = new URL(url).searchParams;
+  const filters = [...params.keys()].filter((k) => !NON_FILTER_PARAMS.has(k));
+  if (filters.length !== 1) return false;
+  if (filters[0] === "id") return params.getAll("id").every((v) => v === `eq.${id}`);
+  return filters[0] === "hidden_at" && params.getAll("hidden_at").join() === "is.null";
+}
+
+/**
+ * Answer `hosted_games` reads with `row` where the real query would return
+ * it (see fixtureGameAnswers) and with no rows otherwise. Install before the
+ * page loads.
  */
 export async function serveFixtureGame(page: Page, row: Record<string, unknown>): Promise<void> {
   const id = String(row.id);
   await page.route(/\/rest\/v1\/hosted_games(\?|$)/, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
-    const idFilter = new URL(route.request().url()).searchParams.get("id");
-    const rows = idFilter && idFilter !== `eq.${id}` ? [] : [row];
+    const rows = fixtureGameAnswers(route.request().url(), id) ? [row] : [];
     await route.fulfill({
       status: 200,
       contentType: "application/json",

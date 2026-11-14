@@ -12,7 +12,7 @@ import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/lib/safe-next-path";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
-import { clearOAuthNext, readOAuthNext, stashOAuthNext } from "@/lib/oauth-next";
+import { oauthNextForPage } from "@/lib/oauth-next";
 import { validateCredentials } from "@/lib/auth-credentials";
 import { RolePicker } from "@/components/RolePicker";
 import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
@@ -185,9 +185,13 @@ function AuthPage() {
   // another. Once one of them has used the hint the rest stand down: a later one
   // sees no hint and would send the member to the feed instead of their setup.
   const usedStartHint = useRef(false);
-  // The page stashed by the Google/Apple button, once one call below has taken it
-  // out of storage: the calls for the same sign-in must all agree on it.
-  const takenOAuthNext = useRef<string | undefined>(undefined);
+  // The page stashed by the Google/Apple button, read once for this page (see
+  // oauthNextForPage): the calls below for one sign-in must all agree on it, even
+  // when the root's sign-in listener removes it from storage in between.
+  const oauthNext = useRef<ReturnType<typeof oauthNextForPage> | null>(null);
+  if (oauthNext.current === null && typeof window !== "undefined") {
+    oauthNext.current = oauthNextForPage();
+  }
 
   const goPostAuth = async (currentUser: User | null | undefined = user) => {
     if (usedStartHint.current) return;
@@ -208,9 +212,9 @@ function AuthPage() {
       /* ignore */
     }
 
-    // The return from Google/Apple can land here without `next`; the button
-    // stashed it before leaving.
-    const savedNext = takenOAuthNext.current ?? readOAuthNext();
+    // A page stashed before a Google/Apple round trip stands in for a missing
+    // `next` (see postAuthDestination), so /auth agrees with the root listener.
+    const savedNext = oauthNext.current?.get();
     const startSetup = startSetupOf(currentUser);
     const startDestination = startSetup ? hrefForSetup(startSetup) : undefined;
     const needsType = await needsAccountType(currentUser);
@@ -225,10 +229,7 @@ function AuthPage() {
     // Used now, so it must not send a later sign-in in this tab there. An
     // account that still needs a type (or that the check could not answer for)
     // keeps it stashed for after the picker.
-    if (savedNext && dest === savedNext && needsType === false) {
-      takenOAuthNext.current = savedNext;
-      clearOAuthNext();
-    }
+    if (savedNext && dest === savedNext && needsType === false) oauthNext.current?.used();
     // Once the hint is what sends them on it has done its job. Wait for that, or
     // the full-page navigation below can cancel the update and send them again.
     if (startDestination && dest === startDestination) {
@@ -475,7 +476,7 @@ function AuthPage() {
     // Stash the intended destination so we can navigate to it AFTER the
     // session is confirmed. `redirect_uri` MUST stay a public same-origin URL —
     // passing protected routes to Google/Apple causes vendor rejection.
-    stashOAuthNext(next);
+    oauthNext.current?.stash(next);
     try {
       window.sessionStorage.setItem("openrun:oauth-provider", provider);
     } catch {

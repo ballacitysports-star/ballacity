@@ -87,6 +87,9 @@ test.describe("OAuth return with missing provider metadata", () => {
         // Raise the OAuth return only once the app shell (and its sign-in
         // listener) is up; the gate holds the member at the picker meanwhile.
         await expectAccountTypePickerInPlace(page);
+        // Still on "/": only the listener's redirect may take the member to the
+        // picker's own page, so the check below is about the listener.
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
         // No `app_metadata.provider` on the session the listener sees.
         await emitSignedIn(page, { provider: null });
 

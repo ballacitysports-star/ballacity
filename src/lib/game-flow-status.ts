@@ -165,7 +165,9 @@ async function fetchFlowInputs(gameId: string, userId: string) {
     })(),
   ]);
   // Ids of the viewer's own rows for this game, so a realtime DELETE (which
-  // carries only the row id) can be recognised as one of them.
+  // carries only the row id) can be recognised as one of them. Only
+  // game_participants DELETEs reach useMyFlowStatus's filtered channel, though:
+  // see the note there.
   const rowIds = [joinRequest?.id, participantRowId, ...submissions.map((s) => s.id)].filter(
     (id): id is string => typeof id === "string",
   );
@@ -215,6 +217,20 @@ let flowChannelSeq = 0;
  * Live-derived join → payment flow status for the signed-in viewer.
  * Refetches whenever a relevant realtime event fires on join_requests,
  * payment_submissions, or game_participants for this (game, user).
+ *
+ * What the filtered channel actually delivers, per table: INSERTs and UPDATEs
+ * on all three (they carry the new row, which the filter is tested against).
+ * DELETEs only on game_participants, which has REPLICA IDENTITY FULL, so
+ * Realtime can test the user_id filter against the old row; it hands the
+ * DELETE over as `{ id }` only (row-level security), hence the id fallback in
+ * flowChangeConcernsGame. join_requests and payment_submissions keep the
+ * default replica identity: their DELETE's old row has no player_id, so the
+ * player_id filter never matches and those DELETEs never arrive (seen on the
+ * local stack for game_participants and join_requests; payment_submissions has
+ * the same replica identity). A request withdrawn, or a submission deleted, on
+ * another device or by the host therefore does not update an open page until
+ * something else makes it re-read (a game_participants change, the page's own
+ * refreshMyFlowStatus after this device's leave or withdrawal, or a remount).
  */
 export function useMyFlowStatus(gameId: string | undefined): {
   status: PlayerFlowStatus;

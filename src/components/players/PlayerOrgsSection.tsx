@@ -23,10 +23,14 @@ type PlayerOrgRow = {
  * the same organization, so for most visitors this renders nothing.
  *
  * Kept live over realtime. A new membership arrives through the user_id
- * filter. A removed one does not: Realtime cannot apply a filter to a DELETE
- * on this table (its old row carries only the primary key), so a filtered
- * subscription never hears about it and the chip stayed until a reload. Deletes
- * are therefore watched unfiltered and matched against the rows shown.
+ * filter. A removed one does not: trainer_org_members has the default replica
+ * identity, so the old row Postgres logs for a DELETE holds only the primary
+ * key, Realtime has no user_id to test the filter against, and the filtered
+ * subscription never receives the DELETE (seen on the local stack; the chip
+ * stayed until a reload). game_participants differs: it has REPLICA IDENTITY
+ * FULL, so its filtered DELETEs do arrive. Here deletes are watched unfiltered
+ * instead, which delivers every membership's DELETE as `{ id }` only (row-level
+ * security strips the rest), and matched against the rows shown.
  */
 export function PlayerOrgsSection({ userId }: { userId: string }) {
   const [rows, setRows] = useState<PlayerOrgRow[]>([]);
