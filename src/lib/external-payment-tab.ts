@@ -56,10 +56,26 @@ function followWithoutReferrer(doc: LinkDocument, url: string) {
   a.remove();
 }
 
+/**
+ * Only web links may be followed. For an "other" method the link is whatever
+ * the host typed, and a `javascript:` or `data:` URL would run with this site's
+ * origin (the empty tab shares it, and so does this one on the fallback path),
+ * where the player's session lives.
+ */
+export function isSafePaymentLink(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export function openExternalPaymentTab(
   url: string,
   win: Opener = window as unknown as Opener,
-): "new-tab" | "this-tab" {
+): "new-tab" | "this-tab" | "refused" {
+  if (!isSafePaymentLink(url)) return "refused";
   // An empty tab: the payment link must not load before opener is cut.
   const tab = win.open("", "_blank");
   if (!tab) {

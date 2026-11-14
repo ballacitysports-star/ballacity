@@ -151,7 +151,21 @@ test("join waits for the Before you join acknowledgment, and Cancel joins nothin
     (u) => isTable(u, "game_participants"),
     async (route: PWRoute) => {
       const req = route.request();
-      if (req.method() === "GET") return route.fallback();
+      if (req.method() === "GET") {
+        // The viewer must start off the roster wherever this runs: on a shared
+        // sandbox a crashed earlier run could have left them on g2. Pass the
+        // real roster through without the viewer's own row.
+        const res = await route.fetch();
+        let rows: unknown = null;
+        try {
+          rows = await res.json();
+        } catch {
+          return route.fulfill({ response: res });
+        }
+        const notViewer = (r: unknown) => (r as { user_id?: string } | null)?.user_id !== userId;
+        const body = Array.isArray(rows) ? rows.filter(notViewer) : notViewer(rows) ? rows : null;
+        return route.fulfill({ response: res, json: body });
+      }
       joinWrites.push({
         table: "game_participants",
         method: req.method(),

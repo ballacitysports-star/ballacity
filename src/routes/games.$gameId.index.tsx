@@ -424,10 +424,11 @@ function GameDetail() {
   // Risk-acknowledgment gate state (physical activity safety).
   const [riskAckOpen, setRiskAckOpen] = useState(false);
   const pendingJoinPositionRef = useRef<string | null>(null);
-  const { data: riskAckVersion, refetch: refetchRiskAck } = useSafetyAck(
-    gameId,
-    "participant_risk",
-  );
+  const {
+    data: riskAckVersion,
+    refetch: refetchRiskAck,
+    isPending: riskAckReadPending,
+  } = useSafetyAck(gameId, "participant_risk");
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -1304,10 +1305,12 @@ function GameDetail() {
         acknowledgedVersion,
       });
     let needsRiskAck = needsAck(riskAckVersion ?? null);
-    if (needsRiskAck && riskAckVersion === undefined) {
+    if (needsRiskAck && riskAckVersion === undefined && riskAckReadPending) {
       // The acknowledgment read has not answered yet (a tap right after the
       // page opened). Wait for it instead of asking a player who already
-      // acknowledged; if it fails, the dialog shows as before.
+      // acknowledged; if it fails, the dialog shows as before. A read that has
+      // already failed is not retried here (its retries would hold the tap for
+      // seconds): the dialog shows at once.
       setProcessing(true);
       try {
         const { data } = await refetchRiskAck({ cancelRefetch: false });

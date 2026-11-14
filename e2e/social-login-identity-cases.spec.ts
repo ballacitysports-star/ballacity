@@ -126,8 +126,12 @@ async function signIn(
   page: Page,
   opts: { pending?: string | null; next: string; provider?: "google" | "apple" | null },
 ) {
-  await page.goto("/auth", { waitUntil: "domcontentloaded" });
+  // Prime the stash before /auth mounts: /auth reads openrun:oauth-next once,
+  // on its first render, so writing it after /auth has loaded would race that
+  // read. sessionStorage carries over to /auth in the same tab.
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await primeStorage(page, opts);
+  await page.goto("/auth", { waitUntil: "domcontentloaded" });
   await page.getByPlaceholder("Email").fill(player.email);
   await page.getByPlaceholder("Password").fill(player.password);
   await page.getByRole("button", { name: /^Sign in$/ }).click();
@@ -152,7 +156,6 @@ async function readState(page: Page) {
     }
   }
 }
-
 
 test.describe("social login: identity-present vs identity-missing", () => {
   for (const provider of ["google", "apple"] as const) {
@@ -242,7 +245,6 @@ test.describe("social login: identity-present vs identity-missing", () => {
     }
   });
 
-
   for (const provider of ["google", "apple"] as const) {
     test(`identity-present (${provider}), onboarding complete: saved next path is consumed`, async ({
       browser,
@@ -263,14 +265,11 @@ test.describe("social login: identity-present vs identity-missing", () => {
         await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
         // Consumed on success so a later sign-in doesn't re-navigate.
-        await expect
-          .poll(async () => (await readState(page)).next, { timeout: 10_000 })
-          .toBeNull();
+        await expect.poll(async () => (await readState(page)).next, { timeout: 10_000 }).toBeNull();
         expect((await readState(page)).provider).toBeNull();
       } finally {
         await context.close();
       }
     });
   }
-
 });

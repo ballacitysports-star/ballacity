@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { openExternalPaymentTab } from "./external-payment-tab";
+import { isSafePaymentLink, openExternalPaymentTab } from "./external-payment-tab";
 
 const URL_ = "https://venmo.com/?txn=pay&recipients=e2e-host&amount=15";
 
@@ -121,6 +121,38 @@ describe("openExternalPaymentTab", () => {
 
     expect(openExternalPaymentTab(URL_, win)).toBe("new-tab");
     expect(tab.location.replace).toHaveBeenCalledWith(URL_);
+    expect(clickedHere).toEqual([]);
+  });
+});
+
+describe("isSafePaymentLink", () => {
+  it("accepts web links", () => {
+    expect(isSafePaymentLink(URL_)).toBe(true);
+    expect(isSafePaymentLink("http://cash.app/$host")).toBe(true);
+  });
+
+  it("refuses script, data and malformed links a host could type", () => {
+    for (const bad of [
+      "javascript:alert(document.cookie)",
+      " JavaScript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+      "venmo.com/host",
+      "",
+    ]) {
+      expect(isSafePaymentLink(bad), bad).toBe(false);
+    }
+  });
+
+  it("opens nothing, here or in a new tab, for a refused link", () => {
+    const { tab, clicked } = fakeTab();
+    const { win, clickedHere } = fakeWindow(tab);
+
+    expect(openExternalPaymentTab("javascript:alert(1)", win)).toBe("refused");
+
+    expect(win.open).not.toHaveBeenCalled();
+    expect(clicked).toEqual([]);
     expect(clickedHere).toEqual([]);
   });
 });

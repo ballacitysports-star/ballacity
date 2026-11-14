@@ -125,7 +125,9 @@ function launchExternalPayment(url: string, copyText?: string | null) {
       .then(() => toast.success(`Copied ${copyText}`))
       .catch(() => {});
   }
-  openExternalPaymentTab(url);
+  if (openExternalPaymentTab(url) === "refused") {
+    toast.error("This payment link can't be opened. Ask the host for another way to pay.");
+  }
 }
 
 function feeLabel(fee: number | null | undefined) {
