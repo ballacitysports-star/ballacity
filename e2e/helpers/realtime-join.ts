@@ -117,7 +117,12 @@ async function onRosterInDb(page: Page, gameId: string): Promise<boolean> {
  * label before its DELETE lands.
  */
 export async function ensureNotJoined(page: Page, gameId = "g1"): Promise<void> {
+  // The game page may still be loading (the first visit of a run compiles it).
+  const settle = { timeout: 20_000 };
   if (await onRosterInDb(page, gameId)) {
+    await expect(joinedCta(page), "the page should show this account on the roster").toBeVisible(
+      settle,
+    );
     await leaveFreeRun(page);
     await expect
       .poll(() => onRosterInDb(page, gameId), {
@@ -126,6 +131,6 @@ export async function ensureNotJoined(page: Page, gameId = "g1"): Promise<void> 
       })
       .toBe(false);
   } else {
-    await expect(joinCta(page)).toBeVisible({ timeout: 15_000 });
+    await expect(joinCta(page)).toBeVisible(settle);
   }
 }
