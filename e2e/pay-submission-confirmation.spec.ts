@@ -1,10 +1,11 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 
 /**
  * E2E: end-to-end mocked payment submission.
  *
  * Navigates to the pay screen for a paid sample game with a fully mocked
- * backend, picks a payment method, fills the proof form (no file upload
+ * backend, lands on the host's only payment method (preselected), fills the proof form (no file upload
  * required — proof screenshot is optional), taps "I have paid", and asserts
  * the post-payment confirmation UI (payment status timeline with a pending
  * submission) appears.
@@ -20,9 +21,9 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-// g2 is a paid sample game (price 8) in src/lib/sample-data.ts.
+// g2: served by serveFixtureGame below (see helpers/pay-fixtures.ts).
 const GAME_ID = "g2";
-const HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo-1";
 
 function tableUrl(url: string, table: string) {
@@ -74,12 +75,14 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
     },
   );
 
-  // Host has one enabled Venmo method (no payment_url so no external launch
-  // is triggered — clicking the row picks it and shows the proof form).
+  // Host has one enabled Venmo method, so the pay screen preselects it and
+  // shows its proof form straight away.
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (url) =>
+      tableUrl(url, "host_payment_methods") ||
+      String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -109,14 +112,10 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
     },
   );
 
-  // No prior hosted game overrides.
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself: src/lib/sample-data.ts ships no games any more, so the pay
+  // page looks g2 up in hosted_games. Answering that with [] rendered "Game not
+  // found."; serve the row instead, hosted by the same mocked host.
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
   // Swallow best-effort game_participants writes triggered by joinGame().
   await page.route(
@@ -145,7 +144,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
         return route.fulfill({
           status: 200,
           contentType: "application/json",
-          headers: { "content-range": `0-${Math.max(0, submissions.length - 1)}/${submissions.length}` },
+          headers: {
+            "content-range": `0-${Math.max(0, submissions.length - 1)}/${submissions.length}`,
+          },
           body: JSON.stringify(submissions),
         });
       }
@@ -192,10 +193,13 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
-  // Pick the Venmo method — the row's primary button (label/username area).
-  const methodButton = page.getByRole("button", { name: /e2e-host|venmo/i }).first();
-  await expect(methodButton).toBeVisible({ timeout: 10_000 });
-  await methodButton.click();
+  // The host takes exactly one method, so the pay screen skips the picker and
+  // opens that method's proof step itself. (There is no method row to tap: the
+  // only button naming Venmo there launches the Venmo app.)
+  await expect(page.getByRole("heading", { name: /i have paid — submit proof/i })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText("e2e-host", { exact: true })).toBeVisible();
 
   // Proof form is now visible.
   // Amount (the $15 fee) and date (today) are prefilled and tucked under "Add details".
@@ -210,8 +214,7 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
 
   const [submitReq] = await Promise.all([
     page.waitForRequest(
-      (req) =>
-        tableUrl(req.url(), "payment_submissions") && req.method() === "POST",
+      (req) => tableUrl(req.url(), "payment_submissions") && req.method() === "POST",
       { timeout: 10_000 },
     ),
     submitBtn.click(),
@@ -222,8 +225,10 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   const timeline = page.getByTestId("payment-status-timeline");
   await expect(timeline).toBeVisible({ timeout: 10_000 });
   await expect(timeline).toHaveAttribute("data-status", "pending");
-  await expect(timeline).toContainText(/proof submitted/i);
-  await expect(timeline).toContainText(/host reviewing/i);
+  // Copy from the shared payment-state vocabulary (src/lib/payment-states.ts).
+  await expect(timeline).toHaveAttribute("data-payment-state", "host_confirmation_pending");
+  await expect(timeline).toContainText(/payment sent/i);
+  await expect(timeline).toContainText(/awaiting host confirmation/i);
 
   await ctx.close();
 });
