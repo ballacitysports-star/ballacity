@@ -15,9 +15,11 @@ import { account } from "./helpers/fixture-auth";
  * So the signed-in fixture player (the browser session) owns an organization
  * and watches the profile of the second fixture player, who joins it the way a
  * trainer does (owner invites their coach profile, they accept) and then
- * leaves. The second player's profile is made visible to members for the
- * duration, since the fixture account keeps it private. Everything seeded is
- * removed and the visibility restored afterwards.
+ * leaves. The second player's profile_visibility is 'private' (what the account
+ * was created with; e2e/global-setup.ts puts it back to that every run), which
+ * hides the profile from the viewer, so it is set to 'members' for the
+ * duration. Everything seeded is removed and the previous visibility restored
+ * afterwards; if the run is killed first, the next run's global-setup resets it.
  */
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
@@ -162,8 +164,10 @@ test("player profile Organizations section updates in real time", async ({ page 
     await owner.from("trainer_org_invites").delete().eq("org_id", orgId);
     await owner.from("trainer_orgs").delete().eq("id", orgId);
     await member.from("teams").delete().eq("id", trainerId);
-    // No row meant the default ("public"), which is what reads saw before.
-    const restoreTo = previousVisibility ?? "public";
+    // Every account has a row (handle_new_user writes one, and global-setup
+    // sets player2's to 'private'), so a missing value means the read failed:
+    // fall back to the fixture's baseline rather than open the profile up.
+    const restoreTo = previousVisibility ?? "private";
     if (restoreTo !== "members") {
       await member
         .from("privacy_preferences")
