@@ -53,8 +53,9 @@ async function restoreSession(page: Page) {
   await page.evaluate(
     ([key, value]) => {
       window.localStorage.setItem(key!, value!);
-      // Ensure no pre-OAuth pending choice interferes with the null test.
-      window.localStorage.removeItem("openrun:pending-account-type");
+      // Ensure no pre-OAuth pending choice interferes with the null test. The
+      // choice lives in sessionStorage (PENDING_KEY in src/lib/account-type.ts).
+      window.sessionStorage.removeItem("openrun.pending_account_type");
     },
     [STORAGE_KEY!, SESSION_JSON!],
   );
@@ -103,24 +104,28 @@ test.describe("null account_type → account-type setup", () => {
         // The app shell registers its sign-in listener when it mounts, after
         // hydration; the gate holding the member at the picker shows it is up.
         await expectAccountTypePickerInPlace(page);
+        // The gate shows the picker in place, on "/". Only the listener's
+        // redirect can take the URL to the picker's own page, so it must not be
+        // there yet, or the check below would pass without the listener.
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
         // Simulate the provider callback firing a SIGNED_IN event on the
-        // existing Supabase client. Every provider that lands back in-app
-        // takes this path — this is the exact hook the OAuth return relies on.
-        await emitSignedIn(page);
-        await page.evaluate((providerId) => {
-          // Tag the run so we can confirm the provider we simulated.
-          (window as unknown as { __simulatedProvider?: string }).__simulatedProvider = providerId;
-        }, provider);
+        // existing Supabase client, with a session that says it came from this
+        // provider. Every provider that lands back in-app takes this path —
+        // this is the exact hook the OAuth return relies on.
+        await emitSignedIn(page, { provider });
 
         await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
           timeout: 15_000,
         });
 
-        const tagged = await page.evaluate(
-          () => (window as unknown as { __simulatedProvider?: string }).__simulatedProvider,
-        );
-        expect(tagged).toBe(provider);
+        // The listener saw a session from this provider.
+        const sessionProvider = await page.evaluate(async () => {
+          const mod = await import("/src/integrations/supabase/client.ts");
+          const { data } = await mod.supabase.auth.getSession();
+          return data.session?.user.app_metadata?.provider;
+        });
+        expect(sessionProvider).toBe(provider);
       } finally {
         await context.close();
       }

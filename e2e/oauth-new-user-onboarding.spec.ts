@@ -31,10 +31,15 @@ const NEXT_KEY = "openrun:oauth-next";
 const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-e2e";
 
-async function stubNullAccountType(page: Page) {
+async function stubNullAccountType(
+  page: Page,
+  serverProvider: "google" | "apple" | "email" = "google",
+) {
   // The root gate asks the server first (getOnboardingStatus reads the profile
   // server-side), so the table stub below only covers its client fallback.
-  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null));
+  // `serverProvider` is what the server's identity check reports ("email" means
+  // it does not see a social sign-in, so `isSocial` is false).
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, serverProvider));
   await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -109,6 +114,9 @@ test.describe("OAuth new-user onboarding gate", () => {
 
         await page.goto("/", { waitUntil: "domcontentloaded" });
         await expectAccountTypePickerInPlace(page);
+        // Held in place, not yet sent to the picker's own page: that redirect
+        // must come from the listener below.
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
         // Force the SIGNED_IN reconcile with the correct app_metadata.provider
         // so the "new OAuth user" branch runs. getSession() is patched so the
@@ -142,10 +150,14 @@ test.describe("OAuth new-user onboarding gate", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      await stubNullAccountType(page);
+      // The server's identity check does not say "social" either, so only the
+      // saved marker can make the listener treat this as an OAuth return
+      // (otherwise it would apply the stashed pending type with a PATCH).
+      await stubNullAccountType(page, "email");
       await primeStorage(page, "google");
       await page.goto("/", { waitUntil: "domcontentloaded" });
       await expectAccountTypePickerInPlace(page);
+      await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
       // The session carries no provider; only the saved marker says Google.
       await emitSignedIn(page, { provider: null });
