@@ -27,7 +27,9 @@ test.skip(
 const GAME_ID = "g2";
 const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const ENTRY_FEE = 10;
-// Client-side pay-page timeout is 8s; give it a comfortable margin.
+// The pay screen gives up on its reads after 6s (withTimeout in
+// src/routes/games.$gameId.pay.tsx, and PAYPAL_CONFIG_DEADLINE_MS for the PayPal
+// config); give it a comfortable margin.
 const OUTCOME_TIMEOUT_MS = 15_000;
 
 function tableUrl(url: string | URL, table: string) {
@@ -159,6 +161,15 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({ 
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("ready");
   await expect(page.getByText(/game not found/i)).toHaveCount(0);
+  // "Ready" above only means no loading box and no Retry, which an error screen
+  // would satisfy too. So also see the ready screen itself: the host's methods
+  // come back empty, so it says the host has none (or, if the target has PayPal
+  // set up for checkout, offers it above "Or pay another way").
+  await expect(
+    page.getByText(
+      /^(host hasn't set up payment yet|or pay another way|how do you want to pay\?)$/i,
+    ),
+  ).toBeVisible();
 
   await ctx.close();
 });
