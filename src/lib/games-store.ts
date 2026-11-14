@@ -3,11 +3,34 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
 const joined = new Set<string>();
-// Which game each of the viewer's roster rows is for, by row id. Realtime
-// delivers a DELETE with only the primary key in `old` (the table has row-level
-// security, and DELETE events are not filtered by user_id either), so the row id
-// is all a leave on another device tells us; this map turns it into the game.
+// Which game each of the viewer's roster rows is for, by row id. game_participants
+// has REPLICA IDENTITY FULL, so Realtime can apply the user_id filter to a DELETE
+// and does deliver the viewer's own leaves to this channel (and nobody else's).
+// But the table has row-level security, and for such a table Realtime strips the
+// DELETE's `old` down to the primary key: `{ id }`, no game_id (seen on the local
+// stack). The row id is all a leave on another device tells us; this map turns it
+// into the game. It is filled from the roster load, from this device's own joins
+// and from realtime INSERTs.
 const rowGame = new Map<string, string>();
+// When each row id, and each game's joined state, was last learned or changed
+// here, on one counter. A roster load that started earlier must not undo them.
+let changeSeq = 0;
+const rowLearnedAt = new Map<string, number>();
+const gameChangedAt = new Map<string, number>();
+
+function learnRow(rowId: string, gameId: string) {
+  rowGame.set(rowId, gameId);
+  rowLearnedAt.set(rowId, ++changeSeq);
+}
+
+function forgetRow(rowId: string) {
+  rowGame.delete(rowId);
+  rowLearnedAt.delete(rowId);
+}
+
+function markGameChanged(gameId: string) {
+  gameChangedAt.set(gameId, ++changeSeq);
+}
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
 let loaded = false;
@@ -65,24 +88,37 @@ function subscribe(cb: () => void) {
 }
 
 async function hydrateFromDb(userId: string) {
+  // Anything learned or changed after this point is newer than the answer, which
+  // may have been read before it happened (a join on this device, a realtime
+  // INSERT or DELETE): keep it rather than let the older answer undo it.
+  const startedAt = changeSeq;
+  const newerThanQuery = (seq: number | undefined) => seq !== undefined && seq > startedAt;
   const { data, error } = await supabase
     .from("game_participants")
     .select("id, game_id")
     .eq("user_id", userId);
   if (error) return;
   lastHydratedAt = Date.now();
-  rowGame.clear();
-  (data ?? []).forEach((r) => {
-    if (r.id) rowGame.set(r.id, r.game_id);
+  const rows = data ?? [];
+  const rowIds = new Set(rows.map((r) => r.id));
+  Array.from(rowGame.keys()).forEach((rowId) => {
+    if (!rowIds.has(rowId) && !newerThanQuery(rowLearnedAt.get(rowId))) forgetRow(rowId);
+  });
+  rows.forEach((r) => {
+    if (r.id && !rowGame.has(r.id)) learnRow(r.id, r.game_id);
   });
   // The database is the truth. A game the host removed us from, or that we left
   // on another device, while this one was offline would otherwise read "joined"
-  // for good: the saved list only ever grew. Joins still being written stay.
-  const onRoster = new Set((data ?? []).map((r) => r.game_id));
+  // for good: the saved list only ever grew. Joins still being written stay, and
+  // so does any game whose state changed here while the query was out.
+  const onRoster = new Set(rows.map((r) => r.game_id));
+  const settled = (id: string) => !inFlight.has(id) && !newerThanQuery(gameChangedAt.get(id));
   Array.from(joined).forEach((id) => {
-    if (!onRoster.has(id) && !inFlight.has(id)) joined.delete(id);
+    if (!onRoster.has(id) && settled(id)) joined.delete(id);
   });
-  onRoster.forEach((id) => joined.add(id));
+  onRoster.forEach((id) => {
+    if (settled(id)) joined.add(id);
+  });
   saveJoinedGames();
   emit();
 }
@@ -112,25 +148,27 @@ type RosterChange = {
 };
 
 /**
- * Apply one `game_participants` change from realtime. An INSERT carries the
- * whole row. A DELETE carries only `{ id }`, and arrives for every player's
- * row, not just the viewer's (the user_id filter does not apply to deletes), so
- * it is resolved through `rowGame` and ignored when the row is not one of ours.
+ * Apply one `game_participants` change from the viewer's filtered channel. An
+ * INSERT carries the whole row. A DELETE carries only `{ id }` (row-level
+ * security strips `old` to the primary key), so it is resolved through
+ * `rowGame`; a row it does not know is ignored rather than guessed at.
  */
 function applyRosterChange(payload: RosterChange) {
   if (payload.eventType === "INSERT") {
     const row = payload.new;
     if (!row?.game_id) return;
     if (currentUserId && row.user_id && row.user_id !== currentUserId) return;
-    if (row.id) rowGame.set(row.id, row.game_id);
+    if (row.id) learnRow(row.id, row.game_id);
     joined.add(row.game_id);
+    markGameChanged(row.game_id);
   } else if (payload.eventType === "DELETE") {
     const old = payload.old ?? {};
     if (currentUserId && old.user_id && old.user_id !== currentUserId) return;
     const gameId = old.game_id ?? (old.id ? rowGame.get(old.id) : undefined);
     if (!gameId) return;
-    if (old.id) rowGame.delete(old.id);
+    if (old.id) forgetRow(old.id);
     joined.delete(gameId);
+    markGameChanged(gameId);
   } else {
     return;
   }
@@ -200,6 +238,8 @@ function ensureRealtime() {
       }
       joined.clear();
       rowGame.clear();
+      rowLearnedAt.clear();
+      gameChangedAt.clear();
       saveJoinedGames();
       emit();
     }
@@ -238,7 +278,14 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
     }
     const insert: TablesInsert<"game_participants"> = { game_id: id, user_id: uid };
     if (position && position.trim()) insert.position = position.trim();
-    const { error } = await supabase.from("game_participants").insert(insert);
+    // Ask for the new row's id: a leave on another device reaches this one as a
+    // DELETE that names only that id, and the INSERT echo that would otherwise
+    // teach it to the store can be missed (the channel may still be joining).
+    const { data: row, error } = await supabase
+      .from("game_participants")
+      .insert(insert)
+      .select("id")
+      .single();
     // A duplicate means they were already on the roster, which is the outcome they wanted.
     if (error && error.code !== "23505") {
       undo();
@@ -250,6 +297,8 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
       toast.error(joinGateErrorMessage(error));
       return false;
     }
+    if (row?.id) learnRow(row.id, id);
+    markGameChanged(id);
     return true;
   } catch {
     undo();
@@ -266,6 +315,7 @@ export function leaveGame(id: string) {
   // Clear local optimistic state (may be a no-op for confirmed players who
   // got onto the roster server-side via approval/payment auto-join).
   const wasJoined = joined.has(id);
+  markGameChanged(id);
   if (wasJoined) {
     joined.delete(id);
     saveJoinedGames();
