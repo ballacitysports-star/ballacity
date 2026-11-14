@@ -74,3 +74,20 @@ Migration `20261114110000_availability_intent_and_lifecycle.sql`, test `850` (44
   stay BallaCity's and the guardian's.
 - Expect on apply: dated posts whose last date has passed stop being listed at once; every other post has 14 days before it needs a
   reconfirm (WP 1.2 sends the reminder).
+
+## WP 1.3: server-side player search
+
+Migration `20261114120000_players_available_near.sql`, test `860` (26 assertions), rollback
+`docs/rollbacks/20261114120000_players_available_near.down.sql`. Apply after WP 1.1. No screen calls it yet (WP 1.5).
+
+- `public.players_available_near(...)` runs as the caller, so everything about who may be seen is the table's read policy (WP 1.0
+  and 1.1). It also requires the post to be open, unhidden and not run out, so guardians and authors do not see closed posts in
+  results, and it never lists the caller's own posts.
+- Matching: sport; intent; skill tiers (a post with no tier for the sport matches any); the time window (default the next 7 days,
+  at most 31), with dated and weekly slots turned into real times in each post's timezone; reach both ways (the caller's radius and
+  the poster's own travel radius). A malformed slot or date is skipped, never an error.
+- Output: one row per person (their earliest matching window), distance in whole miles rounded up (at least 1), nearest or soonest
+  first, limit/offset paging with a stable tie-break. It adds no location precision beyond what the table already returns to the
+  same caller.
+- App: `listPlayersAvailableNear` wraps it. New and edited posts now store a point for their city, rounded to two decimals; the
+  database still applies the author's location-privacy setting and stores no point for anyone under 18.
