@@ -1,3 +1,6 @@
+import { stickyRequestCta } from "./helpers/invite-join-cta";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -10,7 +13,9 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  *   3. Click the CTA, then click it again immediately (before the first
  *      response resolves).
  *   4. Assert only ONE POST reaches the network.
- *   5. After the response resolves, the pending UI must render.
+ *   5. After the response resolves, the pending UI must render. (The CTA
+ *      flips to "Request pending" optimistically on the tap and stays
+ *      disabled while the request is in flight.)
  *
  * Auto-skips without a restored Supabase session.
  */
@@ -126,18 +131,14 @@ test("double-tapping Request to join while the first POST is in flight blocks th
         // Hold the response so the second tap happens while the first is in flight.
         await new Promise((r) => setTimeout(r, POST_DELAY_MS));
         firstPostResolvedAt = Date.now();
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
-        });
+        await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
@@ -148,8 +149,11 @@ test("double-tapping Request to join while the first POST is in flight blocks th
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request spot/i }).first();
+  // The same sticky button through both labels: it reads "Request pending"
+  // while the first request is in flight.
+  const cta = stickyRequestCta(page);
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAccessibleName(/^request spot/i);
 
   // Fire two rapid clicks — the second one happens while the first POST
   // is still hanging server-side.
@@ -165,18 +169,24 @@ test("double-tapping Request to join while the first POST is in flight blocks th
 
   // The in-flight response must not have resolved yet.
   expect(firstPostResolvedAt, "first POST resolved before we could double-tap").toBe(0);
+  // The CTA already reads "Request pending" (optimistic) but stays disabled
+  // until the server answers, so a tap now can neither re-send nor cancel.
+  await expect(cta).toHaveAccessibleName(/^request pending/i);
+  await expect(cta).toBeDisabled();
 
   // Fire a third click for good measure, still mid-flight.
   await cta.click({ force: true, noWaitAfter: true }).catch(() => {
     /* ignore */
   });
 
-  // Wait for the first POST to resolve and pending UI to appear.
+  // Wait for the first POST to resolve; the pending UI must still be shown
+  // with the server's row (the page flips to it optimistically on the tap).
+  await expect
+    .poll(() => firstPostResolvedAt, { timeout: POST_DELAY_MS + 5_000 })
+    .toBeGreaterThan(0);
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
-    timeout: POST_DELAY_MS + 5_000,
+    timeout: 5_000,
   });
-
-  expect(firstPostResolvedAt).toBeGreaterThan(0);
 
   // Give the app a beat to (not) fire any additional POSTs.
   await page.waitForTimeout(750);

@@ -1,3 +1,6 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -124,18 +127,14 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
-        });
+        await fulfillRows(route, [row], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.
@@ -156,10 +155,7 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Open Alerts and tap the invite.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // URL preserves both invite params on landing.
   await page.waitForURL(

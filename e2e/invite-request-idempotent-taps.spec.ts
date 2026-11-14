@@ -1,3 +1,5 @@
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -150,23 +152,13 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
         const existing = rowsByKey.get(key);
         if (existing) {
           // Return the same row (idempotent success).
-          await route.fulfill({
-            status: 201,
-            contentType: "application/json",
-            headers: { "content-range": "0-0/1" },
-            body: JSON.stringify([existing]),
-          });
+          await fulfillRows(route, [existing], { status: 201 });
           return;
         }
 
         const row = makeRow(key);
         rowsByKey.set(key, row);
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
-        });
+        await fulfillRows(route, [row], { status: 201 });
         return;
       }
 
@@ -174,6 +166,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 

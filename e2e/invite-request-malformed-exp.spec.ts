@@ -1,3 +1,6 @@
+import { expectOnDiscovery } from "./helpers/invite-discovery";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -78,11 +81,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
       }
       if (method === "POST") {
         onJoinPost();
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
-        });
+        await fulfillRows(route, [{ id: "should-not-happen" }], { status: 201 });
         return;
       }
       return route.fallback();
@@ -108,6 +107,7 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await installMocks(page, () => {
       joinPostFired = true;
     });
+    await stubRiskAcknowledged(page);
     await restoreSession(page);
 
     await page.goto(
@@ -134,7 +134,8 @@ for (const { label, expParam } of MALFORMED_CASES) {
     // Guard fires: toast surfaces + navigation to /discover fallback.
     const toast = page.getByText(/invite has expired/i).first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
-    await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+    // /discover redirects to /feed, where discovery lives now.
+    await expectOnDiscovery(page);
 
     // Give any illegitimate POST a chance to land before asserting.
     await page.waitForTimeout(500);

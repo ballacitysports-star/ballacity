@@ -1,3 +1,6 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
@@ -92,11 +95,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
       if (method === "POST") {
         // Fail loudly — this test asserts the POST never fires.
         onJoinPost();
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
-        });
+        await fulfillRows(route, [{ id: "should-not-happen" }], { status: 201 });
         return;
       }
       return route.fallback();
@@ -138,14 +137,12 @@ async function runTamperedCase(
   await installMocks(page, () => {
     joinPostFired = true;
   });
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await seedInvite(page, userId, notifTitle, link);
 
   // Tap invite in Alerts.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // Land on game with the tampered/missing params exactly as encoded.
   await page.waitForURL(

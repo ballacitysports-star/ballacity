@@ -1,11 +1,13 @@
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page } from "@playwright/test";
 
 /**
  * E2E: opening an invite deeplink to an unpaid (free, no-approval) game and
  * tapping the join CTA must (a) land on /games/$gameId with `invite=1` +
  * `from=<hostId>` preserved on entry, (b) render the "Join Run" CTA in the
- * sticky action bar, and (c) after tapping the CTA, keep the user on the
- * same game detail page with BOTH invite params still preserved in the URL.
+ * sticky action bar, and (c) after tapping the CTA (and confirming "Join this
+ * run?"), keep the user on the same game detail page with BOTH invite params
+ * still preserved in the URL.
  *
  * Sibling to invite-deeplink-to-pay.spec.ts (paid CTA → /pay) and
  * invite-request-to-join.spec.ts (approval-gated CTA). This locks the
@@ -136,6 +138,7 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Open the invite deeplink directly.
@@ -160,14 +163,21 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/tap\s+[“"']?Join[”"']?\s+below/i);
-  await expect(banner).not.toContainText(/Request to join/i);
-  await expect(banner).not.toContainText(/Pay & join/i);
+  // The banner names the sticky CTA by its label: "Join Run" (free), "Request
+  // Spot" (approval) or "Pay Host" (paid).
+  await expect(banner).toContainText(/tap\s+[“"']?Join Run[”"']?\s+below/i);
+  await expect(banner).not.toContainText(/Request Spot/i);
+  await expect(banner).not.toContainText(/Pay Host/i);
 
   // CTA button shows "Join Run · N spots left".
   const cta = page.getByRole("button", { name: /join run/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
+
+  // A free join asks for confirmation first ("Join this run?").
+  const confirm = page.getByRole("alertdialog", { name: /join this run/i });
+  await expect(confirm).toBeVisible({ timeout: 10_000 });
+  await confirm.getByRole("button", { name: /^join run$/i }).click();
 
   // The join insert should fire...
   await expect
