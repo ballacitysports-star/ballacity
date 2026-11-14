@@ -6,6 +6,7 @@ import {
   type TimeSlot,
 } from "./availability-timeslots";
 import type { AvailabilityIntent } from "./availability-levels";
+import { minorMessagingMessage } from "./minor-messaging";
 
 export type PlaceGeo = {
   lat: number;
@@ -324,7 +325,14 @@ export async function createContactRequest(
     game_sport: invite?.sport ? invite.sport.slice(0, 60) : null,
     game_location: invite?.location ? invite.location.slice(0, 300) : null,
   } as any);
-  if (error) throw error;
+  if (error) {
+    // The database refuses a request to someone the sender may not reach (a minor they are not connected to, a blocked
+    // or hidden post, a guardian's control) with a MINOR_MESSAGING_BLOCKED code that never says why (migration
+    // 20261114100000). Show the one neutral line instead of the raw code; keep any other error as it is.
+    const friendly = minorMessagingMessage(error);
+    if (friendly) throw new Error(friendly);
+    throw error;
+  }
 
   // Fire a best-effort in-app + push notification to the recipient.
   if (invite) {

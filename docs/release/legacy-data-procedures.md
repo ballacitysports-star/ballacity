@@ -10,14 +10,14 @@ Status: **procedures written and exercised in an isolated local replay. Not run 
 4. **Order:** database migrations first (switch OFF), application next, adoption window, then these procedures. Backups and point-in-time recovery keep pre-change values until they age out; record the retention window and never restore a backup into production (runbook section 8, residual data table).
 5. **Stop conditions:** any unexpected non-zero count in a verification query, any error from a batch, any write to a public column from outside the procedure, or any sign the app build in use is older than PRIV-2C. Stop, record, and ask.
 
-## P1. Existing minors' availability posts (R2, #265)
+## P1. Existing minors' availability posts (R2, #265; on `main` as `20261114100000_availability_privacy_foundation`, WP 1.0)
 
 - **Defined:** `private_sec.blank_minor_availability_location(limit)` (service role): removes stored coordinates, street address and place id from posts of non-adult or unknown-age authors; keeps the city; audit row with counts only. `list_minor_availability_notes_with_location_text()` and `moderator_scrub_availability_note(post, reason)` (moderators): find and remove notes that name a place (heuristic detector; ids and reason only).
 - **Why it is safe:** the posts are already unreadable to unrelated accounts after the R2 migration; blanking only removes residue (including from backups' future copies). A trigger prevents any precise value from returning to such a row; the trigger checks a note only when it changes, so an old note never blocks the run.
 - **Before (read-only, production or sandbox):** `select count(*) filter (where lat is not null or formatted_address is not null or place_id is not null) as with_precise, count(*) as total from public.player_availabilities a where coalesce(public.age_cohort_of(a.user_id),'unknown') <> 'adult';`
 - **Run:** repeat `select private_sec.blank_minor_availability_location(500);` until 0; then the moderator scan for notes.
 - **Verify:** the same query returns `with_precise = 0`; the R2 read-policy checks (staging checklist ST-6) still pass; adult posts unchanged (compare adult counts before and after).
-- **Tested:** `supabase/tests/420_minor_availability_privacy.test.sql` (batches of 1 and many, idempotence, adult untouched, city kept, audit counts, the owner cannot re-add a precise value, moderator scan and scrub, grants).
+- **Tested:** `supabase/tests/840_availability_privacy_foundation.test.sql` (R2's test 420, ported; batches of 1 and many, idempotence, adult untouched, city kept, audit counts, the owner cannot re-add a precise value, moderator scan and scrub, grants).
 
 ## P2. Existing private youth-game locations (PRIV-2A, #247, with #256)
 
