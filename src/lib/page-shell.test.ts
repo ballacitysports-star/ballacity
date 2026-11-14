@@ -305,3 +305,47 @@ describe("keyboard focus is visible", () => {
     }
   });
 });
+
+describe("bleed-x-gutter", () => {
+  /** Evaluate the few CSS length forms used here, in px, at a viewport width. */
+  function px(expr: string, viewport: number): number {
+    const e = expr.trim();
+    const call = e.match(/^(min|max|clamp)\((.*)\)$/);
+    if (call) {
+      const args = call[2]!.split(",").map((a) => px(a, viewport));
+      if (call[1] === "min") return Math.min(...args);
+      if (call[1] === "max") return Math.max(...args);
+      return Math.min(Math.max(args[0]!, args[1]!), args[2]!);
+    }
+    const unit = e.match(/^([\d.]+)(rem|vw|px)$/);
+    if (!unit) throw new Error(`unsupported length: ${e}`);
+    const n = Number(unit[1]);
+    return unit[2] === "rem" ? n * 16 : unit[2] === "vw" ? (n * viewport) / 100 : n;
+  }
+
+  const bleed = shell("bleed-x-gutter");
+  const padding = bleed.match(/padding-inline:\s*([^;]+);/)![1]!;
+  const margin = bleed.match(/margin-inline:\s*calc\(-1 \* ([^;]+)\);/)![1]!;
+
+  it("pads back exactly what it bleeds, so the first chip lines up with the content", () => {
+    expect(margin.trim()).toBe(padding.trim());
+  });
+
+  it("never bleeds past the gutter of a padded shell, at any width", () => {
+    // A bleed wider than the gutter pushes the row past the screen edge and the
+    // whole page scrolls sideways (a fixed -1rem did, by 3px at 320px).
+    for (const name of SHELLS) {
+      const gutter = shell(name).match(/padding-inline:\s*([^;]+);/)?.[1];
+      if (!gutter) continue;
+      for (let width = 280; width <= 2560; width += 5) {
+        expect(px(padding, width), `${name} at ${width}px`).toBeLessThanOrEqual(
+          px(gutter, width) + 0.001,
+        );
+      }
+    }
+  });
+
+  it("still reaches the screen edge on a typical phone", () => {
+    expect(px(padding, 390)).toBeCloseTo(px("clamp(0.75rem, 4vw, 2rem)", 390));
+  });
+});

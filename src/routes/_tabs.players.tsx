@@ -712,7 +712,7 @@ function PlayersPage() {
           </div>
 
           {/* Availability filter chips */}
-          <div className="-mx-4 overflow-x-auto px-4 mb-4">
+          <div className="bleed-x-gutter overflow-x-auto mb-4">
             <div className="flex gap-2 pb-1">
               {(
                 [
