@@ -5,7 +5,7 @@ import {
   parseTimeSlots,
   type TimeSlot,
 } from "./availability-timeslots";
-import type { AvailabilityIntent } from "./availability-levels";
+import { parseIntents, type AvailabilityIntent } from "./availability-levels";
 import { minorMessagingMessage } from "./minor-messaging";
 
 export type PlaceGeo = {
@@ -209,6 +209,31 @@ function slotFields(input: Partial<PlayerAvailability>) {
   };
 }
 
+/**
+ * Coordinates to store with a post, so the server-side distance search (players_available_near, migration
+ * 20261114120000) can measure. Given coordinates are kept; otherwise the city is geocoded, best effort. Either way
+ * they are rounded to two decimals (about a kilometre). The database applies the author's location-privacy setting
+ * on top (exact, approximate, city only or hidden) and stores none at all for anyone under 18, whatever is sent.
+ * Never throws: without a point the post is saved without one, as before.
+ */
+export async function coarseCoordinates(
+  input: Pick<Partial<PlayerAvailability>, "city" | "lat" | "lng">,
+): Promise<{ lat: number | null; lng: number | null }> {
+  const round = (v: number) => Math.round(v * 100) / 100;
+  if (typeof input.lat === "number" && typeof input.lng === "number") {
+    return { lat: round(input.lat), lng: round(input.lng) };
+  }
+  const city = input.city?.trim();
+  if (!city || city.length < 2) return { lat: null, lng: null };
+  try {
+    const { geocodeAddress } = await import("@/lib/geocode.functions");
+    const point = await geocodeAddress({ data: { address: city } });
+    return { lat: round(point.lat), lng: round(point.lng) };
+  } catch {
+    return { lat: null, lng: null };
+  }
+}
+
 export async function createAvailability(input: Partial<PlayerAvailability>) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to post availability.");
@@ -222,8 +247,7 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
     city: input.city?.trim() || null,
     place_id: input.place_id ?? null,
     formatted_address: input.formatted_address ?? null,
-    lat: input.lat ?? null,
-    lng: input.lng ?? null,
+    ...(await coarseCoordinates(input)),
     travel_radius_km: input.travel_radius_km ?? 25,
     note: input.note?.slice(0, 500) ?? null,
     status: "open" as AvailabilityStatus,
@@ -238,7 +262,12 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
 }
 
 export async function updateAvailability(id: string, patch: Partial<PlayerAvailability>) {
-  const body = patch.time_slots !== undefined ? { ...patch, ...slotFields(patch) } : patch;
+  const withSlots = patch.time_slots !== undefined ? { ...patch, ...slotFields(patch) } : patch;
+  // A new city without coordinates gets the city's own (rounded) point, so distance search keeps working.
+  const body =
+    patch.city !== undefined && patch.lat == null && patch.lng == null
+      ? { ...withSlots, ...(await coarseCoordinates(patch)) }
+      : withSlots;
   const { error } = await supabase
     .from("player_availabilities" as any)
     .update(body as any)
@@ -468,4 +497,74 @@ export async function getExistingContactRequest(
     updated_at: row.updated_at ?? null,
     id: row.id ?? null,
   };
+}
+
+/** One result of the server-side "players available near me" search (migration 20261114120000). */
+export type NearbyAvailability = {
+  availability_id: string;
+  user_id: string;
+  sports: string[];
+  skill_level: string;
+  skill_levels: Record<string, string>;
+  looking_for: AvailabilityIntent[];
+  city: string | null;
+  /** Whole miles, rounded up; null when the post has no location (only with includeUnlocated). */
+  distance_mi: number | null;
+  /** The earliest window inside the search window; null for a post with no times ("flexible"). */
+  window_start: string | null;
+  window_end: string | null;
+};
+
+export type NearbyAvailabilityQuery = {
+  lat?: number | null;
+  lng?: number | null;
+  /** Miles, 0.5 to 100 (default 15). Posts must also be within the poster's own travel radius. */
+  radiusMi?: number;
+  sport?: string | null;
+  /** ISO times; default now to now + 7 days, at most 31 days. */
+  from?: string | null;
+  to?: string | null;
+  intent?: AvailabilityIntent | null;
+  /** Skill tiers for `sport`; a post that lists no tier matches any. */
+  skill?: string[] | null;
+  includeUnlocated?: boolean;
+  order?: "nearest" | "soonest";
+  limit?: number;
+  offset?: number;
+};
+
+type PlayersNearRpc = (
+  fn: "players_available_near",
+  args: Record<string, unknown>,
+) => PromiseLike<{ data: NearbyAvailability[] | null; error: unknown }>;
+
+/**
+ * One page of open availability posts the signed-in user may see, at most one per person, filtered and ordered by the
+ * database. Visibility (minors, guardians, blocks, hidden or run-out posts) is the table's own read policy: the function
+ * runs as the caller.
+ */
+export async function listPlayersAvailableNear(
+  q: NearbyAvailabilityQuery = {},
+): Promise<NearbyAvailability[]> {
+  const rpc = supabase.rpc.bind(supabase) as unknown as PlayersNearRpc;
+  const { data, error } = await rpc("players_available_near", {
+    _lat: q.lat ?? null,
+    _lng: q.lng ?? null,
+    _radius_mi: q.radiusMi ?? 15,
+    _sport: q.sport ?? null,
+    _from: q.from ?? null,
+    _to: q.to ?? null,
+    _intent: q.intent ?? null,
+    _skill: q.skill?.length ? q.skill : null,
+    _include_unlocated: q.includeUnlocated ?? false,
+    _order: q.order ?? "nearest",
+    _limit: q.limit ?? 20,
+    _offset: q.offset ?? 0,
+  });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    ...row,
+    looking_for: parseIntents(row.looking_for),
+    skill_levels: row.skill_levels ?? {},
+  }));
 }
