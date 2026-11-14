@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSkillFields,
+  INTENT_LABEL,
   initialLevelsForPost,
+  isAvailabilityIntent,
   parseIntents,
   parsePostSkillLevels,
   postTiersForSport,
@@ -20,7 +22,13 @@ describe("availability levels", () => {
   });
 
   it("caps skill_level at the database's 120 characters", () => {
-    const tiers = ["Casual / Pickup", "Rec League", "High School", "Club / Travel", "College / Adult Competitive"];
+    const tiers = [
+      "Casual / Pickup",
+      "Rec League",
+      "High School",
+      "Club / Travel",
+      "College / Adult Competitive",
+    ];
     const long = buildSkillFields(["Soccer"], { Soccer: [...tiers, ...tiers] });
     expect(long.skill_level.length).toBeLessThanOrEqual(120);
   });
@@ -30,13 +38,23 @@ describe("availability levels", () => {
     expect(postTiersForSport(legacy, "Tennis")).toEqual(["3.5"]);
     expect(postTiersForSport(legacy, "Pickleball")).toEqual([]);
     const post = { ...legacy, skill_levels: { Pickleball: "3.0 · 4.0", Ghost: "x" } };
-    expect(parsePostSkillLevels(post.skill_levels, post.sports)).toEqual({ Pickleball: ["3.0", "4.0"] });
+    expect(parsePostSkillLevels(post.skill_levels, post.sports)).toEqual({
+      Pickleball: ["3.0", "4.0"],
+    });
     expect(initialLevelsForPost(post)).toEqual({ Tennis: ["3.5"], Pickleball: ["3.0", "4.0"] });
   });
 
   it("keeps only known intents", () => {
     expect(parseIntents(["tryout", "nope", "guest"])).toEqual(["guest", "tryout"]);
     expect(parseIntents(null)).toEqual([]);
+  });
+
+  it("knows pickup, first, matching the database's allowed intents", () => {
+    expect(parseIntents(["tryout", "pickup"])).toEqual(["pickup", "tryout"]);
+    expect(INTENT_LABEL.pickup).toBe("Pickup");
+    expect(isAvailabilityIntent("pickup")).toBe(true);
+    expect(isAvailabilityIntent("pickups")).toBe(false);
+    expect(isAvailabilityIntent(undefined)).toBe(false);
   });
 });
 
@@ -62,7 +80,11 @@ describe("profile sync keeps picked levels", () => {
 
   it("drops picked levels for sports removed from the post", () => {
     const patch = availabilityPatchFromProfile(
-      { ...base, sports: ["Basketball", "Soccer"], skill_levels: { ...base.skill_levels, Soccer: "Rec League" } },
+      {
+        ...base,
+        sports: ["Basketball", "Soccer"],
+        skill_levels: { ...base.skill_levels, Soccer: "Rec League" },
+      },
       { sports: [{ name: "Basketball" }] },
     );
     expect(patch?.sports).toEqual(["Basketball"]);

@@ -15,7 +15,11 @@ export type PlaceGeo = {
   formattedAddress?: string | null;
 };
 
-export type AvailabilityStatus = "open" | "closed";
+/**
+ * open: listed. paused: the author's switch, listed to nobody else. expired: run out (server code sets it).
+ * closed: closed by BallaCity. inactive: closed by a guardian's consent revocation. Only open/paused are the author's to set.
+ */
+export type AvailabilityStatus = "open" | "paused" | "expired" | "closed" | "inactive";
 export type ContactRequestStatus = "pending" | "accepted" | "declined" | "withdrawn";
 
 export type PlayerAvailability = {
@@ -42,6 +46,8 @@ export type PlayerAvailability = {
   /** Individual dates and/or weekly windows with times. Superset of the legacy columns. */
   time_slots: TimeSlot[];
   timezone: string | null;
+  /** When the author last said the post is still true; the server sets it (resume, reconfirm, new times). */
+  last_confirmed_at?: string;
   created_at: string;
   updated_at: string;
 };
@@ -285,6 +291,41 @@ async function notifyInterestedOnEdit(availabilityId: string) {
       }),
     ),
   );
+}
+
+/**
+ * Pause or resume your own post. A paused post is listed to nobody else and takes no requests; resuming counts as
+ * reconfirming it. The database allows the author only open <-> paused (and expired -> open); see migration
+ * 20261114110000.
+ */
+export async function setAvailabilityPaused(id: string, paused: boolean) {
+  const { error } = await lifecycleTable()
+    .update({ status: paused ? "paused" : "open" })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * "Still available": keeps a weekly post listed for another 14 days and reopens an expired one. The value sent is
+ * ignored; the server stamps its own time.
+ */
+export async function reconfirmAvailability(id: string, currentStatus: AvailabilityStatus) {
+  const patch: LifecycleUpdate = { last_confirmed_at: new Date().toISOString() };
+  if (currentStatus === "expired") patch.status = "open";
+  const { error } = await lifecycleTable().update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/** The only columns an author may move on their own post's lifecycle (enforced by the database). */
+type LifecycleUpdate = { status?: "open" | "paused"; last_confirmed_at?: string };
+type LifecycleTable = {
+  update: (patch: LifecycleUpdate) => {
+    eq: (column: "id", value: string) => PromiseLike<{ error: unknown }>;
+  };
+};
+/** last_confirmed_at (migration 20261114110000) is newer than the generated database types. */
+function lifecycleTable(): LifecycleTable {
+  return supabase.from("player_availabilities") as unknown as LifecycleTable;
 }
 
 export async function deleteAvailability(id: string) {

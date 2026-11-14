@@ -209,7 +209,7 @@ SELECT t.eq(t.count($q$SELECT 1 FROM public.player_availabilities WHERE id = '00
 SELECT t.as_user(t.id('modone'));
 SELECT t.eq(t.count($q$SELECT 1 FROM public.player_availabilities WHERE id = '00000000-0000-0000-0000-0000000000e1'$q$), 0, 'nobody else does, staff included');
 SELECT t.reset();
-SELECT t.throws($q$INSERT INTO public.player_availabilities (user_id, sports, skill_level, status, time_slots) VALUES (t.id('adultpost'), ARRAY['Soccer'], 'All Levels', 'paused', '[]'::jsonb)$q$, 'Invalid status', 'statuses outside open, closed and inactive are still refused');
+SELECT t.throws($q$INSERT INTO public.player_availabilities (user_id, sports, skill_level, status, time_slots) VALUES (t.id('adultpost'), ARRAY['Soccer'], 'All Levels', 'archived', '[]'::jsonb)$q$, 'Invalid status', 'an unknown status is still refused');
 
 -- ================= 7. a player can change their own position in a game (new in WP 1.0) =================
 SELECT t.person('ghost', 40), t.person('gplayer', 29);
