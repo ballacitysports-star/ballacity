@@ -3,6 +3,7 @@ import { restoreSession } from "./helpers/signed-in";
 import {
   HARBOR_COACH,
   NORTHSIDE_COACH,
+  SPRINGFIELD_VIEWER,
   stubTrainerDirectory,
 } from "./helpers/misc-trainer-directory";
 
@@ -13,7 +14,8 @@ import {
  *   - the trainers view/density toggles
  *   - navigation into a trainer profile (which carries the venue; the radius
  *     is a feed-only filter the profile has no use for)
- *   - opening the booking sheet
+ *   - opening and closing the booking sheet (the sheet has no venue of its
+ *     own, so this checks only that the profile's URL keeps the venue)
  *   - the back control to the feed, which restores both
  *
  * The directory is fixed (two coaches at two venues, see
@@ -30,9 +32,24 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, context }) => {
   await stubTrainerDirectory(page);
   await restoreSession(page);
+  // The radius filter only applies once the viewer has a location; without one
+  // it keeps every coach, and the bookmark's radius=25 would prove nothing.
+  // Pin the viewer a few km from both venues instead of depending on whatever
+  // the browser happens to know. The app reads its remembered fix on load
+  // (lib/geo.ts); a fresh request from the browser answers with the same spot.
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: SPRINGFIELD_VIEWER.lat,
+    longitude: SPRINGFIELD_VIEWER.lng,
+  });
+  await page.evaluate(
+    (coords) =>
+      window.localStorage.setItem("openrun.userLoc.v1", JSON.stringify({ at: Date.now(), coords })),
+    SPRINGFIELD_VIEWER,
+  );
 });
 
 const filterSheet = (page: Page) => page.getByRole("dialog", { name: "Filter trainers" });
@@ -55,6 +72,13 @@ test("bookmarked venue+radius URL persists across tabs, profile, and booking she
   const harborCard = page.getByRole("link", { name: new RegExp(HARBOR_COACH.name) });
   await expect(harborCard).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("link", { name: new RegExp(NORTHSIDE_COACH.name) })).toHaveCount(0);
+  // Harbor stays because its venue was measured inside the radius, not
+  // because the viewer has no location: its list entry shows the distance
+  // (the badge sits beside the card's link, in the entry's wrapper).
+  const harborEntry = harborCard.locator(
+    "xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' relative ')][1]",
+  );
+  await expect(harborEntry).toContainText(/\d+\.\d (mi|km)/);
 
   // URL params survive hydration.
   await expectBookmarkedParams(page);
@@ -90,7 +114,7 @@ test("bookmarked venue+radius URL persists across tabs, profile, and booking she
   });
   expect(new URL(page.url()).searchParams.get("venue")).toBe(HARBOR_COACH.venue);
 
-  // Booking sheet: opens from the profile, which hands it the sticky venue.
+  // Booking sheet: opens from the profile.
   await page.getByRole("button", { name: /Book session/i }).click();
   const dialog = page.getByRole("dialog", { name: "Book a session" });
   await expect(dialog).toBeVisible({ timeout: 5_000 });
