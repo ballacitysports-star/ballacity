@@ -54,6 +54,7 @@ import {
   INTENT_LABEL,
   buildSkillFields,
   initialLevelsForPost,
+  isAvailabilityIntent,
   parseIntents,
   postTiersForSport,
   type AvailabilityIntent,
@@ -150,7 +151,7 @@ const playersSearchSchema = z.object({
   ageMax: fallback(z.number().optional(), undefined).default(undefined),
   unknownAge: fallback(z.boolean(), true).default(true),
   when: fallback(z.string(), "any").default("any"),
-  // "" | "guest" | "tryout" — what the player is available as.
+  // "" | "pickup" | "guest" | "tryout" — what the player is available as.
   as: fallback(z.string(), "").default(""),
   sort: fallback(z.string(), "recent").default("recent"),
   view: fallback(z.string(), "list").default("list"),
@@ -289,8 +290,7 @@ function PlayersPage() {
     search.when === "today" || search.when === "week" || search.when === "weekend"
       ? search.when
       : "any";
-  const availableAs: AvailabilityIntent | "" =
-    search.as === "guest" || search.as === "tryout" ? search.as : "";
+  const availableAs: AvailabilityIntent | "" = isAvailabilityIntent(search.as) ? search.as : "";
   const sortBy: PlayersSortBy =
     search.sort === "soonest" || search.sort === "nearest" || search.sort === "name"
       ? search.sort

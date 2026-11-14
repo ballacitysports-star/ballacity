@@ -57,3 +57,20 @@ select count(*) filter (where lat is not null or formatted_address is not null o
 - A 16-17-year-old without guardian controls can still contact an adult through the adult's post (R7, #270, is unmerged).
 - The note detector is a heuristic; moderators have the scan and scrub functions.
 - A refusal still carries one bit (the request was not accepted). It no longer says why.
+
+## WP 1.1: pickup intent and post lifecycle
+
+Migration `20261114110000_availability_intent_and_lifecycle.sql`, test `850` (44 assertions), rollback
+`docs/rollbacks/20261114110000_availability_intent_and_lifecycle.down.sql`. Apply after WP 1.0.
+
+- `looking_for` also accepts `pickup` (listed first in the app).
+- Statuses `paused` (the author's switch; listed to nobody else, takes no requests) and `expired` (set by server code, WP 1.2).
+- `last_confirmed_at`: starts at the apply time for every existing post; the server stamps it when the author resumes, reconfirms or
+  changes the times.
+- A post stops being listed to others (author and guardian still see it): weekly posts 14 days after the last confirmation; dated posts
+  when the last slot ends, in the post's timezone (America/New_York when missing or unknown); slot-less legacy posts at the end of
+  `ends_on`, else 14 days after confirmation. A malformed legacy row is listed as before rather than breaking the listing.
+- Authors can move their own post only between open and paused, or from expired back to open. `closed`, `inactive` and `hidden_at`
+  stay BallaCity's and the guardian's.
+- Expect on apply: dated posts whose last date has passed stop being listed at once; every other post has 14 days before it needs a
+  reconfirm (WP 1.2 sends the reminder).
