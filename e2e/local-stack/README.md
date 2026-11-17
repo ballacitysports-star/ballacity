@@ -22,6 +22,25 @@ node .github/e2e-smoke-gate.mjs results.json e2e/smoke-set.json
 Needs Docker (with Compose v2), `psql` and Node 22 on the host. Stop any dev server on port 8080
 first: Playwright starts its own (see `e2e/safety/dev-server.ts`).
 
+## Slow auth (reproducing the hosted sandbox)
+
+The shared hosted sandbox answers `GET /auth/v1/user` in 1-8 s under load, so specs that pass
+against this fast local stack can still race the app in CI. Set `E2E_LOCAL_AUTH_LATENCY_MS` when
+starting the gateway to make it hold the calls the app makes to learn or renew who is signed in
+(`GET /auth/v1/user` and the refresh-token grant) before forwarding them:
+
+```sh
+E2E_LOCAL_AUTH_LATENCY_MS=2000 node e2e/local-stack/stack.mjs gateway       # fixed 2 s
+E2E_LOCAL_AUTH_LATENCY_MS=500-4000 node e2e/local-stack/stack.mjs gateway   # random per call
+node e2e/local-stack/stack.mjs gateway                                      # back to none
+```
+
+`gateway` restarts only the gateway, from the config `up` saved in `.state/gateway.json`: the
+database, the services and the keys in `env.sh` stay as they are, so there is nothing to
+re-source. `up` takes the variable too. Unset, empty or `0` adds nothing; anything that is not
+`<ms>` or `<min>-<max>` is refused. The gateway reads it when it starts, not per run of the suite,
+so set it on the gateway, not on `playwright test`; `.state/gateway.log` says what is in effect.
+
 ## What runs
 
 | Service  | Image                          | Port (127.0.0.1 only) | Notes                                       |

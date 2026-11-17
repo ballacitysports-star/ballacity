@@ -80,6 +80,46 @@ export function routeRequest(pathAndQuery, upstreams) {
   return { service, url: target.toString(), needsKey };
 }
 
+/**
+ * Opt-in latency for auth calls, to reproduce a slow hosted Auth locally (the shared sandbox's
+ * GET /auth/v1/user takes 1-8 s under load). `spec` is E2E_LOCAL_AUTH_LATENCY_MS: unset, empty
+ * or "0" means none; "2000" a fixed delay; "500-4000" a uniformly random delay in that range,
+ * drawn per request. Returns { minMs, maxMs } or null. Throws on anything else, so a typo is
+ * not silently a fast run.
+ */
+export function parseAuthLatency(spec) {
+  const s = (spec ?? "").trim();
+  if (s === "" || s === "0") return null;
+  const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(s);
+  if (!m) throw new Error(`E2E_LOCAL_AUTH_LATENCY_MS must be "<ms>" or "<min>-<max>", got "${s}"`);
+  const minMs = Number(m[1]);
+  const maxMs = m[2] === undefined ? minMs : Number(m[2]);
+  if (maxMs < minMs) throw new Error(`E2E_LOCAL_AUTH_LATENCY_MS range is reversed: "${s}"`);
+  return maxMs === 0 ? null : { minMs, maxMs };
+}
+
+/**
+ * Whether the gateway delays this request when auth latency is on: the calls the app makes to
+ * learn or renew who is signed in, GET /auth/v1/user and the refresh-token grant. Sign-in,
+ * sign-up and the redirect endpoints stay fast.
+ */
+export function isDelayedAuthCall(method, pathAndQuery) {
+  const u = new URL(pathAndQuery, "http://gateway.invalid");
+  const path = u.pathname.replace(/\/+$/, "");
+  if (method === "GET" && path === "/auth/v1/user") return true;
+  return (
+    method === "POST" &&
+    path === "/auth/v1/token" &&
+    u.searchParams.get("grant_type") === "refresh_token"
+  );
+}
+
+/** One delay drawn from a parsed latency ({ minMs, maxMs } or null). */
+export function drawLatencyMs(latency, rand = Math.random) {
+  if (!latency) return 0;
+  return latency.minMs + Math.floor(rand() * (latency.maxMs - latency.minMs + 1));
+}
+
 /** The API key a request carries: the apikey header, else the apikey query parameter. */
 export function apiKeyOf(headers, pathAndQuery) {
   const h = headers.apikey;

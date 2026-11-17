@@ -4,6 +4,8 @@
 //   node e2e/local-stack/stack.mjs up      start fresh: db, auth, (realtime), migrations, rest, gateway
 //   node e2e/local-stack/stack.mjs down    stop everything and delete the database
 //   node e2e/local-stack/stack.mjs env     print the `export` lines for the running stack
+//   node e2e/local-stack/stack.mjs gateway restart only the gateway (keeps the database), e.g.
+//                                          to change E2E_LOCAL_AUTH_LATENCY_MS
 //
 // `up` always starts from an empty database: it removes any previous stack, generates a new
 // JWT secret and database password, mints anon and service_role keys from that secret, and
@@ -31,7 +33,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { migrationOrder } from "../../scripts/migration-order.mjs";
 import { dedupeMigrations } from "../../scripts/migration-twins.mjs";
-import { envExports, generateSecrets, localApiKeys } from "./lib.mjs";
+import { envExports, generateSecrets, localApiKeys, parseAuthLatency } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -156,6 +158,69 @@ function applyMigrations(password) {
   log(
     `Applied ${order.replay.length} migrations in ${((Date.now() - started) / 1000).toFixed(1)}s.`,
   );
+}
+
+/**
+ * Starts gateway.mjs detached, records its pid in stack.json and waits until it answers. The
+ * auth latency switch (E2E_LOCAL_AUTH_LATENCY_MS) is passed through from this environment.
+ */
+async function startGatewayProcess(config, services) {
+  const latency = process.env.E2E_LOCAL_AUTH_LATENCY_MS ?? "";
+  let parsed;
+  try {
+    parsed = parseAuthLatency(latency);
+  } catch (e) {
+    die(e instanceof Error ? e.message : String(e));
+  }
+  const logFd = openSync(join(stateDir, "gateway.log"), "a");
+  const gateway = spawn(process.execPath, [join(here, "gateway.mjs")], {
+    detached: true,
+    stdio: ["ignore", logFd, logFd],
+    env: {
+      PATH: process.env.PATH ?? "",
+      LOCAL_GATEWAY_CONFIG: JSON.stringify(config),
+      ...(parsed ? { E2E_LOCAL_AUTH_LATENCY_MS: latency } : {}),
+    },
+  });
+  gateway.unref();
+  writeFileSync(
+    join(stateDir, "stack.json"),
+    JSON.stringify({ gatewayPid: gateway.pid, apiUrl: API_URL, ...services }, null, 2),
+    { mode: 0o600 },
+  );
+  await waitFor("the gateway", () =>
+    httpOk(`${API_URL}/auth/v1/health`, { headers: { apikey: config.apiKeys[0] } }),
+  );
+  log(
+    parsed
+      ? `Gateway delays GET /auth/v1/user and token refresh by ${parsed.minMs}-${parsed.maxMs} ms.`
+      : "Gateway adds no auth latency.",
+  );
+}
+
+/** Restarts only the gateway, with the saved config. The database and services are untouched. */
+async function restartGateway() {
+  const state = readState();
+  let config;
+  try {
+    config = JSON.parse(readFileSync(join(stateDir, "gateway.json"), "utf8"));
+  } catch {
+    die("No saved gateway config (.state/gateway.json). Run `up` first.");
+  }
+  stopGateway();
+  // Wait for the old process to release the port.
+  await waitFor("the old gateway to stop", async () => {
+    try {
+      await fetch(`${API_URL}/auth/v1/health`, { signal: AbortSignal.timeout(500) });
+      return "still answering";
+    } catch {
+      return true;
+    }
+  });
+  await startGatewayProcess(config, {
+    withRealtime: state?.withRealtime ?? false,
+    withStorage: state?.withStorage ?? false,
+  });
 }
 
 async function up() {
@@ -292,32 +357,13 @@ async function up() {
     ...(withRealtime ? { realtime: `http://127.0.0.1:${PORTS.realtime}` } : {}),
     ...(withStorage ? { storage: `http://127.0.0.1:${PORTS.storage}` } : {}),
   };
-  const logFd = openSync(join(stateDir, "gateway.log"), "a");
-  const gateway = spawn(process.execPath, [join(here, "gateway.mjs")], {
-    detached: true,
-    stdio: ["ignore", logFd, logFd],
-    env: {
-      PATH: process.env.PATH ?? "",
-      LOCAL_GATEWAY_CONFIG: JSON.stringify({
-        port: PORTS.api,
-        upstreams,
-        apiKeys: [keys.anon, keys.serviceRole],
-      }),
-    },
-  });
-  gateway.unref();
-  writeFileSync(
-    join(stateDir, "stack.json"),
-    JSON.stringify(
-      { gatewayPid: gateway.pid, apiUrl: API_URL, withRealtime, withStorage },
-      null,
-      2,
-    ),
-    { mode: 0o600 },
-  );
-  await waitFor("the gateway", () =>
-    httpOk(`${API_URL}/auth/v1/health`, { headers: { apikey: keys.anon } }),
-  );
+  const gatewayConfig = {
+    port: PORTS.api,
+    upstreams,
+    apiKeys: [keys.anon, keys.serviceRole],
+  };
+  writeFileSync(join(stateDir, "gateway.json"), JSON.stringify(gatewayConfig), { mode: 0o600 });
+  await startGatewayProcess(gatewayConfig, { withRealtime, withStorage });
 
   const exportsText = envExports({ apiUrl: API_URL, keys, baseUrl: SITE_URL });
   writeFileSync(join(stateDir, "env.sh"), `${exportsText}\n`, { mode: 0o600 });
@@ -330,11 +376,12 @@ async function up() {
 const cmd = process.argv[2];
 if (cmd === "up") await up();
 else if (cmd === "down") down();
+else if (cmd === "gateway") await restartGateway();
 else if (cmd === "env") {
   const f = join(stateDir, "env.sh");
   if (!existsSync(f)) die("The stack is not running (no .state/env.sh). Run `up` first.");
   process.stdout.write(readFileSync(f, "utf8"));
 } else {
-  console.error("usage: node e2e/local-stack/stack.mjs up|down|env");
+  console.error("usage: node e2e/local-stack/stack.mjs up|down|env|gateway");
   process.exit(2);
 }
