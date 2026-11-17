@@ -9,6 +9,7 @@ import {
   type Sport,
 } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
 
@@ -229,8 +230,7 @@ function mergeRow(row: TeamRow) {
 }
 
 async function refreshCurrentUser() {
-  const { data } = await supabase.auth.getUser();
-  currentUserId = data.user?.id ?? null;
+  currentUserId = await getCurrentUserId();
   // Re-scan ownership map
   myOrgIds.clear();
   if (currentUserId) {

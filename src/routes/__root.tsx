@@ -23,6 +23,7 @@ import { StaffBar } from "@/components/staff/StaffBar";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
@@ -881,8 +882,8 @@ function RootComponent() {
     });
 
     // Run once on mount for already-signed-in users.
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) runLegacyHostMigration(data.user.id);
+    void getCurrentUserId().then((id) => {
+      if (id) runLegacyHostMigration(id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       // Only react to identity transitions. TOKEN_REFRESHED / INITIAL_SESSION
