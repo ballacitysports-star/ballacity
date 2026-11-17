@@ -115,7 +115,11 @@ export async function listOpenAvailabilities(
   if (opts.from) q = q.or(`ends_on.is.null,ends_on.gte.${opts.from}`);
   const { data, error } = await q;
   if (error) throw error;
-  const rows = (data ?? []) as unknown as PlayerAvailability[];
+  return attachAuthors((data ?? []) as unknown as PlayerAvailability[]);
+}
+
+/** Adds each post's author (name, avatar, levels, age when the viewer may know it), keeping the posts' order. */
+async function attachAuthors(rows: PlayerAvailability[]): Promise<AvailabilityWithAuthor[]> {
   if (rows.length === 0) return [];
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
   const { data: profs } = await supabase
@@ -567,4 +571,50 @@ export async function listPlayersAvailableNear(
     looking_for: parseIntents(row.looking_for),
     skill_levels: row.skill_levels ?? {},
   }));
+}
+
+/** The post fields a Find Players card shows (PlayerAvailability). */
+const AVAILABILITY_CARD_COLUMNS =
+  "id, user_id, sports, skill_level, skill_levels, looking_for, starts_on, ends_on, recurring_days, city, " +
+  "place_id, formatted_address, lat, lng, travel_radius_km, note, status, time_slots, timezone, " +
+  "last_confirmed_at, created_at, updated_at";
+
+/** A Find Players result: the full post with its author, plus what the server search measured. */
+export type NearbyAvailabilityWithAuthor = AvailabilityWithAuthor & {
+  distance_mi: number | null;
+  window_start: string | null;
+  window_end: string | null;
+};
+
+/**
+ * One page of Find Players from the server search (players_available_near), in the server's order, with the same post
+ * and author fields the cards already use. The search decides who is listed (it runs as the caller); the second read
+ * only fetches those posts, under the same read policy.
+ */
+export async function listAvailabilityNear(
+  q: NearbyAvailabilityQuery,
+): Promise<NearbyAvailabilityWithAuthor[]> {
+  const page = await listPlayersAvailableNear(q);
+  if (page.length === 0) return [];
+  const ids = page.map((r) => r.availability_id);
+  const { data, error } = await supabase
+    .from("player_availabilities")
+    .select(AVAILABILITY_CARD_COLUMNS)
+    .in("id", ids);
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as PlayerAvailability[];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // Keep the server's order; a post that disappeared between the two reads is skipped.
+  const ordered = ids.map((id) => byId.get(id)).filter((r): r is PlayerAvailability => !!r);
+  const withAuthors = await attachAuthors(ordered);
+  const measured = new Map(page.map((r) => [r.availability_id, r]));
+  return withAuthors.map((a) => {
+    const m = measured.get(a.id);
+    return {
+      ...a,
+      distance_mi: m?.distance_mi ?? null,
+      window_start: m?.window_start ?? null,
+      window_end: m?.window_end ?? null,
+    };
+  });
 }

@@ -38,8 +38,10 @@ import {
   createContactRequest,
   deleteAvailability,
   getAvailabilityById,
+  listAvailabilityNear,
   listOpenAvailabilities,
   updateAvailability,
+  type NearbyAvailabilityQuery,
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
@@ -125,12 +127,18 @@ import {
 import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
 import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { availabilityWindowFor } from "@/lib/availability-window";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { Shield } from "lucide-react";
 import { InviteToTeamDialog, useMyRecruitingTeams } from "@/components/players/InviteToTeamDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 
 type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
+
+/** Find Players pages from the server search (it allows up to 50). */
+const NEARBY_PAGE_SIZE = 30;
+/** Radius when the distance filter is off, in miles: the quick post's default travel radius. */
+const NEARBY_DEFAULT_RADIUS_MI = 25;
 
 const PLAYER_SORTS = [
   { value: "recent" as const, label: "Recently posted" },
@@ -403,13 +411,71 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportsKey, search.skill]);
 
+  // With the viewer's location, Find Players asks the database (players_available_near, migration 20261114120000):
+  // real distance within both radii, the "When" window in each post's timezone, intent, and paging. Without it, the
+  // newest posts are listed as before.
+  const { coords } = useUserLocation();
+  // If the search is unavailable (an older database, a network error), fall back to the newest-posts list for this
+  // visit rather than showing an empty page.
+  const [serverSearchFailed, setServerSearchFailed] = useState(false);
+  const serverSearch = !!coords && !serverSearchFailed;
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const nearQuery = (offset: number): NearbyAvailabilityQuery => {
+    const { from, to } = availabilityWindowFor(when);
+    return {
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      radiusMi: maxDistance > 0 ? maxDistance : NEARBY_DEFAULT_RADIUS_MI,
+      sport: sports.length === 1 ? sports[0] : null,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      intent: availableAs || null,
+      // Posts saved before locations were captured still show, after the located ones.
+      includeUnlocated: true,
+      order: sortBy === "soonest" ? "soonest" : "nearest",
+      limit: NEARBY_PAGE_SIZE,
+      offset,
+    };
+  };
+  const loadMore = async () => {
+    if (!serverSearch || loadingMore || !list) return;
+    setLoadingMore(true);
+    try {
+      const next = await listAvailabilityNear(nearQuery(list.length));
+      setList((cur) => {
+        const seen = new Set((cur ?? []).map((a) => a.id));
+        return [...(cur ?? []), ...next.filter((a) => !seen.has(a.id))];
+      });
+      setHasMore(next.length === NEARBY_PAGE_SIZE);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't load more players");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     // Hold off until the saved view is restored, so the first fetch already
     // uses the user's sports rather than the empty defaults.
     if (!hydrated) return;
     let cancelled = false;
     setList(null);
-    listOpenAvailabilities({ sports })
+    setHasMore(false);
+    (serverSearch
+      ? listAvailabilityNear(nearQuery(0)).then(
+          (rows) => {
+            if (!cancelled) setHasMore(rows.length === NEARBY_PAGE_SIZE);
+            return rows as AvailabilityWithAuthor[];
+          },
+          (e) => {
+            console.warn("players_available_near failed; listing newest posts instead", e);
+            if (!cancelled) setServerSearchFailed(true);
+            return listOpenAvailabilities({ sports });
+          },
+        )
+      : listOpenAvailabilities({ sports })
+    )
       .then((rows) => {
         if (!cancelled) setList(rows);
       })
@@ -422,7 +488,20 @@ function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sportsKey, reloadTick, hydrated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sportsKey,
+    reloadTick,
+    hydrated,
+    serverSearch,
+    coords?.lat,
+    coords?.lng,
+    // Without a location these are filtered in the browser; refetching on them is harmless.
+    maxDistance,
+    when,
+    availableAs,
+    sortBy,
+  ]);
 
   const ageActive = ageMin !== "" || ageMax !== "";
   const activeFilterCount =
@@ -478,8 +557,10 @@ function PlayersPage() {
         return false;
       if (availableAs && !parseIntents(a.looking_for).includes(availableAs)) return false;
 
-      if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
-      if (when !== "any") {
+      // The server search already measured distance and the time window.
+      if (!serverSearch && maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance)
+        return false;
+      if (!serverSearch && when !== "any") {
         if (when === "today") {
           if (!hits(a, todayISO, todayISO)) return false;
         } else if (when === "week") {
@@ -527,9 +608,9 @@ function PlayersPage() {
     includeUnknownAge,
     when,
     availableAs,
+    serverSearch,
   ]);
 
-  const { coords } = useUserLocation();
   const sorted = useMemo(() => {
     if (!filtered) return null;
     const soonest = (a: AvailabilityWithAuthor) => {
@@ -544,6 +625,8 @@ function PlayersPage() {
       return haversineKm(coords, { lat: a.lat, lng: a.lng }) * MI_PER_KM;
     };
     const out = [...filtered];
+    // Nearest and Soonest come ordered from the server search (Array.prototype.sort is stable).
+    if (serverSearch && (sortBy === "nearest" || sortBy === "soonest")) return out;
     out.sort((a, b) => {
       if (sortBy === "name") return a.author_name.localeCompare(b.author_name);
       if (sortBy === "soonest") return soonest(a).localeCompare(soonest(b));
@@ -551,7 +634,7 @@ function PlayersPage() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
     return out;
-  }, [filtered, sortBy, coords]);
+  }, [filtered, sortBy, coords, serverSearch]);
 
   // Search results: warm the first screenful eagerly, the rest speculatively,
   // then let the viewport observer promote rows as they approach the screen.
@@ -831,6 +914,16 @@ function PlayersPage() {
                   />
                 ))}
               </ul>
+              {serverSearch && hasMore && (
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="mb-6 flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-bold"
+                >
+                  {loadingMore ? "Loading…" : "Load more players"}
+                </button>
+              )}
             </>
           )}
         </>

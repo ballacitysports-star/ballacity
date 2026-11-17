@@ -108,3 +108,19 @@ No database change; it uses WP 1.1's pause and reconfirm.
   bottom nav and below dialogs (z-45).
 - Checked against the verified sandbox at iPhone size: post, listed-until date, pause, resume and remove all saved; the test
   account's profile was restored and the test post removed; no request reached the production host.
+
+## WP 1.5: Find Players on the server search (app only)
+
+No database change; it uses WP 1.3's `players_available_near`.
+
+- With the viewer's location (device or a typed place), the Players list comes from the server search: real distance
+  within both the viewer's radius (the distance filter, else 25 miles) and the poster's travel radius; the "When" filter as
+  a real time window (`src/lib/availability-window.ts`: today to midnight, the next 7 days, the weekend, or two weeks ahead
+  for "any"); intent; one sport when exactly one is picked. Nearest and Soonest keep the server's order. Pages of 30 with
+  "Load more". Posts saved before locations were captured are still listed, after the located ones.
+- The search, the sport and skill chips, the age filter and the text search still narrow the page in the browser; the
+  card, the author details and the read rules are unchanged (`listAvailabilityNear` reads the posts the search returned,
+  under the same read policy).
+- Without a location the list is the newest posts, as before. If the search fails (an older database, a network error)
+  the page falls back to that list for the visit instead of showing an error; checked on the sandbox before WP 1.3 was
+  applied there (the search answered 404, the page listed posts, no error shown).
