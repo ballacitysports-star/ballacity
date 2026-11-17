@@ -37,11 +37,14 @@ import {
   Ban,
   UserCheck,
   UserX,
+  Loader2,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
 import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+import { planRiskAckTap, riskAckReadFrom, settleRiskAckTap } from "@/lib/risk-ack-tap";
+import { createLocalWriteGuard } from "@/lib/local-write-guard";
 import {
   GAME_FULL_MESSAGE,
   INVITE_EXPIRED_MESSAGE,
@@ -214,6 +217,10 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 export const Route = createFileRoute("/games/$gameId/")({
+  // A new game is a new page. Without this the router reuses GameDetail when
+  // only gameId changes, and per-game state (the viewer's request, the status
+  // read guards, an open write's late answer) would carry over to the next game.
+  remountDeps: ({ params }) => params.gameId,
   validateSearch: (search: Record<string, unknown>) => {
     const out: {
       invite?: true;
@@ -341,6 +348,11 @@ function GameDetail() {
   const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // A status read that answers after the page wrote the viewer's own rows (the
+  // Request Spot tap, cancel, leave) must not put back what it read before that
+  // write (src/lib/local-write-guard.ts).
+  const [myReqGuard] = useState(createLocalWriteGuard);
+  const [mySubsGuard] = useState(createLocalWriteGuard);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -428,8 +440,10 @@ function GameDetail() {
   const {
     data: riskAckVersion,
     refetch: refetchRiskAck,
-    isPending: riskAckReadPending,
+    status: riskAckStatus,
   } = useSafetyAck(gameId, "participant_risk");
+  // A tap is waiting (briefly) for the acknowledgment read: the CTA says so.
+  const [checkingRiskAck, setCheckingRiskAck] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -531,6 +545,8 @@ function GameDetail() {
   const refreshStatus = async () => {
     if (!game) return;
     if (leavingRef.current) return;
+    const reqTicket = myReqGuard.beginRead();
+    const subsTicket = mySubsGuard.beginRead();
     try {
       // The settings decide the join button, so they land as soon as they arrive;
       // the viewer's own rows are not waited for (see loadGameViewerStatus).
@@ -543,7 +559,14 @@ function GameDetail() {
       });
       if (leavingRef.current) return;
       setSettings(s);
-      setMySubs(subs);
+      // The viewer's own rows land only if the page has not written them since
+      // this read went out: a read sent before a Request Spot tap would answer
+      // "no request" and wipe the pending request the tap just showed.
+      const subsVerdict = mySubsGuard.settle(subsTicket);
+      const reqVerdict = myReqGuard.settle(reqTicket);
+      if (subsVerdict === "apply") setMySubs(subs);
+      if (subsVerdict === "reread" || reqVerdict === "reread") void refreshStatus();
+      if (reqVerdict !== "apply") return;
       setMyReq(req);
       // Auto-join locally only when there's nothing left to pay. Otherwise the
       // Join CTA would flip to "leave" and hide the Pay flow after approval.
@@ -558,6 +581,22 @@ function GameDetail() {
         }
       }
     } catch {}
+  };
+
+  /**
+   * Mark a write of the viewer's own rows (see myReqGuard). Call the result once
+   * the write has settled; it reads the status again if a read was dropped
+   * while the write was out.
+   */
+  const beginOwnRowWrite = (rows: { req?: boolean; subs?: boolean }) => {
+    const ends = [
+      ...(rows.req ? [myReqGuard.beginWrite()] : []),
+      ...(rows.subs ? [mySubsGuard.beginWrite()] : []),
+    ];
+    return () => {
+      const reread = ends.map((end) => end()).some(Boolean);
+      if (reread) void refreshStatus();
+    };
   };
 
   const refreshHostRequests = async () => {
@@ -1001,6 +1040,7 @@ function GameDetail() {
         }
       }
       setRequesting(true);
+      const endWrite = beginOwnRowWrite({ req: true });
       try {
         const created = await createJoinRequest({
           game_id: game.id,
@@ -1020,6 +1060,7 @@ function GameDetail() {
         );
       } finally {
         setRequesting(false);
+        endWrite();
       }
       return;
     }
@@ -1047,6 +1088,10 @@ function GameDetail() {
       // CTA immediately collapses `isConfirmed` back to false and re-enables
       // "Request to join" / "Pay to join" without waiting for a refetch.
       leavingRef.current = true;
+      // The reconcile read below runs once the leave has settled, so a read that
+      // was dropped meanwhile needs no read of its own.
+      const endReqWrite = myReqGuard.beginWrite();
+      const endSubsWrite = mySubsGuard.beginWrite();
       setMyReq(null);
       setMySubs([]);
       leaveGame(game.id);
@@ -1104,6 +1149,8 @@ function GameDetail() {
         toast.error(e.message ?? "Could not leave.");
       } finally {
         leavingRef.current = false;
+        endReqWrite();
+        endSubsWrite();
         // Single reconcile pass now that all deletes have committed. The
         // status strip and banner read the shared flow status, which otherwise
         // waits on realtime, and a DELETE event does not say which game it was.
@@ -1117,6 +1164,7 @@ function GameDetail() {
     if (isPending) {
       const prevReq = myReq;
       const prevSubs = mySubs;
+      const endWrite = beginOwnRowWrite({ req: true, subs: true });
       // Optimistic clear.
       if (myReq?.status === "pending") setMyReq(null);
       setMySubs((subs) => subs.filter((s) => s.status !== "pending"));
@@ -1129,6 +1177,8 @@ function GameDetail() {
         setMyReq(prevReq);
         setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
+      } finally {
+        endWrite();
       }
       return;
     }
@@ -1193,6 +1243,11 @@ function GameDetail() {
         reviewed_at: null,
       };
       setMyReq(optimistic);
+      // Until the request settles, a status read sent before it must not put
+      // back "no request" over the pending row. Opened right before `try`, so
+      // nothing that can throw sits between it and the `finally` that ends it:
+      // a write left open would drop every later status read on this page.
+      const endWrite = beginOwnRowWrite({ req: true });
       try {
         const wasRejected = prevReq?.status === "rejected";
         const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
@@ -1228,6 +1283,7 @@ function GameDetail() {
         );
       } finally {
         setRequesting(false);
+        endWrite();
       }
       return;
     }
@@ -1305,18 +1361,26 @@ function GameDetail() {
         alreadyJoined: viewerCountsAsJoined || isPending,
         acknowledgedVersion,
       });
-    let needsRiskAck = needsAck(riskAckVersion ?? null);
-    if (needsRiskAck && riskAckVersion === undefined && riskAckReadPending) {
-      // The acknowledgment read has not answered yet (a tap right after the
-      // page opened). Wait for it instead of asking a player who already
-      // acknowledged; if it fails, the dialog shows as before. A read that has
-      // already failed is not retried here (its retries would hold the tap for
-      // seconds): the dialog shows at once.
+    // src/lib/risk-ack-tap.ts: answered -> ask unless the current version is on
+    // file; failed -> ask; not answered yet (a tap right after the page opened)
+    // -> wait for it, "Checking…" on the CTA, for at most RISK_ACK_WAIT_MS, then
+    // ask. A player who acknowledged is not asked because the read was a moment
+    // late, and a held-up read (slow network, retries) cannot hold the tap.
+    const plan = planRiskAckTap(riskAckReadFrom(riskAckStatus, riskAckVersion), needsAck);
+    let needsRiskAck: boolean;
+    if (plan.kind === "decided") {
+      needsRiskAck = plan.needsRiskAck;
+    } else {
       setProcessing(true);
+      setCheckingRiskAck(true);
       try {
-        const { data } = await refetchRiskAck({ cancelRefetch: false });
-        needsRiskAck = needsAck(data ?? null);
+        needsRiskAck = await settleRiskAckTap(async () => {
+          // Joins the read in flight rather than starting another.
+          const r = await refetchRiskAck({ cancelRefetch: false });
+          return riskAckReadFrom(r.status, r.data);
+        }, needsAck);
       } finally {
+        setCheckingRiskAck(false);
         setProcessing(false);
       }
     }
@@ -3022,6 +3086,10 @@ function GameDetail() {
                           aria-hidden
                         />
                         Join Waitlist
+                      </>
+                    ) : checkingRiskAck ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Checking…
                       </>
                     ) : parentAsk ? (
                       <>
