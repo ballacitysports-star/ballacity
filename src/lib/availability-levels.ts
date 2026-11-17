@@ -8,18 +8,25 @@
  */
 import { ANY_SKILL, parseSkillTiers, serializeSkillTiers } from "./sport-levels";
 
-export const AVAILABILITY_INTENTS = ["guest", "tryout"] as const;
+/** Pickup first: the availability-first home is about pickup runs (migration 20261114110000 added it). */
+export const AVAILABILITY_INTENTS = ["pickup", "guest", "tryout"] as const;
 export type AvailabilityIntent = (typeof AVAILABILITY_INTENTS)[number];
 
 export const INTENT_LABEL: Record<AvailabilityIntent, string> = {
+  pickup: "Pickup",
   guest: "Guest player",
   tryout: "Trying out",
 };
 
 export const INTENT_BLURB: Record<AvailabilityIntent, string> = {
+  pickup: "Up for a pickup game",
   guest: "Fill in for a team or game as a guest",
   tryout: "Looking to try out and join a team",
 };
+
+export function isAvailabilityIntent(value: unknown): value is AvailabilityIntent {
+  return typeof value === "string" && (AVAILABILITY_INTENTS as readonly string[]).includes(value);
+}
 
 /** Mirrors the 120-character cap the database puts on `skill_level`. */
 const SKILL_LEVEL_MAX = 120;
