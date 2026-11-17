@@ -64,7 +64,10 @@ const channel: {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getUser: async () => ({ data: { user: server.userId ? { id: server.userId } : null } }),
+      getSession: async () => ({
+        data: { session: server.userId ? { user: { id: server.userId } } : null },
+        error: null,
+      }),
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
         realtime.authListener = cb;
         return { data: { subscription: { unsubscribe() {} } } };

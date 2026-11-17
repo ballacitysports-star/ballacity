@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
 const joined = new Set<string>();
@@ -126,8 +127,7 @@ async function hydrateFromDb(userId: string) {
 function ensureHydrated() {
   if (hydrated || typeof window === "undefined" || hydratingPromise) return;
   hydratingPromise = (async () => {
-    const { data } = await supabase.auth.getUser();
-    currentUserId = data.user?.id ?? null;
+    currentUserId = await getCurrentUserId();
     if (currentUserId) {
       // Subscribe as soon as we know who is signed in. Waiting for an auth event
       // is not enough: a page that mounts after the session was restored only
@@ -268,8 +268,7 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
   };
 
   try {
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
+    const uid = await getCurrentUserId();
     if (!uid) {
       undo();
       const { toast } = await import("sonner");
@@ -324,8 +323,7 @@ export function leaveGame(id: string) {
   // Always attempt the DB delete — confirmed players are on the roster
   // even when the local set never tracked them.
   void (async () => {
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
+    const uid = await getCurrentUserId();
     if (!uid) return;
     const { error } = await supabase
       .from("game_participants")

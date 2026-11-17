@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import {
   getGamePaymentSettings,
   getMyJoinRequest,
@@ -245,8 +246,8 @@ export function useMyFlowStatus(gameId: string | undefined): {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setUserId(data.user?.id ?? null);
+    void getCurrentUserId().then((id) => {
+      if (!cancelled) setUserId(id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!cancelled) setUserId(session?.user?.id ?? null);
