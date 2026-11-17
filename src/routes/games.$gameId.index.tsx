@@ -216,6 +216,10 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 export const Route = createFileRoute("/games/$gameId/")({
+  // A new game is a new page. Without this the router reuses GameDetail when
+  // only gameId changes, and per-game state (the viewer's request, the status
+  // read guards, an open write's late answer) would carry over to the next game.
+  remountDeps: ({ params }) => params.gameId,
   validateSearch: (search: Record<string, unknown>) => {
     const out: {
       invite?: true;
@@ -1222,9 +1226,6 @@ function GameDetail() {
         }
       }
       setRequesting(true);
-      // Until the request settles, a status read sent before it must not put
-      // back "no request" over the pending row shown below.
-      const endWrite = beginOwnRowWrite({ req: true });
       // Optimistic: flip CTA to "Request pending" immediately using a
       // synthetic row. Realtime `join_requests:me:*` reconciles with the
       // authoritative row on success; on server error we roll back.
@@ -1241,6 +1242,11 @@ function GameDetail() {
         reviewed_at: null,
       };
       setMyReq(optimistic);
+      // Until the request settles, a status read sent before it must not put
+      // back "no request" over the pending row. Opened right before `try`, so
+      // nothing that can throw sits between it and the `finally` that ends it:
+      // a write left open would drop every later status read on this page.
+      const endWrite = beginOwnRowWrite({ req: true });
       try {
         const wasRejected = prevReq?.status === "rejected";
         const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
