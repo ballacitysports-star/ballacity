@@ -49,6 +49,7 @@ import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
+import { AvailabilityHome } from "@/components/home/AvailabilityHome";
 import { KidsUpcomingSection } from "@/components/home/KidsUpcomingSection";
 import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
 import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
@@ -583,6 +584,8 @@ function Feed() {
       </div>
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
+      {/* WP 1.6: availability first (switch: app_settings home_availability_first). */}
+      {tab !== "archive" && <AvailabilityHome className="mb-4" />}
       {tab !== "archive" && <NeedsActionStrip />}
       {tab !== "archive" && <KidsUpcomingSection className="mb-4" />}
       {tab !== "archive" && eventsOn && (

@@ -148,3 +148,22 @@ Migration `20261118100000_availability_expiry_job.sql`, test `870` (33 assertion
   post.
 - Expect on apply: production's posts were confirmed at the WP 1.1 apply (2026-11-14), so weekly ones get their reminder from
   2026-11-25 and are marked expired on 2026-11-28 unless the author confirms.
+
+## WP 1.6: Home, availability first (app only)
+
+No database change. `src/components/home/AvailabilityHome.tsx` at the top of Home (`/feed`), rules in
+`src/lib/home-availability.ts`.
+
+- **Card:** with nothing listed, a large "I'm available" card that opens the quick sheet (or, without a player profile, My
+  availability with its setup notice). Once listed, where the member's availability stands, with My availability's own rules
+  (`listingFor`): "You're available · Basketball · Listed until …", or "Still available to play?" with "Still available" in one
+  tap when a weekly post is about to run out or has run out. Dated posts whose dates passed are left to My availability.
+- **Shortcuts:** Find players, Find games, My games (the feed's joined filter) and Invitations (My availability), with the
+  number of pending invitations and contact requests to the member.
+- **Who sees it:** signed-in members; not in parent mode. It reads only the member's own posts and requests, under the same
+  read policies.
+- **Switch:** `app_settings` `home_availability_first`, public, set in Super admin (Ops, "Availability-first Home", audit
+  logged). On unless the row is `{"enabled": false}`; a failed read keeps it on. The feed below never changes.
+- Checked against the verified sandbox at iPhone size: empty, about-to-run-out ("Still available" moved the end from Nov 19
+  to Dec 1) and switched-off states; axe found no WCAG 2.1 A/AA violation in the section; the test post and the switch row
+  were removed; no request reached the production host.
