@@ -62,7 +62,7 @@ const iconFor = (type: string) => {
   if (type === "join_request" || type === "join_approved" || type === "join_declined") return Users;
   if (type === "payment") return CreditCard;
   if (type === "follow" || type === "unfollow") return UserPlus;
-  if (type === "trainer_availability") return CalendarClock;
+  if (type === "trainer_availability" || type === "availability_reconfirm") return CalendarClock;
   return Zap;
 };
 
