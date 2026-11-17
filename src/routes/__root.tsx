@@ -43,7 +43,7 @@ import {
 } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
-import { createOnboardingPrefetch } from "@/lib/onboarding-prefetch";
+import { createGatePrefetch } from "@/lib/gate-prefetch";
 import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
@@ -441,11 +441,12 @@ const onboardedUsers = new Set<string>();
 const ageVerifiedUsers = new Set<string>();
 
 /**
- * The account-type check, started beside the age check so the two server round trips overlap
- * (see src/lib/onboarding-prefetch.ts). Its answer is still applied only after the age step.
+ * The age and account-type checks, started while the stored session is still being verified so
+ * their server round trips overlap that one (see src/lib/gate-prefetch.ts). Each answer is
+ * still applied only in its own step, after the steps before it.
  */
-const onboardingPrefetch =
-  createOnboardingPrefetch<Awaited<ReturnType<typeof fetchOnboardingStatus>>>();
+const agePrefetch = createGatePrefetch<Awaited<ReturnType<typeof getMyAgeStatus>>>();
+const onboardingPrefetch = createGatePrefetch<Awaited<ReturnType<typeof fetchOnboardingStatus>>>();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -658,21 +659,47 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const ageStatusRef = useRef(ageStatus);
   ageStatusRef.current = ageStatus;
 
+  // While the auth store verifies the stored session (a round trip to the auth server), ask the
+  // age and account-type questions for that session's user too: the server functions verify the
+  // token themselves, and their answers are only taken below, once the store has published that
+  // same user. Decided as for a signed-in viewer, since that is who the answers are for.
+  const earlySkipAge = isPublicForViewer(pathname, true) || isAccountSetupEscape(pathname);
+  const earlySkipType = earlySkipAge || pathname === "/onboarding/account-type";
+  useEffect(() => {
+    if (!loading) return;
+    let cancelled = false;
+    void getCurrentUserId().then((id) => {
+      if (cancelled || !id) return;
+      if (!earlySkipAge && !ageVerifiedUsers.has(id)) agePrefetch.start(id, () => getMyAgeStatus());
+      if (!earlySkipType && !onboardedUsers.has(id)) {
+        onboardingPrefetch.start(id, fetchOnboardingStatus);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, earlySkipAge, earlySkipType]);
+
   useEffect(() => {
     if (loading || !user) return;
     if (skipAgeCheck || ageVerifiedUsers.has(user.id)) {
+      agePrefetch.drop(user.id);
       setAgeStatus("ok");
       return;
     }
     let cancelled = false;
-    // Ask the account-type question now too: both checks wait on the auth server, and asking
-    // one after the other doubled the wait. Its answer is only applied after this step.
+    // Ask the account-type question now too, unless it is already out: both checks wait on the
+    // auth server, and asking one after the other doubled the wait. Its answer is only applied
+    // after this step.
     if (!skipTypeCheckRef.current && !onboardedUsers.has(user.id)) {
       onboardingPrefetch.start(user.id, fetchOnboardingStatus);
     }
     (async () => {
       try {
-        const status = await withDeadline(getMyAgeStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
+        const status = await withDeadline(
+          agePrefetch.take(user.id) ?? getMyAgeStatus(),
+          ONBOARDING_CHECK_TIMEOUT_MS,
+        );
         if (cancelled) return;
         if (needsAgeGate(status.status) || status.cohort === "unknown") {
           // Render the date-of-birth step in place instead of redirecting to a

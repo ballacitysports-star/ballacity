@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createOnboardingPrefetch } from "./onboarding-prefetch";
+import { createGatePrefetch } from "./gate-prefetch";
 
-describe("createOnboardingPrefetch", () => {
+describe("createGatePrefetch", () => {
   it("hands the started answer to the first taker for that user, once", async () => {
-    const pf = createOnboardingPrefetch<string>();
+    const pf = createGatePrefetch<string>();
     const fetcher = vi.fn(async () => "ok");
     pf.start("u1", fetcher);
     expect(pf.take("u2")).toBeNull();
@@ -14,7 +14,7 @@ describe("createOnboardingPrefetch", () => {
   });
 
   it("does not start a second check while one is out for the same user", () => {
-    const pf = createOnboardingPrefetch<string>();
+    const pf = createGatePrefetch<string>();
     const fetcher = vi.fn(async () => "ok");
     pf.start("u1", fetcher);
     pf.start("u1", fetcher);
@@ -22,14 +22,14 @@ describe("createOnboardingPrefetch", () => {
   });
 
   it("forgets a dropped answer, so the next taker asks afresh", () => {
-    const pf = createOnboardingPrefetch<string>();
+    const pf = createGatePrefetch<string>();
     pf.start("u1", async () => "stale");
     pf.drop("u1");
     expect(pf.take("u1")).toBeNull();
   });
 
   it("passes a failure to the taker, and an untaken failure is not unhandled", async () => {
-    const pf = createOnboardingPrefetch<string>();
+    const pf = createGatePrefetch<string>();
     pf.start("u1", async () => {
       throw new Error("server down");
     });
@@ -39,7 +39,7 @@ describe("createOnboardingPrefetch", () => {
   });
 
   it("turns a fetcher that throws synchronously into a rejected answer", async () => {
-    const pf = createOnboardingPrefetch<string>();
+    const pf = createGatePrefetch<string>();
     pf.start("u1", () => {
       throw new Error("no session");
     });
