@@ -4,8 +4,8 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
 
 /**
  * E2E: after a network-error retry on "Request to join" succeeds, reloading
- * the page must keep the pending UI and preserve the original invite params
- * (`invite`, `from`, `exp`) in the URL. No additional POSTs should fire on
+ * the page must keep the pending UI (in place of the invite prompt) and
+ * preserve the original invite params (`invite`, `from`, `exp`) in the URL. No additional POSTs should fire on
  * reload — the pending row is fetched via GET.
  *
  * Auto-skips without a restored Supabase session.
@@ -178,15 +178,16 @@ test("pending UI + invite params survive a reload after network-error retry", as
   // Reload — pending UI must be restored from server state, no new POSTs.
   await page.reload({ waitUntil: "domcontentloaded" });
 
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: /you're invited to this game/i })
-      .first(),
-  ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
+  // The invitation has been answered: with a request pending, the page shows
+  // that request instead of the "You're invited" prompt (the banner is hidden
+  // while a request is pending). It used to be asserted visible here, which
+  // only held while the page's own join-request read was still out.
+  await expect(
+    page.getByRole("status").filter({ hasText: /you're invited to this game/i }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
   await expect(page.getByText(/waiting for host approval/i).first()).toBeVisible({
     timeout: 5_000,
