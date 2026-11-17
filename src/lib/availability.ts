@@ -53,6 +53,8 @@ export type PlayerAvailability = {
 };
 
 export type AvailabilityWithAuthor = PlayerAvailability & {
+  /** Whole miles from the viewer, rounded up; only on Find Players results from the server search. */
+  distance_mi?: number | null;
   author_name: string;
   author_initials: string | null;
   author_avatar_url: string | null;

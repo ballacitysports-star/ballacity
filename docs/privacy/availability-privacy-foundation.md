@@ -121,6 +121,11 @@ No database change; it uses WP 1.3's `players_available_near`.
 - The search, the sport and skill chips, the age filter and the text search still narrow the page in the browser; the
   card, the author details and the read rules are unchanged (`listAvailabilityNear` reads the posts the search returned,
   under the same read policy).
+- Each card from the server search leads its location line with "N mi away" (whole miles, rounded up, as the search
+  returns them); cards without a measured distance read as before.
+- Checked end to end on the verified sandbox after WP 1.3 was applied there: a second test account's post near Buford was
+  found 1 mile from a searcher, the list read "1 player available" and the card "1 mi away · Buford · up to 25 mi"; the
+  test post was removed afterwards and no request reached the production host.
 - Without a location the list is the newest posts, as before. If the search fails (an older database, a network error)
   the page falls back to that list for the visit instead of showing an error; checked on the sandbox before WP 1.3 was
   applied there (the search answered 404, the page listed posts, no error shown).

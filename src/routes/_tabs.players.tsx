@@ -1346,6 +1346,14 @@ function AvailabilityCard({
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
+              {typeof a.distance_mi === "number" && (
+                <>
+                  <span className="font-semibold text-foreground">
+                    <Distance mi={a.distance_mi} /> away
+                  </span>{" "}
+                  ·{" "}
+                </>
+              )}
               {a.city || "Anywhere"} · up to <Distance km={a.travel_radius_km} />
             </p>
           )}
