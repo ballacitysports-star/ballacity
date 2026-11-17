@@ -91,3 +91,20 @@ Migration `20261114120000_players_available_near.sql`, test `860` (26 assertions
   same caller.
 - App: `listPlayersAvailableNear` wraps it. New and edited posts now store a point for their city, rounded to two decimals; the
   database still applies the author's location-privacy setting and stores no point for anyone under 18.
+
+## WP 1.4: "I'm available" and My availability (app only)
+
+No database change; it uses WP 1.1's pause and reconfirm.
+
+- **"I'm available" sheet** (`src/components/availability/QuickAvailabilitySheet.tsx`, logic in `src/lib/quick-availability.ts`):
+  sport, level and area come from the profile; the player picks Today, Tomorrow or a date, a time of day, and optionally
+  "every <weekday>". It respects the existing posting gate (a player profile with a sport level). "More options" opens the
+  full form. The Players tab's "+" and the Mine tab's new "I'm available" button open it.
+- **My availability** (`src/components/players/MineView.tsx`, rules in `src/lib/availability-lifecycle.ts`): each post shows
+  Listed until <date>, Paused, Not listed (run out) or Closed; Pause and Resume; "Still available" for weekly posts within
+  three days of running out or already run out; "Pick new dates" for dated posts whose dates passed. The expiry date mirrors
+  `private_sec.availability_expires_at` (same test cases as SQL test 850); the database still decides visibility.
+- **Install banner**: it sat above every sheet and dialog (z-60) and covered their buttons on phones; it now sits above the
+  bottom nav and below dialogs (z-45).
+- Checked against the verified sandbox at iPhone size: post, listed-until date, pause, resume and remove all saved; the test
+  account's profile was restored and the test post removed; no request reached the production host.

@@ -7,11 +7,14 @@ import {
   deleteAvailability,
   listMyAvailabilities,
   listMyContactRequests,
+  reconfirmAvailability,
+  setAvailabilityPaused,
   setContactRequestStatus,
   type AvailabilityContactRequest,
   type PlayerAvailability,
 } from "@/lib/availability";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
+import { listingFor, type ListingState } from "@/lib/availability-lifecycle";
 import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
 import { shareAvailability } from "./share-availability";
 import { useAuthSearchHere } from "@/lib/auth-return";
@@ -25,6 +28,14 @@ function LoadingRows() {
     </ul>
   );
 }
+
+const STATE_CHIP: Record<ListingState, string> = {
+  listed: "Listed",
+  paused: "Paused",
+  ended: "Not listed",
+  closed: "Closed",
+  guardian_closed: "Closed",
+};
 
 /** "Mine" view: your own availability posts plus incoming/outgoing requests. */
 export function MineView({
@@ -40,6 +51,8 @@ export function MineView({
   const [mine, setMine] = useState<PlayerAvailability[] | null>(null);
   const [inbox, setInbox] = useState<AvailabilityContactRequest[] | null>(null);
   const [outbox, setOutbox] = useState<AvailabilityContactRequest[] | null>(null);
+  // Which post a pause, resume or reconfirm is running on (declared before the early return: hooks run every render).
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -69,6 +82,20 @@ export function MineView({
     );
   }
 
+  /** Pause, resume or reconfirm one post, then re-read it: the server sets status and last_confirmed_at. */
+  const run = async (m: PlayerAvailability, change: () => Promise<void>, done: string) => {
+    setBusyId(m.id);
+    try {
+      await change();
+      setMine(await listMyAvailabilities());
+      toast.success(done);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this post. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const act = async (id: string, status: "accepted" | "declined") => {
     try {
       await setContactRequestStatus(id, status);
@@ -91,41 +118,99 @@ export function MineView({
           <p className="text-sm text-muted-foreground">No posts yet.</p>
         ) : (
           <ul className="space-y-2">
-            {mine.map((m) => (
-              <li key={m.id} className="rounded-2xl border border-border bg-surface p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">{m.sports.join(", ") || "Any sport"}</span>
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                    {m.status}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatAvailabilityWindow(m) || "No date set"} · {m.city || "Anywhere"}
-                </p>
-                <AvailabilityIntentBadges value={m.looking_for} className="mt-1" />
-                <div className="mt-2 flex items-center gap-3">
-                  <button onClick={() => onEdit(m)} className="text-xs font-semibold text-lime">
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => shareAvailability(m.id)}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            {mine.map((m) => {
+              const listing = listingFor(m);
+              const busy = busyId === m.id;
+              return (
+                <li
+                  key={m.id}
+                  data-testid="my-availability"
+                  className="rounded-2xl border border-border bg-surface p-3 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{m.sports.join(", ") || "Any sport"}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                        listing.state === "listed" && !listing.needsAttention
+                          ? "bg-lime/15 text-lime"
+                          : listing.needsAttention
+                            ? "bg-coral/15 text-coral"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {STATE_CHIP[listing.state]}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatAvailabilityWindow(m) || "No date set"} · {m.city || "Anywhere"}
+                  </p>
+                  <p
+                    className={`mt-1 text-xs font-medium ${listing.needsAttention ? "text-coral" : "text-muted-foreground"}`}
                   >
-                    <Share2 className="h-3 w-3" /> Share
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!confirm("Remove this post?")) return;
-                      await deleteAvailability(m.id);
-                      setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
-                    }}
-                    className="text-xs font-semibold text-coral"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
+                    {listing.label}
+                  </p>
+                  <AvailabilityIntentBadges value={m.looking_for} className="mt-1" />
+                  {listing.canReconfirm && (
+                    <Button
+                      size="sm"
+                      className="mt-2 w-full"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          m,
+                          () => reconfirmAvailability(m.id, m.status),
+                          "Thanks, you're listed for 2 more weeks",
+                        )
+                      }
+                    >
+                      Still available
+                    </Button>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {(listing.state === "listed" || listing.state === "paused") && (
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          listing.state === "paused"
+                            ? run(
+                                m,
+                                () => setAvailabilityPaused(m.id, false),
+                                "Resumed: you're listed again",
+                              )
+                            : run(
+                                m,
+                                () => setAvailabilityPaused(m.id, true),
+                                "Paused: nobody else sees this post",
+                              )
+                        }
+                        className="text-xs font-semibold text-foreground"
+                      >
+                        {listing.state === "paused" ? "Resume" : "Pause"}
+                      </button>
+                    )}
+                    <button onClick={() => onEdit(m)} className="text-xs font-semibold text-lime">
+                      {listing.state === "ended" && !listing.recurring ? "Pick new dates" : "Edit"}
+                    </button>
+                    <button
+                      onClick={() => shareAvailability(m.id)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+                    >
+                      <Share2 className="h-3 w-3" /> Share
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("Remove this post?")) return;
+                        await deleteAvailability(m.id);
+                        setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
+                      }}
+                      className="text-xs font-semibold text-coral"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
