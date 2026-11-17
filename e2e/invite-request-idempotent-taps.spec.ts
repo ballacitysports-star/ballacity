@@ -189,11 +189,17 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
   ]);
 
-  // Wait for the pending UI (implies at least one POST resolved successfully).
+  // The pending UI shows at once (optimistic), before the POST is sent.
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
   await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
+
+  // The POST goes out once the app has asked the auth server who is signed in
+  // (createJoinRequest), which a loaded sandbox can take seconds to answer.
+  await expect
+    .poll(() => joinPosts.length, { timeout: 10_000, message: "no join_requests POST was sent" })
+    .toBeGreaterThanOrEqual(1);
 
   // Give any late in-flight POSTs a moment to settle.
   await page.waitForTimeout(POST_DELAY_MS + 300);

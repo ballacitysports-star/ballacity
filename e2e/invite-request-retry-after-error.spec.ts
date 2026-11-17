@@ -175,7 +175,12 @@ test("failed first join request can be retried and lands on pending UI with invi
     timeout: 5_000,
   });
 
-  // Exactly 2 POSTs: 1 failed + 1 successful retry.
+  // Exactly 2 POSTs: 1 failed + 1 successful retry. The pending UI above is
+  // optimistic, so the retry's POST may still be on its way (createJoinRequest
+  // asks the auth server who is signed in first): wait for it, then for strays.
+  await expect
+    .poll(() => joinPosts.length, { timeout: 10_000, message: "the retry's POST was never sent" })
+    .toBeGreaterThanOrEqual(2);
   await page.waitForTimeout(400);
   expect(joinPosts.length, `expected exactly 2 join_requests POSTs, saw ${joinPosts.length}`).toBe(
     2,

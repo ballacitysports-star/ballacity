@@ -49,8 +49,9 @@ const ACK_TABLE = /\/rest\/v1\/game_safety_acknowledgments(\?|$)/;
  * (host_responsibility) and every write go to the backend as usual.
  *
  * A tap that lands before this read has answered does not open the dialog: the
- * page waits for the read before it decides (handleJoin in
- * src/routes/games.$gameId.index.tsx), so specs need no wait of their own.
+ * page waits for the read before it decides, for up to RISK_ACK_WAIT_MS
+ * (src/lib/risk-ack-tap.ts), so specs need no wait of their own. This stub
+ * answers at once, well inside that.
  */
 export async function stubRiskAcknowledged(page: Page): Promise<void> {
   const version = currentSafetyAckVersion();
