@@ -119,12 +119,6 @@ test.describe("managed child, end to end", () => {
     );
   });
 
-  const appears = (locator: ReturnType<Page["getByRole"]>, timeout: number) =>
-    locator.waitFor({ state: "visible", timeout }).then(
-      () => true,
-      () => false,
-    );
-
   /**
    * A child's card button in the Parent Center roster. Found by its stable id prefix rather than a
    * role: the cards were tabs until the roster stopped using tab semantics (axe), and are buttons now.
@@ -145,19 +139,22 @@ test.describe("managed child, end to end", () => {
    */
   async function deleteTestChildren(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
-    // Still inside the child's profile (a step failed mid-way)? The banner is
-    // on every page there; go back to the guardian first.
-    const back = page.getByRole("button", { name: /^back to /i });
-    if (await appears(back, 5_000)) {
-      await back.click();
-      await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
-    }
     // The roster loads after the page; wait until it has settled (some child
     // card, or the empty state) rather than sampling once.
     const roster = page
       .locator('button[id^="child-tab-"]')
       .first()
       .or(page.getByText("No children yet", { exact: true }));
+    // Still inside the child's profile (a step failed mid-way)? The banner is
+    // on every page there, rendered with the page itself; go back to the
+    // guardian first. Wait for whichever the page shows rather than giving the
+    // banner a fixed 5 s to appear, which every clean run paid twice.
+    const back = page.getByRole("button", { name: /^back to /i });
+    await expect(back.or(roster).first()).toBeVisible({ timeout: 20_000 });
+    if (await back.isVisible()) {
+      await back.click();
+      await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
+    }
     await expect(roster).toBeVisible({ timeout: 20_000 });
     const cards = childCard(page, CHILD_FIRST);
     const leftovers = await cards.count();
@@ -178,6 +175,18 @@ test.describe("managed child, end to end", () => {
   }
 
   test("add, switch in, switch back, delete", async ({ page }) => {
+    // This journey is a chain of full page loads and two identity switches
+    // (sign in, /parent, /players/add, /parent, into the child's /profile,
+    // /settings, back to /parent, /parent again for cleanup). Each one has to
+    // hear from the auth server before it can go on: the auth store verifies
+    // the session on every load, the root gate's age and account-type checks
+    // verify the token on the server, and switching back re-checks the
+    // guardian's session. Those calls take 1-8 s on a loaded sandbox. Measured:
+    // ~15-20 s against the fast local stack, 21-37 s on CI's sandbox, and
+    // 50-60 s with the local gateway's E2E_LOCAL_AUTH_LATENCY_MS=500-4000, where
+    // the default 60 s no longer holds it. The waits inside keep their own
+    // limits; this is the budget for the whole chain of them.
+    test.setTimeout(120_000);
     await signInAs(page, "host");
     // Start from a guardian with no test child, so the one created below is
     // the only card that can match.
