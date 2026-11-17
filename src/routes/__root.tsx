@@ -8,7 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MotionConfig } from "framer-motion";
 import { MainContentTarget, SkipLink } from "@/components/a11y/SkipLink";
 
@@ -43,6 +43,7 @@ import {
 } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
+import { createOnboardingPrefetch } from "@/lib/onboarding-prefetch";
 import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
@@ -439,6 +440,13 @@ const onboardedUsers = new Set<string>();
 /** User ids whose age has already been determined server-side in this tab. */
 const ageVerifiedUsers = new Set<string>();
 
+/**
+ * The account-type check, started beside the age check so the two server round trips overlap
+ * (see src/lib/onboarding-prefetch.ts). Its answer is still applied only after the age step.
+ */
+const onboardingPrefetch =
+  createOnboardingPrefetch<Awaited<ReturnType<typeof fetchOnboardingStatus>>>();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -640,10 +648,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // lists the only exits (the age form itself, the guardian-consent flow, and
   // legal / safety reading), so the gate can never trap anyone in a loop.
   const skipAgeCheck = isPublic || isAccountSetupEscape(pathname);
+  // Read by the age step to decide whether to start the account-type check beside it; a ref
+  // so a route change does not re-run the age step.
+  const skipTypeCheckRef = useRef(false);
 
   const [ageStatus, setAgeStatus] = useState<"unknown" | "ok" | "missing">(
     !!user && ageVerifiedUsers.has(user.id) ? "ok" : "unknown",
   );
+  const ageStatusRef = useRef(ageStatus);
+  ageStatusRef.current = ageStatus;
 
   useEffect(() => {
     if (loading || !user) return;
@@ -652,6 +665,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     let cancelled = false;
+    // Ask the account-type question now too: both checks wait on the auth server, and asking
+    // one after the other doubled the wait. Its answer is only applied after this step.
+    if (!skipTypeCheckRef.current && !onboardedUsers.has(user.id)) {
+      onboardingPrefetch.start(user.id, fetchOnboardingStatus);
+    }
     (async () => {
       try {
         const status = await withDeadline(getMyAgeStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
@@ -659,7 +677,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         if (needsAgeGate(status.status) || status.cohort === "unknown") {
           // Render the date-of-birth step in place instead of redirecting to a
           // URL that may never resolve — the member finishes setup right here
-          // and continues on the route they asked for.
+          // and continues on the route they asked for. The member may take a
+          // while here: ask the account-type question again afterwards.
+          onboardingPrefetch.drop(user.id);
           setAgeStatus("missing");
         } else {
           ageVerifiedUsers.add(user.id);
@@ -672,8 +692,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         setAgeStatus("ok");
       }
     })();
+    const uid = user.id;
     return () => {
       cancelled = true;
+      // An age check abandoned midway is asked again; so is the type check started with it.
+      if (ageStatusRef.current !== "ok") onboardingPrefetch.drop(uid);
     };
   }, [user, loading, skipAgeCheck, router]);
 
@@ -690,6 +713,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // redirects away from the date-of-birth screen while the age gate redirects
   // back, and the two guards ping-pong forever.
   const skipTypeCheck = isPublic || pathname === "/onboarding/account-type" || skipAgeCheck;
+  skipTypeCheckRef.current = skipTypeCheck;
 
   const alreadyConfirmed = !!user && onboardedUsers.has(user.id);
   const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
@@ -717,7 +741,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // so a social user with stripped provider metadata is still classified
       // correctly. Falls back to the client query if the server fn fails.
       try {
-        const status = await withDeadline(fetchOnboardingStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
+        const status = await withDeadline(
+          onboardingPrefetch.take(user.id) ?? fetchOnboardingStatus(),
+          ONBOARDING_CHECK_TIMEOUT_MS,
+        );
         if (cancelled) return;
         if (status.needsOnboarding) {
           // Render the picker in place; no redirect.
