@@ -20,7 +20,10 @@ vi.mock("./teams.functions", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getSession: async () => ({ data: { session: { user: { id: "member-1" } } }, error: null }),
+      getSession: async () => ({
+        data: { session: { user: { id: "member-1" }, access_token: "member-token" } },
+        error: null,
+      }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
     },
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),

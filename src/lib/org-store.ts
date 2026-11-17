@@ -9,7 +9,6 @@ import {
   type Sport,
 } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
-import { getCurrentUserId } from "@/lib/current-user-id";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
 
@@ -229,8 +228,20 @@ function mergeRow(row: TeamRow) {
   else ORGS[idx] = { ...ORGS[idx], ...org };
 }
 
-async function refreshCurrentUser() {
-  currentUserId = await getCurrentUserId();
+/**
+ * Who is signed in, from the session this browser holds (see current-user-id.ts: the id only
+ * marks which teams are the viewer's own; every team write is checked by RLS). Returns that
+ * session's access token for the team list call below.
+ */
+async function refreshCurrentUser(): Promise<string | null> {
+  let token: string | null = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    currentUserId = data.session?.user?.id ?? null;
+    token = data.session?.access_token ?? null;
+  } catch {
+    currentUserId = null;
+  }
   // Re-scan ownership map
   myOrgIds.clear();
   if (currentUserId) {
@@ -238,6 +249,7 @@ async function refreshCurrentUser() {
       if (owner === currentUserId) myOrgIds.add(id);
     }
   }
+  return token;
 }
 
 // True once the first load has finished, whether or not it succeeded. Until then
@@ -246,27 +258,38 @@ let settled = false;
 
 export async function hydrateOrgs(): Promise<void> {
   if (hydratePromise) return hydratePromise;
-  hydratePromise = (async () => {
+  // Each check below runs after an await, once `attempt` is set.
+  let attempt: Promise<void> | null = null;
+  attempt = (async () => {
     try {
-      await refreshCurrentUser();
+      const token = await refreshCurrentUser();
       // The full team list needs a session. A signed-out visitor (and the
       // server, which has no session) reads the public preview instead, and
       // we stay un-hydrated so the next call after sign-in loads it.
-      if (!currentUserId) {
-        hydratePromise = null;
+      if (!currentUserId || !token) {
+        if (hydratePromise === attempt) hydratePromise = null;
         return;
       }
-      const rows = (await listTeams()) as TeamRow[];
+      // Send the session's token with the call ourselves. This load can start while the app
+      // is still booting (the auth client announces the stored session as SIGNED_IN at
+      // startup), before TanStack Start has installed the global middleware that attaches it
+      // (src/start.ts), and the call then reached the server with no token and failed.
+      const rows = (await listTeams({
+        headers: { Authorization: `Bearer ${token}` },
+      })) as TeamRow[];
       for (const row of rows) mergeRow(row);
       settled = true;
       emit();
     } catch (e) {
       console.error("[org-store] hydrate failed", e);
+      // Let the next caller try again instead of reading this failure for the life of the page.
+      if (hydratePromise === attempt) hydratePromise = null;
       settled = true;
       emit();
     }
   })();
-  return hydratePromise;
+  hydratePromise = attempt;
+  return attempt;
 }
 
 // Re-hydrate on auth change so ownership flags flip immediately.
