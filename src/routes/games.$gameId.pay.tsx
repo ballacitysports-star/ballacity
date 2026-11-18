@@ -71,6 +71,7 @@ import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { useJoinGate } from "@/lib/live-status";
 import { useMyChildStatus } from "@/lib/child-safety";
+import { useMyAge } from "@/lib/use-my-age";
 import {
   blockOutranksApproval,
   checkStateOf,
@@ -230,12 +231,17 @@ function PayPage() {
   const joinGate = useJoinGate(game);
   const childQuery = useMyChildStatus();
   const { can: canChildFeature } = childQuery;
+  // The game's age range, decided as the game page decides it (ageGateState from useMyAge): a viewer outside it, or
+  // with no birthday on file, asks the host first. payEntryView only waits for it on a game with a range.
+  const myAge = useMyAge();
 
   const maxPlayers = game?.maxPlayers ?? 0;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
   const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  // The host never pays for their own game; the game page applies no age range to them.
+  const isHost = !!userId && (game?.hostUserId === userId || settings?.host_id === userId);
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
@@ -601,6 +607,13 @@ function PayPage() {
       paymentStarted ||
       (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
     onProofStep: !!picked,
+    isHost,
+    ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
+    viewerAge: myAge.loading
+      ? { state: "loading" }
+      : myAge.error
+        ? { state: "error" }
+        : { state: "ready", value: myAge.age },
   });
   const entryClear = entryView.kind === "clear";
   // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
@@ -620,6 +633,7 @@ function PayPage() {
     if (guardianQuery.isError) void guardianQuery.refetch();
     if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
     if (rosterLoad === "error") retryRosterLoad();
+    if (myAge.error) myAge.retry();
   };
 
   if (loading || (!game && !lookupTimedOut)) {

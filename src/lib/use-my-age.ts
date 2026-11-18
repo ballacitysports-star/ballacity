@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
 
@@ -16,10 +16,22 @@ function ageFromBirthday(iso: string): number | null {
  * The signed-in viewer's age, derived from their profile birthday via the
  * `get_my_birthday` RPC (birthdays aren't readable through a plain select).
  * `null` means "not shared / unknown".
+ *
+ * `error` is true when the read failed (the RPC answered an error or threw):
+ * `age` is then null as well, so callers that treat a failure as "unknown"
+ * keep doing so, and a caller that must not (the pay page's age range, which
+ * would otherwise say "Add your birthday") can offer `retry` instead.
  */
-export function useMyAge(): { age: number | null; loading: boolean } {
+export function useMyAge(): {
+  age: number | null;
+  loading: boolean;
+  error: boolean;
+  retry: () => void;
+} {
   const [age, setAge] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,19 +40,22 @@ export function useMyAge(): { age: number | null; loading: boolean } {
         if (!(await getCurrentUserId())) {
           if (!cancelled) {
             setAge(null);
+            setError(false);
             setLoading(false);
           }
           return;
         }
-        const { data } = await (supabase.rpc as any)("get_my_birthday");
+        const { data, error: rpcError } = await (supabase.rpc as any)("get_my_birthday");
         const iso = typeof data === "string" ? data : null;
         if (!cancelled) {
           setAge(iso ? ageFromBirthday(iso) : null);
+          setError(!!rpcError);
           setLoading(false);
         }
       } catch {
         if (!cancelled) {
           setAge(null);
+          setError(true);
           setLoading(false);
         }
       }
@@ -49,9 +64,15 @@ export function useMyAge(): { age: number | null; loading: boolean } {
     return () => {
       cancelled = true;
     };
+  }, [attempt]);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    setAttempt((n) => n + 1);
   }, []);
 
-  return { age, loading };
+  return { age, loading, error, retry };
 }
 
 /**

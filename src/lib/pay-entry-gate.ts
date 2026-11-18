@@ -24,21 +24,31 @@
  *   - locked, in progress / closed by the host / past the signup cutoff: enforce_game_join_gate and the PayPal
  *     precondition let a player the host approved through, so (as on the game page, lockedForNewJoin) a viewer already
  *     in the flow (on the roster, a payment in, or approved by the host) keeps their way to pay.
+ *   - age: the game's age range (min_age / max_age). The game page sends a viewer outside it, or one with no birthday
+ *     on file, to request the host's approval (ageGateState in src/lib/game-age.ts, from useMyAge); the server's age
+ *     rule (enforce_game_age_requirement, AGE_REQUIREMENT_NOT_MET in paypal_payment_precondition) lets a player the
+ *     host approved, or one on the roster, through. A manual claim is still recorded (no age check on
+ *     payment_submissions), so a player could pay for a place the roster refuses. Owner decision 2026-11-18 (#430
+ *     question 4): the pay page applies it, with the game page's source and rule. A viewer already in the flow (on the
+ *     roster, a payment in, or approved) and the host are exempt.
  * A full roster is not decided here: the pay page keeps its "This game just filled up" warning (showFilledUpWarning).
- * The game's age range is not decided here either. It needs the viewer's exact age (their birthday, get_my_birthday),
- * which the pay page does not read, and the server lets a player the host approved, or one on the roster, through it.
- * Those, and players with an earlier claim, are the only viewers who can read the host's payment settings and so see
- * any handles (private_sec.can_read_game_payment_settings); PayPal checkout asks the age rule itself before any order.
  */
 import type { FeatureDecision } from "@/lib/child-policy";
 import type { JoinState } from "@/lib/live-status";
+import {
+  ageGateMessage,
+  ageGateState,
+  hasAgeRequirement,
+  type AgeGateState,
+  type AgeRequirement,
+} from "@/lib/game-age";
 import {
   PAYMENTS_AGE_REQUIRED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
   PAYMENTS_GUARDIAN_APPROVAL_MESSAGE,
 } from "@/lib/payments-policy";
 
-export type PayEntryBlockKind = "payments" | "participation" | "guardian" | "locked";
+export type PayEntryBlockKind = "payments" | "participation" | "guardian" | "locked" | "age";
 
 export type PayEntryBlock = {
   kind: PayEntryBlockKind;
@@ -74,7 +84,29 @@ export type PayEntryInput = {
   ageUnknown?: boolean;
   /** public.game_payment_guardian_ready(game) for the viewer. */
   guardianReady: boolean;
+  /** The viewer hosts this game (the game page never applies the age range to the host). */
+  isHost?: boolean;
+  /**
+   * The game's age range and where the viewer stands against it (ageGateState from the viewer's age, useMyAge, as the
+   * game page decides it). Omitted, or state 'none', when the game has no range.
+   */
+  age?: { state: AgeGateState; req: AgeRequirement };
 };
+
+export const AGE_BLOCKED_FALLBACK =
+  "This game has an age requirement. Ask the host to approve your request first.";
+
+/**
+ * The game's age range, for a viewer not yet in the flow. The game page turns an age outside the range, or no birthday
+ * on file, into a request the host decides (requiresApproval); the server lets an approved or rostered player through.
+ */
+function ageBlock(input: PayEntryInput): PayEntryBlock | null {
+  const age = input.age;
+  if (!age || input.isHost) return null;
+  if (age.state !== "needs_approval" && age.state !== "unknown_age") return null;
+  if (input.holdsPlace || input.paymentIn || input.approved) return null;
+  return { kind: "age", message: ageGateMessage(age.state, age.req) ?? AGE_BLOCKED_FALLBACK };
+}
 
 function lockBlock(input: PayEntryInput): PayEntryBlock | null {
   const { gate } = input;
@@ -115,7 +147,7 @@ export function payEntryBlock(input: PayEntryInput): PayEntryBlock | null {
   if (!input.guardianReady) {
     return { kind: "guardian", message: PAYMENTS_GUARDIAN_APPROVAL_MESSAGE };
   }
-  return lockBlock(input);
+  return lockBlock(input) ?? ageBlock(input);
 }
 
 /**
@@ -167,6 +199,7 @@ export type PayEntryView =
 const CLAIM_STILL_RECORDED: ReadonlySet<PayEntryBlockKind> = new Set<PayEntryBlockKind>([
   "locked",
   "participation",
+  "age",
 ]);
 
 /**
@@ -175,11 +208,12 @@ const CLAIM_STILL_RECORDED: ReadonlySet<PayEntryBlockKind> = new Set<PayEntryBlo
  */
 /**
  * Whether a block was decided by the viewer's own flow state (their place, a payment in, the host's approval): a lock
- * other than a cancelled game, which every viewer gets, or the participation block, which a place lifts. Those inputs
+ * other than a cancelled game, which every viewer gets, the participation block, which a place lifts, or the age range,
+ * which any of the three lifts. Those inputs
  * only ever lift a block, so a block that is none of these stands whatever they turn out to be.
  */
 function dependsOnFlow(block: PayEntryBlock): boolean {
-  if (block.kind === "participation") return true;
+  if (block.kind === "participation" || block.kind === "age") return true;
   return block.kind === "locked" && block.joinState !== "cancelled";
 }
 
@@ -210,10 +244,34 @@ export function payEntryView(input: {
   paymentStarted: boolean;
   /** The proof step (a picked method) is what the page would show next. */
   onProofStep: boolean;
+  /** The viewer hosts this game. */
+  isHost?: boolean;
+  /** The game's age range (game.minAge / game.maxAge); null or empty for none. */
+  ageReq?: AgeRequirement | null;
+  /**
+   * The viewer's age (useMyAge, the game page's source): null when no birthday is on file. Only asked when the game
+   * has an age range; until it answers the range counts as not met (fail closed), so a viewer it could block sees
+   * 'checking' (or 'check_failed'), never the handles.
+   */
+  viewerAge?: CheckState<number | null>;
 }): PayEntryView {
   const { child, guardian } = input;
   if (child.state === "error" || guardian.state === "error") return { kind: "check_failed" };
   if (child.state === "loading" || guardian.state === "loading") return { kind: "checking" };
+  const ageReq = input.ageReq ?? null;
+  const ageApplies = !input.isHost && hasAgeRequirement(ageReq);
+  const viewerAge: CheckState<number | null> = input.viewerAge ?? { state: "loading" };
+  // An age not known yet counts as outside the range: the block that answer gives is the worst the real age can give.
+  const ageKnown = !ageApplies || viewerAge.state === "ready";
+  const age = ageApplies
+    ? {
+        state:
+          viewerAge.state === "ready"
+            ? ageGateState({ req: ageReq, viewerAge: viewerAge.value })
+            : ("unknown_age" as const),
+        req: ageReq!,
+      }
+    : undefined;
   // Until the flow state is known it counts as nothing (fail closed): those inputs only lift blocks, so a viewer with
   // no block now has none whatever they turn out to be, and an account-level block shows at once.
   const flowKnown = input.flow === "ready";
@@ -226,8 +284,15 @@ export function payEntryView(input: {
     payments: child.value.payments,
     ageUnknown: child.value.ageUnknown,
     guardianReady: guardian.value,
+    isHost: input.isHost,
+    age,
   });
   if (!block) return { kind: "clear" };
+  if (block.kind === "age" && !ageKnown) {
+    return viewerAge.state === "error" || input.flow === "error"
+      ? { kind: "check_failed" }
+      : { kind: "checking" };
+  }
   if (!flowKnown && dependsOnFlow(block)) {
     return input.flow === "error" ? { kind: "check_failed" } : { kind: "checking" };
   }
@@ -242,13 +307,15 @@ export function payEntryView(input: {
 
 /**
  * Whether the block card comes before the "Waiting on host approval" card. It does, except for a lock the host's
- * approval lifts (in progress, closed by the host, past the cutoff) while the viewer's request is still pending: there
+ * approval lifts (in progress, closed by the host, past the cutoff), or the game's age range, while the viewer's
+ * request is still pending: there
  * "Payment unlocks after the host approves you" is true. A 13-15 or consent-locked account, a cancelled or ended game,
  * a guardian's switch or a missing guardian approval is never lifted by the host, so it is said first.
  */
 export function blockOutranksApproval(block: PayEntryBlock, requestPending: boolean): boolean {
-  if (block.kind !== "locked") return true;
   if (!requestPending) return true;
+  if (block.kind === "age") return false;
+  if (block.kind !== "locked") return true;
   return !(block.joinState && IN_FLOW_EXEMPT.has(block.joinState));
 }
 

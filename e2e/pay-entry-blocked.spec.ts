@@ -300,3 +300,89 @@ test("a host-closed paid game: a host-approved viewer still gets the payment opt
 
   await ctx.close();
 });
+
+/**
+ * The game's age range (owner decision 2026-11-18, #430 question 4). The viewer's age comes from get_my_birthday, as on
+ * the game page (useMyAge); it is answered here so the spec does not depend on the fixture account's birthday.
+ */
+async function serveMyBirthday(page: Page, answer: { yearsAgo: number } | "error") {
+  await page.route(
+    (u) => String(u).includes("/rest/v1/rpc/get_my_birthday"),
+    async (route) => {
+      if (answer === "error") {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "e2e: birthday read failed" }),
+        });
+        return;
+      }
+      const d = new Date();
+      const iso = `${d.getFullYear() - answer.yearsAgo}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      await fulfillJson(route, iso);
+    },
+  );
+}
+
+test("an age-ranged paid game: a new viewer outside the range gets the block card, with the game page's wording", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: { min_age: 50 }, requiresApproval: false, request: null });
+  await serveMyBirthday(page, { yearsAgo: 40 });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  const card = page.getByTestId("pay-entry-blocked");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toHaveAttribute("data-block", "age");
+  await expect(card).toHaveAttribute("data-mode", "replace");
+  await expect(card).toContainText(
+    "This game is 50+ — the host reviews requests outside that range.",
+  );
+  await expect(card.getByRole("link", { name: /back to game/i })).toBeVisible();
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+test("an age-ranged paid game: a failed age read offers a retry, not the handles and not 'add your birthday'", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: { min_age: 50 }, requiresApproval: false, request: null });
+  await serveMyBirthday(page, "error");
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByTestId("pay-entry-check-failed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/add your birthday/i)).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+test("an age-ranged paid game: a host-approved viewer outside the range still gets the payment options", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: { min_age: 50 }, requiresApproval: true, request: "approved" });
+  await serveMyBirthday(page, { yearsAgo: 40 });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  // The server's age rule lets an approved player through (AGE_REQUIREMENT_NOT_MET skips approved players).
+  await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Venmo` })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(VENMO_HANDLE)).toBeVisible();
+  await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
+
+  await ctx.close();
+});
