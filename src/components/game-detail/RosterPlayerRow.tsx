@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { reviewJoinRequest, getSignedProofUrl, type JoinRequest } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
+import { PAID_NOT_PLACED_MESSAGE } from "@/lib/payments-policy";
 import { playAttentionPing } from "@/lib/attention-ping";
 import { formatHoldRemaining, holdExpiresAt, useNow } from "@/lib/payment-hold";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -171,6 +172,11 @@ export function RosterPlayerRow({
         toast.info("Already up to date.");
         return;
       }
+      if (next === "verified" && res.placed === false) {
+        // The server told the player and the host that the place could not be given; don't say "all set".
+        toast.warning(PAID_NOT_PLACED_MESSAGE);
+        return;
+      }
       if (notifyType) {
         await createNotification({
           user_id: req.player_id,
@@ -220,6 +226,10 @@ export function RosterPlayerRow({
       });
       if (!res.changed) {
         toast.info("Already marked as paid.");
+        return;
+      }
+      if (res.placed === false) {
+        toast.warning(PAID_NOT_PLACED_MESSAGE);
         return;
       }
       await createNotification({

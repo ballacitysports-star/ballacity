@@ -8,6 +8,13 @@ type From = Next | "disputed" | "cancelled";
 export type ReviewPaymentResult = {
   ok: true;
   changed: boolean;
+  /**
+   * Set when this call verified the payment: whether the player now holds a roster place (true), could not be given
+   * one and the host and the player were both sent a "payment_not_placed" notice (false), or neither is known (null:
+   * the placement or its notice failed, or the game is gone), in which case the caller says what it says for any
+   * verified payment.
+   */
+  placed?: boolean | null;
   submission: {
     id: string;
     status: From;
@@ -17,6 +24,21 @@ export type ReviewPaymentResult = {
     host_id: string;
   };
 };
+
+/**
+ * After the host verified a payment: give the player their roster place. A place that cannot be given is reported to
+ * both sides by addPaidPlayerToRoster; the verification itself stands either way. False only when those notices were
+ * written, so the caller never tells the host a notice went out that did not.
+ */
+async function placeVerifiedPlayer(gameId: string, playerId: string): Promise<boolean | null> {
+  try {
+    const { addPaidPlayerToRoster, placedAfterVerify } = await import("./roster-on-payment.server");
+    return placedAfterVerify(await addPaidPlayerToRoster(gameId, playerId));
+  } catch (e) {
+    console.error("[payments] roster placement after verification failed", e);
+    return null;
+  }
+}
 
 /**
  * Idempotent host action on a player's payment for a game.
@@ -177,13 +199,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         }
         throw new Error(insErr.message);
       }
-      {
-        const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-        await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
-      }
       return {
         ok: true,
         changed: true,
+        placed: await placeVerifiedPlayer(gameId, playerId),
         submission: inserted as ReviewPaymentResult["submission"],
       };
     }
@@ -232,13 +251,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       };
     }
 
-    if (next === "verified") {
-      const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-      await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
-    }
     return {
       ok: true,
       changed: true,
+      ...(next === "verified" ? { placed: await placeVerifiedPlayer(gameId, playerId) } : {}),
       submission: updated as ReviewPaymentResult["submission"],
     };
   });

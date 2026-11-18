@@ -42,7 +42,7 @@ import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useMyChildStatus } from "@/lib/child-safety";
-import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import { PAID_NOT_PLACED_MESSAGE, PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
@@ -399,9 +399,12 @@ export function HostPaymentsPanel({
       const res = await reviewPaymentAction({
         data: { gameId: row.game_id, playerId: row.player_id, next, expectedFrom: row.status },
       });
+      const notPlaced = next === "verified" && res.placed === false;
       if (!res.changed) toast.info("Already up to date.");
+      else if (notPlaced) toast.warning(PAID_NOT_PLACED_MESSAGE);
       else toast.success(next === "verified" ? "Payment verified." : "Payment declined.");
-      if (res.changed) {
+      // A verified payment without a place: the server already told the player, so don't say "all set".
+      if (res.changed && !notPlaced) {
         await createNotification({
           user_id: row.player_id,
           type: next === "verified" ? "payment_verified" : "payment_rejected",

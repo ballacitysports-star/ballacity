@@ -202,7 +202,6 @@ test("a host-closed paid game: a new viewer gets the block card, not the host's 
   const card = page.getByTestId("pay-entry-blocked");
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toHaveAttribute("data-block", "locked");
-  await expect(card).toHaveAttribute("data-mode", "replace");
   await expect(card).toContainText(/you can't pay for this game/i);
   await expect(card).toContainText(/the host has closed joining for this game/i);
   await expect(card).toContainText(/don't send the host any money/i);

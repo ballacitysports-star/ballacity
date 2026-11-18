@@ -237,7 +237,8 @@ function PayPage() {
   const rosterLoad = useRosterLoadState();
   // The game page's checks for a new join (lockedForNewJoin, consentBlocksNewJoin) never ran for a player who came
   // here by its Pay Host link, an invite or a bookmark; payEntryView asks them again before any payment is offered.
-  // No roster count: a full game keeps its "just filled up" warning below.
+  // No roster count: a full game keeps its "just filled up" warning below (the database refuses the claim itself,
+  // GAME_FULL, for a player not on the roster).
   const joinGate = useJoinGate(game);
   const childQuery = useMyChildStatus();
   const { can: canChildFeature } = childQuery;
@@ -256,9 +257,9 @@ function PayPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   // The viewer was already shown how to pay (a method picked while nothing blocked them, or a payment app opened
-  // from this page in this tab). A block that turns up after that warns above the proof form instead of hiding it.
+  // from this page in this tab). A block that turns up after that tells them to ask the host for a refund.
   // Held per game: the route component stays mounted from /games/A/pay to /games/B/pay, and a start on A says
-  // nothing about B (it would turn B's block into a warning above B's proof form).
+  // nothing about B (it would tell B's viewer to ask for a refund of money they never sent).
   const [paymentStartedFor, setPaymentStartedFor] = useState<string | null>(null);
   const paymentStarted = paymentStartedFor === gameId;
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
@@ -623,7 +624,6 @@ function PayPage() {
     paymentStarted:
       paymentStarted ||
       (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
-    onProofStep: !!picked,
     isHost,
     ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
     viewerAge: myAge.loading
@@ -700,7 +700,7 @@ function PayPage() {
   const hasSubmission = mySubs.length > 0;
   // The block card replaces every payment option. It comes before "Waiting on host approval" unless the host's
   // approval would lift it (blockOutranksApproval), so a 13-15 is never told payment unlocks after approval.
-  const blockCard = entryView.kind === "blocked" && entryView.mode === "replace" ? entryView : null;
+  const blockCard = entryView.kind === "blocked" ? entryView : null;
   // The host's setting, or (as on the game page) a pending request from a viewer outside the game's age range.
   const approvalGateActive = payAwaitsApproval({
     hostRequiresApproval: requiresApproval,
@@ -710,7 +710,6 @@ function PayPage() {
   });
   const blockCardFirst =
     !!blockCard && blockOutranksApproval(blockCard.block, myReq?.status === "pending");
-  const proofWarning = entryView.kind === "blocked" && entryView.mode === "warn" ? entryView : null;
   // The approval card's wording rests on the viewer's request ("Send a request to join first" when there is none), so
   // it waits for that read like a block does.
   const pendingCheck: "checking" | "check_failed" | null =
@@ -814,7 +813,8 @@ function PayPage() {
             aria-live="assertive"
             className="mt-3 text-[11px] font-semibold text-coral"
           >
-            This game just filled up — message the host before submitting.
+            This game just filled up, so the host can't record a payment for it. Message the host
+            before you pay.
           </p>
         )}
       </div>
@@ -1042,7 +1042,6 @@ function PayPage() {
         </div>
       ) : (
         <>
-          {proofWarning && <PayEntryBlockedCard view={proofWarning} gameId={game.id} />}
           <PaymentInstructionsAndProof
             game_id={game.id}
             game_title={game.title}
@@ -1097,8 +1096,9 @@ function PayPage() {
 }
 
 /**
- * "You can't pay for this game": in place of the payment options (mode 'replace'), or above the proof form for a
- * viewer who was already shown how to pay (mode 'warn').
+ * "You can't pay for this game", in place of the payment options and the proof form. The database refuses the
+ * viewer's own manual claim for every block (payEntryView), so a viewer who already paid is told to ask the host for
+ * a refund, not to submit proof.
  */
 function PayEntryBlockedCard({
   view,
@@ -1107,38 +1107,32 @@ function PayEntryBlockedCard({
   view: Extract<PayEntryView, { kind: "blocked" }>;
   gameId: string;
 }) {
-  const warn = view.mode === "warn";
   return (
     <div
-      className={`rounded-2xl border border-coral/40 bg-coral/10 p-5${warn ? " mb-4" : ""}`}
+      className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
       role="status"
       aria-live="polite"
       data-testid="pay-entry-blocked"
       data-block={view.block.kind}
-      data-mode={view.mode}
     >
       <div className="flex items-center gap-2 font-display text-sm font-bold">
         <AlertCircle className="h-4 w-4 text-coral" /> You can't pay for this game
       </div>
       <p className="text-xs text-muted-foreground mt-1">{view.block.message}</p>
       <p className="text-xs text-muted-foreground mt-1">
-        {warn
-          ? "Don't send the host any money for it. If you already paid, submit proof below so the host can see it and refund you."
-          : view.paymentStarted
-            ? "Don't send the host any money for it. If you already paid, message the host to ask for a refund."
-            : "Don't send the host any money for it."}
+        {view.paymentStarted
+          ? "Don't send the host any money for it. If you already paid, message the host to ask for a refund."
+          : "Don't send the host any money for it."}
       </p>
-      {!warn && (
-        <div className="mt-3">
-          <Link
-            to="/games/$gameId"
-            params={{ gameId }}
-            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
-          >
-            Back to game
-          </Link>
-        </div>
-      )}
+      <div className="mt-3">
+        <Link
+          to="/games/$gameId"
+          params={{ gameId }}
+          className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Back to game
+        </Link>
+      </div>
     </div>
   );
 }
