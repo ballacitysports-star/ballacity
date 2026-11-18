@@ -268,9 +268,14 @@ link and then the pay page's block card, as guardedOpenJoin intends).
   loading for a viewer it would ask (the "Loading payment options…" card, never the options); `ask` otherwise,
   including a failed read (fail closed, as src/lib/risk-ack-tap.ts does) and a flow state that failed to load. The
   pay page draws the existing `RiskAcknowledgmentDialog` in place of the payment options, after any block card,
-  pending check or approval card. Agreeing calls `recordSafetyAck({ gameId, kind: "participant_risk" })` (the join
-  path's write: same table, kind, version `SAFETY_ACK_VERSION` and idempotent upsert) and re-reads it; the options
-  then show. Cancel leaves a "Before you join" card (`data-testid="pay-risk-ack-required"`) with no payment options,
+  pending check or approval card, and only once the host's payment settings have answered (`payRiskAckStep`: `held`
+  until then, so the settings' "Loading payment options…" or "Couldn't reach the payment service" card shows; the
+  settings' `requires_approval` decides whether the approval card comes first, and the dialog used to open, then
+  close by itself when it arrived). Agreeing calls `recordSafetyAck({ gameId, kind: "participant_risk" })` (the join
+  path's write: same table, kind, version `SAFETY_ACK_VERSION` and idempotent upsert), then writes the current version
+  into useSafetyAck's cache (`safetyAckQueryKey`) and re-reads in the background, so a failing re-read cannot keep the
+  dialog open over a recorded acknowledgment (the join path carries on after its write too); the options then show.
+  A failed write keeps the dialog and shows a toast. Cancel leaves a "Before you join" card (`data-testid="pay-risk-ack-required"`) with no payment options,
   "Review and agree" (opens the dialog again) and "Back to game". The stepper and the "already started paying" latch
   wait for it too.
 - **Age range on the pay page (#430 question 4).** The game page's source and rule: `useMyAge()` (get_my_birthday)
@@ -283,8 +288,11 @@ link and then the pay page's block card, as guardedOpenJoin intends).
   server's age rule (enforce_game_age_requirement and AGE_REQUIREMENT_NOT_MET skip approved and rostered players). It
   is only asked on a game with a range: until the age has loaded the range counts as not met, so a viewer it could
   block sees `checking`, and a failed read (useMyAge now reports `error` and can `retry`) sees `check_failed`, not
-  "Add your birthday". A pending request keeps the approval card (`blockOutranksApproval`: the host's approval lifts
-  it). A viewer who already started paying gets the `warn` card above the proof form: the claim is still recorded
+  "Add your birthday". A pending request gets "Waiting on host approval", not the age card, whether or not the host's
+  settings require approval: `blockOutranksApproval` puts the approval card first, and `payAwaitsApproval` raises it
+  on an open game too, as the game page's `requiresApproval` does for a viewer outside the range (the host's approval
+  lifts the age rule). With no request, or a declined one, the age card stays. useMyAge's answer belongs to the
+  account signed in now: it reads again, and is `loading` meanwhile, when the account changes without a remount. A viewer who already started paying gets the `warn` card above the proof form: the claim is still recorded
   (no age check on payment_submissions, section 6).
 - **Game page, cancelled games.** `PaymentRequiredBanner` takes `takesPayment = !gameTakesNoPayment(joinState,
 holdsPlace)` and draws nothing on a cancelled game, or an ended one for a viewer without a place (it used to say
@@ -444,3 +452,16 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
   banner's `takesPayment` check removed; `!pending` dropped from unpaidOnGameTakingNoPayment; payRiskAckView showing
   the options while the read waits, or while the flow state loads; the age block's approved exemption removed; an age
   still loading counted as in range; useMyAge ignoring an RPC error.
+
+### Round 6 (review fixes, branch claude/pay-risk-ack-age)
+
+- Fixed: "Before you join" waits for the host's settings (`payRiskAckStep`); a successful ack write lifts the dialog
+  even when the re-read fails (`safetyAckQueryKey` + setQueryData); a pending viewer outside the age range on an open
+  game gets "Waiting on host approval" (`payAwaitsApproval`); useMyAge is keyed by the signed-in account.
+- `npx vitest run` (full): 407 files, 4264 passed, 22 skipped. pay-entry-gate.test.ts: 102; use-my-age.test.tsx: 5.
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh: pay-risk-ack-before-pay and pay-entry-blocked, 11 passed (4 new tests).
+- Mutation checks. E2E: with the three page fixes reverted (settings not awaited, re-read only, age-pending not an
+  approval wait) the four new tests fail and the other seven pass. Unit: payRiskAckStep without the settings check
+  fails 3 tests; payAwaitsApproval without the age clause fails 1; useMyAge keyed without the user id fails 1.

@@ -13,8 +13,8 @@ import {
  * venue-filtered card focuses that venue and still opens the booking sheet.
  *
  * The booking sheet itself has no venue: it asks only for a session type,
- * date, time and duration, and BookPrefill.venue (which the profile fills in)
- * is not read by it. So nothing here claims the venue reaches the sheet.
+ * date, time and duration, and the profile passes it none. So nothing here
+ * claims the venue reaches the sheet.
  *
  * The directory is fixed (two coaches at two venues, see
  * helpers/misc-trainer-directory.ts) so the filter always has something to
