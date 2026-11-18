@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
@@ -13,10 +14,14 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { createPaymentSubmission } from "./payments";
 import {
+  CLAIM_REFUSED_REFUND_STEP,
   PAYMENTS_AGE_REQUIRED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
   PAYMENTS_HOST_AGE_REQUIRED_MESSAGE,
   PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE,
+  PAYMENT_CLAIM_REFUSAL_CODES,
+  PAYMENT_PRECONDITION_MESSAGES,
+  paymentClaimRefusalMessage,
   paymentSubmissionErrorMessage,
 } from "./payments-policy";
 
@@ -76,6 +81,66 @@ describe("paymentSubmissionErrorMessage (20261111120000)", () => {
 
   it("passes any other error through unchanged", () => {
     expect(paymentSubmissionErrorMessage("network down")).toBe("network down");
+  });
+});
+
+describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261119200000)", () => {
+  /** Each code the trigger raises, with the sentence it raises it with, read from the migration itself. */
+  const raised = [
+    ...readFileSync(
+      new URL(
+        "../../supabase/migrations/20261119200000_payment_claim_preconditions.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ).matchAll(/WHEN '([A-Z_]+)' THEN '((?:[^']|'')*)'/g),
+  ].map(([, code, sentence]) => ({
+    code: code!,
+    raw: `${code}: ${sentence!.replace(/''/g, "'")}`,
+  }));
+
+  it("knows every code the trigger raises, and only those", () => {
+    expect(raised.map((r) => r.code).sort()).toEqual([...PAYMENT_CLAIM_REFUSAL_CODES].sort());
+  });
+
+  it.each(PAYMENT_CLAIM_REFUSAL_CODES)(
+    "%s reads as PayPal's sentence, without saying nothing was charged, then how to get money back",
+    (code) => {
+      const { raw } = raised.find((r) => r.code === code)!;
+      const msg = paymentSubmissionErrorMessage(raw);
+      expect(msg).toBe(paymentClaimRefusalMessage(code));
+      const reason = PAYMENT_PRECONDITION_MESSAGES[code]!.replace(/ You weren't charged\.$/, "");
+      expect(msg).toBe(`${reason} ${CLAIM_REFUSED_REFUND_STEP}`);
+      // The money may already have moved in the player's payment app, and no row tells the host.
+      expect(msg).not.toMatch(/charged/i);
+      expect(msg).toMatch(/message them to ask for it back\.$/);
+      expect(msg).not.toContain(code);
+      expect(msg.length).toBeGreaterThan(10);
+    },
+  );
+
+  it("gives the plain sentences the player sees", () => {
+    expect(paymentSubmissionErrorMessage("GAME_FULL: this game is full.")).toBe(
+      "This game is full. If you already sent the host money, message them to ask for it back.",
+    );
+    expect(paymentSubmissionErrorMessage("GAME_CANCELLED: x")).toBe(
+      "This game was cancelled. If you already sent the host money, message them to ask for it back.",
+    );
+    expect(paymentSubmissionErrorMessage("GAME_PARTICIPATION_BLOCKED: x")).toBe(
+      "A parent or guardian has to allow game participation before you can pay. If you already sent the host money, message them to ask for it back.",
+    );
+  });
+
+  it("matches whole codes at the start only", () => {
+    // A longer code that merely ends in one of these is not that code.
+    const child =
+      "CHILD_GAME_PARTICIPATION_BLOCKED: a parent or guardian must approve this account.";
+    expect(paymentSubmissionErrorMessage(child)).toBe(child);
+    // Other codes and plain errors pass through as before.
+    expect(paymentSubmissionErrorMessage("PAYMENT_IN_PROGRESS: x")).toBe("PAYMENT_IN_PROGRESS: x");
+    expect(paymentSubmissionErrorMessage("network down: GAME_FULL")).toBe(
+      "network down: GAME_FULL",
+    );
   });
 });
 

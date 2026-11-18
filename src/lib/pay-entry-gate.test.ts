@@ -329,7 +329,6 @@ describe("payEntryView", () => {
     child: readyChild,
     guardian: ready(true),
     paymentStarted: false,
-    onProofStep: false,
   };
 
   describe("fails closed for minor safety", () => {
@@ -445,14 +444,13 @@ describe("payEntryView", () => {
       ).toMatchObject({ kind: "blocked", block: { kind: "locked" } });
     });
 
-    it("never warns above the proof form before the flow state is known", () => {
+    it("never shows a block before the flow state is known, even after a start", () => {
       expect(
         payEntryView({
           ...base,
           gate: gateFor("closed_cutoff"),
           flow: "loading",
           paymentStarted: true,
-          onProofStep: true,
         }),
       ).toEqual({ kind: "checking" });
     });
@@ -464,99 +462,55 @@ describe("payEntryView", () => {
 
   it("blocks a host-approved guarded minor whose guardian has not approved", () => {
     const view = payEntryView({ ...base, approved: true, guardian: ready(false) });
-    expect(view).toMatchObject({ kind: "blocked", mode: "replace", block: { kind: "guardian" } });
+    expect(view).toMatchObject({ kind: "blocked", block: { kind: "guardian" } });
   });
 
-  describe("a viewer who already started paying (don't strand them)", () => {
-    it("warns above the proof form on a locked game: the claim is still recorded", () => {
-      const view = payEntryView({
-        ...base,
-        gate: gateFor("closed_cutoff"),
-        paymentStarted: true,
-        onProofStep: true,
-      });
-      expect(view).toMatchObject({
+  describe("a viewer who already started paying", () => {
+    // The database refuses their own manual claim for every block (zz_payment_claim_preconditions, the cohort and
+    // guardian triggers), so the card replaces the proof form and tells them to ask the host for a refund.
+    const started = { ...base, paymentStarted: true };
+    const participationOff = {
+      state: "ready" as const,
+      value: {
+        participation: { allowed: false, reason: "off" },
+        payments: allowed,
+        ageUnknown: false,
+      },
+    };
+    const paymentsOff = {
+      state: "ready" as const,
+      value: {
+        participation: allowed,
+        payments: { allowed: false, level: "blocked" as const, reason: null },
+        ageUnknown: false,
+      },
+    };
+
+    it.each([
+      ["closed past the cutoff", { gate: gateFor("closed_cutoff") }, "locked"],
+      ["closed by the host", { gate: gateFor("closed_by_host") }, "locked"],
+      [
+        "cancelled, even for an approved viewer",
+        { approved: true, gate: gateFor("cancelled") },
+        "locked",
+      ],
+      ["ended", { gate: gateFor("completed") }, "locked"],
+      ["in progress", { gate: gateFor("in_progress") }, "locked"],
+      ["a guardian turned games off", { child: participationOff }, "participation"],
+      ["payments not available", { child: paymentsOff }, "payments"],
+      ["no guardian approval", { guardian: ready(false) }, "guardian"],
+    ] as const)("%s: one block card, no proof form, refund advice", (_label, over, kind) => {
+      const view = payEntryView({ ...started, ...over });
+      expect(view).toEqual({
         kind: "blocked",
-        mode: "warn",
         paymentStarted: true,
-        block: { kind: "locked" },
+        block: expect.objectContaining({ kind }),
       });
     });
 
-    it("warns above the proof form on a cancelled game too", () => {
-      const view = payEntryView({
-        ...base,
-        approved: true,
-        gate: gateFor("cancelled"),
-        paymentStarted: true,
-        onProofStep: true,
-      });
-      expect(view).toMatchObject({ kind: "blocked", mode: "warn" });
-    });
-
-    it("warns above the proof form when a guardian turned games off", () => {
-      const view = payEntryView({
-        ...base,
-        child: {
-          state: "ready",
-          value: {
-            participation: { allowed: false, reason: "off" },
-            payments: allowed,
-            ageUnknown: false,
-          },
-        },
-        paymentStarted: true,
-        onProofStep: true,
-      });
-      expect(view).toMatchObject({
-        kind: "blocked",
-        mode: "warn",
-        block: { kind: "participation" },
-      });
-    });
-
-    it("replaces the options when the claim would be refused anyway (payments, guardian)", () => {
-      const payments = payEntryView({
-        ...base,
-        child: {
-          state: "ready",
-          value: {
-            participation: allowed,
-            payments: { allowed: false, level: "blocked", reason: null },
-            ageUnknown: false,
-          },
-        },
-        paymentStarted: true,
-        onProofStep: true,
-      });
-      expect(payments).toMatchObject({ kind: "blocked", mode: "replace", paymentStarted: true });
-      const guardian = payEntryView({
-        ...base,
-        guardian: ready(false),
-        paymentStarted: true,
-        onProofStep: true,
-      });
-      expect(guardian).toMatchObject({ kind: "blocked", mode: "replace", paymentStarted: true });
-    });
-
-    it("replaces the options when no method is on screen (the picker would show the handles)", () => {
-      const view = payEntryView({
-        ...base,
-        gate: gateFor("closed_by_host"),
-        paymentStarted: true,
-        onProofStep: false,
-      });
-      expect(view).toMatchObject({ kind: "blocked", mode: "replace" });
-    });
-
-    it("replaces the options for a viewer who has not started (a preselected method is not a start)", () => {
-      const view = payEntryView({
-        ...base,
-        gate: gateFor("closed_by_host"),
-        paymentStarted: false,
-        onProofStep: true,
-      });
-      expect(view).toMatchObject({ kind: "blocked", mode: "replace", paymentStarted: false });
+    it("says nothing about a refund to a viewer who has not started", () => {
+      const view = payEntryView({ ...base, gate: gateFor("closed_by_host") });
+      expect(view).toMatchObject({ kind: "blocked", paymentStarted: false });
     });
   });
 });
