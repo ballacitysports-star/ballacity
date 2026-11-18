@@ -14,6 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { createPaymentSubmission } from "./payments";
 import {
+  CLAIM_REFUSED_REFUND_STEP,
   PAYMENTS_AGE_REQUIRED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
   PAYMENTS_HOST_AGE_REQUIRED_MESSAGE,
@@ -103,14 +104,16 @@ describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (202
   });
 
   it.each(PAYMENT_CLAIM_REFUSAL_CODES)(
-    "%s reads as PayPal's sentence, without saying nothing was charged",
+    "%s reads as PayPal's sentence, without saying nothing was charged, then how to get money back",
     (code) => {
       const { raw } = raised.find((r) => r.code === code)!;
       const msg = paymentSubmissionErrorMessage(raw);
       expect(msg).toBe(paymentClaimRefusalMessage(code));
-      expect(`${msg} You weren't charged.`).toBe(PAYMENT_PRECONDITION_MESSAGES[code]);
-      // The money may already have moved in the player's payment app.
+      const reason = PAYMENT_PRECONDITION_MESSAGES[code]!.replace(/ You weren't charged\.$/, "");
+      expect(msg).toBe(`${reason} ${CLAIM_REFUSED_REFUND_STEP}`);
+      // The money may already have moved in the player's payment app, and no row tells the host.
       expect(msg).not.toMatch(/charged/i);
+      expect(msg).toMatch(/message them to ask for it back\.$/);
       expect(msg).not.toContain(code);
       expect(msg.length).toBeGreaterThan(10);
     },
@@ -118,11 +121,13 @@ describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (202
 
   it("gives the plain sentences the player sees", () => {
     expect(paymentSubmissionErrorMessage("GAME_FULL: this game is full.")).toBe(
-      "This game is full.",
+      "This game is full. If you already sent the host money, message them to ask for it back.",
     );
-    expect(paymentSubmissionErrorMessage("GAME_CANCELLED: x")).toBe("This game was cancelled.");
-    expect(paymentSubmissionErrorMessage("BLOCKED_BY_HOST: x")).toBe(
-      "You can't join this host's games.",
+    expect(paymentSubmissionErrorMessage("GAME_CANCELLED: x")).toBe(
+      "This game was cancelled. If you already sent the host money, message them to ask for it back.",
+    );
+    expect(paymentSubmissionErrorMessage("GAME_PARTICIPATION_BLOCKED: x")).toBe(
+      "A parent or guardian has to allow game participation before you can pay. If you already sent the host money, message them to ask for it back.",
     );
   });
 

@@ -58,13 +58,21 @@ export type PaymentClaimRefusalCode = (typeof PAYMENT_CLAIM_REFUSAL_CODES)[numbe
 const NOT_CHARGED = " You weren't charged.";
 
 /**
+ * What a player whose manual claim was refused does about money they may already have sent: the refused claim writes
+ * no row, so the host is not told of it and has nothing to refund from.
+ */
+export const CLAIM_REFUSED_REFUND_STEP =
+  "If you already sent the host money, message them to ask for it back.";
+
+/**
  * What the player reads when their manual claim is refused: PayPal's wording for the same code, without "You weren't
- * charged." A manual payment is sent in the player's own payment app before the claim is written, so the money may
- * already have moved.
+ * charged." (a manual payment is sent in the player's own payment app before the claim is written, so the money may
+ * already have moved), followed by how to get it back (CLAIM_REFUSED_REFUND_STEP).
  */
 export function paymentClaimRefusalMessage(code: PaymentClaimRefusalCode): string {
   const message = PAYMENT_PRECONDITION_MESSAGES[code]!;
-  return message.endsWith(NOT_CHARGED) ? message.slice(0, -NOT_CHARGED.length) : message;
+  const reason = message.endsWith(NOT_CHARGED) ? message.slice(0, -NOT_CHARGED.length) : message;
+  return `${reason} ${CLAIM_REFUSED_REFUND_STEP}`;
 }
 
 /** The claim-refusal code a database error starts with ("GAME_FULL: ..."), whole codes only. */
