@@ -441,3 +441,50 @@ export function payRiskAckView(input: {
   // Not on file: a viewer whose place, payment or approval has not been read yet may be exempt.
   return input.flow === "loading" ? "checking" : "ask";
 }
+
+/**
+ * What the pay page draws for "Before you join" (payRiskAckView) once its other cards have had their say:
+ *   - 'none': nothing; either no acknowledgment is owed, or a block card, a pending check or the approval card stands
+ *     in front of the payment options (`outranked`), so asking would be for options the viewer could not use.
+ *   - 'held': an acknowledgment is owed (or still being read), but the host's payment settings are not known yet
+ *     (`settings` 'loading') or could not be read ('error'). Those settings decide whether the approval card outranks
+ *     the dialog (requires_approval), so the dialog must not open before them: it would open, then close by itself
+ *     when "Waiting on host approval" arrives, or ask in front of "Couldn't reach the payment service". The page shows
+ *     its settings card (loading, or Retry) in its place. The payment options stay hidden: they wait on
+ *     payRiskAckView's own answer as well.
+ *   - 'checking' / 'ask': payRiskAckView's, once the settings are known.
+ */
+export type PayRiskAckStep = "none" | "held" | "checking" | "ask";
+
+export function payRiskAckStep(input: {
+  riskAck: PayRiskAckView;
+  /** A block card, a pending check or the approval card is on screen in place of the payment options. */
+  outranked: boolean;
+  /** The host's payment settings and methods (getGamePaymentSettings, listPaymentMethodsForHost). */
+  settings: "loading" | "error" | "ready";
+}): PayRiskAckStep {
+  if (input.outranked || input.riskAck === "none") return "none";
+  if (input.settings !== "ready") return "held";
+  return input.riskAck;
+}
+
+/**
+ * Whether the pay page shows "Waiting on host approval" in place of the payment options. As on the game page
+ * (requiresApproval = the host's setting, or the viewer outside the game's age range), a viewer whose only block is
+ * the age range and whose request is pending waits on the host: their approval lifts the age rule
+ * (enforce_game_age_requirement and AGE_REQUIREMENT_NOT_MET skip approved players), so "Payment unlocks after the
+ * host approves you" is true, and "You can't pay for this game" would not be. With no request, or a declined one, the
+ * age block card stays.
+ */
+export function payAwaitsApproval(input: {
+  /** The host's payment settings require approval (game_payment_settings.requires_approval). */
+  hostRequiresApproval: boolean;
+  approved: boolean;
+  requestPending: boolean;
+  /** The block card payEntryView would draw in place of the payment options, if any. */
+  replaceBlock: PayEntryBlock | null;
+}): boolean {
+  if (input.approved) return false;
+  if (input.hostRequiresApproval) return true;
+  return input.requestPending && input.replaceBlock?.kind === "age";
+}

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -77,13 +78,15 @@ import {
   blockOutranksApproval,
   checkStateOf,
   payEntryView,
+  payAwaitsApproval,
   payPalOffered,
+  payRiskAckStep,
   payRiskAckView,
   type PayEntryView,
 } from "@/lib/pay-entry-gate";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
-import { RISK_ACKNOWLEDGMENT } from "@/lib/safety";
-import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
+import { recordSafetyAck, safetyAckQueryKey, useSafetyAck } from "@/lib/safety-acks";
 import { riskAckReadFrom } from "@/lib/risk-ack-tap";
 import { useGamePaymentGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
@@ -220,6 +223,7 @@ function PayPage() {
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const { isParentMode } = useParentMode();
   const userId = user?.id ?? null;
   const hasGame = !!game;
@@ -656,7 +660,13 @@ function PayPage() {
     try {
       // The join path's write (game page confirmRiskAck): same kind, same version, idempotent.
       await recordSafetyAck({ gameId, kind: "participant_risk" });
-      await riskAckQuery.refetch();
+      // The write succeeded: the current version is on file. Say so in the cache at once, as the join path carries on
+      // after its write whatever a re-read says, so a failing ack read (the case the fail-closed rule exists for) does
+      // not keep the dialog open over an acknowledgment already recorded. The re-read runs in the background; if it
+      // fails, react-query keeps this answer.
+      const key = safetyAckQueryKey(user?.id, gameId, "participant_risk");
+      queryClient.setQueryData(key, SAFETY_ACK_VERSION);
+      void queryClient.invalidateQueries({ queryKey: key });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Couldn't record your acknowledgment");
     } finally {
@@ -686,12 +696,18 @@ function PayPage() {
   const fee = settings?.entry_fee ?? game.price;
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
-  const approvalGateActive = requiresApproval && !isApproved;
 
   const hasSubmission = mySubs.length > 0;
   // The block card replaces every payment option. It comes before "Waiting on host approval" unless the host's
   // approval would lift it (blockOutranksApproval), so a 13-15 is never told payment unlocks after approval.
   const blockCard = entryView.kind === "blocked" && entryView.mode === "replace" ? entryView : null;
+  // The host's setting, or (as on the game page) a pending request from a viewer outside the game's age range.
+  const approvalGateActive = payAwaitsApproval({
+    hostRequiresApproval: requiresApproval,
+    approved: isApproved,
+    requestPending: myReq?.status === "pending",
+    replaceBlock: blockCard?.block ?? null,
+  });
   const blockCardFirst =
     !!blockCard && blockOutranksApproval(blockCard.block, myReq?.status === "pending");
   const proofWarning = entryView.kind === "blocked" && entryView.mode === "warn" ? entryView : null;
@@ -706,8 +722,13 @@ function PayPage() {
           : "checking"
         : null;
   // "Before you join" stands in for the payment options only where they would otherwise come next: not in front of a
-  // block card, a pending check or the approval card.
-  const riskAckStep = blockCard || pendingCheck || approvalGateActive ? "none" : riskAck;
+  // block card, a pending check or the approval card, and not before the host's settings have answered (they decide
+  // whether the approval card comes first).
+  const riskAckStep = payRiskAckStep({
+    riskAck,
+    outranked: !!blockCard || !!pendingCheck || approvalGateActive,
+    settings: fetching ? "loading" : fetchTimedOut ? "error" : "ready",
+  });
   const justFilledDuringPay = showFilledUpWarning({
     liveCount,
     spotsLeft,
@@ -823,7 +844,7 @@ function PayPage() {
       <PayApprovalIndicator
         gameId={gameId}
         isPaid={Number(fee) > 0}
-        requiresApproval={requiresApproval}
+        requiresApproval={requiresApproval || approvalGateActive}
       />
 
       {/* Two-step progress (Pay → Confirm) */}

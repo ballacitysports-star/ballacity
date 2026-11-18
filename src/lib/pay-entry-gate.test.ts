@@ -6,7 +6,9 @@ import {
   gameTakesNoPayment,
   payEntryView,
   payHostLinkShown,
+  payAwaitsApproval,
   payPalOffered,
+  payRiskAckStep,
   payRiskAckView,
   unpaidOnGameTakingNoPayment,
   PARTICIPATION_BLOCKED_FALLBACK,
@@ -998,6 +1000,107 @@ describe("unpaidOnGameTakingNoPayment (the game page's join button on a game tha
           }),
         ).toBe(false);
       }
+    }
+  });
+});
+
+describe("payRiskAckStep ('Before you join' waits for the host's payment settings)", () => {
+  it("never opens the dialog before the settings have answered: they decide whether the approval card comes first", () => {
+    // A fresh viewer on an approval-gated game (the default host setting): the ack read answers before the settings,
+    // and the dialog used to open, then close itself when "Waiting on host approval" arrived.
+    for (const riskAck of ["ask", "checking"] as const) {
+      expect(payRiskAckStep({ riskAck, outranked: false, settings: "loading" })).toBe("held");
+    }
+  });
+
+  it("does not ask in front of 'Couldn't reach the payment service'", () => {
+    for (const riskAck of ["ask", "checking"] as const) {
+      expect(payRiskAckStep({ riskAck, outranked: false, settings: "error" })).toBe("held");
+    }
+  });
+
+  it("asks once the settings are known and nothing outranks it", () => {
+    expect(payRiskAckStep({ riskAck: "ask", outranked: false, settings: "ready" })).toBe("ask");
+    expect(payRiskAckStep({ riskAck: "checking", outranked: false, settings: "ready" })).toBe(
+      "checking",
+    );
+  });
+
+  it("gives way to a block card, a pending check or the approval card", () => {
+    for (const settings of ["loading", "error", "ready"] as const) {
+      for (const riskAck of ["ask", "checking", "none"] as const) {
+        expect(payRiskAckStep({ riskAck, outranked: true, settings })).toBe("none");
+      }
+    }
+  });
+
+  it("is 'none' only where payRiskAckView owes nothing (or something outranks it)", () => {
+    for (const settings of ["loading", "error", "ready"] as const) {
+      expect(payRiskAckStep({ riskAck: "none", outranked: false, settings })).toBe("none");
+    }
+  });
+
+  it("with the approval gate decided from loaded settings: an approval-gated game never asks a fresh viewer", () => {
+    const riskAck = payRiskAckView({
+      isHost: false,
+      ...fresh,
+      flow: "ready",
+      read: { state: "answered", version: null },
+    });
+    expect(riskAck).toBe("ask");
+    const gate = (hostRequiresApproval: boolean) =>
+      payAwaitsApproval({
+        hostRequiresApproval,
+        approved: false,
+        requestPending: false,
+        replaceBlock: null,
+      });
+    // Settings still loading: the gate reads requires_approval as false, but the step holds.
+    expect(payRiskAckStep({ riskAck, outranked: gate(false), settings: "loading" })).toBe("held");
+    // Settings arrive with requires_approval: the approval card, no dialog at any point.
+    expect(payRiskAckStep({ riskAck, outranked: gate(true), settings: "ready" })).toBe("none");
+    // An open game: the dialog, once.
+    expect(payRiskAckStep({ riskAck, outranked: gate(false), settings: "ready" })).toBe("ask");
+  });
+});
+
+describe("payAwaitsApproval ('Waiting on host approval' on the pay page)", () => {
+  const age = { kind: "age" as const, message: "This game is 18+ — the host reviews requests." };
+  const base = {
+    hostRequiresApproval: false,
+    approved: false,
+    requestPending: false,
+    replaceBlock: null,
+  };
+
+  it("follows the host's setting until the viewer is approved", () => {
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true })).toBe(true);
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true, requestPending: true })).toBe(
+      true,
+    );
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true, approved: true })).toBe(false);
+    expect(payAwaitsApproval(base)).toBe(false);
+  });
+
+  it("on an open game, waits on the host for a pending viewer outside the age range (as the game page does)", () => {
+    expect(payAwaitsApproval({ ...base, requestPending: true, replaceBlock: age })).toBe(true);
+    // The card that would otherwise show is the age block, and the host's approval lifts it.
+    expect(blockOutranksApproval(age, true)).toBe(false);
+  });
+
+  it("keeps the age block card without a pending request (none, or declined)", () => {
+    expect(payAwaitsApproval({ ...base, replaceBlock: age })).toBe(false);
+  });
+
+  it("never turns another block into an approval wait", () => {
+    for (const block of [
+      { kind: "payments" as const, message: "" },
+      { kind: "participation" as const, message: "" },
+      { kind: "guardian" as const, message: "" },
+      { kind: "locked" as const, message: "", joinState: "cancelled" as const },
+      { kind: "locked" as const, message: "", joinState: "closed_by_host" as const },
+    ]) {
+      expect(payAwaitsApproval({ ...base, requestPending: true, replaceBlock: block })).toBe(false);
     }
   });
 });

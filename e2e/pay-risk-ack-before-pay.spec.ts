@@ -1,7 +1,11 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
 import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
-import { currentSafetyAckVersion, mockRiskNotAcknowledged } from "./helpers/risk-ack";
+import {
+  currentSafetyAckVersion,
+  mockRiskNotAcknowledged,
+  watchRiskDialog,
+} from "./helpers/risk-ack";
 
 /**
  * E2E: "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B, owner decision 2026-11-18).
@@ -17,6 +21,16 @@ import { currentSafetyAckVersion, mockRiskNotAcknowledged } from "./helpers/risk
  *     open the dialog again and a way back to the game;
  *   - ticking the box and "Agree & join" records exactly one participant_risk acknowledgment for the current version
  *     (the join path's write), and only then are the host's handles shown.
+ *
+ * And, around it:
+ *
+ *   - on a game whose host requires approval (the default setting), the dialog never opens before the host's payment
+ *     settings have answered, however late they are: those settings put "Waiting on host approval" first, and the
+ *     dialog used to open, then close by itself when they arrived;
+ *   - when the settings cannot be read, the page offers its Retry card, not the dialog; after a Retry that succeeds,
+ *     the dialog asks;
+ *   - when the acknowledgment read keeps failing, the dialog asks (fail closed), and once the write succeeds the
+ *     handles show even though the re-read still fails (the write's own answer lifts the dialog, as on the join path).
  *
  * The game row, the host's settings and methods, the viewer's request, payments and place, and the guardian check are
  * served, and every acknowledgment or payment write is captured, so nothing depends on, or is written to, the backend.
@@ -51,14 +65,37 @@ async function fulfillJson(route: Route, body: unknown) {
   await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-/** A paid game that needs no approval, two manual methods, and a viewer with no request, payment or place. */
-async function mockPaidOpenGame(page: Page): Promise<{ paymentWrites: string[] }> {
+type SettingsMock = {
+  /** game_payment_settings.requires_approval (default false: an open game). */
+  requiresApproval?: boolean;
+  /** Hold the settings read this long before answering. */
+  settingsDelayMs?: number;
+};
+
+/**
+ * A paid game (open unless `requiresApproval`), two manual methods, and a viewer with no request, payment or place.
+ * Setting `settingsFail.value` makes the settings read answer 500 until it is set back.
+ */
+async function mockPaidOpenGame(
+  page: Page,
+  opts: SettingsMock = {},
+): Promise<{ paymentWrites: string[]; settingsFail: { value: boolean } }> {
   const now = new Date().toISOString();
   const paymentWrites: string[] = [];
+  const settingsFail = { value: false };
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
     async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
+      if (opts.settingsDelayMs) await new Promise((r) => setTimeout(r, opts.settingsDelayMs));
+      if (settingsFail.value) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "e2e: settings unavailable" }),
+        });
+        return;
+      }
       await fulfillJson(route, [
         {
           id: "mock-settings-riskack",
@@ -69,7 +106,7 @@ async function mockPaidOpenGame(page: Page): Promise<{ paymentWrites: string[] }
           payment_deadline: null,
           refund_policy: null,
           payment_instructions: null,
-          requires_approval: false,
+          requires_approval: opts.requiresApproval ?? false,
           created_at: now,
           updated_at: now,
         },
@@ -131,7 +168,7 @@ async function mockPaidOpenGame(page: Page): Promise<{ paymentWrites: string[] }
     },
   );
   await serveFixtureGame(page, payFixtureGameRow(GAME_ID, { price: ENTRY_FEE }));
-  return { paymentWrites };
+  return { paymentWrites, settingsFail };
 }
 
 /** Nothing on the page lets money move: no handle, no Venmo or Cash App link, no proof form. */
@@ -222,6 +259,133 @@ test("a paid open game: the pay page asks 'Before you join' before any payment o
   await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Cash App` })).toBeVisible();
   await expect(page.getByText(VENMO_HANDLE)).toBeVisible();
   expect(riskAck.writes, "one acknowledgment, not one per render").toHaveLength(1);
+  expect(paymentWrites).toEqual([]);
+
+  await ctx.close();
+});
+
+test("an approval-gated paid game: 'Before you join' never opens before the host's settings answer, however late", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+
+  const riskAck = await mockRiskNotAcknowledged(page);
+  // The settings answer well after the viewer's request, payments and acknowledgment reads.
+  const { paymentWrites } = await mockPaidOpenGame(page, {
+    requiresApproval: true,
+    settingsDelayMs: 3_000,
+  });
+  const dialogSeen = await watchRiskDialog(page);
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  const gate = page.getByTestId("approval-required-gate");
+  await expect(gate).toBeVisible({ timeout: 20_000 });
+  await expect(gate).toContainText(/send a request to join first/i);
+  await page.waitForTimeout(1_000);
+  expect(
+    await dialogSeen(),
+    "the dialog must not open before the settings put the approval card first",
+  ).toBe(false);
+  await expect(page.getByRole("dialog", { name: /before you join/i })).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+  expect(riskAck.writes).toEqual([]);
+  expect(paymentWrites).toEqual([]);
+
+  await ctx.close();
+});
+
+test("a paid open game whose settings cannot be read: the Retry card, not the dialog; after a good Retry, the dialog", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+
+  const riskAck = await mockRiskNotAcknowledged(page);
+  const { paymentWrites, settingsFail } = await mockPaidOpenGame(page);
+  settingsFail.value = true;
+  const dialogSeen = await watchRiskDialog(page);
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByText(/couldn't reach the payment service/i)).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.waitForTimeout(1_000);
+  expect(await dialogSeen(), "no dialog in front of 'Couldn't reach the payment service'").toBe(
+    false,
+  );
+  await expectNoPaymentOffered(page);
+
+  settingsFail.value = false;
+  await page.getByRole("button", { name: /^retry$/i }).click();
+  const dialog = page.getByRole("dialog", { name: /before you join/i });
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  await expectNoPaymentOffered(page);
+  expect(riskAck.writes).toEqual([]);
+  expect(paymentWrites).toEqual([]);
+
+  await ctx.close();
+});
+
+test("a failing acknowledgment read: the dialog asks, and after a successful write the handles show", async ({
+  browser,
+}) => {
+  const userId = sessionUserId();
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+
+  const riskAck = await mockRiskNotAcknowledged(page);
+  // Every participant_risk read fails (registered after the mock, so it answers first); writes still reach the mock.
+  let failedReads = 0;
+  await page.route(/\/rest\/v1\/game_safety_acknowledgments(\?|$)/, async (route) => {
+    const req = route.request();
+    const isRiskRead =
+      req.method() === "GET" &&
+      new URL(req.url()).searchParams.get("kind") === "eq.participant_risk";
+    if (!isRiskRead) return route.fallback();
+    failedReads += 1;
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "e2e: acknowledgments unavailable" }),
+    });
+  });
+  const { paymentWrites } = await mockPaidOpenGame(page);
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  // react-query retries a failed first read (about 7 s) before the page counts it as failed and asks.
+  const dialog = page.getByRole("dialog", { name: /before you join/i });
+  await expect(dialog).toBeVisible({ timeout: 25_000 });
+  await expectNoPaymentOffered(page);
+  const readsBeforeAgree = failedReads;
+  await dialog.getByRole("checkbox").click();
+  await dialog.getByRole("button", { name: /^agree & join$/i }).click();
+
+  await expect
+    .poll(() => riskAck.writes.length, { timeout: 10_000, message: "acknowledgment never sent" })
+    .toBe(1);
+  expect(riskAck.writes[0]).toMatchObject({
+    kind: "participant_risk",
+    version: currentSafetyAckVersion(),
+    game_id: GAME_ID,
+    user_id: userId,
+  });
+  await expect(dialog).toBeHidden({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Venmo` })).toBeVisible({
+    timeout: 15_000,
+  });
+  // The re-read after the write fails too: the write's own answer lifted the dialog, and it stays lifted.
+  await expect.poll(() => failedReads, { timeout: 15_000 }).toBeGreaterThan(readsBeforeAgree);
+  await page.waitForTimeout(500);
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(VENMO_HANDLE)).toBeVisible();
+  expect(riskAck.writes).toHaveLength(1);
   expect(paymentWrites).toEqual([]);
 
   await ctx.close();

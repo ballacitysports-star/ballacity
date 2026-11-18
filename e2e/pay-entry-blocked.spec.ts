@@ -386,3 +386,25 @@ test("an age-ranged paid game: a host-approved viewer outside the range still ge
 
   await ctx.close();
 });
+
+test("an age-ranged open paid game: a pending viewer outside the range waits on the host, as on the game page", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  // The host's settings need no approval; the age range alone made this viewer ask (the game page's requiresApproval).
+  await mockPayScreen(page, { game: { min_age: 50 }, requiresApproval: false, request: "pending" });
+  await serveMyBirthday(page, { yearsAgo: 40 });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  // The host's approval lifts the age rule, so "Payment unlocks after the host approves you" is true here.
+  const gate = page.getByTestId("approval-required-gate");
+  await expect(gate).toBeVisible({ timeout: 15_000 });
+  await expect(gate).toContainText(/payment unlocks after the host approves you/i);
+  await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});

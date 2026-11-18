@@ -29,11 +29,20 @@ export async function recordSafetyAck(input: {
   if (error) throw error;
 }
 
+/** useSafetyAck's cache key, for a caller that writes an acknowledgment and must see it at once. */
+export function safetyAckQueryKey(
+  userId: string | null | undefined,
+  gameId: string | null | undefined,
+  kind: SafetyAckKind,
+) {
+  return ["safety-ack", userId ?? "anon", gameId ?? "none", kind] as const;
+}
+
 /** Latest acknowledged version for this viewer + game + kind (null when none). */
 export function useSafetyAck(gameId: string | null | undefined, kind: SafetyAckKind) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["safety-ack", user?.id ?? "anon", gameId ?? "none", kind],
+    queryKey: safetyAckQueryKey(user?.id, gameId, kind),
     enabled: !!user && !!gameId,
     staleTime: 60_000,
     queryFn: async () => {
