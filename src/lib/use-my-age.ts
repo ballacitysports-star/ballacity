@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
+import { useAuth } from "@/hooks/use-auth";
 
 function ageFromBirthday(iso: string): number | null {
   const d = new Date(iso);
@@ -21,6 +22,12 @@ function ageFromBirthday(iso: string): number | null {
  * `age` is then null as well, so callers that treat a failure as "unknown"
  * keep doing so, and a caller that must not (the pay page's age range, which
  * would otherwise say "Add your birthday") can offer `retry` instead.
+ *
+ * The answer belongs to the account that is signed in now (useAuth): when the
+ * account changes without a remount (a sign-in in another tab reaches this one
+ * through the session storage event), it is `loading` again, with no age, until
+ * the new account's birthday has been read. The pay page gates on it, so the
+ * previous account's age must never judge the new one against a game's range.
  */
 export function useMyAge(): {
   age: number | null;
@@ -28,51 +35,49 @@ export function useMyAge(): {
   error: boolean;
   retry: () => void;
 } {
-  const [age, setAge] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { user } = useAuth();
   const [attempt, setAttempt] = useState(0);
+  // Which account and attempt the answer was read for; any other key is still loading.
+  const key = `${user?.id ?? ""}#${attempt}`;
+  const [result, setResult] = useState<{ key: string; age: number | null; error: boolean } | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
+    const settle = (age: number | null, error: boolean) => {
+      if (!cancelled) setResult({ key, age, error });
+    };
     const load = async () => {
       try {
         if (!(await getCurrentUserId())) {
-          if (!cancelled) {
-            setAge(null);
-            setError(false);
-            setLoading(false);
-          }
+          settle(null, false);
           return;
         }
         const { data, error: rpcError } = await (supabase.rpc as any)("get_my_birthday");
         const iso = typeof data === "string" ? data : null;
-        if (!cancelled) {
-          setAge(iso ? ageFromBirthday(iso) : null);
-          setError(!!rpcError);
-          setLoading(false);
-        }
+        settle(iso ? ageFromBirthday(iso) : null, !!rpcError);
       } catch {
-        if (!cancelled) {
-          setAge(null);
-          setError(true);
-          setLoading(false);
-        }
+        settle(null, true);
       }
     };
     void load();
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [key]);
 
   const retry = useCallback(() => {
-    setLoading(true);
-    setError(false);
     setAttempt((n) => n + 1);
   }, []);
 
-  return { age, loading, error, retry };
+  const current = result?.key === key ? result : null;
+  return {
+    age: current?.age ?? null,
+    loading: !current,
+    error: current?.error ?? false,
+    retry,
+  };
 }
 
 /**
