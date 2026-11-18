@@ -1267,19 +1267,40 @@ export const addOrgMemberDirect = createServerFn({ method: "POST" })
       throw new Error(orgMemberAddErrorMessage(error.message));
     }
 
-    const { data: org } = await context.supabase
+    // The notification is for the new member, not the caller: the notifications
+    // insert policy only lets a signed-in client write its own rows, so it is
+    // written with the service role, with text built here (not from input).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: org } = await supabaseAdmin
       .from("trainer_orgs")
       .select("name")
       .eq("id", data.orgId)
       .maybeSingle();
 
-    await context.supabase.from("notifications").insert({
-      user_id: data.userId,
-      type: "org_membership",
-      title: `You were added to ${org?.name ?? "an organization"}`,
-      body: "An admin added you as a member.",
-      link: `/orgs/${data.orgId}`,
-    });
+    const title = `You were added to ${org?.name ?? "an organization"}`;
+    const body = "An admin added you as a member.";
+    const link = `/orgs/${data.orgId}`;
+    const { data: note, error: noteErr } = await supabaseAdmin
+      .from("notifications")
+      .insert({ user_id: data.userId, type: "org_membership", title, body, link })
+      .select("id")
+      .maybeSingle();
+    if (noteErr) {
+      console.error("[orgs] org_membership notification insert failed", noteErr.message);
+    } else {
+      try {
+        const { deliverPush } = await import("@/lib/push.server");
+        await deliverPush({
+          userId: data.userId,
+          title,
+          body,
+          url: link,
+          notificationId: note?.id ?? null,
+        });
+      } catch (e) {
+        console.warn("[orgs] org_membership push failed", e);
+      }
+    }
 
     return { ok: true };
   });
