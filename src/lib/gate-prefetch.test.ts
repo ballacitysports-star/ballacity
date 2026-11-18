@@ -45,4 +45,30 @@ describe("createGatePrefetch", () => {
     });
     await expect(pf.take("u1")).rejects.toThrow("no session");
   });
+
+  it("forgets a failure nobody took yet, so the next taker asks afresh", async () => {
+    const pf = createGatePrefetch<string>();
+    pf.start("u1", () => Promise.reject(new Error("token refused")));
+    // Let the rejection settle before anyone takes it.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(pf.take("u1")).toBeNull();
+    const fresh = vi.fn(async () => "ok");
+    pf.start("u1", fresh);
+    await expect(pf.take("u1")).resolves.toBe("ok");
+    expect(fresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("a late failure does not remove a newer check for the same user", async () => {
+    const pf = createGatePrefetch<string>();
+    let rejectOld!: (e: Error) => void;
+    pf.start("u1", () => new Promise<string>((_, rej) => (rejectOld = rej)));
+    const old = pf.take("u1")!;
+    old.catch(() => {});
+    // The fetcher runs on the next microtask.
+    await Promise.resolve();
+    pf.start("u1", async () => "new");
+    rejectOld(new Error("late"));
+    await new Promise((r) => setTimeout(r, 0));
+    await expect(pf.take("u1")).resolves.toBe("new");
+  });
 });

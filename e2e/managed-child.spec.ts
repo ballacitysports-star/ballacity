@@ -151,7 +151,13 @@ test.describe("managed child, end to end", () => {
     // banner a fixed 5 s to appear, which every clean run paid twice.
     const back = page.getByRole("button", { name: /^back to /i });
     await expect(back.or(roster).first()).toBeVisible({ timeout: 20_000 });
-    if (await back.isVisible()) {
+    // The roster can paint a moment before the banner while the page is still
+    // in the child's identity: give the banner a short look before deciding.
+    const inChild = await back
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (inChild) {
       await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }

@@ -663,6 +663,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // age and account-type questions for that session's user too: the server functions verify the
   // token themselves, and their answers are only taken below, once the store has published that
   // same user. Decided as for a signed-in viewer, since that is who the answers are for.
+  // The stored token is not verified yet, which use-auth.ts otherwise waits for before any
+  // authenticated request. These two are safe to send early: each server function verifies the
+  // token with the auth server before reading anything (requireSupabaseAuth), so a dead or
+  // deleted session only costs a refused request, and a refused answer is never kept (see
+  // gate-prefetch.ts).
   const earlySkipAge = isPublicForViewer(pathname, true) || isAccountSetupEscape(pathname);
   const earlySkipType = earlySkipAge || pathname === "/onboarding/account-type";
   useEffect(() => {

@@ -32,9 +32,17 @@ export function createGatePrefetch<T>(): GatePrefetch<T> {
     start(userId, fetcher) {
       if (pending.has(userId)) return;
       const p = Promise.resolve().then(fetcher);
-      // Nobody may ever take it (the session fails verification, the member signs out, a step
-      // stops for input): do not report an unhandled rejection for it. The taker still sees it.
-      p.catch(() => {});
+      // A failure that comes back before anyone takes it is forgotten, so the step asks afresh
+      // with whatever session it has by then: the early check may have gone out with a stored
+      // token the auth server then refused, and the member can sign in again in the same tab.
+      // (The age step treats a failed check as "let them through, the server still refuses
+      // age-restricted actions"; that must only ever follow a check made for the session in
+      // hand.) A taker that already holds the promise still sees the failure. Nobody may ever
+      // take it (the session fails verification, the member signs out, a step stops for
+      // input), so this also keeps the rejection from being reported as unhandled.
+      p.catch(() => {
+        if (pending.get(userId) === p) pending.delete(userId);
+      });
       pending.set(userId, p);
     },
     take(userId) {
