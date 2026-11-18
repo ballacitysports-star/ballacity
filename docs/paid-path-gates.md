@@ -139,13 +139,12 @@ the commit after that. No database change.
 
 `payEntryView(...)` decides what the pay page may show before any payment option is drawn. It returns one of:
 
-| View                      | When                                                                                                                                                                                                                                                                     | What the page shows                                                                                                                                                                                                                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `checking`                | the child-status policy (`useMyChildStatus`) or the guardian check (`game_payment_guardian_ready`) has not answered yet; or the viewer's own flow state (their request, their payments, the roster store) has not loaded and the only block is one that state could lift | "Loading payment options…". Never the handles, links, PayPal or proof form, and never "You can't pay" to a player who may be approved or on the roster.                                                                                                                                                                   |
-| `check_failed`            | any of those failed before it ever answered (a later refresh failure keeps the last answer)                                                                                                                                                                              | "We couldn't check whether this account can pay for this game." with Retry (`data-testid="pay-entry-check-failed"`), which re-asks whatever failed. Never the handles.                                                                                                                                                    |
-| `blocked`, mode `replace` | `payEntryBlock` answers a block (below)                                                                                                                                                                                                                                  | "You can't pay for this game" card (`data-testid="pay-entry-blocked"`, `data-block=<kind>`, `data-mode="replace"`) with the reason, "Don't send the host any money for it." and "Back to game", in place of PayPal, the handles and deep links, the proof form, the stepper and the "arrange payment with the host" card. |
-| `blocked`, mode `warn`    | a block of a kind whose claim the database still records (`locked`, `participation`), for a viewer who already started paying and is on the proof step                                                                                                                   | the same card (`data-mode="warn"`) ABOVE the proof form: "Don't send the host any money for it. If you already paid, submit proof below so the host can see it and refund you."                                                                                                                                           |
-| `clear`                   | nothing blocks                                                                                                                                                                                                                                                           | the page as before.                                                                                                                                                                                                                                                                                                       |
+| View           | When                                                                                                                                                                                                                                                                     | What the page shows                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checking`     | the child-status policy (`useMyChildStatus`) or the guardian check (`game_payment_guardian_ready`) has not answered yet; or the viewer's own flow state (their request, their payments, the roster store) has not loaded and the only block is one that state could lift | "Loading payment options…". Never the handles, links, PayPal or proof form, and never "You can't pay" to a player who may be approved or on the roster.                                                                                                                                                                                                                                                        |
+| `check_failed` | any of those failed before it ever answered (a later refresh failure keeps the last answer)                                                                                                                                                                              | "We couldn't check whether this account can pay for this game." with Retry (`data-testid="pay-entry-check-failed"`), which re-asks whatever failed. Never the handles.                                                                                                                                                                                                                                         |
+| `blocked`      | `payEntryBlock` answers a block (below)                                                                                                                                                                                                                                  | "You can't pay for this game" card (`data-testid="pay-entry-blocked"`, `data-block=<kind>`) with the reason, "Don't send the host any money for it." (plus "If you already paid, message the host to ask for a refund." for a viewer who already started paying) and "Back to game", in place of PayPal, the handles and deep links, the proof form, the stepper and the "arrange payment with the host" card. |
+| `clear`        | nothing blocks                                                                                                                                                                                                                                                           | the page as before.                                                                                                                                                                                                                                                                                                                                                                                            |
 
 So the page now fails closed for minor safety: before, `can()` answered "allowed" while the child status loaded and,
 permanently, when it errored.
@@ -205,10 +204,13 @@ case, a non-approved viewer with an earlier claim on an age-ranged game, stays a
   the viewer (a picked method, including a single method the page preselected, once it was actually shown), or when
   the pay-opened sessionStorage marker (`pay-opened:<game>:<method>`, markExternalPaymentOpened) exists for one of the
   host's methods (survives a reload). A block that turns up afterwards (the signup cutoff passes, the host closes
-  joining, the game is cancelled, a guardian turns games off) shows as the `warn` card above the proof form, so the
-  claim can still be recorded and the host can refund. If the viewer leaves the proof step (Cancel), the picker would
-  show the handles again, so the card replaces it. For `payments` and `guardian` the database refuses the claim, so the
-  proof form would only fail: the card replaces it and says "If you already paid, message the host to ask for a refund."
+  joining, the game is cancelled, a guardian turns games off) replaces the payment options and the proof form, and
+  the card says "If you already paid, message the host to ask for a refund." Until 20261118200000 a `locked` or
+  `participation` block showed instead as a `warn` card above the proof form ("submit proof below so the host can see
+  it and refund you"), because nothing on `payment_submissions` checked the join gate or participation then. Since that
+  migration's trigger refuses exactly those claims (GAME_CANCELLED, GAME_COMPLETED, GAME_JOINS_CLOSED,
+  GAME_PARTICIPATION_BLOCKED), the proof form could only fail, so the `warn` mode was removed (section 6, review
+  round).
 - The status timeline (withdraw or dispute an existing claim) is unchanged and shows in every case.
 - Round 4: the request and submissions reads run in their own effect, beside the settings and methods (they used to
   start only after both of those). Their state is kept per game and viewer (`viewerLookup`, keyed `game:viewer`): a
@@ -221,7 +223,7 @@ case, a non-approved viewer with an earlier claim on an age-ranged game, stays a
   join first") rests on it.
 - Round 4: the `paymentStarted` latch is held per game (`paymentStartedFor === gameId`). The route component stays
   mounted from /games/A/pay to /games/B/pay, and a latch from A with B's preselected single method would have turned
-  B's block into a warning above B's handles and proof form.
+  B's block into a warning above B's handles and proof form (now: told B's viewer to ask for a refund).
 - Round 4: PayPal is not offered on an ended or cancelled game (`payPalOffered(joinState)`): paypal_payment_precondition
   answers GAME_COMPLETED / GAME_CANCELLED to every player, rostered or not. A rostered player who still owes for an
   ended game keeps the host's manual methods; with no manual method they get the "message the host" card.
@@ -249,8 +251,8 @@ link and then the pay page's block card, as guardedOpenJoin intends).
   every viewer incl. holdsPlace/paymentIn/approved; completed blocks all but holdsPlace; in_progress / closed_by_host /
   closed_cutoff block a new viewer and exempt each in-flow case; open), the guardian kind (host-approved but
   guardian-pending; applies to in-flow viewers; cancelled said first), fail-closed (loading and error for each check),
-  the warn/replace decision (locked, cancelled, participation warn; payments/guardian replace; no method on screen
-  replaces; not started replaces), blockOutranksApproval, and payHostLinkShown.
+  the already-started cases (one block card and the refund advice for every kind, since 20261118200000 removed the
+  `warn` mode), blockOutranksApproval, and payHostLinkShown.
 - `e2e/pay-entry-blocked.spec.ts` (mocked, data-independent: game row, settings, two methods (Venmo, Cash App), request,
   payments, place, guardian RPC, PayPal config and a stand-in PayPal SDK so a PayPal button WOULD render if offered):
   (a) host-closed paid game, fresh viewer → block card, no Venmo/Cash App link or handle, no PayPal, no proof form;
@@ -268,9 +270,11 @@ link and then the pay page's block card, as guardedOpenJoin intends).
 ### What is left on the client
 
 - The pay page does not apply the game's age range (above).
-- A full roster stays a soft warning on the pay page, but since 20261118200000 the database refuses the claim
-  (GAME_FULL). The pay page should block a full game before showing handles (as payEntryBlock does for the other
-  codes), so a player does not pay first and then get the refusal: not done here.
+- A full roster stays a soft warning on the pay page ("This game just filled up, so the host can't record a payment
+  for it. Message the host before you pay."), but since 20261118200000 the database refuses the claim (GAME_FULL).
+  The pay page should block a full game before showing handles (as payEntryBlock does for the other codes), so a
+  player does not pay first and then get the refusal: not done here. A refused claim tells the player to message the
+  host to get their money back (section 6).
 - /pay still reads `requires_approval` and the methods from the settings row a new viewer cannot read (6c).
 - Game page, edge case not changed: a viewer on the roster of a cancelled paid game whose payment was never verified
   (e.g. added by the host) still gets the "Pay Host" button; its tap opens the pay page, which shows the block card.
@@ -289,7 +293,7 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
 | Outline item                                  | Where                                                                                                                                                                                                                                                |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1-3. Claim trigger, shared rules, INSERT only | `supabase/migrations/20261118200000_payment_claim_preconditions.sql`                                                                                                                                                                                 |
-| SQL tests                                     | `supabase/tests/870_payment_claim_preconditions.test.sql` (100 assertions); `762_paypal_payment_preconditions` unchanged and passing                                                                                                                 |
+| SQL tests                                     | `supabase/tests/880_payment_claim_preconditions.test.sql` (100 assertions); `762_paypal_payment_preconditions` unchanged and passing                                                                                                                 |
 | 4. App messages                               | `src/lib/payments-policy.ts` (`PAYMENT_CLAIM_REFUSAL_CODES`, `paymentClaimRefusalMessage`, `paymentSubmissionErrorMessage`); tests in `src/lib/payments-submission.test.ts`                                                                          |
 | 5. Verified but not placed                    | `src/lib/roster-on-payment.server.ts`, `src/lib/payments.functions.ts`, `src/lib/paypal.functions.ts`, `src/components/game-detail/RosterPlayerRow.tsx`, `src/components/GamePaymentsPanel.tsx`; tests in `src/lib/roster-on-payment.server.test.ts` |
 | 6. Rollback                                   | `docs/rollbacks/20261118200000_payment_claim_preconditions.down.sql` (guarded: confirmation setting plus the md5 of all four functions; rehearsed)                                                                                                   |
@@ -303,7 +307,7 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
   points as before (its own cancelled/completed check first, GAME_PARTICIPATION_BLOCKED / BLOCKED_BY_HOST where they
   were, the place rules last), so PayPal's answers are unchanged in value and order. PayPal-only codes stay in it.
   Proof: 762 passes unchanged; a differential run with the old function installed beside the new one gave identical
-  answers for 9 people x 10 games at 15 points of the 870 scenario (1,350 comparisons).
+  answers for 9 people x 10 games at 15 points of the 880 scenario (1,350 comparisons).
 - Trigger `zz_payment_claim_preconditions` (BEFORE INSERT on `payment_submissions`, named to fire after every other
   BEFORE INSERT trigger so their refusals keep their messages) runs `public.enforce_payment_claim_preconditions()`
   only when `auth.uid() = NEW.player_id`. Host "Marked paid by host" rows and the service role's PayPal record are not
@@ -311,25 +315,35 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
 - `get_game_host_payment_methods` returns nothing to a caller for whom `game_payments_allowed(auth.uid())` is false,
   except the payee viewing their own handles. An adult guardian and a 16-17 who may pay still see them. It now pins
   `search_path = ''` (every name in it was already qualified).
-- App: the new codes read as PayPal's sentence without "You weren't charged." (e.g. "This game is full."). Only a
-  whole code at the start of the message counts.
+- App: the new codes read as PayPal's sentence without "You weren't charged.", followed by "If you already sent the
+  host money, message them to ask for it back." (e.g. "This game is full. If you already sent the host money, message
+  them to ask for it back."): the refused claim writes no row, so the host is not told and the player needs the next
+  step. Only a whole code at the start of the message counts.
 - Item 5: `addPaidPlayerToRoster` returns why a verified payment gave no place (`cancelled`, `approval_required`,
   `refused` + the join gate's code, `already_on_roster`, `game_missing`). For the first three it writes a
   `payment_not_placed` notification (Payment updates category) to the host and to the player, with the reason and
   the next step (give the place, or send the money back). Only the game's own state is named (full, ended, joining
   closed, cancelled); a rule about the player (age range, guardian setting, block) reads as "the game's joining rules
-  don't allow it". `reviewPaymentAction` returns `placed`; the host's roster row and payments panel show a warning
-  instead of "Payment verified." and no longer send the player "You're all set" when `placed` is false. No new
-  server path or migration was needed.
+  don't allow it". A player already on the roster is `already_on_roster` (checked before the approval rule, so a
+  player the host added, or who joined before approval was switched on, is not reported as unplaced). The result
+  says whether the notices were written (`noticeSent`). `reviewPaymentAction` returns `placed` (`placedAfterVerify`):
+  true when the player holds the place, false only when both notices were written, else null. When it is false the
+  host's roster row and payments panel show a warning ("We've sent you both a notice…") instead of "Payment
+  verified." and do not send the player "You're all set"; on null (game gone, notice not written) they say and send
+  what they do for any verified payment. No new server path or migration was needed.
 
 ### Found while building it
 
 - **A host cannot "mark paid" a player with no claim.** `reviewPaymentAction` inserts that row with the host's own
   client, and `payment_submissions` has no INSERT policy for a host (only "Players create own submissions",
   `player_id = auth.uid()`), so the insert is refused by row level security today, with or without this migration.
-  The 870 test checks the trigger's host exemption with RLS out of the way and says so. Not changed here.
+  The 880 test checks the trigger's host exemption with RLS out of the way and says so. Not changed here.
 - On a manual claim the money still moves before the database can refuse (the claim follows the payment). The pay
   page's own blocks (payEntryBlock, section 5) are what stop it first; GAME_FULL is not one of them yet.
+- The pay page blocks a game in progress for a new viewer (as the game page does), but the trigger lets that claim
+  through when the game has no signup cutoff and joining is open (enforce_game_join_gate does the same for the roster
+  place). Every other lock and the participation block are refused by the trigger, which is why the pay page's `warn`
+  mode was removed (section 5b).
 
 ### (c) checked on the local stack (not changed)
 
@@ -480,12 +494,12 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 ### Section 6 (branch claude/payment-claim-preconditions, 2026-11-18)
 
 - SQL, private disposable Postgres 16 with `node scripts/db-test.mjs` (as the Database tests workflow runs it): 2687
-  passed, 0 failed; `870_payment_claim_preconditions` 100 passed, `762_paypal_payment_preconditions` 90 passed
+  passed, 0 failed; `880_payment_claim_preconditions` (numbered 870 before the rebase onto main, which took 870 for `870_availability_expiry_job`) 100 passed, `762_paypal_payment_preconditions` 90 passed
   (unchanged file).
-- Negative controls: without the migration (main's replay) 870 errors at its first call; with the trigger dropped 35
+- Negative controls: without the migration (main's replay) 880 errors at its first call; with the trigger dropped 35
   assertions fail; with every writer checked the host and service-role exemptions fail; without the roster exemption 5
   fail; without the approval exemption 3 fail; with the old payment-methods body 4 fail; with the helper granted to
-  `authenticated` 1 fails; with PayPal asking the shared rules first 4 fail in 870 and 1 in 762.
+  `authenticated` 1 fails; with PayPal asking the shared rules first 4 fail in 880 and 1 in 762.
 - Rollback rehearsal on a copy: refuses unconfirmed; refuses (changing nothing) when `payment_claim_block` was
   changed; confirmed, restores `paypal_payment_block` and `get_game_host_payment_methods` to main's md5s with grants
   intact (762 and 340 pass); the migration then re-applies cleanly.
