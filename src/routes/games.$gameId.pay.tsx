@@ -79,6 +79,7 @@ import {
   checkStateOf,
   payEntryView,
   payAwaitsApproval,
+  payManualMethodsStep,
   payPalOffered,
   payRiskAckStep,
   payRiskAckView,
@@ -88,7 +89,10 @@ import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgment
 import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
 import { recordSafetyAck, safetyAckQueryKey, useSafetyAck } from "@/lib/safety-acks";
 import { riskAckReadFrom } from "@/lib/risk-ack-tap";
-import { useGamePaymentGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
+import {
+  useGameManualClaimGuardianReady,
+  useGamePaymentGuardianReady,
+} from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -286,10 +290,18 @@ function PayPage() {
     });
   }, []);
   // A guarded minor pays only on a request their guardian approved; host approval alone clears the approval card.
+  const guardianRequestKey = `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`;
   const guardianQuery = useGamePaymentGuardianReady(
     hasGame ? gameId : undefined,
     userId,
-    `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`,
+    guardianRequestKey,
+  );
+  // The manual-claim trigger's own guardian rule, which has no adult exemption (docs/paid-path-gates.md section 6
+  // (d)): an adult whose guardian link from before 18 is still active may pay by PayPal, not by Venmo or Cash App.
+  const manualClaimQuery = useGameManualClaimGuardianReady(
+    hasGame ? gameId : undefined,
+    userId,
+    guardianRequestKey,
   );
   // "Before you join" (docs/paid-path-gates.md section 7, Option B): the same acknowledgment the join tap asks for
   // (useSafetyAck / recordSafetyAck, participant_risk, SAFETY_ACK_VERSION), asked here before any payment option is
@@ -604,6 +616,8 @@ function PayPage() {
     : flowLookups.every((l) => l === "ready")
       ? "ready"
       : "loading";
+  const paymentStartedHere =
+    paymentStarted || (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods));
   const entryView = payEntryView({
     holdsPlace: viewerHoldsPlace,
     paymentIn: hasPaymentIn(mySubs),
@@ -621,9 +635,7 @@ function PayPage() {
       isError: childQuery.isError,
     }),
     guardian: checkStateOf({ data: guardianQuery.data, isError: guardianQuery.isError }),
-    paymentStarted:
-      paymentStarted ||
-      (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
+    paymentStarted: paymentStartedHere,
     isHost,
     ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
     viewerAge: myAge.loading
@@ -643,11 +655,22 @@ function PayPage() {
     read: riskAckReadFrom(riskAckQuery.status, riskAckQuery.data),
   });
   const entryClear = entryView.kind === "clear" && riskAck === "none";
+  // The host's manual methods and the proof form, once nothing else stands in front of them: held back (PayPal only,
+  // or the block card) when the database would refuse this viewer's manual claim on the guardian rule.
+  const manualStep = payManualMethodsStep({
+    manualClaim: checkStateOf({ data: manualClaimQuery.data, isError: manualClaimQuery.isError }),
+    hasManualMethods: !!settings && methods.length > 0,
+    paypalOffered: !!paypalCfg && !!settings,
+    paypalSettled: paypal.settled,
+    paymentStarted: paymentStartedHere,
+  });
+  const manualOffered = manualStep.kind === "offer_all";
   // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
   // while the approval card or a loading state stands in its place.)
   const proofStepOnScreen =
     !!picked &&
     entryClear &&
+    manualOffered &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -676,6 +699,7 @@ function PayPage() {
   const retryEntryChecks = () => {
     if (childQuery.isError) void childQuery.refetch();
     if (guardianQuery.isError) void guardianQuery.refetch();
+    if (manualClaimQuery.isError) void manualClaimQuery.refetch();
     if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
     if (rosterLoad === "error") retryRosterLoad();
     if (myAge.error) myAge.retry();
@@ -740,6 +764,7 @@ function PayPage() {
     !hasSubmission &&
     !approvalGateActive &&
     entryClear &&
+    manualOffered &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -950,6 +975,72 @@ function PayPage() {
           >
             Retry
           </button>
+        </div>
+      ) : manualStep.kind === "checking" ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : manualStep.kind === "check_failed" ? (
+        <div
+          className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2"
+          data-testid="pay-manual-check-failed"
+        >
+          <div className="text-sm text-muted-foreground">
+            We couldn't check whether this account can pay for this game.
+          </div>
+          <button
+            type="button"
+            onClick={retryEntryChecks}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
+        </div>
+      ) : manualStep.kind === "blocked" ? (
+        <PayEntryBlockedCard view={manualStep} gameId={game.id} />
+      ) : manualStep.kind === "paypal_only" ? (
+        <div className="space-y-3">
+          <div
+            className="rounded-2xl border border-coral/40 bg-coral/10 p-4"
+            role="status"
+            aria-live="polite"
+            data-testid="pay-manual-guardian-hold"
+          >
+            <div className="flex items-center gap-2 font-display text-sm font-bold">
+              <AlertCircle className="h-4 w-4 text-coral" /> Manual payments need a guardian's
+              approval
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{manualStep.message}</p>
+            <p className="text-xs text-muted-foreground mt-1">{manualStep.next}</p>
+            {manualStep.paymentStarted && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Don't send the host money by Venmo, Cash App or another app for it. If you already
+                paid, message the host to ask for a refund.
+              </p>
+            )}
+            <div className="mt-3">
+              <Link
+                to="/games/$gameId"
+                params={{ gameId: game.id }}
+                className="inline-flex items-center rounded-full border border-border px-4 py-1.5 text-xs font-bold"
+              >
+                Back to game
+              </Link>
+            </div>
+          </div>
+          {/* paypal_only means both are there (payManualMethodsStep's paypalOffered); never the manual list here. */}
+          {paypalCfg && settings && (
+            <PayPalCheckoutButton
+              gameId={game.id}
+              clientId={paypalCfg.clientId}
+              merchantId={paypalCfg.merchantId}
+              feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+              onPaid={async () => {
+                const subs = await listMySubmissionsForGame(game.id);
+                setMySubs(subs);
+              }}
+            />
+          )}
         </div>
       ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
         "loading" ? (

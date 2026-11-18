@@ -7,11 +7,15 @@ import {
   payEntryView,
   payHostLinkShown,
   payAwaitsApproval,
+  payManualMethodsStep,
   payPalOffered,
   payRiskAckStep,
   payRiskAckView,
   unpaidOnGameTakingNoPayment,
   PARTICIPATION_BLOCKED_FALLBACK,
+  MANUAL_GUARDIAN_HOLD_MESSAGE,
+  MANUAL_GUARDIAN_HOLD_NEXT,
+  MANUAL_GUARDIAN_HOLD_NEXT_WITH_PAYPAL,
   type PayEntryInput,
 } from "./pay-entry-gate";
 import { ageGateMessage, ageGateState, type AgeRequirement } from "./game-age";
@@ -1057,5 +1061,109 @@ describe("payAwaitsApproval ('Waiting on host approval' on the pay page)", () =>
     ]) {
       expect(payAwaitsApproval({ ...base, requestPending: true, replaceBlock: block })).toBe(false);
     }
+  });
+});
+
+describe("payManualMethodsStep (manual methods vs the manual-claim guardian rule, section 6 (d))", () => {
+  const base = {
+    manualClaim: { state: "ready", value: true } as const,
+    hasManualMethods: true,
+    paypalOffered: true,
+    paypalSettled: true,
+    paymentStarted: false,
+  };
+  const no = { state: "ready", value: false } as const;
+
+  it("offers every method when the trigger would accept the viewer's manual claim", () => {
+    expect(payManualMethodsStep(base)).toEqual({ kind: "offer_all" });
+    expect(payManualMethodsStep({ ...base, paypalOffered: false })).toEqual({ kind: "offer_all" });
+  });
+
+  it("fails closed while the check loads, and offers a retry when it failed: never the handles", () => {
+    expect(payManualMethodsStep({ ...base, manualClaim: { state: "loading" } })).toEqual({
+      kind: "checking",
+    });
+    expect(payManualMethodsStep({ ...base, manualClaim: { state: "error" } })).toEqual({
+      kind: "check_failed",
+    });
+    // Even with PayPal there: the answer decides what else is drawn next to it.
+    expect(
+      payManualMethodsStep({ ...base, paypalOffered: true, manualClaim: { state: "loading" } })
+        .kind,
+    ).toBe("checking");
+  });
+
+  it("an adult with an old guardian link: PayPal kept, manual methods and the proof form held back", () => {
+    const step = payManualMethodsStep({ ...base, manualClaim: no });
+    expect(step).toEqual({
+      kind: "paypal_only",
+      message: MANUAL_GUARDIAN_HOLD_MESSAGE,
+      next: MANUAL_GUARDIAN_HOLD_NEXT_WITH_PAYPAL,
+      paymentStarted: false,
+    });
+  });
+
+  it("no PayPal for the game: the block card, not an empty method list", () => {
+    const step = payManualMethodsStep({ ...base, manualClaim: no, paypalOffered: false });
+    expect(step).toEqual({
+      kind: "blocked",
+      block: {
+        kind: "manual_guardian",
+        message: `${MANUAL_GUARDIAN_HOLD_MESSAGE} ${MANUAL_GUARDIAN_HOLD_NEXT}`,
+      },
+      paymentStarted: false,
+    });
+  });
+
+  it("waits for PayPal to settle before saying the viewer cannot pay at all", () => {
+    expect(
+      payManualMethodsStep({
+        ...base,
+        manualClaim: no,
+        paypalOffered: false,
+        paypalSettled: false,
+      }),
+    ).toEqual({ kind: "checking" });
+  });
+
+  it("a viewer who was already shown how to pay is told about a refund, with or without PayPal", () => {
+    const withPayPal = payManualMethodsStep({ ...base, manualClaim: no, paymentStarted: true });
+    expect(withPayPal).toMatchObject({ kind: "paypal_only", paymentStarted: true });
+    const without = payManualMethodsStep({
+      ...base,
+      manualClaim: no,
+      paypalOffered: false,
+      paymentStarted: true,
+    });
+    expect(without).toMatchObject({ kind: "blocked", paymentStarted: true });
+  });
+
+  it("a host with no manual method has nothing to hold back (the page's own options and empty state)", () => {
+    for (const manualClaim of [no, { state: "loading" } as const, { state: "error" } as const]) {
+      expect(payManualMethodsStep({ ...base, manualClaim, hasManualMethods: false })).toEqual({
+        kind: "offer_all",
+      });
+    }
+  });
+
+  it("uses adult wording: no 'ask your parent', names PayPal, the guardian's approval and the Parent Center", () => {
+    for (const text of [
+      MANUAL_GUARDIAN_HOLD_MESSAGE,
+      MANUAL_GUARDIAN_HOLD_NEXT,
+      MANUAL_GUARDIAN_HOLD_NEXT_WITH_PAYPAL,
+    ]) {
+      expect(text).not.toMatch(/parent needs|ask your parent|ask them/i);
+    }
+    expect(MANUAL_GUARDIAN_HOLD_MESSAGE).toMatch(/before you turned 18/);
+    expect(MANUAL_GUARDIAN_HOLD_MESSAGE).toMatch(/Venmo, Cash App/);
+    expect(MANUAL_GUARDIAN_HOLD_NEXT_WITH_PAYPAL).toMatch(/PayPal/);
+    expect(MANUAL_GUARDIAN_HOLD_NEXT).not.toMatch(/PayPal/);
+    expect(MANUAL_GUARDIAN_HOLD_NEXT).toMatch(/Parent Center/);
+  });
+
+  it("the block it gives is not one the viewer's place, payment or the host's approval lifts", () => {
+    const step = payManualMethodsStep({ ...base, manualClaim: no, paypalOffered: false });
+    if (step.kind !== "blocked") throw new Error("expected the block card");
+    expect(blockOutranksApproval(step.block, true)).toBe(true);
   });
 });

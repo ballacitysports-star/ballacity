@@ -318,14 +318,15 @@ holdsPlace)` and draws nothing on a cancelled game, or an ended one for a viewer
   player does not pay first and then get the refusal: not done here. A refused claim tells the player to message the
   host to get their money back (section 6).
 - /pay still reads `requires_approval` and the methods from the settings row a new viewer cannot read (6c).
-- An 18+ viewer with a leftover active guardian link: the client follows game_payment_guardian_ready and shows the
-  handles, but the manual-claim trigger still refuses their proof (server gap 6d).
+- An 18+ viewer with a leftover active guardian link: done on branch claude/guardian-adult-manual-claim (section 6
+  (d)): the pay page asks the manual-claim rule itself and holds back the manual methods (PayPal kept).
 
 ## 6. Server gaps: payment claim preconditions (IMPLEMENTED, branch claude/payment-claim-preconditions)
 
 **Owner decision, 2026-11-18: "approve all".** Items 1-6 of the outline below, including GAME_FULL as a refusal (it
 replaces the pay page's soft "just filled up" warning on the server), and "Also related" (a). Item (d) is **not**
-changed: it would loosen a guardian rule and stays a separate owner question. (c) was checked, not changed (below).
+changed: it would loosen a guardian rule and stays a separate owner question (decided later the same day: block up
+front, rule unchanged; see (d) below). (c) was checked, not changed (below).
 Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and is not built on this branch.
 
 ### What was built
@@ -438,7 +439,8 @@ row), as proposed in (c) below; not done here.
 6. Rollback file in docs/rollbacks, guarded as the others are. Apply to the sandbox first, never directly to
    production.
 
-Also related (as proposed; status after this branch: (a) done, (b) done earlier, (c) checked live, (d) unchanged):
+Also related (as proposed; status: (a) done, (b) done earlier, (c) checked live, (d) blocked up front on branch
+claude/guardian-adult-manual-claim, guardian rule unchanged):
 
 - (d) **Guardian rule, adult exemption: the RPC and the trigger disagree.** `public.game_payment_guardian_ready(game)`
   (20261111100000 §3) exempts a viewer known to be 18 or over (a stored birthday, `age(birthday) >= 18`) even when a
@@ -453,6 +455,54 @@ Also related (as proposed; status after this branch: (a) done, (b) done earlier,
   `guardian_payment_approval_missing` so the RPC, the trigger and PayPal share one rule; or end guardian links when
   the child turns 18. No client change is needed once the trigger matches; until then the client cannot see the
   difference (the RPC is its only view of the rule).
+
+  **Owner decision 2026-11-18: block up front; the guardian rule is not loosened.** The trigger keeps refusing that
+  adult's manual claim. The pay page instead stops offering a manual method it knows the database will refuse.
+  Built on branch claude/guardian-adult-manual-claim:
+
+  - `public.game_manual_claim_guardian_ready(game)` returns
+    `NOT private_sec.guardian_payment_approval_missing(auth.uid(), game)`, false for no caller. Read-only (STABLE,
+    SECURITY DEFINER, `search_path = ''`), EXECUTE for `authenticated` only (not PUBLIC, anon or service_role), no
+    player argument: it answers about the caller only. No existing RPC answered this: `game_payment_guardian_ready`
+    adds the adult exemption, and the rule itself is in `private_sec`, not callable through the API. The trigger, the rule, `game_payment_guardian_ready` and PayPal
+    are untouched. The 910 test checks the check and the trigger agree for 7 accounts x 2 games (adult, 17 with no
+    link, guarded 16 before and after approval and after a host rejection, 18 and 25 with an old link, the
+    guardian, the host), the adult case before and after a guardian approval (for that game only) and after the
+    guardian ends the link, and that PayPal's check still exempts the adult.
+  - Pay page: once nothing else stands in front of the payment options (payEntryView 'clear', no approval card, no
+    "Before you join", the host's settings loaded) and the host has a manual method, `payManualMethodsStep` decides:
+    the check says yes: every method, as before; still loading: "Loading payment options…" (no handles, no proof
+    form); failed with nothing loaded: "We couldn't check…" with Retry; says no and PayPal is offered: PayPal only,
+    with the notice "Manual payments need a guardian's approval" (no Venmo, Cash App or other method, no proof form,
+    no "Pay the host → Confirm" stepper); says no and PayPal is not offered (not set up, or an ended game): the
+    block card (`data-block="manual_guardian"`), not an empty method list; says no and PayPal has not settled yet:
+    loading. A method resumed from the pay-opened marker, or picked automatically when the host has one, does not
+    count as "already shown how to pay" while it is held back.
+  - Wording (adult, no "ask your parent"): "A guardian link from before you turned 18 is still active on this
+    account, so Venmo, Cash App and other manual payments for this game need your guardian's approval first." then
+    "You can pay with PayPal now. Or go back to the game to ask your guardian to approve it; your guardian can also
+    end the family link from their Parent Center." (without PayPal: the second sentence only, in the block card). A
+    viewer who was already shown how to pay also reads "Don't send the host money by Venmo, Cash App or another app
+    for it. If you already paid, message the host to ask for a refund." (the block card keeps its own "If you
+    already paid, message the host to ask for a refund.").
+  - Ending the link: only the guardian can, from the Parent Center ("End family link", `revoke_guardian_link`,
+    which is guardian-only and refused for a managed child's link). The player has no way to end it themselves, so
+    the page points them to their guardian; no new way was invented. Approving the game: the game page already
+    sends this adult to ask their guardian on a paid open game (`guardianOnlyJoin` asks on any paid game, whatever
+    the age), which is the request the guardian approves.
+  - The answer is asked again when the viewer's request changes (status, guardian stamp), and every 15 s while it is
+    no (a guardian approving or ending the link on their own device), as `useGamePaymentGuardianReady` does.
+
+  | Piece                    | Where                                                                                                  |
+  | ------------------------ | ------------------------------------------------------------------------------------------------------ |
+  | The trigger's rule, read | `supabase/migrations/20261120100000_manual_claim_guardian_ready.sql`                                   |
+  | SQL test                 | `supabase/tests/910_manual_claim_guardian_ready.test.sql` (58 assertions; fails without the migration) |
+  | Rollback                 | `docs/rollbacks/20261120100000_manual_claim_guardian_ready.down.sql` (guarded; rehearsed)              |
+  | Decision                 | `src/lib/pay-entry-gate.ts` (`payManualMethodsStep`); tests in `src/lib/pay-entry-gate.test.ts`        |
+  | Hook                     | `src/hooks/use-game-payment-guardian-ready.ts` (`useGameManualClaimGuardianReady`)                     |
+  | Pay page                 | `src/routes/games.$gameId.pay.tsx`                                                                     |
+  | E2E (mocked)             | `e2e/pay-manual-guardian-hold.spec.ts`                                                                 |
+
 - (a) `get_game_host_payment_methods` (20261111120000 §2) returns the host's handles to any caller who can see the
   game, including a 13-15 who may not pay. The handles are an adult's (adult payee only), so this is a minor-safety
   question rather than a privacy leak. It could add `public.game_payments_allowed(auth.uid())`.
@@ -599,3 +649,19 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 - Mutation checks. E2E: with the three page fixes reverted (settings not awaited, re-read only, age-pending not an
   approval wait) the four new tests fail and the other seven pass. Unit: payRiskAckStep without the settings check
   fails 3 tests; payAwaitsApproval without the age clause fails 1; useMyAge keyed without the user id fails 1.
+
+### Section 6 (d) (branch claude/guardian-adult-manual-claim, owner decision 2026-11-18)
+
+- SQL: `910_manual_claim_guardian_ready` 58 passed. Negative control: with the migration file moved out of the
+  replay, 910 stops on "function public.game_manual_claim_guardian_ready(text) does not exist" (0 passed, 1 failed).
+- Rollback rehearsal on a scratch replay: refuses unconfirmed (function kept); refuses, changing nothing, when the
+  function's definition differs from the migration's (md5); with the confirmation it drops the function and leaves
+  the guardian trigger and `game_payment_guardian_ready` in place; a second run refuses (function gone); re-applying
+  the migration restores the same definition (md5 `109ac8d2…`) and grants.
+- `npx vitest run` (full): 411 files, 4334 passed, 22 skipped. pay-entry-gate.test.ts: 114 (9 new).
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh, with the migration applied to the stack: all `e2e/pay-*.spec.ts` (including the
+  new pay-manual-guardian-hold) and `e2e/invite-pay-and-join*.spec.ts`: 21 files, **40 passed**, 0 failed (3.4 min).
+- Mutation check: with `payManualMethodsStep` always answering 'offer_all', three of the four new E2E tests fail (the
+  "check says yes" test passes, as it should).
