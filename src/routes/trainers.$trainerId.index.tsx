@@ -690,7 +690,6 @@ function TrainerPage({ org }: { org: Org }) {
                       setBookPrefill({
                         date: s.dateKey,
                         startTime: s.trainerStart ?? s.start,
-                        venue: s.venue ?? null,
                       });
                       setBookOpen(true);
                     }}
@@ -760,12 +759,7 @@ function TrainerPage({ org }: { org: Org }) {
               </Link>
               <button
                 onClick={() => {
-                  const venueOffered =
-                    !!selectedVenue &&
-                    (org.venueAddresses ?? []).some(
-                      (a) => a.trim().toLowerCase() === selectedVenue.trim().toLowerCase(),
-                    );
-                  setBookPrefill(venueOffered ? { venue: selectedVenue } : null);
+                  setBookPrefill(null);
                   setBookOpen(true);
                 }}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
