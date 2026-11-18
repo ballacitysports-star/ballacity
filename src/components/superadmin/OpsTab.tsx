@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmAction } from "./ConfirmAction";
 import { LandingListingsPanel } from "./LandingListingsPanel";
+import { HomeAvailabilityPanel } from "./HomeAvailabilityPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
 
@@ -109,6 +110,7 @@ export function OpsTab() {
     <div className="grid gap-3 lg:grid-cols-2">
       <MaintenancePanel />
       <LandingListingsPanel />
+      <HomeAvailabilityPanel />
 
       <Card>
         <CardHeader className="pb-2">

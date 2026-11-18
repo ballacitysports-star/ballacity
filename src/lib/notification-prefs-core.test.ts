@@ -44,4 +44,18 @@ describe("notification prefs rules, shared by the app and the server", () => {
     expect(pushAllowed({ approvals: { push: false }, messages: { push: false } })).toBe(true);
     expect(pushAllowed({ gameReminders: { push: false } })).toBe(false);
   });
+
+  it("the 'Still available?' reminder for a weekly availability post follows the game reminders switch", () => {
+    expect(core.categoryFor("availability_reconfirm")).toBe("gameReminders");
+    expect(core.isAllowedIn(core.mergeNotifPrefs(null), "availability_reconfirm", "inApp")).toBe(
+      true,
+    );
+    expect(
+      core.isAllowedIn(
+        core.mergeNotifPrefs({ gameReminders: { inApp: false } }),
+        "availability_reconfirm",
+        "inApp",
+      ),
+    ).toBe(false);
+  });
 });

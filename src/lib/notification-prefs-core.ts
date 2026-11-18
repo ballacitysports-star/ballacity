@@ -78,7 +78,8 @@ const LEGACY_CATEGORY_MAP: Record<string, NotifCategory> = {
 };
 
 export function categoryFor(type: string): NotifCategory {
-  if (type === "game_reminder") return "gameReminders";
+  // "Still available?" for the player's own weekly availability (WP 1.2): a reminder, like a game's.
+  if (type === "game_reminder" || type === "availability_reconfirm") return "gameReminders";
   if (type === "message") return "messages";
   if (type === "game_invite" || type === "org_membership" || type === "team_invite")
     return "invitations";

@@ -129,3 +129,42 @@ No database change; it uses WP 1.3's `players_available_near`.
 - Without a location the list is the newest posts, as before. If the search fails (an older database, a network error)
   the page falls back to that list for the visit instead of showing an error; checked on the sandbox before WP 1.3 was
   applied there (the search answered 404, the page listed posts, no error shown).
+
+## WP 1.2: expiry and "Still available?" reminders
+
+Migration `20261118100000_availability_expiry_job.sql`, test `870` (33 assertions), rollback
+`docs/rollbacks/20261118100000_availability_expiry_job.down.sql`. Apply after WP 1.1.
+
+- An hourly job (`sweep-availability-lifecycle`, pg_cron, minute 23) runs `private_sec.sweep_availability_lifecycle`. Clients,
+  visitors and server code cannot call it; only the scheduler does.
+- **Reminder:** when a weekly or open-ended post is within three days of running out, its author gets one in-app notification,
+  "Still available to play?", naming the sport and the day it stops being listed (in the post's timezone), linking to My
+  availability. One per confirmation: tapping "Still available" starts a new cycle. Dated posts get none. It goes to the author
+  only, minors included (it is about their own post), and follows the "Game reminders" switch. No push yet.
+- **Expiry:** an open post that has run out becomes `expired`. Visibility does not change (WP 1.1's read policy already hides it);
+  the author sees "Not listed" and can reopen it. Paused, closed, inactive and hidden-by-BallaCity states are never touched; a post
+  whose run-out time cannot be computed is left as it is, and a legacy row a validation trigger refuses is skipped, not fatal.
+- `private_sec.availability_reminders` records which confirmation was reminded; clients cannot read it, and rows go with their
+  post.
+- Expect on apply: production's posts were confirmed at the WP 1.1 apply (2026-11-14), so weekly ones get their reminder from
+  2026-11-25 and are marked expired on 2026-11-28 unless the author confirms.
+
+## WP 1.6: Home, availability first (app only)
+
+No database change. `src/components/home/AvailabilityHome.tsx` at the top of Home (`/feed`), rules in
+`src/lib/home-availability.ts`.
+
+- **Card:** with nothing listed, a large "I'm available" card that opens the quick sheet (or, without a player profile, My
+  availability with its setup notice). Once listed, where the member's availability stands, with My availability's own rules
+  (`listingFor`): "You're available · Basketball · Listed until …", or "Still available to play?" with "Still available" in one
+  tap when a weekly post is about to run out or has run out. Dated posts whose dates passed are left to My availability.
+- **Shortcuts:** Find players (the Players tab); Find games and My games, which use Home's own games list (`/discover`
+  only redirects to Home): they set the feed's "My games" filter to everyone's or to games the member joined, and scroll
+  to the list; Invitations (My availability), with the number of pending invitations and contact requests to the member.
+- **Who sees it:** signed-in members; not in parent mode. It reads only the member's own posts and requests, under the same
+  read policies.
+- **Switch:** `app_settings` `home_availability_first`, public, set in Super admin (Ops, "Availability-first Home", audit
+  logged). On unless the row is `{"enabled": false}`; a failed read keeps it on. The feed below never changes.
+- Checked against the verified sandbox at iPhone size: empty, about-to-run-out ("Still available" moved the end from Nov 19
+  to Dec 1) and switched-off states; axe found no WCAG 2.1 A/AA violation in the section; the test post and the switch row
+  were removed; no request reached the production host.
