@@ -19,6 +19,8 @@ const server = {
   rosterGate: null as Promise<void> | null,
   // When set, the roster read fails with it.
   rosterError: null as { message: string } | null,
+  // When set, reading the stored session fails with it.
+  sessionError: null as { message: string } | null,
 };
 
 const toastError = vi.fn();
@@ -67,7 +69,13 @@ const channel: {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getUser: async () => ({ data: { user: server.userId ? { id: server.userId } : null } }),
+      getSession: async () =>
+        server.sessionError
+          ? { data: { session: null }, error: server.sessionError }
+          : {
+              data: { session: server.userId ? { user: { id: server.userId } } : null },
+              error: null,
+            },
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
         realtime.authListener = cb;
         return { data: { subscription: { unsubscribe() {} } } };
@@ -93,6 +101,7 @@ beforeEach(() => {
   server.inserted = [];
   server.rosterGate = null;
   server.rosterError = null;
+  server.sessionError = null;
   toastError.mockReset();
   realtime.handlers = [];
   realtime.authListener = null;
@@ -288,6 +297,27 @@ describe("useRosterLoadState (whether useIsJoined has been read from the databas
     server.rosterError = null;
     act(() => store.retryRosterLoad());
     await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: true }));
+  });
+
+  it("is 'error', not 'ready', when the session cannot be read, and 'ready' after a retry", async () => {
+    server.roster = ["g1"];
+    server.sessionError = { message: "refresh failed" };
+    const store = await loadStore();
+    const { result } = renderHook(() => ({
+      load: store.useRosterLoadState(),
+      joined: store.useIsJoined("g1"),
+    }));
+    await waitFor(() => expect(result.current.load).toBe("error"));
+    server.sessionError = null;
+    act(() => store.retryRosterLoad());
+    await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: true }));
+  });
+
+  it("is 'ready' with no places when nobody is signed in", async () => {
+    server.userId = null;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useRosterLoadState());
+    await waitFor(() => expect(result.current).toBe("ready"));
   });
 
   it("keeps 'ready' when a later refresh fails", async () => {

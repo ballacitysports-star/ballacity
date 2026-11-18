@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { useAuth } from "@/hooks/use-auth";
 import { SAFETY_ACK_VERSION, type SafetyAckKind } from "@/lib/safety";
 
@@ -13,11 +14,11 @@ export async function recordSafetyAck(input: {
   kind: SafetyAckKind;
   version?: string;
 }) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to continue");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to continue");
   const { error } = await supabase.from("game_safety_acknowledgments").upsert(
     {
-      user_id: u.user.id,
+      user_id: userId,
       game_id: input.gameId,
       kind: input.kind,
       version: input.version ?? SAFETY_ACK_VERSION,

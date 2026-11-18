@@ -7,9 +7,13 @@
  * test could render, none of which the specs are about:
  *
  *   - `GET /auth/v1/user`: the auth store verifies the stored session with it
- *     before publishing a user, and a page load sends 9 to 26 of them;
- *   - the root gate's `getMyAgeStatus`, then `getOnboardingStatus` (5s cap each),
- *     server functions that themselves call the sandbox;
+ *     before publishing a user (on 2026-11-12 a page load sent 9 to 26 of them;
+ *     since the game and pay pages read the user id from the stored session,
+ *     a game page load sends about one);
+ *   - the root gate's `getMyAgeStatus` and `getOnboardingStatus` (5s cap each),
+ *     server functions that themselves call the sandbox. They now start while
+ *     the session is being verified (src/lib/gate-prefetch.ts), but each still
+ *     waits on the auth server;
  *   - `getMyChildStatus`, the account's age and consent policy. The pay page
  *     shows no payment option until it has answered (it fails closed for
  *     minors), so a slow answer would hold every pay spec's first screen.

@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
 const joined = new Set<string>();
@@ -152,11 +153,21 @@ async function hydrateFromDb(userId: string) {
 function ensureHydrated() {
   if (hydrated || typeof window === "undefined" || hydratingPromise) return;
   hydratingPromise = (async () => {
-    const { data, error } = await supabase.auth.getUser();
-    currentUserId = data.user?.id ?? null;
+    // The id comes from the stored session, not the auth server (see current-user-id.ts); read
+    // it here rather than through getCurrentUserId so a failed read can be told apart from
+    // "nobody is signed in".
+    let sessionFailed = false;
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      sessionFailed = !!error;
+      currentUserId = error ? null : (data.session?.user?.id ?? null);
+    } catch {
+      sessionFailed = true;
+      currentUserId = null;
+    }
     if (!currentUserId) {
-      // No signed-in account: no places. Unless asking who is signed in failed, which says nothing about the roster.
-      if (error) rosterLoadFailed();
+      // No signed-in account: no places. Unless reading the session failed, which says nothing about the roster.
+      if (sessionFailed) rosterLoadFailed();
       else setRosterLoad("ready");
     }
     if (currentUserId) {
@@ -316,8 +327,7 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
   };
 
   try {
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
+    const uid = await getCurrentUserId();
     if (!uid) {
       undo();
       const { toast } = await import("sonner");
@@ -372,8 +382,7 @@ export function leaveGame(id: string) {
   // Always attempt the DB delete — confirmed players are on the roster
   // even when the local set never tracked them.
   void (async () => {
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
+    const uid = await getCurrentUserId();
     if (!uid) return;
     const { error } = await supabase
       .from("game_participants")

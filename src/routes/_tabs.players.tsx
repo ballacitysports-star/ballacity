@@ -45,6 +45,7 @@ import {
 } from "@/lib/availability";
 import { MineView } from "@/components/players/MineView";
 import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability-gate";
+import { QuickAvailabilitySheet } from "@/components/availability/QuickAvailabilitySheet";
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
@@ -344,8 +345,10 @@ function PlayersPage() {
   // Availability lives on the player profile — gate posting on having one.
   const availGate = useAvailabilityGate();
   const [gateOpen, setGateOpen] = useState(false);
+  // New posts start with the three-tap "I'm available" sheet; "More options" opens the full form.
+  const [quickOpen, setQuickOpen] = useState(false);
   const openPostFlow = () => {
-    if (availGate.canPost) setPostOpen(true);
+    if (availGate.canPost) setQuickOpen(true);
     else setGateOpen(true);
   };
 
@@ -633,6 +636,15 @@ function PlayersPage() {
               onSwitched={() => setPostOpen(true)}
             />
           )}
+          {user && availGate.canPost && (
+            <button
+              type="button"
+              onClick={openPostFlow}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient text-base font-bold text-primary-foreground glow-lime"
+            >
+              <Plus className="h-5 w-5" strokeWidth={2.5} /> I'm available
+            </button>
+          )}
           <MineView
             user={user ? { id: user.id } : null}
             onEdit={(m) => setEditingPost(m)}
@@ -666,7 +678,7 @@ function PlayersPage() {
                 <button
                   onClick={openPostFlow}
                   className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-                  aria-label="Post availability"
+                  aria-label="I'm available: post availability"
                 >
                   <Plus className="h-5 w-5" strokeWidth={2.5} />
                 </button>
@@ -839,6 +851,22 @@ function PlayersPage() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {!isParentMode && (
+        <QuickAvailabilitySheet
+          open={quickOpen}
+          onOpenChange={setQuickOpen}
+          onPosted={() => {
+            setQuickOpen(false);
+            setReloadTick((t) => t + 1);
+            toast.success("You're listed. Players near you can see when you're free.");
+          }}
+          onMoreOptions={() => {
+            setQuickOpen(false);
+            setPostOpen(true);
+          }}
+        />
       )}
 
       {!isParentMode && (postOpen || editingPost) && (
