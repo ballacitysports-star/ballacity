@@ -30,7 +30,6 @@ vi.mock("@/lib/notifications.functions", () => ({
     notif.calls.push(data);
   },
 }));
-vi.mock("@/lib/push.functions", () => ({ sendPushToUser: async () => {} }));
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -283,11 +282,10 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
-    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId) as
-      Record<string, string> | undefined;
-    expect(found).toBeTruthy();
-    expect(found!.title).toMatch(/Notif verification game/);
-    expect(found!.link).toBe(`/games/${gameId}?invite=1&from=${hostId}`);
+    // The app names the invite; the server writes the title and link from the game
+    // (notification-plan.server.test.ts covers the text).
+    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId);
+    expect(found).toEqual({ type: "game_invite", game_id: gameId, user_id: playerId });
 
     // Cleanup the request row created via the helper (by recipient/game_id).
     const { data: rows } = await hostClient

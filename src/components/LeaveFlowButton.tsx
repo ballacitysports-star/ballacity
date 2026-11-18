@@ -134,13 +134,11 @@ export function LeaveFlowButton({
         // On an open game a request to the parent stays pending through payment; it goes too, as the game page's own
         // leave does, so a later join asks the parent again.
         await cancelMyJoinRequest(gameId).catch(() => {});
-        leaveGame(gameId);
-        void notifyHostOfLeave(gameId, gameTitle);
+        void leaveGame(gameId).then(() => notifyHostOfLeave(gameId));
       } else {
         await withdrawMyApprovedJoinRequest(gameId).catch(() => {});
         await cancelMyJoinRequest(gameId).catch(() => {});
-        leaveGame(gameId);
-        void notifyHostOfLeave(gameId, gameTitle);
+        void leaveGame(gameId).then(() => notifyHostOfLeave(gameId));
       }
       toast.success(copy.success);
       setOpen(false);

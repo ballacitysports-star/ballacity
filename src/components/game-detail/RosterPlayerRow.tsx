@@ -173,17 +173,9 @@ export function RosterPlayerRow({
       }
       if (notifyType) {
         await createNotification({
-          user_id: req.player_id,
           type: notifyType,
-          title:
-            next === "verified"
-              ? `Payment verified for ${gameTitle}`
-              : `Payment rejected for ${gameTitle}`,
-          body:
-            next === "verified"
-              ? "The host confirmed your payment. You're all set."
-              : "The host couldn't verify your payment. Please resubmit.",
-          link: `/games/${req.game_id}`,
+          game_id: req.game_id,
+          user_id: req.player_id,
         });
       }
       toast.success(
@@ -223,11 +215,9 @@ export function RosterPlayerRow({
         return;
       }
       await createNotification({
-        user_id: req.player_id,
         type: "payment_verified",
-        title: `Payment recorded for ${gameTitle}`,
-        body: "The host marked your payment as received.",
-        link: `/games/${req.game_id}`,
+        game_id: req.game_id,
+        user_id: req.player_id,
       });
       toast.success("Marked as paid.");
     } catch (e: unknown) {
@@ -319,12 +309,11 @@ export function RosterPlayerRow({
         .eq("game_id", req.game_id)
         .eq("user_id", req.player_id);
       if (delErr) throw delErr;
+      // The request, now rejected, is what lets the server confirm this player was on the game.
       await createNotification({
+        type: "participant_removed",
+        game_id: req.game_id,
         user_id: req.player_id,
-        type: "join_declined",
-        title: `Removed from ${gameTitle}`,
-        body: "The host removed you from this game.",
-        link: `/games/${req.game_id}`,
       });
       toast.success(`${name} removed.`);
     } catch (e: unknown) {
@@ -352,12 +341,11 @@ export function RosterPlayerRow({
         .eq("game_id", req.game_id)
         .eq("user_id", req.player_id);
       if (delErr) throw delErr;
+      // The request, now rejected, is what lets the server confirm this player was on the game.
       await createNotification({
+        type: "participant_removed",
+        game_id: req.game_id,
         user_id: req.player_id,
-        type: "join_declined",
-        title: `Removed from ${gameTitle}`,
-        body: "The host removed you from this game.",
-        link: `/games/${req.game_id}`,
       });
       await blockPlayer(req.player_id, name);
     } catch (e: unknown) {
@@ -373,11 +361,9 @@ export function RosterPlayerRow({
     setReminding(true);
     try {
       await createNotification({
-        user_id: req.player_id,
         type: "payment_reminder",
-        title: `Payment reminder · ${gameTitle}`.slice(0, 200),
-        body: `Your $${fee} spot for ${gameTitle} is held. Tap here to pay the host.`,
-        link: `/games/${req.game_id}/pay`,
+        game_id: req.game_id,
+        user_id: req.player_id,
       });
       toast.success(`Reminder sent to ${name}.`);
     } catch {

@@ -397,24 +397,22 @@ export function HostPaymentsPanel({
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)));
     try {
       const res = await reviewPaymentAction({
-        data: { gameId: row.game_id, playerId: row.player_id, next, expectedFrom: row.status },
+        data: {
+          gameId: row.game_id,
+          playerId: row.player_id,
+          next,
+          expectedFrom: row.status,
+          notes: reason,
+        },
       });
       if (!res.changed) toast.info("Already up to date.");
       else toast.success(next === "verified" ? "Payment verified." : "Payment declined.");
       if (res.changed) {
         await createNotification({
-          user_id: row.player_id,
           type: next === "verified" ? "payment_verified" : "payment_rejected",
-          title:
-            next === "verified"
-              ? `Payment verified for ${gameTitle}`
-              : `Payment declined for ${gameTitle}`,
-          body:
-            next === "verified"
-              ? "The host confirmed your payment. You're all set."
-              : reason || "The host couldn't verify your payment. Please resubmit.",
-          link: `/games/${row.game_id}`,
-        }).catch(() => {});
+          game_id: row.game_id,
+          user_id: row.player_id,
+        });
       }
     } catch (e: any) {
       // rollback

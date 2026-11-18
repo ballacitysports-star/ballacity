@@ -39,7 +39,14 @@ export type ReviewPaymentResult = {
 export const reviewPaymentAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { gameId: string; playerId: string; next: Next; expectedFrom?: From | "none" }) => {
+    (input: {
+      gameId: string;
+      playerId: string;
+      next: Next;
+      expectedFrom?: From | "none";
+      /** A decline reason, kept on the submission (reviewer_notes) where the player's pay page shows it. */
+      notes?: string | null;
+    }) => {
       if (!input?.gameId || typeof input.gameId !== "string") {
         throw new Error("gameId is required.");
       }
@@ -49,7 +56,11 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       if (!["verified", "rejected", "pending"].includes(input.next)) {
         throw new Error("Invalid next status.");
       }
-      return input;
+      const notes =
+        typeof input.notes === "string" && input.notes.trim()
+          ? input.notes.trim().slice(0, 500)
+          : null;
+      return { ...input, notes };
     },
   )
   .handler(async ({ data, context }): Promise<ReviewPaymentResult> => {
@@ -211,6 +222,7 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       .update({
         status: next,
         reviewed_at: next === "pending" ? null : new Date().toISOString(),
+        ...(next === "rejected" ? { reviewer_notes: data.notes ?? null } : {}),
       })
       .eq("id", existing.id)
       .eq("status", existing.status)

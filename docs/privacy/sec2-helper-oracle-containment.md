@@ -35,6 +35,8 @@ After the SQL, each of these would get the fixed `false`: every cross-user notif
 
 **Order: publish the app first, then apply the SQL.** The new app code gives the same answers before and after the migration. The old app code breaks the three flows above as soon as the migration is applied.
 
+**Later (20261119120000, `docs/privacy/client-notifications.md`):** items 1 and 2 no longer ask `can_notify` at all. `createNotificationForUser` takes only an allow-listed type and the row it is about, and the server writes the text and link; `sendPushToUser` was removed. `can_notify` also stopped counting an availability contact request as a relationship.
+
 ## Later migrations that redefine a helper
 
 - **Prefer `CREATE OR REPLACE FUNCTION private_sec.<helper>(...)`** for a new body. It keeps the OID every policy points at, and the public wrapper needs nothing.

@@ -65,13 +65,7 @@ export function HostRequestRow({
       return false;
     }
     // The decision is saved; a failed heads-up to the player must not undo it on screen.
-    const heardBack = await notifyJoinReview(
-      req.player_id,
-      req.game_id,
-      gameTitle,
-      status,
-      reason,
-    ).then(
+    const heardBack = await notifyJoinReview(req.player_id, req.game_id, status).then(
       () => true,
       () => false,
     );
@@ -231,13 +225,7 @@ export function HostPendingChip({
       return false;
     }
     // The decision is saved; a failed heads-up to the player must not undo it on screen.
-    const heardBack = await notifyJoinReview(
-      req.player_id,
-      req.game_id,
-      gameTitle,
-      status,
-      reason,
-    ).then(
+    const heardBack = await notifyJoinReview(req.player_id, req.game_id, status).then(
       () => true,
       () => false,
     );

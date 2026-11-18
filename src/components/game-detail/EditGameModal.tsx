@@ -2,7 +2,6 @@ import { Check, X as XIcon, Lock, DollarSign, Home, ShieldCheck } from "lucide-r
 import { SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { normalizeGamePolicy, validateGamePolicy, type GamePolicy } from "@/lib/game-policy";
@@ -41,7 +40,7 @@ import { buildMediaRef } from "@/lib/media-refs";
 import { isAllowedImageMime, MAX_IMAGE_BYTES } from "@/lib/image-validation";
 import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { useBlockedUsersList } from "@/lib/moderation";
-import { Field, formatEndsAt } from "@/components/game-detail/GameDetailBits";
+import { Field } from "@/components/game-detail/GameDetailBits";
 
 export function EditGameModal({
   game,
@@ -317,43 +316,8 @@ export function EditGameModal({
       const endChanged = !allDay && nextEndMs !== prevEndMs;
       const allDayChanged = !!game.allDay !== allDay;
       if (endChanged || allDayChanged) {
-        void (async () => {
-          try {
-            const { data: roster } = await supabase
-              .from("game_participants")
-              .select("user_id")
-              .eq("game_id", game.id);
-            const targets = (roster ?? [])
-              .map((r: { user_id: string }) => String(r.user_id))
-              .filter((uid) => uid && uid !== user?.id);
-            const body = allDayChanged
-              ? allDay
-                ? `${title.trim() || game.title} is now an all-day event on ${formatWhenDate(game.date)}.`
-                : `${title.trim() || game.title} now ends at ${formatEndsAt({
-                    ...game,
-                    allDay,
-                    endsAt: new Date(nextEndMs).toISOString(),
-                  } as Game)}.`
-              : `New end time: ${formatEndsAt({
-                  ...game,
-                  allDay,
-                  endsAt: new Date(nextEndMs).toISOString(),
-                } as Game)}.`;
-            await Promise.all(
-              targets.map((uid) =>
-                createNotification({
-                  user_id: uid,
-                  type: "game_time_changed",
-                  title: `Schedule updated: ${title.trim() || game.title}`,
-                  body,
-                  link: `/games/${game.id}`,
-                }).catch(() => {}),
-              ),
-            );
-          } catch {
-            /* best effort */
-          }
-        })();
+        // The server reads the roster and writes the text from the saved game.
+        void createNotification({ type: "game_time_changed", game_id: game.id });
       }
 
       toast.success("Game updated.");
