@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
@@ -17,6 +18,9 @@ import {
   PAYMENTS_BLOCKED_MESSAGE,
   PAYMENTS_HOST_AGE_REQUIRED_MESSAGE,
   PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE,
+  PAYMENT_CLAIM_REFUSAL_CODES,
+  PAYMENT_PRECONDITION_MESSAGES,
+  paymentClaimRefusalMessage,
   paymentSubmissionErrorMessage,
 } from "./payments-policy";
 
@@ -76,6 +80,62 @@ describe("paymentSubmissionErrorMessage (20261111120000)", () => {
 
   it("passes any other error through unchanged", () => {
     expect(paymentSubmissionErrorMessage("network down")).toBe("network down");
+  });
+});
+
+describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261118200000)", () => {
+  /** Each code the trigger raises, with the sentence it raises it with, read from the migration itself. */
+  const raised = [
+    ...readFileSync(
+      new URL(
+        "../../supabase/migrations/20261118200000_payment_claim_preconditions.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ).matchAll(/WHEN '([A-Z_]+)' THEN '((?:[^']|'')*)'/g),
+  ].map(([, code, sentence]) => ({
+    code: code!,
+    raw: `${code}: ${sentence!.replace(/''/g, "'")}`,
+  }));
+
+  it("knows every code the trigger raises, and only those", () => {
+    expect(raised.map((r) => r.code).sort()).toEqual([...PAYMENT_CLAIM_REFUSAL_CODES].sort());
+  });
+
+  it.each(PAYMENT_CLAIM_REFUSAL_CODES)(
+    "%s reads as PayPal's sentence, without saying nothing was charged",
+    (code) => {
+      const { raw } = raised.find((r) => r.code === code)!;
+      const msg = paymentSubmissionErrorMessage(raw);
+      expect(msg).toBe(paymentClaimRefusalMessage(code));
+      expect(`${msg} You weren't charged.`).toBe(PAYMENT_PRECONDITION_MESSAGES[code]);
+      // The money may already have moved in the player's payment app.
+      expect(msg).not.toMatch(/charged/i);
+      expect(msg).not.toContain(code);
+      expect(msg.length).toBeGreaterThan(10);
+    },
+  );
+
+  it("gives the plain sentences the player sees", () => {
+    expect(paymentSubmissionErrorMessage("GAME_FULL: this game is full.")).toBe(
+      "This game is full.",
+    );
+    expect(paymentSubmissionErrorMessage("GAME_CANCELLED: x")).toBe("This game was cancelled.");
+    expect(paymentSubmissionErrorMessage("BLOCKED_BY_HOST: x")).toBe(
+      "You can't join this host's games.",
+    );
+  });
+
+  it("matches whole codes at the start only", () => {
+    // A longer code that merely ends in one of these is not that code.
+    const child =
+      "CHILD_GAME_PARTICIPATION_BLOCKED: a parent or guardian must approve this account.";
+    expect(paymentSubmissionErrorMessage(child)).toBe(child);
+    // Other codes and plain errors pass through as before.
+    expect(paymentSubmissionErrorMessage("PAYMENT_IN_PROGRESS: x")).toBe("PAYMENT_IN_PROGRESS: x");
+    expect(paymentSubmissionErrorMessage("network down: GAME_FULL")).toBe(
+      "network down: GAME_FULL",
+    );
   });
 });
 

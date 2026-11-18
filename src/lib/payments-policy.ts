@@ -40,11 +40,49 @@ export const PAYMENTS_GUARDIAN_APPROVAL_MESSAGE =
   "Your parent needs to approve this game before you can pay. Go back to the game and ask them.";
 
 /**
- * A plain sentence for a refused payment claim. The database trigger
- * `enforce_game_payment_cohort` (and `enforce_guardian_before_payment`) answers with a code; anything unrecognised
- * is passed through unchanged.
+ * The codes the database refuses a player's own manual payment claim with when the roster place could not be given
+ * (trigger zz_payment_claim_preconditions, supabase/migrations/20261118200000_payment_claim_preconditions.sql). They are
+ * PayPal checkout's codes for the same rules.
+ */
+export const PAYMENT_CLAIM_REFUSAL_CODES = [
+  "GAME_CANCELLED",
+  "GAME_COMPLETED",
+  "GAME_JOINS_CLOSED",
+  "GAME_FULL",
+  "GAME_PARTICIPATION_BLOCKED",
+  "BLOCKED_BY_HOST",
+  "AGE_REQUIREMENT_NOT_MET",
+] as const;
+export type PaymentClaimRefusalCode = (typeof PAYMENT_CLAIM_REFUSAL_CODES)[number];
+
+const NOT_CHARGED = " You weren't charged.";
+
+/**
+ * What the player reads when their manual claim is refused: PayPal's wording for the same code, without "You weren't
+ * charged." A manual payment is sent in the player's own payment app before the claim is written, so the money may
+ * already have moved.
+ */
+export function paymentClaimRefusalMessage(code: PaymentClaimRefusalCode): string {
+  const message = PAYMENT_PRECONDITION_MESSAGES[code]!;
+  return message.endsWith(NOT_CHARGED) ? message.slice(0, -NOT_CHARGED.length) : message;
+}
+
+/** The claim-refusal code a database error starts with ("GAME_FULL: ..."), whole codes only. */
+function claimRefusalCodeOf(raw: string): PaymentClaimRefusalCode | null {
+  const code = /^\s*([A-Z][A-Z_]*):/.exec(raw)?.[1];
+  return (PAYMENT_CLAIM_REFUSAL_CODES as readonly string[]).includes(code ?? "")
+    ? (code as PaymentClaimRefusalCode)
+    : null;
+}
+
+/**
+ * A plain sentence for a refused payment claim. The database triggers `enforce_game_payment_cohort`,
+ * `enforce_guardian_before_payment` and `enforce_payment_claim_preconditions` answer with a code; anything
+ * unrecognised is passed through unchanged.
  */
 export function paymentSubmissionErrorMessage(raw: string): string {
+  const refusal = claimRefusalCodeOf(raw);
+  if (refusal) return paymentClaimRefusalMessage(refusal);
   if (raw.includes("AGE_VERIFICATION_REQUIRED")) {
     // A host confirming another player's claim, or a host whose own account has no birthday.
     if (raw.includes("this player must add")) return PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE;
