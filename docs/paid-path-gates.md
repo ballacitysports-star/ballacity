@@ -174,14 +174,14 @@ and for 15+ s when getMyJoinRequest failed or timed out (it only logged a warnin
    approved. These are the only lock states where the server lets an approved (or rostered) player through
    (enforce_game_join_gate for non-approved writers only; the PayPal precondition's GAME_JOINS_CLOSED skips approved
    players, and its "over by the clock" check skips rostered ones).
+6. `age` (round 5): the game's age range, for a viewer who is not the host and not in the flow, whose age is outside
+   it or unknown (no birthday on file). Same wording as the game page (ageGateMessage). See 5e.
 
 A full roster is still not decided here (the "just filled up" warning stays).
 
-**Age range: not applied on the pay page.** It needs the viewer's exact age, i.e. a new read of their birthday
-(`get_my_birthday`), which the task ruled out. In practice the only viewers who see handles are those who can read the
-settings row (payee, approved requester, payer, participant: private_sec.can_read_game_payment_settings), and the
-server's age rule exempts approved and rostered players; PayPal checks AGE_REQUIREMENT_NOT_MET itself. The remaining
-case, a non-approved viewer with an earlier claim on an age-ranged game, stays a server gap (section 6).
+**Age range: applied on the pay page since round 5 (owner decision 2026-11-18, #430 question 4).** Before, it was
+not, because it needs the viewer's exact age (a read of their birthday, `get_my_birthday`). The decision asks for
+the game page's own source and rule, which is that read (`useMyAge`). See section 5e.
 
 ### 5b. The pay page: `src/routes/games.$gameId.pay.tsx`
 
@@ -230,8 +230,8 @@ holdsPlace)` (a cancelled game, or an ended one without a place, as payEntryBloc
 approval no longer exempts such a viewer from `lockedForNewJoin`, so an approved, unpaid player gets the disabled
 "Cancelled" (new label) or "Game ended" button instead of a link to a page that only says they cannot pay. A pending
 payment keeps its "Payment pending · View status" link: the pay page shows that payment's timeline (withdraw,
-dispute), and the button's tap would open the same page. The risk acknowledgment was NOT added to the paid
-path (owner decision pending, section 7). No payments-permission check was added to the link (a 13-15 still gets the
+dispute), and the button's tap would open the same page. The risk acknowledgment was not added to the game page's paid
+link; since round 5 the pay page asks it (section 7, Option B). No payments-permission check was added to the link (a 13-15 still gets the
 link and then the pay page's block card, as guardedOpenJoin intends).
 
 ### 5d. Tests
@@ -259,13 +259,45 @@ link and then the pay page's block card, as guardedOpenJoin intends).
   pay page offers nothing until getMyChildStatus answers, pay-entry-blocked (c) routes it to the real server function
   (`route.continue()` ahead of the stub), so a regression that makes it fail or hang fails E2E.
 
+### 5e. Round 5 (branch claude/pay-risk-ack-age, owner decisions 2026-11-18)
+
+- **"Before you join" on the pay page (section 7, Option B).** `payRiskAckView` (src/lib/pay-entry-gate.ts) decides
+  it with the join tap's own rules (`needsRiskAcknowledgment`, `planRiskAckTap`): `none` for the host, for a viewer
+  in the flow (on the roster, a payment in, or approved: payEntryBlock's exemptions) and once the current version is
+  on file; `checking` while the acknowledgment read has not answered, or while the viewer's flow state is still
+  loading for a viewer it would ask (the "Loading payment options…" card, never the options); `ask` otherwise,
+  including a failed read (fail closed, as src/lib/risk-ack-tap.ts does) and a flow state that failed to load. The
+  pay page draws the existing `RiskAcknowledgmentDialog` in place of the payment options, after any block card,
+  pending check or approval card. Agreeing calls `recordSafetyAck({ gameId, kind: "participant_risk" })` (the join
+  path's write: same table, kind, version `SAFETY_ACK_VERSION` and idempotent upsert) and re-reads it; the options
+  then show. Cancel leaves a "Before you join" card (`data-testid="pay-risk-ack-required"`) with no payment options,
+  "Review and agree" (opens the dialog again) and "Back to game". The stepper and the "already started paying" latch
+  wait for it too.
+- **Age range on the pay page (#430 question 4).** The game page's source and rule: `useMyAge()` (get_my_birthday)
+  and `ageGateState` / `ageGateMessage` (src/lib/game-age.ts). No age-only source covers the viewer's own exact age
+  (`my_platform_status` gives the cohort only; `profile_ages` hides an age whose profile is private), so the pay page
+  reads it as the game page does. New block kind `age`, said after every other block, for a viewer who is not the
+  host and not in the flow, when their age is outside the range or no birthday is on file. Wording as on the game
+  page ("This game is 18+ — the host reviews requests outside that range." / "This game is 18+. Add your birthday to
+  your profile, or request the host's approval."). Approved, rostered and paid-in viewers are exempt, matching the
+  server's age rule (enforce_game_age_requirement and AGE_REQUIREMENT_NOT_MET skip approved and rostered players). It
+  is only asked on a game with a range: until the age has loaded the range counts as not met, so a viewer it could
+  block sees `checking`, and a failed read (useMyAge now reports `error` and can `retry`) sees `check_failed`, not
+  "Add your birthday". A pending request keeps the approval card (`blockOutranksApproval`: the host's approval lifts
+  it). A viewer who already started paying gets the `warn` card above the proof form: the claim is still recorded
+  (no age check on payment_submissions, section 6).
+- **Game page, cancelled games.** `PaymentRequiredBanner` takes `takesPayment = !gameTakesNoPayment(joinState,
+holdsPlace)` and draws nothing on a cancelled game, or an ended one for a viewer without a place (it used to say
+  "Pay $X now"). A player on the roster of a cancelled paid game whose payment was never verified no longer gets
+  "Pay Host": `unpaidOnGameTakingNoPayment` puts them under `lockedForNewJoin`, so the button is the disabled
+  "Cancelled". A pending request or payment keeps its cancel/withdraw button; a confirmed player keeps "Tap to leave".
+- **Booking sheet (#428 owner question).** `BookPrefill.venue` and its producers (TrainerActions' `defaultVenue`, the
+  trainer profile's slot pick and "Book session") are removed: the sheet has no venue field. No behaviour change.
+
 ### What is left on the client
 
-- The pay page does not apply the game's age range (above).
 - A full roster stays a soft warning.
 - /pay still reads `requires_approval` and the methods from the settings row a new viewer cannot read (6c).
-- Game page, edge case not changed: a viewer on the roster of a cancelled paid game whose payment was never verified
-  (e.g. added by the host) still gets the "Pay Host" button; its tap opens the pay page, which shows the block card.
 - An 18+ viewer with a leftover active guardian link: the client follows game_payment_guardian_ready and shows the
   handles, but the manual-claim trigger still refuses their proof (server gap 6d).
 
@@ -330,6 +362,10 @@ Also related, not fixed:
 
 ## 7. Product decision: should paid joins show "Before you join"?
 
+**Decision (owner, 2026-11-18): Option B**, built in round 5 (section 5e). The pay page asks it before any payment
+option, for every entry (the game page's Pay Host link, an invite, a bookmark). Option C (server enforcement) is not
+built: nothing on the server requires the acknowledgment yet.
+
 Today: free joins and request-to-join show it (handleJoin). A paid open game never shows it. A paid approval game
 shows it at request time only. Nothing on the server requires it anywhere.
 
@@ -391,3 +427,20 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
   0 skipped, 0 flaky (2.7 min, e2e-r4-all.log).
 - Mutation check: with `flow` forced to `"ready"` on the pay page (the round-3 behaviour), pay-entry-blocked (c) fails:
   "Loading payment options…" never shows while the request is held, because the block card is drawn instead.
+
+### Round 5 (branch claude/pay-risk-ack-age, owner decisions 2026-11-18)
+
+- `npx vitest run` (full): 407 files, 4253 passed, 22 skipped (none added here). pay-entry-gate.test.ts: 92;
+  use-my-age.test.tsx: 4; PaymentRequiredBanner.test.tsx: 3.
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh (stack recreated from main's migrations; no migration in this round): all
+  `e2e/pay-*.spec.ts`, `e2e/invite-pay-and-join*.spec.ts`, `e2e/invite-deeplink-*.spec.ts`, risk-ack-before-join,
+  pay-entry-blocked, plus fixture-age-gated-flows, invite-fallback-params, leave-verified-payment-consistency and the
+  two trainers-venue-filter specs (booking sheet): 28 files, **52 passed**, 0 failed, 0 skipped, 0 flaky (4.1 min).
+- Mutation checks. E2E: with the pay page's age range dropped (`ageReq: null`) and "Before you join" forced to `none`,
+  the two age-range block tests in pay-entry-blocked and pay-risk-ack-before-pay fail (3 failed, 4 passed: the
+  approved-viewer age test passes either way, as it should). Unit: each of these fails at least one test: the
+  banner's `takesPayment` check removed; `!pending` dropped from unpaidOnGameTakingNoPayment; payRiskAckView showing
+  the options while the read waits, or while the flow state loads; the age block's approved exemption removed; an age
+  still loading counted as in range; useMyAge ignoring an RPC error.
