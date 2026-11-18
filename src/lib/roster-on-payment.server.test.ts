@@ -72,7 +72,7 @@ const rpc = async (fn: string) => ({ data: fn === "game_payee_id" ? db.payee : n
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from, rpc } }));
 
-const { addPaidPlayerToRoster, holdsPlace, notPlacedWhy } =
+const { addPaidPlayerToRoster, holdsPlace, notPlacedWhy, placedAfterVerify } =
   await import("./roster-on-payment.server");
 
 const rostered = () => db.inserts.filter((i) => i.table === "game_participants");
@@ -122,6 +122,7 @@ describe("addPaidPlayerToRoster", () => {
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
       added: false,
       reason: "approval_required",
+      noticeSent: true,
     });
     expect(rostered()).toHaveLength(0);
     const [host, player] = notPlaced();
@@ -168,6 +169,7 @@ describe("addPaidPlayerToRoster", () => {
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
       added: false,
       reason: "cancelled",
+      noticeSent: true,
     });
     expect(rostered()).toHaveLength(0);
     const notices = notPlaced();
@@ -189,12 +191,43 @@ describe("addPaidPlayerToRoster", () => {
     error.mockRestore();
   });
 
+  it("keeps a player already on the roster of an approval-required game without an approved request", async () => {
+    // The host added them, or they joined before approval was switched on: no request, but the place is theirs.
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.rows.game_participants = { user_id: "p1" };
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({ added: false, reason: "already_on_roster" });
+    expect(holdsPlace(result)).toBe(true);
+    expect(rostered()).toHaveLength(0);
+    expect(notPlaced()).toHaveLength(0);
+    expect(db.eqs).toEqual(
+      expect.arrayContaining([
+        { table: "game_participants", col: "game_id", val: "g1" },
+        { table: "game_participants", col: "user_id", val: "p1" },
+      ]),
+    );
+  });
+
+  it("keeps a player already on the roster of a game with no settings row", async () => {
+    db.rows.game_participants = { user_id: "p1" };
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "already_on_roster",
+    });
+    expect(notPlaced()).toHaveLength(0);
+  });
+
   it("reports a refusal from the join gate (full, ended) instead of pretending", async () => {
     db.rows.game_payment_settings = { requires_approval: false };
     db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const result = await addPaidPlayerToRoster("g1", "p1");
-    expect(result).toEqual({ added: false, reason: "refused", code: "GAME_FULL" });
+    expect(result).toEqual({
+      added: false,
+      reason: "refused",
+      code: "GAME_FULL",
+      noticeSent: true,
+    });
     expect(holdsPlace(result)).toBe(false);
     expect(error).toHaveBeenCalled();
     error.mockRestore();
@@ -235,6 +268,7 @@ describe("addPaidPlayerToRoster", () => {
       added: false,
       reason: "refused",
       code: "GAME_COMPLETED",
+      noticeSent: true,
     });
     expect(notPlaced()[0].title).toBe("Paid, not on the roster · A player");
     expect(notPlaced()[0].body).toMatch(/the game has ended/);
@@ -246,10 +280,12 @@ describe("addPaidPlayerToRoster", () => {
     db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
     db.notificationsDown = true;
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    // noticeSent false: the caller must not tell the host a notice went out.
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
       added: false,
       reason: "refused",
       code: "GAME_FULL",
+      noticeSent: false,
     });
     expect(error).toHaveBeenCalledWith("[roster] not-placed notice failed", expect.any(Error));
     error.mockRestore();
@@ -269,5 +305,40 @@ describe("addPaidPlayerToRoster", () => {
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toMatchObject({ added: false });
     const asked = db.eqs.find((e) => e.table === "game_payment_settings" && e.col === "host_id");
     expect(asked?.val).toBe("00000000-0000-0000-0000-000000000000");
+  });
+});
+
+describe("placedAfterVerify (what the host's verify call reports)", () => {
+  it("is true when the player holds the place", () => {
+    expect(placedAfterVerify({ added: true })).toBe(true);
+    expect(placedAfterVerify({ added: false, reason: "already_on_roster" })).toBe(true);
+  });
+
+  it("is false only when both sides were sent the notice", () => {
+    expect(
+      placedAfterVerify({ added: false, reason: "refused", code: "GAME_FULL", noticeSent: true }),
+    ).toBe(false);
+    expect(placedAfterVerify({ added: false, reason: "approval_required", noticeSent: true })).toBe(
+      false,
+    );
+  });
+
+  it("is null when no notice went out, so the caller sends the usual verified notice", () => {
+    expect(placedAfterVerify({ added: false, reason: "game_missing" })).toBeNull();
+    expect(
+      placedAfterVerify({ added: false, reason: "refused", code: "GAME_FULL", noticeSent: false }),
+    ).toBeNull();
+  });
+
+  it("follows addPaidPlayerToRoster end to end", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBe(false);
+    db.notificationsDown = true;
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBeNull();
+    db.rows.hosted_games = null;
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBeNull();
+    error.mockRestore();
   });
 });

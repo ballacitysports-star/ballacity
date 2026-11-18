@@ -10,8 +10,9 @@ export type ReviewPaymentResult = {
   changed: boolean;
   /**
    * Set when this call verified the payment: whether the player now holds a roster place (true), could not be given
-   * one (false: the host and the player were both sent a "payment_not_placed" notice), or the server could not tell
-   * (null).
+   * one and the host and the player were both sent a "payment_not_placed" notice (false), or neither is known (null:
+   * the placement or its notice failed, or the game is gone), in which case the caller says what it says for any
+   * verified payment.
    */
   placed?: boolean | null;
   submission: {
@@ -26,12 +27,13 @@ export type ReviewPaymentResult = {
 
 /**
  * After the host verified a payment: give the player their roster place. A place that cannot be given is reported to
- * both sides by addPaidPlayerToRoster; the verification itself stands either way.
+ * both sides by addPaidPlayerToRoster; the verification itself stands either way. False only when those notices were
+ * written, so the caller never tells the host a notice went out that did not.
  */
 async function placeVerifiedPlayer(gameId: string, playerId: string): Promise<boolean | null> {
   try {
-    const { addPaidPlayerToRoster, holdsPlace } = await import("./roster-on-payment.server");
-    return holdsPlace(await addPaidPlayerToRoster(gameId, playerId));
+    const { addPaidPlayerToRoster, placedAfterVerify } = await import("./roster-on-payment.server");
+    return placedAfterVerify(await addPaidPlayerToRoster(gameId, playerId));
   } catch (e) {
     console.error("[payments] roster placement after verification failed", e);
     return null;

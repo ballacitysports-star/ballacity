@@ -13,11 +13,31 @@ export type NotPlacedReason =
   "game_missing" | "already_on_roster" | "cancelled" | "approval_required" | "refused";
 
 export type RosterOnPaymentResult =
-  { added: true } | { added: false; reason: NotPlacedReason; code?: string };
+  | { added: true }
+  | {
+      added: false;
+      reason: NotPlacedReason;
+      code?: string;
+      /**
+       * The "payment_not_placed" notices to the host and the player were written. Only set when the place could not
+       * be given; false when writing them failed (the caller then has to tell both sides itself).
+       */
+      noticeSent?: boolean;
+    };
 
 /** True when the player holds the place after this call (newly added, or already there). */
 export function holdsPlace(result: RosterOnPaymentResult): boolean {
   return result.added || result.reason === "already_on_roster";
+}
+
+/**
+ * What a host's verify call reports about the place (ReviewPaymentResult.placed): true when the player holds it, false
+ * only when they do not and both sides were sent the "payment_not_placed" notice, else null (the game is gone, or the
+ * notice could not be written), so the host is never told of a notice that did not go out.
+ */
+export function placedAfterVerify(result: RosterOnPaymentResult): boolean | null {
+  if (holdsPlace(result)) return true;
+  return !result.added && result.noticeSent === true ? false : null;
 }
 
 /** The join gate's code at the start of a refused insert ("GAME_FULL: the roster is full."), if any. */
@@ -124,6 +144,7 @@ export async function addPaidPlayerToRoster(
     reason: "cancelled" | "approval_required" | "refused",
     code?: string,
   ): Promise<RosterOnPaymentResult> => {
+    let noticeSent = false;
     try {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
@@ -141,13 +162,25 @@ export async function addPaidPlayerToRoster(
       });
       const { error } = await supabaseAdmin.from("notifications").insert(notices as never);
       if (error) console.error("[roster] not-placed notice failed", error.message);
+      else noticeSent = true;
     } catch (e) {
       console.error("[roster] not-placed notice failed", e);
     }
-    return code ? { added: false, reason, code } : { added: false, reason };
+    return code ? { added: false, reason, code, noticeSent } : { added: false, reason, noticeSent };
   };
 
   if (game.cancelled_at) return notPlaced("cancelled");
+
+  // A player already on the roster keeps their place, whatever the approval setting says now: the host added them,
+  // or they joined before approval was switched on (or before any settings row existed).
+  const { data: onRoster, error: rosterReadError } = await supabaseAdmin
+    .from("game_participants")
+    .select("user_id")
+    .eq("game_id", gameId)
+    .eq("user_id", playerId)
+    .limit(1)
+    .maybeSingle();
+  if (!rosterReadError && onRoster) return { added: false, reason: "already_on_roster" };
 
   // Approval-required games still need an approved request before rostering. A
   // game with no settings row is request-to-join, as the game page treats it.
