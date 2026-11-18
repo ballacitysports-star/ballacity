@@ -1,4 +1,11 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import {
+  PAY_FIXTURE_HOST_ID,
+  anyRealtimeChannelJoined,
+  blockRealtime,
+  payFixtureGameRow,
+  serveFixtureGame,
+} from "./helpers/pay-fixtures";
 
 /**
  * E2E: with realtime frames delayed / intermittently blocked, the pay page
@@ -26,7 +33,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
 
@@ -105,11 +112,10 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // "Realtime frames delayed / intermittently blocked" — for the full test we
   // keep the realtime WebSocket unavailable. The client will still create
   // channel objects (with bindings) so we can synthesize a "late" frame
-  // later in the test.
-  await page.route(
-    (u) => String(u).includes("/realtime/"),
-    (route: PWRoute) => route.abort(),
-  );
+  // later in the test. (page.route never sees WebSockets, so aborting
+  // "/realtime/" there blocked nothing; see helpers/pay-fixtures.ts.)
+  await blockRealtime(page);
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
@@ -255,16 +261,15 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
 
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 10_000 });
+  // The gate renders as soon as the settings say approval is required, before
+  // the page has read the player's own request. Approving before that first
+  // read lands would let the initial load, not the poll, show "approved".
+  await expect(gate).toContainText(/your request to join is pending/i);
   await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // No realtime channel should have joined (WS blocked).
-  const joined = await page.evaluate(async () => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    return mod.supabase
-      .getChannels()
-      .some((c: any) => c.state === "joined" || c.state === "SUBSCRIBED");
-  });
-  expect(joined).toBe(false);
+  const joined = await anyRealtimeChannelJoined(page);
+  expect(joined, "no realtime channel should be joined when WS is blocked").toBe(false);
 
   // Host approves — polling must flip the UI.
   const getsBeforeApproval = joinGets;

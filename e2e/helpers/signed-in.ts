@@ -7,9 +7,13 @@
  * test could render, none of which the specs are about:
  *
  *   - `GET /auth/v1/user`: the auth store verifies the stored session with it
- *     before publishing a user, and a page load sends 9 to 26 of them;
- *   - the root gate's `getMyAgeStatus`, then `getOnboardingStatus` (5s cap each),
- *     server functions that themselves call the sandbox.
+ *     before publishing a user (on 2026-11-12 a page load sent 9 to 26 of them;
+ *     since the game and pay pages read the user id from the stored session,
+ *     a game page load sends about one);
+ *   - the root gate's `getMyAgeStatus` and `getOnboardingStatus` (5s cap each),
+ *     server functions that themselves call the sandbox. They now start while
+ *     the session is being verified (src/lib/gate-prefetch.ts), but each still
+ *     waits on the auth server.
  *
  * The sandbox slows down under the suite's own traffic. Measured locally on
  * 2026-11-12 (2 workers, these specs repeated): `/auth/v1/user` went from a

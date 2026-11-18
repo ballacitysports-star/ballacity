@@ -8,14 +8,14 @@
  */
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { useAuth } from "@/hooks/use-auth";
 
 /** Default lead times applied when a player RSVPs without changing anything. */
 export const DEFAULT_GAME_REMINDER_OFFSETS = [1440, 120] as const;
 
 export async function getMyGameReminderOffsets(gameId: string): Promise<number[] | null> {
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth?.user?.id;
+  const uid = await getCurrentUserId();
   if (!uid) return null;
   const { data, error } = await supabase
     .from("game_reminders" as any)
@@ -33,8 +33,7 @@ export async function saveMyGameReminderOffsets(
   gameId: string,
   offsets: number[],
 ): Promise<boolean> {
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth?.user?.id;
+  const uid = await getCurrentUserId();
   if (!uid) return false;
   const clean = [...new Set(offsets.map(Number).filter((n) => Number.isFinite(n) && n > 0))].sort(
     (a, b) => b - a,
@@ -58,8 +57,7 @@ export async function saveMyGameReminderOffsets(
 
 /** Clear the viewer's reminders for a game (used when they leave). */
 export async function clearMyGameReminders(gameId: string): Promise<void> {
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth?.user?.id;
+  const uid = await getCurrentUserId();
   if (!uid) return;
   await supabase
     .from("game_reminders" as any)

@@ -58,3 +58,21 @@ describe("ViewDensityToggle icons variant", () => {
     expect(onDensityChange).not.toHaveBeenCalled();
   });
 });
+
+describe("ViewDensityToggle full variant", () => {
+  it("lets the density switch wrap under the view switch instead of overflowing", () => {
+    // Side by side, the two switches are wider than a 320px screen's column.
+    // Layout itself is checked by e2e/responsive-overflow.spec.ts.
+    render(
+      <ViewDensityToggle
+        view="list"
+        density="list"
+        onViewChange={() => {}}
+        onDensityChange={() => {}}
+      />,
+    );
+    const row = screen.getByRole("tablist", { name: "View mode" }).parentElement!;
+    expect(row).toBe(screen.getByRole("tablist", { name: "Card density" }).parentElement);
+    expect(row.classList.contains("flex-wrap")).toBe(true);
+  });
+});

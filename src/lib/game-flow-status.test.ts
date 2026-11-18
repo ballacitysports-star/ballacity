@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePlayerFlowStatus, isGameId } from "./game-flow-status";
+import { computePlayerFlowStatus, flowChangeConcernsGame, isGameId } from "./game-flow-status";
 
 describe("isGameId", () => {
   it("accepts the ids games are actually stored with", () => {
@@ -94,5 +94,55 @@ describe("computePlayerFlowStatus on an open game with a request to the parent",
     expect(flow(pending, [{ status: "pending" }], paidQueue)).toBe("requested");
     expect(flow(pending, [{ status: "pending" }], null, true)).toBe("requested");
     expect(flow(declined, [{ status: "pending" }], paidQueue)).toBe("rejected");
+  });
+});
+
+describe("flowChangeConcernsGame", () => {
+  const GAME = "host-mvli8nwx-l71w";
+  const known = new Set(["req-1", "sub-1", "part-1"]);
+
+  it("follows an insert or update by its game", () => {
+    expect(
+      flowChangeConcernsGame({ eventType: "INSERT", new: { id: "x", game_id: GAME } }, GAME, known),
+    ).toBe(true);
+    expect(
+      flowChangeConcernsGame(
+        { eventType: "UPDATE", new: { id: "x", game_id: "other" } },
+        GAME,
+        known,
+      ),
+    ).toBe(false);
+  });
+
+  it("recognises a DELETE of one of the viewer's rows by id alone", () => {
+    // What realtime delivers for a DELETE under row-level security: `new` is {}
+    // and `old` has only the primary key. Reading `new ?? old` saw {} and
+    // never reloaded, so a leave left "You're in! Payment confirmed" up.
+    expect(
+      flowChangeConcernsGame({ eventType: "DELETE", new: {}, old: { id: "sub-1" } }, GAME, known),
+    ).toBe(true);
+    expect(
+      flowChangeConcernsGame({ eventType: "DELETE", new: {}, old: { id: "part-1" } }, GAME, known),
+    ).toBe(true);
+  });
+
+  it("ignores a DELETE of a row it does not know", () => {
+    expect(
+      flowChangeConcernsGame(
+        { eventType: "DELETE", new: {}, old: { id: "someone-else" } },
+        GAME,
+        known,
+      ),
+    ).toBe(false);
+  });
+
+  it("uses the deleted row's game when the event carries it", () => {
+    expect(
+      flowChangeConcernsGame(
+        { eventType: "DELETE", new: {}, old: { id: "zzz", game_id: GAME } },
+        GAME,
+        known,
+      ),
+    ).toBe(true);
   });
 });

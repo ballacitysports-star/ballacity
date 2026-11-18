@@ -72,7 +72,10 @@ export function ViewDensityToggle({
     );
   }
   return (
-    <div className="mb-4 flex items-center gap-2">
+    // Wraps: on a 320px screen the two switches side by side are wider than the
+    // column, so the density switch drops to its own line instead of pushing
+    // the page sideways.
+    <div className="mb-4 flex flex-wrap items-center gap-2">
       <div
         className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1"
         role="tablist"
