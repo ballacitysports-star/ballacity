@@ -35,6 +35,18 @@ App: "Send invite" on the Players tab calls `game_invite_player` and shows the i
 shows Accept and Decline when opened from the invitation; My availability lists pending game invitations; Home's Invitations count
 includes them.
 
+## Checked on the sandbox
+
+Applied to `qkukefvzwlyusvspablz` by the ledger route (md5 37c02c55, ledger 55). Leaving out one out-of-repo read rule on
+`reputation_insights` that is on the sandbox only (migration `20261118021038`, not in the repository or in production), the sandbox
+equals a local replay of the branch (a14ff623, 3360 objects).
+
+At iPhone size with the test accounts, production host blocked (0 attempted): the host invited the player to two games from the
+Players tab (reopening the dialog showed "Invite pending" with Withdraw); the player's notifications named the real games and
+times; opening one showed Accept and Decline on the game page, and accepting put the player on the roster ("You're approved",
+request approved "Invited by the host"); the other was declined from My availability; the host was told of the acceptance. The test
+games, post, invitations and notifications were removed afterwards.
+
 ## Not in this package
 
 - Bulk invite UI and the host's invited list on the game page (WP 2.1; the server side, `game_invite_players` and the host's read
