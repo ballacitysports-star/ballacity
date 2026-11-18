@@ -32,6 +32,8 @@
  *     question 4): the pay page applies it, with the game page's source and rule. A viewer already in the flow (on the
  *     roster, a payment in, or approved) and the host are exempt.
  * A full roster is not decided here: the pay page keeps its "This game just filled up" warning (showFilledUpWarning).
+ *
+ * payRiskAckView (below) decides "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B).
  */
 import type { FeatureDecision } from "@/lib/child-policy";
 import type { JoinState } from "@/lib/live-status";
@@ -42,6 +44,8 @@ import {
   type AgeGateState,
   type AgeRequirement,
 } from "@/lib/game-age";
+import { planRiskAckTap, type RiskAckRead } from "@/lib/risk-ack-tap";
+import { needsRiskAcknowledgment } from "@/lib/safety";
 import {
   PAYMENTS_AGE_REQUIRED_MESSAGE,
   PAYMENTS_BLOCKED_MESSAGE,
@@ -373,4 +377,43 @@ export function payHostLinkShown(input: {
     !input.lockedForNewJoin &&
     !input.consentBlocksNewJoin
   );
+}
+
+/**
+ * "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B, owner decision 2026-11-18). The
+ * game page asks it in handleJoin, which a paid game's "Pay Host" link and a direct visit to /pay never run, so the pay
+ * page asks it before any payment option is drawn:
+ *   - 'none': the host, a viewer already in the flow (on the roster, a payment in, or approved: the in-flow notion of
+ *     payEntryBlock), or one whose acknowledgment of the current version is on file. The payment options show.
+ *   - 'checking': the acknowledgment read has not answered yet, or the viewer's flow state (which could exempt them)
+ *     is still loading. The loading card shows, never the payment options (fail closed).
+ *   - 'ask': the dialog. Also when the read failed with no answer (fail closed, as src/lib/risk-ack-tap.ts does: the
+ *     write is idempotent), and when the flow state failed to load (the viewer then counts as not in the flow).
+ * The rule is needsRiskAcknowledgment's (src/lib/safety.ts), the same the join tap uses.
+ */
+export type PayRiskAckView = "none" | "checking" | "ask";
+
+export function payRiskAckView(input: {
+  isHost: boolean;
+  holdsPlace: boolean;
+  paymentIn: boolean;
+  approved: boolean;
+  /** As payEntryView's flow: whether holdsPlace, paymentIn and approved are known. */
+  flow: "loading" | "error" | "ready";
+  /** The participant_risk acknowledgment read (riskAckReadFrom(useSafetyAck(...))). */
+  read: RiskAckRead;
+}): PayRiskAckView {
+  const inFlow = input.flow === "ready" && (input.holdsPlace || input.paymentIn || input.approved);
+  const plan = planRiskAckTap(input.read, (acknowledgedVersion) =>
+    needsRiskAcknowledgment({
+      signedIn: true,
+      isHost: input.isHost,
+      alreadyJoined: inFlow,
+      acknowledgedVersion,
+    }),
+  );
+  if (plan.kind === "wait") return "checking";
+  if (!plan.needsRiskAck) return "none";
+  // Not on file: a viewer whose place, payment or approval has not been read yet may be exempt.
+  return input.flow === "loading" ? "checking" : "ask";
 }

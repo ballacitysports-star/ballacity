@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: opening an invite deeplink directly (as if tapped from email/SMS)
@@ -93,6 +94,9 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Open the invite deeplink directly.

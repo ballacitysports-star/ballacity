@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
 import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
@@ -146,6 +147,9 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({ 
 
   await mockPaidSettingsOk(page);
   await mockEmptyLists(page);
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -180,6 +184,7 @@ test("Pay CTA surfaces retry affordance when the payment service hangs", async (
 
   const settings = await mockPaidSettingsHangOnPay(page);
   await mockEmptyLists(page);
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });

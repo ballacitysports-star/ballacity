@@ -7,10 +7,13 @@ import {
   payEntryView,
   payHostLinkShown,
   payPalOffered,
+  payRiskAckView,
   PARTICIPATION_BLOCKED_FALLBACK,
   type PayEntryInput,
 } from "./pay-entry-gate";
 import { ageGateMessage, ageGateState, type AgeRequirement } from "./game-age";
+import { riskAckReadFrom } from "./risk-ack-tap";
+import { SAFETY_ACK_VERSION } from "./safety";
 import { can, DEFAULT_CHILD_CONTROLS } from "./child-policy";
 import { resolveJoinGate, type JoinState } from "./live-status";
 import {
@@ -861,5 +864,80 @@ describe("payHostLinkShown (the game page's paid CTA)", () => {
     expect(payHostLinkShown({ ...link, approvalCleared: false })).toBe(false);
     expect(payHostLinkShown({ ...link, canEnterPaymentFlow: false })).toBe(false);
     expect(payHostLinkShown({ ...link, parentAsk: true })).toBe(false);
+  });
+});
+
+describe("payRiskAckView ('Before you join' on the pay page, section 7 Option B)", () => {
+  const answered = (version: string | null) => ({ state: "answered" as const, version });
+  const base = {
+    isHost: false,
+    ...fresh,
+    flow: "ready" as const,
+    read: answered(null),
+  };
+
+  it("asks a fresh viewer with no acknowledgment on file", () => {
+    expect(payRiskAckView(base)).toBe("ask");
+  });
+
+  it("asks again when only an older version is on file", () => {
+    expect(payRiskAckView({ ...base, read: answered("2025-old-version") })).toBe("ask");
+  });
+
+  it("does not ask once the current version is on file", () => {
+    expect(payRiskAckView({ ...base, read: answered(SAFETY_ACK_VERSION) })).toBe("none");
+  });
+
+  it("never asks the host, whatever the read says", () => {
+    for (const read of [
+      answered(null),
+      { state: "failed" as const },
+      { state: "pending" as const },
+    ]) {
+      expect(payRiskAckView({ ...base, isHost: true, read })).toBe("none");
+      expect(payRiskAckView({ ...base, isHost: true, flow: "loading", read })).toBe("none");
+    }
+  });
+
+  it("never asks a viewer already in the flow (approved, on the roster, a payment in)", () => {
+    for (const c of inFlowCases) {
+      expect(payRiskAckView({ ...base, ...c, read: answered(null) })).toBe("none");
+      expect(payRiskAckView({ ...base, ...c, read: { state: "failed" } })).toBe("none");
+      expect(payRiskAckView({ ...base, ...c, read: { state: "pending" } })).toBe("none");
+    }
+  });
+
+  it("fails closed while the read has not answered: the loading card, never the payment options", () => {
+    expect(payRiskAckView({ ...base, read: { state: "pending" } })).toBe("checking");
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("pending", undefined) })).toBe(
+      "checking",
+    );
+  });
+
+  it("asks when the read failed with no answer (as the join tap does)", () => {
+    expect(payRiskAckView({ ...base, read: { state: "failed" } })).toBe("ask");
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("error", undefined) })).toBe("ask");
+  });
+
+  it("keeps the last answer when a refresh failed", () => {
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("error", SAFETY_ACK_VERSION) })).toBe(
+      "none",
+    );
+  });
+
+  it("waits for the flow state before asking: an approval or a place exempts the viewer", () => {
+    // In-flow values are not trusted until the flow is known.
+    for (const c of inFlowCases) {
+      expect(payRiskAckView({ ...base, ...c, flow: "loading" })).toBe("checking");
+    }
+    expect(payRiskAckView({ ...base, flow: "loading" })).toBe("checking");
+    // An acknowledgment on file needs no flow state.
+    expect(payRiskAckView({ ...base, flow: "loading", read: answered(SAFETY_ACK_VERSION) })).toBe(
+      "none",
+    );
+  });
+
+  it("asks when the flow state failed to load (the viewer counts as not in the flow)", () => {
+    expect(payRiskAckView({ ...base, approved: true, flow: "error" })).toBe("ask");
   });
 });

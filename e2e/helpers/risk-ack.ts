@@ -9,14 +9,18 @@
  * join_requests POST. Recording the acknowledgment writes a real row, which a
  * mocked sample game (`g1`) cannot have.
  *
+ * The pay page asks it too, before it draws any payment option, for a viewer
+ * not already in the flow (docs/paid-path-gates.md section 7, Option B): a
+ * paid game's "Pay Host" link and a direct visit never run the join tap.
+ *
  * Specs about joins, payments and realtime that are not testing the gate itself
  * (src/lib/safety.test.ts covers its rules) serve the viewer's acknowledgment
  * as already given for the current version (stubRiskAcknowledged). The version
  * is read from the app's source so the stub cannot drift from it.
  *
  * Specs that need the dialog to be due serve it as not given and capture the
- * write (mockRiskNotAcknowledged): risk-ack-before-join exercises the dialog
- * itself, and the expired and tampered invite specs check that a refused join
+ * write (mockRiskNotAcknowledged): risk-ack-before-join and
+ * pay-risk-ack-before-pay exercise the dialog itself, and the expired and tampered invite specs check that a refused join
  * never opens it.
  */
 import { readFileSync } from "node:fs";
