@@ -585,7 +585,20 @@ function Feed() {
 
       <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
       {/* WP 1.6: availability first (switch: app_settings home_availability_first). */}
-      {tab !== "archive" && <AvailabilityHome className="mb-4" />}
+      {tab !== "archive" && (
+        <AvailabilityHome
+          className="mb-4"
+          onGames={(which) => {
+            // Home's shortcuts: everyone's games, or the ones you joined (the "My games" filter), then the list.
+            setFeedPrefs({ ...getFeedPrefsSnapshot(), mineFilter: which });
+            requestAnimationFrame(() =>
+              document
+                .getElementById("feed-games")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+            );
+          }}
+        />
+      )}
       {tab !== "archive" && <NeedsActionStrip />}
       {tab !== "archive" && <KidsUpcomingSection className="mb-4" />}
       {tab !== "archive" && eventsOn && (
@@ -608,9 +621,10 @@ function Feed() {
           {/* Tier 2: where you are + run count on the left (tap to update
           location), one Map/List switch on the right. */}
           <motion.div
+            id="feed-games"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-3 flex items-center justify-between gap-3"
+            className="mb-3 flex scroll-mt-4 items-center justify-between gap-3"
           >
             {tab === "archive" ? (
               <button

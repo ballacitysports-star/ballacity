@@ -158,8 +158,9 @@ No database change. `src/components/home/AvailabilityHome.tsx` at the top of Hom
   availability with its setup notice). Once listed, where the member's availability stands, with My availability's own rules
   (`listingFor`): "You're available · Basketball · Listed until …", or "Still available to play?" with "Still available" in one
   tap when a weekly post is about to run out or has run out. Dated posts whose dates passed are left to My availability.
-- **Shortcuts:** Find players, Find games, My games (the feed's joined filter) and Invitations (My availability), with the
-  number of pending invitations and contact requests to the member.
+- **Shortcuts:** Find players (the Players tab); Find games and My games, which use Home's own games list (`/discover`
+  only redirects to Home): they set the feed's "My games" filter to everyone's or to games the member joined, and scroll
+  to the list; Invitations (My availability), with the number of pending invitations and contact requests to the member.
 - **Who sees it:** signed-in members; not in parent mode. It reads only the member's own posts and requests, under the same
   read policies.
 - **Switch:** `app_settings` `home_availability_first`, public, set in Super admin (Ops, "Availability-first Home", audit

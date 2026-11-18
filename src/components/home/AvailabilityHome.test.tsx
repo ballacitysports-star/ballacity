@@ -19,6 +19,7 @@ const env = vi.hoisted(() => ({
   canPost: true,
   navigate: vi.fn(),
   reconfirm: vi.fn(async () => {}),
+  games: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -79,7 +80,7 @@ function show() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <AvailabilityHome />
+      <AvailabilityHome onGames={env.games} />
     </QueryClientProvider>,
   );
 }
@@ -102,9 +103,13 @@ describe("AvailabilityHome", () => {
   it("nothing listed: a large I'm available card that opens the quick sheet, then four shortcuts", async () => {
     show();
     const card = await screen.findByRole("button", { name: /I'm available/ });
-    for (const name of ["Find players", "Find games", "My games", "Invitations"]) {
+    for (const name of ["Find players", "Invitations"]) {
       expect(screen.getByRole("link", { name })).toBeTruthy();
     }
+    // /discover only redirects to Home, so the games shortcuts use Home's own list.
+    fireEvent.click(screen.getByRole("button", { name: "Find games" }));
+    fireEvent.click(screen.getByRole("button", { name: "My games" }));
+    expect(env.games.mock.calls).toEqual([["all"], ["joined"]]);
     fireEvent.click(card);
     expect(screen.getByRole("dialog", { name: "I'm available sheet" })).toBeTruthy();
   });

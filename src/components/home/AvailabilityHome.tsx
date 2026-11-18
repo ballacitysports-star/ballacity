@@ -41,10 +41,19 @@ export async function fetchHomeAvailabilitySwitch(): Promise<boolean> {
  * availability stands, with "Still available" in one tap when it is about to run out), then four shortcuts: Find
  * players, Find games, My games and Invitations (pending invitations and contact requests to them, counted).
  *
+ * "Find games" and "My games" are Home's own games list (/discover only redirects back to Home): `onGames("all")` shows
+ * everyone's games, `onGames("joined")` the games the member joined, and Home scrolls to the list.
+ *
  * Hidden in parent mode (a guardian acting for a child uses the family screens) and when a Super admin turns the
  * `home_availability_first` switch off. The feed below is unchanged.
  */
-export function AvailabilityHome({ className = "" }: { className?: string }) {
+export function AvailabilityHome({
+  className = "",
+  onGames,
+}: {
+  className?: string;
+  onGames: (which: "all" | "joined") => void;
+}) {
   const { user } = useAuth();
   const { isParentMode } = useParentMode();
   const enabled = useQuery({
@@ -53,10 +62,18 @@ export function AvailabilityHome({ className = "" }: { className?: string }) {
     staleTime: 5 * 60_000,
   });
   if (!user || isParentMode || enabled.data !== true) return null;
-  return <Section userId={user.id} className={className} />;
+  return <Section userId={user.id} className={className} onGames={onGames} />;
 }
 
-function Section({ userId, className }: { userId: string; className: string }) {
+function Section({
+  userId,
+  className,
+  onGames,
+}: {
+  userId: string;
+  className: string;
+  onGames: (which: "all" | "joined") => void;
+}) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const gate = useAvailabilityGate();
@@ -177,8 +194,22 @@ function Section({ userId, className }: { userId: string; className: string }) {
 
       <nav aria-label="Shortcuts" className="mt-3 grid grid-cols-4 gap-2">
         <Shortcut to="/players" icon={Users} label="Find players" />
-        <Shortcut to="/discover" icon={Search} label="Find games" />
-        <Shortcut to="/feed" search={{ joined: true }} icon={CalendarDays} label="My games" />
+        <button
+          type="button"
+          onClick={() => onGames("all")}
+          className="relative flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface px-1 text-center"
+        >
+          <Search className="h-5 w-5 text-lime" aria-hidden />
+          <span className="text-[11px] font-semibold leading-tight">Find games</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onGames("joined")}
+          className="relative flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface px-1 text-center"
+        >
+          <CalendarDays className="h-5 w-5 text-lime" aria-hidden />
+          <span className="text-[11px] font-semibold leading-tight">My games</span>
+        </button>
         <Shortcut
           to="/players"
           search={{ tab: "mine" }}
