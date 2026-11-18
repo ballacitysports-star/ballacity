@@ -65,10 +65,20 @@ import { useLiveParticipantCount } from "@/lib/game-participants-store";
 // joinGame no longer called here — player is added to roster only after host verifies payment.
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useGameLookup } from "@/hooks/use-game-lookup";
-import { useIsJoined } from "@/lib/games-store";
+import { retryRosterLoad, useIsJoined, useRosterLoadState } from "@/lib/games-store";
 import { hasPaymentIn, showFilledUpWarning } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { useJoinGate } from "@/lib/live-status";
+import { useMyChildStatus } from "@/lib/child-safety";
+import {
+  blockOutranksApproval,
+  checkStateOf,
+  payEntryView,
+  payPalOffered,
+  type PayEntryView,
+} from "@/lib/pay-entry-gate";
+import { useGamePaymentGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -108,6 +118,18 @@ const proofSchema = z.object({
 
 function externalPaymentResumeKey(gameId: string, methodId: string) {
   return `pay-opened:${gameId}:${methodId}`;
+}
+
+/** Whether the player already left for a payment app from this game's pay page in this tab (any method). */
+function externalPaymentOpenedFor(gameId: string, methods: PaymentMethod[]): boolean {
+  try {
+    return methods.some(
+      (method) =>
+        window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
+    );
+  } catch {
+    return false;
+  }
 }
 
 function markExternalPaymentOpened(gameId: string, methodId: string) {
@@ -200,6 +222,14 @@ function PayPage() {
   const liveCount = useLiveParticipantCount(game?.id);
   // The viewer's own place (their game_participants rows, kept live by games-store).
   const viewerHoldsPlace = useIsJoined(gameId);
+  // Until the store has read the roster, useIsJoined is only what this browser saved.
+  const rosterLoad = useRosterLoadState();
+  // The game page's checks for a new join (lockedForNewJoin, consentBlocksNewJoin) never ran for a player who came
+  // here by its Pay Host link, an invite or a bookmark; payEntryView asks them again before any payment is offered.
+  // No roster count: a full game keeps its "just filled up" warning below.
+  const joinGate = useJoinGate(game);
+  const childQuery = useMyChildStatus();
+  const { can: canChildFeature } = childQuery;
 
   const maxPlayers = game?.maxPlayers ?? 0;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
@@ -209,13 +239,53 @@ function PayPage() {
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
+  // The viewer was already shown how to pay (a method picked while nothing blocked them, or a payment app opened
+  // from this page in this tab). A block that turns up after that warns above the proof form instead of hiding it.
+  // Held per game: the route component stays mounted from /games/A/pay to /games/B/pay, and a start on A says
+  // nothing about B (it would turn B's block into a warning above B's proof form).
+  const [paymentStartedFor, setPaymentStartedFor] = useState<string | null>(null);
+  const paymentStarted = paymentStartedFor === gameId;
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // Whether mySubs and myReq have been read for this game and viewer: 'error' when the first read failed (a later
+  // poll that succeeds makes it 'ready'). Keyed so that another game's or account's answers never count here.
+  const viewerKey = `${gameId}:${userId ?? ""}`;
+  const viewerKeyRef = useRef(viewerKey);
+  viewerKeyRef.current = viewerKey;
+  type Lookup = "loading" | "ready" | "error";
+  const [viewerLookup, setViewerLookup] = useState<{ key: string; req: Lookup; subs: Lookup }>({
+    key: "",
+    req: "loading",
+    subs: "loading",
+  });
+  const [viewerAttempt, setViewerAttempt] = useState(0);
+  const markLookup = useCallback((key: string, which: "req" | "subs", ok: boolean) => {
+    setViewerLookup((prev) => {
+      const base =
+        prev.key === key ? prev : { key, req: "loading" as Lookup, subs: "loading" as Lookup };
+      // A failure after an answer keeps the answer (as the polls do).
+      const next: Lookup = ok ? "ready" : base[which] === "ready" ? "ready" : "error";
+      return base[which] === next && base === prev ? prev : { ...base, [which]: next };
+    });
+  }, []);
+  // A guarded minor pays only on a request their guardian approved; host approval alone clears the approval card.
+  const guardianQuery = useGamePaymentGuardianReady(
+    hasGame ? gameId : undefined,
+    userId,
+    `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`,
+  );
   const [fetching, setFetching] = useState(true);
   const [fetchAttempt, setFetchAttempt] = useState(0);
   // PayPal checkout config loads on its own, with its own deadline, and Retry re-asks for it too. It holds the
   // screen only when there is nothing else to offer (see the empty state below).
-  const paypal = usePayPalCheckoutConfig(hasGame ? gameId : undefined, undefined, fetchAttempt);
+  const paypalLookup = usePayPalCheckoutConfig(
+    hasGame ? gameId : undefined,
+    undefined,
+    fetchAttempt,
+  );
+  // PayPal refuses an ended or cancelled game to every player (paypal_payment_precondition), so it is not offered
+  // there; a rostered player who still owes for an ended game keeps the host's manual methods.
+  const paypal = payPalOffered(joinGate.joinState) ? paypalLookup : { config: null, settled: true };
   const paypalCfg = paypal.config;
   const [fetchTimedOut, setFetchTimedOut] = useState(false);
   const stage: "auth" | "lookup" | "fetch" | "ready" = loading
@@ -257,8 +327,11 @@ function PayPage() {
 
   const refreshJoinRequest = useCallback(async () => {
     if (!userId) return;
+    const key = `${gameId}:${userId}`;
     try {
       const req = await getMyJoinRequest(gameId);
+      if (viewerKeyRef.current !== key) return;
+      markLookup(key, "req", true);
       setMyReq((prev) => {
         // Toast on approval transition (pending/rejected/none → approved).
         if (req?.status === "approved" && prev?.status !== "approved") {
@@ -269,7 +342,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, userId]);
+  }, [gameId, userId, markLookup]);
 
   useEffect(() => {
     if (!hasGame) return;
@@ -303,28 +376,10 @@ function PayPage() {
         }
 
         // Payment settings + host payment methods are the critical path for
-        // rendering the pay UI. User-specific status is helpful, but should
-        // never blank the screen or show the payment-service retry if a
-        // realtime/status lookup is slow on mobile.
+        // rendering the pay UI. The viewer's own request and payments load
+        // beside them (below) and never blank the screen or show the
+        // payment-service retry; only a block they could lift waits for them.
         if (!cancelled) setFetching(false);
-
-        if (userId) {
-          const [subsResult, reqResult] = await Promise.allSettled([
-            withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
-            withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
-          ]);
-          if (cancelled) return;
-          if (subsResult.status === "fulfilled") {
-            setMySubs(subsResult.value);
-          } else {
-            console.warn(`[pay] optional submissions lookup failed: ${subsResult.reason}`);
-          }
-          if (reqResult.status === "fulfilled") {
-            setMyReq(reqResult.value);
-          } else {
-            console.warn(`[pay] optional join-request lookup failed: ${reqResult.reason}`);
-          }
-        }
       } catch (e: any) {
         if (cancelled) return;
         const msg: string = e?.message ?? String(e);
@@ -339,6 +394,52 @@ function PayPage() {
     };
   }, [hasGame, gameId, userId, fetchAttempt]);
 
+  // The viewer's own request and payments for this game. Until both have answered, payEntryView counts them as
+  // nothing and shows a block they could lift (a closed game, an ended one, a guardian's switch) as "Loading payment
+  // options…", not as "You can't pay for this game" to a player who is approved or has already paid.
+  const lastViewerKeyRef = useRef("");
+  useEffect(() => {
+    if (!hasGame || !userId) return;
+    const key = `${gameId}:${userId}`;
+    if (lastViewerKeyRef.current !== key) {
+      // Another game's (or account's) request and payments must not stand in for this one's.
+      lastViewerKeyRef.current = key;
+      setMySubs([]);
+      setMyReq(null);
+      setViewerLookup({ key, req: "loading", subs: "loading" });
+    }
+    let cancelled = false;
+    const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after 6s`)), 6000),
+        ),
+      ]);
+    void (async () => {
+      const [subsResult, reqResult] = await Promise.allSettled([
+        withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
+        withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
+      ]);
+      if (cancelled) return;
+      if (subsResult.status === "fulfilled") {
+        setMySubs(subsResult.value);
+      } else {
+        console.warn(`[pay] submissions lookup failed: ${subsResult.reason}`);
+      }
+      markLookup(key, "subs", subsResult.status === "fulfilled");
+      if (reqResult.status === "fulfilled") {
+        setMyReq(reqResult.value);
+      } else {
+        console.warn(`[pay] join-request lookup failed: ${reqResult.reason}`);
+      }
+      markLookup(key, "req", reqResult.status === "fulfilled");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasGame, gameId, userId, fetchAttempt, viewerAttempt, markLookup]);
+
   useEffect(() => {
     if (picked || methods.length === 0) return;
     // Resume a payment where the player previously bounced out to Venmo/etc.
@@ -349,6 +450,7 @@ function PayPage() {
       );
       if (resumed) {
         setPicked(resumed);
+        setPaymentStartedFor(gameId);
         return;
       }
     }
@@ -403,8 +505,11 @@ function PayPage() {
   // review (verified/rejected) in real time. Realtime primary, poll fallback.
   const refreshSubs = useCallback(async () => {
     if (!userId) return;
+    const key = `${gameId}:${userId}`;
     try {
       const subs = await listMySubmissionsForGame(gameId);
+      if (viewerKeyRef.current !== key) return;
+      markLookup(key, "subs", true);
       setMySubs((prev) => {
         const prevLatest = prev[0];
         const nextLatest = subs[0];
@@ -423,7 +528,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, userId]);
+  }, [gameId, userId, markLookup]);
 
   const refreshSubsRef = useRef(refreshSubs);
   useEffect(() => {
@@ -464,6 +569,59 @@ function PayPage() {
     };
   }, [gameId, userId]);
 
+  // Decided before any payment option is drawn. Fails closed: until the child-status policy and the guardian check
+  // have answered, the page shows "Loading payment options…" (or a retry), never the host's handles.
+  const childStatus = childQuery.status;
+  const lookupFor = viewerLookup.key === viewerKey ? viewerLookup : null;
+  const reqLookup: Lookup = lookupFor?.req ?? "loading";
+  const flowLookups: Lookup[] = [reqLookup, lookupFor?.subs ?? "loading", rosterLoad];
+  const flowState: Lookup = flowLookups.includes("error")
+    ? "error"
+    : flowLookups.every((l) => l === "ready")
+      ? "ready"
+      : "loading";
+  const entryView = payEntryView({
+    holdsPlace: viewerHoldsPlace,
+    paymentIn: hasPaymentIn(mySubs),
+    approved: myReq?.status === "approved",
+    flow: flowState,
+    gate: joinGate,
+    child: checkStateOf({
+      data: childStatus
+        ? {
+            participation: canChildFeature("game_participation"),
+            payments: canChildFeature("game_payments"),
+            ageUnknown: childStatus.cohort === "unknown",
+          }
+        : null,
+      isError: childQuery.isError,
+    }),
+    guardian: checkStateOf({ data: guardianQuery.data, isError: guardianQuery.isError }),
+    paymentStarted:
+      paymentStarted ||
+      (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
+    onProofStep: !!picked,
+  });
+  const entryClear = entryView.kind === "clear";
+  // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
+  // while the approval card or a loading state stands in its place.)
+  const proofStepOnScreen =
+    !!picked &&
+    entryClear &&
+    !fetching &&
+    !fetchTimedOut &&
+    !!settings &&
+    !(settings.requires_approval && myReq?.status !== "approved");
+  useEffect(() => {
+    if (proofStepOnScreen) setPaymentStartedFor(gameId);
+  }, [proofStepOnScreen, gameId]);
+  const retryEntryChecks = () => {
+    if (childQuery.isError) void childQuery.refetch();
+    if (guardianQuery.isError) void guardianQuery.refetch();
+    if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
+    if (rosterLoad === "error") retryRosterLoad();
+  };
+
   if (loading || (!game && !lookupTimedOut)) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
@@ -482,6 +640,22 @@ function PayPage() {
   const approvalGateActive = requiresApproval && !isApproved;
 
   const hasSubmission = mySubs.length > 0;
+  // The block card replaces every payment option. It comes before "Waiting on host approval" unless the host's
+  // approval would lift it (blockOutranksApproval), so a 13-15 is never told payment unlocks after approval.
+  const blockCard = entryView.kind === "blocked" && entryView.mode === "replace" ? entryView : null;
+  const blockCardFirst =
+    !!blockCard && blockOutranksApproval(blockCard.block, myReq?.status === "pending");
+  const proofWarning = entryView.kind === "blocked" && entryView.mode === "warn" ? entryView : null;
+  // The approval card's wording rests on the viewer's request ("Send a request to join first" when there is none), so
+  // it waits for that read like a block does.
+  const pendingCheck: "checking" | "check_failed" | null =
+    entryView.kind === "checking" || entryView.kind === "check_failed"
+      ? entryView.kind
+      : !blockCard && approvalGateActive && reqLookup !== "ready"
+        ? reqLookup === "error"
+          ? "check_failed"
+          : "checking"
+        : null;
   const justFilledDuringPay = showFilledUpWarning({
     liveCount,
     spotsLeft,
@@ -493,6 +667,7 @@ function PayPage() {
   const showStepper =
     !hasSubmission &&
     !approvalGateActive &&
+    entryClear &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -614,7 +789,29 @@ function PayPage() {
       )}
 
       {/* Single active step body */}
-      {approvalGateActive ? (
+      {blockCard && blockCardFirst ? (
+        <PayEntryBlockedCard view={blockCard} gameId={game.id} />
+      ) : pendingCheck === "checking" ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : pendingCheck === "check_failed" ? (
+        <div
+          className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2"
+          data-testid="pay-entry-check-failed"
+        >
+          <div className="text-sm text-muted-foreground">
+            We couldn't check whether this account can pay for this game.
+          </div>
+          <button
+            type="button"
+            onClick={retryEntryChecks}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
+        </div>
+      ) : approvalGateActive ? (
         <div
           className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
           role="status"
@@ -649,6 +846,8 @@ function PayPage() {
             )}
           </div>
         </div>
+      ) : blockCard ? (
+        <PayEntryBlockedCard view={blockCard} gameId={game.id} />
       ) : fetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
           Loading payment options…
@@ -754,28 +953,31 @@ function PayPage() {
           </p>
         </div>
       ) : (
-        <PaymentInstructionsAndProof
-          game_id={game.id}
-          game_title={game.title}
-          fee={settings?.entry_fee ?? game.price}
-          host_id={settings!.host_id}
-          method={picked}
-          extraInstructions={settings?.payment_instructions ?? null}
-          refundTerms={refundDisclaimer(
-            normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
-            game.cancelCutoffMin,
-            refundTerms?.refund_policy,
-          )}
-          onCancel={() => setPicked(null)}
-          onSubmitted={async () => {
-            // Do NOT join the roster yet — player is only added after the
-            // host verifies the payment (handled on the game details page
-            // via a realtime listener on payment_submissions).
-            const subs = await listMySubmissionsForGame(game.id);
-            setMySubs(subs);
-            setPicked(null);
-          }}
-        />
+        <>
+          {proofWarning && <PayEntryBlockedCard view={proofWarning} gameId={game.id} />}
+          <PaymentInstructionsAndProof
+            game_id={game.id}
+            game_title={game.title}
+            fee={settings?.entry_fee ?? game.price}
+            host_id={settings!.host_id}
+            method={picked}
+            extraInstructions={settings?.payment_instructions ?? null}
+            refundTerms={refundDisclaimer(
+              normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
+              game.cancelCutoffMin,
+              refundTerms?.refund_policy,
+            )}
+            onCancel={() => setPicked(null)}
+            onSubmitted={async () => {
+              // Do NOT join the roster yet — player is only added after the
+              // host verifies the payment (handled on the game details page
+              // via a realtime listener on payment_submissions).
+              const subs = await listMySubmissionsForGame(game.id);
+              setMySubs(subs);
+              setPicked(null);
+            }}
+          />
+        </>
       )}
 
       {/* Footer: refund policy is collapsed by default; legal always shows */}
@@ -802,6 +1004,53 @@ function PayPage() {
       </details>
 
       <LegalNotice />
+    </div>
+  );
+}
+
+/**
+ * "You can't pay for this game": in place of the payment options (mode 'replace'), or above the proof form for a
+ * viewer who was already shown how to pay (mode 'warn').
+ */
+function PayEntryBlockedCard({
+  view,
+  gameId,
+}: {
+  view: Extract<PayEntryView, { kind: "blocked" }>;
+  gameId: string;
+}) {
+  const warn = view.mode === "warn";
+  return (
+    <div
+      className={`rounded-2xl border border-coral/40 bg-coral/10 p-5${warn ? " mb-4" : ""}`}
+      role="status"
+      aria-live="polite"
+      data-testid="pay-entry-blocked"
+      data-block={view.block.kind}
+      data-mode={view.mode}
+    >
+      <div className="flex items-center gap-2 font-display text-sm font-bold">
+        <AlertCircle className="h-4 w-4 text-coral" /> You can't pay for this game
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">{view.block.message}</p>
+      <p className="text-xs text-muted-foreground mt-1">
+        {warn
+          ? "Don't send the host any money for it. If you already paid, submit proof below so the host can see it and refund you."
+          : view.paymentStarted
+            ? "Don't send the host any money for it. If you already paid, message the host to ask for a refund."
+            : "Don't send the host any money for it."}
+      </p>
+      {!warn && (
+        <div className="mt-3">
+          <Link
+            to="/games/$gameId"
+            params={{ gameId }}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Back to game
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

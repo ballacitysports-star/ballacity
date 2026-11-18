@@ -17,6 +17,10 @@ const server = {
   // When set, the roster read waits for it, and answers with the roster as it
   // was when the read started (as a real query would).
   rosterGate: null as Promise<void> | null,
+  // When set, the roster read fails with it.
+  rosterError: null as { message: string } | null,
+  // When set, reading the stored session fails with it.
+  sessionError: null as { message: string } | null,
 };
 
 const toastError = vi.fn();
@@ -27,6 +31,7 @@ function table() {
       eq: async () => {
         const data = server.roster.map((game_id) => ({ id: `row-${game_id}`, game_id }));
         if (server.rosterGate) await server.rosterGate;
+        if (server.rosterError) return { data: null, error: server.rosterError };
         return { data, error: null };
       },
     }),
@@ -64,10 +69,13 @@ const channel: {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getSession: async () => ({
-        data: { session: server.userId ? { user: { id: server.userId } } : null },
-        error: null,
-      }),
+      getSession: async () =>
+        server.sessionError
+          ? { data: { session: null }, error: server.sessionError }
+          : {
+              data: { session: server.userId ? { user: { id: server.userId } } : null },
+              error: null,
+            },
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
         realtime.authListener = cb;
         return { data: { subscription: { unsubscribe() {} } } };
@@ -92,6 +100,8 @@ beforeEach(() => {
   server.insertError = null;
   server.inserted = [];
   server.rosterGate = null;
+  server.rosterError = null;
+  server.sessionError = null;
   toastError.mockReset();
   realtime.handlers = [];
   realtime.authListener = null;
@@ -255,5 +265,83 @@ describe("realtime roster changes from another device", () => {
     await waitFor(() => expect(result.current).toEqual(["g7"]));
     act(() => realtime.handlers[0]!({ eventType: "DELETE", old: { id: "row-late" }, new: {} }));
     expect(result.current).toEqual([]);
+  });
+});
+
+describe("useRosterLoadState (whether useIsJoined has been read from the database)", () => {
+  it("is 'loading' while only the saved list is known, then 'ready' with the roster", async () => {
+    // Saved on this device, but the host has since removed them: the saved list alone would say "joined".
+    window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify(["removed"]));
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    const store = await loadStore();
+    const { result } = renderHook(() => ({
+      load: store.useRosterLoadState(),
+      joined: store.useIsJoined("removed"),
+    }));
+    expect(result.current).toEqual({ load: "loading", joined: true });
+    await act(async () => release());
+    await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: false }));
+  });
+
+  it("is 'error' when the first read fails, and 'ready' after a retry that answers", async () => {
+    server.roster = ["g1"];
+    server.rosterError = { message: "network down" };
+    const store = await loadStore();
+    const { result } = renderHook(() => ({
+      load: store.useRosterLoadState(),
+      joined: store.useIsJoined("g1"),
+    }));
+    await waitFor(() => expect(result.current.load).toBe("error"));
+    expect(result.current.joined).toBe(false);
+    server.rosterError = null;
+    act(() => store.retryRosterLoad());
+    await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: true }));
+  });
+
+  it("is 'error', not 'ready', when the session cannot be read, and 'ready' after a retry", async () => {
+    server.roster = ["g1"];
+    server.sessionError = { message: "refresh failed" };
+    const store = await loadStore();
+    const { result } = renderHook(() => ({
+      load: store.useRosterLoadState(),
+      joined: store.useIsJoined("g1"),
+    }));
+    await waitFor(() => expect(result.current.load).toBe("error"));
+    server.sessionError = null;
+    act(() => store.retryRosterLoad());
+    await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: true }));
+  });
+
+  it("is 'ready' with no places when nobody is signed in", async () => {
+    server.userId = null;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useRosterLoadState());
+    await waitFor(() => expect(result.current).toBe("ready"));
+  });
+
+  it("keeps 'ready' when a later refresh fails", async () => {
+    server.roster = ["g1"];
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useRosterLoadState());
+    await waitFor(() => expect(result.current).toBe("ready"));
+    server.rosterError = { message: "network down" };
+    act(() => store.retryRosterLoad());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(result.current).toBe("ready");
+  });
+
+  it("is 'loading' again for another account until its roster is read", async () => {
+    server.roster = ["g1"];
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useRosterLoadState());
+    await waitFor(() => expect(result.current).toBe("ready"));
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    server.userId = "u2";
+    act(() => realtime.authListener?.("SIGNED_IN", { user: { id: "u2" } }));
+    expect(result.current).toBe("loading");
+    await act(async () => release());
+    await waitFor(() => expect(result.current).toBe("ready"));
   });
 });
