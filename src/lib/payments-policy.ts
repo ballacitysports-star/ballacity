@@ -137,6 +137,13 @@ export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
   GAME_FULL: "This game is full. You weren't charged.",
 };
 
+/**
+ * The host verified a payment and the player could not be given a roster place (cancelled game, request not approved,
+ * full, ended, closed...). The server sent both of them a "payment_not_placed" notice with the reason.
+ */
+export const PAID_NOT_PLACED_MESSAGE =
+  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a place if you can, or send their money back.";
+
 /** The payment check itself failed (or gave an answer the server does not know): checkout refuses. */
 export const PAYMENT_CHECK_FAILED_MESSAGE =
   "We couldn't check this payment right now. Please try again in a moment. You weren't charged.";
