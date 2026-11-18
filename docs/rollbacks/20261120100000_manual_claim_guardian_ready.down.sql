@@ -4,10 +4,11 @@
 -- manual-claim guardian rule. Nothing else changes: the guardian trigger (enforce_guardian_before_payment), its rule
 -- (private_sec.guardian_payment_approval_missing), game_payment_guardian_ready and PayPal checkout were not touched by
 -- the migration and are not touched here. No row is written or removed.
--- Effect on the app that shipped with the migration: the pay page's check fails, so it fails closed: no manual
--- methods (Venmo, Cash App, other) and no proof form for ANY viewer, with "We couldn't check..." and a Retry, until
--- the app is rolled back too or the function is restored. Roll the app back first if manual payments must keep
--- working.
+-- Effect on the app that shipped with the migration: the check fails, so the app fails closed on the manual methods:
+-- no manual method (Venmo, Cash App, other) and no proof form on the pay page for ANY viewer, with "We couldn't
+-- check..." and a Retry in their place, and no handles on the game page's Payments tab, until the app is rolled back
+-- too or the function is restored. PayPal checkout does not ask this function and stays offered. Roll the app back
+-- first if manual payments must keep working.
 -- It stops, changing nothing, if the function no longer has the definition the migration gave it (a later migration
 -- changed it): a person needs to look first.
 -- It refuses to run unless the session sets the confirmation first:
@@ -21,7 +22,7 @@ DECLARE
   _got text;
 BEGIN
   IF current_setting('app.confirm_manual_claim_guardian_ready_rollback', true) IS DISTINCT FROM 'yes' THEN
-    RAISE EXCEPTION 'Refusing to run: the pay page asks this function before it offers a manual payment, and fails closed without it (no Venmo, Cash App or other method for anyone until the app is rolled back). Set app.confirm_manual_claim_guardian_ready_rollback=yes for the session to proceed deliberately.';
+    RAISE EXCEPTION 'Refusing to run: the pay page asks this function before it offers a manual payment, and fails closed without it (no Venmo, Cash App or other method for anyone until the app is rolled back; PayPal stays). Set app.confirm_manual_claim_guardian_ready_rollback=yes for the session to proceed deliberately.';
   END IF;
   FOR _k IN SELECT jsonb_object_keys(_want) LOOP
     SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = to_regprocedure(_k);

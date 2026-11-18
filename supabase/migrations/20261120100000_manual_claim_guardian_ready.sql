@@ -15,7 +15,9 @@
 --   argument), as game_payment_guardian_ready does, and says nothing that function does not already say to the same
 --   caller except whether a guardian link is still active for an adult, which is the caller's own link.
 -- Read-only: no table, trigger, policy or existing function changes. The trigger, the RPC and PayPal are unchanged.
--- Deploy order: this migration BEFORE the app. The pay page fails closed without it (no manual methods, a Retry).
+-- Deploy order: this migration BEFORE the app. Without it the app fails closed on the manual methods only: the pay
+-- page offers no manual method or proof form (a Retry in their place) and the game page's Payments tab shows no
+-- handles. PayPal checkout does not depend on this function and stays offered.
 -- Rollback: docs/rollbacks/20261120100000_manual_claim_guardian_ready.down.sql (guarded).
 
 CREATE OR REPLACE FUNCTION public.game_manual_claim_guardian_ready(_game_id text)

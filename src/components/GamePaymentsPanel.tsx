@@ -43,6 +43,9 @@ import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { PAID_NOT_PLACED_MESSAGE, PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import { MANUAL_GUARDIAN_HOLD_MESSAGE } from "@/lib/pay-entry-gate";
+import { useAuth } from "@/hooks/use-auth";
+import { useGameManualClaimGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
@@ -126,10 +129,17 @@ export function PaymentPoliciesCard({
   gameId,
   settings,
   isHost,
+  manualHandles = "show",
 }: {
   gameId: string;
   settings: GamePaymentSettings | null;
   isHost: boolean;
+  /**
+   * Where to send a manual payment (the methods' handles and the host's payment instructions). A player's card shows
+   * them only once game_manual_claim_guardian_ready says the database would take their manual claim: 'hide' while it
+   * loads or failed, 'held' (hidden, with a line) when it said no (docs/paid-path-gates.md section 6 (d)).
+   */
+  manualHandles?: "show" | "hide" | "held";
 }) {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,6 +177,7 @@ export function PaymentPoliciesCard({
     !!settings?.refund_policy ||
     !!settings?.payment_instructions ||
     methods.length > 0;
+  const showHandles = manualHandles === "show";
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
@@ -233,7 +244,9 @@ export function PaymentPoliciesCard({
                       <span className="font-semibold">
                         {meta.emoji} {meta.name}
                       </span>
-                      {m.username && <span className="text-muted-foreground">· {m.username}</span>}
+                      {showHandles && m.username && (
+                        <span className="text-muted-foreground">· {m.username}</span>
+                      )}
                     </li>
                   );
                 })}
@@ -241,7 +254,16 @@ export function PaymentPoliciesCard({
             </div>
           )}
 
-          {settings?.payment_instructions && (
+          {manualHandles === "held" && methods.length > 0 && (
+            <div
+              className="rounded-xl border border-coral/40 bg-coral/10 p-3 text-xs text-muted-foreground"
+              data-testid="payment-details-manual-held"
+            >
+              {MANUAL_GUARDIAN_HOLD_MESSAGE}
+            </div>
+          )}
+
+          {showHandles && settings?.payment_instructions && (
             <div className="rounded-xl border border-border bg-background p-3">
               <div className="flex items-center gap-2 micro-label text-muted-foreground">
                 <FileText className="h-3.5 w-3.5" /> Instructions
@@ -743,6 +765,9 @@ export function PlayerPaymentsPanel({
 }) {
   const { can: canFeature } = useMyChildStatus();
   const paymentsGate = canFeature("game_payments");
+  const { user } = useAuth();
+  // The manual-claim trigger's guardian rule (section 6 (d)): no handles for a manual payment the database would refuse.
+  const manualClaim = useGameManualClaimGuardianReady(gameId, user?.id ?? null, "payments-tab");
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -797,7 +822,14 @@ export function PlayerPaymentsPanel({
 
   return (
     <div className="space-y-4">
-      <PaymentPoliciesCard gameId={gameId} settings={settings} isHost={false} />
+      <PaymentPoliciesCard
+        gameId={gameId}
+        settings={settings}
+        isHost={false}
+        manualHandles={
+          manualClaim.data === true ? "show" : manualClaim.data === false ? "held" : "hide"
+        }
+      />
       {/* Status card */}
 
       <div className="rounded-2xl border border-border bg-surface p-4">

@@ -45,7 +45,8 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-type ManualAnswer = boolean | "error";
+/** 'pending': the request is held and never answered (the check stays loading). */
+type ManualAnswer = boolean | "error" | "pending";
 
 async function mockPayScreen(
   page: Page,
@@ -128,6 +129,7 @@ async function mockPayScreen(
     async (route) => {
       if (route.request().method() !== "POST") return route.fallback();
       const answer = answers.length > 1 ? answers.shift()! : answers[0];
+      if (answer === "pending") return; // never fulfilled: the page stays on "checking"
       if (answer === "error") {
         await fulfillJson(route, { message: "e2e: manual-claim check failed" }, 500);
         return;
@@ -249,12 +251,68 @@ test("a failed manual-claim check offers a retry, never the handles; the retry t
   const failed = page.getByTestId("pay-manual-check-failed");
   await expect(failed).toBeVisible({ timeout: 20_000 });
   await expectNoManualMethod(page);
+  // PayPal does not depend on this check (its server precondition is game_payment_guardian_ready): still offered.
+  await expect(page.getByText(/paypal or card/i)).toBeVisible();
+  await expect(page.locator('[aria-label="Pay with PayPal or card"]')).toHaveCount(1);
 
   await failed.getByRole("button", { name: /retry/i }).click();
   await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Venmo` })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByTestId("pay-manual-check-failed")).toHaveCount(0);
+  await expect(page.locator('[aria-label="Pay with PayPal or card"]')).toHaveCount(1);
 
   await ctx.close();
 });
+
+test("while the manual-claim check has not answered, PayPal is offered and the handles are not", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { manual: ["pending"], paypal: true });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator('[aria-label="Pay with PayPal or card"]')).toHaveCount(1, {
+    timeout: 15_000,
+  });
+  await expect(page.getByText(/loading payment options/i)).toBeVisible();
+  await expectNoManualMethod(page);
+  await expect(page.getByTestId("pay-manual-guardian-hold")).toHaveCount(0);
+
+  await ctx.close();
+});
+
+for (const manual of [false, true]) {
+  test(`the game page's Payments tab shows the handles only when the manual-claim check says yes (${manual})`, async ({
+    browser,
+  }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await mockPayScreen(page, { manual: [manual], paypal: true });
+
+    await restoreSession(page);
+    await page.goto(`/games/${GAME_ID}?tab=payments`, { waitUntil: "domcontentloaded" });
+
+    const accepted = page.getByText("Accepted methods");
+    await expect(accepted).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Venmo/).first()).toBeVisible();
+    if (manual) {
+      await expect(page.getByText(VENMO_HANDLE)).toBeVisible();
+      await expect(page.getByText(CASHTAG)).toBeVisible();
+      await expect(page.getByTestId("payment-details-manual-held")).toHaveCount(0);
+    } else {
+      const held = page.getByTestId("payment-details-manual-held");
+      await expect(held).toBeVisible();
+      await expect(held).toContainText(
+        /a guardian link from before you turned 18 is still active/i,
+      );
+      await expect(page.getByText(VENMO_HANDLE)).toHaveCount(0);
+      await expect(page.getByText(CASHTAG)).toHaveCount(0);
+    }
+
+    await ctx.close();
+  });
+}

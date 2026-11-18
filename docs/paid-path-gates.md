@@ -471,17 +471,27 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
     guardian ends the link, and that PayPal's check still exempts the adult.
   - Pay page: once nothing else stands in front of the payment options (payEntryView 'clear', no approval card, no
     "Before you join", the host's settings loaded) and the host has a manual method, `payManualMethodsStep` decides:
-    the check says yes: every method, as before; still loading: "Loading payment options…" (no handles, no proof
-    form); failed with nothing loaded: "We couldn't check…" with Retry; says no and PayPal is offered: PayPal only,
+    the check says yes: every method, as before; still loading: "Loading payment options…" in place of the manual
+    list (no handles, no proof form); failed with nothing loaded: "We couldn't check…" with Retry in place of the
+    manual list. In both of these PayPal stays where it was before this check existed (offered and no manual method
+    picked), because PayPal's server precondition asks `game_payment_guardian_ready`, not this check: a missing
+    function (the app shipped before the migration, or the migration rolled back on its own) costs the manual methods
+    only, never PayPal. PayPal and what stands in place of the list share one container, so the PayPal button is not
+    mounted again when the check answers. Says no and PayPal is offered: PayPal only,
     with the notice "Manual payments need a guardian's approval" (no Venmo, Cash App or other method, no proof form,
     no "Pay the host → Confirm" stepper); says no and PayPal is not offered (not set up, or an ended game): the
     block card (`data-block="manual_guardian"`), not an empty method list; says no and PayPal has not settled yet:
-    loading. A method resumed from the pay-opened marker, or picked automatically when the host has one, does not
-    count as "already shown how to pay" while it is held back.
+    loading. A method picked automatically when the host has one does not count as "already shown how to pay" while
+    it is held back (`proofStepOnScreen` needs the manual methods offered). A method resumed from the pay-opened
+    marker does count: the marker means the viewer really opened Venmo or Cash App, so `paymentStarted` is set and
+    the notice adds the refund line.
   - Wording (adult, no "ask your parent"): "A guardian link from before you turned 18 is still active on this
     account, so Venmo, Cash App and other manual payments for this game need your guardian's approval first." then
-    "You can pay with PayPal now. Or go back to the game to ask your guardian to approve it; your guardian can also
-    end the family link from their Parent Center." (without PayPal: the second sentence only, in the block card). A
+    "You can pay with PayPal now. Or go back to the game to ask your guardian to approve it. Your guardian can also
+    end the family link from their Parent Center." (without PayPal: from "Go back to the game", in the block card).
+    A managed account (`app_metadata.managed`, `isManagedUser`) is not told the link can be ended: its managing
+    guardian is refused by `revoke_guardian_link` (MANAGED_CHILD_DELETE_INSTEAD, 20261110120000), and a managed
+    child's stored birthday reaches 18 like anyone's (`manualGuardianHoldNext`). A
     viewer who was already shown how to pay also reads "Don't send the host money by Venmo, Cash App or another app
     for it. If you already paid, message the host to ask for a refund." (the block card keeps its own "If you
     already paid, message the host to ask for a refund.").
@@ -492,6 +502,14 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
     the age), which is the request the guardian approves.
   - The answer is asked again when the viewer's request changes (status, guardian stamp), and every 15 s while it is
     no (a guardian approving or ending the link on their own device), as `useGamePaymentGuardianReady` does.
+  - The game page's Payments tab (`PlayerPaymentsPanel` → `PaymentPoliciesCard`, "Accepted methods") listed the same
+    handles from `get_game_host_payment_methods`, which has no guardian check. It now asks the same check and shows
+    the handles and the host's payment instructions only when it says yes: hidden while it loads or failed, hidden
+    with the notice's first sentence when it says no. The method names (Venmo, Cash App) stay. The host's own card is
+    unchanged. `get_game_host_payment_methods` itself still returns the handles to this viewer (see (a)): the client
+    no longer shows them, the API still does. Changing that RPC would be a server change for an owner decision.
+  - Open owner question: managed accounts at 18. Their link cannot be ended by the guardian (only the profile
+    deleted), so a managed account that reaches 18 can pay a manual method only for a game the guardian approves.
 
   | Piece                    | Where                                                                                                  |
   | ------------------------ | ------------------------------------------------------------------------------------------------------ |
@@ -501,6 +519,7 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
   | Decision                 | `src/lib/pay-entry-gate.ts` (`payManualMethodsStep`); tests in `src/lib/pay-entry-gate.test.ts`        |
   | Hook                     | `src/hooks/use-game-payment-guardian-ready.ts` (`useGameManualClaimGuardianReady`)                     |
   | Pay page                 | `src/routes/games.$gameId.pay.tsx`                                                                     |
+  | Payments tab             | `src/components/GamePaymentsPanel.tsx` (`PlayerPaymentsPanel`, `PaymentPoliciesCard` `manualHandles`)  |
   | E2E (mocked)             | `e2e/pay-manual-guardian-hold.spec.ts`                                                                 |
 
 - (a) `get_game_host_payment_methods` (20261111120000 §2) returns the host's handles to any caller who can see the
@@ -665,3 +684,11 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
   new pay-manual-guardian-hold) and `e2e/invite-pay-and-join*.spec.ts`: 21 files, **40 passed**, 0 failed (3.4 min).
 - Mutation check: with `payManualMethodsStep` always answering 'offer_all', three of the four new E2E tests fail (the
   "check says yes" test passes, as it should).
+- Review fixes (PayPal kept while the check loads or failed; Payments tab handles; managed-account wording): unit
+  `pay-entry-gate.test.ts` 116; full `npx vitest run` 411 files, 4336 passed, 22 skipped; SQL 910 58 passed and the
+  negative control unchanged (0 passed, 1 failed without the migration); rollback rehearsed again on a scratch
+  replay (refuses unconfirmed; drops with the confirmation, the trigger and `game_payment_guardian_ready` kept;
+  refuses a second run; re-apply gives md5 `109ac8d2…`, EXECUTE for authenticated, not anon). E2E, all
+  `e2e/pay-*.spec.ts` and `e2e/invite-pay-and-join*.spec.ts`: 21 files, **43 passed** (pay-manual-guardian-hold: 7).
+  Mutation check: with PayPal never drawn beside the check's loading or failed state, and with the Payments tab
+  always showing handles, the three tests that cover these fail; the other four pass.
