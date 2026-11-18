@@ -34,7 +34,7 @@
 -- between game_payment_guardian_ready and enforce_guardian_before_payment (section 6 "Also related" (d)).
 -- Deploy order: this migration BEFORE the app change that maps the new codes; the app without it shows the raw
 -- "CODE: sentence" text the database returns.
--- Rollback: docs/rollbacks/20261118200000_payment_claim_preconditions.down.sql (guarded).
+-- Rollback: docs/rollbacks/20261119200000_payment_claim_preconditions.down.sql (guarded).
 
 DO $guard$
 BEGIN
@@ -44,7 +44,7 @@ BEGIN
      OR to_regprocedure('public.game_duration_minutes(text)') IS NULL
      OR to_regprocedure('public.game_payments_allowed(uuid)') IS NULL
      OR to_regprocedure('public.get_game_host_payment_methods(uuid, text)') IS NULL THEN
-    RAISE EXCEPTION '20261118200000: an earlier migration it builds on (20261111140000_paypal_payment_preconditions and the payment and join gates) is not applied';
+    RAISE EXCEPTION '20261119200000: an earlier migration it builds on (20261111140000_paypal_payment_preconditions and the payment and join gates) is not applied';
   END IF;
 END
 $guard$;

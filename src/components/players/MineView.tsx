@@ -16,6 +16,7 @@ import {
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { listingFor, type ListingState } from "@/lib/availability-lifecycle";
 import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
+import { GameInvitationsSection } from "./GameInvitationsSection";
 import { shareAvailability } from "./share-availability";
 import { useAuthSearchHere } from "@/lib/auth-return";
 
@@ -214,6 +215,8 @@ export function MineView({
           </ul>
         )}
       </section>
+
+      <GameInvitationsSection userId={user.id} refreshKey={refreshKey} />
 
       <section>
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">

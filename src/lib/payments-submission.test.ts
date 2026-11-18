@@ -84,12 +84,12 @@ describe("paymentSubmissionErrorMessage (20261111120000)", () => {
   });
 });
 
-describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261118200000)", () => {
+describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261119200000)", () => {
   /** Each code the trigger raises, with the sentence it raises it with, read from the migration itself. */
   const raised = [
     ...readFileSync(
       new URL(
-        "../../supabase/migrations/20261118200000_payment_claim_preconditions.sql",
+        "../../supabase/migrations/20261119200000_payment_claim_preconditions.sql",
         import.meta.url,
       ),
       "utf8",

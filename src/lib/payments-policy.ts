@@ -41,7 +41,7 @@ export const PAYMENTS_GUARDIAN_APPROVAL_MESSAGE =
 
 /**
  * The codes the database refuses a player's own manual payment claim with when the roster place could not be given
- * (trigger zz_payment_claim_preconditions, supabase/migrations/20261118200000_payment_claim_preconditions.sql). They are
+ * (trigger zz_payment_claim_preconditions, supabase/migrations/20261119200000_payment_claim_preconditions.sql). They are
  * PayPal checkout's codes for the same rules.
  */
 export const PAYMENT_CLAIM_REFUSAL_CODES = [

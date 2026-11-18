@@ -1,4 +1,4 @@
--- ROLLBACK for supabase/migrations/20261118200000_payment_claim_preconditions.sql (docs/paid-path-gates.md section 6).
+-- ROLLBACK for supabase/migrations/20261119200000_payment_claim_preconditions.sql (docs/paid-path-gates.md section 6).
 -- NOT a migration. It reopens what the migration closed:
 --   * a player's own manual payment claim (Venmo, Cash App, ...) is again recorded for a game that is cancelled,
 --     finished (marked or by the clock), closed to joining or past its signup cutoff, or full, for a player whose
@@ -33,7 +33,7 @@ BEGIN
   FOR _k IN SELECT jsonb_object_keys(_want) LOOP
     SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = to_regprocedure(_k);
     IF _got IS DISTINCT FROM _want ->> _k THEN
-      RAISE EXCEPTION 'Refusing to run: % is not the definition 20261118200000 created (md5 %, expected %). A later change needs a person to look first.', _k, _got, _want ->> _k;
+      RAISE EXCEPTION 'Refusing to run: % is not the definition 20261119200000 created (md5 %, expected %). A later change needs a person to look first.', _k, _got, _want ->> _k;
     END IF;
   END LOOP;
 END

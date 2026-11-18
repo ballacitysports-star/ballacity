@@ -209,7 +209,7 @@ function dependsOnFlow(block: PayEntryBlock): boolean {
  *
  * A block never shows a proof form, not even to a viewer who already picked a method or opened the payment app: the
  * database refuses their own manual claim for each kind. 'payments' by enforce_game_payment_cohort, 'guardian' by
- * enforce_guardian_before_payment, and (20261118200000, zz_payment_claim_preconditions) 'participation' as
+ * enforce_guardian_before_payment, and (20261119200000, zz_payment_claim_preconditions) 'participation' as
  * GAME_PARTICIPATION_BLOCKED and a 'locked' game as GAME_CANCELLED, GAME_COMPLETED (ended, or over by the clock) or
  * GAME_JOINS_CLOSED (closed by the host or past the cutoff, for a player the host has not approved). A game in
  * progress with no cutoff and joining left open is the one lock the trigger lets a claim through for; it is blocked

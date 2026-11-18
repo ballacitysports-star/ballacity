@@ -80,6 +80,13 @@ import {
   type TimeSlot,
 } from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
+import {
+  cancelGameInvite,
+  findGameInvite,
+  gameInviteErrorMessage,
+  inviteToGame,
+  type GameInvite,
+} from "@/lib/game-invites";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { useAuthSearchHere } from "@/lib/auth-return";
@@ -1789,35 +1796,63 @@ function ContactDialog({
     });
   };
 
+  // WP 2.0: an invitation goes through the server (game_invite_player), which checks the game and the player and writes
+  // the notification from the real game. Its status comes from game_invites, not from the old contact requests.
+  const [invite, setInvite] = useState<GameInvite | null>(null);
+  useEffect(() => {
+    if (!isInvite || !selected) {
+      setInvite(null);
+      return;
+    }
+    let live = true;
+    findGameInvite(selected.id, availability.user_id)
+      .then((row) => live && setInvite(row))
+      .catch(() => live && setInvite(null));
+    return () => {
+      live = false;
+    };
+  }, [isInvite, selected, availability.user_id, refreshKey]);
+  const invitePending = invite?.status === "pending";
+
+  const withdraw = async () => {
+    if (!invite) return;
+    setSaving(true);
+    try {
+      await cancelGameInvite(invite.id);
+      toast.success("Invite withdrawn");
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      toast.error(gameInviteErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const send = async () => {
     setSaving(true);
     try {
-      let body = msg.trim();
-      const invite =
-        isInvite && selected
-          ? {
-              gameId: selected.id,
-              title: selected.title,
-              startsAt: selected.date,
-              sport: selected.sport,
-              location: selected.location,
-            }
-          : null;
-      if (invite) {
-        const header = `You're invited to ${selected!.title} — ${selected!.sport} on ${formattedDate(selected!.date)} at ${selected!.location}.`;
-        body = body ? `${header}\n\n${body}` : header;
+      if (isInvite) {
+        if (!selected) return;
+        await inviteToGame(selected.id, availability.user_id, {
+          availabilityId: availability.id,
+          message: msg,
+        });
+        toast.success("Invite sent");
+        onClose();
+        return;
       }
-      await createContactRequest(availability.id, availability.user_id, body, invite);
-      toast.success(isInvite ? "Invite sent" : "Contact request sent");
+      await createContactRequest(availability.id, availability.user_id, msg.trim(), null);
+      toast.success("Contact request sent");
       onClose();
     } catch (e: any) {
+      if (isInvite) {
+        toast.error(gameInviteErrorMessage(e));
+        setRefreshKey((k) => k + 1);
+        return;
+      }
       const msg = String(e?.message ?? "");
       if (msg.includes("duplicate") || (e as { code?: string })?.code === "23505") {
-        toast.error(
-          isInvite
-            ? "You already have a pending invite to this player for this game."
-            : "You already have a pending request to this player.",
-        );
+        toast.error("You already have a pending request to this player.");
         setRefreshKey((k) => k + 1);
       } else toast.error(msg || "Couldn't send request");
     } finally {
@@ -1836,13 +1871,24 @@ function ContactDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <RequestStatusPanel
-          availabilityId={availability.id}
-          gameId={isInvite ? (selected?.id ?? null) : null}
-          refreshKey={refreshKey}
-          onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
-          onCancelled={() => setExistingStatus("none")}
-        />
+        {isInvite ? (
+          invitePending && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3 text-sm">
+              <span>Invite sent. Waiting for {availability.author_name} to answer.</span>
+              <Button size="sm" variant="ghost" disabled={saving} onClick={() => void withdraw()}>
+                Withdraw
+              </Button>
+            </div>
+          )
+        ) : (
+          <RequestStatusPanel
+            availabilityId={availability.id}
+            gameId={null}
+            refreshKey={refreshKey}
+            onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+            onCancelled={() => setExistingStatus("none")}
+          />
+        )}
 
         {isInvite && (
           <div className="space-y-2">
@@ -1903,16 +1949,16 @@ function ContactDialog({
           </Button>
           <Button
             onClick={send}
-            disabled={saving || isPending || (isInvite && !selected)}
+            disabled={saving || (isInvite ? invitePending || !selected : isPending)}
             className="bg-lime-gradient text-primary-foreground"
           >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isPending
-              ? isInvite
+            {isInvite
+              ? invitePending
                 ? "Invite pending"
-                : "Request pending"
-              : isInvite
-                ? "Send invite"
+                : "Send invite"
+              : isPending
+                ? "Request pending"
                 : "Send request"}
           </Button>
         </DialogFooter>
