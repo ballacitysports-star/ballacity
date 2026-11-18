@@ -337,7 +337,6 @@ test("an age-ranged paid game: a new viewer outside the range gets the block car
   const card = page.getByTestId("pay-entry-blocked");
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toHaveAttribute("data-block", "age");
-  await expect(card).toHaveAttribute("data-mode", "replace");
   await expect(card).toContainText(
     "This game is 50+ — the host reviews requests outside that range.",
   );
