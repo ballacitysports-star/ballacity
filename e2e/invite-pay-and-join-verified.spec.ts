@@ -1,3 +1,4 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { test, expect, type Page, type Route } from "@playwright/test";
 
 /**
@@ -7,7 +8,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * Flow:
  *   1. Seed a `game_invite` notification and tap it → /games/$gameId with invite params.
  *   2. Pay host → /games/$gameId/pay (invite params preserved).
- *   3. Pick method + "I have paid" → payment_submissions POST.
+ *   3. The only method (Venmo) opens directly; "I have paid" → payment_submissions POST.
  *   4. Flip the mocked submission row from `pending` to `verified` (host approves).
  *   5. Navigate back to /games/$gameId?invite=1&from=<hostId>.
  *   6. Assert the join CTA reads "Confirmed · Tap to leave" AND both invite
@@ -187,10 +188,7 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Tap invite.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   await page.waitForURL(
     (u) =>
@@ -200,9 +198,9 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
     { timeout: 10_000 },
   );
 
-  // Pay host → /pay.
+  // Pay host → /pay. On a paid, no-approval game the CTA is a link to the pay page.
   await page
-    .getByRole("button", { name: /pay host/i })
+    .getByRole("link", { name: /pay host/i })
     .first()
     .click();
   await page.waitForURL(
@@ -213,8 +211,14 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
     { timeout: 10_000 },
   );
 
-  // Pick venmo + submit proof.
-  await page.getByRole("button", { name: /venmo/i }).first().click();
+  // The host has a single payment method, so the pay page opens it straight
+  // away instead of showing a picker. (A /venmo/ button here is now "Open Venmo
+  // in a new tab to pay the host", which leaves for venmo.com.) Check the
+  // mocked Venmo method is the one shown, then use its proof form.
+  await expect(page.getByText("@fakehost", { exact: true }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+  // Submit proof.
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
   // Paying requires accepting the host's refund terms first.
   await page.getByRole("checkbox", { name: /refund terms/i }).check();
@@ -226,8 +230,11 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   await submitBtn.click();
   await insertReq;
 
-  // Pending-verification state renders on /pay.
-  await expect(page.getByText(/pending verification/i).first()).toBeVisible({ timeout: 10_000 });
+  // Pending state renders on /pay: the status timeline waits on the host.
+  const timeline = page.getByTestId("payment-status-timeline");
+  await expect(timeline).toBeVisible({ timeout: 10_000 });
+  await expect(timeline).toHaveAttribute("data-status", "pending");
+  await expect(timeline).toContainText(/awaiting host confirmation/i);
 
   // Host verifies the payment (flip the mocked status).
   subStatus = "verified";

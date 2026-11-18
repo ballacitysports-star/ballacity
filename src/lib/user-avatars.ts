@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 
 export type AvatarStatus = "loading" | "ready" | "error";
 
@@ -133,10 +134,8 @@ function hydrate() {
 
   if (!viewerChecked) {
     viewerChecked = true;
-    void supabase.auth
-      .getUser()
-      .then(({ data }) => {
-        const me = data.user?.id ?? null;
+    void getCurrentUserId()
+      .then((me) => {
         viewerId = me;
         if (stored && stored.viewer !== me) {
           // Different account (or signed out vs in) — privacy answers differ.

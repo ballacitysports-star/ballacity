@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
 const insert = vi.fn();
-const getUser = vi.fn();
+const getSession = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...a: unknown[]) => rpc(...a),
     from: () => ({ insert: (...a: unknown[]) => insert(...a) }),
-    auth: { getUser: () => getUser() },
+    auth: { getSession: () => getSession() },
   },
 }));
 
@@ -32,8 +32,8 @@ const claim = {
 beforeEach(() => {
   rpc.mockReset();
   insert.mockReset();
-  getUser.mockReset();
-  getUser.mockResolvedValue({ data: { user: { id: "me" } } });
+  getSession.mockReset();
+  getSession.mockResolvedValue({ data: { session: { user: { id: "me" } } }, error: null });
 });
 
 describe("paymentSubmissionErrorMessage (20261111120000)", () => {

@@ -1,9 +1,11 @@
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 
 /**
  * E2E: after a network-error retry on "Request to join" succeeds, reloading
- * the page must keep the pending UI and preserve the original invite params
- * (`invite`, `from`, `exp`) in the URL. No additional POSTs should fire on
+ * the page must keep the pending UI (in place of the invite prompt) and
+ * preserve the original invite params (`invite`, `from`, `exp`) in the URL. No additional POSTs should fire on
  * reload — the pending row is fetched via GET.
  *
  * Auto-skips without a restored Supabase session.
@@ -120,18 +122,14 @@ test("pending UI + invite params survive a reload after network-error retry", as
           return;
         }
         retrySucceeded = true;
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
-        });
+        await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
@@ -164,7 +162,14 @@ test("pending UI + invite params survive a reload after network-error retry", as
   });
   await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
 
-  // Sanity: exactly 2 POSTs so far.
+  // Sanity: exactly 2 POSTs so far (1 failed + 1 successful retry). The pending
+  // UI above is optimistic, so the retry's POST may still be on its way (the
+  // tap first settles the risk acknowledgment and reads the signed-in session):
+  // wait for it, then give strays a moment, as retry-after-error does. Counting
+  // only after the POST is out also keeps it from landing after the reload.
+  await expect
+    .poll(() => joinPosts.length, { timeout: 10_000, message: "the retry's POST was never sent" })
+    .toBeGreaterThanOrEqual(2);
   await page.waitForTimeout(300);
   expect(joinPosts.length, `expected 2 POSTs pre-reload, saw ${joinPosts.length}`).toBe(2);
 
@@ -173,15 +178,16 @@ test("pending UI + invite params survive a reload after network-error retry", as
   // Reload — pending UI must be restored from server state, no new POSTs.
   await page.reload({ waitUntil: "domcontentloaded" });
 
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: /you're invited to this game/i })
-      .first(),
-  ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
+  // The invitation has been answered: with a request pending, the page shows
+  // that request instead of the "You're invited" prompt (the banner is hidden
+  // while a request is pending). It used to be asserted visible here, which
+  // only held while the page's own join-request read was still out.
+  await expect(
+    page.getByRole("status").filter({ hasText: /you're invited to this game/i }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
   await expect(page.getByText(/waiting for host approval/i).first()).toBeVisible({
     timeout: 5_000,

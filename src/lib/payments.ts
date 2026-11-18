@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { validateImageMeta } from "@/lib/image-validation";
 import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
@@ -198,12 +199,12 @@ export function resolvePaymentDeepLink(
 
 // ----- Host payment methods -----
 export async function listMyPaymentMethods(): Promise<PaymentMethod[]> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
   const { data, error } = await supabase
     .from("host_payment_methods")
     .select("*")
-    .eq("host_id", u.user.id)
+    .eq("host_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as PaymentMethod[];
@@ -223,11 +224,11 @@ export async function listPaymentMethodsForHost(
 export async function createPaymentMethod(
   input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean },
 ) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to add payment methods.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to add payment methods.");
   const { error } = await supabase.from("host_payment_methods").insert({
     ...input,
-    host_id: u.user.id,
+    host_id: userId,
     is_enabled: input.is_enabled ?? true,
   });
   if (error) throw error;
@@ -252,20 +253,20 @@ export type HostPayPalAccount = {
 };
 
 export async function getMyPayPalAccount(): Promise<HostPayPalAccount | null> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return null;
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
   const { data, error } = await supabase
     .from("host_paypal_accounts")
     .select("*")
-    .eq("host_id", u.user.id)
+    .eq("host_id", userId)
     .maybeSingle();
   if (error) throw error;
   return (data as HostPayPalAccount) ?? null;
 }
 
 export async function saveMyPayPalAccount(merchantId: string, email?: string | null) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to connect PayPal.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to connect PayPal.");
   const clean = merchantId.trim();
   if (!/^[A-Za-z0-9]{3,64}$/.test(clean)) {
     throw new Error(
@@ -273,7 +274,7 @@ export async function saveMyPayPalAccount(merchantId: string, email?: string | n
     );
   }
   const { error } = await supabase.from("host_paypal_accounts").upsert({
-    host_id: u.user.id,
+    host_id: userId,
     merchant_id: clean,
     email: email?.trim() || null,
   });
@@ -281,9 +282,9 @@ export async function saveMyPayPalAccount(merchantId: string, email?: string | n
 }
 
 export async function disconnectMyPayPalAccount() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
-  const { error } = await supabase.from("host_paypal_accounts").delete().eq("host_id", u.user.id);
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  const { error } = await supabase.from("host_paypal_accounts").delete().eq("host_id", userId);
   if (error) throw error;
 }
 
@@ -334,13 +335,13 @@ export async function getGameJoinPolicy(
 export async function getMyGamePaymentSettings(
   gameId: string,
 ): Promise<GamePaymentSettings | null> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return null;
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
   const { data, error } = await supabase
     .from("game_payment_settings")
     .select("*")
     .eq("game_id", gameId)
-    .eq("host_id", u.user.id)
+    .eq("host_id", userId)
     .maybeSingle();
   if (error) throw error;
   return (data as GamePaymentSettings) ?? null;
@@ -364,28 +365,28 @@ export async function upsertGamePaymentSettings(input: {
    */
   payment_mode?: PaymentMode;
 }) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to configure payments.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to configure payments.");
   const payment_mode = input.payment_mode ?? "direct_host";
   if (payment_mode !== "direct_host") {
     throw new Error("BallaCity does not process game payments yet — hosts collect directly.");
   }
   const { error } = await supabase
     .from("game_payment_settings")
-    .upsert({ ...input, payment_mode, host_id: u.user.id }, { onConflict: "game_id,host_id" });
+    .upsert({ ...input, payment_mode, host_id: userId }, { onConflict: "game_id,host_id" });
   if (error) throw error;
 }
 
 // ----- Submissions -----
 export async function uploadProofScreenshot(file: File): Promise<string> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to upload proof.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to upload proof.");
   // Proof screenshots are images only — reject anything else before it lands in
   // storage, and pin the stored content type so it can never be served as HTML.
   const invalid = validateImageMeta({ mime: file.type, bytes: file.size });
   if (invalid) throw new Error(invalid);
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `${u.user.id}/${crypto.randomUUID()}.${ext}`;
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("payment-proofs").upload(path, file, {
     cacheControl: "3600",
     upsert: false,
@@ -414,33 +415,33 @@ export async function createPaymentSubmission(input: {
   paid_at?: string | null;
   notes?: string | null;
 }) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to submit proof.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to submit proof.");
   // Age gate (see PERMISSION_MATRIX.game_payments). Enforced again by the
   // `enforce_game_payment_cohort` database trigger.
   const { data: allowed } = await (supabase.rpc as any)("game_payments_allowed", {
-    _user: u.user.id,
+    _user: userId,
   });
   if (allowed === false) {
     // No date of birth on file is the one refusal the player can fix themselves: say so.
-    const { data: verified } = await supabase.rpc("age_verified", { _user: u.user.id });
+    const { data: verified } = await supabase.rpc("age_verified", { _user: userId });
     throw new Error(verified === false ? PAYMENTS_AGE_REQUIRED_MESSAGE : PAYMENTS_BLOCKED_MESSAGE);
   }
   const { error } = await supabase.from("payment_submissions").insert({
     ...input,
-    player_id: u.user.id,
+    player_id: userId,
   });
   if (error) throw new Error(paymentSubmissionErrorMessage(error.message ?? ""));
 }
 
 export async function listMySubmissionsForGame(gameId: string): Promise<PaymentSubmission[]> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
   const { data, error } = await supabase
     .from("payment_submissions")
     .select("*")
     .eq("game_id", gameId)
-    .eq("player_id", u.user.id)
+    .eq("player_id", userId)
     .order("submitted_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as PaymentSubmission[];
@@ -449,12 +450,12 @@ export async function listMySubmissionsForGame(gameId: string): Promise<PaymentS
 export async function listHostSubmissions(
   status?: PaymentSubmissionStatus,
 ): Promise<PaymentSubmission[]> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
   let q = supabase
     .from("payment_submissions")
     .select("*")
-    .eq("host_id", u.user.id)
+    .eq("host_id", userId)
     .order("submitted_at", { ascending: false });
   if (status) q = q.eq("status", status);
   const { data, error } = await q;
@@ -554,8 +555,8 @@ export async function createJoinRequest(input: {
   message?: string | null;
   idempotency_key?: string;
 }): Promise<JoinRequest> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to request to join.");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to request to join.");
 
   const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 
@@ -565,7 +566,7 @@ export async function createJoinRequest(input: {
       .insert({
         game_id: input.game_id,
         host_id: input.host_id,
-        player_id: u.user!.id,
+        player_id: userId,
         message: input.message ?? null,
         idempotency_key,
       })
@@ -591,7 +592,7 @@ export async function createJoinRequest(input: {
     const { data: existing, error: readErr } = await supabase
       .from("join_requests")
       .select("*")
-      .eq("player_id", u.user.id)
+      .eq("player_id", userId)
       .or(`idempotency_key.eq.${idempotency_key},and(game_id.eq.${input.game_id})`)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -647,13 +648,13 @@ function formatCooldown(secs: number): string {
 }
 
 export async function cancelMyJoinRequest(gameId: string) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
+  const userId = await getCurrentUserId();
+  if (!userId) return;
   const { error } = await supabase
     .from("join_requests")
     .delete()
     .eq("game_id", gameId)
-    .eq("player_id", u.user.id)
+    .eq("player_id", userId)
     .eq("status", "pending");
   if (error) throw error;
 }
@@ -665,13 +666,13 @@ export async function cancelMyJoinRequest(gameId: string) {
  * RLS scopes deletes to `player_id = auth.uid()`.
  */
 export async function withdrawMyApprovedJoinRequest(gameId: string) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
+  const userId = await getCurrentUserId();
+  if (!userId) return;
   const { error } = await supabase
     .from("join_requests")
     .delete()
     .eq("game_id", gameId)
-    .eq("player_id", u.user.id)
+    .eq("player_id", userId)
     .eq("status", "approved");
   if (error) throw error;
 }
@@ -718,13 +719,13 @@ export async function hostRemoveParticipant(params: {
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return null;
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
   const { data, error } = await supabase
     .from("join_requests")
     .select("*")
     .eq("game_id", gameId)
-    .eq("player_id", u.user.id)
+    .eq("player_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -735,12 +736,12 @@ export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | nu
 export async function listHostJoinRequests(
   status?: "pending" | "approved" | "rejected",
 ): Promise<JoinRequest[]> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
   let q = supabase
     .from("join_requests")
     .select("*")
-    .eq("host_id", u.user.id)
+    .eq("host_id", userId)
     .order("created_at", { ascending: false });
   if (status) q = q.eq("status", status);
   const { data, error } = await q;
@@ -775,12 +776,12 @@ export async function withoutGuardianOnly<
 export async function listMyJoinRequests(
   status?: "pending" | "approved" | "rejected",
 ): Promise<JoinRequest[]> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
   let q = supabase
     .from("join_requests")
     .select("*")
-    .eq("player_id", u.user.id)
+    .eq("player_id", userId)
     .order("created_at", { ascending: false });
   if (status) q = q.eq("status", status);
   const { data, error } = await q;

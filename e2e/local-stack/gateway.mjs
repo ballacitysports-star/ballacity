@@ -10,11 +10,23 @@
 // endpoints), copies the key into Authorization when the client sent none, and answers
 // CORS for the dev server's origin. It binds to loopback only.
 //
+// Optionally it delays the auth calls that learn or renew who is signed in (GET /auth/v1/user
+// and the refresh-token grant) by `authLatency` ({ minMs, maxMs }), to reproduce a slow hosted
+// Auth; see E2E_LOCAL_AUTH_LATENCY_MS in README.md. Off by default.
+//
 // Run by stack.mjs with its configuration in LOCAL_GATEWAY_CONFIG (JSON); importable for tests.
 import { createServer, request as httpRequest } from "node:http";
 import { connect } from "node:net";
 import { pathToFileURL } from "node:url";
-import { apiKeyOf, corsHeaders, routeRequest, upstreamHeaders } from "./lib.mjs";
+import {
+  apiKeyOf,
+  corsHeaders,
+  drawLatencyMs,
+  isDelayedAuthCall,
+  parseAuthLatency,
+  routeRequest,
+  upstreamHeaders,
+} from "./lib.mjs";
 
 /** Realtime finds its tenant from the first label of the Host header (SEED_SELF_HOST tenant). */
 const REALTIME_TENANT_HOST = "realtime-dev.localhost";
@@ -27,7 +39,8 @@ function sendJson(res, status, body, cors) {
 }
 
 /**
- * @param {{ upstreams: Record<string, string>, apiKeys: string[] }} config
+ * @param {{ upstreams: Record<string, string>, apiKeys: string[],
+ *   authLatency?: { minMs: number, maxMs: number } | null }} config
  * @returns {import("node:http").Server}
  */
 export function createGateway(config) {
@@ -51,6 +64,14 @@ export function createGateway(config) {
         cors,
       );
     }
+    const delay = isDelayedAuthCall(req.method, req.url ?? "/")
+      ? drawLatencyMs(config.authLatency)
+      : 0;
+    if (delay > 0) setTimeout(() => forward(req, res, route, key, cors), delay);
+    else forward(req, res, route, key, cors);
+  });
+
+  function forward(req, res, route, key, cors) {
     const target = new URL(route.url);
     const host = route.service === "realtime" ? REALTIME_TENANT_HOST : target.host;
     const upstream = httpRequest(
@@ -76,7 +97,7 @@ export function createGateway(config) {
       else res.destroy();
     });
     req.pipe(upstream);
-  });
+  }
 
   // WebSockets (Realtime): check the key, then splice the raw connection to the upstream.
   server.on("upgrade", (req, socket, head) => {
@@ -126,6 +147,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     console.error("[local gateway] LOCAL_GATEWAY_CONFIG is not set; start it with stack.mjs up.");
     process.exit(2);
   }
-  const server = await startGateway(config);
+  // The latency comes from this process's environment, not the saved config, so
+  // `stack.mjs gateway` can change it without touching anything else.
+  const authLatency = parseAuthLatency(process.env.E2E_LOCAL_AUTH_LATENCY_MS);
+  const server = await startGateway({ ...config, authLatency });
   console.log(`[local gateway] listening on http://127.0.0.1:${server.address().port}`);
+  if (authLatency)
+    console.log(
+      `[local gateway] delaying GET /auth/v1/user and token refresh by ${authLatency.minMs}-${authLatency.maxMs} ms`,
+    );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 
 function ageFromBirthday(iso: string): number | null {
   const d = new Date(iso);
@@ -24,8 +25,7 @@ export function useMyAge(): { age: number | null; loading: boolean } {
     let cancelled = false;
     const load = async () => {
       try {
-        const { data: u } = await supabase.auth.getUser();
-        if (!u.user) {
+        if (!(await getCurrentUserId())) {
           if (!cancelled) {
             setAge(null);
             setLoading(false);

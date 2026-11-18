@@ -51,7 +51,11 @@ async function stubNullAccountType(page: Page) {
       });
       return;
     }
-    await route.continue();
+    // `fallback`, not `continue`: this pattern also matches the account_type
+    // read (`select=account_type&id=eq.<uid>`), and `continue` would send that
+    // read to the real database past the null stub above (routes registered
+    // later run first), so a fixture that has a type would look onboarded.
+    await route.fallback();
   });
 }
 

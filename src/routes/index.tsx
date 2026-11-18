@@ -101,6 +101,12 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user || startedSetup.current) return;
+    // Only from the landing page itself. While another navigation is still
+    // loading its route, the router keeps this page on screen with the new URL
+    // already in place; a new user object then (a sign-in event, a refresh)
+    // re-ran this and dragged the member back from wherever they were sent,
+    // e.g. from the account-type picker an OAuth return routes to.
+    if (router.state.location.pathname !== "/") return;
     // A returning member has nothing to route through first: go straight on.
     // A member who has not picked a role is caught by the app shell's own
     // account-type check, so the profile lookup below is only for a pending setup.
@@ -115,7 +121,7 @@ function Landing() {
         .select("account_type")
         .eq("id", user.id)
         .maybeSingle();
-      if (cancelled) return;
+      if (cancelled || router.state.location.pathname !== "/") return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (!isAccountType(t)) {
         router.navigate({ to: "/onboarding/account-type", replace: true });

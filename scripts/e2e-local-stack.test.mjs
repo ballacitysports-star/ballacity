@@ -7,11 +7,14 @@ import { connect } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startGateway } from "../e2e/local-stack/gateway.mjs";
 import {
+  drawLatencyMs,
   envExports,
   generateSecrets,
+  isDelayedAuthCall,
   LOCAL_PROJECT_LABEL,
   localApiKeys,
   mintJwt,
+  parseAuthLatency,
   routeRequest,
 } from "../e2e/local-stack/lib.mjs";
 import { buildDevServerSpec } from "../e2e/safety/dev-server";
@@ -246,5 +249,70 @@ describe("gateway", () => {
     });
     const refused = await handshake("/realtime/v1/websocket?vsn=1.0.0");
     expect(refused.startsWith("HTTP/1.1 401")).toBe(true);
+  });
+});
+
+describe("auth latency switch", () => {
+  it("is off unless E2E_LOCAL_AUTH_LATENCY_MS is set to a delay", () => {
+    expect(parseAuthLatency(undefined)).toBeNull();
+    expect(parseAuthLatency("")).toBeNull();
+    expect(parseAuthLatency("0")).toBeNull();
+    expect(parseAuthLatency("0-0")).toBeNull();
+  });
+
+  it("takes a fixed delay or a range, and refuses anything else", () => {
+    expect(parseAuthLatency("2000")).toEqual({ minMs: 2000, maxMs: 2000 });
+    expect(parseAuthLatency(" 500-4000 ")).toEqual({ minMs: 500, maxMs: 4000 });
+    expect(() => parseAuthLatency("2s")).toThrow(/E2E_LOCAL_AUTH_LATENCY_MS/);
+    expect(() => parseAuthLatency("4000-500")).toThrow(/reversed/);
+  });
+
+  it("draws a delay inside the range", () => {
+    const r = { minMs: 500, maxMs: 4000 };
+    expect(drawLatencyMs(r, () => 0)).toBe(500);
+    expect(drawLatencyMs(r, () => 0.999999)).toBe(4000);
+    expect(drawLatencyMs(null)).toBe(0);
+  });
+
+  it("delays only GET /auth/v1/user and the refresh-token grant", () => {
+    expect(isDelayedAuthCall("GET", "/auth/v1/user")).toBe(true);
+    expect(isDelayedAuthCall("POST", "/auth/v1/token?grant_type=refresh_token")).toBe(true);
+    expect(isDelayedAuthCall("POST", "/auth/v1/token?grant_type=password")).toBe(false);
+    expect(isDelayedAuthCall("PUT", "/auth/v1/user")).toBe(false);
+    expect(isDelayedAuthCall("GET", "/rest/v1/user")).toBe(false);
+    expect(isDelayedAuthCall("GET", "/auth/v1/health")).toBe(false);
+  });
+
+  it("makes the gateway hold a delayed call and pass the rest straight through", async () => {
+    const upstream = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+    });
+    await new Promise((r) => upstream.listen(0, "127.0.0.1", r));
+    const up = `http://127.0.0.1:${upstream.address().port}`;
+    const gw = await startGateway({
+      port: 0,
+      upstreams: { auth: up, rest: up },
+      apiKeys: ["k"],
+      authLatency: { minMs: 300, maxMs: 300 },
+    });
+    const base = `http://127.0.0.1:${gw.address().port}`;
+    try {
+      const timed = async (path, init) => {
+        const t = Date.now();
+        const res = await fetch(`${base}${path}`, { headers: { apikey: "k" }, ...init });
+        expect(res.status).toBe(200);
+        return Date.now() - t;
+      };
+      expect(await timed("/auth/v1/user")).toBeGreaterThanOrEqual(290);
+      expect(
+        await timed("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: "{}" }),
+      ).toBeGreaterThanOrEqual(290);
+      expect(await timed("/rest/v1/x")).toBeLessThan(250);
+      expect(await timed("/auth/v1/health")).toBeLessThan(250);
+    } finally {
+      gw.close();
+      upstream.close();
+    }
   });
 });

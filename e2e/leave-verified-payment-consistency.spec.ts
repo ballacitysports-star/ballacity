@@ -1,11 +1,13 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { pushHostedGameUpdate, serveHostedGame } from "./helpers/realtime-game-row";
 
 /**
  * E2E: leaving a game with a verified payment must, in a single tap,
  *   1. flip the sticky CTA from "Confirmed · Tap to leave" back to
  *      "Request to join · N spots left" (approval + paid game),
- *   2. remove the viewer from the roster ("YOU" chip gone, count updates),
- *   3. hide the "Payment verified — you're on the roster" status strip
+ *   2. remove the viewer from the roster (their chip, which links to their
+ *      own profile, is gone and the count updates),
+ *   3. hide the "You're in! Payment confirmed" status strip
  *      and keep it hidden (guards a realtime-rehydrate regression),
  *   4. fire DELETE calls against `join_requests`, `payment_submissions`,
  *      and `game_participants` scoped to the viewer — which is exactly
@@ -24,7 +26,12 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-const GAME_ID = "g2";
+// Every REST read of the game is mocked below, the game row included, so the
+// id names no backend data. It has the shape of an app-hosted game id
+// (`host-<a>-<b>`): the page only looks up a viewer's request/payment status
+// for ids that can name a stored game (isGameId in src/lib/game-flow-status.ts),
+// and the fixture id "g2" does not, which left the status strip blank.
+const GAME_ID = "host-e2emock-leaveverified";
 const HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const METHOD_ID = "mock-method-venmo";
 const JOIN_REQ_ID = "mock-join-req-id";
@@ -68,15 +75,16 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
 
   // ---- Static mocks -------------------------------------------------------
 
-  // The game itself lives in sample data (`GAMES.find` fallback). Stub the
-  // DB read so hydration doesn't wipe it and doesn't hit the network.
-  await page.route(
-    (u) => tableUrl(u, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself: a paid ($15), approval-gated game hosted by someone
+  // else. Served from the mock so it does not depend on the backend's g2 (the
+  // page no longer falls back to bundled sample games).
+  const game = await serveHostedGame(page, {
+    id: GAME_ID,
+    host_id: HOST_ID,
+    title: "E2E verified payment game",
+    price: 15,
+    joined: 1,
+  });
 
   await page.route(
     (u) => tableUrl(u, "game_payment_settings"),
@@ -252,6 +260,8 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
       if (method === "DELETE") {
         deleteRequests.game_participants += 1;
         participantDeleted = true;
+        // The server's game_participants_sync_count trigger recounts the game.
+        game.row.joined = 0;
         return route.fulfill({ status: 204, body: "" });
       }
       return route.fallback();
@@ -266,13 +276,16 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
   // 1. Baseline: confirmed state visible.
   const strip = page.getByTestId("your-status-strip");
   await expect(strip).toBeVisible({ timeout: 15_000 });
-  await expect(strip).toContainText(/payment verified/i);
+  await expect(strip).toHaveAttribute("data-status", "payment_verified");
+  await expect(strip).toContainText(/payment confirmed/i);
 
   const cta = page.getByRole("button", { name: /confirmed · tap to leave/i });
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
-  // Roster surfaces the viewer as "YOU".
-  await expect(page.getByText(/^YOU$/).first()).toBeVisible({ timeout: 10_000 });
+  // Roster surfaces the viewer: their chip shows their avatar and links to
+  // their profile (it used to read "YOU"; nothing else on the page links there).
+  const myRosterChip = page.locator(`a[href="/players/${userId}"]`);
+  await expect(myRosterChip.first()).toBeVisible({ timeout: 10_000 });
 
   const baselineJoinedText = await page
     .locator("text=/^\\d+\\s*\\/\\s*\\d+$/")
@@ -288,8 +301,10 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
   await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
   await confirmBtn.click();
 
-  // 3. CTA flips back to the pre-join state (approval + paid game → "Request to join").
-  await expect(page.getByRole("button", { name: /request spot/i })).toBeVisible({
+  // 3. The sticky CTA flips back to the pre-join state (approval + paid game →
+  // "Request Spot · N spots left"). Anchored on the spots suffix: the closing
+  // confirmation dialog briefly carries a plain "Request Spot" button too.
+  await expect(page.getByRole("button", { name: /^request spot · /i })).toBeVisible({
     timeout: 15_000,
   });
 
@@ -298,10 +313,19 @@ test("leaving with a verified payment flips CTA, roster, and clears host-visible
   await page.waitForTimeout(3_000);
   await expect(strip).toHaveCount(0);
 
-  // 5. Roster "YOU" chip gone.
-  await expect(page.getByText(/^YOU$/)).toHaveCount(0, { timeout: 10_000 });
+  // 5. The viewer's roster chip is gone.
+  await expect(myRosterChip).toHaveCount(0, { timeout: 10_000 });
 
   // 6. Roster header count decremented (only assert when we captured a baseline).
+  // The count is hosted_games.joined, which the database recounts when the
+  // participant row goes and broadcasts on the app-wide hosted_games channel.
+  // Nothing here is a real database, so deliver that broadcast once the
+  // participant DELETE has landed.
+  await expect.poll(() => deleteRequests.game_participants, { timeout: 10_000 }).toBeGreaterThan(0);
+  expect(
+    await pushHostedGameUpdate(page, game.row),
+    "the app-wide hosted_games channel must be listening",
+  ).toBeGreaterThan(0);
   if (!Number.isNaN(baselineJoined)) {
     await expect
       .poll(

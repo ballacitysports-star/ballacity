@@ -26,10 +26,34 @@ export const PARKED_GUARDIAN_KEY = "openrun:guardian-session";
  * tabs for; in this tab the swap ends with its own navigation, and a reload
  * racing it would land on the wrong page before the swap finished.
  */
-let identitySwitchInProgress = false;
+let identitySwitchStartedAt: number | null = null;
+const identitySwitchListeners = new Set<() => void>();
+
+function setIdentitySwitchInProgress(on: boolean) {
+  const next = on ? (identitySwitchStartedAt ?? Date.now()) : null;
+  if (next === identitySwitchStartedAt) return;
+  identitySwitchStartedAt = next;
+  for (const listener of [...identitySwitchListeners]) listener();
+}
 
 export function isIdentitySwitchInProgress(): boolean {
-  return identitySwitchInProgress;
+  return identitySwitchStartedAt !== null;
+}
+
+/** When the current switch began (ms epoch), or null when none is in progress. */
+export function getIdentitySwitchStartedAt(): number | null {
+  return identitySwitchStartedAt;
+}
+
+/**
+ * Be told when a switch starts or ends, so AuthGate can re-check the page once
+ * the flag clears instead of waiting for some unrelated re-render.
+ */
+export function subscribeIdentitySwitch(listener: () => void): () => void {
+  identitySwitchListeners.add(listener);
+  return () => {
+    identitySwitchListeners.delete(listener);
+  };
 }
 
 export type ParkedGuardianSession = {
@@ -83,7 +107,7 @@ export async function switchToManagedChild(input: {
   const current = data.session;
   if (!current) throw new Error("Sign in again to switch profiles.");
 
-  identitySwitchInProgress = true;
+  setIdentitySwitchInProgress(true);
   // Stop the timer before snapshotting: a refresh between the snapshot and
   // the swap would rotate the guardian's refresh token and leave a used one
   // parked.
@@ -106,7 +130,7 @@ export async function switchToManagedChild(input: {
       .setSession({ access_token: current.access_token, refresh_token: current.refresh_token })
       .catch(() => undefined);
     await supabase.auth.startAutoRefresh();
-    identitySwitchInProgress = false;
+    setIdentitySwitchInProgress(false);
     throw new Error("Couldn't switch to that profile. Try again.");
   }
 
@@ -133,7 +157,7 @@ export function takeParkedGuardianSession(): ParkedGuardianSession | null {
  */
 export async function switchBackToGuardian(): Promise<void> {
   // Ends in a navigation on every path, so the flag is never reset here.
-  identitySwitchInProgress = true;
+  setIdentitySwitchInProgress(true);
   const parked = takeParkedGuardianSession();
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
   await resetPerUserClientState();
@@ -157,7 +181,7 @@ export async function switchBackToGuardian(): Promise<void> {
  * outlive the "Sign out" tap. The session is restored only to revoke it.
  */
 export async function revokeParkedGuardianSession(parked: ParkedGuardianSession): Promise<void> {
-  identitySwitchInProgress = true;
+  setIdentitySwitchInProgress(true);
   try {
     const { error } = await supabase.auth.setSession({
       access_token: parked.accessToken,
@@ -167,6 +191,6 @@ export async function revokeParkedGuardianSession(parked: ParkedGuardianSession)
   } catch {
     /* already invalid — nothing left to revoke */
   } finally {
-    identitySwitchInProgress = false;
+    setIdentitySwitchInProgress(false);
   }
 }

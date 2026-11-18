@@ -26,7 +26,7 @@ export function DiscoverCategoryPills({
     <div
       role="group"
       aria-label="Discover category"
-      className="-mx-4 mb-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide"
+      className="bleed-x-gutter mb-4 flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide"
     >
       {DISCOVER_CATEGORIES.map((c) => {
         const on = value === c.id;

@@ -14,8 +14,6 @@ import {
   Trophy,
   UserPlus,
   UserCheck,
-  Building2,
-  ShieldCheck,
   Share2,
   Clapperboard,
 } from "lucide-react";
@@ -34,6 +32,7 @@ import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
+import { PlayerOrgsSection } from "@/components/players/PlayerOrgsSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
@@ -704,84 +703,4 @@ function formatBirthday(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-type PlayerOrgRow = {
-  id: string;
-  org_id: string;
-  role: string;
-  org: {
-    id: string;
-    name: string;
-    handle: string | null;
-    avatar: string | null;
-    city: string | null;
-    verified: boolean | null;
-  } | null;
-};
-
-function PlayerOrgsSection({ userId }: { userId: string }) {
-  const [rows, setRows] = useState<PlayerOrgRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchRows = async () => {
-      const { data } = await supabase
-        .from("trainer_org_members")
-        .select("id, org_id, role, org:org_id(id,name,handle,avatar,city,verified)")
-        .eq("user_id", userId);
-      if (cancelled) return;
-      setRows(((data as unknown as PlayerOrgRow[]) ?? []).filter((r) => r.org));
-      setLoaded(true);
-    };
-    fetchRows();
-
-    const ch = supabase
-      .channel(`player-orgs:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "trainer_org_members",
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          fetchRows();
-        },
-      )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trainer_orgs" }, () => {
-        fetchRows();
-      })
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(ch);
-    };
-  }, [userId]);
-
-  if (!loaded || rows.length === 0) return null;
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-1.5">
-      {rows.map((r) => {
-        const o = r.org!;
-        return (
-          <Link
-            key={r.id}
-            to="/orgs/$orgId"
-            params={{ orgId: o.id }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-lime/60 hover:text-lime"
-          >
-            <Building2 className="h-3.5 w-3.5" />
-            <span className="truncate max-w-[160px]">{o.name}</span>
-            {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="micro-label text-muted-foreground">{r.role}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
 }
