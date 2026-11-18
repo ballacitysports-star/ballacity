@@ -368,7 +368,11 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
   }
 }
 
-export function leaveGame(id: string) {
+/**
+ * Leaves a game. The local state changes at once; the returned promise settles when the roster row is gone (or the
+ * delete failed), so a caller that tells the host can wait for the server to see the player gone first.
+ */
+export function leaveGame(id: string): Promise<void> {
   loadJoinedGames();
   // Clear local optimistic state (may be a no-op for confirmed players who
   // got onto the roster server-side via approval/payment auto-join).
@@ -381,7 +385,7 @@ export function leaveGame(id: string) {
   }
   // Always attempt the DB delete — confirmed players are on the roster
   // even when the local set never tracked them.
-  void (async () => {
+  return (async () => {
     const uid = await getCurrentUserId();
     if (!uid) return;
     const { error } = await supabase

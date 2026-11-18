@@ -175,14 +175,13 @@ describe("sendMessage", () => {
     });
   });
 
-  it("stores the message before it looks anything else up", async () => {
+  it("stores the message, then asks the server to tell the thread about it, reading nothing itself", async () => {
     await sendMessage("c1", "hi");
-    expect(h.state.log[0]).toBe("insert");
-  });
-
-  it("reads the thread's details at the same time, not one after another", async () => {
-    await sendMessage("c1", "hi");
-    expect(h.state.maxReadsInFlight).toBe(3);
+    expect(h.state.log).toEqual(["insert"]);
+    // The server reads the thread, who accepted it and whether this is the opening message, and writes the
+    // text (notification-plan.server.test.ts); the app only names the stored message.
+    expect(h.createNotification).toHaveBeenCalledTimes(1);
+    expect(h.createNotification).toHaveBeenCalledWith({ type: "message", message_id: "m-new" });
   });
 
   it("does not notify anyone when the insert fails", async () => {
@@ -194,7 +193,6 @@ describe("sendMessage", () => {
   it("is done once the message is stored, without waiting for notifications", async () => {
     let release!: () => void;
     h.gate.current = new Promise<void>((r) => (release = r));
-    h.state.acceptedBy = [THEM];
 
     const outcome = await Promise.race([
       sendMessage("c1", "hi").then(() => "returned"),
@@ -206,82 +204,9 @@ describe("sendMessage", () => {
   });
 
   it("does not let a failing notification break a send that already went through", async () => {
-    h.state.acceptedBy = [THEM];
     h.createNotification.mockImplementationOnce(() => Promise.reject(new Error("push down")));
     await expect(sendMessage("c1", "hi")).resolves.toMatchObject({ id: "m-new" });
     await new Promise((r) => setTimeout(r, 0));
-  });
-});
-
-describe("sendMessage — who hears about it", () => {
-  it("tells a known contact about every message, with a preview", async () => {
-    h.state.acceptedBy = [THEM];
-    await sendMessage("c1", "see you at 7");
-    expect(h.createNotification).toHaveBeenCalledWith({
-      user_id: THEM,
-      type: "message",
-      title: "New message from Sam",
-      body: "see you at 7",
-      link: "/messages/c1",
-    });
-    // No need to count anything for someone who already accepted.
-    expect(h.state.log).not.toContain("count");
-  });
-
-  it("previews an attachment-only message by its name", async () => {
-    h.state.acceptedBy = [THEM];
-    await sendMessage("c1", "", {
-      path: "c1/me/1-a.jpg",
-      type: "image/jpeg",
-      name: "a.jpg",
-      size: 9,
-    });
-    expect(h.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ body: "📎 a.jpg" }),
-    );
-  });
-
-  it("tells a stranger about the opening message — without quoting it", async () => {
-    h.state.acceptedBy = [ME];
-    h.state.myMessageCount = 1;
-    await sendMessage("c1", "secret words");
-    expect(h.createNotification).toHaveBeenCalledTimes(1);
-    expect(h.createNotification).toHaveBeenCalledWith({
-      user_id: THEM,
-      type: "message",
-      title: "Message request from Sam",
-      body: "They'd like to start a conversation.",
-      link: "/messages/c1",
-    });
-  });
-
-  it("does not notify a stranger again for later messages", async () => {
-    h.state.acceptedBy = [ME];
-    h.state.myMessageCount = 2;
-    await sendMessage("c1", "hello?");
-    expect(h.createNotification).not.toHaveBeenCalled();
-  });
-
-  it("counts the sender's messages before returning, so a quick second message cannot hide the first", async () => {
-    h.state.acceptedBy = [ME];
-    await sendMessage("c1", "hi");
-    // Already counted by the time the caller can send another.
-    expect(h.state.log).toEqual([
-      "insert",
-      expect.stringMatching(/^read:/),
-      expect.stringMatching(/^read:/),
-      expect.stringMatching(/^read:/),
-      "count",
-    ]);
-  });
-
-  it("falls back to a neutral name when the sender has no profile name", async () => {
-    h.state.acceptedBy = [THEM];
-    h.state.displayName = null;
-    await sendMessage("c1", "hi");
-    expect(h.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "New message from Someone" }),
-    );
   });
 });
 

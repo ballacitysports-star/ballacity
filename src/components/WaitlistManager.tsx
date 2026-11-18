@@ -95,15 +95,10 @@ export function WaitlistManager({
           : "Waitlist request declined.",
       );
       void createNotification({
-        user_id: entry.userId,
         type: status === "approved" ? "waitlist_approved" : "waitlist_declined",
-        title:
-          status === "approved"
-            ? `You're approved for ${entry.position}`
-            : `Your ${entry.position} waitlist request was declined`,
-        body: gameTitle,
-        link: `/games/${gameId}`,
-      }).catch(() => {});
+        game_id: gameId,
+        user_id: entry.userId,
+      });
     } catch (e: any) {
       toast.error(e?.message ?? "Could not update the waitlist.");
     } finally {

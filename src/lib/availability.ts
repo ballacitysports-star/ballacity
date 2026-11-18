@@ -289,43 +289,10 @@ export async function updateAvailability(id: string, patch: Partial<PlayerAvaila
   }
 }
 
+/** Tells the people who asked about this post that its author changed it. The server finds them and writes the text. */
 async function notifyInterestedOnEdit(availabilityId: string) {
-  const { data: u } = await supabase.auth.getUser();
-  const editorId = u.user?.id ?? null;
-
-  const { data: reqs } = await supabase
-    .from("availability_contact_requests" as any)
-    .select("from_user_id")
-    .eq("availability_id", availabilityId);
-  const rows = (reqs ?? []) as unknown as { from_user_id: string }[];
-  const recipients = Array.from(
-    new Set(rows.map((r) => r.from_user_id).filter((id) => id && id !== editorId)),
-  );
-  if (recipients.length === 0) return;
-
-  // Pull a friendly label for the notification body: editor's display name.
-  let editorName = "A player";
-  if (editorId) {
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", editorId)
-      .maybeSingle();
-    if (prof?.display_name) editorName = prof.display_name;
-  }
-
   const { createNotification } = await import("@/lib/notifications");
-  await Promise.all(
-    recipients.map((uid) =>
-      createNotification({
-        user_id: uid,
-        type: "availability_updated",
-        title: `${editorName} updated their availability`,
-        body: "Tap to see the new details.",
-        link: `/players?post=${availabilityId}`,
-      }),
-    ),
-  );
+  await createNotification({ type: "availability_updated", availability_id: availabilityId });
 }
 
 /**
@@ -414,13 +381,8 @@ export async function createContactRequest(
   if (invite) {
     try {
       const { createNotification } = await import("@/lib/notifications");
-      await createNotification({
-        user_id: toUserId,
-        type: "game_invite",
-        title: `You're invited to ${invite.title ?? "a pickup game"}`,
-        body: [invite.sport, invite.location].filter(Boolean).join(" · ") || null,
-        link: `/games/${invite.gameId}?invite=1&from=${u.user.id}`,
-      });
+      // The server checks this invite request and that the sender hosts the game, and writes the text from the game.
+      await createNotification({ type: "game_invite", game_id: invite.gameId, user_id: toUserId });
     } catch (e) {
       console.warn("invite notification failed", e);
     }

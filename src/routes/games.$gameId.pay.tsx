@@ -1675,13 +1675,8 @@ function PaymentInstructionsAndProof({
       void (async () => {
         try {
           const { createNotification } = await import("@/lib/notifications");
-          await createNotification({
-            user_id: host_id,
-            type: "payment_submitted",
-            title: "Payment proof to review",
-            body: `$${parsed.data.paidAmount} via ${meta.name} for ${game_title}`,
-            link: `/games/${game_id}`,
-          });
+          // The server reads this submission and writes the amount and method from it.
+          await createNotification({ type: "payment_submitted", game_id });
           const { emailHostPaymentSubmitted } = await import("@/lib/payment-alerts.functions");
           await emailHostPaymentSubmitted({ data: { gameId: game_id } });
         } catch (e) {

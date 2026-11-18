@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
-import { openDeepLink, toAbsoluteDeepLink } from "@/lib/deep-links";
+import { openDeepLink } from "@/lib/deep-links";
+import type { NotifyRequest } from "@/lib/notification-requests";
 
 export type Notification = {
   id: string;
@@ -15,35 +16,18 @@ export type Notification = {
   created_at: string;
 };
 
-export async function createNotification(input: {
-  user_id: string;
-  type: string;
-  title: string;
-  body?: string | null;
-  link?: string | null;
-}) {
+/**
+ * Asks the server to tell another member something (and push it to their phone). Only allow-listed types, naming the
+ * row they are about: the server checks the caller's part in it and writes the text and link itself (see
+ * notification-requests.ts). Best effort, like before: a refusal or a failure is logged, never thrown, so the
+ * action that prompted it is never undone by its heads-up.
+ */
+export async function createNotification(request: NotifyRequest): Promise<void> {
   try {
     const { createNotificationForUser } = await import("@/lib/notifications.functions");
-    await createNotificationForUser({ data: input });
+    await createNotificationForUser({ data: request });
   } catch (e: any) {
-    console.warn("notification insert failed", e?.message ?? e);
-  }
-
-  // Best-effort OneSignal push (background/closed-app delivery). Never blocks.
-  try {
-    const { sendPushToUser } = await import("@/lib/push.functions");
-    void sendPushToUser({
-      data: {
-        userId: input.user_id,
-        title: input.title,
-        body: input.body ?? null,
-        // Push providers need an absolute URL so tapping the alert opens the
-        // exact game / chat / profile the notification refers to.
-        url: toAbsoluteDeepLink(input.link ?? null, input.type),
-      },
-    }).catch((e) => console.warn("push send failed", e));
-  } catch (e) {
-    console.warn("push module load failed", e);
+    console.warn("notification failed", request.type, e?.message ?? e);
   }
 }
 

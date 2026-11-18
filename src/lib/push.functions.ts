@@ -1,52 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import type { PushInput } from "@/lib/push.server";
-
 const ONESIGNAL_APP_ID = "c6024ea7-b1a2-4f64-b43a-783971d802f9";
 const ONESIGNAL_API = "https://api.onesignal.com/notifications";
 
-function validate(input: unknown): PushInput {
-  const i = input as Partial<PushInput> | null | undefined;
-  if (!i || typeof i.userId !== "string" || typeof i.title !== "string") {
-    throw new Error("Invalid push input");
-  }
-  return {
-    userId: i.userId,
-    title: i.title.slice(0, 200),
-    body: i.body ? String(i.body).slice(0, 500) : null,
-    url: i.url ? String(i.url).slice(0, 500) : null,
-  };
-}
-
-/**
- * Sends a OneSignal push to a single user, identified by their Supabase user id
- * (registered as the OneSignal external_id alias on the client).
- *
- * Returns { ok: true } on best-effort success. Never throws to the caller for
- * provider errors — pushes are auxiliary to the in-app notification row.
- */
-export const sendPushToUser = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(validate)
-  .handler(async ({ data, context }) => {
-    if (data.userId !== context.userId) {
-      // Asked with the service role: `_caller` is the verified session user, and
-      // the database gives a signed-in client a fixed answer for this two-party
-      // helper (SEC-2).
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: allowed, error: relErr } = await supabaseAdmin.rpc("can_notify" as any, {
-        _caller: context.userId,
-        _target: data.userId,
-      });
-      if (relErr || !allowed) {
-        return { ok: false as const, reason: "not_authorized" };
-      }
-    }
-
-    const { deliverPush } = await import("@/lib/push.server");
-    return deliverPush(data);
-  });
+// There is no server function that pushes arbitrary text to another member. A push to someone else goes out only
+// with the notification it mirrors, from createNotificationForUser (server-built text) or other server code; the old
+// sendPushToUser, which took any title, body and URL for anyone can_notify allowed, is gone.
 
 type PushSubscriptionSummary = {
   id: string | null;

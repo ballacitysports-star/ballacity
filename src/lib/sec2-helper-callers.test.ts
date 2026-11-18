@@ -78,7 +78,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 vi.mock("@/lib/push.server", () => ({ deliverPush: async () => ({ ok: true as const }) }));
 
 import { createNotificationForUser } from "@/lib/notifications.functions";
-import { sendPushToUser } from "@/lib/push.functions";
+import * as pushFunctions from "@/lib/push.functions";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 
 const TARGET = "00000000-0000-4000-8000-000000000002";
@@ -101,48 +101,37 @@ beforeEach(() => {
   db.inserted = [];
 });
 
-describe("can_notify is asked with the service role", () => {
-  it("a cross-user notification goes through when the relationship holds", async () => {
+// Notifications no longer ask can_notify at all: createNotificationForUser takes an allow-listed type and the row it is
+// about, and the server checks the caller's part in that row (notification-plan.server). Its own tests are in
+// notifications.functions.test.ts and notification-plan.server.test.ts.
+describe("notifications do not lean on can_notify", () => {
+  it("a free-form notification is refused, even where can_notify would say yes", async () => {
     db.rpc.can_notify = true;
-    const res = await createNotificationForUser({
-      data: { user_id: TARGET, type: "game", title: "Hi" },
-      context: ctx("host-1"),
-    } as never);
-    expect(res).toEqual({ ok: true });
-    expect(calls).toEqual([
-      { who: "admin", fn: "can_notify", args: { _caller: "host-1", _target: TARGET } },
-    ]);
-    expect(db.inserted).toHaveLength(1);
-  });
-
-  it("and is refused when it does not", async () => {
-    db.rpc.can_notify = false;
     await expect(
-      createNotificationForUser({
-        data: { user_id: TARGET, type: "game", title: "Hi" },
-        context: ctx("host-1"),
-      } as never),
-    ).rejects.toThrow("Not authorized to notify this user");
+      (async () =>
+        createNotificationForUser({
+          data: { user_id: TARGET, type: "game", title: "Hi" },
+          context: ctx("host-1"),
+        } as never))(),
+    ).rejects.toThrow();
+    expect(calls).toEqual([]);
     expect(db.inserted).toHaveLength(0);
   });
 
-  it("a push to another user asks the same way, with the session user as _caller", async () => {
+  it("a request about a row the caller has no part in is refused without asking any helper", async () => {
     db.rpc.can_notify = true;
-    const res = await sendPushToUser({
-      data: { userId: TARGET, title: "Hi" },
-      context: ctx("host-1"),
-    } as never);
-    expect(res).toEqual({ ok: true });
-    expect(calls).toEqual([
-      { who: "admin", fn: "can_notify", args: { _caller: "host-1", _target: TARGET } },
-    ]);
-    db.rpc.can_notify = false;
-    expect(
-      await sendPushToUser({
-        data: { userId: TARGET, title: "Hi" },
+    await expect(
+      createNotificationForUser({
+        data: { type: "payment_reminder", game_id: "host-abc123-def456", user_id: TARGET },
         context: ctx("host-1"),
       } as never),
-    ).toEqual({ ok: false, reason: "not_authorized" });
+    ).rejects.toThrow("Not authorized to notify this user");
+    expect(calls).toEqual([]);
+    expect(db.inserted).toHaveLength(0);
+  });
+
+  it("there is no endpoint that pushes to another user", () => {
+    expect("sendPushToUser" in pushFunctions).toBe(false);
   });
 });
 

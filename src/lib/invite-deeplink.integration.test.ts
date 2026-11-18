@@ -1,16 +1,15 @@
 /**
- * Integration test: tapping a `game_invite` notification deep-links to the
- * correct hosted-game details page with the `invite=1` and `from=<hostId>`
- * search params preserved.
+ * Tapping a `game_invite` notification deep-links to the correct hosted-game
+ * details page with the `invite=1` and `from=<hostId>` search params preserved.
  *
- * We assert on the persisted `notifications.link` value (what the in-app
- * Alerts list and the browser notification handler navigate to) and run it
- * through the actual route's `validateSearch` so the test fails if either
- * side of the contract drifts:
- *   - `createContactRequest` (the writer) must encode `?invite=1&from=...`
- *   - `/games/$gameId` route (the reader) must parse those params back out
- *
- * Auto-skips when the seeded fixture accounts can't sign in.
+ * The link is written by the server (notification-plan.server.ts) from the
+ * game and the invite request; the app only names them. So:
+ *   - the always-run test below takes the link the server writes and runs it
+ *     through the actual route's `validateSearch`, so it fails if either side
+ *     of the contract drifts;
+ *   - the backend test checks that `createContactRequest` names the invite
+ *     (game and player) for the server. It auto-skips when the seeded fixture
+ *     accounts can't sign in.
  *
  * Run:
  *   bunx vitest run src/lib/invite-deeplink.integration.test.ts
@@ -19,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
 import { Route as GameIndexRoute } from "@/routes/games.$gameId.index";
+import { planNotification } from "./notification-plan.server";
 
 // The notification row is written by a TanStack server function, which has no
 // Start runtime under vitest. Capture the payload the writer produces so the
@@ -29,7 +29,6 @@ vi.mock("@/lib/notifications.functions", () => ({
     notif.calls.push(data);
   },
 }));
-vi.mock("@/lib/push.functions", () => ({ sendPushToUser: async () => {} }));
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -82,7 +81,7 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
     }
   });
 
-  it("stores a link that opens the correct game and preserves invite query params", async () => {
+  it("names the invite for the server: the game and the player", async () => {
     if (!canRun || !playerAvailabilityId) return;
 
     // Re-sign in the singleton client as host so createContactRequest sees the host session.
@@ -100,10 +99,12 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
-    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId) as
-      { link: string | null } | undefined;
-    expect(found, "game_invite notification should be written").toBeTruthy();
-    expect(found!.link, "notification.link must be set").toBeTruthy();
+    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId);
+    expect(found, "game_invite notification should be requested").toEqual({
+      type: "game_invite",
+      game_id: gameId,
+      user_id: playerId,
+    });
 
     // Track for cleanup.
     const { data: rows } = await hostClient
@@ -111,26 +112,66 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
       .select("id")
       .eq("game_id", gameId);
     if (rows) for (const r of rows) createdRequestIds.push(r.id as string);
+  });
+});
 
-    const link = found!.link!;
+describe("the invite link the server writes", () => {
+  const HOST = "00000000-0000-4000-8000-0000000000a1";
+  const PLAYER = "00000000-0000-4000-8000-0000000000b2";
+  const GAME = "host-abc123-def456";
+  const tables: Record<string, Record<string, unknown>[]> = {
+    hosted_games: [
+      {
+        id: GAME,
+        host_id: HOST,
+        title: "Deeplink invite game",
+        date: new Date(Date.now() + 86_400_000).toISOString(),
+        sport: "Basketball",
+        location: "Test Park",
+        cancelled_at: null,
+        completed_at: null,
+      },
+    ],
+    availability_contact_requests: [
+      { from_user_id: HOST, to_user_id: PLAYER, kind: "invite", game_id: GAME, status: "pending" },
+    ],
+  };
+  const admin = {
+    from(table: string) {
+      let rows = [...(tables[table] ?? [])];
+      const q: Record<string, unknown> = {
+        select: () => q,
+        eq: (k: string, v: unknown) => ((rows = rows.filter((r) => r[k] === v)), q),
+        limit: (n: number) => ((rows = rows.slice(0, n)), q),
+        maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+        then: (res: (v: unknown) => unknown) => res({ data: rows, error: null }),
+      };
+      return q;
+    },
+  };
 
-    // 1. Path points to the correct hosted game.
+  it("opens the right game, and the game route parses the invite back out", async () => {
+    const p = await planNotification(admin, HOST, {
+      type: "game_invite",
+      game_id: GAME,
+      user_id: PLAYER,
+    });
+    if (!p.ok) throw new Error("refused");
+    const link = p.rows[0].link;
+
     const [pathname, query = ""] = link.split("?");
-    expect(pathname).toBe(`/games/${gameId}`);
-
-    // 2. Both invite query params are present and non-empty.
+    expect(pathname).toBe(`/games/${GAME}`);
     const params = new URLSearchParams(query);
     expect(params.get("invite")).toBe("1");
-    expect(params.get("from")).toBe(hostId);
+    expect(params.get("from")).toBe(HOST);
 
-    // 3. The actual route's validateSearch parses them back into typed state,
-    //    so the Game detail page will render the "You're invited" banner.
-    const search = Object.fromEntries(params.entries()) as Record<string, unknown>;
+    // The actual route's validateSearch parses them back into typed state, so the
+    // Game detail page will render the "You're invited" banner.
     const validate = GameIndexRoute.options.validateSearch as unknown as (
       s: Record<string, unknown>,
     ) => { invite?: true; from?: string };
-    const parsed = validate(search);
+    const parsed = validate(Object.fromEntries(params.entries()));
     expect(parsed.invite).toBe(true);
-    expect(parsed.from).toBe(hostId);
+    expect(parsed.from).toBe(HOST);
   });
 });

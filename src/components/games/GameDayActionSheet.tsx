@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle, DollarSign, Megaphone, UserCheck, UserX, ChevronDown } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  DollarSign,
+  Megaphone,
+  UserCheck,
+  UserX,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { LiveParticipant } from "@/lib/game-roster";
 import { listHostSubmissions, type PaymentSubmission } from "@/lib/payments";
 import { createNotification } from "@/lib/notifications";
+import { BROADCAST_MAX, broadcastHasLink } from "@/lib/notification-requests";
 
 type Props = {
   gameId: string;
@@ -23,8 +32,6 @@ type Props = {
   onMarkAttendance: (playerId: string, attended: boolean) => void;
 };
 
-const MAX_BROADCAST = 280;
-
 /** Host-only sticky game-day checklist: check-in, unpaid players, roster broadcast. */
 export function GameDayActionSheet({
   gameId,
@@ -42,7 +49,6 @@ export function GameDayActionSheet({
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
-  const [unpaidMsg, setUnpaidMsg] = useState<string | null>(null);
   const [sendingUnpaid, setSendingUnpaid] = useState(false);
   const players = useMemo(() => roster.filter((p) => p.userId !== hostId), [roster, hostId]);
   const started = Date.now() >= new Date(startsAt).getTime();
@@ -81,27 +87,24 @@ export function GameDayActionSheet({
       return st !== "verified" && st !== "pending";
     });
   }, [isPaid, players, approvedPlayerIds, hostId, payStatus]);
-  const defaultUnpaidMsg = `${owingIds.length} spot${owingIds.length === 1 ? "" : "s"} still awaiting payment. Please send your ${
+  const unpaidSummary = `${owingIds.length} spot${owingIds.length === 1 ? "" : "s"} still awaiting payment. Each player gets a reminder to pay their ${
     fee > 0 ? `$${fee} ` : ""
-  }fee before kickoff or your spot may open to the waitlist.`;
+  }fee.`;
   const checkedIn = players.filter((p) => p.attended !== null).length;
 
   const broadcast = async () => {
     const text = msg.trim();
     if (!text || players.length === 0) return;
+    // The server refuses a link in a roster update (it writes the title and the in-app link itself); say so here
+    // rather than report a send that never happened.
+    if (broadcastHasLink(text)) {
+      toast.error("Links can't be sent in a roster update.");
+      return;
+    }
     setSending(true);
     try {
-      await Promise.all(
-        players.map((p) =>
-          createNotification({
-            user_id: p.userId,
-            type: "game_broadcast",
-            title: `Host update · ${gameTitle}`.slice(0, 200),
-            body: text,
-            link: `/games/${gameId}`,
-          }),
-        ),
-      );
+      // One request: the server reads this game's roster and sends to it.
+      await createNotification({ type: "game_broadcast", game_id: gameId, text });
       toast.success(`Sent to ${players.length} player${players.length === 1 ? "" : "s"}.`);
       setMsg("");
     } finally {
@@ -109,24 +112,17 @@ export function GameDayActionSheet({
     }
   };
 
-  const remindUnpaid = async (body: string) => {
-    const text = body.trim();
-    if (!text || owingIds.length === 0) return;
+  // The reminder's text is the server's, built from the game's fee and title.
+  const remindUnpaid = async () => {
+    if (owingIds.length === 0) return;
     setSendingUnpaid(true);
     try {
       await Promise.all(
         owingIds.map((id) =>
-          createNotification({
-            user_id: id,
-            type: "payment_reminder",
-            title: `Payment reminder · ${gameTitle}`.slice(0, 200),
-            body: text,
-            link: `/games/${gameId}/pay`,
-          }),
+          createNotification({ type: "payment_reminder", game_id: gameId, user_id: id }),
         ),
       );
       toast.success(`Reminded ${owingIds.length} player${owingIds.length === 1 ? "" : "s"}.`);
-      setUnpaidMsg(null);
     } finally {
       setSendingUnpaid(false);
     }
@@ -134,7 +130,11 @@ export function GameDayActionSheet({
 
   const Step = ({ done, label, detail }: { done: boolean; label: string; detail: string }) => (
     <div className="flex items-center gap-2 text-xs">
-      {done ? <CheckCircle2 className="h-4 w-4 text-lime" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+      {done ? (
+        <CheckCircle2 className="h-4 w-4 text-lime" />
+      ) : (
+        <Circle className="h-4 w-4 text-muted-foreground" />
+      )}
       <span className="font-semibold">{label}</span>
       <span className="ml-auto text-muted-foreground">{detail}</span>
     </div>
@@ -155,7 +155,9 @@ export function GameDayActionSheet({
         <span className="text-[11px] text-muted-foreground">
           {checkedIn}/{players.length} checked in{isPaid ? ` · ${unpaid.length} unpaid` : ""}
         </span>
-        <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`ml-auto h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
@@ -167,7 +169,11 @@ export function GameDayActionSheet({
               detail={started ? `${checkedIn}/${players.length}` : "Opens at kickoff"}
             />
             {isPaid && (
-              <Step done={unpaid.length === 0} label="Collect payments" detail={`${unpaid.length} unpaid`} />
+              <Step
+                done={unpaid.length === 0}
+                label="Collect payments"
+                detail={`${unpaid.length} unpaid`}
+              />
             )}
           </div>
 
@@ -177,7 +183,9 @@ export function GameDayActionSheet({
                 const st = payStatus.get(p.userId);
                 return (
                   <div key={p.userId} className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-xs font-semibold">{p.displayName}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                      {p.displayName}
+                    </span>
                     {isPaid && st !== "verified" && (
                       <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral">
                         {st === "pending" ? "Proof to review" : "Unpaid"}
@@ -190,7 +198,9 @@ export function GameDayActionSheet({
                       disabled={!started || busyId === p.userId}
                       onClick={() => onMarkAttendance(p.userId, true)}
                       className={`rounded-full border p-1.5 disabled:opacity-40 ${
-                        p.attended === true ? "border-lime/40 bg-lime/10 text-lime" : "border-border text-muted-foreground"
+                        p.attended === true
+                          ? "border-lime/40 bg-lime/10 text-lime"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
                       <UserCheck className="h-3.5 w-3.5" />
@@ -202,7 +212,9 @@ export function GameDayActionSheet({
                       disabled={!started || busyId === p.userId}
                       onClick={() => onMarkAttendance(p.userId, false)}
                       className={`rounded-full border p-1.5 disabled:opacity-40 ${
-                        p.attended === false ? "border-coral/40 bg-coral/10 text-coral" : "border-border text-muted-foreground"
+                        p.attended === false
+                          ? "border-coral/40 bg-coral/10 text-coral"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
                       <UserX className="h-3.5 w-3.5" />
@@ -215,59 +227,22 @@ export function GameDayActionSheet({
 
           {isPaid && owingIds.length > 0 && (
             <div className="space-y-1.5 rounded-xl border border-amber-500/40 bg-amber-500/5 p-2">
-              {unpaidMsg === null ? (
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    disabled={sendingUnpaid}
-                    onClick={() => void remindUnpaid(defaultUnpaidMsg)}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-2 text-xs font-bold disabled:opacity-50"
-                  >
-                    <DollarSign className="h-3.5 w-3.5" /> Remind {owingIds.length} unpaid
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUnpaidMsg(defaultUnpaidMsg)}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold"
-                  >
-                    Edit message
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <textarea
-                    value={unpaidMsg}
-                    onChange={(e) => setUnpaidMsg(e.target.value.slice(0, MAX_BROADCAST))}
-                    rows={3}
-                    aria-label="Announcement to unpaid players"
-                    className="w-full resize-none rounded-lg border border-border bg-background p-2 text-xs"
-                  />
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setUnpaidMsg(null)}
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={sendingUnpaid || !unpaidMsg.trim()}
-                      onClick={() => void remindUnpaid(unpaidMsg)}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-2 text-xs font-bold text-background disabled:opacity-50"
-                    >
-                      <Megaphone className="h-3.5 w-3.5" /> Send to {owingIds.length} unpaid
-                    </button>
-                  </div>
-                </>
-              )}
+              <p className="text-xs text-muted-foreground">{unpaidSummary}</p>
+              <button
+                type="button"
+                disabled={sendingUnpaid}
+                onClick={() => void remindUnpaid()}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-2 text-xs font-bold disabled:opacity-50"
+              >
+                <DollarSign className="h-3.5 w-3.5" /> Remind {owingIds.length} unpaid
+              </button>
             </div>
           )}
 
           <div className="space-y-1.5">
             <textarea
               value={msg}
-              onChange={(e) => setMsg(e.target.value.slice(0, MAX_BROADCAST))}
+              onChange={(e) => setMsg(e.target.value.slice(0, BROADCAST_MAX))}
               rows={2}
               placeholder="Message the roster: running late, moved to court 2…"
               aria-label="Message to everyone on the roster"
@@ -279,7 +254,8 @@ export function GameDayActionSheet({
               onClick={() => void broadcast()}
               className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-lime-gradient py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
             >
-              <Megaphone className="h-3.5 w-3.5" /> Send to {players.length} player{players.length === 1 ? "" : "s"}
+              <Megaphone className="h-3.5 w-3.5" /> Send to {players.length} player
+              {players.length === 1 ? "" : "s"}
             </button>
           </div>
         </div>

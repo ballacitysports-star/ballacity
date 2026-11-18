@@ -516,25 +516,14 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
       const trimmed = note.trim();
       await reviewSubmission(sub.id, status, trimmed || undefined);
       toast.success(status === "verified" ? "Payment approved" : "Payment rejected");
-      if (status === "verified") {
-        const { createNotification } = await import("@/lib/notifications");
-        void createNotification({
-          user_id: sub.player_id,
-          type: "payment_verified",
-          title: `Payment verified for ${game?.title ?? "your game"}`,
-          body: trimmed || "You're on the roster. See you there!",
-          link: `/games/${sub.game_id}`,
-        }).catch(() => {});
-      } else {
-        const { createNotification } = await import("@/lib/notifications");
-        void createNotification({
-          user_id: sub.player_id,
-          type: "payment_rejected",
-          title: `Payment rejected for ${game?.title ?? "your game"}`,
-          body: trimmed || "The host was not able to verify your payment.",
-          link: `/games/${sub.game_id}/pay`,
-        }).catch(() => {});
-      }
+      // The note is saved on the submission (reviewer_notes), where the player's pay page shows it; the alert's
+      // text is the server's.
+      const { createNotification } = await import("@/lib/notifications");
+      void createNotification({
+        type: status === "verified" ? "payment_verified" : "payment_rejected",
+        game_id: sub.game_id,
+        user_id: sub.player_id,
+      });
       setNote("");
       onReviewed();
     } catch (e: any) {

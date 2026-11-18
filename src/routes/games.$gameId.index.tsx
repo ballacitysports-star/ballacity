@@ -7,7 +7,6 @@ import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react
 import type { ComponentProps } from "react";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { PublicGamePreview } from "@/components/games/PublicGamePreview";
-import { emailLocalPart } from "@/lib/managed-children";
 import { Navigation } from "lucide-react";
 import { OpenInMaps } from "@/components/OpenInMaps";
 import { GameDayActionSheet } from "@/components/games/GameDayActionSheet";
@@ -645,17 +644,16 @@ function GameDetail() {
     removeRosterLocal(playerId);
     setHostRequests((prev) => prev.filter((r) => r.player_id !== playerId));
     try {
-      await hostRemoveParticipant({ gameId: game.id, playerId });
-      // Notify the removed player (best-effort).
+      // Tell the player first (best effort): the removal deletes their roster row, request and payment proof, which
+      // are what show the server this player was on the game, so afterwards it would refuse the notice.
       if (user && playerId !== user.id) {
-        void createNotification({
-          user_id: playerId,
+        await createNotification({
           type: "participant_removed",
-          title: `Removed from ${game.title}`,
-          body: "The host removed you from the roster.",
-          link: `/games/${game.id}`,
-        }).catch(() => {});
+          game_id: game.id,
+          user_id: playerId,
+        });
       }
+      await hostRemoveParticipant({ gameId: game.id, playerId });
       toast.success(`Removed ${displayName} from the roster.`);
     } catch (e: any) {
       // Rollback.
@@ -1132,14 +1130,7 @@ function GameDetail() {
           gameHostId !== user.id &&
           !isLateCancel(game.date, game.cancelCutoffMin)
         ) {
-          const who = myProfile?.name || emailLocalPart(user.email) || "A player";
-          void createNotification({
-            user_id: gameHostId,
-            type: "participant_left",
-            title: `${who} left ${game.title}`,
-            body: "Their spot is open again.",
-            link: `/games/${game.id}`,
-          }).catch(() => {});
+          void createNotification({ type: "participant_left", game_id: game.id });
         }
       } catch (e: any) {
         // Rollback optimistic state.
@@ -1255,17 +1246,8 @@ function GameDetail() {
         setMyReq(created);
         const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
-        void createNotification({
-          user_id: requestHostId,
-          type: isResubmit ? "join_resubmitted" : "join_request",
-          title: isResubmit
-            ? `Resubmitted request: ${game.title}`
-            : `New request to join ${game.title}`,
-          body: isResubmit
-            ? "A player resubmitted their request — pending your review."
-            : "Tap to review.",
-          link: `/games/${game.id}`,
-        }).catch(() => {});
+        // The server reads the request and tells this game's host (new or resubmitted, from the request itself).
+        void createNotification({ type: "join_request", game_id: game.id });
         void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
         trackEvent("join_game", { game_id: game.id, kind: "request" });
         toast.success(
@@ -1311,14 +1293,7 @@ function GameDetail() {
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
     if (gameHostId && user && gameHostId !== user.id) {
-      const who = myProfile?.name || emailLocalPart(user.email) || "A player";
-      void createNotification({
-        user_id: gameHostId,
-        type: "participant_joined",
-        title: `${who} joined ${game.title}`,
-        body: `${effectiveJoined + 1}/${game.maxPlayers} players confirmed.`,
-        link: `/games/${game.id}`,
-      }).catch(() => {});
+      void createNotification({ type: "participant_joined", game_id: game.id });
     }
   };
 
@@ -2129,15 +2104,7 @@ function GameDetail() {
                             toast.success(`You're on the ${name} waitlist.`);
                             const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
                             if (gameHostId && user && gameHostId !== user.id) {
-                              const who =
-                                myProfile?.name || emailLocalPart(user.email) || "A player";
-                              void createNotification({
-                                user_id: gameHostId,
-                                type: "waitlist_join",
-                                title: `${who} joined the ${name} waitlist`,
-                                body: `${game.title}`,
-                                link: `/games/${game.id}`,
-                              }).catch(() => {});
+                              void createNotification({ type: "waitlist_join", game_id: game.id });
                             }
                           } catch (e: any) {
                             toast.error(e.message ?? "Could not join waitlist.");
