@@ -77,7 +77,7 @@ BEFORE INSERT triggers:
 - `aa_payment_destination_trg` (20261103140000 L82-95): the payee must be the game's host.
 - state guard, credentials, refund-field locks (no bearing here).
 
-NOT checked on the claim (before 20261118200000; now checked, see section 6): the game's join gate (cancelled,
+NOT checked on the claim (before 20261119200000; now checked, see section 6): the game's join gate (cancelled,
 completed, over by the clock, joins_closed, signup cutoff), capacity, `child_game_participation_allowed` (a guardian's
 "Can join games" switch, for a 16-17 who is otherwise allowed to pay), host blocks (`enforce_host_block` covers
 join_requests and game_participants only, 20261028150000 L61-68), and the game's age range.
@@ -122,7 +122,7 @@ the payment themselves. What leaks is **manual payment claims, and the money tha
 accounts that can never be given the place. On a manual payment the money moves in Venmo or Cash App before the app
 ever writes anything, so the only safeguard before money moves is what the pay page shows.
 
-Since 20261118200000 (section 6) every "Claim recorded? **Yes**" row above is refused when the player writes the claim,
+Since 20261119200000 (section 6) every "Claim recorded? **Yes**" row above is refused when the player writes the claim,
 with PayPal's code for the same rule. The money in those rows can still move first (the claim comes after the payment
 in Venmo or Cash App); what changed is that the host is never asked to verify, and the player is told why, instead of
 a claim for a place that can never be given.
@@ -205,7 +205,7 @@ case, a non-approved viewer with an earlier claim on an age-ranged game, stays a
   the pay-opened sessionStorage marker (`pay-opened:<game>:<method>`, markExternalPaymentOpened) exists for one of the
   host's methods (survives a reload). A block that turns up afterwards (the signup cutoff passes, the host closes
   joining, the game is cancelled, a guardian turns games off) replaces the payment options and the proof form, and
-  the card says "If you already paid, message the host to ask for a refund." Until 20261118200000 a `locked` or
+  the card says "If you already paid, message the host to ask for a refund." Until 20261119200000 a `locked` or
   `participation` block showed instead as a `warn` card above the proof form ("submit proof below so the host can see
   it and refund you"), because nothing on `payment_submissions` checked the join gate or participation then. Since that
   migration's trigger refuses exactly those claims (GAME_CANCELLED, GAME_COMPLETED, GAME_JOINS_CLOSED,
@@ -251,7 +251,7 @@ link and then the pay page's block card, as guardedOpenJoin intends).
   every viewer incl. holdsPlace/paymentIn/approved; completed blocks all but holdsPlace; in_progress / closed_by_host /
   closed_cutoff block a new viewer and exempt each in-flow case; open), the guardian kind (host-approved but
   guardian-pending; applies to in-flow viewers; cancelled said first), fail-closed (loading and error for each check),
-  the already-started cases (one block card and the refund advice for every kind, since 20261118200000 removed the
+  the already-started cases (one block card and the refund advice for every kind, since 20261119200000 removed the
   `warn` mode), blockOutranksApproval, and payHostLinkShown.
 - `e2e/pay-entry-blocked.spec.ts` (mocked, data-independent: game row, settings, two methods (Venmo, Cash App), request,
   payments, place, guardian RPC, PayPal config and a stand-in PayPal SDK so a PayPal button WOULD render if offered):
@@ -271,7 +271,7 @@ link and then the pay page's block card, as guardedOpenJoin intends).
 
 - The pay page does not apply the game's age range (above).
 - A full roster stays a soft warning on the pay page ("This game just filled up, so the host can't record a payment
-  for it. Message the host before you pay."), but since 20261118200000 the database refuses the claim (GAME_FULL).
+  for it. Message the host before you pay."), but since 20261119200000 the database refuses the claim (GAME_FULL).
   The pay page should block a full game before showing handles (as payEntryBlock does for the other codes), so a
   player does not pay first and then get the refusal: not done here. A refused claim tells the player to message the
   host to get their money back (section 6).
@@ -292,11 +292,11 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
 
 | Outline item                                  | Where                                                                                                                                                                                                                                                |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1-3. Claim trigger, shared rules, INSERT only | `supabase/migrations/20261118200000_payment_claim_preconditions.sql`                                                                                                                                                                                 |
-| SQL tests                                     | `supabase/tests/880_payment_claim_preconditions.test.sql` (100 assertions); `762_paypal_payment_preconditions` unchanged and passing                                                                                                                 |
+| 1-3. Claim trigger, shared rules, INSERT only | `supabase/migrations/20261119200000_payment_claim_preconditions.sql`                                                                                                                                                                                 |
+| SQL tests                                     | `supabase/tests/900_payment_claim_preconditions.test.sql` (100 assertions); `762_paypal_payment_preconditions` unchanged and passing                                                                                                                 |
 | 4. App messages                               | `src/lib/payments-policy.ts` (`PAYMENT_CLAIM_REFUSAL_CODES`, `paymentClaimRefusalMessage`, `paymentSubmissionErrorMessage`); tests in `src/lib/payments-submission.test.ts`                                                                          |
 | 5. Verified but not placed                    | `src/lib/roster-on-payment.server.ts`, `src/lib/payments.functions.ts`, `src/lib/paypal.functions.ts`, `src/components/game-detail/RosterPlayerRow.tsx`, `src/components/GamePaymentsPanel.tsx`; tests in `src/lib/roster-on-payment.server.test.ts` |
-| 6. Rollback                                   | `docs/rollbacks/20261118200000_payment_claim_preconditions.down.sql` (guarded: confirmation setting plus the md5 of all four functions; rehearsed)                                                                                                   |
+| 6. Rollback                                   | `docs/rollbacks/20261119200000_payment_claim_preconditions.down.sql` (guarded: confirmation setting plus the md5 of all four functions; rehearsed)                                                                                                   |
 | (a) Handles only for a caller who may pay     | same migration, `public.get_game_host_payment_methods`                                                                                                                                                                                               |
 
 - `private_sec.payment_claim_block(game, player)` holds the shared rules in `paypal_payment_block`'s order:
@@ -307,7 +307,7 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
   points as before (its own cancelled/completed check first, GAME_PARTICIPATION_BLOCKED / BLOCKED_BY_HOST where they
   were, the place rules last), so PayPal's answers are unchanged in value and order. PayPal-only codes stay in it.
   Proof: 762 passes unchanged; a differential run with the old function installed beside the new one gave identical
-  answers for 9 people x 10 games at 15 points of the 880 scenario (1,350 comparisons).
+  answers for 9 people x 10 games at 15 points of the 900 scenario (1,350 comparisons).
 - Trigger `zz_payment_claim_preconditions` (BEFORE INSERT on `payment_submissions`, named to fire after every other
   BEFORE INSERT trigger so their refusals keep their messages) runs `public.enforce_payment_claim_preconditions()`
   only when `auth.uid() = NEW.player_id`. Host "Marked paid by host" rows and the service role's PayPal record are not
@@ -337,7 +337,7 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
 - **A host cannot "mark paid" a player with no claim.** `reviewPaymentAction` inserts that row with the host's own
   client, and `payment_submissions` has no INSERT policy for a host (only "Players create own submissions",
   `player_id = auth.uid()`), so the insert is refused by row level security today, with or without this migration.
-  The 880 test checks the trigger's host exemption with RLS out of the way and says so. Not changed here.
+  The 900 test checks the trigger's host exemption with RLS out of the way and says so. Not changed here.
 - On a manual claim the money still moves before the database can refuse (the claim follows the payment). The pay
   page's own blocks (payEntryBlock, section 5) are what stop it first; GAME_FULL is not one of them yet.
 - The pay page blocks a game in progress for a new viewer (as the game page does), but the trigger lets that claim
@@ -347,7 +347,7 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
 
 ### (c) checked on the local stack (not changed)
 
-Confirmed live on the local E2E stack (2026-11-18, with 20261118200000 applied). Setup: a new adult host with a
+Confirmed live on the local E2E stack (2026-11-18, with 20261119200000 applied). Setup: a new adult host with a
 Venmo handle, a public paid game (fee 12, 10 places, nobody on the roster) and its settings row with
 `requires_approval = false`; the viewer is the E2E fixture player (adult, date of birth on file, not on the roster, no
 join request, no payment). No mocks.
@@ -494,12 +494,12 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 ### Section 6 (branch claude/payment-claim-preconditions, 2026-11-18)
 
 - SQL, private disposable Postgres 16 with `node scripts/db-test.mjs` (as the Database tests workflow runs it): 2687
-  passed, 0 failed; `880_payment_claim_preconditions` (numbered 870 before the rebase onto main, which took 870 for `870_availability_expiry_job`) 100 passed, `762_paypal_payment_preconditions` 90 passed
+  passed, 0 failed; `900_payment_claim_preconditions` (numbered 870 before the rebase onto main, which took 870 for `870_availability_expiry_job`) 100 passed, `762_paypal_payment_preconditions` 90 passed
   (unchanged file).
-- Negative controls: without the migration (main's replay) 880 errors at its first call; with the trigger dropped 35
+- Negative controls: without the migration (main's replay) 900 errors at its first call; with the trigger dropped 35
   assertions fail; with every writer checked the host and service-role exemptions fail; without the roster exemption 5
   fail; without the approval exemption 3 fail; with the old payment-methods body 4 fail; with the helper granted to
-  `authenticated` 1 fails; with PayPal asking the shared rules first 4 fail in 880 and 1 in 762.
+  `authenticated` 1 fails; with PayPal asking the shared rules first 4 fail in 900 and 1 in 762.
 - Rollback rehearsal on a copy: refuses unconfirmed; refuses (changing nothing) when `payment_claim_block` was
   changed; confirmed, restores `paypal_payment_block` and `get_game_host_payment_methods` to main's md5s with grants
   intact (762 and 340 pass); the migration then re-applies cleanly.
@@ -511,16 +511,16 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 
 - Rebased onto main after #430 (pay entry gate). Its `warn` mode told a player who had started paying to "submit proof
   below" under a lock or participation block, which the new trigger refuses; the mode is removed (5b). The SQL test is
-  now `880_payment_claim_preconditions` (main took 870).
-- SQL, private disposable Postgres 16 with `node scripts/db-test.mjs`: 2720 passed, 0 failed (880: 100, 762: 90).
-  Negative controls re-run on the new replay: no migration, 880 errors at its first call (118 errors, 0 ok); trigger
+  now `900_payment_claim_preconditions` (main took 870).
+- SQL, private disposable Postgres 16 with `node scripts/db-test.mjs`: 2720 passed, 0 failed (900: 100, 762: 90).
+  Negative controls re-run on the new replay: no migration, 900 errors at its first call (118 errors, 0 ok); trigger
   dropped 35 fail; every writer checked 3 fail and 24 error; roster exemption removed 5; approval exemption removed 3;
-  old payment-methods body 4; helper granted to `authenticated` 1; PayPal asking the shared rules first 4 in 880 and
+  old payment-methods body 4; helper granted to `authenticated` 1; PayPal asking the shared rules first 4 in 900 and
   1 in 762.
 - Rollback rehearsal on a copy of the new replay: refuses unconfirmed; refuses (changing nothing) with
   `payment_claim_block` changed; confirmed, restores `paypal_payment_block` (d234777c…) and
-  `get_game_host_payment_methods` (0749f4a8…) with grants intact, 762 and 340 pass and 880 errors; the migration then
-  re-applies and 880 passes.
+  `get_game_host_payment_methods` (0749f4a8…) with grants intact, 762 and 340 pass and 900 errors; the migration then
+  re-applies and 900 passes.
 - Unit: `npx vitest run` 4252 passed, 22 skipped (412 files).
 - E2E, local stack with the migration applied (the function md5s match the replay), via run-e2e.sh: every
   e2e/pay-\*.spec.ts (now including pay-entry-blocked), e2e/invite-pay-and-join\*, leave-verified-payment-consistency,

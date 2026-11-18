@@ -9,8 +9,9 @@
  *   - forces `status='pending'` regardless of client input
  *   - locks identity fields (`from_user_id`, `to_user_id`,
  *     `availability_id`, `kind`, `game_id`) against UPDATE
- *   - persists the selected hosted game metadata exactly as sent
- *     (game_id, game_title, game_sport, game_starts_at, game_location)
+ *   - refuses an invite naming a game the sender does not host, or one that
+ *     does not exist (WP 2.0, migration 20261119100000: the game details used to
+ *     be stored exactly as the sender's app sent them)
  *
  * Auto-skips when the seeded fixture accounts can't sign in.
  *
@@ -174,43 +175,21 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     expect(data!.status).toBe("pending");
   });
 
-  it("persists the selected hosted game metadata exactly as sent", async () => {
+  it("refuses an invite to a game the sender does not host or that does not exist", async () => {
     if (!canRun || !playerAvailabilityId) return;
-    const gameId = `persist-${Date.now()}`;
-    const payload = {
+    const { error } = await hostClient.from("availability_contact_requests").insert({
       availability_id: playerAvailabilityId,
       from_user_id: hostId,
       to_user_id: playerId,
       kind: "invite" as const,
-      game_id: gameId,
+      game_id: `persist-${Date.now()}`,
       game_title: "Sunday Pickup at Prospect Park",
       game_sport: "Basketball",
       game_starts_at: new Date(Date.now() + 86_400_000).toISOString(),
       game_location: "Prospect Park, Brooklyn NY",
       message: "Come join us!",
-    };
-    const { data, error } = await hostClient
-      .from("availability_contact_requests")
-      .insert(payload)
-      .select(
-        "id, kind, game_id, game_title, game_sport, game_starts_at, game_location, message, from_user_id, to_user_id, status",
-      )
-      .single();
-    expect(error).toBeNull();
-    expect(data).toBeTruthy();
-    if (!data) return;
-    createdRequestIds.push(data.id as string);
-
-    expect(data.kind).toBe("invite");
-    expect(data.game_id).toBe(gameId);
-    expect(data.game_title).toBe(payload.game_title);
-    expect(data.game_sport).toBe(payload.game_sport);
-    expect(data.game_location).toBe(payload.game_location);
-    expect(new Date(data.game_starts_at as string).toISOString()).toBe(payload.game_starts_at);
-    expect(data.message).toBe(payload.message);
-    expect(data.from_user_id).toBe(hostId);
-    expect(data.to_user_id).toBe(playerId);
-    expect(data.status).toBe("pending");
+    });
+    expect(error?.message ?? "").toMatch(/NOT_GAME_HOST/);
   });
 
   it("locks identity fields against UPDATE (game_id, kind, from/to, availability)", async () => {
@@ -264,7 +243,7 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     expect(after?.to_user_id).toBe(playerId);
   });
 
-  it("createContactRequest(invite) notifies the recipient", async () => {
+  it("createContactRequest(invite) to a game that does not exist is refused, and notifies nobody", async () => {
     if (!canRun || !playerAvailabilityId) return;
     // Use the real client-side helper so we exercise the same code path the UI uses.
     const mod = await import("./availability");
@@ -275,19 +254,17 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
 
     const gameId = `notif-${Date.now()}`;
     notif.calls.length = 0;
-    await mod.createContactRequest(playerAvailabilityId, playerId, "Want in?", {
+    const attempt = mod.createContactRequest(playerAvailabilityId, playerId, "Want in?", {
       gameId,
       title: "Notif verification game",
       sport: "Basketball",
       location: "Test Park",
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
-
-    const found = notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId) as
-      Record<string, string> | undefined;
-    expect(found).toBeTruthy();
-    expect(found!.title).toMatch(/Notif verification game/);
-    expect(found!.link).toBe(`/games/${gameId}?invite=1&from=${hostId}`);
+    await expect(attempt).rejects.toThrow(/NOT_GAME_HOST/);
+    expect(
+      notif.calls.find((c) => c.type === "game_invite" && c.user_id === playerId),
+    ).toBeUndefined();
 
     // Cleanup the request row created via the helper (by recipient/game_id).
     const { data: rows } = await hostClient

@@ -1,4 +1,4 @@
--- docs/paid-path-gates.md section 6 (20261118200000_payment_claim_preconditions): a player's own manual payment claim
+-- docs/paid-path-gates.md section 6 (20261119200000_payment_claim_preconditions): a player's own manual payment claim
 -- meets the game rules PayPal checkout asks before any money moves. Each refusal code (section 2), each exemption: a
 -- player on the roster, a player the host approved, the host's own "marked paid" row, the server's PayPal record
 -- (section 3), INSERT only (section 4), the claim and PayPal give the same answer and PayPal's answers are unchanged
