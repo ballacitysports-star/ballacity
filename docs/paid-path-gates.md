@@ -506,3 +506,22 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 - E2E, local stack with the migration applied, via run-e2e.sh: every e2e/pay-\*.spec.ts, e2e/invite-pay-and-join\*,
   leave-verified-payment-consistency, fixture-age-gated-flows and invite-fallback-params (21 files, 39 tests): 39
   passed, 0 failed.
+
+### Section 6, review round (rebased onto main 429ac2f2, 2026-11-18)
+
+- Rebased onto main after #430 (pay entry gate). Its `warn` mode told a player who had started paying to "submit proof
+  below" under a lock or participation block, which the new trigger refuses; the mode is removed (5b). The SQL test is
+  now `880_payment_claim_preconditions` (main took 870).
+- SQL, private disposable Postgres 16 with `node scripts/db-test.mjs`: 2720 passed, 0 failed (880: 100, 762: 90).
+  Negative controls re-run on the new replay: no migration, 880 errors at its first call (118 errors, 0 ok); trigger
+  dropped 35 fail; every writer checked 3 fail and 24 error; roster exemption removed 5; approval exemption removed 3;
+  old payment-methods body 4; helper granted to `authenticated` 1; PayPal asking the shared rules first 4 in 880 and
+  1 in 762.
+- Rollback rehearsal on a copy of the new replay: refuses unconfirmed; refuses (changing nothing) with
+  `payment_claim_block` changed; confirmed, restores `paypal_payment_block` (d234777c…) and
+  `get_game_host_payment_methods` (0749f4a8…) with grants intact, 762 and 340 pass and 880 errors; the migration then
+  re-applies and 880 passes.
+- Unit: `npx vitest run` 4252 passed, 22 skipped (412 files).
+- E2E, local stack with the migration applied (the function md5s match the replay), via run-e2e.sh: every
+  e2e/pay-\*.spec.ts (now including pay-entry-blocked), e2e/invite-pay-and-join\*, leave-verified-payment-consistency,
+  fixture-age-gated-flows and invite-fallback-params (22 files): 42 passed, 0 failed.
