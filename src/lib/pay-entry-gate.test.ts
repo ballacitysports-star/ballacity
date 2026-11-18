@@ -8,6 +8,7 @@ import {
   payHostLinkShown,
   payPalOffered,
   payRiskAckView,
+  unpaidOnGameTakingNoPayment,
   PARTICIPATION_BLOCKED_FALLBACK,
   type PayEntryInput,
 } from "./pay-entry-gate";
@@ -939,5 +940,64 @@ describe("payRiskAckView ('Before you join' on the pay page, section 7 Option B)
 
   it("asks when the flow state failed to load (the viewer counts as not in the flow)", () => {
     expect(payRiskAckView({ ...base, approved: true, flow: "error" })).toBe("ask");
+  });
+});
+
+describe("unpaidOnGameTakingNoPayment (the game page's join button on a game that takes no payment)", () => {
+  const owes = {
+    joinState: "cancelled" as JoinState,
+    holdsPlace: true,
+    isPaid: true,
+    paymentCleared: false,
+    pending: false,
+  };
+
+  it("is true for a rostered player who still owes the fee on a cancelled game (no 'Pay Host')", () => {
+    expect(unpaidOnGameTakingNoPayment(owes)).toBe(true);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, holdsPlace: false })).toBe(true);
+  });
+
+  it("is true on an ended game only without a place: a rostered player keeps the host's manual methods", () => {
+    expect(
+      unpaidOnGameTakingNoPayment({ ...owes, joinState: "completed", holdsPlace: false }),
+    ).toBe(true);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, joinState: "completed", holdsPlace: true })).toBe(
+      false,
+    );
+  });
+
+  it("leaves a paid-up, free or pending viewer's own button alone", () => {
+    expect(unpaidOnGameTakingNoPayment({ ...owes, paymentCleared: true })).toBe(false);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, isPaid: false })).toBe(false);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, pending: true })).toBe(false);
+  });
+
+  it("is false wherever the game still takes payment", () => {
+    for (const joinState of ["open", "in_progress", "closed_by_host", "closed_cutoff"] as const) {
+      expect(unpaidOnGameTakingNoPayment({ ...owes, joinState })).toBe(false);
+      expect(unpaidOnGameTakingNoPayment({ ...owes, joinState, holdsPlace: false })).toBe(false);
+    }
+  });
+
+  it("agrees with payHostLinkShown: where it holds, the link is not shown either", () => {
+    for (const joinState of ["cancelled", "completed"] as const) {
+      for (const holdsPlace of [false, true]) {
+        if (!unpaidOnGameTakingNoPayment({ ...owes, joinState, holdsPlace })) continue;
+        expect(
+          payHostLinkShown({
+            joinState,
+            holdsPlace,
+            paymentPending: false,
+            isPaid: true,
+            paymentCleared: false,
+            approvalCleared: true,
+            canEnterPaymentFlow: true,
+            parentAsk: false,
+            lockedForNewJoin: false,
+            consentBlocksNewJoin: false,
+          }),
+        ).toBe(false);
+      }
+    }
   });
 });

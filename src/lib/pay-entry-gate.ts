@@ -380,6 +380,30 @@ export function payHostLinkShown(input: {
 }
 
 /**
+ * The game page's join button for a viewer who still owes the fee on a game that takes no payment (a cancelled game,
+ * or an ended one without a place, gameTakesNoPayment). lockedForNewJoin exempts a viewer on the roster, so a player
+ * the host added to a cancelled paid game without a verified payment fell through to "Pay Host · $X", whose tap opens
+ * a pay page that only says they cannot pay. With this the button is the disabled "Cancelled" / "Game ended" one. A
+ * pending request or payment keeps its own button (cancel, withdraw), and a confirmed player keeps "Tap to leave".
+ */
+export function unpaidOnGameTakingNoPayment(input: {
+  joinState: JoinState;
+  holdsPlace: boolean;
+  isPaid: boolean;
+  /** The fee is settled (a verified payment), or the game is free. */
+  paymentCleared: boolean;
+  /** A request or payment of theirs waits on the host. */
+  pending: boolean;
+}): boolean {
+  return (
+    input.isPaid &&
+    !input.paymentCleared &&
+    !input.pending &&
+    gameTakesNoPayment(input.joinState, input.holdsPlace)
+  );
+}
+
+/**
  * "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B, owner decision 2026-11-18). The
  * game page asks it in handleJoin, which a paid game's "Pay Host" link and a direct visit to /pay never run, so the pay
  * page asks it before any payment option is drawn:
