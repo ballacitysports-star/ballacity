@@ -202,7 +202,11 @@ import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
 import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
-import { gameTakesNoPayment, payHostLinkShown } from "@/lib/pay-entry-gate";
+import {
+  gameTakesNoPayment,
+  payHostLinkShown,
+  unpaidOnGameTakingNoPayment,
+} from "@/lib/pay-entry-gate";
 import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
@@ -1834,6 +1838,7 @@ function GameDetail() {
             gameId={gameId}
             settings={flowSettings ?? settings}
             status={myFlowStatus}
+            takesPayment={!gameTakesNoPayment(gate.joinState, joined)}
           />
         )}
 
@@ -2902,12 +2907,21 @@ function GameDetail() {
                 // block NEW joins, but keep leave/cancel and payment actions live.
                 // An approval does not reopen a cancelled game, or an ended one to a player without a place: the
                 // server refuses them a place and PayPal refuses the payment (gameTakesNoPayment).
+                // A player on the roster who still owes the fee on a cancelled game gets the disabled "Cancelled"
+                // button too, not "Pay Host" (unpaidOnGameTakingNoPayment).
                 const lockedForNewJoin =
-                  gate.locked &&
-                  !joined &&
-                  !isPending &&
-                  !isConfirmed &&
-                  (!isApproved || gameTakesNoPayment(gate.joinState, joined));
+                  (gate.locked &&
+                    !joined &&
+                    !isPending &&
+                    !isConfirmed &&
+                    (!isApproved || gameTakesNoPayment(gate.joinState, joined))) ||
+                  unpaidOnGameTakingNoPayment({
+                    joinState: gate.joinState,
+                    holdsPlace: joined,
+                    isPaid,
+                    paymentCleared,
+                    pending: isPending,
+                  });
                 const alreadyInFlow = joined || isPending || isConfirmed;
                 // A parent/guardian must approve this account before a NEW
                 // join; leaving/withdrawing a join made before consent was

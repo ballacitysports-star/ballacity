@@ -6,10 +6,17 @@ import {
   gameTakesNoPayment,
   payEntryView,
   payHostLinkShown,
+  payAwaitsApproval,
   payPalOffered,
+  payRiskAckStep,
+  payRiskAckView,
+  unpaidOnGameTakingNoPayment,
   PARTICIPATION_BLOCKED_FALLBACK,
   type PayEntryInput,
 } from "./pay-entry-gate";
+import { ageGateMessage, ageGateState, type AgeRequirement } from "./game-age";
+import { riskAckReadFrom } from "./risk-ack-tap";
+import { SAFETY_ACK_VERSION } from "./safety";
 import { can, DEFAULT_CHILD_CONTROLS } from "./child-policy";
 import { resolveJoinGate, type JoinState } from "./live-status";
 import {
@@ -266,6 +273,71 @@ describe("payEntryBlock", () => {
   });
 });
 
+describe("payEntryBlock: the game's age range (owner decision 2026-11-18, #430 question 4)", () => {
+  const adultsOnly: AgeRequirement = { minAge: 18, maxAge: null };
+  const teens: AgeRequirement = { minAge: 13, maxAge: 17 };
+  const ageOf = (req: AgeRequirement, viewerAge: number | null) => ({
+    state: ageGateState({ req, viewerAge }),
+    req,
+  });
+
+  it("blocks a fresh viewer outside the range with the game page's wording", () => {
+    const block = payEntryBlock(input({ age: ageOf(adultsOnly, 16) }));
+    expect(block).toEqual({
+      kind: "age",
+      message: "This game is 18+ — the host reviews requests outside that range.",
+    });
+    expect(block?.message).toBe(ageGateMessage("needs_approval", adultsOnly));
+    expect(payEntryBlock(input({ age: ageOf(teens, 19) }))?.kind).toBe("age");
+    expect(payEntryBlock(input({ age: ageOf(teens, 12) }))?.kind).toBe("age");
+  });
+
+  it("blocks a fresh viewer with no birthday on file, as the game page asks them to add one or request", () => {
+    const block = payEntryBlock(input({ age: ageOf(adultsOnly, null) }));
+    expect(block).toEqual({
+      kind: "age",
+      message:
+        "This game is 18+. Add your birthday to your profile, or request the host's approval.",
+    });
+  });
+
+  it("lets a viewer inside the range through, at either bound", () => {
+    expect(payEntryBlock(input({ age: ageOf(adultsOnly, 18) }))).toBeNull();
+    expect(payEntryBlock(input({ age: ageOf(teens, 13) }))).toBeNull();
+    expect(payEntryBlock(input({ age: ageOf(teens, 17) }))).toBeNull();
+  });
+
+  it("does not apply to a game without a range", () => {
+    expect(payEntryBlock(input({ age: ageOf({ minAge: null, maxAge: null }, null) }))).toBeNull();
+    expect(payEntryBlock(input({ age: undefined }))).toBeNull();
+  });
+
+  it("exempts a viewer in the flow (the server's age rule lets approved and rostered players through)", () => {
+    for (const c of inFlowCases) {
+      expect(payEntryBlock(input({ ...c, age: ageOf(adultsOnly, 15) }))).toBeNull();
+      expect(payEntryBlock(input({ ...c, age: ageOf(adultsOnly, null) }))).toBeNull();
+    }
+  });
+
+  it("exempts the host, as the game page does", () => {
+    expect(payEntryBlock(input({ isHost: true, age: ageOf(adultsOnly, 15) }))).toBeNull();
+  });
+
+  it("is said after every other block", () => {
+    const age = ageOf(adultsOnly, 15);
+    expect(
+      payEntryBlock(input({ age, payments: { allowed: false, level: "blocked", reason: null } }))
+        ?.kind,
+    ).toBe("payments");
+    expect(payEntryBlock(input({ age, gate: gateFor("cancelled") }))?.kind).toBe("locked");
+    expect(
+      payEntryBlock(input({ age, participation: { allowed: false, reason: "off" } }))?.kind,
+    ).toBe("participation");
+    expect(payEntryBlock(input({ age, guardianReady: false }))?.kind).toBe("guardian");
+    expect(payEntryBlock(input({ age, gate: closed }))?.kind).toBe("locked");
+  });
+});
+
 describe("payEntryBlock: the viewer's flow state only ever lifts a block", () => {
   // payEntryView relies on this to show 'clear' (and account-level blocks) before that state has loaded.
   it("never blocks a viewer in the flow whom it lets through as a fresh viewer, nor changes an account-level block", () => {
@@ -278,28 +350,42 @@ describe("payEntryBlock: the viewer's flow state only ever lifts a block", () =>
       "closed_cutoff",
     ];
     const participations = [allowed, { allowed: false, reason: "off" }];
+    const adultsOnly = { minAge: 18, maxAge: null };
+    const ages = [
+      undefined,
+      { state: "eligible" as const, req: adultsOnly },
+      { state: "needs_approval" as const, req: adultsOnly },
+      { state: "unknown_age" as const, req: adultsOnly },
+    ];
     for (const state of states) {
       for (const participation of participations) {
         for (const guardianReady of [true, false]) {
-          const asFresh = payEntryBlock(
-            input({
-              gate: state === "open" ? open : gateFor(state),
-              participation,
-              guardianReady,
-            }),
-          );
-          for (const c of [...inFlowCases, { holdsPlace: true, paymentIn: true, approved: true }]) {
-            const inFlow = payEntryBlock(
+          for (const age of ages) {
+            const asFresh = payEntryBlock(
               input({
-                ...c,
                 gate: state === "open" ? open : gateFor(state),
                 participation,
                 guardianReady,
+                age,
               }),
             );
-            if (!asFresh) expect(inFlow).toBeNull();
-            if (asFresh && (asFresh.kind === "guardian" || asFresh.joinState === "cancelled")) {
-              expect(inFlow).toEqual(asFresh);
+            for (const c of [
+              ...inFlowCases,
+              { holdsPlace: true, paymentIn: true, approved: true },
+            ]) {
+              const inFlow = payEntryBlock(
+                input({
+                  ...c,
+                  gate: state === "open" ? open : gateFor(state),
+                  participation,
+                  guardianReady,
+                  age,
+                }),
+              );
+              if (!asFresh) expect(inFlow).toBeNull();
+              if (asFresh && (asFresh.kind === "guardian" || asFresh.joinState === "cancelled")) {
+                expect(inFlow).toEqual(asFresh);
+              }
             }
           }
         }
@@ -460,6 +546,107 @@ describe("payEntryView", () => {
     expect(payEntryView(base)).toEqual({ kind: "clear" });
   });
 
+  describe("the game's age range", () => {
+    const adultsOnly = { minAge: 18, maxAge: null };
+    const age = (value: number | null) => ({ state: "ready" as const, value });
+
+    it("does not wait for the viewer's age on a game without a range", () => {
+      expect(payEntryView({ ...base, viewerAge: { state: "loading" } })).toEqual({ kind: "clear" });
+      expect(
+        payEntryView({
+          ...base,
+          ageReq: { minAge: null, maxAge: null },
+          viewerAge: { state: "error" },
+        }),
+      ).toEqual({ kind: "clear" });
+    });
+
+    it("fails closed while the age loads: 'checking', never clear", () => {
+      expect(
+        payEntryView({ ...base, ageReq: adultsOnly, viewerAge: { state: "loading" } }),
+      ).toEqual({ kind: "checking" });
+      // No age passed at all counts as still loading.
+      expect(payEntryView({ ...base, ageReq: adultsOnly })).toEqual({ kind: "checking" });
+    });
+
+    it("is 'check_failed' when the age read failed, not 'add your birthday'", () => {
+      expect(payEntryView({ ...base, ageReq: adultsOnly, viewerAge: { state: "error" } })).toEqual({
+        kind: "check_failed",
+      });
+    });
+
+    it("blocks a fresh viewer outside the range, and clears one inside it", () => {
+      expect(payEntryView({ ...base, ageReq: adultsOnly, viewerAge: age(16) })).toMatchObject({
+        kind: "blocked",
+        block: { kind: "age" },
+      });
+      expect(payEntryView({ ...base, ageReq: adultsOnly, viewerAge: age(null) })).toMatchObject({
+        kind: "blocked",
+        block: { kind: "age" },
+      });
+      expect(payEntryView({ ...base, ageReq: adultsOnly, viewerAge: age(30) })).toEqual({
+        kind: "clear",
+      });
+    });
+
+    it("never waits on the age for an approved viewer, nor for the host", () => {
+      expect(
+        payEntryView({
+          ...base,
+          approved: true,
+          ageReq: adultsOnly,
+          viewerAge: { state: "loading" },
+        }),
+      ).toEqual({ kind: "clear" });
+      expect(
+        payEntryView({ ...base, isHost: true, ageReq: adultsOnly, viewerAge: { state: "error" } }),
+      ).toEqual({ kind: "clear" });
+    });
+
+    it("waits for the flow state before blocking: an approval or a place lifts it", () => {
+      expect(
+        payEntryView({ ...base, flow: "loading", ageReq: adultsOnly, viewerAge: age(15) }),
+      ).toEqual({ kind: "checking" });
+      expect(
+        payEntryView({ ...base, flow: "error", ageReq: adultsOnly, viewerAge: age(15) }),
+      ).toEqual({ kind: "check_failed" });
+      expect(
+        payEntryView({
+          ...base,
+          flow: "ready",
+          holdsPlace: true,
+          ageReq: adultsOnly,
+          viewerAge: age(15),
+        }),
+      ).toEqual({ kind: "clear" });
+    });
+
+    it("says a block that comes first without waiting for the age", () => {
+      expect(
+        payEntryView({
+          ...base,
+          gate: gateFor("cancelled"),
+          ageReq: adultsOnly,
+          viewerAge: { state: "loading" },
+        }),
+      ).toMatchObject({ kind: "blocked", block: { kind: "locked", joinState: "cancelled" } });
+    });
+
+    it("replaces the proof form for a viewer who already started paying: the database refuses the claim", () => {
+      const view = payEntryView({
+        ...base,
+        ageReq: adultsOnly,
+        viewerAge: age(15),
+        paymentStarted: true,
+      });
+      expect(view).toEqual({
+        kind: "blocked",
+        block: { kind: "age", message: expect.any(String) },
+        paymentStarted: true,
+      });
+    });
+  });
+
   it("blocks a host-approved guarded minor whose guardian has not approved", () => {
     const view = payEntryView({ ...base, approved: true, guardian: ready(false) });
     expect(view).toMatchObject({ kind: "blocked", block: { kind: "guardian" } });
@@ -526,6 +713,11 @@ describe("blockOutranksApproval", () => {
     ]) {
       expect(blockOutranksApproval(block, true)).toBe(true);
     }
+  });
+
+  it("keeps the approval card for a pending request on an age range (the host's approval lifts it)", () => {
+    expect(blockOutranksApproval({ kind: "age", message: "" }, true)).toBe(false);
+    expect(blockOutranksApproval({ kind: "age", message: "" }, false)).toBe(true);
   });
 
   it("keeps the approval card for a pending request on a lock the host's approval lifts", () => {
@@ -630,5 +822,240 @@ describe("payHostLinkShown (the game page's paid CTA)", () => {
     expect(payHostLinkShown({ ...link, approvalCleared: false })).toBe(false);
     expect(payHostLinkShown({ ...link, canEnterPaymentFlow: false })).toBe(false);
     expect(payHostLinkShown({ ...link, parentAsk: true })).toBe(false);
+  });
+});
+
+describe("payRiskAckView ('Before you join' on the pay page, section 7 Option B)", () => {
+  const answered = (version: string | null) => ({ state: "answered" as const, version });
+  const base = {
+    isHost: false,
+    ...fresh,
+    flow: "ready" as const,
+    read: answered(null),
+  };
+
+  it("asks a fresh viewer with no acknowledgment on file", () => {
+    expect(payRiskAckView(base)).toBe("ask");
+  });
+
+  it("asks again when only an older version is on file", () => {
+    expect(payRiskAckView({ ...base, read: answered("2025-old-version") })).toBe("ask");
+  });
+
+  it("does not ask once the current version is on file", () => {
+    expect(payRiskAckView({ ...base, read: answered(SAFETY_ACK_VERSION) })).toBe("none");
+  });
+
+  it("never asks the host, whatever the read says", () => {
+    for (const read of [
+      answered(null),
+      { state: "failed" as const },
+      { state: "pending" as const },
+    ]) {
+      expect(payRiskAckView({ ...base, isHost: true, read })).toBe("none");
+      expect(payRiskAckView({ ...base, isHost: true, flow: "loading", read })).toBe("none");
+    }
+  });
+
+  it("never asks a viewer already in the flow (approved, on the roster, a payment in)", () => {
+    for (const c of inFlowCases) {
+      expect(payRiskAckView({ ...base, ...c, read: answered(null) })).toBe("none");
+      expect(payRiskAckView({ ...base, ...c, read: { state: "failed" } })).toBe("none");
+      expect(payRiskAckView({ ...base, ...c, read: { state: "pending" } })).toBe("none");
+    }
+  });
+
+  it("fails closed while the read has not answered: the loading card, never the payment options", () => {
+    expect(payRiskAckView({ ...base, read: { state: "pending" } })).toBe("checking");
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("pending", undefined) })).toBe(
+      "checking",
+    );
+  });
+
+  it("asks when the read failed with no answer (as the join tap does)", () => {
+    expect(payRiskAckView({ ...base, read: { state: "failed" } })).toBe("ask");
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("error", undefined) })).toBe("ask");
+  });
+
+  it("keeps the last answer when a refresh failed", () => {
+    expect(payRiskAckView({ ...base, read: riskAckReadFrom("error", SAFETY_ACK_VERSION) })).toBe(
+      "none",
+    );
+  });
+
+  it("waits for the flow state before asking: an approval or a place exempts the viewer", () => {
+    // In-flow values are not trusted until the flow is known.
+    for (const c of inFlowCases) {
+      expect(payRiskAckView({ ...base, ...c, flow: "loading" })).toBe("checking");
+    }
+    expect(payRiskAckView({ ...base, flow: "loading" })).toBe("checking");
+    // An acknowledgment on file needs no flow state.
+    expect(payRiskAckView({ ...base, flow: "loading", read: answered(SAFETY_ACK_VERSION) })).toBe(
+      "none",
+    );
+  });
+
+  it("asks when the flow state failed to load (the viewer counts as not in the flow)", () => {
+    expect(payRiskAckView({ ...base, approved: true, flow: "error" })).toBe("ask");
+  });
+});
+
+describe("unpaidOnGameTakingNoPayment (the game page's join button on a game that takes no payment)", () => {
+  const owes = {
+    joinState: "cancelled" as JoinState,
+    holdsPlace: true,
+    isPaid: true,
+    paymentCleared: false,
+    pending: false,
+  };
+
+  it("is true for a rostered player who still owes the fee on a cancelled game (no 'Pay Host')", () => {
+    expect(unpaidOnGameTakingNoPayment(owes)).toBe(true);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, holdsPlace: false })).toBe(true);
+  });
+
+  it("is true on an ended game only without a place: a rostered player keeps the host's manual methods", () => {
+    expect(
+      unpaidOnGameTakingNoPayment({ ...owes, joinState: "completed", holdsPlace: false }),
+    ).toBe(true);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, joinState: "completed", holdsPlace: true })).toBe(
+      false,
+    );
+  });
+
+  it("leaves a paid-up, free or pending viewer's own button alone", () => {
+    expect(unpaidOnGameTakingNoPayment({ ...owes, paymentCleared: true })).toBe(false);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, isPaid: false })).toBe(false);
+    expect(unpaidOnGameTakingNoPayment({ ...owes, pending: true })).toBe(false);
+  });
+
+  it("is false wherever the game still takes payment", () => {
+    for (const joinState of ["open", "in_progress", "closed_by_host", "closed_cutoff"] as const) {
+      expect(unpaidOnGameTakingNoPayment({ ...owes, joinState })).toBe(false);
+      expect(unpaidOnGameTakingNoPayment({ ...owes, joinState, holdsPlace: false })).toBe(false);
+    }
+  });
+
+  it("agrees with payHostLinkShown: where it holds, the link is not shown either", () => {
+    for (const joinState of ["cancelled", "completed"] as const) {
+      for (const holdsPlace of [false, true]) {
+        if (!unpaidOnGameTakingNoPayment({ ...owes, joinState, holdsPlace })) continue;
+        expect(
+          payHostLinkShown({
+            joinState,
+            holdsPlace,
+            paymentPending: false,
+            isPaid: true,
+            paymentCleared: false,
+            approvalCleared: true,
+            canEnterPaymentFlow: true,
+            parentAsk: false,
+            lockedForNewJoin: false,
+            consentBlocksNewJoin: false,
+          }),
+        ).toBe(false);
+      }
+    }
+  });
+});
+
+describe("payRiskAckStep ('Before you join' waits for the host's payment settings)", () => {
+  it("never opens the dialog before the settings have answered: they decide whether the approval card comes first", () => {
+    // A fresh viewer on an approval-gated game (the default host setting): the ack read answers before the settings,
+    // and the dialog used to open, then close itself when "Waiting on host approval" arrived.
+    for (const riskAck of ["ask", "checking"] as const) {
+      expect(payRiskAckStep({ riskAck, outranked: false, settings: "loading" })).toBe("held");
+    }
+  });
+
+  it("does not ask in front of 'Couldn't reach the payment service'", () => {
+    for (const riskAck of ["ask", "checking"] as const) {
+      expect(payRiskAckStep({ riskAck, outranked: false, settings: "error" })).toBe("held");
+    }
+  });
+
+  it("asks once the settings are known and nothing outranks it", () => {
+    expect(payRiskAckStep({ riskAck: "ask", outranked: false, settings: "ready" })).toBe("ask");
+    expect(payRiskAckStep({ riskAck: "checking", outranked: false, settings: "ready" })).toBe(
+      "checking",
+    );
+  });
+
+  it("gives way to a block card, a pending check or the approval card", () => {
+    for (const settings of ["loading", "error", "ready"] as const) {
+      for (const riskAck of ["ask", "checking", "none"] as const) {
+        expect(payRiskAckStep({ riskAck, outranked: true, settings })).toBe("none");
+      }
+    }
+  });
+
+  it("is 'none' only where payRiskAckView owes nothing (or something outranks it)", () => {
+    for (const settings of ["loading", "error", "ready"] as const) {
+      expect(payRiskAckStep({ riskAck: "none", outranked: false, settings })).toBe("none");
+    }
+  });
+
+  it("with the approval gate decided from loaded settings: an approval-gated game never asks a fresh viewer", () => {
+    const riskAck = payRiskAckView({
+      isHost: false,
+      ...fresh,
+      flow: "ready",
+      read: { state: "answered", version: null },
+    });
+    expect(riskAck).toBe("ask");
+    const gate = (hostRequiresApproval: boolean) =>
+      payAwaitsApproval({
+        hostRequiresApproval,
+        approved: false,
+        requestPending: false,
+        replaceBlock: null,
+      });
+    // Settings still loading: the gate reads requires_approval as false, but the step holds.
+    expect(payRiskAckStep({ riskAck, outranked: gate(false), settings: "loading" })).toBe("held");
+    // Settings arrive with requires_approval: the approval card, no dialog at any point.
+    expect(payRiskAckStep({ riskAck, outranked: gate(true), settings: "ready" })).toBe("none");
+    // An open game: the dialog, once.
+    expect(payRiskAckStep({ riskAck, outranked: gate(false), settings: "ready" })).toBe("ask");
+  });
+});
+
+describe("payAwaitsApproval ('Waiting on host approval' on the pay page)", () => {
+  const age = { kind: "age" as const, message: "This game is 18+ — the host reviews requests." };
+  const base = {
+    hostRequiresApproval: false,
+    approved: false,
+    requestPending: false,
+    replaceBlock: null,
+  };
+
+  it("follows the host's setting until the viewer is approved", () => {
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true })).toBe(true);
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true, requestPending: true })).toBe(
+      true,
+    );
+    expect(payAwaitsApproval({ ...base, hostRequiresApproval: true, approved: true })).toBe(false);
+    expect(payAwaitsApproval(base)).toBe(false);
+  });
+
+  it("on an open game, waits on the host for a pending viewer outside the age range (as the game page does)", () => {
+    expect(payAwaitsApproval({ ...base, requestPending: true, replaceBlock: age })).toBe(true);
+    // The card that would otherwise show is the age block, and the host's approval lifts it.
+    expect(blockOutranksApproval(age, true)).toBe(false);
+  });
+
+  it("keeps the age block card without a pending request (none, or declined)", () => {
+    expect(payAwaitsApproval({ ...base, replaceBlock: age })).toBe(false);
+  });
+
+  it("never turns another block into an approval wait", () => {
+    for (const block of [
+      { kind: "payments" as const, message: "" },
+      { kind: "participation" as const, message: "" },
+      { kind: "guardian" as const, message: "" },
+      { kind: "locked" as const, message: "", joinState: "cancelled" as const },
+      { kind: "locked" as const, message: "", joinState: "closed_by_host" as const },
+    ]) {
+      expect(payAwaitsApproval({ ...base, requestPending: true, replaceBlock: block })).toBe(false);
+    }
   });
 });

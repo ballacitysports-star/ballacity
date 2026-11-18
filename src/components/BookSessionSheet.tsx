@@ -55,7 +55,6 @@ import { useAuthSearchHere } from "@/lib/auth-return";
 export type BookPrefill = {
   date?: string;
   startTime?: string;
-  venue?: string | null;
   duration?: "30" | "60" | "90";
 };
 

@@ -44,6 +44,7 @@ import {
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
 import { createGatePrefetch } from "@/lib/gate-prefetch";
+import { clearOAuthProvider, readOAuthProvider } from "@/lib/oauth-next";
 import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
@@ -226,7 +227,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
 const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
 
@@ -279,23 +279,6 @@ async function readSessionBounded() {
     ]);
   } finally {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  }
-}
-
-function readSavedOAuthProvider(): "google" | "apple" | null {
-  try {
-    const provider = window.sessionStorage.getItem(OAUTH_PROVIDER_KEY);
-    return provider === "google" || provider === "apple" ? provider : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearSavedOAuthProvider() {
-  try {
-    window.sessionStorage.removeItem(OAUTH_PROVIDER_KEY);
-  } catch {
-    /* sessionStorage unavailable */
   }
 }
 
@@ -848,7 +831,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
   // "Signing you in…" only while an OAuth attempt is actually pending.
-  const oauthPending = typeof window !== "undefined" && !!readSavedOAuthProvider();
+  const oauthPending = typeof window !== "undefined" && !!readOAuthProvider();
   if (loading || verifying || !user) {
     return <AuthLoadingFallback pending={oauthPending} />;
   }
@@ -982,7 +965,7 @@ function RootComponent() {
         const pending = readPendingAccountType();
         const uid = session.user.id;
         const clientProvider = session.user.app_metadata?.provider;
-        const savedProvider = readSavedOAuthProvider();
+        const savedProvider = readOAuthProvider();
         const clientIsOAuth =
           clientProvider === "google" || clientProvider === "apple" || !!savedProvider;
         // Backend guard: authoritative check via getOnboardingStatus. Even if
@@ -993,7 +976,7 @@ function RootComponent() {
             const isOAuth = clientIsOAuth || status.isSocial;
             if (!status.needsOnboarding) {
               if (pending) clearPendingAccountType();
-              if (isOAuth) clearSavedOAuthProvider();
+              if (isOAuth) clearOAuthProvider();
               consumeSavedNext();
               return;
             }
@@ -1012,7 +995,7 @@ function RootComponent() {
                 .eq("id", uid)
                 .then(() => {
                   clearPendingAccountType();
-                  clearSavedOAuthProvider();
+                  clearOAuthProvider();
                   router.invalidate();
                   consumeSavedNext();
                 });

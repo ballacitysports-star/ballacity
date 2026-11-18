@@ -1,5 +1,6 @@
 import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: tapping a `game_invite` notification for a paid game must
@@ -107,6 +108,9 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.

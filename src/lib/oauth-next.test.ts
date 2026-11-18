@@ -2,7 +2,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   OAUTH_NEXT_KEY,
+  OAUTH_PROVIDER_KEY,
   clearOAuthNext,
+  clearOAuthProvider,
+  readOAuthProvider,
+  stashOAuthProvider,
   oauthNextForPage,
   readOAuthNext,
   stashOAuthNext,
@@ -77,5 +81,29 @@ describe("oauthNextForPage", () => {
   it("never hands back an unsafe stash", () => {
     window.sessionStorage.setItem(OAUTH_NEXT_KEY, "https://evil.example/");
     expect(oauthNextForPage().get()).toBeUndefined();
+  });
+});
+
+describe("oauth provider stash", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("round-trips the provider under the key the root listener reads", () => {
+    expect(OAUTH_PROVIDER_KEY).toBe("openrun:oauth-provider");
+    stashOAuthProvider("apple");
+    expect(window.sessionStorage.getItem(OAUTH_PROVIDER_KEY)).toBe("apple");
+    expect(readOAuthProvider()).toBe("apple");
+  });
+
+  it("reads anything but google or apple as no provider", () => {
+    window.sessionStorage.setItem(OAUTH_PROVIDER_KEY, "facebook");
+    expect(readOAuthProvider()).toBeNull();
+  });
+
+  it("clears only the provider, not the stashed page", () => {
+    stashOAuthNext("/feed");
+    stashOAuthProvider("google");
+    clearOAuthProvider();
+    expect(readOAuthProvider()).toBeNull();
+    expect(readOAuthNext()).toBe("/feed");
   });
 });

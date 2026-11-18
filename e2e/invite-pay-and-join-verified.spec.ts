@@ -1,5 +1,6 @@
 import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: complete the (mocked) payment verification and confirm the viewer is
@@ -168,6 +169,9 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed invite notification.

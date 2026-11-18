@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -6,6 +7,7 @@ import {
   ArrowLeft,
   ExternalLink,
   Upload,
+  ShieldAlert,
   ShieldCheck,
   Clock,
   X,
@@ -71,13 +73,21 @@ import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { useJoinGate } from "@/lib/live-status";
 import { useMyChildStatus } from "@/lib/child-safety";
+import { useMyAge } from "@/lib/use-my-age";
 import {
   blockOutranksApproval,
   checkStateOf,
   payEntryView,
+  payAwaitsApproval,
   payPalOffered,
+  payRiskAckStep,
+  payRiskAckView,
   type PayEntryView,
 } from "@/lib/pay-entry-gate";
+import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
+import { recordSafetyAck, safetyAckQueryKey, useSafetyAck } from "@/lib/safety-acks";
+import { riskAckReadFrom } from "@/lib/risk-ack-tap";
 import { useGamePaymentGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
 
@@ -213,6 +223,7 @@ function PayPage() {
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const { isParentMode } = useParentMode();
   const userId = user?.id ?? null;
   const hasGame = !!game;
@@ -231,12 +242,17 @@ function PayPage() {
   const joinGate = useJoinGate(game);
   const childQuery = useMyChildStatus();
   const { can: canChildFeature } = childQuery;
+  // The game's age range, decided as the game page decides it (ageGateState from useMyAge): a viewer outside it, or
+  // with no birthday on file, asks the host first. payEntryView only waits for it on a game with a range.
+  const myAge = useMyAge();
 
   const maxPlayers = game?.maxPlayers ?? 0;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
   const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  // The host never pays for their own game; the game page applies no age range and no "Before you join" to them.
+  const isHost = !!userId && (game?.hostUserId === userId || settings?.host_id === userId);
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
@@ -275,6 +291,13 @@ function PayPage() {
     userId,
     `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`,
   );
+  // "Before you join" (docs/paid-path-gates.md section 7, Option B): the same acknowledgment the join tap asks for
+  // (useSafetyAck / recordSafetyAck, participant_risk, SAFETY_ACK_VERSION), asked here before any payment option is
+  // drawn, because a paid game's Pay Host link and a direct visit never run the game page's handleJoin.
+  const riskAckQuery = useSafetyAck(hasGame ? gameId : null, "participant_risk");
+  // Cancel closes the dialog for this game only; the card it leaves offers it again.
+  const [riskAckDismissedFor, setRiskAckDismissedFor] = useState<string | null>(null);
+  const [riskAckSubmitting, setRiskAckSubmitting] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [fetchAttempt, setFetchAttempt] = useState(0);
   // PayPal checkout config loads on its own, with its own deadline, and Retry re-asks for it too. It holds the
@@ -601,8 +624,25 @@ function PayPage() {
     paymentStarted:
       paymentStarted ||
       (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
+    isHost,
+    ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
+    viewerAge: myAge.loading
+      ? { state: "loading" }
+      : myAge.error
+        ? { state: "error" }
+        : { state: "ready", value: myAge.age },
   });
-  const entryClear = entryView.kind === "clear";
+  // Fails closed: until the acknowledgment read (and, for a viewer it would ask, their flow state) has answered, the
+  // page shows "Loading payment options…"; a failed read asks (src/lib/risk-ack-tap.ts).
+  const riskAck = payRiskAckView({
+    isHost,
+    holdsPlace: viewerHoldsPlace,
+    paymentIn: hasPaymentIn(mySubs),
+    approved: myReq?.status === "approved",
+    flow: flowState,
+    read: riskAckReadFrom(riskAckQuery.status, riskAckQuery.data),
+  });
+  const entryClear = entryView.kind === "clear" && riskAck === "none";
   // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
   // while the approval card or a loading state stands in its place.)
   const proofStepOnScreen =
@@ -615,11 +655,30 @@ function PayPage() {
   useEffect(() => {
     if (proofStepOnScreen) setPaymentStartedFor(gameId);
   }, [proofStepOnScreen, gameId]);
+  const confirmRiskAck = async () => {
+    setRiskAckSubmitting(true);
+    try {
+      // The join path's write (game page confirmRiskAck): same kind, same version, idempotent.
+      await recordSafetyAck({ gameId, kind: "participant_risk" });
+      // The write succeeded: the current version is on file. Say so in the cache at once, as the join path carries on
+      // after its write whatever a re-read says, so a failing ack read (the case the fail-closed rule exists for) does
+      // not keep the dialog open over an acknowledgment already recorded. The re-read runs in the background; if it
+      // fails, react-query keeps this answer.
+      const key = safetyAckQueryKey(user?.id, gameId, "participant_risk");
+      queryClient.setQueryData(key, SAFETY_ACK_VERSION);
+      void queryClient.invalidateQueries({ queryKey: key });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't record your acknowledgment");
+    } finally {
+      setRiskAckSubmitting(false);
+    }
+  };
   const retryEntryChecks = () => {
     if (childQuery.isError) void childQuery.refetch();
     if (guardianQuery.isError) void guardianQuery.refetch();
     if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
     if (rosterLoad === "error") retryRosterLoad();
+    if (myAge.error) myAge.retry();
   };
 
   if (loading || (!game && !lookupTimedOut)) {
@@ -637,12 +696,18 @@ function PayPage() {
   const fee = settings?.entry_fee ?? game.price;
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
-  const approvalGateActive = requiresApproval && !isApproved;
 
   const hasSubmission = mySubs.length > 0;
   // The block card replaces every payment option. It comes before "Waiting on host approval" unless the host's
   // approval would lift it (blockOutranksApproval), so a 13-15 is never told payment unlocks after approval.
   const blockCard = entryView.kind === "blocked" ? entryView : null;
+  // The host's setting, or (as on the game page) a pending request from a viewer outside the game's age range.
+  const approvalGateActive = payAwaitsApproval({
+    hostRequiresApproval: requiresApproval,
+    approved: isApproved,
+    requestPending: myReq?.status === "pending",
+    replaceBlock: blockCard?.block ?? null,
+  });
   const blockCardFirst =
     !!blockCard && blockOutranksApproval(blockCard.block, myReq?.status === "pending");
   // The approval card's wording rests on the viewer's request ("Send a request to join first" when there is none), so
@@ -655,6 +720,14 @@ function PayPage() {
           ? "check_failed"
           : "checking"
         : null;
+  // "Before you join" stands in for the payment options only where they would otherwise come next: not in front of a
+  // block card, a pending check or the approval card, and not before the host's settings have answered (they decide
+  // whether the approval card comes first).
+  const riskAckStep = payRiskAckStep({
+    riskAck,
+    outranked: !!blockCard || !!pendingCheck || approvalGateActive,
+    settings: fetching ? "loading" : fetchTimedOut ? "error" : "ready",
+  });
   const justFilledDuringPay = showFilledUpWarning({
     liveCount,
     spotsLeft,
@@ -674,6 +747,15 @@ function PayPage() {
 
   return (
     <div className="page-shell-narrow pt-6 pb-32 space-y-4">
+      <RiskAcknowledgmentDialog
+        open={riskAckStep === "ask" && riskAckDismissedFor !== gameId}
+        onOpenChange={(v) => {
+          if (!v) setRiskAckDismissedFor(gameId);
+        }}
+        gameTitle={game.title}
+        submitting={riskAckSubmitting}
+        onConfirm={() => void confirmRiskAck()}
+      />
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
@@ -762,7 +844,7 @@ function PayPage() {
       <PayApprovalIndicator
         gameId={gameId}
         isPaid={Number(fee) > 0}
-        requiresApproval={requiresApproval}
+        requiresApproval={requiresApproval || approvalGateActive}
       />
 
       {/* Two-step progress (Pay → Confirm) */}
@@ -848,6 +930,12 @@ function PayPage() {
         </div>
       ) : blockCard ? (
         <PayEntryBlockedCard view={blockCard} gameId={game.id} />
+      ) : riskAckStep === "checking" ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : riskAckStep === "ask" ? (
+        <PayRiskAckCard gameId={game.id} onReview={() => setRiskAckDismissedFor(null)} />
       ) : fetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
           Loading payment options…
@@ -1041,6 +1129,45 @@ function PayEntryBlockedCard({
           to="/games/$gameId"
           params={{ gameId }}
           className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Back to game
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * In place of the payment options until the viewer acknowledges "Before you join" (the dialog over it). Cancel leaves
+ * this card: nothing payable, a way to open the dialog again, and a way back to the game.
+ */
+function PayRiskAckCard({ gameId, onReview }: { gameId: string; onReview: () => void }) {
+  return (
+    <div
+      className="rounded-2xl border border-border bg-surface p-5"
+      role="status"
+      aria-live="polite"
+      data-testid="pay-risk-ack-required"
+    >
+      <div className="flex items-center gap-2 font-display text-sm font-bold">
+        <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> {RISK_ACKNOWLEDGMENT.title}
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        Acknowledge the risks of this activity before you pay the host. The payment options show
+        once you agree.
+      </p>
+      <div className="mt-3 flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={onReview}
+          className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Review and agree
+        </button>
+        <Link
+          to="/games/$gameId"
+          params={{ gameId }}
+          className="text-xs font-semibold text-muted-foreground underline"
         >
           Back to game
         </Link>

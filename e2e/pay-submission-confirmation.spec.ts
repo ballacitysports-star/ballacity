@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: end-to-end mocked payment submission.
@@ -190,6 +191,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
 
   // ---- Flow ----------------------------------------------------------
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 

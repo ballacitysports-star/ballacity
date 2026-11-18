@@ -736,7 +736,7 @@ function TrainersPage() {
                       {availabilityLabel(score)}
                     </span>
                   </div>
-                  <TrainerActions org={o} defaultVenue={venue || null} />
+                  <TrainerActions org={o} />
                   {/* P2-5: follow from the list (request and message are above). */}
                   <DiscoverCardActions org={o} followOnly />
                 </div>

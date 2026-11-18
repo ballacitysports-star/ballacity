@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
 import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: a host who takes more than one payment method gets the picker, and
@@ -88,6 +89,9 @@ test("picking one of the host's methods opens its proof step on this tab", async
   await json(page, (url) => tableUrl(url, "game_participants"), []);
   await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
