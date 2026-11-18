@@ -201,6 +201,7 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
+import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
 import { gameTakesNoPayment, payHostLinkShown } from "@/lib/pay-entry-gate";
 import {
   ASK_PARENT_AGAIN_LABEL,
@@ -225,6 +226,8 @@ export const Route = createFileRoute("/games/$gameId/")({
     const out: {
       invite?: true;
       from?: string;
+      /** WP 2.0: the server-side invitation (game_invites.id) the notification links to. */
+      inv?: string;
       exp?: number;
       expInvalid?: true;
       tab?: "overview" | "payments";
@@ -232,6 +235,7 @@ export const Route = createFileRoute("/games/$gameId/")({
     } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    if (typeof search.inv === "string" && /^[0-9a-f-]{36}$/i.test(search.inv)) out.inv = search.inv;
     const rawExp = search.exp;
     if (rawExp !== undefined && rawExp !== null && rawExp !== "") {
       const expNum =
@@ -302,7 +306,13 @@ function GameDetail() {
   useEffect(() => {
     trackEvent("view_game", { game_id: gameId });
   }, [gameId]);
-  const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
+  const {
+    invite: isInvite,
+    from: inviteFrom,
+    exp: inviteExp,
+    expInvalid,
+    inv: inviteId,
+  } = Route.useSearch();
   const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
 
   const hosted = useHostedGames();
@@ -1714,8 +1724,17 @@ function GameDetail() {
       <div
         className={`page-shell mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
       >
-        {/* Invite deep-link banner */}
+        {/* WP 2.0: the server-side invitation, with Accept and Decline (replaces the banner below). */}
+        {inviteId && !isHost && (
+          <GameInviteBanner
+            inviteId={inviteId}
+            viewerId={user?.id ?? null}
+            onAnswered={() => void refreshStatus()}
+          />
+        )}
+        {/* Invite deep-link banner (links from before WP 2.0) */}
         {isInvite &&
+          !inviteId &&
           !isHost &&
           !viewerCountsAsJoined &&
           !viewerPending &&

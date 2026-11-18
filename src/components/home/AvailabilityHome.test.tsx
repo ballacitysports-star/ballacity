@@ -16,6 +16,7 @@ const env = vi.hoisted(() => ({
   settingError: null as unknown,
   posts: [] as Record<string, unknown>[],
   inbox: [] as { status: string }[],
+  invites: [] as unknown[],
   canPost: true,
   navigate: vi.fn(),
   reconfirm: vi.fn(async () => {}),
@@ -57,6 +58,11 @@ vi.mock("@/lib/availability", () => ({
   listMyContactRequests: async () => env.inbox,
   reconfirmAvailability: env.reconfirm,
 }));
+vi.mock("@/lib/game-invites", () => ({
+  listMyPendingGameInvites: async () => env.invites,
+  respondToGameInvite: vi.fn(),
+  gameInviteErrorMessage: () => "",
+}));
 vi.mock("@/components/availability/QuickAvailabilitySheet", () => ({
   QuickAvailabilitySheet: ({ open }: { open: boolean }) =>
     open ? <div role="dialog" aria-label="I'm available sheet" /> : null,
@@ -92,6 +98,7 @@ beforeEach(() => {
   env.settingError = null;
   env.posts = [];
   env.inbox = [];
+  env.invites = [];
   env.canPost = true;
 });
 afterEach(() => {
@@ -139,10 +146,11 @@ describe("AvailabilityHome", () => {
     await waitFor(() => expect(env.reconfirm).toHaveBeenCalledWith("soon", "open"));
   });
 
-  it("counts pending invitations only", async () => {
+  it("counts pending requests and game invitations", async () => {
     env.inbox = [{ status: "pending" }, { status: "pending" }, { status: "accepted" }];
+    env.invites = [{ id: "i1" }];
     show();
-    expect(await screen.findByRole("link", { name: "Invitations, 2 waiting" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Invitations, 3 waiting" })).toBeTruthy();
   });
 
   it("hidden when the switch is off, in parent mode, or signed out; a failed read keeps it", async () => {
