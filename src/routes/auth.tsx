@@ -12,7 +12,7 @@ import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/lib/safe-next-path";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
-import { oauthNextForPage } from "@/lib/oauth-next";
+import { clearOAuthProvider, oauthNextForPage, stashOAuthProvider } from "@/lib/oauth-next";
 import { validateCredentials } from "@/lib/auth-credentials";
 import { RolePicker } from "@/components/RolePicker";
 import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
@@ -230,6 +230,10 @@ function AuthPage() {
     // account that still needs a type (or that the check could not answer for)
     // keeps it stashed for after the picker.
     if (savedNext && dest === savedNext && needsType === false) oauthNext.current?.used();
+    // The account has a type, so the provider stash has done its job (it only routes a new social account to the
+    // picker). Clear it here: the root listener clears it too, but only once its own onboarding check answers, and
+    // leave() below is a full-page navigation that can discard that.
+    if (needsType === false) clearOAuthProvider();
     // Once the hint is what sends them on it has done its job. Wait for that, or
     // the full-page navigation below can cancel the update and send them again.
     if (startDestination && dest === startDestination) {
@@ -477,11 +481,7 @@ function AuthPage() {
     // session is confirmed. `redirect_uri` MUST stay a public same-origin URL —
     // passing protected routes to Google/Apple causes vendor rejection.
     oauthNext.current?.stash(next);
-    try {
-      window.sessionStorage.setItem("openrun:oauth-provider", provider);
-    } catch {
-      /* sessionStorage may be unavailable in private mode */
-    }
+    stashOAuthProvider(provider);
 
     setBusy(true);
     trackSigninEvent(opts.isRetry ? "retry_clicked" : "attempt");

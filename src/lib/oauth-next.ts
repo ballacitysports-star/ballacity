@@ -30,6 +30,45 @@ export function readOAuthNext(): string | undefined {
   }
 }
 
+/**
+ * Which provider ("google" or "apple") the sign-in button used, stashed next to `next` in this tab. The root's
+ * SIGNED_IN listener reads it to send a new social account to the account-type picker even when the session's
+ * provider metadata is missing.
+ */
+export const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
+
+/** Stash the provider the member chose, for after the round trip. */
+export function stashOAuthProvider(provider: "google" | "apple"): void {
+  try {
+    window.sessionStorage.setItem(OAUTH_PROVIDER_KEY, provider);
+  } catch {
+    /* sessionStorage may be unavailable in private mode */
+  }
+}
+
+/** The stashed provider, if it is one this app offers. */
+export function readOAuthProvider(): "google" | "apple" | null {
+  try {
+    const provider = window.sessionStorage.getItem(OAUTH_PROVIDER_KEY);
+    return provider === "google" || provider === "apple" ? provider : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forget the provider once the account is known to have a type: it only decides whether a new account goes to the
+ * picker. Both `/auth` and the root's SIGNED_IN listener clear it then, because `/auth` leaves with a full-page
+ * navigation that discards the listener's pending work, so the listener alone can miss it.
+ */
+export function clearOAuthProvider(): void {
+  try {
+    window.sessionStorage.removeItem(OAUTH_PROVIDER_KEY);
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
+
 /** Forget the stashed page once it has been used. */
 export function clearOAuthNext(): void {
   try {
