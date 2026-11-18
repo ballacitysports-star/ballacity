@@ -12,6 +12,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/lib/auth-return", () => ({ useAuthSearchHere: () => ({}) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("./share-availability", () => ({ shareAvailability: vi.fn() }));
+vi.mock("@/lib/game-invites", () => ({
+  listMyPendingGameInvites: async () => [],
+  respondToGameInvite: vi.fn(),
+  gameInviteErrorMessage: () => "",
+}));
 
 const api = vi.hoisted(() => ({
   posts: [] as Record<string, unknown>[],

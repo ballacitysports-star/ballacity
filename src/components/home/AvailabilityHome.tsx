@@ -12,6 +12,7 @@ import {
   reconfirmAvailability,
 } from "@/lib/availability";
 import { useAvailabilityGate } from "@/lib/availability-gate";
+import { listMyPendingGameInvites } from "@/lib/game-invites";
 import {
   HOME_AVAILABILITY_SETTING_KEY,
   parseHomeAvailabilitySetting,
@@ -88,8 +89,14 @@ function Section({
   });
   const invitations = useQuery({
     queryKey: ["home-pending-invitations", userId],
-    queryFn: async () =>
-      (await listMyContactRequests("inbox")).filter((r) => r.status === "pending").length,
+    // Pending contact requests plus game invitations waiting for an answer (WP 2.0).
+    queryFn: async () => {
+      const [requests, invites] = await Promise.all([
+        listMyContactRequests("inbox"),
+        listMyPendingGameInvites(userId).catch(() => []),
+      ]);
+      return requests.filter((r) => r.status === "pending").length + invites.length;
+    },
     staleTime: 60_000,
   });
 
