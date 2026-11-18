@@ -24,7 +24,8 @@
  *   - locked, in progress / closed by the host / past the signup cutoff: enforce_game_join_gate and the PayPal
  *     precondition let a player the host approved through, so (as on the game page, lockedForNewJoin) a viewer already
  *     in the flow (on the roster, a payment in, or approved by the host) keeps their way to pay.
- * A full roster is not decided here: the pay page keeps its "This game just filled up" warning (showFilledUpWarning).
+ * A full roster is not decided here: the pay page keeps its "This game just filled up" warning (showFilledUpWarning),
+ * and the database refuses the claim itself (GAME_FULL) for a player not on the roster.
  * The game's age range is not decided here either. It needs the viewer's exact age (their birthday, get_my_birthday),
  * which the pay page does not read, and the server lets a player the host approved, or one on the roster, through it.
  * Those, and players with an earlier claim, are the only viewers who can read the host's payment settings and so see
@@ -144,35 +145,18 @@ export type PayEntryView =
   /** One of those failed before answering: show a retry, never the handles. */
   | { kind: "check_failed" }
   /**
-   * 'replace': the block card takes the place of every payment option.
-   * 'warn': the viewer was already shown how to pay (they picked a method or opened the payment app), and the
-   * database would still record their claim, so the block shows as a warning above the proof form: if they already
-   * paid, the claim lets the host see it and refund them.
+   * The block card takes the place of every payment option, the proof form included, even for a viewer who was
+   * already shown how to pay: the database refuses their manual claim for every block this decides (see
+   * payEntryView), so a proof form could only fail.
    */
   | {
       kind: "blocked";
       block: PayEntryBlock;
-      mode: "replace" | "warn";
-      /** The viewer was already shown how to pay; the card says what to do if money already moved. */
+      /** The viewer was already shown how to pay; the card tells them to ask the host for a refund. */
       paymentStarted: boolean;
     }
   | { kind: "clear" };
 
-/**
- * Block kinds the database still records a manual claim for (nothing on payment_submissions checks the join gate or
- * child_game_participation_allowed), so a player who already paid can at least tell the host. 'payments' and
- * 'guardian' claims are refused by enforce_game_payment_cohort and enforce_guardian_before_payment, so a proof form
- * would only fail for them.
- */
-const CLAIM_STILL_RECORDED: ReadonlySet<PayEntryBlockKind> = new Set<PayEntryBlockKind>([
-  "locked",
-  "participation",
-]);
-
-/**
- * What the pay page shows in place of (or above) its payment options. Fails closed: while the child-status policy or
- * the guardian check has not answered, nothing that lets money move is shown.
- */
 /**
  * Whether a block was decided by the viewer's own flow state (their place, a payment in, the host's approval): a lock
  * other than a cancelled game, which every viewer gets, or the participation block, which a place lifts. Those inputs
@@ -183,6 +167,20 @@ function dependsOnFlow(block: PayEntryBlock): boolean {
   return block.kind === "locked" && block.joinState !== "cancelled";
 }
 
+/**
+ * What the pay page shows in place of its payment options. Fails closed: while the child-status policy or the guardian
+ * check has not answered, nothing that lets money move is shown.
+ *
+ * A block never shows a proof form, not even to a viewer who already picked a method or opened the payment app: the
+ * database refuses their own manual claim for each kind. 'payments' by enforce_game_payment_cohort, 'guardian' by
+ * enforce_guardian_before_payment, and (20261118200000, zz_payment_claim_preconditions) 'participation' as
+ * GAME_PARTICIPATION_BLOCKED and a 'locked' game as GAME_CANCELLED, GAME_COMPLETED (ended, or over by the clock) or
+ * GAME_JOINS_CLOSED (closed by the host or past the cutoff, for a player the host has not approved). A game in
+ * progress with no cutoff and joining left open is the one lock the trigger lets a claim through for; it is blocked
+ * here as on the game page, and the card's advice (ask the host for a refund) holds there too. The card tells a
+ * viewer who was already shown how to pay to ask the host for a refund, rather than promising a proof the host would
+ * never see.
+ */
 export function payEntryView(input: {
   holdsPlace: boolean;
   paymentIn: boolean;
@@ -208,8 +206,6 @@ export function payEntryView(input: {
    * (markExternalPaymentOpened) exists for this game.
    */
   paymentStarted: boolean;
-  /** The proof step (a picked method) is what the page would show next. */
-  onProofStep: boolean;
 }): PayEntryView {
   const { child, guardian } = input;
   if (child.state === "error" || guardian.state === "error") return { kind: "check_failed" };
@@ -231,13 +227,7 @@ export function payEntryView(input: {
   if (!flowKnown && dependsOnFlow(block)) {
     return input.flow === "error" ? { kind: "check_failed" } : { kind: "checking" };
   }
-  const warn = input.paymentStarted && input.onProofStep && CLAIM_STILL_RECORDED.has(block.kind);
-  return {
-    kind: "blocked",
-    block,
-    mode: warn ? "warn" : "replace",
-    paymentStarted: input.paymentStarted,
-  };
+  return { kind: "blocked", block, paymentStarted: input.paymentStarted };
 }
 
 /**
