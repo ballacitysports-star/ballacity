@@ -81,6 +81,20 @@ import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { trackOpenCreate } from "@/lib/nav-analytics";
 import { BackButton } from "@/components/layout/BackButton";
 import {
+  REPEAT_OPTIONS,
+  repeatLabel,
+  startGameSeries,
+  untilError,
+  type RepeatChoice,
+} from "@/lib/game-series-api";
+import {
+  affiliationLabel as hostAffiliationLabel,
+  hostAffiliations,
+  preferredAffiliation,
+  teamIdFor,
+  type HostAffiliation,
+} from "@/lib/host-affiliations";
+import {
   clearCreateDraft,
   loadCreateDraft,
   saveCreateDraft,
@@ -132,7 +146,8 @@ function Create() {
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const { can: canFeature } = useMyChildStatus();
+  const childStatus = useMyChildStatus();
+  const canFeature = childStatus.can;
   const hostingDecision = canFeature("game_hosting");
   const fetchMyTeams = useServerFn(listMyTeams);
   const myTeamsQuery = useQuery({
@@ -142,17 +157,15 @@ function Create() {
     staleTime: 30_000,
   });
   const myTeams = myTeamsQuery.data ?? [];
-  type Affiliation = {
-    source: "team";
-    id: string;
-    name: string;
-    kind?: "team" | "coach";
-  };
-  // Games are always published under a team profile the account owns.
-  const affiliations: Affiliation[] = myTeams
-    .filter((t) => t.kind !== "coach")
-    .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind }));
-  const affiliationsLoading = myTeamsQuery.isLoading;
+  type Affiliation = HostAffiliation;
+  // An adult may host as themselves or under a team they own; a 16-17-year-old under a team (host-affiliations.ts; the
+  // server enforces the same, 20261121100000).
+  const affiliations: Affiliation[] = hostAffiliations({
+    teams: myTeams,
+    cohort: childStatus.status?.cohort,
+    selfName: profile?.name,
+  });
+  const affiliationsLoading = myTeamsQuery.isLoading || (!!user && childStatus.isLoading);
   const { active: activeProfile } = useMyProfiles();
   const activeRefId = activeProfile && activeProfile.kind === "team" ? activeProfile.refId : null;
   const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
@@ -163,15 +176,15 @@ function Create() {
       setSelectedAffiliation(null);
       return;
     }
-    // Prefer the team the app is currently acting as, then fall back to the
-    // only team the account owns.
-    const preferred =
-      (activeRefId ? affiliations.find((a) => a.id === activeRefId) : undefined) ??
-      (affiliations.length === 1 ? affiliations[0] : undefined);
+    // Prefer the team the app is currently acting as, then the person when the app is acting as them, then the only choice.
+    const preferred = preferredAffiliation(affiliations, {
+      teamId: activeRefId,
+      actingAsTeam: !!activeProfile && activeProfile.kind !== "player",
+    });
     if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading, activeRefId]);
-  const affiliationLabel = (_a: Affiliation) => "Team";
+  const affiliationLabel = (a: Affiliation) => hostAffiliationLabel(a);
   const affiliationShortLabel = affiliationLabel;
 
   const [sport, setSport] = useState<Sport>("Basketball");
@@ -236,6 +249,8 @@ function Create() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
   const [multiDay, setMultiDay] = useState(false);
+  // A one-day game can repeat; the server creates the next dates (WP 3.1).
+  const [repeat, setRepeat] = useState<RepeatChoice>({ freq: "none", until: null });
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
 
   useEffect(() => {
@@ -574,7 +589,7 @@ function Create() {
     );
   }
 
-  // Gate: games are always published under a team profile.
+  // Gate: someone who may host but is not an adult (16-17) hosts under a team profile.
 
   if (affiliationsLoading) {
     return (
@@ -603,8 +618,9 @@ function Create() {
           <div>
             <h2 className="font-display text-lg font-bold">Host as a team</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Games are published under a team profile so players know who they're joining. Add a
-              team profile to your account to start hosting — your other profiles stay as they are.
+              Under 18, games are published under a team profile so players know who they're
+              joining. Add a team profile to your account to start hosting — your other profiles
+              stay as they are.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-2">
@@ -766,7 +782,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team profile you're hosting as");
+            toast.error("Pick who you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -806,6 +822,13 @@ function Create() {
               const check = validateWhenRange(when, new Date(), eventTimeZone);
               if (!check.ok) {
                 toast.error(check.error ?? "Fix the date and time to continue.");
+                setPublishing(false);
+                return;
+              }
+              const repeatProblem =
+                repeat.freq === "none" ? null : untilError(when.startDate, repeat.until);
+              if (repeatProblem) {
+                toast.error(repeatProblem);
                 setPublishing(false);
                 return;
               }
@@ -883,7 +906,7 @@ function Create() {
                 signupCutoffMin,
                 minAge,
                 maxAge,
-                teamId: selectedAffiliation?.id,
+                teamId: teamIdFor(selectedAffiliation),
                 // Only public runs can be listed at someone else's facility.
                 orgId: postingOrg && (postingOfficial || !priv) ? postingOrg.id : undefined,
                 seriesId,
@@ -937,7 +960,28 @@ function Create() {
             } catch {
               /* ignore */
             }
-            toast.success(plans.length > 1 ? `Created ${plans.length} games` : "Game published");
+            // A one-day game set to repeat: the server makes it a series and creates the next dates. The game is already
+            // published, so a failure here only leaves it as a single game.
+            let repeatNote = "";
+            if (!multiDay && plans.length === 1 && repeat.freq !== "none" && firstGameId) {
+              try {
+                const started = await startGameSeries(firstGameId, repeat);
+                repeatNote = ` · ${repeatLabel({ freq: repeat.freq, until: repeat.until })?.toLowerCase()}${
+                  started.created > 0
+                    ? ` (${started.created} more ${started.created === 1 ? "date" : "dates"} added)`
+                    : ""
+                }`;
+              } catch (err) {
+                toast.error(
+                  `Game published, but it couldn't be set to repeat. ${
+                    err instanceof Error ? err.message : ""
+                  }`.trim(),
+                );
+              }
+            }
+            toast.success(
+              plans.length > 1 ? `Created ${plans.length} games` : `Game published${repeatNote}`,
+            );
             // A series opens on its first date, not back on the feed, so the host sees it exist.
             nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
           } catch (err) {
@@ -1021,7 +1065,7 @@ function Create() {
                 </div>
                 {!selectedAffiliation && (
                   <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                    Pick the team profile you're hosting as to continue.
+                    Pick who you're hosting as to continue.
                   </p>
                 )}
               </>
@@ -1116,12 +1160,68 @@ function Create() {
             {multiDay ? (
               <GameScheduleBuilder value={schedule} onChange={setSchedule} />
             ) : (
-              <DateTimeRangePicker
-                value={when}
-                onChange={setWhen}
-                todayKey={todayKeyInZone(eventTimeZone)}
-                timeZoneLabel={`${timeZoneAbbr(new Date(), eventTimeZone)} · ${eventTimeZone.split("/").pop()?.replace(/_/g, " ")}`}
-              />
+              <>
+                <DateTimeRangePicker
+                  value={when}
+                  onChange={setWhen}
+                  todayKey={todayKeyInZone(eventTimeZone)}
+                  timeZoneLabel={`${timeZoneAbbr(new Date(), eventTimeZone)} · ${eventTimeZone.split("/").pop()?.replace(/_/g, " ")}`}
+                />
+                <div className="space-y-2">
+                  <div
+                    role="radiogroup"
+                    aria-label="Repeat"
+                    className="flex flex-wrap gap-2"
+                    data-testid="repeat-choice"
+                  >
+                    {REPEAT_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={repeat.freq === o.value}
+                        onClick={() =>
+                          setRepeat((r) => ({
+                            freq: o.value,
+                            until: o.value === "none" ? null : r.until,
+                          }))
+                        }
+                        className={`rounded-full border px-3 py-2 text-[13px] font-semibold ${
+                          repeat.freq === o.value
+                            ? "border-lime bg-lime/10 text-lime"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  {repeat.freq !== "none" && (
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="create-repeat-until"
+                        className="block px-1 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        Last date (optional)
+                      </label>
+                      <input
+                        id="create-repeat-until"
+                        type="date"
+                        min={when.startDate}
+                        value={repeat.until ?? ""}
+                        onChange={(e) =>
+                          setRepeat((r) => ({ ...r, until: e.target.value || null }))
+                        }
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="px-1 text-[11px] text-muted-foreground">
+                        Dates are added up to 4 weeks ahead. Each new date copies the latest one, so
+                        edits to it carry forward.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </Section>
 
@@ -1335,7 +1435,7 @@ function Create() {
             {publishing
               ? "Publishing…"
               : !selectedAffiliation
-                ? "Choose a team profile to continue"
+                ? "Choose who you're hosting as"
                 : !hostAck
                   ? "Acknowledge host responsibilities"
                   : "Publish game"}
