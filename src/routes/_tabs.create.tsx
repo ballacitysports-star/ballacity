@@ -81,6 +81,13 @@ import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { trackOpenCreate } from "@/lib/nav-analytics";
 import { BackButton } from "@/components/layout/BackButton";
 import {
+  affiliationLabel as hostAffiliationLabel,
+  hostAffiliations,
+  preferredAffiliation,
+  teamIdFor,
+  type HostAffiliation,
+} from "@/lib/host-affiliations";
+import {
   clearCreateDraft,
   loadCreateDraft,
   saveCreateDraft,
@@ -132,7 +139,8 @@ function Create() {
   const [facilityId, setFacilityId] = useState<string | null>(orgIdParam ?? null);
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const { can: canFeature } = useMyChildStatus();
+  const childStatus = useMyChildStatus();
+  const canFeature = childStatus.can;
   const hostingDecision = canFeature("game_hosting");
   const fetchMyTeams = useServerFn(listMyTeams);
   const myTeamsQuery = useQuery({
@@ -142,17 +150,15 @@ function Create() {
     staleTime: 30_000,
   });
   const myTeams = myTeamsQuery.data ?? [];
-  type Affiliation = {
-    source: "team";
-    id: string;
-    name: string;
-    kind?: "team" | "coach";
-  };
-  // Games are always published under a team profile the account owns.
-  const affiliations: Affiliation[] = myTeams
-    .filter((t) => t.kind !== "coach")
-    .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind }));
-  const affiliationsLoading = myTeamsQuery.isLoading;
+  type Affiliation = HostAffiliation;
+  // An adult may host as themselves or under a team they own; a 16-17-year-old under a team (host-affiliations.ts; the
+  // server enforces the same, 20261121100000).
+  const affiliations: Affiliation[] = hostAffiliations({
+    teams: myTeams,
+    cohort: childStatus.status?.cohort,
+    selfName: profile?.name,
+  });
+  const affiliationsLoading = myTeamsQuery.isLoading || (!!user && childStatus.isLoading);
   const { active: activeProfile } = useMyProfiles();
   const activeRefId = activeProfile && activeProfile.kind === "team" ? activeProfile.refId : null;
   const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
@@ -163,15 +169,15 @@ function Create() {
       setSelectedAffiliation(null);
       return;
     }
-    // Prefer the team the app is currently acting as, then fall back to the
-    // only team the account owns.
-    const preferred =
-      (activeRefId ? affiliations.find((a) => a.id === activeRefId) : undefined) ??
-      (affiliations.length === 1 ? affiliations[0] : undefined);
+    // Prefer the team the app is currently acting as, then the person when the app is acting as them, then the only choice.
+    const preferred = preferredAffiliation(affiliations, {
+      teamId: activeRefId,
+      actingAsTeam: !!activeProfile && activeProfile.kind !== "player",
+    });
     if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading, activeRefId]);
-  const affiliationLabel = (_a: Affiliation) => "Team";
+  const affiliationLabel = (a: Affiliation) => hostAffiliationLabel(a);
   const affiliationShortLabel = affiliationLabel;
 
   const [sport, setSport] = useState<Sport>("Basketball");
@@ -574,7 +580,7 @@ function Create() {
     );
   }
 
-  // Gate: games are always published under a team profile.
+  // Gate: someone who may host but is not an adult (16-17) hosts under a team profile.
 
   if (affiliationsLoading) {
     return (
@@ -603,8 +609,9 @@ function Create() {
           <div>
             <h2 className="font-display text-lg font-bold">Host as a team</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Games are published under a team profile so players know who they're joining. Add a
-              team profile to your account to start hosting — your other profiles stay as they are.
+              Under 18, games are published under a team profile so players know who they're
+              joining. Add a team profile to your account to start hosting — your other profiles
+              stay as they are.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-2">
@@ -766,7 +773,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team profile you're hosting as");
+            toast.error("Pick who you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -883,7 +890,7 @@ function Create() {
                 signupCutoffMin,
                 minAge,
                 maxAge,
-                teamId: selectedAffiliation?.id,
+                teamId: teamIdFor(selectedAffiliation),
                 // Only public runs can be listed at someone else's facility.
                 orgId: postingOrg && (postingOfficial || !priv) ? postingOrg.id : undefined,
                 seriesId,
@@ -1021,7 +1028,7 @@ function Create() {
                 </div>
                 {!selectedAffiliation && (
                   <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                    Pick the team profile you're hosting as to continue.
+                    Pick who you're hosting as to continue.
                   </p>
                 )}
               </>
@@ -1335,7 +1342,7 @@ function Create() {
             {publishing
               ? "Publishing…"
               : !selectedAffiliation
-                ? "Choose a team profile to continue"
+                ? "Choose who you're hosting as"
                 : !hostAck
                   ? "Acknowledge host responsibilities"
                   : "Publish game"}
