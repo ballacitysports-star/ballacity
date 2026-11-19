@@ -69,6 +69,13 @@ const CATEGORY_QUERIES: Record<
       column: "requester_id",
       columns: "target_id, created_at",
     },
+    {
+      // WP 3.2b: the host's own named lists of regulars (the names; who is on them is other people's data)
+      key: "host_groups",
+      table: "host_groups",
+      column: "host_id",
+      columns: "name, created_at, updated_at",
+    },
   ],
   preferences: [
     {

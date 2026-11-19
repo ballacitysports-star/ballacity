@@ -1,9 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Repeat, Send, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  createHostGroup,
+  deleteHostGroup,
+  groupNameError,
+  listMyHostGroups,
+  GROUP_NAME_MAX,
+} from "@/lib/host-groups";
 import {
   Sheet,
   SheetContent,
@@ -314,7 +322,14 @@ function InviteRegularsSheet({
     staleTime: 30_000,
   });
 
-  const people = useMemo<Candidate[]>(
+  const qc = useQueryClient();
+  const groups = useQuery({ queryKey: ["host-groups"], queryFn: listMyHostGroups, enabled: open });
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const group = (groups.data ?? []).find((g) => g.id === groupId) ?? null;
+
+  const allPeople = useMemo<Candidate[]>(
     () =>
       (regulars.data?.rows ?? []).map((r) => {
         // The server's answer, or what this page already knows (an invitation sent a moment ago).
@@ -328,17 +343,131 @@ function InviteRegularsSheet({
       }),
     [regulars.data, hostId, rosterIds, invites],
   );
+  // A group shows its members who are still regulars; anyone who is not (no game in 90 days, opted out, blocked) is left out.
+  const people = group ? allPeople.filter((p) => group.memberIds.includes(p.id)) : allPeople;
+  const missing = group
+    ? group.memberIds.filter((id) => !allPeople.some((p) => p.id === id)).length
+    : 0;
+
+  const saveGroup = async (picked: string[], clear: () => void) => {
+    const problem = groupNameError(groupName, groups.data ?? []);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    setSavingGroup(true);
+    try {
+      const id = await createHostGroup(groupName, picked);
+      toast.success(
+        `Saved “${groupName.trim()}” with ${picked.length} ${picked.length === 1 ? "player" : "players"}.`,
+      );
+      setGroupName("");
+      clear();
+      await qc.invalidateQueries({ queryKey: ["host-groups"] });
+      setGroupId(id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save the group.");
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const removeGroup = async () => {
+    if (!group) return;
+    try {
+      await deleteHostGroup(group.id);
+      toast.success(`Deleted “${group.name}”.`);
+      setGroupId(null);
+      await qc.invalidateQueries({ queryKey: ["host-groups"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete the group.");
+    }
+  };
+
+  const toolbar =
+    (groups.data ?? []).length > 0 ? (
+      <div className="space-y-1">
+        <div role="group" aria-label="Your groups" className="flex flex-wrap gap-2">
+          {[{ id: null as string | null, name: "All regulars" }, ...(groups.data ?? [])].map(
+            (g) => (
+              <button
+                key={g.id ?? "all"}
+                type="button"
+                aria-pressed={groupId === g.id}
+                onClick={() => setGroupId(g.id)}
+                className={`min-h-9 rounded-full border px-3 text-[13px] font-semibold ${
+                  groupId === g.id
+                    ? "border-lime bg-lime/10 text-lime"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {g.name}
+              </button>
+            ),
+          )}
+        </div>
+        {group && (
+          <p className="text-xs text-muted-foreground">
+            {missing > 0
+              ? `${missing} ${missing === 1 ? "person" : "people"} in this group can't be invited right now. `
+              : ""}
+            <button
+              type="button"
+              onClick={() => void removeGroup()}
+              className="font-semibold underline underline-offset-2"
+            >
+              Delete group
+            </button>
+          </p>
+        )}
+      </div>
+    ) : null;
 
   return (
     <InvitePickerSheet
       open={open}
       onOpenChange={onOpenChange}
       game={game}
+      toolbar={toolbar}
+      renderExtra={(picked, clear) =>
+        !group && picked.length > 0 ? (
+          <div className="space-y-1">
+            <label
+              htmlFor="save-group-name"
+              className="block text-xs font-bold uppercase text-muted-foreground"
+            >
+              Save these {picked.length} as a group (only you see it)
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="save-group-name"
+                value={groupName}
+                maxLength={GROUP_NAME_MAX}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Tuesday crew"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 rounded-full"
+                disabled={savingGroup}
+                onClick={() => void saveGroup(picked, clear)}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : null
+      }
       title="Invite your regulars"
       description="Players from your games in the last 90 days. They don't need to have posted availability; they can turn this off in their privacy settings."
       listLabel="Your regulars"
       loadingText="Finding your regulars…"
-      emptyText="No one has played in your games in the last 90 days yet."
+      emptyText={
+        group
+          ? "No one in this group can be invited right now."
+          : "No one has played in your games in the last 90 days yet."
+      }
       loading={regulars.isLoading}
       error={regulars.isError}
       people={people}
@@ -360,10 +489,14 @@ function InvitePickerSheet({
   error,
   people,
   onInvited,
+  toolbar,
+  renderExtra,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   game: Game;
+  toolbar?: ReactNode;
+  renderExtra?: (picked: string[], clear: () => void) => ReactNode;
   title: string;
   description: string;
   listLabel: string;
@@ -374,7 +507,9 @@ function InvitePickerSheet({
   people: readonly Candidate[];
   onInvited: () => void;
 }) {
-  const [picked, setPicked] = useState<string[]>([]);
+  const [pickedAll, setPicked] = useState<string[]>([]);
+  // Only what is on screen counts (a host who switches group does not send to people they can no longer see).
+  const picked = pickedAll.filter((id) => people.some((p) => p.id === id && p.state === null));
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const noteId = `invite-note-${listLabel.replace(/\W+/g, "-").toLowerCase()}`;
@@ -415,6 +550,7 @@ function InvitePickerSheet({
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
+          {toolbar}
           {loading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {loadingText}
@@ -497,6 +633,7 @@ function InvitePickerSheet({
               </div>
             </>
           )}
+          {renderExtra?.(picked, () => setPicked([]))}
           <Button
             className="h-12 w-full rounded-full bg-lime-gradient text-base font-bold text-primary-foreground"
             disabled={sending || picked.length === 0}
