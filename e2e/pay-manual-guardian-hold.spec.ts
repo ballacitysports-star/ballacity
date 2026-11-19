@@ -296,7 +296,7 @@ for (const manual of [false, true]) {
     await restoreSession(page);
     await page.goto(`/games/${GAME_ID}?tab=payments`, { waitUntil: "domcontentloaded" });
 
-    const accepted = page.getByText("Accepted methods");
+    const accepted = page.getByText("Accepted methods", { exact: true });
     await expect(accepted).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/Venmo/).first()).toBeVisible();
     if (manual) {
