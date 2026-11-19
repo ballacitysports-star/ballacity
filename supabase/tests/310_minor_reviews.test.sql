@@ -100,7 +100,9 @@ INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, r
   (t.id('r-adult-pub'),   t.id('adultrev'), 'player', 'player', t.id('adultsubj')::text,  'Adult',   5, 'Great teammate, always on time.',  false, true, false),
   (t.id('r-team-pub'),    t.id('adultrev'), 'player', 'team',   'tm',                     'Team',    5, 'A well run team with good vibes.', false, true, false),
   (t.id('r-by-teen'),     t.id('teen17'),   'player', 'player', t.id('adultsubj')::text,  'Adult',   4, 'Played well and was friendly.',    false, true, false),
-  (t.id('r-gym-by-teen'), t.id('teen17'),   'player', 'gym',    'some-gym',               'Gym',     4, 'Clean courts and friendly staff.', false, true, false);
+  (t.id('r-gym-by-teen'), t.id('teen17'),   'player', 'gym',    'some-gym',               'Gym',     4, 'Clean courts and friendly staff.', false, true, false),
+  -- backs the adult host summary below: a summary is readable only while a public review of its subject is (20261120100000)
+  (t.id('r-adult-host'),  t.id('adultrev'), 'player', 'host',   t.id('adultsubj')::text,  'Adult',   5, 'Well organised and started on time.', false, true, false);
 INSERT INTO public.review_ai_analysis (review_id, traits, sentiment, mismatch, model) VALUES
   (t.id('r-teen14-pub'), ARRAY['positive'], 0.2, false, 'fixture'),
   (t.id('r-adult-pub'),  ARRAY['positive','onTime'], 0.9, false, 'fixture'),
@@ -439,7 +441,11 @@ SELECT t.reset();
 -- merely editing other columns cannot clear a flag
 UPDATE public.reputation_insights SET minor_protected = false, summary = 'edited' WHERE reviewee_id = t.id('grad')::text;
 SELECT t.ok((SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'editing other columns cannot clear the summary flag');
--- a summary regenerated after 18 (the server builds it from unprotected reviews only) is judged at its own time
+-- a summary regenerated after 18 (the server builds it from unprotected reviews only) is judged at its own time; it is backed
+-- by a review written about them as an adult (a summary is readable only while a public review of its subject is)
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (t.id('h-about-grad-adult'), t.id('peer31'), 'player', 'player', t.id('grad')::text, 'Grad', 5, 'Written about them after they turned 18.');
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reviews WHERE id = t.id('h-about-grad-adult')), 'fixture: a review about grad as an adult is not flagged');
 UPDATE public.reputation_insights SET summary = 'Regenerated from adult-era reviews.', generated_at = now() WHERE reviewee_id = t.id('grad')::text;
 SELECT t.ok(NOT (SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'a regenerated summary is not flagged');
 SELECT t.as_user(t.id('stranger'));

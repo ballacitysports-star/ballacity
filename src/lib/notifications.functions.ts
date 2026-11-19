@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { guardNotificationForOther } from "@/lib/notification-guard";
+import { resolveNotificationTarget } from "@/lib/deep-links";
 
 const inputSchema = z.object({
   user_id: z.string().uuid(),
@@ -16,7 +18,17 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const callerId = context.userId;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let row = {
+      type: data.type,
+      title: data.title,
+      body: data.body ?? null,
+      link: data.link ?? null,
+    };
     if (data.user_id !== callerId) {
+      // For someone else: only the types, in-app links and lengths the app's own screens send (notification-guard.ts).
+      const guarded = guardNotificationForOther(row);
+      if (!guarded.ok) throw new Error(guarded.code);
+      row = guarded.value;
       // Verify the caller has a legitimate relationship with the target user
       // before sending them an in-app notification. Asked with the service
       // role: `_caller` is the verified session user, and the database gives
@@ -31,11 +43,22 @@ export const createNotificationForUser = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: data.user_id,
-      type: data.type,
-      title: data.title,
-      body: data.body ?? null,
-      link: data.link ?? null,
+      ...row,
     });
     if (error) throw new Error(error.message);
+
+    // The push goes from here, with the stored (guarded) text and link, so a push to someone else can carry nothing the
+    // in-app notification could not. Best effort: a provider failure never fails the notification.
+    try {
+      const { deliverPush } = await import("@/lib/push.server");
+      await deliverPush({
+        userId: data.user_id,
+        title: row.title,
+        body: row.body,
+        url: resolveNotificationTarget({ link: row.link, type: row.type }),
+      });
+    } catch (e) {
+      console.warn("push send failed", e);
+    }
     return { ok: true };
   });
