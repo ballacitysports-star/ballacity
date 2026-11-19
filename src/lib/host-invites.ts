@@ -82,6 +82,33 @@ export function candidateState(
   return null;
 }
 
+/** The server's answer for a regular, in the same terms as candidateState (null: can be invited). */
+export function regularState(
+  status: "in_game" | "accepted" | "invited" | "declined_recently" | "available",
+): CandidateState {
+  switch (status) {
+    case "in_game":
+      return "on_roster";
+    case "accepted":
+      return "joined";
+    case "invited":
+      return "invited";
+    case "declined_recently":
+      return "declined_recently";
+    default:
+      return null;
+  }
+}
+
+/** "3 games with you · last Nov 12" for a regular. */
+export function regularDetail(games: number, lastPlayed: string): string {
+  const d = new Date(lastPlayed);
+  const when = Number.isNaN(+d)
+    ? ""
+    : ` · last ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  return `${games} ${games === 1 ? "game" : "games"} with you${when}`;
+}
+
 export const CANDIDATE_LABEL: Record<Exclude<CandidateState, null>, string> = {
   on_roster: "On the roster",
   invited: "Invited",

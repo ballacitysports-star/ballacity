@@ -243,5 +243,9 @@ test("join waits for the Before you join acknowledgment, and Cancel joins nothin
     timeout: 10_000,
   });
 
+  // The app may still be refetching the roster through the game_participants route when the test ends; closing the
+  // context under it made route.fetch throw "Request context disposed" outside any test, which failed the run and kept
+  // the next spec from running. Drop the routes first and ignore anything still in flight.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
   await ctx.close();
 });

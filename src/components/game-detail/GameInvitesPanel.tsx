@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Send, UserPlus } from "lucide-react";
+import { Loader2, Repeat, Send, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import {
   inviteeNames,
   invitePlayersToGame,
   listGameInvitesForGame,
+  listRegularPlayers,
   type GameInvite,
 } from "@/lib/game-invites";
 import {
@@ -28,6 +29,9 @@ import {
   candidateState,
   inviteCounts,
   inviteSearchFor,
+  regularDetail,
+  regularState,
+  type CandidateState,
 } from "@/lib/host-invites";
 import type { Game } from "@/lib/sample-data";
 
@@ -41,9 +45,10 @@ const STATUS_LABEL: Record<GameInvite["status"], string> = {
 
 /**
  * WP 2.1: the host's invitations for one game. A summary line, the invited players with their answers (Withdraw while one
- * waits), and "Invite players nearby": players whose availability overlaps the game, near its place, for its sport, to invite
- * up to 30 at once. Shown only to the host of an upcoming game. The database decides who can be invited and says so
- * neutrally; this only offers the people the host can already see in Find Players.
+ * waits), and two ways to invite up to 30 at once: "Invite nearby" (players whose availability overlaps the game, near its
+ * place, for its sport) and, from WP 3.2a, "Invite regulars" (adults who played in this host's games in the last 90 days).
+ * Shown only to the host of an upcoming game. The database decides who can be invited and says so neutrally; this only
+ * offers the people the host can already see.
  */
 export function GameInvitesPanel({
   game,
@@ -55,7 +60,7 @@ export function GameInvitesPanel({
   rosterIds: readonly string[];
 }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<null | "nearby" | "regulars">(null);
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const search = useMemo(() => inviteSearchFor(game), [game]);
@@ -113,14 +118,24 @@ export function GameInvitesPanel({
           <h2 className="section-eyebrow text-muted-foreground">Invite players</h2>
           <p className="mt-1 text-sm">{summary}</p>
         </div>
-        <Button
-          size="sm"
-          className="shrink-0 rounded-full bg-lime-gradient text-primary-foreground"
-          onClick={() => setOpen(true)}
-          disabled={!search.ok}
-        >
-          <UserPlus className="mr-1 h-4 w-4" aria-hidden /> Invite nearby
-        </Button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Button
+            size="sm"
+            className="rounded-full bg-lime-gradient text-primary-foreground"
+            onClick={() => setOpen("nearby")}
+            disabled={!search.ok}
+          >
+            <UserPlus className="mr-1 h-4 w-4" aria-hidden /> Invite nearby
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full"
+            onClick={() => setOpen("regulars")}
+          >
+            <Repeat className="mr-1 h-4 w-4" aria-hidden /> Invite regulars
+          </Button>
+        </div>
       </div>
       {!search.ok && search.reason === "no_location" && (
         <p className="mt-2 text-xs text-muted-foreground">
@@ -178,8 +193,8 @@ export function GameInvitesPanel({
 
       {search.ok && (
         <InviteNearbySheet
-          open={open}
-          onOpenChange={setOpen}
+          open={open === "nearby"}
+          onOpenChange={(o) => setOpen(o ? "nearby" : null)}
           game={game}
           query={search.query}
           hostId={hostId}
@@ -188,9 +203,23 @@ export function GameInvitesPanel({
           onInvited={() => void qc.invalidateQueries({ queryKey: invitesKey })}
         />
       )}
+      <InviteRegularsSheet
+        open={open === "regulars"}
+        onOpenChange={(o) => setOpen(o ? "regulars" : null)}
+        game={game}
+        hostId={hostId}
+        rosterIds={rosterIds}
+        invites={rows}
+        onInvited={() => {
+          void qc.invalidateQueries({ queryKey: invitesKey });
+          void qc.invalidateQueries({ queryKey: ["invite-regulars", game.id] });
+        }}
+      />
     </section>
   );
 }
+
+type Candidate = { id: string; name: string; detail: string; state: CandidateState };
 
 function InviteNearbySheet({
   open,
@@ -211,10 +240,6 @@ function InviteNearbySheet({
   invites: readonly GameInvite[];
   onInvited: () => void;
 }) {
-  const [picked, setPicked] = useState<string[]>([]);
-  const [note, setNote] = useState("");
-  const [sending, setSending] = useState(false);
-
   const nearby = useQuery({
     queryKey: ["invite-candidates", game.id, query.from, query.to, query.sport],
     queryFn: () => listAvailabilityNear(query),
@@ -223,20 +248,138 @@ function InviteNearbySheet({
   });
 
   // One row per person: the search already returns one, the nearest first.
-  const people = useMemo(() => {
+  const people = useMemo<Candidate[]>(() => {
     const seen = new Set<string>();
-    return (nearby.data ?? []).filter((p: NearbyAvailabilityWithAuthor) =>
-      seen.has(p.user_id) ? false : (seen.add(p.user_id), true),
-    );
-  }, [nearby.data]);
-  const states = useMemo(
-    () =>
-      Object.fromEntries(
-        people.map((p) => [p.user_id, candidateState(p.user_id, { hostId, rosterIds, invites })]),
-      ),
-    [people, hostId, rosterIds, invites],
+    return (nearby.data ?? [])
+      .filter((p: NearbyAvailabilityWithAuthor) =>
+        seen.has(p.user_id) ? false : (seen.add(p.user_id), true),
+      )
+      .map((p) => {
+        const st = candidateState(p.user_id, { hostId, rosterIds, invites });
+        return {
+          id: p.user_id,
+          name: p.author_name,
+          detail: `${typeof p.distance_mi === "number" ? `${p.distance_mi} mi away` : ""}${
+            p.skill_level ? ` · ${p.skill_level}` : ""
+          }`,
+          state: st === "host" ? "on_roster" : st,
+        };
+      })
+      .filter((p) => p.id !== hostId);
+  }, [nearby.data, hostId, rosterIds, invites]);
+
+  return (
+    <InvitePickerSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      game={game}
+      title="Invite players nearby"
+      description={`Players who said they're free for ${game.sport} at this game's time, within ${INVITE_SEARCH_RADIUS_MI} miles.`}
+      listLabel="Available players"
+      loadingText="Finding players…"
+      emptyText="No one nearby has posted availability for this time yet."
+      loading={nearby.isLoading}
+      error={nearby.isError}
+      people={people}
+      onInvited={onInvited}
+    />
   );
-  const open_ = people.filter((p) => states[p.user_id] === null);
+}
+
+function InviteRegularsSheet({
+  open,
+  onOpenChange,
+  game,
+  hostId,
+  rosterIds,
+  invites,
+  onInvited,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  game: Game;
+  hostId: string | null;
+  rosterIds: readonly string[];
+  invites: readonly GameInvite[];
+  onInvited: () => void;
+}) {
+  const regulars = useQuery({
+    queryKey: ["invite-regulars", game.id],
+    queryFn: async () => {
+      const rows = await listRegularPlayers(game.id);
+      const names = await inviteeNames(rows.map((r) => r.user_id));
+      return { rows, names };
+    },
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const people = useMemo<Candidate[]>(
+    () =>
+      (regulars.data?.rows ?? []).map((r) => {
+        // The server's answer, or what this page already knows (an invitation sent a moment ago).
+        const local = candidateState(r.user_id, { hostId, rosterIds, invites });
+        return {
+          id: r.user_id,
+          name: regulars.data?.names[r.user_id] ?? "Player",
+          detail: regularDetail(r.games, r.last_played),
+          state: regularState(r.status) ?? (local === "host" ? "on_roster" : local),
+        };
+      }),
+    [regulars.data, hostId, rosterIds, invites],
+  );
+
+  return (
+    <InvitePickerSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      game={game}
+      title="Invite your regulars"
+      description="Players from your games in the last 90 days. They don't need to have posted availability; they can turn this off in their privacy settings."
+      listLabel="Your regulars"
+      loadingText="Finding your regulars…"
+      emptyText="No one has played in your games in the last 90 days yet."
+      loading={regulars.isLoading}
+      error={regulars.isError}
+      people={people}
+      onInvited={onInvited}
+    />
+  );
+}
+
+function InvitePickerSheet({
+  open,
+  onOpenChange,
+  game,
+  title,
+  description,
+  listLabel,
+  loadingText,
+  emptyText,
+  loading,
+  error,
+  people,
+  onInvited,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  game: Game;
+  title: string;
+  description: string;
+  listLabel: string;
+  loadingText: string;
+  emptyText: string;
+  loading: boolean;
+  error: boolean;
+  people: readonly Candidate[];
+  onInvited: () => void;
+}) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const noteId = `invite-note-${listLabel.replace(/\W+/g, "-").toLowerCase()}`;
+
+  const open_ = people.filter((p) => p.state === null);
   const toggle = (id: string) =>
     setPicked((cur) =>
       cur.includes(id)
@@ -267,26 +410,21 @@ function InviteNearbySheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl pb-8">
         <SheetHeader className="text-left">
-          <SheetTitle>Invite players nearby</SheetTitle>
-          <SheetDescription>
-            Players who said they're free for {game.sport} at this game's time, within{" "}
-            {INVITE_SEARCH_RADIUS_MI} miles.
-          </SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          {nearby.isLoading ? (
+          {loading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Finding players…
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {loadingText}
             </p>
-          ) : nearby.isError ? (
+          ) : error ? (
             <p className="text-sm text-muted-foreground">
               Couldn't load players right now. Try again in a moment.
             </p>
           ) : people.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No one nearby has posted availability for this time yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{emptyText}</p>
           ) : (
             <>
               {open_.length > 1 && (
@@ -297,7 +435,7 @@ function InviteNearbySheet({
                     setPicked(
                       picked.length === Math.min(open_.length, INVITE_BATCH_MAX)
                         ? []
-                        : open_.slice(0, INVITE_BATCH_MAX).map((p) => p.user_id),
+                        : open_.slice(0, INVITE_BATCH_MAX).map((p) => p.id),
                     )
                   }
                 >
@@ -306,12 +444,12 @@ function InviteNearbySheet({
                     : "Select everyone available"}
                 </button>
               )}
-              <ul className="space-y-2" aria-label="Available players">
+              <ul className="space-y-2" aria-label={listLabel}>
                 {people.map((p) => {
-                  const st = states[p.user_id];
-                  const checked = picked.includes(p.user_id);
+                  const st = p.state;
+                  const checked = picked.includes(p.id);
                   return (
-                    <li key={p.user_id}>
+                    <li key={p.id}>
                       <label
                         className={`flex min-h-12 items-center gap-3 rounded-2xl border p-3 ${
                           st ? "opacity-60" : "cursor-pointer"
@@ -322,19 +460,16 @@ function InviteNearbySheet({
                           className="h-5 w-5 accent-lime"
                           checked={checked}
                           disabled={!!st}
-                          onChange={() => toggle(p.user_id)}
-                          aria-label={`Invite ${p.author_name}`}
+                          onChange={() => toggle(p.id)}
+                          aria-label={`Invite ${p.name}`}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">
-                            {p.author_name}
-                          </span>
+                          <span className="block truncate text-sm font-semibold">{p.name}</span>
                           <span className="block truncate text-xs text-muted-foreground">
-                            {typeof p.distance_mi === "number" ? `${p.distance_mi} mi away` : ""}
-                            {p.skill_level ? ` · ${p.skill_level}` : ""}
+                            {p.detail}
                           </span>
                         </span>
-                        {st && st !== "host" && (
+                        {st && (
                           <span className="shrink-0 text-[11px] font-bold uppercase text-muted-foreground">
                             {CANDIDATE_LABEL[st]}
                           </span>
@@ -346,13 +481,13 @@ function InviteNearbySheet({
               </ul>
               <div>
                 <label
-                  htmlFor="invite-note"
+                  htmlFor={noteId}
                   className="mb-1 block text-xs font-bold uppercase text-muted-foreground"
                 >
                   Note (optional)
                 </label>
                 <Textarea
-                  id="invite-note"
+                  id={noteId}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={500}
