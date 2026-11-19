@@ -18,7 +18,7 @@
 -- Deploy order: this migration BEFORE the app. Without it the app fails closed on the manual methods only: the pay
 -- page offers no manual method or proof form (a Retry in their place) and the game page's Payments tab shows no
 -- handles. PayPal checkout does not depend on this function and stays offered.
--- Rollback: docs/rollbacks/20261120100000_manual_claim_guardian_ready.down.sql (guarded).
+-- Rollback: docs/rollbacks/20261123100000_manual_claim_guardian_ready.down.sql (guarded).
 
 CREATE OR REPLACE FUNCTION public.game_manual_claim_guardian_ready(_game_id text)
 RETURNS boolean

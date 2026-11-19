@@ -410,21 +410,8 @@ export async function createContactRequest(
     throw error;
   }
 
-  // Fire a best-effort in-app + push notification to the recipient.
-  if (invite) {
-    try {
-      const { createNotification } = await import("@/lib/notifications");
-      await createNotification({
-        user_id: toUserId,
-        type: "game_invite",
-        title: `You're invited to ${invite.title ?? "a pickup game"}`,
-        body: [invite.sport, invite.location].filter(Boolean).join(" · ") || null,
-        link: `/games/${invite.gameId}?invite=1&from=${u.user.id}`,
-      });
-    } catch (e) {
-      console.warn("invite notification failed", e);
-    }
-  }
+  // No notification from here: an invitation through game_invite_player is announced by the database from the real game
+  // (WP 2.0), and the server no longer accepts a client-written "game_invite" for someone else (notification-guard.ts).
 }
 
 export async function listMyContactRequests(

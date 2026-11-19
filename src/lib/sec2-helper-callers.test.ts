@@ -75,7 +75,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({
     },
   },
 }));
-vi.mock("@/lib/push.server", () => ({ deliverPush: async () => ({ ok: true as const }) }));
+const pushed: unknown[] = [];
+vi.mock("@/lib/push.server", () => ({
+  deliverPush: async (p: unknown) => {
+    pushed.push(p);
+    return { ok: true as const };
+  },
+}));
 
 import { createNotificationForUser } from "@/lib/notifications.functions";
 import { sendPushToUser } from "@/lib/push.functions";
@@ -99,50 +105,88 @@ beforeEach(() => {
   db.hostId = "host-1";
   db.linked = { game_participants: 0, join_requests: 0, payment_submissions: 0 };
   db.inserted = [];
+  pushed.length = 0;
 });
 
 describe("can_notify is asked with the service role", () => {
-  it("a cross-user notification goes through when the relationship holds", async () => {
+  it("a cross-user notification goes through when the relationship holds, and its push carries the stored row", async () => {
     db.rpc.can_notify = true;
     const res = await createNotificationForUser({
-      data: { user_id: TARGET, type: "game", title: "Hi" },
+      data: { user_id: TARGET, type: "message", title: "  Hi  ", link: "/messages/c1" },
       context: ctx("host-1"),
     } as never);
     expect(res).toEqual({ ok: true });
     expect(calls).toEqual([
       { who: "admin", fn: "can_notify", args: { _caller: "host-1", _target: TARGET } },
     ]);
-    expect(db.inserted).toHaveLength(1);
+    expect(db.inserted).toEqual([
+      {
+        table: "notifications",
+        row: { user_id: TARGET, type: "message", title: "Hi", body: null, link: "/messages/c1" },
+      },
+    ]);
+    expect(pushed).toEqual([{ userId: TARGET, title: "Hi", body: null, url: "/messages/c1" }]);
   });
 
-  it("and is refused when it does not", async () => {
+  it("and is refused when it does not (no row, no push)", async () => {
     db.rpc.can_notify = false;
     await expect(
       createNotificationForUser({
-        data: { user_id: TARGET, type: "game", title: "Hi" },
+        data: { user_id: TARGET, type: "message", title: "Hi" },
         context: ctx("host-1"),
       } as never),
     ).rejects.toThrow("Not authorized to notify this user");
     expect(db.inserted).toHaveLength(0);
+    expect(pushed).toHaveLength(0);
   });
 
-  it("a push to another user asks the same way, with the session user as _caller", async () => {
+  it("a type or link the app's screens do not send is refused for someone else, whatever the relationship", async () => {
     db.rpc.can_notify = true;
-    const res = await sendPushToUser({
-      data: { userId: TARGET, title: "Hi" },
-      context: ctx("host-1"),
+    await expect(
+      createNotificationForUser({
+        data: { user_id: TARGET, type: "safety_alert", title: "Your account is suspended" },
+        context: ctx("host-1"),
+      } as never),
+    ).rejects.toThrow("NOTIFICATION_TYPE_NOT_ALLOWED");
+    await expect(
+      createNotificationForUser({
+        data: { user_id: TARGET, type: "message", title: "Hi", link: "https://evil.example/login" },
+        context: ctx("host-1"),
+      } as never),
+    ).rejects.toThrow("NOTIFICATION_LINK_NOT_ALLOWED");
+    expect(db.inserted).toHaveLength(0);
+    expect(pushed).toHaveLength(0);
+  });
+
+  it("a notification to oneself is not limited by the guard", async () => {
+    await createNotificationForUser({
+      data: { user_id: TARGET, type: "reel_ready", title: "Your reel is ready" },
+      context: ctx(TARGET),
     } as never);
-    expect(res).toEqual({ ok: true });
-    expect(calls).toEqual([
-      { who: "admin", fn: "can_notify", args: { _caller: "host-1", _target: TARGET } },
+    expect(calls).toEqual([]);
+    expect(db.inserted).toHaveLength(1);
+    expect(pushed).toEqual([
+      { userId: TARGET, title: "Your reel is ready", body: null, url: "/reels" },
     ]);
-    db.rpc.can_notify = false;
+  });
+
+  it("a free-text push to another user is refused without asking anything; a push to oneself still goes", async () => {
+    db.rpc.can_notify = true;
     expect(
       await sendPushToUser({
-        data: { userId: TARGET, title: "Hi" },
+        data: { userId: TARGET, title: "Hi", url: "https://evil.example" },
         context: ctx("host-1"),
       } as never),
     ).toEqual({ ok: false, reason: "not_authorized" });
+    expect(calls).toEqual([]);
+    expect(pushed).toHaveLength(0);
+    expect(
+      await sendPushToUser({
+        data: { userId: TARGET, title: "Hi" },
+        context: ctx(TARGET),
+      } as never),
+    ).toEqual({ ok: true });
+    expect(pushed).toHaveLength(1);
   });
 });
 

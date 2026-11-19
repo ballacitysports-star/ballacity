@@ -465,7 +465,7 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
     SECURITY DEFINER, `search_path = ''`), EXECUTE for `authenticated` only (not PUBLIC, anon or service_role), no
     player argument: it answers about the caller only. No existing RPC answered this: `game_payment_guardian_ready`
     adds the adult exemption, and the rule itself is in `private_sec`, not callable through the API. The trigger, the rule, `game_payment_guardian_ready` and PayPal
-    are untouched. The 910 test checks the check and the trigger agree for 7 accounts x 2 games (adult, 17 with no
+    are untouched. The 940 test checks the check and the trigger agree for 7 accounts x 2 games (adult, 17 with no
     link, guarded 16 before and after approval and after a host rejection, 18 and 25 with an old link, the
     guardian, the host), the adult case before and after a guardian approval (for that game only) and after the
     guardian ends the link, and that PayPal's check still exempts the adult.
@@ -513,9 +513,9 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
 
   | Piece                    | Where                                                                                                  |
   | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-  | The trigger's rule, read | `supabase/migrations/20261120100000_manual_claim_guardian_ready.sql`                                   |
-  | SQL test                 | `supabase/tests/910_manual_claim_guardian_ready.test.sql` (58 assertions; fails without the migration) |
-  | Rollback                 | `docs/rollbacks/20261120100000_manual_claim_guardian_ready.down.sql` (guarded; rehearsed)              |
+  | The trigger's rule, read | `supabase/migrations/20261123100000_manual_claim_guardian_ready.sql`                                   |
+  | SQL test                 | `supabase/tests/940_manual_claim_guardian_ready.test.sql` (58 assertions; fails without the migration) |
+  | Rollback                 | `docs/rollbacks/20261123100000_manual_claim_guardian_ready.down.sql` (guarded; rehearsed)              |
   | Decision                 | `src/lib/pay-entry-gate.ts` (`payManualMethodsStep`); tests in `src/lib/pay-entry-gate.test.ts`        |
   | Hook                     | `src/hooks/use-game-payment-guardian-ready.ts` (`useGameManualClaimGuardianReady`)                     |
   | Pay page                 | `src/routes/games.$gameId.pay.tsx`                                                                     |
@@ -671,8 +671,8 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 
 ### Section 6 (d) (branch claude/guardian-adult-manual-claim, owner decision 2026-11-18)
 
-- SQL: `910_manual_claim_guardian_ready` 58 passed. Negative control: with the migration file moved out of the
-  replay, 910 stops on "function public.game_manual_claim_guardian_ready(text) does not exist" (0 passed, 1 failed).
+- SQL: `940_manual_claim_guardian_ready` 58 passed. Negative control: with the migration file moved out of the
+  replay, 940 stops on "function public.game_manual_claim_guardian_ready(text) does not exist" (0 passed, 1 failed).
 - Rollback rehearsal on a scratch replay: refuses unconfirmed (function kept); refuses, changing nothing, when the
   function's definition differs from the migration's (md5); with the confirmation it drops the function and leaves
   the guardian trigger and `game_payment_guardian_ready` in place; a second run refuses (function gone); re-applying
@@ -685,7 +685,7 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 - Mutation check: with `payManualMethodsStep` always answering 'offer_all', three of the four new E2E tests fail (the
   "check says yes" test passes, as it should).
 - Review fixes (PayPal kept while the check loads or failed; Payments tab handles; managed-account wording): unit
-  `pay-entry-gate.test.ts` 116; full `npx vitest run` 411 files, 4336 passed, 22 skipped; SQL 910 58 passed and the
+  `pay-entry-gate.test.ts` 116; full `npx vitest run` 411 files, 4336 passed, 22 skipped; SQL 940 58 passed and the
   negative control unchanged (0 passed, 1 failed without the migration); rollback rehearsed again on a scratch
   replay (refuses unconfirmed; drops with the confirmation, the trigger and `game_payment_guardian_ready` kept;
   refuses a second run; re-apply gives md5 `109ac8d2…`, EXECUTE for authenticated, not anon). E2E, all

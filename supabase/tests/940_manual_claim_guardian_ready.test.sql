@@ -1,4 +1,4 @@
--- docs/paid-path-gates.md section 6 (d) (20261120100000_manual_claim_guardian_ready): the pay page's view of the
+-- docs/paid-path-gates.md section 6 (d) (20261123100000_manual_claim_guardian_ready): the pay page's view of the
 -- manual-claim guardian rule. public.game_manual_claim_guardian_ready(game) must give exactly the answer the payment
 -- trigger (enforce_guardian_before_payment) gives the caller's own manual claim, including for an adult whose guardian
 -- link from before 18 is still active, whom game_payment_guardian_ready (PayPal) lets pay. The trigger itself is

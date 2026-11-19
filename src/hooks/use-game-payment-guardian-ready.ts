@@ -52,7 +52,7 @@ export function useGamePaymentGuardianReady(
 }
 
 /**
- * public.game_manual_claim_guardian_ready(game) for the signed-in viewer (20261120100000): the manual-claim trigger's
+ * public.game_manual_claim_guardian_ready(game) for the signed-in viewer (20261123100000): the manual-claim trigger's
  * own rule (enforce_guardian_before_payment), with no adult exemption. It differs from useGamePaymentGuardianReady only
  * for a viewer known to be 18 or over whose guardian link from before 18 is still active: PayPal takes their payment,
  * the database refuses their Venmo / Cash App proof. The pay page asks it before it shows a manual method

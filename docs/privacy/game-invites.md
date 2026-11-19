@@ -52,8 +52,9 @@ games, post, invitations and notifications were removed afterwards.
 - Bulk invite UI and the host's invited list on the game page (WP 2.1; the server side, `game_invite_players` and the host's read
   of `game_invites`, is here).
 - Push notifications for invitations (in-app only, like the WP 1.2 reminders).
-- `can_notify`: once any contact request exists between two people, the sender's app can still write arbitrary notifications to the
-  other through `createNotificationForUser`. The app no longer does this for invitations; closing the channel is a separate change.
+- `can_notify`: once any contact request exists between two people, the sender's app could still write arbitrary notifications to
+  the other through `createNotificationForUser`. The app no longer does this for invitations; the channel itself is closed in
+  `docs/privacy/insights-and-notifications.md`.
 
 ## WP 2.1: the host's side (app only)
 
