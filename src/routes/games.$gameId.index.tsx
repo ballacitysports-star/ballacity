@@ -1669,7 +1669,7 @@ function GameDetail() {
       {/* Multi-day series: switch between sessions */}
       {game.seriesId && (
         <div className="page-shell mt-4">
-          <SeriesSessionsStrip game={game} />
+          <SeriesSessionsStrip game={game} isHost={isHost} />
         </div>
       )}
 

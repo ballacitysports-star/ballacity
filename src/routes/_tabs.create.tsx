@@ -81,6 +81,13 @@ import { trackEvent, trackTaskError } from "@/lib/analytics";
 import { trackOpenCreate } from "@/lib/nav-analytics";
 import { BackButton } from "@/components/layout/BackButton";
 import {
+  REPEAT_OPTIONS,
+  repeatLabel,
+  startGameSeries,
+  untilError,
+  type RepeatChoice,
+} from "@/lib/game-series-api";
+import {
   affiliationLabel as hostAffiliationLabel,
   hostAffiliations,
   preferredAffiliation,
@@ -242,6 +249,8 @@ function Create() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
   const [multiDay, setMultiDay] = useState(false);
+  // A one-day game can repeat; the server creates the next dates (WP 3.1).
+  const [repeat, setRepeat] = useState<RepeatChoice>({ freq: "none", until: null });
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
 
   useEffect(() => {
@@ -816,6 +825,13 @@ function Create() {
                 setPublishing(false);
                 return;
               }
+              const repeatProblem =
+                repeat.freq === "none" ? null : untilError(when.startDate, repeat.until);
+              if (repeatProblem) {
+                toast.error(repeatProblem);
+                setPublishing(false);
+                return;
+              }
               plans = [whenRangeToPlan(when, eventTimeZone)];
             }
             totalPlans = plans.length;
@@ -944,7 +960,28 @@ function Create() {
             } catch {
               /* ignore */
             }
-            toast.success(plans.length > 1 ? `Created ${plans.length} games` : "Game published");
+            // A one-day game set to repeat: the server makes it a series and creates the next dates. The game is already
+            // published, so a failure here only leaves it as a single game.
+            let repeatNote = "";
+            if (!multiDay && plans.length === 1 && repeat.freq !== "none" && firstGameId) {
+              try {
+                const started = await startGameSeries(firstGameId, repeat);
+                repeatNote = ` · ${repeatLabel({ freq: repeat.freq, until: repeat.until })?.toLowerCase()}${
+                  started.created > 0
+                    ? ` (${started.created} more ${started.created === 1 ? "date" : "dates"} added)`
+                    : ""
+                }`;
+              } catch (err) {
+                toast.error(
+                  `Game published, but it couldn't be set to repeat. ${
+                    err instanceof Error ? err.message : ""
+                  }`.trim(),
+                );
+              }
+            }
+            toast.success(
+              plans.length > 1 ? `Created ${plans.length} games` : `Game published${repeatNote}`,
+            );
             // A series opens on its first date, not back on the feed, so the host sees it exist.
             nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
           } catch (err) {
@@ -1123,12 +1160,68 @@ function Create() {
             {multiDay ? (
               <GameScheduleBuilder value={schedule} onChange={setSchedule} />
             ) : (
-              <DateTimeRangePicker
-                value={when}
-                onChange={setWhen}
-                todayKey={todayKeyInZone(eventTimeZone)}
-                timeZoneLabel={`${timeZoneAbbr(new Date(), eventTimeZone)} · ${eventTimeZone.split("/").pop()?.replace(/_/g, " ")}`}
-              />
+              <>
+                <DateTimeRangePicker
+                  value={when}
+                  onChange={setWhen}
+                  todayKey={todayKeyInZone(eventTimeZone)}
+                  timeZoneLabel={`${timeZoneAbbr(new Date(), eventTimeZone)} · ${eventTimeZone.split("/").pop()?.replace(/_/g, " ")}`}
+                />
+                <div className="space-y-2">
+                  <div
+                    role="radiogroup"
+                    aria-label="Repeat"
+                    className="flex flex-wrap gap-2"
+                    data-testid="repeat-choice"
+                  >
+                    {REPEAT_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={repeat.freq === o.value}
+                        onClick={() =>
+                          setRepeat((r) => ({
+                            freq: o.value,
+                            until: o.value === "none" ? null : r.until,
+                          }))
+                        }
+                        className={`rounded-full border px-3 py-2 text-[13px] font-semibold ${
+                          repeat.freq === o.value
+                            ? "border-lime bg-lime/10 text-lime"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  {repeat.freq !== "none" && (
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="create-repeat-until"
+                        className="block px-1 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        Last date (optional)
+                      </label>
+                      <input
+                        id="create-repeat-until"
+                        type="date"
+                        min={when.startDate}
+                        value={repeat.until ?? ""}
+                        onChange={(e) =>
+                          setRepeat((r) => ({ ...r, until: e.target.value || null }))
+                        }
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="px-1 text-[11px] text-muted-foreground">
+                        Dates are added up to 4 weeks ahead. Each new date copies the latest one, so
+                        edits to it carry forward.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </Section>
 
