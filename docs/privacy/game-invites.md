@@ -54,3 +54,22 @@ games, post, invitations and notifications were removed afterwards.
 - Push notifications for invitations (in-app only, like the WP 1.2 reminders).
 - `can_notify`: once any contact request exists between two people, the sender's app can still write arbitrary notifications to the
   other through `createNotificationForUser`. The app no longer does this for invitations; closing the channel is a separate change.
+
+## WP 2.1: the host's side (app only)
+
+No database change; it uses WP 2.0's `game_invite_players`, `game_cancel_invite` and the host's read of `game_invites`.
+
+- On the game page, the host of an upcoming game sees "Invite players" (`src/components/game-detail/GameInvitesPanel.tsx`, rules
+  in `src/lib/host-invites.ts`): a summary ("2 waiting · 1 accepted"), each invited player with their answer, and Withdraw while
+  one waits. Nothing for a game that has started, ended or been cancelled.
+- "Invite nearby" opens a sheet listing players whose availability overlaps the game's time, within 25 miles of its place, for its
+  sport, nearest first, up to 30 (`players_available_near`, under the read policy: the host sees exactly whom Find Players would
+  show them). Players on the roster, already invited or who accepted, and those who declined in the last 7 days are shown but
+  cannot be picked. An optional note goes with the invitations; the result says how many were invited and why the rest were not
+  (the server's neutral reasons).
+- A game without a mapped place cannot be searched by distance; the panel says to add the address.
+- Names come from `profiles` as the host may read them; a private profile reads "Player", as in Find Players.
+- Checked on the verified sandbox at iPhone size: the sheet listed both test players (1 and 4 miles), "Select everyone available"
+  and "Invite 2 players" invited both ("Invited 2 players."), the panel read "2 waiting", Withdraw moved one to "Withdrawn"; axe
+  found no WCAG 2.1 A/AA violation in the sheet or the panel; the test game, posts, invitations and notifications were removed;
+  no request reached the production host.

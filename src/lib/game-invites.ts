@@ -246,3 +246,27 @@ export async function getGameInvite(inviteId: string): Promise<GameInvite | null
   if (error) throw error;
   return (data as GameInvite | null) ?? null;
 }
+
+type ProfilesTable = {
+  select: (cols: string) => {
+    in: (
+      col: string,
+      ids: readonly string[],
+    ) => PromiseLike<{
+      data: { id: string; display_name: string | null }[] | null;
+      error: unknown;
+    }>;
+  };
+};
+
+/** Display names for invited players, as the host may read them; an unreadable profile reads "Player". */
+export async function inviteeNames(ids: readonly string[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(ids));
+  if (unique.length === 0) return {};
+  const t = supabase.from("profiles" as never) as unknown as ProfilesTable;
+  const { data } = await t.select("id, display_name").in("id", unique);
+  const out: Record<string, string> = {};
+  for (const id of unique) out[id] = "Player";
+  for (const p of data ?? []) if (p.display_name?.trim()) out[p.id] = p.display_name.trim();
+  return out;
+}
