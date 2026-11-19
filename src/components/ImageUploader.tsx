@@ -263,9 +263,7 @@ export function ImageUploader({
 
       {isCover && presets && presets.length > 0 && (
         <div>
-          <div className="mb-2 micro-label text-muted-foreground">
-            Or pick a preset
-          </div>
+          <div className="mb-2 micro-label text-muted-foreground">Or pick a preset</div>
           <div className="grid grid-cols-3 gap-2">
             {(presets.length ? presets : DEFAULT_PRESETS).map((s) => {
               const src = imageFor(s);
@@ -274,6 +272,8 @@ export function ImageUploader({
                 <button
                   key={s}
                   type="button"
+                  aria-label={`Use the ${s} cover`}
+                  aria-pressed={active}
                   disabled={uploading || disabled}
                   onClick={() => onChange(src)}
                   className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${

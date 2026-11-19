@@ -94,9 +94,11 @@ export function GamePolicyFields({
         )}
       </div>
 
-      {/* Waitlist */}
+      {/* Waitlist: the whole row is the switch, so it is named by its label */}
       <button
         type="button"
+        role="switch"
+        aria-checked={value.allowWaitlist}
         onClick={() => set("allowWaitlist", !value.allowWaitlist)}
         className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-left"
       >
@@ -113,8 +115,7 @@ export function GamePolicyFields({
           </span>
         </span>
         <span
-          role="switch"
-          aria-checked={value.allowWaitlist}
+          aria-hidden
           className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
             value.allowWaitlist ? "bg-lime" : "bg-secondary"
           }`}
@@ -155,7 +156,7 @@ export function GamePolicyFields({
                 }`}
               >
                 <span className="block text-sm font-semibold">{p.label}</span>
-                <span className="block text-[11px] opacity-80">{p.short}</span>
+                <span className="block text-[11px]">{p.short}</span>
               </button>
             );
           })}
