@@ -202,6 +202,7 @@ import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
 import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
+import { GameInvitesPanel } from "@/components/game-detail/GameInvitesPanel";
 import {
   gameTakesNoPayment,
   payHostLinkShown,
@@ -1980,6 +1981,15 @@ function GameDetail() {
         {viewerCountsAsJoined && <GameReminderCard gameId={game.id} />}
 
         <GameLocationCard game={game} />
+
+        {/* WP 2.1: the host invites players available near the game and follows their answers. */}
+        {isHost && (
+          <GameInvitesPanel
+            game={game}
+            hostId={settings?.host_id ?? game.hostUserId ?? null}
+            rosterIds={liveRoster.map((p) => p.userId)}
+          />
+        )}
 
         <GameHostSection
           canReviewHost={canReviewHost}
