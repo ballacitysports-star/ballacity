@@ -270,3 +270,24 @@ export async function inviteeNames(ids: readonly string[]): Promise<Record<strin
   for (const p of data ?? []) if (p.display_name?.trim()) out[p.id] = p.display_name.trim();
   return out;
 }
+
+/** WP 3.2a: one of the host's regulars, as my_regular_players returns them (migration 20261123100000). */
+export type RegularPlayer = {
+  user_id: string;
+  last_played: string;
+  games: number;
+  status: "in_game" | "accepted" | "invited" | "declined_recently" | "available";
+};
+
+/**
+ * The adults who played in this host's games in the last 90 days and may be invited again without an availability post (not
+ * blocked, not suspended, not opted out), most recent first, at most 50. Only the game's host can ask.
+ */
+export async function listRegularPlayers(gameId: string): Promise<RegularPlayer[]> {
+  const { data, error } = await supabase.rpc(
+    "my_regular_players" as never,
+    { _game: gameId } as never,
+  );
+  if (error) throw error;
+  return (data ?? []) as RegularPlayer[];
+}

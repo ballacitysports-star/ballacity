@@ -269,6 +269,18 @@ function PrivacySettingsPage() {
               onChange={(v: ContactScope) => save({ allow_invites: v })}
             />
           </SettingsStaticRow>
+          <SettingsStaticRow
+            label="Hosts you've played with can invite you again"
+            description="Hosts of games you played in during the last 90 days can invite you without an availability post. Who can invite you at all still follows the setting above."
+            trailing={
+              <Switch
+                checked={prefs.allow_regular_invites}
+                disabled={isLoading || saving}
+                onCheckedChange={(v) => save({ allow_regular_invites: v })}
+                aria-label="Hosts you've played with can invite you again"
+              />
+            }
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Communications & AI">

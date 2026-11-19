@@ -76,7 +76,7 @@ const CATEGORY_QUERIES: Record<
       table: "privacy_preferences",
       column: "user_id",
       columns:
-        "profile_visibility, require_follow_approval, location_precision, show_sports, show_games_played, allow_messages, allow_invites, marketing_emails, ai_processing, ai_training_opt_in, ai_disclosure_ack_at, updated_at",
+        "profile_visibility, require_follow_approval, location_precision, show_sports, show_games_played, allow_messages, allow_invites, allow_regular_invites, marketing_emails, ai_processing, ai_training_opt_in, ai_disclosure_ack_at, updated_at",
     },
     {
       key: "notification_preferences",
