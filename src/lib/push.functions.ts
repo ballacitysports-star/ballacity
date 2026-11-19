@@ -31,17 +31,10 @@ export const sendPushToUser = createServerFn({ method: "POST" })
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
     if (data.userId !== context.userId) {
-      // Asked with the service role: `_caller` is the verified session user, and
-      // the database gives a signed-in client a fixed answer for this two-party
-      // helper (SEC-2).
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: allowed, error: relErr } = await supabaseAdmin.rpc("can_notify" as any, {
-        _caller: context.userId,
-        _target: data.userId,
-      });
-      if (relErr || !allowed) {
-        return { ok: false as const, reason: "not_authorized" };
-      }
+      // A push to someone else goes only with an in-app notification, from createNotificationForUser, which checks the
+      // relationship (can_notify) and sends the stored type, text and link (notification-guard.ts). Free text from the
+      // sender's app is not pushed to another member.
+      return { ok: false as const, reason: "not_authorized" };
     }
 
     const { deliverPush } = await import("@/lib/push.server");

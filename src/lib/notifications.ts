@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
-import { openDeepLink, toAbsoluteDeepLink } from "@/lib/deep-links";
+import { openDeepLink } from "@/lib/deep-links";
 
 export type Notification = {
   id: string;
@@ -28,23 +28,7 @@ export async function createNotification(input: {
   } catch (e: any) {
     console.warn("notification insert failed", e?.message ?? e);
   }
-
-  // Best-effort OneSignal push (background/closed-app delivery). Never blocks.
-  try {
-    const { sendPushToUser } = await import("@/lib/push.functions");
-    void sendPushToUser({
-      data: {
-        userId: input.user_id,
-        title: input.title,
-        body: input.body ?? null,
-        // Push providers need an absolute URL so tapping the alert opens the
-        // exact game / chat / profile the notification refers to.
-        url: toAbsoluteDeepLink(input.link ?? null, input.type),
-      },
-    }).catch((e) => console.warn("push send failed", e));
-  } catch (e) {
-    console.warn("push module load failed", e);
-  }
+  // The push (background/closed-app delivery) is sent by createNotificationForUser from the stored notification.
 }
 
 export async function listMyNotifications(): Promise<Notification[]> {
