@@ -1,0 +1,211 @@
+import { test, expect, type Page } from "@playwright/test";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { account } from "./helpers/fixture-auth";
+import { restoreSession } from "./helpers/signed-in";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+
+/**
+ * E2E against the real database rules (docs/paid-path-gates.md section 6 (c) and the full-game block, owner decision
+ * 2026-11-20): nothing on the payment path is mocked.
+ *
+ * The host's settings row (game_payment_settings) is readable only by the payee, an approved requester, a payer or a
+ * participant (private_sec.can_read_game_payment_settings). A fresh signed-in player on a paid OPEN game read it as
+ * absent and got "Host hasn't set up payment yet", although get_game_host_payment_methods returns the handles to them
+ * and the database accepts their claim. The pay page now asks the public join policy (get_game_join_policy) and the
+ * methods RPC for that viewer, with the settings row still hidden from them (checked below, as the browser reads it).
+ *
+ * The fixture host creates three real games for the run (each with its own id, so the fixture player is a fresh viewer
+ * of each: no request, no payment, no place):
+ *   - open: paid, requires_approval false. The player sees the host's Venmo handle.
+ *   - approval: paid, requires_approval true. The player gets "Waiting on host approval", no handle.
+ *   - full: paid, open, one place, taken by the host. The player gets the full-roster block card, no handle
+ *     (payment_claim_block would refuse their claim with GAME_FULL).
+ * Everything is deleted afterwards. Only "Before you join" is answered (as acknowledged): it is not what this spec is
+ * about, and recording it would write a row per game.
+ *
+ * Writes real rows, so it runs only against the local stack (e2e/local-stack), never a hosted project.
+ */
+
+const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
+const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+function isLocalStack(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname;
+    return host === "127.0.0.1" || host === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+test.skip(
+  !SESSION_JSON || !STORAGE_KEY || !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY,
+  "Requires a signed-in fixture session and Supabase env vars.",
+);
+test.skip(
+  !isLocalStack(SUPABASE_URL),
+  "Creates real games, settings and payment methods: runs against the local stack only.",
+);
+
+const ENTRY_FEE = 12;
+const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const VENMO_HANDLE = `e2e-fresh-${suffix}`;
+const GAMES = {
+  open: `host-${suffix}-open`,
+  approval: `host-${suffix}-appr`,
+  full: `host-${suffix}-full`,
+};
+
+let host: SupabaseClient;
+let hostId = "";
+let methodId = "";
+
+function gameRow(id: string, maxPlayers: number) {
+  return {
+    id,
+    host_id: hostId,
+    sport: "Soccer",
+    title: `Fresh viewer ${id.slice(-4)}`,
+    date: new Date(Date.now() + 48 * 3600_000).toISOString(),
+    duration: "90 min",
+    location: "Pier 40 Turf",
+    neighborhood: "West Side",
+    max_players: maxPlayers,
+    joined: 0,
+    skill: "All Levels",
+    price: ENTRY_FEE,
+    indoor: false,
+    is_private: false,
+    host_snapshot: { name: "E2E Host", username: "@e2ehost", avatar: "EH", rating: 5 },
+  };
+}
+
+function must<T>(res: { data: T; error: { message: string } | null }, what: string): T {
+  if (res.error) throw new Error(`${what}: ${res.error.message}`);
+  return res.data;
+}
+
+test.beforeAll(async () => {
+  host = createClient(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+  });
+  const h = account("host");
+  const signIn = await host.auth.signInWithPassword({ email: h.email, password: h.password });
+  if (signIn.error || !signIn.data.user) throw new Error(`host sign-in: ${signIn.error?.message}`);
+  hostId = signIn.data.user.id;
+
+  const method = must(
+    await host
+      .from("host_payment_methods")
+      .insert({
+        host_id: hostId,
+        payment_type: "venmo",
+        label: "Venmo",
+        username: VENMO_HANDLE,
+        is_enabled: true,
+      })
+      .select("id")
+      .single(),
+    "insert Venmo method",
+  );
+  methodId = method.id as string;
+
+  must(
+    await host
+      .from("hosted_games")
+      .insert([gameRow(GAMES.open, 10), gameRow(GAMES.approval, 10), gameRow(GAMES.full, 1)]),
+    "insert games",
+  );
+  must(
+    await host.from("game_payment_settings").insert(
+      [GAMES.open, GAMES.approval, GAMES.full].map((game_id) => ({
+        game_id,
+        host_id: hostId,
+        entry_fee: ENTRY_FEE,
+        accepted_method_ids: [methodId],
+        requires_approval: game_id === GAMES.approval,
+      })),
+    ),
+    "insert settings",
+  );
+  // The one place of the full game, taken by the host (game_participants_sync_count makes hosted_games.joined 1).
+  must(
+    await host.from("game_participants").insert({ game_id: GAMES.full, user_id: hostId }),
+    "fill the full game",
+  );
+});
+
+test.afterAll(async () => {
+  if (!host || !hostId) return;
+  const ids = Object.values(GAMES);
+  await host.from("game_participants").delete().in("game_id", ids);
+  await host.from("game_payment_settings").delete().in("game_id", ids);
+  await host.from("hosted_games").delete().in("id", ids);
+  if (methodId) await host.from("host_payment_methods").delete().eq("id", methodId);
+});
+
+/** Open /games/<id>/pay as the fixture player and return what the browser's settings read answered. */
+async function openPay(page: Page, gameId: string): Promise<unknown> {
+  await stubRiskAcknowledged(page);
+  await restoreSession(page);
+  const settingsRead = page.waitForResponse(
+    (r) => r.url().includes("/rest/v1/game_payment_settings") && r.url().includes(gameId),
+  );
+  await page.goto(`/games/${gameId}/pay`, { waitUntil: "domcontentloaded" });
+  const res = await settingsRead;
+  expect(res.ok()).toBe(true);
+  return res.json();
+}
+
+test("a fresh player on a paid open game sees the host's handle, with the settings row still hidden by RLS", async ({
+  page,
+}) => {
+  const settingsBody = await openPay(page, GAMES.open);
+  // Real RLS: the viewer is not the payee, approved, a payer or on the roster, so the row is not theirs to read.
+  expect(settingsBody, "the settings row stays hidden from a fresh viewer").toEqual([]);
+
+  // The host has one method, so the page opens its pay step straight away (the handle and the Venmo link).
+  await expect(page.getByText(VENMO_HANDLE)).toBeVisible({ timeout: 20_000 });
+  await expect(
+    page.getByRole("button", { name: /open venmo in a new tab to pay the host/i }),
+  ).toBeVisible();
+  await expect(page.getByText(`Pay $${ENTRY_FEE} in Venmo`)).toBeVisible();
+  await expect(page.getByText(/host hasn't set up payment yet/i)).toHaveCount(0);
+  await expect(page.getByTestId("approval-required-gate")).toHaveCount(0);
+  await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
+});
+
+test("a fresh player on a paid approval game still gets 'Waiting on host approval', not the handle", async ({
+  page,
+}) => {
+  const settingsBody = await openPay(page, GAMES.approval);
+  expect(settingsBody).toEqual([]);
+
+  const gate = page.getByTestId("approval-required-gate");
+  await expect(gate).toBeVisible({ timeout: 20_000 });
+  await expect(gate).toContainText(/request a spot first/i);
+  await expect(page.getByText(VENMO_HANDLE)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /venmo/i })).toHaveCount(0);
+  await expect(page.getByText(/host hasn't set up payment yet/i)).toHaveCount(0);
+});
+
+test("a fresh player on a full paid game gets the full-roster block, not the handle", async ({
+  page,
+}) => {
+  const settingsBody = await openPay(page, GAMES.full);
+  expect(settingsBody).toEqual([]);
+
+  const card = page.getByTestId("pay-entry-blocked");
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card).toHaveAttribute("data-block", "full");
+  await expect(card).toContainText(/you can't pay for this game/i);
+  await expect(card).toContainText("The roster is full — no spots left.");
+  await expect(card).toContainText(/don't send the host any money/i);
+  await expect(page.getByText(VENMO_HANDLE)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /venmo/i })).toHaveCount(0);
+  await expect(page.getByText(/just filled up/i)).toHaveCount(0);
+});

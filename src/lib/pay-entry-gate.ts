@@ -30,8 +30,11 @@
  *     and a manual claim ask) lets a player the host approved, or one on the roster, through. Owner decision
  *     2026-11-18 (#430 question 4): the pay page applies it, with the game page's source and rule. A viewer already in
  *     the flow (on the roster, a payment in, or approved) and the host are exempt.
- * A full roster is not decided here: the pay page keeps its "This game just filled up" warning (showFilledUpWarning),
- * and the database refuses the claim itself (GAME_FULL) for a player not on the roster.
+ *   - full: the roster holds as many players as the game takes (hosted_games.joined, kept equal to the game's
+ *     participant rows, >= max_players). payment_claim_block refuses a manual claim and PayPal checkout from a player
+ *     not on the roster (GAME_FULL, 20261119200000), whatever the host approved, so only a viewer on the roster (and
+ *     the host) is exempt. Owner decision 2026-11-20 ("Continue session as you recommend"): it replaces the pay page's
+ *     soft "This game just filled up" warning, which showed the host's handles under it.
  *
  * payRiskAckView (below) decides "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B).
  */
@@ -57,7 +60,7 @@ import {
  * when PayPal is not there to take the payment instead.
  */
 export type PayEntryBlockKind =
-  "payments" | "participation" | "guardian" | "locked" | "age" | "manual_guardian";
+  "payments" | "participation" | "guardian" | "locked" | "age" | "full" | "manual_guardian";
 
 export type PayEntryBlock = {
   kind: PayEntryBlockKind;
@@ -100,7 +103,33 @@ export type PayEntryInput = {
    * game page decides it). Omitted, or state 'none', when the game has no range.
    */
   age?: { state: AgeGateState; req: AgeRequirement };
+  /**
+   * The game's roster is full (payEntryView: rosterIsFull from the participant count and max_players). Omitted when the
+   * count says there is room.
+   */
+  rosterFull?: boolean;
 };
+
+/** The game page's own words for a full roster (its viewerGate 'roster_full' reason). */
+export const ROSTER_FULL_MESSAGE = "The roster is full — no spots left.";
+
+/**
+ * payment_claim_block's GAME_FULL count: the game's participant rows against GREATEST(max_players, 1). The pay page's
+ * count is hosted_games.joined, which game_participants_sync_count keeps equal to those rows.
+ */
+export function rosterIsFull(input: { count: number; maxPlayers: number }): boolean {
+  return input.count >= Math.max(Number(input.maxPlayers) || 0, 1);
+}
+
+/**
+ * A full roster, for a viewer not on it. payment_claim_block asks it last, after the age range, and lets only a player
+ * on the roster through: a host's approval does not make room. Asked here before the age range, so a viewer outside
+ * the range on a full game is told the game is full (the host's approval would not help) rather than to wait for it.
+ */
+function fullBlock(input: PayEntryInput): PayEntryBlock | null {
+  if (!input.rosterFull || input.holdsPlace || input.isHost) return null;
+  return { kind: "full", message: ROSTER_FULL_MESSAGE };
+}
 
 export const AGE_BLOCKED_FALLBACK =
   "This game has an age requirement. Ask the host to approve your request first.";
@@ -156,7 +185,7 @@ export function payEntryBlock(input: PayEntryInput): PayEntryBlock | null {
   if (!input.guardianReady) {
     return { kind: "guardian", message: PAYMENTS_GUARDIAN_APPROVAL_MESSAGE };
   }
-  return lockBlock(input) ?? ageBlock(input);
+  return lockBlock(input) ?? fullBlock(input) ?? ageBlock(input);
 }
 
 /**
@@ -200,11 +229,11 @@ export type PayEntryView =
 /**
  * Whether a block was decided by the viewer's own flow state (their place, a payment in, the host's approval): a lock
  * other than a cancelled game, which every viewer gets, the participation block, which a place lifts, or the age range,
- * which any of the three lifts. Those inputs
+ * which any of the three lifts, or a full roster, which a place lifts. Those inputs
  * only ever lift a block, so a block that is none of these stands whatever they turn out to be.
  */
 function dependsOnFlow(block: PayEntryBlock): boolean {
-  if (block.kind === "participation" || block.kind === "age") return true;
+  if (block.kind === "participation" || block.kind === "age" || block.kind === "full") return true;
   return block.kind === "locked" && block.joinState !== "cancelled";
 }
 
@@ -257,8 +286,14 @@ export function payEntryView(input: {
    * 'checking' (or 'check_failed'), never the handles.
    */
   viewerAge?: CheckState<number | null>;
+  /**
+   * The game's participant count and max_players (the pay page's live count, hosted_games.joined). Until it answers
+   * the roster counts as full (fail closed), so a viewer not on it sees 'checking' (or 'check_failed'), never the
+   * handles; a viewer on the roster and the host never wait for it.
+   */
+  roster: CheckState<{ count: number; maxPlayers: number }>;
 }): PayEntryView {
-  const { child, guardian } = input;
+  const { child, guardian, roster } = input;
   if (child.state === "error" || guardian.state === "error") return { kind: "check_failed" };
   if (child.state === "loading" || guardian.state === "loading") return { kind: "checking" };
   const ageReq = input.ageReq ?? null;
@@ -289,8 +324,15 @@ export function payEntryView(input: {
     guardianReady: guardian.value,
     isHost: input.isHost,
     age,
+    // A count not known yet counts as full: the worst the real count can give.
+    rosterFull: roster.state === "ready" ? rosterIsFull(roster.value) : true,
   });
   if (!block) return { kind: "clear" };
+  if (block.kind === "full" && roster.state !== "ready") {
+    return roster.state === "error" || input.flow === "error"
+      ? { kind: "check_failed" }
+      : { kind: "checking" };
+  }
   if (block.kind === "age" && !ageKnown) {
     return viewerAge.state === "error" || input.flow === "error"
       ? { kind: "check_failed" }
@@ -571,4 +613,50 @@ export function payAwaitsApproval(input: {
   if (input.approved) return false;
   if (input.hostRequiresApproval) return true;
   return input.requestPending && input.replaceBlock?.kind === "age";
+}
+
+/**
+ * Who the pay page pays and whether the host screens players, for any viewer (docs/paid-path-gates.md section 6 (c),
+ * owner decision 2026-11-20). The host's settings row (game_payment_settings) is readable only by the payee, an
+ * approved requester, a payer or a participant (private_sec.can_read_game_payment_settings), so a fresh player on a
+ * paid open game read it as absent and was told "Host hasn't set up payment yet" although the server lets them pay.
+ * RLS is unchanged. For a viewer who cannot read the row the page asks the public sources instead:
+ *   - requires_approval from get_game_join_policy (the payee's row, for anyone who can see the game; what the game page
+ *     uses, useGameJoinPolicy);
+ *   - the payee is the game's host (hosted_games.host_id, which is private_sec.game_payee); the methods then come from
+ *     get_game_host_payment_methods(payee, game), which keeps its own guards (payee only, a caller who may coordinate
+ *     payments, an adult payee, a game the caller can see, the accepted methods of the payee's row).
+ * The policy answers with no row when the payee has no settings row at all: nothing is offered (null), as before, and
+ * PayPal's precondition would refuse a player with no approval there (HOST_APPROVAL_REQUIRED).
+ */
+export type PaySetup = {
+  /** The game's payee, whose methods the page lists and whom a claim names. */
+  hostId: string;
+  /** The host reviews every player before payment. */
+  requiresApproval: boolean;
+  /** 'settings' when the viewer reads the host's row; 'public' when it came from the join policy. */
+  source: "settings" | "public";
+};
+
+export function paySetupFrom(input: {
+  /** The settings row, when this viewer may read it (getGamePaymentSettings). */
+  settings: { host_id: string; requires_approval: boolean } | null;
+  /** get_game_join_policy(game); null when the payee has no settings row (or the game is not visible). */
+  policy: { requires_approval: boolean } | null;
+  /** The game's host (hosted_games.host_id), the payee. */
+  gameHostId: string | null | undefined;
+}): PaySetup | null {
+  if (input.settings) {
+    return {
+      hostId: input.settings.host_id,
+      requiresApproval: !!input.settings.requires_approval,
+      source: "settings",
+    };
+  }
+  if (!input.policy || !input.gameHostId) return null;
+  return {
+    hostId: input.gameHostId,
+    requiresApproval: !!input.policy.requires_approval,
+    source: "public",
+  };
 }

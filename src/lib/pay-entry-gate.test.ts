@@ -16,6 +16,9 @@ import {
   MANUAL_GUARDIAN_HOLD_MESSAGE,
   MANUAL_GUARDIAN_HOLD_END_LINK,
   manualGuardianHoldNext,
+  paySetupFrom,
+  rosterIsFull,
+  ROSTER_FULL_MESSAGE,
   type PayEntryInput,
 } from "./pay-entry-gate";
 import { ageGateMessage, ageGateState, type AgeRequirement } from "./game-age";
@@ -419,6 +422,7 @@ describe("payEntryView", () => {
     child: readyChild,
     guardian: ready(true),
     paymentStarted: false,
+    roster: { state: "ready" as const, value: { count: 3, maxPlayers: 10 } },
   };
 
   describe("fails closed for minor safety", () => {
@@ -1208,3 +1212,204 @@ describe("payManualMethodsStep (manual methods vs the manual-claim guardian rule
     expect(blockOutranksApproval(step.block, true)).toBe(true);
   });
 });
+
+describe("rosterIsFull (payment_claim_block's GAME_FULL count)", () => {
+  it("is full once the participant count reaches max_players", () => {
+    expect(rosterIsFull({ count: 10, maxPlayers: 10 })).toBe(true);
+    expect(rosterIsFull({ count: 11, maxPlayers: 10 })).toBe(true);
+    expect(rosterIsFull({ count: 9, maxPlayers: 10 })).toBe(false);
+  });
+
+  it("counts a game with no max as taking one player (GREATEST(max_players, 1))", () => {
+    expect(rosterIsFull({ count: 0, maxPlayers: 0 })).toBe(false);
+    expect(rosterIsFull({ count: 1, maxPlayers: 0 })).toBe(true);
+  });
+});
+
+describe("payEntryBlock: a full roster (GAME_FULL, owner decision 2026-11-20)", () => {
+  it("blocks a viewer not on the roster with the game page's full-roster words", () => {
+    expect(payEntryBlock(input({ rosterFull: true }))).toEqual({
+      kind: "full",
+      message: ROSTER_FULL_MESSAGE,
+    });
+    expect(ROSTER_FULL_MESSAGE).toBe(resolveJoinGateFullReason());
+  });
+
+  it("does not block a viewer on the roster, or the host", () => {
+    expect(payEntryBlock(input({ rosterFull: true, holdsPlace: true }))).toBeNull();
+    expect(payEntryBlock(input({ rosterFull: true, isHost: true }))).toBeNull();
+  });
+
+  it("still blocks an approved viewer or one with a payment in: only a place makes room", () => {
+    expect(payEntryBlock(input({ rosterFull: true, approved: true }))?.kind).toBe("full");
+    expect(payEntryBlock(input({ rosterFull: true, paymentIn: true }))?.kind).toBe("full");
+  });
+
+  it("an approved viewer on a game closed by the host gets the full block, not the lock", () => {
+    expect(
+      payEntryBlock(input({ rosterFull: true, approved: true, gate: gateFor("closed_by_host") })),
+    ).toMatchObject({ kind: "full" });
+  });
+
+  it("an account-level block and a game that takes no player still come first", () => {
+    expect(
+      payEntryBlock(input({ rosterFull: true, payments: { ...allowed, allowed: false } }))?.kind,
+    ).toBe("payments");
+    expect(payEntryBlock(input({ rosterFull: true, gate: gateFor("cancelled") }))?.kind).toBe(
+      "locked",
+    );
+    expect(payEntryBlock(input({ rosterFull: true, guardianReady: false }))?.kind).toBe("guardian");
+  });
+
+  it("is said before the age range: the host's approval would not make room", () => {
+    const adultsOnly: AgeRequirement = { minAge: 18, maxAge: null };
+    expect(
+      payEntryBlock(input({ rosterFull: true, age: { state: "needs_approval", req: adultsOnly } }))
+        ?.kind,
+    ).toBe("full");
+  });
+
+  it("outranks the approval card, even with a pending request", () => {
+    const block = { kind: "full" as const, message: ROSTER_FULL_MESSAGE };
+    expect(blockOutranksApproval(block, true)).toBe(true);
+    expect(blockOutranksApproval(block, false)).toBe(true);
+    expect(
+      payAwaitsApproval({
+        hostRequiresApproval: false,
+        approved: false,
+        requestPending: true,
+        replaceBlock: block,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("payEntryView: the roster count (fails closed)", () => {
+  const readyChild = {
+    state: "ready" as const,
+    value: { participation: allowed, payments: allowed, ageUnknown: false },
+  };
+  const roster = (count: number, maxPlayers = 10) => ({
+    state: "ready" as const,
+    value: { count, maxPlayers },
+  });
+  const base = {
+    ...fresh,
+    flow: "ready" as const,
+    gate: open,
+    child: readyChild,
+    guardian: { state: "ready" as const, value: true },
+    paymentStarted: false,
+    roster: roster(3),
+  };
+
+  it("is clear while there is room", () => {
+    expect(payEntryView(base)).toEqual({ kind: "clear" });
+    expect(payEntryView({ ...base, roster: roster(9) })).toEqual({ kind: "clear" });
+  });
+
+  it("blocks a fresh viewer on a full game", () => {
+    expect(payEntryView({ ...base, roster: roster(10) })).toEqual({
+      kind: "blocked",
+      block: { kind: "full", message: ROSTER_FULL_MESSAGE },
+      paymentStarted: false,
+    });
+  });
+
+  it("keeps the refund line for a viewer who was already shown how to pay", () => {
+    expect(payEntryView({ ...base, roster: roster(10), paymentStarted: true })).toMatchObject({
+      kind: "blocked",
+      block: { kind: "full" },
+      paymentStarted: true,
+    });
+  });
+
+  it("lets a viewer on the roster through a full game", () => {
+    expect(payEntryView({ ...base, holdsPlace: true, roster: roster(10) })).toEqual({
+      kind: "clear",
+    });
+  });
+
+  it("is 'checking' (never clear) while the count loads, and 'check_failed' when it failed", () => {
+    expect(payEntryView({ ...base, roster: { state: "loading" } })).toEqual({ kind: "checking" });
+    expect(payEntryView({ ...base, roster: { state: "error" } })).toEqual({
+      kind: "check_failed",
+    });
+  });
+
+  it("does not wait for the count for a viewer on the roster, or the host", () => {
+    expect(payEntryView({ ...base, holdsPlace: true, roster: { state: "loading" } })).toEqual({
+      kind: "clear",
+    });
+    expect(payEntryView({ ...base, isHost: true, roster: { state: "error" } })).toEqual({
+      kind: "clear",
+    });
+  });
+
+  it("waits for the viewer's own flow state before a full block (a place lifts it)", () => {
+    expect(payEntryView({ ...base, flow: "loading", roster: roster(10) })).toEqual({
+      kind: "checking",
+    });
+    expect(payEntryView({ ...base, flow: "error", roster: roster(10) })).toEqual({
+      kind: "check_failed",
+    });
+  });
+
+  it("an account-level block shows at once, whatever the count", () => {
+    expect(
+      payEntryView({
+        ...base,
+        roster: { state: "loading" },
+        guardian: { state: "ready", value: false },
+      }),
+    ).toMatchObject({ kind: "blocked", block: { kind: "guardian" } });
+  });
+});
+
+describe("paySetupFrom (section 6 (c): a fresh viewer cannot read the settings row)", () => {
+  const HOST = "11111111-1111-1111-1111-111111111111";
+
+  it("uses the settings row when the viewer may read it", () => {
+    expect(
+      paySetupFrom({
+        settings: { host_id: HOST, requires_approval: true },
+        policy: { requires_approval: false },
+        gameHostId: "someone-else",
+      }),
+    ).toEqual({ hostId: HOST, requiresApproval: true, source: "settings" });
+  });
+
+  it("falls back to the public join policy and the game's host when the row is hidden", () => {
+    expect(
+      paySetupFrom({ settings: null, policy: { requires_approval: false }, gameHostId: HOST }),
+    ).toEqual({ hostId: HOST, requiresApproval: false, source: "public" });
+  });
+
+  it("keeps the approval gate for an approval-required game read from the public policy", () => {
+    expect(
+      paySetupFrom({ settings: null, policy: { requires_approval: true }, gameHostId: HOST }),
+    ).toEqual({ hostId: HOST, requiresApproval: true, source: "public" });
+  });
+
+  it("offers nothing when the host has no settings row (no policy) or the host is unknown", () => {
+    expect(paySetupFrom({ settings: null, policy: null, gameHostId: HOST })).toBeNull();
+    expect(
+      paySetupFrom({ settings: null, policy: { requires_approval: false }, gameHostId: null }),
+    ).toBeNull();
+    expect(
+      paySetupFrom({ settings: null, policy: { requires_approval: false }, gameHostId: undefined }),
+    ).toBeNull();
+  });
+});
+
+/** The game page's own words for a full roster (games.$gameId.index.tsx viewerGate, resolveJoinGate). */
+function resolveJoinGateFullReason(): string {
+  const now = Date.parse("2026-11-14T18:00:00Z");
+  const game = {
+    id: "g",
+    date: new Date(now + 24 * 3600_000).toISOString(),
+    duration: "90 min",
+    status: "scheduled",
+  } as unknown as Game;
+  return resolveJoinGate(game, now, { spotsLeft: 0 }).reason;
+}
