@@ -18,7 +18,15 @@ describe("orgMemberAddErrorMessage", () => {
     expect(msg).not.toMatch(/\b(age|birth|birthday|minor|adult|under 18)\b/i);
   });
 
-  it("passes any other error through unchanged", () => {
-    expect(orgMemberAddErrorMessage("network down")).toBe("network down");
+  it("never passes other database text through (WP 4.0)", () => {
+    expect(
+      orgMemberAddErrorMessage('insert or update on table "org_members" violates foreign key'),
+    ).toBe("Couldn't add this member. Please try again.");
+    expect(orgMemberAddErrorMessage("FORBIDDEN: not an admin")).toBe(
+      "You don't have access to that.",
+    );
+    expect(orgMemberAddErrorMessage("TypeError: Failed to fetch")).toBe(
+      "We couldn't connect. Check your internet connection and try again.",
+    );
   });
 });

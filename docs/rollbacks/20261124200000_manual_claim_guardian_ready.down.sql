@@ -1,4 +1,4 @@
--- ROLLBACK for supabase/migrations/20261123100000_manual_claim_guardian_ready.sql (docs/paid-path-gates.md section 6,
+-- ROLLBACK for supabase/migrations/20261124200000_manual_claim_guardian_ready.sql (docs/paid-path-gates.md section 6,
 -- "Also related" (d)).
 -- NOT a migration. It drops public.game_manual_claim_guardian_ready(text), the pay page's read-only view of the
 -- manual-claim guardian rule. Nothing else changes: the guardian trigger (enforce_guardian_before_payment), its rule
@@ -27,7 +27,7 @@ BEGIN
   FOR _k IN SELECT jsonb_object_keys(_want) LOOP
     SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = to_regprocedure(_k);
     IF _got IS DISTINCT FROM _want ->> _k THEN
-      RAISE EXCEPTION 'Refusing to run: % is not the definition 20261123100000 created (md5 %, expected %). A later change needs a person to look first.', _k, _got, _want ->> _k;
+      RAISE EXCEPTION 'Refusing to run: % is not the definition 20261124200000 created (md5 %, expected %). A later change needs a person to look first.', _k, _got, _want ->> _k;
     END IF;
   END LOOP;
 END

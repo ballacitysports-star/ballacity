@@ -38,6 +38,7 @@ import { clearSportContext, readSportContext } from "@/lib/sport-hubs";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { LoadingState } from "@/components/ui/loading-state";
+import { userErrorMessage } from "@/lib/user-error";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
@@ -111,7 +112,7 @@ const NEXT_STEPS: Record<
     steps: [
       { title: "Gym profile", body: "Name, address, and photos so members can find you." },
       { title: "Invite trainers", body: "Link the trainers who run sessions at your gym." },
-      { title: "Publish programs", body: "Post clinics, camps, and open runs to your community." },
+      { title: "Publish programs", body: "Post clinics, camps, and open games to your community." },
     ],
   },
 };
@@ -317,7 +318,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         } else {
           setGeo({
             kind: "denied",
-            message: err.message || "Something went wrong requesting your location.",
+            // The browser's own text ("Unknown error acquiring position") is not for members (WP 4.0).
+            message: "We couldn't get your location. Try again, or set a radius manually below.",
             canRetry: true,
           });
         }
@@ -484,7 +486,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       }
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save your profile");
+      toast.error(userErrorMessage(err, "Couldn't save your profile. Please try again."));
       return false;
     } finally {
       setSaving(false);

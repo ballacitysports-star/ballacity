@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useMyBirthdayLock, useRequestBirthdayCorrection } from "@/lib/birthday-lock";
 import { birthdayToDisplay } from "@/components/profile/ProfileFormPrimitives";
 import { AGE_CATEGORY_LABELS, ageCategoryFromBirthday } from "@/lib/age-policy";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Read-only date of birth with a support-reviewed correction request.
@@ -43,7 +44,7 @@ export function BirthdayLockCard() {
       setDob("");
       setReason("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not send that request.");
+      toast.error(userErrorMessage(e, "Couldn't send your correction request. Please try again."));
     }
   };
 

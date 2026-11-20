@@ -1,7 +1,7 @@
 /** Top-level categories on the Discover feed (`/feed?cat=`). */
 export const DISCOVER_CATEGORIES = [
   { id: "all", label: "All" },
-  { id: "runs", label: "Pickup Runs" },
+  { id: "runs", label: "Pickup Games" },
   { id: "teams", label: "Teams & Tryouts" },
   { id: "gyms", label: "Venues" },
   { id: "trainers", label: "Trainers" },

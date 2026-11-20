@@ -25,7 +25,7 @@ export function RosterRecruitPanel({
   return (
     <div className="mt-4 rounded-2xl border border-border/60 bg-surface p-3">
       <h3 className="section-eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
-        <UserPlus className="h-4 w-4" /> Scout this run
+        <UserPlus className="h-4 w-4" /> Scout this game
       </h3>
       <ul className="space-y-1.5">
         {others.map((p) => (

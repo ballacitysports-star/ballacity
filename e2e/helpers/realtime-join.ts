@@ -2,9 +2,10 @@
  * Join and leave a free, no-approval run (the seeded `g1`) from its game page,
  * the way a player does today, for the realtime specs.
  *
- * Those specs were written when tapping "Join Run" put the player straight on
- * the roster. Since then the sticky CTA opens a "Join this run?" confirmation
- * (where the player also picks their reminders) and "You're in · Tap to leave"
+ * Those specs were written when tapping "Join Game" put the player straight on
+ * the roster. Since then the sticky CTA opens a "Join this game?" dialog
+ * (where the player also picks their reminders; it also holds the "Before you
+ * join" risk acknowledgment when that is due) and "You're in · Tap to leave"
  * opens "Leave this game?" (src/routes/games.$gameId.index.tsx). The specs kept
  * tapping the CTA once and waiting for the flipped label behind a dialog that
  * nobody confirmed, so no row was ever written and nothing could propagate.
@@ -23,27 +24,31 @@ export function joinedCta(page: Page): Locator {
   return page.getByRole("button", { name: /you're in · tap to leave/i }).first();
 }
 
-/** Sticky CTA while the viewer can still join a free run ("Join Run · N spots left"). */
+/** Sticky CTA while the viewer can still join a free run ("Join Game · N spots left"). */
 export function joinCta(page: Page): Locator {
-  return page.getByRole("button", { name: /^join run · /i }).first();
+  return page.getByRole("button", { name: /^join game · /i }).first();
 }
 
-/** Tap "Join Run", confirm "Join this run?", and wait until the CTA reads "You're in". */
+/**
+ * Tap "Join Game", confirm "Join this game?", and wait until the CTA reads
+ * "You're in". With the acknowledgment stubbed as given, the dialog has no
+ * checkbox and its button reads "Join game".
+ */
 export async function joinFreeRun(page: Page): Promise<void> {
   const cta = joinCta(page);
   await expect(cta).toBeVisible({ timeout: 15_000 });
   await cta.click();
 
-  const confirm = page.getByRole("alertdialog", { name: /join this run\?/i });
+  const confirm = page.getByRole("dialog", { name: /join this game\?/i });
   await expect(confirm).toBeVisible({ timeout: 5_000 });
-  await confirm.getByRole("button", { name: /^join run$/i }).click();
+  await confirm.getByRole("button", { name: /^join game$/i }).click();
   await expect(confirm).toBeHidden({ timeout: 5_000 });
 
   await expect(joinedCta(page)).toBeVisible({ timeout: 10_000 });
 }
 
 /**
- * Tap "You're in · Tap to leave", confirm "Leave this game?", and wait for "Join Run".
+ * Tap "You're in · Tap to leave", confirm "Leave this game?", and wait for "Join Game".
  *
  * Only a free cancellation is accepted. Inside g1's late-cancel window the
  * dialog offers "Leave anyway" instead, and confirming it would record a late
@@ -110,7 +115,7 @@ async function onRosterInDb(page: Page, gameId: string): Promise<boolean> {
  * roster, so the join under test writes a real INSERT.
  *
  * Decided on the database's answer, not on the CTA: the page starts from the
- * saved joined list (which the specs clear) and shows "Join Run" until its
+ * saved joined list (which the specs clear) and shows "Join Game" until its
  * roster load comes back, so whichever label appeared first said nothing about
  * the roster. Once the database has answered, wait for the page to agree, and
  * after leaving wait for the row to really be gone, since the page flips its

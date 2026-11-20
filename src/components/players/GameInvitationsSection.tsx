@@ -98,7 +98,7 @@ export function GameInvitationsSection({
                 <Link
                   to="/games/$gameId"
                   params={{ gameId: accepted[r.id] }}
-                  className="inline-flex min-h-9 items-center rounded-full bg-lime-gradient px-4 text-xs font-bold text-primary-foreground"
+                  className="inline-flex min-h-11 items-center rounded-full bg-lime-gradient px-4 text-xs font-bold text-primary-foreground"
                 >
                   Open the game
                 </Link>
@@ -106,7 +106,7 @@ export function GameInvitationsSection({
                 <>
                   <Button
                     size="sm"
-                    className="h-9 rounded-full bg-lime-gradient text-primary-foreground"
+                    className="min-h-11 rounded-full bg-lime-gradient px-4 text-primary-foreground"
                     disabled={busy === r.id}
                     onClick={() => void answer(r, true)}
                   >
@@ -115,7 +115,7 @@ export function GameInvitationsSection({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-9 rounded-full"
+                    className="min-h-11 rounded-full px-4"
                     disabled={busy === r.id}
                     onClick={() => void answer(r, false)}
                   >
@@ -124,7 +124,7 @@ export function GameInvitationsSection({
                   <Link
                     to="/games/$gameId"
                     params={{ gameId: r.game_id }}
-                    className="text-xs font-semibold text-lime"
+                    className="inline-flex min-h-11 items-center px-2 text-xs font-semibold text-lime"
                   >
                     See the game
                   </Link>

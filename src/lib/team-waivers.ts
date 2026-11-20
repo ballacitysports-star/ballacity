@@ -6,6 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { errorText, knownErrorMessage } from "@/lib/user-error";
 
 export type TeamWaiver = {
   id: string;
@@ -166,7 +167,12 @@ export function useSaveWaiverDraft(teamId: string) {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (v: { id?: string | null; version: string; title: string; content: string }) => {
+    mutationFn: async (v: {
+      id?: string | null;
+      version: string;
+      title: string;
+      content: string;
+    }) => {
       const row = { version: v.version.trim(), title: v.title.trim(), content: v.content.trim() };
       if (v.id) {
         const { error } = await db
@@ -204,7 +210,11 @@ export function useDeleteWaiverDraft() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from("team_waivers").delete().eq("id", id).is("published_at", null);
+      const { error } = await db
+        .from("team_waivers")
+        .delete()
+        .eq("id", id)
+        .is("published_at", null);
       if (error) throw error;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["team-waiver"] }),
@@ -233,15 +243,10 @@ export function useSignWaiver() {
 }
 
 export function waiverErrorMessage(err: unknown): string {
-  const raw = String((err as { message?: string })?.message ?? err ?? "");
-  if (raw.includes("NOT_YOUR_GUARDIAN_LINK")) return "You're not a linked guardian for this player.";
-  if (raw.includes("ATTESTATION_REQUIRED")) return "Confirm you're signing on your child's behalf.";
-  if (raw.includes("WAIVER_NOT_PUBLISHED")) return "This waiver was replaced. Reload and try again.";
-  if (raw.includes("NOT_TEAM_MEMBER_OR_INVITEE"))
-    return "Only team members or invited players can sign this waiver.";
-  if (raw.includes("NOT_TEAM_MANAGER")) return "Only the team's owner, managers or coaches can do that.";
-  if (raw.includes("EMPTY_WAIVER")) return "Add waiver text before publishing.";
+  const known = knownErrorMessage(err);
+  if (known) return known;
+  const raw = errorText(err) ?? "";
+  // The unique (team, version) index (23505): here it can only mean the version name is taken.
   if (raw.includes("duplicate key")) return "That version name is already used. Pick another.";
-  if (raw.includes("AUTH_REQUIRED")) return "Sign in first.";
   return "Couldn't save the waiver. Try again.";
 }

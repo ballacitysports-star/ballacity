@@ -24,6 +24,10 @@ import { switchBackToGuardian } from "@/lib/managed-session";
 import { useSwitchToManagedChild } from "@/lib/use-managed-children";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { useCoachedTeams } from "@/lib/coach-identity";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** switchToManagedChild's own sentence when the guardian's session is gone; shown as it is. */
+const SWITCH_SIGN_IN_AGAIN = "Sign in again to switch profiles.";
 
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
@@ -120,7 +124,9 @@ export function ProfileSwitcher({ className }: { className?: string }) {
                   switcher.mutate(p, {
                     onSuccess: () => toast.success(`Switched to ${p.name}`),
                     onError: (e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not switch profile"),
+                      toast.error(
+                        userErrorMessage(e, "Couldn't switch profiles. Please try again."),
+                      ),
                   });
                 }}
               >
@@ -157,7 +163,10 @@ export function ProfileSwitcher({ className }: { className?: string }) {
                         ),
                       onError: (err) =>
                         toast.error(
-                          err instanceof Error ? err.message : "Could not save default profile",
+                          userErrorMessage(
+                            err,
+                            "Couldn't save your default profile. Please try again.",
+                          ),
                         ),
                     });
                   }}
@@ -214,7 +223,12 @@ export function ProfileSwitcher({ className }: { className?: string }) {
                         {
                           onError: (e) =>
                             toast.error(
-                              e instanceof Error ? e.message : "Could not switch to that profile",
+                              errorText(e) === SWITCH_SIGN_IN_AGAIN
+                                ? SWITCH_SIGN_IN_AGAIN
+                                : userErrorMessage(
+                                    e,
+                                    "Couldn't switch to that profile. Please try again.",
+                                  ),
                             ),
                         },
                       )

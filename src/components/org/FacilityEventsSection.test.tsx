@@ -81,19 +81,19 @@ afterEach(() => {
 });
 
 describe("FacilityEventsSection", () => {
-  it("lets any visitor host a run and labels official vs community runs", async () => {
+  it("lets any visitor host a game and labels official vs community games", async () => {
     games.push(game("g1", "Apex Open Run", true), game("g2", "Sunday hoops", false));
     renderSection(false);
-    expect(screen.getByRole("link", { name: /host a run here/i }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: /host a game here/i }).getAttribute("href")).toBe(
       "/create?orgId=org-1&kind=run",
     );
     expect(screen.queryByRole("link", { name: /post official event/i })).toBeNull();
     expect(await screen.findByText("Official")).toBeTruthy();
-    expect(screen.getByText("Community run")).toBeTruthy();
+    expect(screen.getByText("Community game")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /hide/i })).toBeNull();
   });
 
-  it("gives admins an official-event link and a hide action for community runs only", async () => {
+  it("gives admins an official-event link and a hide action for community games only", async () => {
     games.push(game("g1", "Apex Open Run", true), game("g2", "Sunday hoops", false));
     renderSection(true);
     expect(screen.getByRole("link", { name: /post official event/i })).toBeTruthy();

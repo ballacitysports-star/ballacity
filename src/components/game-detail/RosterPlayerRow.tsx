@@ -26,6 +26,26 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { blockPlayer } from "@/components/game-detail/game-player-actions";
+import { errorText, paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences reviewPaymentAction words itself for a host; shown as they are (WP 4.0). */
+const PAYMENT_REVIEW_SENTENCES: readonly string[] = [
+  "Only this game's host can review its payments.",
+  "This player isn't part of this game.",
+  "Payment coordination isn't available for this account yet.",
+  "Payment coordination isn't available for this player's account yet.",
+  "No payment submission to update.",
+];
+
+/** What a host sees when reviewing a payment fails: our own sentence, else the payment mapper's, never raw text. */
+function paymentReviewErrorMessage(e: unknown): string {
+  const text = errorText(e) ?? "";
+  if (text.startsWith("Payment status changed since you loaded the page")) {
+    return "This payment changed since you loaded the page. Refresh and try again.";
+  }
+  if (PAYMENT_REVIEW_SENTENCES.includes(text)) return text;
+  return paymentSubmissionErrorMessage(e);
+}
 
 type ProfileBits = {
   display_name?: string | null;
@@ -201,7 +221,7 @@ export function RosterPlayerRow({
       );
     } catch (e: unknown) {
       setLatestSub(prev);
-      toast.error((e as { message?: string } | null)?.message ?? "Could not update payment.");
+      toast.error(paymentReviewErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -241,7 +261,7 @@ export function RosterPlayerRow({
       });
       toast.success("Marked as paid.");
     } catch (e: unknown) {
-      toast.error((e as { message?: string } | null)?.message ?? "Could not mark as paid.");
+      toast.error(paymentReviewErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -299,7 +319,7 @@ export function RosterPlayerRow({
         }),
       );
     } catch (e: unknown) {
-      toast.error((e as { message?: string } | null)?.message ?? "Could not load history.");
+      toast.error(userErrorMessage(e, "Couldn't load the payment history. Please try again."));
     } finally {
       setHistoryLoading(false);
     }
@@ -339,7 +359,7 @@ export function RosterPlayerRow({
       toast.success(`${name} removed.`);
     } catch (e: unknown) {
       rollback();
-      toast.error((e as { message?: string } | null)?.message ?? "Could not remove.");
+      toast.error(userErrorMessage(e, "Couldn't remove this player. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -348,7 +368,7 @@ export function RosterPlayerRow({
   const removeAndBlock = async () => {
     if (
       !confirm(
-        `Remove ${name} from this game and block them? From now on they can't ask to join your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`,
+        `Remove ${name} from this game and block them? From now on they can't request a spot in your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`,
       )
     )
       return;
@@ -372,7 +392,7 @@ export function RosterPlayerRow({
       await blockPlayer(req.player_id, name);
     } catch (e: unknown) {
       rollback();
-      toast.error((e as { message?: string } | null)?.message ?? "Could not block.");
+      toast.error(userErrorMessage(e, "Couldn't block this player. Please try again."));
     } finally {
       setBusy(false);
     }

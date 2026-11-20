@@ -11,6 +11,7 @@ import {
   type FollowRequest,
   type FollowUser,
 } from "@/lib/follows";
+import { userErrorMessage } from "@/lib/user-error";
 
 type Person = Pick<
   FollowUser,
@@ -62,13 +63,15 @@ export function FollowRequestsPanel({
     mutationFn: (v: { requesterId: string; approve: boolean }) =>
       respondToFollowRequest(v.requesterId, targetUserId, v.approve),
     onSuccess: (_d, v) => toast.success(v.approve ? "Request approved" : "Request declined"),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(userErrorMessage(e, "Couldn't answer this follow request. Please try again.")),
     onSettled: refresh,
   });
   const remove = useMutation({
     mutationFn: (followerId: string) => removeFollower(targetUserId, followerId),
     onSuccess: () => toast.success("Follower removed"),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(userErrorMessage(e, "Couldn't remove this follower. Please try again.")),
     onSettled: refresh,
   });
 

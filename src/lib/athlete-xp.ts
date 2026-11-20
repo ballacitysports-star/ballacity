@@ -57,19 +57,49 @@ export function computeAthleteProgress(i: AthleteProgressInput): AthleteProgress
 
   const badges: AthleteBadge[] = [];
   const add = (ok: boolean, b: AthleteBadge) => ok && badges.push(b);
-  add(i.attendedRuns >= 1, { id: "first-run", label: "First Run", emoji: "🏁", hint: "Completed a first run" });
-  add(i.attendedRuns >= 10, { id: "runs-10", label: "10 Runs", emoji: "🔟", hint: "10 runs completed" });
-  add(i.attendedRuns >= 25, { id: "runs-25", label: "25 Runs", emoji: "🔥", hint: "25 runs completed" });
-  add(i.attendedRuns >= 50, { id: "runs-50", label: "50 Runs", emoji: "🏆", hint: "50 runs completed" });
-  add(currentStreak >= 5, { id: "streak-5", label: "Iron Streak", emoji: "⛓️", hint: "5 runs in a row" });
+  add(i.attendedRuns >= 1, {
+    id: "first-run",
+    label: "First Game",
+    emoji: "🏁",
+    hint: "Completed a first game",
+  });
+  add(i.attendedRuns >= 10, {
+    id: "runs-10",
+    label: "10 Games",
+    emoji: "🔟",
+    hint: "10 games completed",
+  });
+  add(i.attendedRuns >= 25, {
+    id: "runs-25",
+    label: "25 Games",
+    emoji: "🔥",
+    hint: "25 games completed",
+  });
+  add(i.attendedRuns >= 50, {
+    id: "runs-50",
+    label: "50 Games",
+    emoji: "🏆",
+    hint: "50 games completed",
+  });
+  add(currentStreak >= 5, {
+    id: "streak-5",
+    label: "Iron Streak",
+    emoji: "⛓️",
+    hint: "5 games in a row",
+  });
   add(reliability != null && reliability >= 95 && commitments >= 10, {
     id: "reliable",
     label: "Always Shows",
     emoji: "✅",
-    hint: "95%+ reliability over 10+ runs",
+    hint: "95%+ reliability over 10+ games",
   });
   add(i.hostedGames >= 1, { id: "host", label: "Host", emoji: "📣", hint: "Hosted a game" });
-  add(i.attendedTryouts >= 1, { id: "tryout", label: "Tryout Ready", emoji: "🎯", hint: "Attended a verified tryout" });
+  add(i.attendedTryouts >= 1, {
+    id: "tryout",
+    label: "Tryout Ready",
+    emoji: "🎯",
+    hint: "Attended a verified tryout",
+  });
 
   return {
     xp,

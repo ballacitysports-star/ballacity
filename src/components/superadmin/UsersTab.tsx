@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ConfirmAction } from "./ConfirmAction";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 const ROLES = ["superadmin", "admin", "moderator"] as const;
 const EDITABLE = [
@@ -80,7 +81,12 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
       setConfirm(null);
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Action failed"),
+    onError: (e: unknown) => {
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't update this user.")}${code ? ` (${code})` : ""}`,
+      );
+    },
   });
 
   const p = userDetail.data?.profile as any;

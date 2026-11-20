@@ -123,7 +123,7 @@ describe("PayPalCheckoutButton", () => {
     h.captureOrder.mockResolvedValue({ ok: true, already: false, rostered: false });
     await h.buttons!.onApprove({ orderID: "ORDER-1" });
     expect(h.toastSuccess).toHaveBeenCalledWith(
-      "Payment confirmed. The host will confirm your place on the roster.",
+      "Payment confirmed. The host will confirm your spot on the roster.",
     );
   });
 
@@ -132,7 +132,7 @@ describe("PayPalCheckoutButton", () => {
     h.captureOrder.mockResolvedValue({ ok: true, already: true, rostered: null });
     await h.buttons!.onApprove({ orderID: "ORDER-1" });
     expect(h.toastSuccess).toHaveBeenCalledWith(
-      "Payment confirmed. Check the game page for your place on the roster.",
+      "Payment confirmed. Check the game page for your spot on the roster.",
     );
     h.captureOrder.mockResolvedValue({ ok: true, already: false, rostered: true });
     await h.buttons!.onApprove({ orderID: "ORDER-1" });

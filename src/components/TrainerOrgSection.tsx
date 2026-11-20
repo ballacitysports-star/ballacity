@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   createTrainerOrg,
   leaveTrainerOrg,
@@ -78,7 +79,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
                   toast.success("Left organization");
                   invalidate();
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Failed to leave");
+                  toast.error(userErrorMessage(e, "Couldn't leave this gym. Please try again."));
                 }
               }}
             >
@@ -112,7 +113,9 @@ export function TrainerOrgSection({ trainerId }: Props) {
                           toast.success("Joined organization");
                           invalidate();
                         } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "Failed");
+                          toast.error(
+                            userErrorMessage(e, "Couldn't accept this invite. Please try again."),
+                          );
                         }
                       }}
                     >
@@ -128,7 +131,9 @@ export function TrainerOrgSection({ trainerId }: Props) {
                           });
                           invalidate();
                         } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "Failed");
+                          toast.error(
+                            userErrorMessage(e, "Couldn't decline this invite. Please try again."),
+                          );
                         }
                       }}
                     >
@@ -228,7 +233,7 @@ function JoinForm({ trainerId, onDone }: { trainerId: string; onDone: () => void
                   toast.success("Join request sent");
                   onDone();
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Failed");
+                  toast.error(userErrorMessage(e, "Couldn't send your request. Please try again."));
                 } finally {
                   setPending(null);
                 }
@@ -293,7 +298,7 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
             toast.success("Venue created");
             onDone();
           } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Failed to create");
+            toast.error(userErrorMessage(e, "Couldn't create the venue. Please try again."));
           } finally {
             setSubmitting(false);
           }

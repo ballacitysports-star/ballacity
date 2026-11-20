@@ -64,3 +64,12 @@ export function feedGameCard(page: Page, title: string): Locator {
     .filter({ has: page.getByRole("heading", { name: title, exact: true }) })
     .first();
 }
+
+/**
+ * The signed-in profile page's "Pickup" heading (src/routes/_tabs.profile.tsx,
+ * the default Games tab): the member page has rendered, with the upcoming games
+ * list under it. The signed-out preview and the loaders have no such heading.
+ */
+export function profileGamesHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 2, name: "Pickup", exact: true });
+}

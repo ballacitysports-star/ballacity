@@ -10,6 +10,7 @@ import {
 } from "@/lib/legal-consent";
 import { LEGAL_DOCUMENTS, effectiveVersion } from "@/lib/legal-documents";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Returning users whose accepted version is older than a published material
@@ -57,7 +58,7 @@ export function LegalReacceptGate() {
       );
       toast.success("Thanks — your agreement is recorded.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't record your agreement");
+      toast.error(userErrorMessage(e, "Couldn't record your agreement. Please try again."));
     }
   };
 

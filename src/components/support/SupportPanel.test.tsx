@@ -174,12 +174,24 @@ describe("signed in: the assistant", () => {
     expect(screen.getByRole("button", { name: "Paying for games" })).toBeTruthy();
   });
 
-  it("falls back to a generic message when the error has none", async () => {
+  it("falls back to a plain sentence when the error has none", async () => {
     askSupportAssistant.mockRejectedValue("nope");
     render(<SupportPanel signedIn />);
     type("hello");
     send();
-    expect((await screen.findByRole("alert")).textContent).toMatch(/Something went wrong/);
+    expect((await screen.findByRole("alert")).textContent).toMatch(
+      /Support chat isn't answering right now\./,
+    );
+  });
+
+  it("never shows raw server text", async () => {
+    askSupportAssistant.mockRejectedValue(new Error('relation "support_logs" does not exist'));
+    render(<SupportPanel signedIn />);
+    type("hello");
+    send();
+    const text = (await screen.findByRole("alert")).textContent ?? "";
+    expect(text).toMatch(/Support chat isn't answering right now\./);
+    expect(text).not.toMatch(/relation|support_logs/);
   });
 });
 

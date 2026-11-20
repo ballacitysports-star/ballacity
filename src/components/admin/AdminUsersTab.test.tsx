@@ -80,11 +80,16 @@ async function openUsersTab() {
 
 describe("/admin Users tab role buttons", () => {
   it("shows the server's reason when a grant fails, not 'Updated', and reloads the list", async () => {
-    setRole.mockRejectedValueOnce(new Error("Could not grant the admin role: duplicate key"));
+    setRole.mockRejectedValueOnce(
+      new Error(
+        'Could not grant the admin role: duplicate key value violates unique constraint "user_roles_user_id_role_key"',
+      ),
+    );
     fireEvent.click(await openUsersTab());
 
+    // WP 4.0: the plain sentence for the refusal, never the raw database text.
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Could not grant the admin role: duplicate key"),
+      expect(toast.error).toHaveBeenCalledWith("That already exists. Refresh the page to see it."),
     );
     expect(toast.success).not.toHaveBeenCalled();
     expect(setRole).toHaveBeenCalledWith({ data: { userId: USER_ID, role: "admin", grant: true } });

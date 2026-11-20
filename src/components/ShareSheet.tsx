@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, Copy, Download, Facebook, Loader2, MessageCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   Dialog,
   DialogContent,
@@ -56,7 +57,7 @@ export function ShareSheet({
     try {
       await onDownload();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't download the video");
+      toast.error(userErrorMessage(e, "Couldn't download the video. Please try again."));
     } finally {
       setDownloading(false);
     }

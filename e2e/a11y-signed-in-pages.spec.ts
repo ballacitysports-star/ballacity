@@ -15,6 +15,7 @@ const PAGES = [
   "/discover",
   "/teams",
   "/players",
+  "/availability",
   "/messages",
   "/notifications",
   "/profile",

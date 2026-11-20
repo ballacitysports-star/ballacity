@@ -43,8 +43,11 @@ import {
   isLateCancel,
   lateCancelWarning,
 } from "@/lib/cancel-window";
+import { pluralize } from "@/lib/pluralize";
 
 const KIND_LABEL = { tryout: "Tryout", clinic: "Camp / Clinic" } as const;
+/** Events the landing's compact list shows before "See all". */
+const COMPACT_LIMIT = 3;
 
 function fmtDate(d: string | null) {
   if (!d) return "Date TBA";
@@ -57,7 +60,11 @@ function fmtDate(d: string | null) {
   });
 }
 
-export function TryoutsSection() {
+/**
+ * Upcoming tryouts and camps with RSVP. `compact` is the landing page's version: a sub-block of the combined
+ * "Tryouts, teams, trainers & facilities" section, so its heading is one level down and it lists a few events only.
+ */
+export function TryoutsSection({ compact = false }: { compact?: boolean } = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const list = useServerFn(listUpcomingTryouts);
@@ -67,24 +74,57 @@ export function TryoutsSection() {
   });
   const [active, setActive] = useState<TryoutListing | null>(null);
   const [posting, setPosting] = useState(false);
+  // The landing's compact list shows a few events; "See all" opens the rest in place (there is no tryouts index page).
+  const [showAll, setShowAll] = useState(false);
   const mine = useMyTryoutRegistrations();
 
   const requireAuth = (fn: () => void) =>
-    user ? fn() : navigate({ to: "/auth", search: { next: "/#tryouts" } as any });
+    user ? fn() : navigate({ to: "/auth", search: { next: "/#tryouts" } });
+
+  const Heading = compact ? "h3" : "h2";
+  const ItemHeading = compact ? "h4" : "h3";
+  const shown = compact && !showAll ? data.slice(0, COMPACT_LIMIT) : data;
+  const hiddenCount = data.length - shown.length;
 
   return (
-    <section id="tryouts" className="page-shell py-16" aria-labelledby="tryouts-heading">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <section
+      id="tryouts"
+      className={compact ? "mt-10 scroll-mt-20" : "page-shell py-16"}
+      aria-labelledby="tryouts-heading"
+    >
+      <div
+        className={
+          compact
+            ? "mb-4 flex flex-wrap items-end justify-between gap-3"
+            : "mb-8 flex flex-wrap items-end justify-between gap-4"
+        }
+      >
         <div>
-          <h2 id="tryouts-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Open tryouts &amp; camps
-          </h2>
-          <p className="mt-2 max-w-xl text-muted-foreground">
+          <Heading
+            id="tryouts-heading"
+            className={
+              compact
+                ? "font-display text-xl font-semibold"
+                : "font-display text-3xl md:text-4xl font-bold"
+            }
+          >
+            {compact ? "Upcoming tryouts & camps" : "Open tryouts & camps"}
+          </Heading>
+          <p
+            className={
+              compact
+                ? "mt-1 max-w-xl text-sm text-muted-foreground"
+                : "mt-2 max-w-xl text-muted-foreground"
+            }
+          >
             Teams and coaches post tryouts and camps. Players and parents RSVP and sign the team
             waiver in one step.
           </p>
         </div>
-        <Button onClick={() => requireAuth(() => setPosting(true))} className="rounded-full">
+        <Button
+          onClick={() => requireAuth(() => setPosting(true))}
+          className={compact ? "min-h-11 rounded-full" : "rounded-full"}
+        >
           <Megaphone className="mr-1 h-4 w-4" /> Post a tryout
         </Button>
       </div>
@@ -92,7 +132,13 @@ export function TryoutsSection() {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading events…</p>
       ) : data.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-8 text-center">
+        <div
+          className={
+            compact
+              ? "rounded-2xl border border-border bg-card p-5 text-center"
+              : "rounded-2xl border border-border bg-card p-8 text-center"
+          }
+        >
           <p className="font-semibold">No upcoming tryouts yet.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Run a team? Be the first to post one.
@@ -100,7 +146,7 @@ export function TryoutsSection() {
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((t) => {
+          {shown.map((t) => {
             const left = t.spotsMax != null ? Math.max(t.spotsMax - t.spotsTaken, 0) : null;
             return (
               <li key={t.id} className="flex flex-col rounded-2xl border border-border bg-card p-5">
@@ -110,11 +156,11 @@ export function TryoutsSection() {
                   </span>
                   <span className="text-muted-foreground">{t.price ? `$${t.price}` : "Free"}</span>
                 </div>
-                <h3 className="mt-3 font-display text-lg font-semibold">
+                <ItemHeading className="mt-3 font-display text-lg font-semibold">
                   <Link to="/tryouts/$postId" params={{ postId: t.id }} className="hover:underline">
                     {t.title}
                   </Link>
-                </h3>
+                </ItemHeading>
                 <Link
                   to="/teams/$teamId"
                   params={{ teamId: t.teamId }}
@@ -141,7 +187,7 @@ export function TryoutsSection() {
                   {left != null && (
                     <p className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      {left === 0 ? "Full" : `${left} spots left`}
+                      {left === 0 ? "Full" : `${pluralize(left, "spot")} left`}
                     </p>
                   )}
                 </div>
@@ -167,6 +213,15 @@ export function TryoutsSection() {
             );
           })}
         </ul>
+      )}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="mt-4 inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-4 text-sm font-semibold"
+        >
+          See all {data.length} tryouts &amp; camps
+        </button>
       )}
 
       {active && <RsvpDialog tryout={active} onClose={() => setActive(null)} />}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { superadminListSettings, superadminSetSetting } from "@/lib/superadmin.functions";
@@ -45,7 +46,11 @@ export function HomeAvailabilityPanel() {
       await qc.invalidateQueries({ queryKey: ["home-availability-switch"] });
       toast.success(`Availability-first Home ${next ? "is on" : "is off"}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save this setting");
+      // Superadmin only: no raw SQL, but the code (when there is one) helps support (WP 4.0).
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting. Please try again.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setBusy(false);
     }

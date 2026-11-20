@@ -1,3 +1,4 @@
+import { repeatOf } from "@/lib/game-series-api";
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
 import { normalizeCutoff } from "@/lib/cancel-window";
@@ -147,6 +148,7 @@ type DbRow = {
   org_id?: string | null;
   org_official?: boolean | null;
   series_id?: string | null;
+  rrule?: unknown;
   min_players?: number | null;
   allow_waitlist?: boolean | null;
   cancellation_policy?: string | null;
@@ -215,6 +217,7 @@ function rowToGame(r: DbRow): Game {
     orgId: r.org_id ?? undefined,
     orgOfficial: r.org_id ? !!r.org_official : undefined,
     seriesId: r.series_id ?? null,
+    repeat: repeatOf(r.rrule),
     endsAt: r.ends_at ?? null,
     allDay: !!r.all_day,
     timezone: r.timezone ?? null,

@@ -5,6 +5,7 @@ import { pageHead, ogImageUrl } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { PublicXpCard } from "@/components/players/PublicXpCard";
 import { ContactGuardianButton } from "@/components/players/ContactGuardianButton";
+import { ProfileUnavailable } from "@/components/players/ProfileUnavailable";
 import { FamilyClipsSection } from "@/components/reels/FamilyClipsSection";
 import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
@@ -139,22 +140,9 @@ function PlayerCardPage() {
     );
   }
 
-  if (!card?.profile) {
-    return (
-      <div className="page-shell-content pt-6 pb-24">
-        <Link
-          to="/players"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to players
-        </Link>
-        <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
-          <p className="font-semibold">Player not found</p>
-          <p className="mt-1 text-sm text-muted-foreground">This card may have been removed.</p>
-        </div>
-      </div>
-    );
-  }
+  // getPlayerCard answers profile: null for nonexistent, non-public and suspended
+  // players alike (and a failed call lands here too): one screen for all of them.
+  if (!card?.profile) return <ProfileUnavailable kind="card" />;
 
   const p = card.profile;
   const stats = card.stats;

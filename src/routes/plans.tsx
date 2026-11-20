@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { Check, Loader2, ArrowLeft, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import { useAllSubscriptions } from "@/hooks/useAllSubscriptions";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
@@ -84,8 +85,13 @@ function PlansPage() {
       });
       if ("error" in res) throw new Error(res.error);
       window.open(res.url, "_blank");
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not open billing portal");
+    } catch (e: unknown) {
+      // createPortalSession's own "No subscription found" shows as it is; Stripe's or the database's text never does.
+      toast.error(
+        errorText(e) === "No subscription found"
+          ? "No subscription found"
+          : userErrorMessage(e, "Couldn't open the billing portal. Please try again."),
+      );
     } finally {
       setPortalBusy(false);
     }

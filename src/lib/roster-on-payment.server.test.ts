@@ -176,7 +176,7 @@ describe("addPaidPlayerToRoster", () => {
     expect(notices.map((n) => n.user_id)).toEqual(["host-1", "p1"]);
     expect(notices[0].body).toMatch(/the game was cancelled\. .*send their money back/);
     expect(notices[1].title).toBe("Payment confirmed, but you're not on the roster yet");
-    expect(notices[1].body).toMatch(/Ask them for your place or your money back/);
+    expect(notices[1].body).toMatch(/Ask them for your spot or your money back/);
   });
 
   it("is quiet when the player is already on the roster", async () => {

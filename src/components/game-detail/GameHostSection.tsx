@@ -16,6 +16,7 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { type GamePaymentSettings } from "@/lib/payments";
 import { type Game } from "@/lib/sample-data";
 import { type Reputation } from "@/lib/reviews";
+import { liveHostRating } from "@/lib/host-rating";
 
 export type GameHostSectionProps = {
   canReviewHost: boolean;
@@ -38,6 +39,9 @@ export function GameHostSection({
   setReviewsOpen,
   settings,
 }: GameHostSectionProps) {
+  // Live rating from the reviews already loaded for the badge below; hidden
+  // when there are none (not the publish-time snapshot, which defaults to 5).
+  const rating = liveHostRating(hostRep);
   return (
     <>
       {/* Host */}
@@ -86,8 +90,12 @@ export function GameHostSection({
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Organized by <NameTag {...nameProps}>{game.host.name}</NameTag>
-                    {game.host.rating ? (
-                      <span className="text-lime font-semibold"> · ★ {game.host.rating}</span>
+                    {rating ? (
+                      <span className="text-lime font-semibold">
+                        {" "}
+                        · <span aria-hidden>★</span> {rating.stars}
+                        <span className="sr-only"> out of 5 from {rating.reviews}</span>
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -117,9 +125,13 @@ export function GameHostSection({
                     {game.host.username}
                   </span>
                 </div>
-                <div className="text-xs text-lime font-semibold">
-                  ★ {game.host.rating} host rating
-                </div>
+                {rating ? (
+                  <div className="text-xs text-lime font-semibold">
+                    <span aria-hidden>★</span> {rating.stars}
+                    <span className="sr-only"> out of 5</span>
+                    <span className="font-normal text-muted-foreground"> · {rating.reviews}</span>
+                  </div>
+                ) : null}
               </div>
             </>
           );

@@ -7,6 +7,7 @@
  * and guardian steps then follow as for any approved player. Nothing here decides who may invite whom.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { USER_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
 
 export type GameInviteStatus = "pending" | "accepted" | "declined" | "cancelled" | "expired";
 
@@ -67,39 +68,9 @@ const GAME_COLUMNS = "game:hosted_games(id,title,sport,date,location,timezone,ho
 
 /** The sentence a host or player sees for a refusal; the raw code otherwise never reaches the screen. */
 export function gameInviteErrorMessage(e: unknown): string {
-  const msg = (e as { message?: string } | null)?.message ?? String(e ?? "");
-  const code = msg.split(":")[0].trim();
-  switch (code) {
-    case "NOT_GAME_HOST":
-      return "Only the game's host can invite players to it.";
-    case "GAME_NOT_OPEN":
-      return "This game isn't taking players right now.";
-    case "GAME_FULL":
-      return "This game is full.";
-    case "ALREADY_IN_GAME":
-      return "This player already has a spot in this game.";
-    case "INVITE_NOT_AVAILABLE":
-    case "MINOR_MESSAGING_BLOCKED":
-      return "This player can't be invited to this game.";
-    case "INVITE_DECLINED_RECENTLY":
-      return "This player declined an invitation to this game in the last week.";
-    case "INVITE_LIMIT":
-      return msg.includes("30")
-        ? "You can invite up to 30 players at once."
-        : "You've reached the invitation limit for now. Try again later.";
-    case "INVITE_NOT_FOUND":
-      return "This invitation is no longer available.";
-    case "SELF_INVITE":
-      return "You can't invite yourself.";
-    case "AGE_VERIFICATION_REQUIRED":
-      return "Add your date of birth in your profile before joining games.";
-    case "CHILD_GAME_PARTICIPATION_BLOCKED":
-      return "A parent or guardian needs to allow game participation first.";
-    case "BLOCKED_BY_HOST":
-      return "You can't join this game.";
-    default:
-      return "Something went wrong. Please try again.";
-  }
+  // A messaging rule is one more reason a player can't be invited; it reads as the same neutral refusal.
+  if (errorCode(e) === "MINOR_MESSAGING_BLOCKED") return USER_ERROR_MESSAGES.INVITE_NOT_AVAILABLE;
+  return knownErrorMessage(e) ?? "Something went wrong. Please try again.";
 }
 
 async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
@@ -269,4 +240,25 @@ export async function inviteeNames(ids: readonly string[]): Promise<Record<strin
   for (const id of unique) out[id] = "Player";
   for (const p of data ?? []) if (p.display_name?.trim()) out[p.id] = p.display_name.trim();
   return out;
+}
+
+/** WP 3.2a: one of the host's regulars, as my_regular_players returns them (migration 20261123100000). */
+export type RegularPlayer = {
+  user_id: string;
+  last_played: string;
+  games: number;
+  status: "in_game" | "accepted" | "invited" | "declined_recently" | "available";
+};
+
+/**
+ * The adults who played in this host's games in the last 90 days and may be invited again without an availability post (not
+ * blocked, not suspended, not opted out), most recent first, at most 50. Only the game's host can ask.
+ */
+export async function listRegularPlayers(gameId: string): Promise<RegularPlayer[]> {
+  const { data, error } = await supabase.rpc(
+    "my_regular_players" as never,
+    { _game: gameId } as never,
+  );
+  if (error) throw error;
+  return (data ?? []) as RegularPlayer[];
 }

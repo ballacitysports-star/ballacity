@@ -13,6 +13,7 @@ import { VENUE_HIDDEN_LABEL } from "@/lib/post-venues";
 import { isAppSwitchOn, type EventsClient } from "@/lib/events-read";
 import { VENUE_EVENTS_SETTING_KEY } from "@/lib/feed-events";
 import { blockedMessage } from "@/lib/post-moderation";
+import { errorText } from "@/lib/user-error";
 import { createTrainerEvent, createVenueEvent } from "@/lib/venue-events.functions";
 import {
   Dialog,
@@ -113,6 +114,14 @@ function EventItem({
   );
 }
 
+/** A form check of our own (buildVenueEventPayload, the trainer's type check): its sentence is shown as it is. */
+class VenueEventDraftError extends Error {}
+
+/** What a failed event action reads as: never the raw database or server text. */
+function eventActionErrorMessage(e: unknown): string {
+  return venueEventErrorMessage(errorText(e) ?? "");
+}
+
 function CreateForm({
   hostKind,
   hostId,
@@ -131,10 +140,10 @@ function CreateForm({
   const m = useMutation({
     mutationFn: async () => {
       const built = buildVenueEventPayload(d, new Date(), kinds);
-      if (!built.ok) throw new Error(built.error);
+      if (!built.ok) throw new VenueEventDraftError(built.error);
       if (hostKind === "trainer") {
         const { kind } = built.payload;
-        if (kind !== "clinic" && kind !== "camp") throw new Error("Pick a type.");
+        if (kind !== "clinic" && kind !== "camp") throw new VenueEventDraftError("Pick a type.");
         return createTrainer({ data: { trainerId: hostId, event: { ...built.payload, kind } } });
       }
       return createVenue({ data: { orgId: hostId, event: built.payload } });
@@ -146,7 +155,12 @@ function CreateForm({
       setD(EMPTY_VENUE_EVENT_DRAFT);
       onDone();
     },
-    onError: (e) => setError(blockedMessage(e) ?? (e instanceof Error ? e.message : String(e))),
+    onError: (e) =>
+      setError(
+        e instanceof VenueEventDraftError
+          ? e.message
+          : (blockedMessage(e) ?? eventActionErrorMessage(e)),
+      ),
   });
 
   const field = (id: keyof VenueEventDraft, label: string, props: Record<string, unknown> = {}) => (
@@ -338,7 +352,7 @@ function HostEventsSection({
       toast.success("You're signed up.");
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(eventActionErrorMessage(e)),
   });
   const cancel = useMutation({
     mutationFn: async (id: string) => {
@@ -349,7 +363,7 @@ function HostEventsSection({
       toast.success("Sign-up cancelled.");
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(eventActionErrorMessage(e)),
   });
 
   if (on.data !== true) return null;

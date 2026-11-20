@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { userErrorMessage } from "@/lib/user-error";
 
 type RpcResult = { data: unknown; error: { message: string } | null };
 
@@ -148,18 +149,14 @@ export async function cancelFollowRequest(targetId: string) {
   if (error) throw new Error(followErrorMessage(error.message));
 }
 
-function followErrorMessage(message: string): string {
-  if (/FOLLOW_LOCKED/.test(message))
-    return "A parent or guardian needs to approve your account first.";
-  if (/NOT_SIGNED_IN/.test(message)) return "Sign in to follow";
-  if (/FOLLOW_NOT_ALLOWED/.test(message)) return "You can't change this account's followers.";
-  if (/NO_SUCH_FOLLOW_REQUEST/.test(message)) return "That request is no longer there.";
-  if (/INVALID_FOLLOW_TARGET/.test(message)) return "That account isn't available.";
-  // Older databases raised a separate code for a block; the same neutral wording, so the block is not
-  // disclosed. Since SEC-2b the database itself answers INVALID_FOLLOW_TARGET for a missing or blocked account
-  // (a profile the viewer cannot see is never refused: it is asked, and the answer is "requested").
-  if (/FOLLOW_BLOCKED/.test(message)) return "That account isn't available.";
-  return message;
+/**
+ * Words for a refused follow; any other failure reads as a generic sentence, never as the database's text.
+ * FOLLOW_BLOCKED (older databases) and INVALID_FOLLOW_TARGET read the same, so a block is not disclosed. Since SEC-2b
+ * the database itself answers INVALID_FOLLOW_TARGET for a missing or blocked account (a profile the viewer cannot see
+ * is never refused: it is asked, and the answer is "requested").
+ */
+export function followErrorMessage(message: string): string {
+  return userErrorMessage(message, "Couldn't update this follow. Please try again.");
 }
 
 export type FollowRequest = {

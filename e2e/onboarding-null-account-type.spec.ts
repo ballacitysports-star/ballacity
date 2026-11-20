@@ -227,7 +227,7 @@ async function openPicker(page: Page, cohort: "adult" | "teen_16_17" = "adult") 
 }
 
 const ROLE_CARDS: [label: string, blurb: string][] = [
-  ["Player", "Athletes looking for games and runs"],
+  ["Player", "Athletes looking for pickup games"],
   ["Parent / Guardian", "Parents managing kids' sports schedules"],
   ["Team / Coach", "Coaches and captains organizing squads"],
   ["Facility / Venue", "Venue owners and sports facilities"],

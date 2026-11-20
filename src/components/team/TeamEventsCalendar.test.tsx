@@ -4,11 +4,26 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { dateKeyInZone } from "@/lib/datetime";
 import { TeamEventsCalendar, EventWaiverStatus, groupCalendarEvents } from "./TeamEventsCalendar";
 
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const events = [
-  { id: "one", title: "Open tryout", kind: "tryout" as const, event_date: "2026-10-15T16:00:00Z", spots_taken: 3 },
-  { id: "two", title: "Skills camp", kind: "clinic" as const, event_date: "2026-10-15T18:00:00Z", spots_taken: 2 },
+  {
+    id: "one",
+    title: "Open tryout",
+    kind: "tryout" as const,
+    event_date: "2026-10-15T16:00:00Z",
+    spots_taken: 3,
+  },
+  {
+    id: "two",
+    title: "Skills camp",
+    kind: "clinic" as const,
+    event_date: "2026-10-15T18:00:00Z",
+    spots_taken: 2,
+  },
   { id: "tba", title: "Undated camp", kind: "clinic" as const, event_date: null, spots_taken: 0 },
 ];
 
@@ -24,11 +39,26 @@ describe("Team event calendar", () => {
   it("selects event days, summarizes current waivers, changes months and returns to today", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));
-    render(<TeamEventsCalendar events={events} summaries={new Map([["one", { going: 3, signed: 2 }], ["two", { going: 2, signed: 2 }]])}
-      waiverRequired summaryLoading={false} summaryError={false} renderEvent={(e) => <li key={e.id}>{e.title}</li>} />);
+    render(
+      <TeamEventsCalendar
+        events={events}
+        summaries={
+          new Map([
+            ["one", { going: 3, signed: 2 }],
+            ["two", { going: 2, signed: 2 }],
+          ])
+        }
+        waiverRequired
+        summaryLoading={false}
+        summaryError={false}
+        renderEvent={(e) => <li key={e.id}>{e.title}</li>}
+      />,
+    );
     expect(screen.getByText("5 RSVPs")).toBeTruthy();
     expect(screen.getByText("4/5 waivers signed · 1 missing")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "2026-10-15, 2 events, 5 RSVPs, 1 missing waivers" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "2026-10-15, 2 events, 5 RSVPs, 1 missing waivers" }),
+    );
     expect(screen.getByText("Skills camp")).toBeTruthy();
     expect(screen.getByText("Undated camp")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next month" }));
@@ -37,11 +67,36 @@ describe("Team event calendar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
     expect(screen.getByText("October 2026")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Today" }));
-    expect(screen.getByRole("button", { name: /2026-10-03, 0 events/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen.getByRole("button", { name: /2026-10-03, 0 events/ }).getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("says 1 event, not 1 events, in the summary, the day button and the day heading (WP 4.3)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));
+    render(
+      <TeamEventsCalendar
+        events={[events[0]]}
+        summaries={new Map([["one", { going: 3, signed: 3 }]])}
+        waiverRequired={false}
+        summaryLoading={false}
+        summaryError={false}
+        renderEvent={(e) => <li key={e.id}>{e.title}</li>}
+      />,
+    );
+    // The month summary and the day cell's compact count.
+    expect(screen.getAllByText("1 event")).toHaveLength(2);
+    const day = screen.getByRole("button", { name: /^2026-10-15, 1 event, 3 RSVPs$/ });
+    fireEvent.click(day);
+    expect(screen.getByRole("heading", { level: 3, name: /· 1 event$/ })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\b1 events\b/);
   });
 
   it("never presents a failed or pending waiver read as signed", () => {
-    const { rerender } = render(<EventWaiverStatus required loading={false} error summary={{ going: 5, signed: 5 }} />);
+    const { rerender } = render(
+      <EventWaiverStatus required loading={false} error summary={{ going: 5, signed: 5 }} />,
+    );
     expect(screen.getByText("Waiver status unavailable")).toBeTruthy();
     rerender(<EventWaiverStatus required loading error={false} />);
     expect(screen.getByText("Loading waivers…")).toBeTruthy();

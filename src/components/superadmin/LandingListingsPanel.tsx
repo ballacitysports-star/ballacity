@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { superadminListSettings, superadminSetSetting } from "@/lib/superadmin.functions";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -72,7 +73,10 @@ export function LandingListingsPanel() {
       void qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     } catch (e) {
       setLocal(prev);
-      toast.error(e instanceof Error ? e.message : "Could not save setting");
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setSaving(false);
     }

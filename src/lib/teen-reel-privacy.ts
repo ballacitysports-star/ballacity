@@ -7,6 +7,7 @@
  */
 
 import type { AgeCohort } from "@/lib/child-policy";
+import { knownErrorMessage } from "@/lib/user-error";
 
 export const REEL_PRIVACY_PATH = "/reel-privacy";
 
@@ -115,16 +116,6 @@ export function teenReelState(r: {
   return r.team_share_team_id && r.guardian_team_approved_by ? "team" : "guardian";
 }
 
-const TEEN_ERRORS: Record<string, string> = {
-  TEEN_TEAM_NOT_AVAILABLE: "Team sharing is only available for reels from ages 13 to 15.",
-  TEEN_TEAM_GUARDIAN_ONLY: "Only a verified parent or guardian can approve this.",
-  TEEN_TEAM_INCOMPLETE: "Choose a team to approve.",
-  TEEN_TEAM_NOT_ON_TEAM: "Your child needs to be on that team.",
-  TEEN_TEAM_NOT_READY: "The reel has to be finished, posted and not on hold first.",
-};
-
 export function teenReelErrorMessage(err: unknown): string | null {
-  const text = err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  for (const [code, msg] of Object.entries(TEEN_ERRORS)) if (text.includes(code)) return msg;
-  return null;
+  return knownErrorMessage(err) ?? null;
 }

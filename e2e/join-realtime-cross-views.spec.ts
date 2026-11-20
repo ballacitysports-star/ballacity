@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { ensureNotJoined, joinCta, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
+import { profileGamesHeading } from "./helpers/realtime-counters";
 
 /**
  * E2E: joining a game from the game-detail view must propagate in real time
@@ -81,17 +82,23 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
       await detailPage.getByRole("heading", { level: 1 }).first().textContent()
     )?.trim();
     expect(title, "game page should name the game").toBeTruthy();
-    await Promise.all([
-      feedPage.goto(`/feed?q=${encodeURIComponent(title!)}`, { waitUntil: "domcontentloaded" }),
-      profilePage.goto("/profile", { waitUntil: "domcontentloaded" }),
-    ]);
 
     // --- Baseline: viewer is NOT joined on any surface ---
     await expect(joinCta(detailPage)).toBeVisible({ timeout: 15_000 });
 
+    // The feed, then the profile, each opened once the one before has drawn.
+    // Opened together, the two app boots share the dev server with each other
+    // (and with the game page, which reloads its data when they sign in), and
+    // on CI (PR run 1334) the feed had not drawn its card 15 s later while the
+    // backend answered every request in milliseconds. See the same change in
+    // join-cross-device-roster.spec.ts.
+    //
     // Feed card for this game shouldn't show a "Joined" pill yet. Cards link
     // to /games/<id> and carry the title as a heading; the "Needs you now"
     // row that appears once joined links there too, but has no heading.
+    await feedPage.goto(`/feed?q=${encodeURIComponent(title!)}`, {
+      waitUntil: "domcontentloaded",
+    });
     const feedCard = feedPage
       .locator(`a[href="/games/${GAME_ID}"]`)
       .filter({ has: feedPage.getByRole("heading", { level: 3 }) })
@@ -100,11 +107,14 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     // The badge is its own element reading exactly "Joined".
     await expect(feedCard.getByText(/^Joined$/)).toHaveCount(0);
 
-    // Profile "Upcoming" list shouldn't include the game yet.
+    // Profile "Upcoming" list shouldn't include the game yet. Counted once the
+    // member page has drawn its lists, so an empty count means something.
+    await profilePage.goto("/profile", { waitUntil: "domcontentloaded" });
+    await expect(profileGamesHeading(profilePage)).toBeVisible({ timeout: 15_000 });
     const profileCardBefore = profilePage.locator(`a[href*="/games/${GAME_ID}"]`);
     expect(await profileCardBefore.count()).toBe(0);
 
-    // --- Action: join from the detail page (through "Join this run?") ---
+    // --- Action: join from the detail page (through "Join this game?") ---
     // Detail page flips locally (same tab, sync store update).
     await joinFreeRun(detailPage);
 

@@ -4,6 +4,7 @@ import { ensureNotJoined, joinFreeRun, leaveFreeRun } from "./helpers/realtime-j
 import {
   mapSpotsPill,
   mapViewUrlFor,
+  profileGamesHeading,
   readCardJoinedCount,
   readMapSpotsLeft,
 } from "./helpers/realtime-counters";
@@ -97,30 +98,43 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     const title = (await bDetail.getByRole("heading", { level: 1 }).first().textContent())?.trim();
     expect(title, "game page should name the game").toBeTruthy();
 
-    await Promise.all([
-      aDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" }),
-      aFeed.goto(`/feed?q=${encodeURIComponent(title!)}`, { waitUntil: "domcontentloaded" }),
-      aMap.goto(mapViewUrlFor(title!), { waitUntil: "domcontentloaded" }),
-      aProfile.goto("/profile", { waitUntil: "domcontentloaded" }),
-    ]);
-
-    // Wait for detail roster, feed card and map card to hydrate on device A.
+    // Open Device A's surfaces one at a time, each until it shows the game.
+    //
+    // They used to be opened together and then given 15 s each. Every surface is
+    // a cold boot of the app on the dev server (about 550 module requests and ten
+    // server-function calls, then the sign-in, age and account-type checks), and
+    // four booting at once in one browser share its six connections to the dev
+    // server and the server's single thread: each takes two to three times as
+    // long as it does alone, the game page longest. On CI (main, run 1332) the
+    // game page had not drawn its roster after 15 s; the sandbox's request log
+    // for that window shows every request answered in milliseconds, but Device
+    // A's tabs sending their first auth checks 2 to 7 s after loading and the
+    // game page never asking for its roster at all. In turn, each surface has its
+    // budget to itself, and all four are still open before the join, so what
+    // changes on them afterwards still arrives over realtime.
+    await aDetail.goto(`/games/${GAME_ID}`, { waitUntil: "domcontentloaded" });
     await expect(aDetail.getByText(/Roster \(\d+\/\d+\)/).first()).toBeVisible({
       timeout: 15_000,
     });
+    await aFeed.goto(`/feed?q=${encodeURIComponent(title!)}`, { waitUntil: "domcontentloaded" });
     await expect
       .poll(async () => readCardJoinedCount(aFeed, GAME_ID), {
         timeout: 15_000,
         message: "feed card counter for the game never rendered on Device A",
       })
       .not.toBeNull();
+    await aMap.goto(mapViewUrlFor(title!), { waitUntil: "domcontentloaded" });
     await expect(mapSpotsPill(aMap, GAME_ID)).toBeVisible({ timeout: 20_000 });
+    // The profile has drawn its lists before the join, so the game appearing
+    // there afterwards is the realtime update, not its first load.
+    await aProfile.goto("/profile", { waitUntil: "domcontentloaded" });
+    await expect(profileGamesHeading(aProfile)).toBeVisible({ timeout: 15_000 });
     const beforeRoster = await readSpotsFromDetail(aDetail);
     const beforeFeed = (await readCardJoinedCount(aFeed, GAME_ID))!;
     const beforeMap = await readMapSpotsLeft(aMap, GAME_ID);
     expect(beforeMap, "map card should show a spots count").not.toBeNull();
 
-    // Device B joins (through the "Join this run?" confirmation) and flips locally.
+    // Device B joins (through the "Join this game?" confirmation) and flips locally.
     await joinFreeRun(bDetail);
 
     // --- Realtime propagation to Device A ---

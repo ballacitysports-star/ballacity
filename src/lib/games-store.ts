@@ -310,8 +310,15 @@ function ensureRealtime() {
  * the roster (including when they already were), false when it refused or they
  * are signed out; the player has been told why. The list updates straight away
  * so the button responds, and is put back if the join fails.
+ *
+ * Pass the game's `allowWaitlist` so a player who loses the last spot is pointed at
+ * the waitlist when the host kept one.
  */
-export async function joinGame(id: string, position?: string): Promise<boolean> {
+export async function joinGame(
+  id: string,
+  position?: string,
+  game?: { allowWaitlist?: boolean | null },
+): Promise<boolean> {
   loadJoinedGames();
   if (joined.has(id) && !inFlight.has(id)) return true;
   if (inFlight.has(id)) return false;
@@ -352,7 +359,7 @@ export async function joinGame(id: string, position?: string): Promise<boolean> 
       // player why instead of silently un-joining them.
       const { joinGateErrorMessage } = await import("@/lib/game-status");
       const { toast } = await import("sonner");
-      toast.error(joinGateErrorMessage(error));
+      toast.error(joinGateErrorMessage(error, game));
       return false;
     }
     if (row?.id) learnRow(row.id, id);

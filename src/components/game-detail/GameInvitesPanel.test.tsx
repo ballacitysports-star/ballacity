@@ -15,6 +15,9 @@ const env = vi.hoisted(() => ({
   cancel: vi.fn(async () => "cancelled"),
   near: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn() },
+  regulars: [] as Record<string, unknown>[],
+  groups: [] as { id: string; name: string; memberIds: string[] }[],
+  deleteGroup: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({ toast: env.toast }));
@@ -25,6 +28,14 @@ vi.mock("@/lib/game-invites", () => ({
   invitePlayersToGame: env.bulk,
   cancelGameInvite: env.cancel,
   gameInviteErrorMessage: () => "nope",
+  listRegularPlayers: async () => env.regulars,
+}));
+vi.mock("@/lib/host-groups", () => ({
+  GROUP_NAME_MAX: 60,
+  groupNameError: () => null,
+  createHostGroup: vi.fn(),
+  listMyHostGroups: async () => env.groups,
+  deleteHostGroup: env.deleteGroup,
 }));
 vi.mock("@/lib/availability", () => ({
   listAvailabilityNear: (q: unknown) => {
@@ -83,6 +94,10 @@ beforeEach(() => {
   env.near.mockReset();
   env.cancel.mockClear();
   env.toast.success.mockClear();
+  env.toast.error.mockClear();
+  env.regulars = [];
+  env.groups = [];
+  env.deleteGroup.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -158,5 +173,69 @@ describe("GameInvitesPanel", () => {
   it("nothing for a game that has started", () => {
     const { container } = show(game({ date: new Date(Date.now() - 60_000).toISOString() }));
     expect(container.innerHTML).toBe("");
+  });
+
+  describe("Delete group (WP 4.3)", () => {
+    const regular = (user: string) => ({
+      user_id: user,
+      games: 3,
+      last_played: "2026-11-01T18:00:00Z",
+      status: "available",
+    });
+
+    async function openGroup() {
+      env.regulars = [regular("u1"), regular("u2")];
+      env.groups = [{ id: "grp1", name: "Tuesday crew", memberIds: ["u1"] }];
+      show();
+      fireEvent.click(await screen.findByRole("button", { name: /Invite regulars/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Tuesday crew" }));
+      return screen.getByRole("button", { name: "Delete group" });
+    }
+
+    it("is a 44px target, and asks before deleting; Keep it deletes nothing", async () => {
+      const del = await openGroup();
+      expect(del.className).toContain("min-h-11");
+      fireEvent.click(del);
+      const dialog = await screen.findByRole("alertdialog");
+      expect(within(dialog).getByText("Delete “Tuesday crew”?")).toBeTruthy();
+      expect(env.deleteGroup).not.toHaveBeenCalled();
+      const keep = within(dialog).getByRole("button", { name: "Keep it" });
+      expect(keep.className).toContain("min-h-11");
+      fireEvent.click(keep);
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(env.deleteGroup).not.toHaveBeenCalled();
+      // Focus goes back to the button that opened the dialog, not to <body>.
+      await waitFor(() => expect(document.activeElement).toBe(del));
+    });
+
+    it("deletes the group once confirmed", async () => {
+      env.deleteGroup.mockResolvedValue(undefined);
+      fireEvent.click(await openGroup());
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete group" }));
+      await waitFor(() => expect(env.deleteGroup).toHaveBeenCalledWith("grp1"));
+      await waitFor(() =>
+        expect(env.toast.success).toHaveBeenCalledWith("Deleted “Tuesday crew”."),
+      );
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      // "Delete group" is gone with the group, so focus lands on "All regulars", inside the sheet.
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "All regulars" })),
+      );
+    });
+
+    it("a failed delete says so in plain words and keeps the dialog open", async () => {
+      env.deleteGroup.mockRejectedValue(new Error("permission denied for table host_groups"));
+      fireEvent.click(await openGroup());
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete group" }));
+      await waitFor(() => expect(env.toast.error).toHaveBeenCalledTimes(1));
+      const shown = String(env.toast.error.mock.calls[0][0]);
+      expect(shown).not.toMatch(/permission denied|host_groups/);
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+      expect(env.toast.success).not.toHaveBeenCalled();
+      // Focus stayed in the dialog while the delete ran (the button was never disabled under it).
+      expect(screen.getByRole("alertdialog").contains(document.activeElement)).toBe(true);
+    });
   });
 });

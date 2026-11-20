@@ -18,7 +18,14 @@ import {
   type DobParts,
 } from "@/lib/age-verification";
 import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useAgePolicy } from "@/lib/youth-features";
+
+/** Sentences submitMyBirthday words itself (beyond the catalog's DOB_* and AGE_MINIMUM_13); shown as they are. */
+const SUBMIT_BIRTHDAY_SENTENCES: readonly string[] = [
+  "Enter your date of birth as month, day and year.",
+  "Saved, but we could not read your account status. Reload the page.",
+];
 
 /**
  * The date-of-birth step. Rendered either as its own page (/onboarding/age) or
@@ -62,8 +69,11 @@ export function AgeGateScreen({ onResolved }: { onResolved?: (cohort: string) =>
       routeOnward(result.cohort);
     } catch (err) {
       setBusy(false);
-      const message =
-        err instanceof Error ? err.message : "We couldn't save your date of birth. Try again.";
+      // The catalog or our own sentence, never the raw database text: minors see this screen (WP 4.0).
+      const text = errorText(err) ?? "";
+      const message = SUBMIT_BIRTHDAY_SENTENCES.includes(text)
+        ? text
+        : userErrorMessage(err, "We couldn't save your date of birth. Please try again.");
       setError(message);
       toast.error(message);
     }

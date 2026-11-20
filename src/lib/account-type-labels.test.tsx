@@ -97,7 +97,7 @@ describe("RolePicker (sign-up and onboarding)", () => {
 
   it("says who each role is for", () => {
     expect(Object.fromEntries(ROLES.map((r) => [r.label, r.blurb]))).toEqual({
-      Player: "Athletes looking for games and runs",
+      Player: "Athletes looking for pickup games",
       "Parent / Guardian": "Parents managing kids' sports schedules",
       "Team / Coach": "Coaches and captains organizing squads",
       "Facility / Venue": "Venue owners and sports facilities",

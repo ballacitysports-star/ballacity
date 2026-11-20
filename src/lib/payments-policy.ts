@@ -23,6 +23,10 @@ import {
 export const PAYMENTS_BLOCKED_MESSAGE =
   "Payment coordination isn't available for this account yet.";
 
+/** The same, when it is the host's account that cannot take payments. */
+export const PAYMENTS_HOST_BLOCKED_MESSAGE =
+  "Payment coordination isn't available for this host account yet.";
+
 /** An account with no date of birth cannot pay for a game (AGE_VERIFICATION_REQUIRED). */
 export const PAYMENTS_AGE_REQUIRED_MESSAGE =
   "Add your date of birth in your profile before paying for a game.";
@@ -69,41 +73,20 @@ export const CLAIM_REFUSED_REFUND_STEP =
  * charged." (a manual payment is sent in the player's own payment app before the claim is written, so the money may
  * already have moved), followed by how to get it back (CLAIM_REFUSED_REFUND_STEP).
  */
-export function paymentClaimRefusalMessage(code: PaymentClaimRefusalCode): string {
+export function paymentClaimRefusalMessage(
+  code: PaymentClaimRefusalCode | "HOST_APPROVAL_REQUIRED",
+): string {
   const message = PAYMENT_PRECONDITION_MESSAGES[code]!;
   const reason = message.endsWith(NOT_CHARGED) ? message.slice(0, -NOT_CHARGED.length) : message;
   return `${reason} ${CLAIM_REFUSED_REFUND_STEP}`;
 }
 
-/** The claim-refusal code a database error starts with ("GAME_FULL: ..."), whole codes only. */
-function claimRefusalCodeOf(raw: string): PaymentClaimRefusalCode | null {
-  const code = /^\s*([A-Z][A-Z_]*):/.exec(raw)?.[1];
-  return (PAYMENT_CLAIM_REFUSAL_CODES as readonly string[]).includes(code ?? "")
-    ? (code as PaymentClaimRefusalCode)
-    : null;
-}
-
 /**
- * A plain sentence for a refused payment claim. The database triggers `enforce_game_payment_cohort`,
- * `enforce_guardian_before_payment` and `enforce_payment_claim_preconditions` answer with a code; anything
- * unrecognised is passed through unchanged.
+ * What a player or host reads when a payment claim, or a host's review of one, fails for a reason that has no sentence
+ * of its own. paymentSubmissionErrorMessage, which words those failures, lives in user-error.ts: that module reads the
+ * sentences here, so this one cannot import it back.
  */
-export function paymentSubmissionErrorMessage(raw: string): string {
-  const refusal = claimRefusalCodeOf(raw);
-  if (refusal) return paymentClaimRefusalMessage(refusal);
-  if (raw.includes("AGE_VERIFICATION_REQUIRED")) {
-    // A host confirming another player's claim, or a host whose own account has no birthday.
-    if (raw.includes("this player must add")) return PAYMENTS_PLAYER_AGE_REQUIRED_MESSAGE;
-    if (raw.includes("before taking payments")) return PAYMENTS_HOST_AGE_REQUIRED_MESSAGE;
-    return PAYMENTS_AGE_REQUIRED_MESSAGE;
-  }
-  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED")) return PAYMENTS_GUARDIAN_APPROVAL_MESSAGE;
-  if (raw.includes("PAYMENTS_NOT_AVAILABLE"))
-    return raw.includes("host account")
-      ? "Payment coordination isn't available for this host account yet."
-      : PAYMENTS_BLOCKED_MESSAGE;
-  return raw;
-}
+export const PAYMENT_SAVE_FAILED_MESSAGE = "We couldn't save this payment. Please try again.";
 
 /**
  * A 16-17-year-old with a guardian pays for a game only once a guardian has
@@ -137,20 +120,53 @@ export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
   PAYMENT_IN_PROGRESS:
     "Your earlier PayPal payment for this game is still being confirmed, so you can't pay again yet. Refresh this page in a few minutes, and contact support if it hasn't updated. You weren't charged.",
   HOST_APPROVAL_REQUIRED:
-    "The host has to approve your request to join before you can pay. You weren't charged.",
+    "The host has to approve your request for a spot before you can pay. You weren't charged.",
   GUARDIAN_APPROVAL_REQUIRED: GUARDIAN_PAYMENT_MESSAGE,
   AGE_REQUIREMENT_NOT_MET:
-    "This game has an age requirement, so the host has to approve your request to join first. You weren't charged.",
+    "This game has an age requirement, so the host has to approve your request for a spot first. You weren't charged.",
   GAME_JOINS_CLOSED: "Joining is closed for this game. You weren't charged.",
   GAME_FULL: "This game is full. You weren't charged.",
 };
+
+/**
+ * The payment_submissions triggers that refuse with a plain sentence and no code, and what a player or host reads for
+ * each. Retrying cannot get past any of them, so each says what to change instead (paymentSubmissionErrorMessage).
+ */
+export const PAYMENT_TRIGGER_REFUSALS: readonly { when: RegExp; message: string }[] = [
+  // reject_payment_credentials (trigger no_payment_credentials, 20260901165150): a word like "card number" or "cvv".
+  {
+    when: /never enter card, bank, or password details/i,
+    message:
+      "Remove card, bank or password details from the transaction ID and note. Use your payment app's handle or reference instead.",
+  },
+  // The same trigger: 13 to 19 digits in a row, which a long payment app transaction ID can also look like.
+  {
+    when: /looks like a card or bank account number/i,
+    message:
+      "That looks like a card or bank account number. Take long numbers out of the transaction ID and note, and use your payment app's handle or a shorter reference instead.",
+  },
+  // enforce_approval_before_payment (20261103140000): a requires-approval game, and no approved join request.
+  {
+    when: /host approval required before payment/i,
+    message: paymentClaimRefusalMessage("HOST_APPROVAL_REQUIRED"),
+  },
+  // The review guard (20260915214000): a host review, or a claim whose details were changed after it.
+  {
+    when: /only the game host can confirm/i,
+    message: "Only the game's host can confirm or decline this payment.",
+  },
+  {
+    when: /payment claim details are locked/i,
+    message: "This payment has already been reviewed, so its details can't be changed.",
+  },
+];
 
 /**
  * The host verified a payment and the player could not be given a roster place (cancelled game, request not approved,
  * full, ended, closed...). The server sent both of them a "payment_not_placed" notice with the reason.
  */
 export const PAID_NOT_PLACED_MESSAGE =
-  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a place if you can, or send their money back.";
+  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a spot if you can, or send their money back.";
 
 /** The payment check itself failed (or gave an answer the server does not know): checkout refuses. */
 export const PAYMENT_CHECK_FAILED_MESSAGE =
@@ -203,7 +219,7 @@ export const PAYMENT_RECORD_UNCONFIRMED_MESSAGE =
  * reported, and a superadmin records or refunds it.
  */
 export const PAYMENT_HELD_FOR_SUPPORT_MESSAGE =
-  "Your PayPal payment went through, but we couldn't finish recording it, so your place isn't confirmed yet. Don't pay again: we've flagged it, and support will record or refund it.";
+  "Your PayPal payment went through, but we couldn't finish recording it, so your spot isn't confirmed yet. Don't pay again: we've flagged it, and support will record or refund it.";
 /**
  * An order PayPal captured whose payment record is gone (for example withdrawn after the host rejected it). The server
  * does not write it again on its own, since that would skip the payment rules; it is flagged for support.
@@ -273,7 +289,7 @@ export function paymentParticipantsGate(
   if (!recipient.allowed) {
     return {
       ok: false,
-      reason: "Payment coordination isn't available for this host account yet.",
+      reason: PAYMENTS_HOST_BLOCKED_MESSAGE,
     };
   }
   return { ok: true, reason: null };

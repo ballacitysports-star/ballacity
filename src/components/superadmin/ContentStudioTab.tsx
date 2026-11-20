@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, errorText, userErrorMessage } from "@/lib/user-error";
 import { ExternalLink, Facebook, Link2, Sparkles } from "lucide-react";
 import {
   approveStudioDraft,
@@ -34,6 +35,8 @@ import { createUnclaimedListing } from "@/lib/listings.functions";
 import {
   DRAFT_KINDS,
   LISTING_KINDS,
+  PUBLISH_ERROR_MESSAGES,
+  SOURCE_URL_ERROR_MESSAGES,
   SOURCE_DETAIL_FIELDS,
   composePostMessage,
   hasUnverifiedFacts,
@@ -183,8 +186,46 @@ const KIND_LABEL: Record<DraftKind, string> = {
   reel_concept: "Reel concept",
 };
 
-function errMessage(e: unknown) {
-  return e instanceof Error ? e.message : "Something went wrong";
+/**
+ * Content Studio's own sentences (content-studio.ts and the refusals content-studio.functions.ts words before it
+ * throws): shown as they are. Anything else is raw server or database text and never shows (WP 4.0).
+ */
+const STUDIO_OWN_MESSAGES: ReadonlySet<string> = new Set<string>([
+  ...Object.values(PUBLISH_ERROR_MESSAGES),
+  ...Object.values(SOURCE_URL_ERROR_MESSAGES),
+  "Source submission is turned off in Content Studio settings.",
+  "Listing creation is turned off in Content Studio settings.",
+  "That listing doesn't exist.",
+  "Links in a post must be https links to ballacity.com.",
+  "AI drafting is turned off in Content Studio settings.",
+  "Source not found.",
+  "This source was dismissed.",
+  "This draft has been published or is publishing, so it can't be edited.",
+  "That status change isn't allowed here.",
+  "Only a superadmin can approve, reject or publish.",
+  "The draft changed after you opened it. Review the latest version, then approve.",
+  "This draft can't be approved in its current state.",
+  "Connect the official BallaCity Facebook Page and set it as the destination first.",
+  "Draft not found.",
+  "This draft can't be rejected in its current state.",
+  "Only an approved draft can be published.",
+  "The draft changed since it was approved. It needs a new approval.",
+  "The destination Page changed since this was approved. Approve it again for the current Page.",
+  "This approval has already been published.",
+  "A publish for this draft is already running.",
+  "That request key belongs to another draft.",
+  "Only a superadmin can publish.",
+  "Publishing is turned off in Content Studio settings.",
+  "Publish could not start.",
+  "Connection not found.",
+]);
+
+/** Superadmin screen: our own sentence, else the catalog or generic one or `fallback`, with the code for support. */
+function errMessage(e: unknown, fallback: string) {
+  const text = errorText(e);
+  if (text && STUDIO_OWN_MESSAGES.has(text)) return text;
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
 }
 
 function selectClass() {
@@ -306,7 +347,7 @@ function SourcesSection({ data }: { data: Overview }) {
         toast.success("Source saved. Add the details by hand: links are never read automatically.");
       setEditing(res.source as Source);
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't save the source.")),
   });
 
   const rows = data.sources.filter((s) => showDismissed || s.status !== "dismissed");
@@ -483,7 +524,7 @@ function SourceDetailsDialog({ source, onClose }: { source: Source; onClose: () 
       qc.invalidateQueries({ queryKey: QUERY_KEY });
       onClose();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't update the source.")),
   });
 
   return (
@@ -636,13 +677,13 @@ function NewDraftDialog({
         data: { sourceId: source.id, kind, notes: notes || null, linkUrl: linkUrl || null },
       }),
     onSuccess: done,
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't draft this with AI.")),
   });
   const manual = useMutation({
     mutationFn: () =>
       create({ data: { sourceId: source.id, kind, message, linkUrl: linkUrl || null } }),
     onSuccess: done,
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't create the draft.")),
   });
 
   const filled = SOURCE_DETAIL_FIELDS.filter((f) => source[f]).length;
@@ -783,7 +824,7 @@ function CreateListingDialog({ source, onClose }: { source: Source; onClose: () 
       qc.invalidateQueries({ queryKey: QUERY_KEY });
       onClose();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't create the listing.")),
   });
 
   return (
@@ -1020,7 +1061,7 @@ function DraftDialog({
       refresh();
       if (status === "canceled") onClose();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't save the draft.")),
   });
 
   const doApprove = useMutation({
@@ -1030,7 +1071,7 @@ function DraftDialog({
       toast.success("Approved. Exactly this version can now be published.");
       refresh();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't approve the draft.")),
   });
 
   const doReject = useMutation({
@@ -1040,7 +1081,7 @@ function DraftDialog({
       refresh();
       onClose();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't reject the draft.")),
   });
 
   const doPublish = useMutation({
@@ -1050,13 +1091,17 @@ function DraftDialog({
       else if (res.status === "pending")
         toast.info("Already publishing — the result will appear shortly.");
       else {
-        toast.error(res.message);
+        // A retried request reports the first attempt's stored text, which can be Facebook's own words: show the
+        // sentence for its code instead.
+        toast.error(
+          `${PUBLISH_ERROR_MESSAGES[res.code] ?? "Couldn't publish the draft."}${res.code ? ` (${res.code})` : ""}`,
+        );
         // A failed attempt is finished; a retry is a new intent with a new key.
         setPublishKey(newKey(draft.id));
       }
       refresh();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't publish the draft.")),
   });
 
   const unverified = hasUnverifiedFacts(facts);
@@ -1357,9 +1402,19 @@ function PublishedSection({ data }: { data: Overview }) {
             </div>
             {d && <p className="mt-1 line-clamp-2 text-muted-foreground">{d.message}</p>}
             {a.error_code && (
-              <p className="mt-1 text-xs text-destructive">
-                {a.error_code}: {a.error_message}
-              </p>
+              <div className="mt-1 text-xs text-destructive">
+                <p>
+                  {PUBLISH_ERROR_MESSAGES[a.error_code as keyof typeof PUBLISH_ERROR_MESSAGES] ??
+                    "Publishing failed."}{" "}
+                  ({a.error_code})
+                </p>
+                {a.error_message && (
+                  <details className="mt-0.5 text-muted-foreground">
+                    <summary className="cursor-pointer">Facebook's details</summary>
+                    <p className="break-words">{a.error_message}</p>
+                  </details>
+                )}
+              </div>
             )}
           </li>
         );
@@ -1383,7 +1438,7 @@ function PageSettingsSection({ data }: { data: Overview }) {
     onSuccess: (res) => {
       window.location.assign(res.url);
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't start the Facebook connection.")),
   });
   const dest = useMutation({
     mutationFn: (connectionId: string) => setDest({ data: { connectionId } }),
@@ -1391,7 +1446,7 @@ function PageSettingsSection({ data }: { data: Overview }) {
       toast.success("Destination set. Approvals for another Page must be approved again.");
       refresh();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't set the destination Page.")),
   });
   const drop = useMutation({
     mutationFn: (connectionId: string) => disconnect({ data: { connectionId } }),
@@ -1399,7 +1454,7 @@ function PageSettingsSection({ data }: { data: Overview }) {
       toast.success("Page disconnected and its token deleted.");
       refresh();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't disconnect the Page.")),
   });
   const flags = useMutation({
     mutationFn: (patch: Partial<ContentStudioSettings>) => saveSettings({ data: patch }),
@@ -1407,7 +1462,7 @@ function PageSettingsSection({ data }: { data: Overview }) {
       toast.success("Settings saved");
       refresh();
     },
-    onError: (e) => toast.error(errMessage(e)),
+    onError: (e) => toast.error(errMessage(e, "Couldn't save the settings.")),
   });
 
   const SWITCHES: {

@@ -22,6 +22,10 @@ import {
   useSwitchToManagedChild,
 } from "@/lib/use-managed-children";
 import type { CreatedManagedChild } from "@/lib/managed-children.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** switchToManagedChild's own sentence when the guardian's session is gone; shown as it is. */
+const SWITCH_SIGN_IN_AGAIN = "Sign in again to switch profiles.";
 
 const searchSchema = z.object({
   /** Where the parent came from, so the success screen sends them onward. */
@@ -115,9 +119,10 @@ function AddChildPage() {
       },
       {
         onSuccess: (child) => setCreated(child),
-        // §23: the server only ever throws a message written for a parent.
+        // §23: the server's sentences are the catalog's (managedChildErrorMessage); anything else, such as an input
+        // check that failed, reads as the fallback, never as raw text.
         onError: (e) =>
-          toast.error(e instanceof Error ? e.message : "Couldn't add your child. Try again."),
+          toast.error(userErrorMessage(e, "Couldn't add your child. Please try again.")),
       },
     );
   };
@@ -148,7 +153,9 @@ function AddChildPage() {
                 {
                   onError: (e) =>
                     toast.error(
-                      e instanceof Error ? e.message : "Couldn't switch to that profile.",
+                      errorText(e) === SWITCH_SIGN_IN_AGAIN
+                        ? SWITCH_SIGN_IN_AGAIN
+                        : userErrorMessage(e, "Couldn't switch to that profile. Please try again."),
                     ),
                 },
               )

@@ -15,6 +15,7 @@ import {
   formatBytes,
 } from "@/lib/data-export";
 import { RETENTION_RULES } from "@/lib/retention";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   getDataExportDownloadUrl,
   listMyDataExports,
@@ -51,14 +52,29 @@ function formatWhen(iso: string | null) {
   });
 }
 
+/** Sentences getDataExportDownloadUrl words itself for the member; shown as they are (WP 4.0). */
+const DOWNLOAD_SENTENCES: readonly string[] = [
+  "This export is not available for download",
+  "This export has expired. Request a new one.",
+];
+
+/** The daily-cap trigger on data_export_requests already answers with a member-friendly sentence. */
+const DAILY_CAP = /^You have reached the limit of \d+ data exports per day\. Try again later\.$/;
+
 function ExportRow({ row }: { row: DataExportRequestRow }) {
   const status = effectiveExportStatus(row);
   const meta = EXPORT_STATUS_META[status];
   const download = useMutation({
     mutationFn: () => getDataExportDownloadUrl({ data: { id: row.id } }),
     onSuccess: ({ url }) => window.open(url, "_blank", "noopener,noreferrer"),
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Couldn't start the download"),
+    onError: (e: unknown) => {
+      const text = errorText(e) ?? "";
+      toast.error(
+        DOWNLOAD_SENTENCES.includes(text)
+          ? text
+          : userErrorMessage(e, "Couldn't start the download. Please try again."),
+      );
+    },
   });
 
   const totalRows = Object.values(row.row_counts ?? {}).reduce((a, b) => a + (b || 0), 0);
@@ -85,10 +101,9 @@ function ExportRow({ row }: { row: DataExportRequestRow }) {
         </span>
       </div>
 
+      {/* A failed export's error_message is the raw server text (table key plus database message), so it is not shown
+          (WP 4.0); the failed status's description already says what happened and what to do. */}
       <p className="mt-2 text-xs text-muted-foreground">{meta.description}</p>
-      {status === "failed" && row.error_message && (
-        <p className="mt-1 text-xs text-destructive">{row.error_message}</p>
-      )}
       {status === "ready" && row.expires_at && (
         <p className="mt-1 text-[11px] text-muted-foreground">
           Available until {formatWhen(row.expires_at)}
@@ -125,10 +140,16 @@ function DataExportPage() {
       else toast.error("We couldn't build your export. Please try again.");
       void qc.invalidateQueries({ queryKey: ["my-data-exports"] });
     },
-    onError: (e: unknown) =>
+    onError: (e: unknown) => {
       // The daily cap is enforced by a database trigger and already returns a
-      // member-friendly sentence, so pass it through unchanged.
-      toast.error(e instanceof Error ? e.message : "Couldn't request your export"),
+      // member-friendly sentence, so pass it through unchanged. Anything else is never raw text (WP 4.0).
+      const text = errorText(e) ?? "";
+      toast.error(
+        DAILY_CAP.test(text)
+          ? text
+          : userErrorMessage(e, "Couldn't request your data export. Please try again."),
+      );
+    },
   });
 
   const rows = exports.data ?? [];

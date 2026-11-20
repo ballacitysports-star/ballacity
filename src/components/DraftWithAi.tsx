@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Sparkles, Undo2 } from "lucide-react";
 import { suggestTeamPostDraft } from "@/lib/team-posts.functions";
 import type { TeamPostKind } from "@/lib/sample-data";
+import { userErrorMessage } from "@/lib/user-error";
 
 /** The server needs at least this much to write from (matches suggestTeamPostDraft). */
 export const DRAFT_MIN_NOTES = 10;
@@ -38,7 +39,8 @@ export function DraftWithAi({
       setBeforeDraft({ title, body });
       onApply({ title: draft.title, body: draft.body });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
+      // AI errors arrive as our own vetted sentences; anything else is never raw text (WP 4.0).
+      toast.error(userErrorMessage(e, "Couldn't draft that right now. Please try again."));
     } finally {
       setDrafting(false);
     }

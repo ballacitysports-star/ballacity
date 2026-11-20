@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { FEATURED_LIMIT_MESSAGE } from "@/lib/featured-orgs";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import type { ListingSubjectType } from "@/lib/listings.functions";
 
@@ -41,40 +43,13 @@ export const CLAIM_STATUS_LABEL: Record<MyClaim["status"], string> = {
   withdrawn: "Withdrawn",
 };
 
-/** Turn a listing RPC's error code into something a person can act on. */
+/**
+ * Turn a listing RPC's error code into something a person can act on; any other failure reads as a generic sentence,
+ * never as the database's text. The moderators' featured-venue limit (setOrgFeatured) keeps its own sentence.
+ */
 export function listingErrorMessage(err: unknown): string {
-  const raw =
-    err instanceof Error
-      ? err.message
-      : String((err as { message?: string })?.message ?? err ?? "");
-  if (raw.includes("NOT_MODERATOR")) return "Only moderators can do that.";
-  if (raw.includes("OWN_CLAIM"))
-    return "You can't review your own claim. Another moderator has to.";
-  if (raw.includes("RELATIONSHIP_REQUIRED")) return "Say how you're connected to this listing.";
-  if (raw.includes("ATTESTATION_REQUIRED"))
-    return "Confirm that your claim is accurate and that you're authorized to make it.";
-  if (raw.includes("NOTE_REQUIRED")) return "Say what information you need from the claimant.";
-  if (raw.includes("NOTE_TOO_LONG")) return "That note is too long.";
-  if (raw.includes("CLAIM_NOT_AWAITING_INFO"))
-    return "That claim isn't waiting for more information.";
-  if (raw.includes("MESSAGE_REQUIRED")) return "Write a reply first.";
-  if (raw.includes("EVIDENCE_TOO_LONG")) return "That link is too long.";
-  if (raw.includes("ALREADY_CLAIMED")) return "Someone already claims this listing.";
-  if (raw.includes("CLAIM_ALREADY_PENDING"))
-    return "You already have a claim waiting on this listing.";
-  if (raw.includes("CLAIM_NOT_PENDING")) return "That claim was already reviewed.";
-  if (raw.includes("CLAIM_NOT_FOUND")) return "That claim no longer exists.";
-  if (raw.includes("NOT_CLAIM_OWNER")) return "That claim belongs to someone else.";
-  if (raw.includes("LISTING_NOT_FOUND")) return "That listing no longer exists.";
-  if (raw.includes("OWNER_SET_BY_CLAIM_ONLY"))
-    return "Ownership can only change through an approved claim.";
-  if (raw.includes("HANDLE_TAKEN")) return "That handle is already in use.";
-  if (raw.includes("ID_TAKEN")) return "A listing with that handle already exists.";
-  if (raw.includes("NAME_REQUIRED")) return "Give the listing a name.";
-  if (raw.includes("MESSAGE_TOO_LONG")) return "That message is too long.";
-  if (raw.includes("USER_MISMATCH") || raw.includes("AUTH_REQUIRED"))
-    return "Sign in to claim a listing.";
-  return raw || "Something went wrong.";
+  if (errorText(err) === FEATURED_LIMIT_MESSAGE) return FEATURED_LIMIT_MESSAGE;
+  return userErrorMessage(err, "Something went wrong. Please try again.");
 }
 
 async function rpc(name: string, args: Record<string, unknown>) {

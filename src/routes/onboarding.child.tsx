@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** Sentences requestParentalConsent words itself (its daily and recipient limits); shown as they are. */
+const CONSENT_REQUEST_SENTENCES: readonly string[] = [
+  "Could not send the request right now. Please try again.",
+  "You've sent the most guardian requests allowed today. Please try again tomorrow.",
+  "Guardian requests can only go to the guardian emails you've already used. Ask BallaCity support to change it.",
+];
 
 export const Route = createFileRoute("/onboarding/child")({
   head: () =>
@@ -62,7 +70,15 @@ function ChildOnboardingPage() {
       toast.success("Approval request created — send the link to your parent or guardian.");
       void refetch();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create the request.");
+      const text = errorText(e) ?? "";
+      toast.error(
+        CONSENT_REQUEST_SENTENCES.includes(text)
+          ? text
+          : userErrorMessage(
+              e,
+              "Couldn't send the request to your parent or guardian. Please try again.",
+            ),
+      );
     }
   };
 

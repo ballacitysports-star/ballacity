@@ -6,7 +6,7 @@ import { test, expect, type Page } from "@playwright/test";
  * navigate to the deep-linked game detail page with the `invite=1` and
  * `from=<hostId>` query params preserved, and the "You're invited" banner
  * must render CTA-specific copy driven by the game's join settings
- * ("Join Run" / "Request Spot" / "Pay Host", the sticky CTA's labels).
+ * ("Join Game" / "Request Spot" / "Pay Host", the sticky CTA's labels).
  *
  * We seed the notification row directly via the browser Supabase client
  * (RLS: users can insert their own notifications) so the test is decoupled
@@ -43,7 +43,7 @@ test("tapping an invite notification opens the game with preserved invite params
   browser,
 }) => {
   const userId = sessionUserId();
-  // A free/no-approval game (settings mocked below) — CTA should be "Join Run".
+  // A free/no-approval game (settings mocked below) — CTA should be "Join Game".
   const gameId = "g1";
   const fakeHostId = "11111111-2222-3333-4444-555555555555";
   const link = `/games/${gameId}?invite=1&from=${fakeHostId}`;
@@ -60,8 +60,8 @@ test("tapping an invite notification opens the game with preserved invite params
   // would flip the expected label without anything being wrong with invites.
   // g1's real row is still read end to end by the realtime join specs
   // (join-cross-device-*, join-realtime-cross-views), which tap the same
-  // "Join Run" CTA without mocking settings.
-  // Free, no-approval settings → the CTA is "Join Run".
+  // "Join Game" CTA without mocking settings.
+  // Free, no-approval settings → the CTA is "Join Game".
   await page.route(
     (url) => String(url).includes("/rest/v1/game_payment_settings"),
     async (route) => {
@@ -125,10 +125,10 @@ test("tapping an invite notification opens the game with preserved invite params
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  // ...with CTA-specific copy. g1 is free + no-approval → "Join Run".
-  // The banner names the sticky CTA by its label: "Join Run" (free), "Request
+  // ...with CTA-specific copy. g1 is free + no-approval → "Join Game".
+  // The banner names the sticky CTA by its label: "Join Game" (free), "Request
   // Spot" (approval) or "Pay Host" (paid).
-  await expect(banner).toContainText(/tap\s+[“"']?Join Run[”"']?\s+below/i);
+  await expect(banner).toContainText(/tap\s+[“"']?Join Game[”"']?\s+below/i);
   await expect(banner).not.toContainText(/Request Spot/i);
   await expect(banner).not.toContainText(/Pay Host/i);
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { ArrowLeft, RefreshCw, ShieldCheck } from "lucide-react";
 import { YouthOversightCard } from "@/components/admin/YouthOversightCard";
 import { pageHead } from "@/lib/seo";
@@ -125,7 +126,13 @@ function ComplianceDashboard() {
       toast.success("Security review recorded");
       qc.invalidateQueries({ queryKey: ["admin-compliance-overview"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      // Admin screen: a readable sentence with the code for support, never raw database text (WP 4.0).
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't record the security review.")}${code ? ` (${code})` : ""}`,
+      );
+    },
   });
 
   return (

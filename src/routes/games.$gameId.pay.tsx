@@ -41,6 +41,8 @@ import {
   cancelMyPaymentSubmission,
   disputeMyPaymentSubmission,
 } from "@/lib/payments";
+import { validateImageMeta } from "@/lib/image-validation";
+import { paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
 import {
   PAYMENT_DISCLAIMER,
   PAYMENT_STATE_META,
@@ -694,7 +696,7 @@ function PayPage() {
       queryClient.setQueryData(key, SAFETY_ACK_VERSION);
       void queryClient.invalidateQueries({ queryKey: key });
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Couldn't record your acknowledgment");
+      toast.error(userErrorMessage(e, "Couldn't record your acknowledgment. Please try again."));
     } finally {
       setRiskAckSubmitting(false);
     }
@@ -933,10 +935,10 @@ function PayPage() {
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {myReq?.status === "pending"
-              ? "Your request to join is pending. Payment unlocks after the host approves you."
+              ? "Your request for a spot is pending. Payment unlocks after the host approves you."
               : myReq?.status === "rejected"
                 ? "The host declined your request. You can't submit payment for this game."
-                : "This host reviews every player before payment. Send a request to join first."}
+                : "This host reviews every player before payment. Request a spot first."}
           </p>
           <div className="mt-3 flex items-center gap-3 flex-wrap">
             <Link
@@ -944,7 +946,7 @@ function PayPage() {
               params={{ gameId: game.id }}
               className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
             >
-              {myReq ? "Back to game" : "Request to join"}
+              {myReq ? "Back to game" : "Request Spot"}
             </Link>
             {myReq?.status === "pending" && (
               <LeaveFlowButton
@@ -1543,8 +1545,10 @@ function PaymentClaimActions({
       setMode(null);
       setReason("");
       await onChanged?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't update this payment");
+    } catch (e: unknown) {
+      // disputeMyPaymentSubmission's own "tell us what went wrong" refusal can't happen: Send is disabled until
+      // there is a reason.
+      toast.error(paymentSubmissionErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1790,10 +1794,14 @@ function PaymentInstructionsAndProof({
       setUploadProgress(0);
       setUploadedPath(null);
       setUploadState("error");
-      const msg =
-        err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
+      // uploadProofScreenshot refuses a file that isn't a JPG, PNG or WEBP under 8 MB with its own sentence (pickFile
+      // lets videos and larger files through); say that. Anything else is a storage or network failure (WP 4.0).
+      const invalid = validateImageMeta({ mime: f.type, bytes: f.size });
+      const msg = invalid
+        ? `${invalid}.`
+        : userErrorMessage(err, "Couldn't upload your proof. Check your connection and try again.");
       setUploadError(msg);
-      toast.error(`Upload failed: ${msg}`);
+      toast.error(msg);
     }
   }, []);
 
@@ -1908,8 +1916,8 @@ function PaymentInstructionsAndProof({
         /* ignore */
       }
       onSubmitted();
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(paymentSubmissionErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

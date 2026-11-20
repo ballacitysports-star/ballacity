@@ -14,6 +14,7 @@ import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
 import { clearOAuthProvider, oauthNextForPage, stashOAuthProvider } from "@/lib/oauth-next";
 import { validateCredentials } from "@/lib/auth-credentials";
+import { userErrorMessage } from "@/lib/user-error";
 import { RolePicker } from "@/components/RolePicker";
 import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
 import {
@@ -44,12 +45,42 @@ import {
   usePublishedLegalDocuments,
 } from "@/lib/legal-consent";
 
+const RATE_LIMITED = "Too many attempts. Wait a few minutes and try again.";
+
+/**
+ * What the sign-in form shows for a Supabase Auth refusal. The few refusals a person can fix get their own words
+ * (Supabase Auth names them in `code`); anything else reads as userErrorMessage reads it, never as the raw text.
+ */
+const AUTH_ERROR_MESSAGES: ReadonlyMap<string, string> = new Map([
+  [
+    "weak_password",
+    "That password is too easy to guess. Choose a longer one with a mix of letters and numbers.",
+  ],
+  ["user_already_exists", "An account with this email already exists. Try signing in."],
+  ["email_exists", "An account with this email already exists. Try signing in."],
+  ["email_address_invalid", "Enter a valid email address."],
+  [
+    "over_email_send_rate_limit",
+    "Too many emails were sent to this address. Wait a few minutes and try again.",
+  ],
+  ["over_request_rate_limit", RATE_LIMITED],
+]);
+
+function authErrorMessage(err: unknown, fallback: string): string {
+  const e = err && typeof err === "object" ? (err as { code?: unknown; status?: unknown }) : {};
+  const own = typeof e.code === "string" ? AUTH_ERROR_MESSAGES.get(e.code) : undefined;
+  if (own) return own;
+  if (e.status === 429) return RATE_LIMITED;
+  return userErrorMessage(err, fallback);
+}
+
 export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead({
       path: "/auth",
       title: "Sign in — BallaCity",
-      description: "Sign in or create a BallaCity account to join and host pickup games.",
+      description:
+        "Sign in or create a BallaCity account to post when you're free, get invited to pickup games and host your own.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) => {
@@ -304,6 +335,7 @@ function AuthPage() {
         const dobCheck = checkDobParts(dob);
         if (!dobCheck.ok) {
           setErrors((p) => ({ ...p, dob: dobCheck.message }));
+          // eslint-disable-next-line local/no-raw-toast-error -- checkDobParts' own validation sentence, not an error's text.
           toast.error(dobCheck.message);
           dobRef.current?.focus();
           return;
@@ -391,7 +423,12 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Auth failed";
+      const message = authErrorMessage(
+        err,
+        mode === "signup"
+          ? "We couldn't create your account. Please try again."
+          : "We couldn't sign you in. Please try again.",
+      );
       setErrors((p) => ({ ...p, form: message }));
       toast.error(message);
     } finally {
@@ -416,7 +453,7 @@ function AuthPage() {
       setNotice(null);
       setErrors((p) => ({
         ...p,
-        form: err instanceof Error ? err.message : "Could not send reset email",
+        form: authErrorMessage(err, "We couldn't send the reset email. Try again in a minute."),
       }));
     }
   };
@@ -428,7 +465,9 @@ function AuthPage() {
       email: addr,
       options: { emailRedirectTo: window.location.origin },
     });
-    return error ? error.message || "Could not send the email. Try again shortly." : null;
+    return error
+      ? authErrorMessage(error, "We couldn't send the email. Try again in a minute.")
+      : null;
   };
 
   const switchMode = (nextMode: "signin" | "signup") => {
@@ -544,7 +583,8 @@ function AuthPage() {
           duration: 10000,
         });
       } else {
-        toast.error(raw || `${providerLabel} sign-in failed`);
+        // The raw text is logged and tracked above; the member gets plain words.
+        toast.error(`${providerLabel} sign-in didn't work. Please try again.`);
       }
     };
 
@@ -662,7 +702,7 @@ function AuthPage() {
         <div className="text-center">
           <div className="font-display text-3xl font-bold">BallaCity</div>
           <p className="text-sm text-muted-foreground mt-1">
-            Save games, write reviews, and build your reputation.
+            Post when you're free. Get invited to play.
           </p>
         </div>
 

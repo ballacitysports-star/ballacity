@@ -4,7 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * E2E: opening an invite deeplink to an unpaid (free, no-approval) game and
  * tapping the join CTA must (a) land on /games/$gameId with `invite=1` +
- * `from=<hostId>` preserved on entry, (b) render the "Join Run" CTA in the
+ * `from=<hostId>` preserved on entry, (b) render the "Join Game" CTA in the
  * sticky action bar, and (c) after tapping the CTA (and confirming "Join this
  * run?"), keep the user on the same game detail page with BOTH invite params
  * still preserved in the URL.
@@ -163,21 +163,22 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  // The banner names the sticky CTA by its label: "Join Run" (free), "Request
+  // The banner names the sticky CTA by its label: "Join Game" (free), "Request
   // Spot" (approval) or "Pay Host" (paid).
-  await expect(banner).toContainText(/tap\s+[“"']?Join Run[”"']?\s+below/i);
+  await expect(banner).toContainText(/tap\s+[“"']?Join Game[”"']?\s+below/i);
   await expect(banner).not.toContainText(/Request Spot/i);
   await expect(banner).not.toContainText(/Pay Host/i);
 
-  // CTA button shows "Join Run · N spots left".
-  const cta = page.getByRole("button", { name: /join run/i }).first();
+  // CTA button shows "Join Game · N spots left".
+  const cta = page.getByRole("button", { name: /^join game · /i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 
-  // A free join asks for confirmation first ("Join this run?").
-  const confirm = page.getByRole("alertdialog", { name: /join this run/i });
+  // A free join asks for confirmation first ("Join this game?"; the
+  // acknowledgment is stubbed as given, so the dialog has no checkbox).
+  const confirm = page.getByRole("dialog", { name: /join this game/i });
   await expect(confirm).toBeVisible({ timeout: 10_000 });
-  await confirm.getByRole("button", { name: /^join run$/i }).click();
+  await confirm.getByRole("button", { name: /^join game$/i }).click();
 
   // The join insert should fire...
   await expect

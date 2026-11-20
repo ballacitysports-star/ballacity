@@ -1,3 +1,5 @@
+import { userErrorMessage } from "@/lib/user-error";
+
 /**
  * Plain words for a refused direct add to an organization (`org_members`).
  *
@@ -7,9 +9,12 @@
  * does not say why the add was refused, so it tells the administrator nothing
  * about the person's age.
  */
+/** The sentence a refused direct add reads as; addOrgMemberDirect throws it as is. */
+export const ORG_MEMBER_DIRECT_ADD_REFUSED =
+  "This person can't be added directly. Ask them to request to join from the gym's page, then approve their request here.";
+
 export function orgMemberAddErrorMessage(message: string): string {
-  if (/row-level security/i.test(message)) {
-    return "This person can't be added directly. Ask them to request to join from the gym's page, then approve their request here.";
-  }
-  return message;
+  if (/row-level security/i.test(message)) return ORG_MEMBER_DIRECT_ADD_REFUSED;
+  // Any other refusal: the catalog or generic sentence, never the raw database text (WP 4.0).
+  return userErrorMessage(message, "Couldn't add this member. Please try again.");
 }

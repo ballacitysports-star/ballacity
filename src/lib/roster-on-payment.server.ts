@@ -83,12 +83,12 @@ export function notPlacedNotices(input: {
     input.reason === "cancelled" ? notPlacedWhy("GAME_CANCELLED") : notPlacedWhy(input.code);
   const host =
     input.reason === "approval_required"
-      ? `${who}'s payment for ${game} is confirmed, but you haven't approved their request to join yet. Approve it to give them their place, or send their money back in your payment app.`
-      : `${who}'s payment for ${game} is confirmed, but they couldn't be added to the roster: ${why}. Give them a place if you can, or send their money back in your payment app.`;
+      ? `${who}'s payment for ${game} is confirmed, but you haven't approved their request for a spot yet. Approve it to give them their spot, or send their money back in your payment app.`
+      : `${who}'s payment for ${game} is confirmed, but they couldn't be added to the roster: ${why}. Give them a spot if you can, or send their money back in your payment app.`;
   const player =
     input.reason === "approval_required"
-      ? `Your payment for ${game} is confirmed, but the host still has to approve your request to join. They've been told.`
-      : `Your payment for ${game} is confirmed, but you couldn't be added to the roster: ${why}. The host has been told. Ask them for your place or your money back.`;
+      ? `Your payment for ${game} is confirmed, but the host still has to approve your request for a spot. They've been told.`
+      : `Your payment for ${game} is confirmed, but you couldn't be added to the roster: ${why}. The host has been told. Ask them for your spot or your money back.`;
   return [
     {
       user_id: input.hostId,

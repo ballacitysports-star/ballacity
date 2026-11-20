@@ -1,6 +1,6 @@
 # BallaCity
 
-> Find and join pickup baseball, basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms, and grab your spot fast.
+> Post when you're free and get invited to pickup basketball near you, or find an open game and grab a spot. Soccer, pickleball, baseball and more too, plus local teams, tryouts, trainers and gyms.
 
 BallaCity is a pickup sports community app. Players discover nearby games on a map or list, request to join, and follow teams, trainers and gyms. Hosts create games under a team, trainer or gym profile and manage rosters, approvals and entry fees.
 

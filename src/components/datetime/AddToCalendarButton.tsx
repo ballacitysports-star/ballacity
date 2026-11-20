@@ -7,7 +7,7 @@ import {
   type CalendarEvent,
 } from "@/lib/datetime";
 
-/** Add-to-calendar menu (Apple/Outlook/Google) built on the shared .ics logic. */
+/** Add-to-calendar menu (Apple/Outlook/Google) built on the shared .ics logic. The button and each choice are 44px tap targets. */
 export function AddToCalendarButton({
   event,
   className = "",
@@ -27,7 +27,7 @@ export function AddToCalendarButton({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground hover:border-lime/60 ${className}`}
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-4 text-[12px] font-semibold text-muted-foreground hover:border-lime/60 ${className}`}
       >
         <CalendarPlus className="size-3.5" />
         Add to calendar
@@ -39,7 +39,7 @@ export function AddToCalendarButton({
             target="_blank"
             rel="noreferrer"
             onClick={() => setOpen(false)}
-            className="block px-3 py-2.5 text-sm hover:bg-background"
+            className="flex min-h-11 items-center px-3 py-2.5 text-sm hover:bg-background"
           >
             Google Calendar
           </a>
@@ -48,7 +48,7 @@ export function AddToCalendarButton({
             target="_blank"
             rel="noreferrer"
             onClick={() => setOpen(false)}
-            className="block px-3 py-2.5 text-sm hover:bg-background"
+            className="flex min-h-11 items-center px-3 py-2.5 text-sm hover:bg-background"
           >
             Outlook
           </a>
@@ -58,7 +58,7 @@ export function AddToCalendarButton({
               downloadIcs(event, `${slug || "event"}.ics`);
               setOpen(false);
             }}
-            className="block w-full px-3 py-2.5 text-left text-sm hover:bg-background"
+            className="flex min-h-11 w-full items-center px-3 py-2.5 text-left text-sm hover:bg-background"
           >
             Apple / .ics file
           </button>

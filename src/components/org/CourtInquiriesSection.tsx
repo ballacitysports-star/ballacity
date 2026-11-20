@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { CalendarClock, Check, MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
@@ -29,7 +30,7 @@ export function CourtInquiriesSection({ orgId }: { orgId: string }) {
       toast.success(status === "handled" ? "Marked handled" : "Declined");
       qc.invalidateQueries({ queryKey: key });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't update this inquiry. Please try again."));
     }
   }
 

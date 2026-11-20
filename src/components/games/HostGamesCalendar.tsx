@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dateKeyInZone, monthGridKeys, monthLabel, WEEKDAY_LABELS } from "@/lib/datetime";
 import { formatGameWhen } from "@/lib/format";
+import { pluralize } from "@/lib/pluralize";
 
 export type HostCalendarGame = {
   id: string;
@@ -78,7 +79,7 @@ export function HostGamesCalendar({ games }: { games: HostCalendarGame[] }) {
 
   const grouped = groupHostGames(games);
   const cells = monthGridKeys(cursor.year, cursor.month);
-  const monthEvents = cells.flatMap((key) => (key ? grouped.get(key) ?? [] : []));
+  const monthEvents = cells.flatMap((key) => (key ? (grouped.get(key) ?? []) : []));
   const dayEvents = grouped.get(selected) ?? [];
   const undated = grouped.get("") ?? [];
   const active = monthEvents.filter((g) => !g.cancelled_at);
@@ -108,36 +109,57 @@ export function HostGamesCalendar({ games }: { games: HostCalendarGame[] }) {
           >
             Today
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Previous month" title="Previous month" onClick={() => shiftMonth(-1)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Previous month"
+            title="Previous month"
+            onClick={() => shiftMonth(-1)}
+          >
             <ChevronLeft />
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Next month" title="Next month" onClick={() => shiftMonth(1)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next month"
+            title="Next month"
+            onClick={() => shiftMonth(1)}
+          >
             <ChevronRight />
           </Button>
         </div>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-border py-3 text-sm">
-        <span className="font-semibold">{active.length} games</span>
-        <span className="text-muted-foreground">{paidCount} paid · {active.length - paidCount} free</span>
+        <span className="font-semibold">{pluralize(active.length, "game")}</span>
+        <span className="text-muted-foreground">
+          {paidCount} paid · {active.length - paidCount} free
+        </span>
       </div>
-      <div className="grid grid-cols-7" role="group" aria-label={monthLabel(cursor.year, cursor.month)}>
+      <div
+        className="grid grid-cols-7"
+        role="group"
+        aria-label={monthLabel(cursor.year, cursor.month)}
+      >
         {WEEKDAY_LABELS.map((day) => (
           <span key={day} className="pb-2 text-center text-[11px] font-bold text-muted-foreground">
             {day}
           </span>
         ))}
         {cells.map((key, index) => {
-          if (!key) return <div key={`empty-${index}`} className="h-20 border-b border-border sm:h-24" />;
+          if (!key)
+            return <div key={`empty-${index}`} className="h-20 border-b border-border sm:h-24" />;
           const entries = grouped.get(key) ?? [];
           const cancelledCount = entries.filter((g) => g.cancelled_at).length;
-          const dots = entries.map((g) => (Number(g.price) > 0 && !g.cancelled_at ? "paid" : "free"));
+          const dots = entries.map((g) =>
+            Number(g.price) > 0 && !g.cancelled_at ? "paid" : "free",
+          );
           return (
             <Button
               key={key}
               variant="ghost"
               aria-pressed={selected === key}
               aria-current={today === key ? "date" : undefined}
-              aria-label={`${key}, ${entries.length} game${entries.length === 1 ? "" : "s"}${entries.some((g) => Number(g.price) > 0 && !g.cancelled_at) ? ", includes paid" : ""}`}
+              aria-label={`${key}, ${pluralize(entries.length, "game")}${entries.some((g) => Number(g.price) > 0 && !g.cancelled_at) ? ", includes paid" : ""}`}
               onClick={() => setSelected(key)}
               className={`h-20 min-w-0 flex-col justify-start gap-0.5 overflow-hidden whitespace-normal rounded-none border-b border-border px-0.5 py-1.5 sm:h-24 sm:px-2 ${
                 selected === key ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""
@@ -162,8 +184,12 @@ export function HostGamesCalendar({ games }: { games: HostCalendarGame[] }) {
                     ))}
                   </span>
                   <span className="w-full truncate text-[10px] text-muted-foreground">
-                    {entries.length - cancelledCount > 0 ? `${entries.length - cancelledCount} game${entries.length - cancelledCount === 1 ? "" : "s"}` : ""}
-                    {cancelledCount > 0 ? `${entries.length - cancelledCount > 0 ? " · " : ""}${cancelledCount} cancelled` : ""}
+                    {entries.length - cancelledCount > 0
+                      ? `${entries.length - cancelledCount} game${entries.length - cancelledCount === 1 ? "" : "s"}`
+                      : ""}
+                    {cancelledCount > 0
+                      ? `${entries.length - cancelledCount > 0 ? " · " : ""}${cancelledCount} cancelled`
+                      : ""}
                   </span>
                 </>
               )}
@@ -171,7 +197,9 @@ export function HostGamesCalendar({ games }: { games: HostCalendarGame[] }) {
           );
         })}
       </div>
-      {monthEvents.length === 0 && <p className="text-sm text-muted-foreground">No games scheduled this month.</p>}
+      {monthEvents.length === 0 && (
+        <p className="text-sm text-muted-foreground">No games scheduled this month.</p>
+      )}
       <div className="space-y-3" aria-live="polite">
         <h3 className="text-sm font-bold">
           {new Date(`${selected}T12:00:00`).toLocaleDateString(undefined, {

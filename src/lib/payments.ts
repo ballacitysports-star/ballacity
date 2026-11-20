@@ -4,11 +4,8 @@ import { validateImageMeta } from "@/lib/image-validation";
 import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
-import {
-  PAYMENTS_AGE_REQUIRED_MESSAGE,
-  PAYMENTS_BLOCKED_MESSAGE,
-  paymentSubmissionErrorMessage,
-} from "@/lib/payments-policy";
+import { PAYMENTS_AGE_REQUIRED_MESSAGE, PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import { paymentSubmissionErrorMessage } from "@/lib/user-error";
 
 export type PaymentType =
   "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
@@ -431,7 +428,7 @@ export async function createPaymentSubmission(input: {
     ...input,
     player_id: userId,
   });
-  if (error) throw new Error(paymentSubmissionErrorMessage(error.message ?? ""));
+  if (error) throw new Error(paymentSubmissionErrorMessage(error));
 }
 
 export async function listMySubmissionsForGame(gameId: string): Promise<PaymentSubmission[]> {
@@ -556,7 +553,7 @@ export async function createJoinRequest(input: {
   idempotency_key?: string;
 }): Promise<JoinRequest> {
   const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Sign in to request to join.");
+  if (!userId) throw new Error("Sign in to request a spot.");
 
   const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 

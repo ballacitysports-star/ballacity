@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { superadminListSettings, superadminSetSetting } from "@/lib/superadmin.functions";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +47,11 @@ export function MaintenancePanel() {
       void qc.invalidateQueries({ queryKey: ["maintenance-config"] });
     } catch (e) {
       setLocal(prev);
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      // Staff screen: the plain sentence plus the error's code for support, never raw SQL (WP 4.0).
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save maintenance settings.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -59,8 +64,8 @@ export function MaintenancePanel() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Regular users see a maintenance screen on the app. Landing page, guides, city pages,
-          legal pages and sign-in stay open for search engines. Staff are never blocked.
+          Regular users see a maintenance screen on the app. Landing page, guides, city pages, legal
+          pages and sign-in stay open for search engines. Staff are never blocked.
         </p>
         <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span className="text-sm font-medium">Maintenance on</span>

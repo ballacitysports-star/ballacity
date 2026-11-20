@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { AgeCohort } from "@/lib/child-policy";
 import type { PlatformStatus } from "@/lib/age-verification";
+import { knownErrorMessage } from "@/lib/user-error";
 
 /**
  * Server-authoritative age determination.
@@ -79,13 +80,5 @@ export const submitMyBirthday = createServerFn({ method: "POST" })
 
 /** Raw database messages never reach the member. */
 function friendlyDobError(message: string): string {
-  const m = message ?? "";
-  if (m.includes("DOB_REQUIRED")) return "Enter your date of birth to continue.";
-  if (m.includes("DOB_IN_FUTURE")) return "That date is in the future. Enter your real birth date.";
-  if (m.includes("DOB_INVALID"))
-    return "That date of birth isn't valid. Check the month, day and year.";
-  if (m.includes("AUTH_REQUIRED")) return "Sign in again, then add your date of birth.";
-  // Same text as MIN_AGE_MESSAGE in age-verification.ts (not imported: that module is client-side).
-  if (m.includes("MIN_AGE")) return "You need to be at least 13 to use BallaCity.";
-  return "We couldn't save your date of birth. Please try again.";
+  return knownErrorMessage(message) ?? "We couldn't save your date of birth. Please try again.";
 }

@@ -162,3 +162,21 @@ describe("bulkInviteMessage", () => {
     ).toBe("No one was invited. 1 already has a spot, 1 couldn't be invited.");
   });
 });
+
+describe("regulars (WP 3.2a)", () => {
+  it("maps the server's answer onto the same states as the nearby list", async () => {
+    const { regularState } = await import("./host-invites");
+    expect(regularState("available")).toBeNull();
+    expect(regularState("in_game")).toBe("on_roster");
+    expect(regularState("invited")).toBe("invited");
+    expect(regularState("accepted")).toBe("joined");
+    expect(regularState("declined_recently")).toBe("declined_recently");
+  });
+
+  it("says how many games and when", async () => {
+    const { regularDetail } = await import("./host-invites");
+    expect(regularDetail(1, "2026-11-12T23:00:00Z")).toMatch(/^1 game with you · last Nov 1[23]$/);
+    expect(regularDetail(3, "2026-11-05T18:00:00Z")).toBe("3 games with you · last Nov 5");
+    expect(regularDetail(2, "not a date")).toBe("2 games with you");
+  });
+});

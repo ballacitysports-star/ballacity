@@ -283,7 +283,7 @@ test("an approval-gated paid game: 'Before you join' never opens before the host
 
   const gate = page.getByTestId("approval-required-gate");
   await expect(gate).toBeVisible({ timeout: 20_000 });
-  await expect(gate).toContainText(/send a request to join first/i);
+  await expect(gate).toContainText(/request a spot first/i);
   await page.waitForTimeout(1_000);
   expect(
     await dialogSeen(),

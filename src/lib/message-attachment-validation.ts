@@ -36,17 +36,29 @@ export function classifyAttachment(bytes: Uint8Array): CheckedAttachment | null 
   return null;
 }
 
+/** The sentences an attachment is refused with (here, in uploadMessageAttachment and finalizeMessageAttachment). */
+export const ATTACHMENT_TOO_LARGE_MESSAGE = "Attachment too large (max 20MB).";
+export const ATTACHMENT_TYPE_MESSAGE =
+  "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.";
+export const ANIMATED_ATTACHMENT_MESSAGE =
+  "Animated pictures can't be sent. Send a still photo instead.";
+/** finalizeMessageAttachment: the safety scan refused the picture. */
+export const UNSAFE_ATTACHMENT_MESSAGE = "That picture can't be sent.";
+/** Every refusal above: they tell the sender what to do, so a failed send shows them as they are (WP 4.0). */
+export const ATTACHMENT_REFUSAL_MESSAGES: readonly string[] = [
+  ATTACHMENT_TOO_LARGE_MESSAGE,
+  ATTACHMENT_TYPE_MESSAGE,
+  ANIMATED_ATTACHMENT_MESSAGE,
+  UNSAFE_ATTACHMENT_MESSAGE,
+];
+
 /** Why a file is refused, or null when it passes. */
 export function attachmentProblem(bytes: Uint8Array, size = bytes.byteLength): string | null {
-  if (size > MAX_ATTACHMENT_BYTES) return "Attachment too large (max 20MB).";
+  if (size > MAX_ATTACHMENT_BYTES) return ATTACHMENT_TOO_LARGE_MESSAGE;
   const checked = classifyAttachment(bytes);
-  if (!checked) {
-    return "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.";
-  }
+  if (!checked) return ATTACHMENT_TYPE_MESSAGE;
   // F05: every frame of an animated picture would be sent, but only one is checked. Refuse until frames are scanned.
-  if (checked.kind === "image" && isAnimatedImage(bytes)) {
-    return "Animated pictures can't be sent. Send a still photo instead.";
-  }
+  if (checked.kind === "image" && isAnimatedImage(bytes)) return ANIMATED_ATTACHMENT_MESSAGE;
   return null;
 }
 
