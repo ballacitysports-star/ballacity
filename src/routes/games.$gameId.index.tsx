@@ -205,6 +205,7 @@ import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
 import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
+import { pluralize } from "@/lib/pluralize";
 import { GameInvitesPanel } from "@/components/game-detail/GameInvitesPanel";
 import {
   gameTakesNoPayment,
@@ -220,6 +221,7 @@ import {
   guardianOnlyJoin,
   guardianOnlyRequestKey,
 } from "@/lib/guarded-open-join";
+import { clearOfHelpLauncher } from "@/lib/support/launcher-clearance";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -305,13 +307,13 @@ export const Route = createFileRoute("/games/$gameId/")({
  * show as they are.
  */
 const JOIN_REQUEST_OWN_TEXT =
-  /^(?:Sign in to request to join\.|You(?:'ve| have) reached the maximum of \d+ resubmit attempts for this game\.(?: Message the host instead\.)?|Please wait [\w ]{1,40} before resubmitting this request\.)$/;
+  /^(?:Sign in to request a spot\.|You(?:'ve| have) reached the maximum of \d+ resubmit attempts for this game\.(?: Message the host instead\.)?|Please wait [\w ]{1,40} before resubmitting this request\.)$/;
 
 /** What a failed request to join (to the host, or to a parent) reads as: never the raw database text (WP 4.0). */
 function joinRequestErrorMessage(e: unknown, game: { allowWaitlist?: boolean | null }): string {
   const text = errorText(e) ?? "";
   if (JOIN_REQUEST_OWN_TEXT.test(text)) return text;
-  if (errorCode(e) === "BLOCKED_BY_HOST") return "You can't request to join this game.";
+  if (errorCode(e) === "BLOCKED_BY_HOST") return "You can't request a spot in this game.";
   return knownErrorMessage(e)
     ? joinGateErrorMessage(e, game)
     : userErrorMessage(e, "Couldn't send your request. Please try again.");
@@ -1300,7 +1302,7 @@ function GameDetail() {
           type: isResubmit ? "join_resubmitted" : "join_request",
           title: isResubmit
             ? `Resubmitted request: ${game.title}`
-            : `New request to join ${game.title}`,
+            : `New spot request: ${game.title}`,
           body: isResubmit
             ? "A player resubmitted their request — pending your review."
             : "Tap to review.",
@@ -1749,7 +1751,7 @@ function GameDetail() {
             )}
             {game.urgent && spotsLeft > 0 && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
-                ⚡ {spotsLeft} spots left
+                ⚡ {pluralize(spotsLeft, "spot")} left
               </span>
             )}
           </div>
@@ -1771,7 +1773,7 @@ function GameDetail() {
             <button
               type="button"
               onClick={() => setActiveTab("overview")}
-              className={`flex-1 rounded-full px-3 py-2 font-semibold transition ${
+              className={`min-h-11 flex-1 rounded-full px-3 py-2 font-semibold transition ${
                 activeTab === "overview"
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1782,7 +1784,7 @@ function GameDetail() {
             <button
               type="button"
               onClick={() => setActiveTab("payments")}
-              className={`flex-1 rounded-full px-3 py-2 font-semibold transition inline-flex items-center justify-center gap-1.5 ${
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 font-semibold transition ${
                 activeTab === "payments"
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1847,8 +1849,7 @@ function GameDetail() {
               <div className="min-w-0 flex-1">
                 <div className="font-display text-sm font-bold">Invite expired</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This invitation is no longer valid. Browse other open games to find a run near
-                  you.
+                  This invitation is no longer valid. Browse other open games to find one near you.
                 </p>
                 <Link
                   to="/discover"
@@ -1876,7 +1877,7 @@ function GameDetail() {
                       ? "“Request Spot”"
                       : isPaid
                         ? "“Pay Host”"
-                        : "“Join Run”"}{" "}
+                        : "“Join Game”"}{" "}
                   below to confirm your spot.
                 </p>
               </div>
@@ -2095,7 +2096,7 @@ function GameDetail() {
 
         {/* About */}
         <div>
-          <h2 className="section-eyebrow text-muted-foreground mb-2">About the run</h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">About the game</h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
           {/* Safety: risk notice + safety reporting entry point */}
           <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
@@ -2212,7 +2213,7 @@ function GameDetail() {
                       aria-label={
                         isFull
                           ? `${name}: filled, ${posWaitlist.length} on waitlist`
-                          : `${name}: ${remaining} of ${count} spots remaining`
+                          : `${name}: ${remaining} of ${pluralize(count, "spot")} remaining`
                       }
                     >
                       <span>{name}</span>
@@ -2701,7 +2702,9 @@ function GameDetail() {
                         toast.error("Couldn't delete this game.");
                       }
                     }}
-                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold disabled:opacity-50"
+                    // Solid destructive-strong behind white text (4.8:1). Coral text on its own 10% tint
+                    // over the card read 4.4:1, under WCAG AA (destructive-contrast.test.ts).
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-destructive-strong text-destructive-foreground py-2.5 text-xs font-bold disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" /> Delete game
                   </button>
@@ -2737,7 +2740,7 @@ function GameDetail() {
             </div>
           ) : requiresApproval ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-              No pickup requests yet. You'll see them here as players ask to join.
+              No pickup requests yet. You'll see them here as players request a spot.
             </div>
           ) : null}
 
@@ -2955,7 +2958,10 @@ function GameDetail() {
       )}
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
+      <div
+        ref={clearOfHelpLauncher}
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border"
+      >
         <div className="mx-auto w-[min(100%,28rem)]">
           {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
@@ -3257,7 +3263,7 @@ function GameDetail() {
                       </>
                     ) : (
                       <>
-                        Join Run · <LiveSpots />
+                        Join Game · <LiveSpots />
                       </>
                     )}
                   </motion.button>
@@ -3332,7 +3338,7 @@ function GameDetail() {
               Remove {removeTarget?.name ?? "player"} from this game?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              They'll be notified and their spot will open up. They can request to join again later.
+              They'll be notified and their spot will open up. They can request a spot again later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

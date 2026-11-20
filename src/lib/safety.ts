@@ -114,7 +114,7 @@ export const GAME_INFO_TIPS: GameInfoTip[] = [
     label: "Start time & duration",
     hint: "Include end time so players plan around it.",
   },
-  { id: "skill", label: "Skill level", hint: "Keeps the run competitive and safe for everyone." },
+  { id: "skill", label: "Skill level", hint: "Keeps the game competitive and safe for everyone." },
   { id: "limit", label: "Player limit", hint: "Avoid overcrowding the space you booked." },
   {
     id: "rules",

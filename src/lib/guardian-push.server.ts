@@ -76,7 +76,7 @@ export async function planGuardianApprovalPush(
       id: req.game_id,
     });
     childId = req.player_id;
-    what = `asked to join ${game?.title?.trim() || "a game"}`;
+    what = `requested a spot in ${game?.title?.trim() || "a game"}`;
   } else {
     const inv = await one<{
       invitee_id: string;

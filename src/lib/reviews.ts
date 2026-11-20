@@ -228,7 +228,7 @@ function buildSummary(args: {
     args.trend === "up"
       ? "Momentum is rising fast over the last few outings."
       : args.trend === "down"
-        ? "Recent feedback has cooled slightly — watch for the next runs."
+        ? "Recent feedback has cooled slightly — watch for the next games."
         : "Feedback has been remarkably consistent.";
   return `${subject} is most known for ${strengths}. ${trend}`;
 }

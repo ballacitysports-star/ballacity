@@ -58,7 +58,7 @@ export function GamePlayersSection({
               </span>
             )}
           </h2>
-          <button className="text-xs font-semibold text-lime">See all</button>
+          {/* No "See all" here (WP 4.3): the roster below already lists everyone, and the old button did nothing. */}
         </div>
         <div className="flex flex-wrap gap-2">
           {players.map((p, i) => {

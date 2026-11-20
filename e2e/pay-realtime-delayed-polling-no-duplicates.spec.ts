@@ -264,7 +264,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // The gate renders as soon as the settings say approval is required, before
   // the page has read the player's own request. Approving before that first
   // read lands would let the initial load, not the poll, show "approved".
-  await expect(gate).toContainText(/your request to join is pending/i);
+  await expect(gate).toContainText(/your request for a spot is pending/i);
   await expect(page.getByText(/pay \$\d+ in /i)).toHaveCount(0);
 
   // No realtime channel should have joined (WS blocked).

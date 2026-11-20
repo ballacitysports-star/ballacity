@@ -3,8 +3,7 @@ import type { PublicGameSeo } from "@/lib/city-seo";
 import { ogImageUrl, pageHead } from "@/lib/seo";
 
 const GENERIC_TITLE = "Pickup game";
-const GENERIC_DESCRIPTION =
-  "See the details for this pickup game and request to join on BallaCity.";
+const GENERIC_DESCRIPTION = "See the details for this pickup game and request a spot on BallaCity.";
 
 /**
  * Head metadata for /games/<id>. `seo` is non-null only for a game that is public to

@@ -229,7 +229,7 @@ export function DiscoverResults({
               <button
                 type="button"
                 onClick={() => onSeeAll(s.id)}
-                className="text-xs font-semibold text-lime"
+                className="-mr-2 inline-flex min-h-11 items-center px-2 text-xs font-semibold text-lime"
               >
                 See all
               </button>

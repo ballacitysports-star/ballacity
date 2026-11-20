@@ -553,7 +553,7 @@ export async function createJoinRequest(input: {
   idempotency_key?: string;
 }): Promise<JoinRequest> {
   const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Sign in to request to join.");
+  if (!userId) throw new Error("Sign in to request a spot.");
 
   const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 

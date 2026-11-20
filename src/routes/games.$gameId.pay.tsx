@@ -907,10 +907,10 @@ function PayPage() {
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {myReq?.status === "pending"
-              ? "Your request to join is pending. Payment unlocks after the host approves you."
+              ? "Your request for a spot is pending. Payment unlocks after the host approves you."
               : myReq?.status === "rejected"
                 ? "The host declined your request. You can't submit payment for this game."
-                : "This host reviews every player before payment. Send a request to join first."}
+                : "This host reviews every player before payment. Request a spot first."}
           </p>
           <div className="mt-3 flex items-center gap-3 flex-wrap">
             <Link
@@ -918,7 +918,7 @@ function PayPage() {
               params={{ gameId: game.id }}
               className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
             >
-              {myReq ? "Back to game" : "Request to join"}
+              {myReq ? "Back to game" : "Request Spot"}
             </Link>
             {myReq?.status === "pending" && (
               <LeaveFlowButton

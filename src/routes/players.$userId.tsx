@@ -59,6 +59,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { pluralize } from "@/lib/pluralize";
 
 export const Route = createFileRoute("/players/$userId")({
   head: ({ params }) => ({
@@ -345,7 +346,7 @@ function PlayerProfilePage() {
             onClick={() => setFollowList("followers")}
             className="underline-offset-2 hover:underline"
           >
-            {follow.followers} followers
+            {pluralize(follow.followers, "follower")}
           </button>,
           <button
             key="following"

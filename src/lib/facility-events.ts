@@ -19,9 +19,9 @@ export const FACILITY_EVENT_KINDS: ReadonlyArray<{
 }> = [
   {
     kind: "run",
-    label: "Pickup run",
-    plural: "Pickup runs",
-    defaultTitle: (n) => `${n} pickup run`,
+    label: "Pickup game",
+    plural: "Pickup games",
+    defaultTitle: (n) => `${n} pickup game`,
   },
   {
     kind: "open_court",

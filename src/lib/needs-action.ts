@@ -1,3 +1,14 @@
+import {
+  DEFAULT_TIME_ZONE,
+  dateKeyInZone,
+  deviceTimeZone,
+  formatRelativeDay,
+  formatTimeOfDay,
+  isValidTimeZone,
+  timeZoneAbbr,
+  zoneOffsetMin,
+} from "@/lib/datetime";
+
 /**
  * "What needs me now": the few things waiting on the signed-in member, in the
  * order that matters. Pure, so what is shown (and what is left out) can be tested.
@@ -35,12 +46,27 @@ export const MAX_NEEDS_ACTION_ITEMS = 4;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export function formatStartTime(iso: string, now: Date = new Date()): string {
+/**
+ * When a game starts, in the same zone every other game surface uses (the game page and the cards read times through
+ * `formatGameWhen`, which is fixed to the app zone, America/New_York), so Home and the game page never disagree:
+ * "6:30 PM" on the day, else "Tomorrow 6:30 PM" (or "Yesterday …" for one already under way). When the viewer's
+ * device is in a different zone the time is labelled, e.g. "7:30 PM EDT", so it is never read as local time.
+ */
+export function formatStartTime(
+  iso: string,
+  now: Date = new Date(),
+  viewerZone: string = deviceTimeZone(),
+): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const sameDay = d.toDateString() === now.toDateString();
-  return sameDay ? time : `Tomorrow ${time}`;
+  const zone = DEFAULT_TIME_ZONE;
+  const time = formatTimeOfDay(d, zone);
+  const viewerDiffers =
+    !isValidTimeZone(viewerZone) || zoneOffsetMin(d, viewerZone) !== zoneOffsetMin(d, zone);
+  const abbr = viewerDiffers ? timeZoneAbbr(d, zone) : "";
+  const label = abbr ? `${time} ${abbr}` : time;
+  const sameDay = dateKeyInZone(d, zone) === dateKeyInZone(now, zone);
+  return sameDay ? label : `${formatRelativeDay(d, zone, now)} ${label}`;
 }
 
 export function buildNeedsAction(

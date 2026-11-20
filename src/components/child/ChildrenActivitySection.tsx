@@ -121,7 +121,7 @@ function GameRow({
         description={
           holds
             ? `${g.title} will open up for someone else and the host will be told. If a fee was paid, the host's refund policy decides what comes back; any refund is sent by the host directly.`
-            : `The request to join ${g.title} will be withdrawn.`
+            : `The request for a spot in ${g.title} will be withdrawn.`
         }
         lateWarning={
           holds && isLateCancel(g.date, g.cancelCutoffMin)

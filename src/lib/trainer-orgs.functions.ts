@@ -363,7 +363,7 @@ export const listMyManagedOrgs = createServerFn({ method: "GET" })
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
 
-// Pre-fill data for "Host a run here" on a facility page. Any signed-in host
+// Pre-fill data for "Host a game here" on a facility page. Any signed-in host
 // may list a public run at a facility; `official` (owner/admin) only drives
 // the UI. The `hosted_games` trigger decides `org_official` itself, so a
 // crafted `?orgId=` link cannot make a community run look official.

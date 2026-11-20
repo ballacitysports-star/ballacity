@@ -58,7 +58,7 @@ import {
 } from "@/components/ui/dialog";
 
 const SECTIONS: { key: ListingSection; label: string }[] = [
-  { key: "games", label: "🏀 Games & runs" },
+  { key: "games", label: "🏀 Games" },
   { key: "tryouts", label: "📋 Tryouts & camps" },
   { key: "availability", label: "🙋 Player availability" },
 ];

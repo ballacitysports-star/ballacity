@@ -49,7 +49,7 @@ export const USER_ERROR_MESSAGES = {
   AGE_RANGE_LOCKED: "You can't change the age range once players have signed up.",
   AGE_RANGE_REQUIRED: "Add an age range for this event.",
   AGE_REQUIREMENT_NOT_MET:
-    "This game has an age requirement, so the host has to approve your request to join first.",
+    "This game has an age requirement, so the host has to approve your request for a spot first.",
   AGE_UNKNOWN: "Add a date of birth to this player's profile before signing up for this event.",
   AGE_VERIFICATION_REQUIRED: "Add your date of birth in your profile first.",
   ALREADY_CLAIMED: "Someone has already claimed this listing.",
@@ -514,7 +514,7 @@ export const DATABASE_SENTENCE_REFUSALS: readonly { when: RegExp; message: strin
   },
   {
     when: /^Hosts cannot request to join their own game\.?$/,
-    message: "You're hosting this game, so you don't need to request to join it.",
+    message: "You're hosting this game, so you don't need to request a spot in it.",
   },
   // validate_join_request and the venue join-request trigger (20260719232124).
   {

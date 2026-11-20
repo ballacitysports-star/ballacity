@@ -120,10 +120,10 @@ export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
   PAYMENT_IN_PROGRESS:
     "Your earlier PayPal payment for this game is still being confirmed, so you can't pay again yet. Refresh this page in a few minutes, and contact support if it hasn't updated. You weren't charged.",
   HOST_APPROVAL_REQUIRED:
-    "The host has to approve your request to join before you can pay. You weren't charged.",
+    "The host has to approve your request for a spot before you can pay. You weren't charged.",
   GUARDIAN_APPROVAL_REQUIRED: GUARDIAN_PAYMENT_MESSAGE,
   AGE_REQUIREMENT_NOT_MET:
-    "This game has an age requirement, so the host has to approve your request to join first. You weren't charged.",
+    "This game has an age requirement, so the host has to approve your request for a spot first. You weren't charged.",
   GAME_JOINS_CLOSED: "Joining is closed for this game. You weren't charged.",
   GAME_FULL: "This game is full. You weren't charged.",
 };
@@ -166,7 +166,7 @@ export const PAYMENT_TRIGGER_REFUSALS: readonly { when: RegExp; message: string 
  * full, ended, closed...). The server sent both of them a "payment_not_placed" notice with the reason.
  */
 export const PAID_NOT_PLACED_MESSAGE =
-  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a place if you can, or send their money back.";
+  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a spot if you can, or send their money back.";
 
 /** The payment check itself failed (or gave an answer the server does not know): checkout refuses. */
 export const PAYMENT_CHECK_FAILED_MESSAGE =
@@ -219,7 +219,7 @@ export const PAYMENT_RECORD_UNCONFIRMED_MESSAGE =
  * reported, and a superadmin records or refunds it.
  */
 export const PAYMENT_HELD_FOR_SUPPORT_MESSAGE =
-  "Your PayPal payment went through, but we couldn't finish recording it, so your place isn't confirmed yet. Don't pay again: we've flagged it, and support will record or refund it.";
+  "Your PayPal payment went through, but we couldn't finish recording it, so your spot isn't confirmed yet. Don't pay again: we've flagged it, and support will record or refund it.";
 /**
  * An order PayPal captured whose payment record is gone (for example withdrawn after the host rejected it). The server
  * does not write it again on its own, since that would skip the payment rules; it is flagged for support.

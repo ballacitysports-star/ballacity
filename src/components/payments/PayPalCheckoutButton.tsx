@@ -72,8 +72,8 @@ export function PayPalCheckoutButton(props: {
                   res.rostered === true
                     ? "Payment confirmed — you're in!"
                     : res.rostered === false
-                      ? "Payment confirmed. The host will confirm your place on the roster."
-                      : "Payment confirmed. Check the game page for your place on the roster.",
+                      ? "Payment confirmed. The host will confirm your spot on the roster."
+                      : "Payment confirmed. Check the game page for your spot on the roster.",
                 );
                 props.onPaid();
               } catch (e) {

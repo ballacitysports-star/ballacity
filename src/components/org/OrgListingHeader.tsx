@@ -288,7 +288,7 @@ export function OrgListingHeader({
                   search={postFacilityEventSearch(org.id)}
                   className="rounded-full bg-lime px-3 py-1.5 text-center text-xs font-bold text-primary-foreground hover:opacity-90"
                 >
-                  Host a run here
+                  Host a game here
                 </Link>
                 <Link
                   to="/orgs/$orgId/edit"
@@ -342,7 +342,7 @@ export function OrgListingHeader({
                 search={postFacilityEventSearch(org.id, "run")}
                 className="rounded-full border border-lime/40 bg-lime/10 px-4 py-3 text-xs font-bold text-lime hover:bg-lime/20"
               >
-                Host a run here
+                Host a game here
               </Link>
             </div>
           )}
