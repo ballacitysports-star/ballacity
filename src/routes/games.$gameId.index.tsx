@@ -41,6 +41,8 @@ import {
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { JoinGameDialog } from "@/components/game-detail/JoinGameDialog";
+import { isFreeInstantJoin, joinTapRoute, recordAckThenJoin } from "@/lib/join-dialog";
 import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
 import { planRiskAckTap, riskAckReadFrom, settleRiskAckTap } from "@/lib/risk-ack-tap";
@@ -480,6 +482,13 @@ function GameDetail() {
   } = useSafetyAck(gameId, "participant_risk");
   // A tap is waiting (briefly) for the acknowledgment read: the CTA says so.
   const [checkingRiskAck, setCheckingRiskAck] = useState(false);
+  // The one dialog for joining a free game ("Join this game?"): the reminder
+  // picker plus, when it is due, the risk acknowledgment. `position` carries a
+  // "Join as {position}" tap through it.
+  const [joinDialog, setJoinDialog] = useState<{
+    needsAck: boolean;
+    position: string | null;
+  } | null>(null);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -912,7 +921,7 @@ function GameDetail() {
   const now = useNow();
   const { age: myAge } = useMyAge();
   const gate = useJoinGate(game);
-  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"leave" | null>(null);
   // Reminder lead times the player picks while RSVPing.
   const [reminderOffsets, setReminderOffsets] = useState<number[]>([
     ...DEFAULT_GAME_REMINDER_OFFSETS,
@@ -1379,7 +1388,7 @@ function GameDetail() {
 
   // Physical-activity risk acknowledgment gate. Players see it once per
   // acknowledgment version per game; hosts and confirmed players skip it.
-  const handleJoin = async (preselectedPosition?: string) => {
+  const decideRiskAck = async (): Promise<boolean> => {
     const needsAck = (acknowledgedVersion: string | null) =>
       needsRiskAcknowledgment({
         signedIn: !!user,
@@ -1395,34 +1404,90 @@ function GameDetail() {
     // ask. A player who acknowledged is not asked because the read was a moment
     // late, and a held-up read (slow network, retries) cannot hold the tap.
     const plan = planRiskAckTap(riskAckReadFrom(riskAckStatus, riskAckVersion), needsAck);
-    let needsRiskAck: boolean;
-    if (plan.kind === "decided") {
-      needsRiskAck = plan.needsRiskAck;
-    } else {
-      setProcessing(true);
-      setCheckingRiskAck(true);
-      try {
-        needsRiskAck = await settleRiskAckTap(async () => {
-          // Joins the read in flight rather than starting another.
-          const r = await refetchRiskAck({ cancelRefetch: false });
-          return riskAckReadFrom(r.status, r.data);
-        }, needsAck);
-      } finally {
-        setCheckingRiskAck(false);
-        setProcessing(false);
-      }
+    if (plan.kind === "decided") return plan.needsRiskAck;
+    setProcessing(true);
+    setCheckingRiskAck(true);
+    try {
+      return await settleRiskAckTap(async () => {
+        // Joins the read in flight rather than starting another.
+        const r = await refetchRiskAck({ cancelRefetch: false });
+        return riskAckReadFrom(r.status, r.data);
+      }, needsAck);
+    } finally {
+      setCheckingRiskAck(false);
+      setProcessing(false);
     }
-    const step = joinTapStep({ ...joinPreflight, needsRiskAck });
-    if (step.step === "refuse") {
-      refuseJoin(step.refusal);
+  };
+
+  // `confirm`: the sticky CTA's free join, which always asks "Join this game?"
+  // first (with the reminder picker). Every other tap (Join as {position},
+  // Request Spot, Ask parent, Pay Host, leave, cancel) goes ahead unless the
+  // risk acknowledgment is due.
+  const handleJoin = async (preselectedPosition?: string, opts?: { confirm?: boolean }) => {
+    // The acknowledgment is decided before any dialog opens, so the dialog never
+    // switches content under the player; a slow or failed read asks (fail closed).
+    const needsRiskAck = await decideRiskAck();
+    // A free game joins on the spot (executeJoinAction's instant join): it gets
+    // the one merged dialog. Requests to the host or a parent and paid games
+    // keep the standalone "Before you join". Refusals still come first.
+    const next = joinTapRoute(joinTapStep({ ...joinPreflight, needsRiskAck }), {
+      freeInstantJoin: isFreeInstantJoin({
+        asksParent: !!parentAsk,
+        asksHost: requiresApproval && !isApproved,
+        isPaid,
+      }),
+      confirm: !!opts?.confirm,
+    });
+    if (next.route === "refuse") {
+      refuseJoin(next.refusal);
       return;
     }
-    if (step.step === "acknowledge") {
+    if (next.route === "join-dialog") {
+      setJoinDialog({ needsAck: next.needsAck, position: preselectedPosition ?? null });
+      return;
+    }
+    if (next.route === "risk-dialog") {
       pendingJoinPositionRef.current = preselectedPosition ?? null;
       setRiskAckOpen(true);
       return;
     }
     await runJoin(preselectedPosition);
+  };
+
+  // "Join this game?" confirmed. With the acknowledgment due, it is recorded for
+  // the current version first and the join runs only once that write succeeded.
+  const confirmFreeJoin = async () => {
+    const pending = joinDialog;
+    if (!pending) return;
+    const pos = pending.position ?? undefined;
+    if (!pending.needsAck) {
+      setJoinDialog(null);
+      await runJoin(pos);
+      return;
+    }
+    setProcessing(true);
+    try {
+      const result = await recordAckThenJoin({
+        recordAck: async () => {
+          await recordSafetyAck({ gameId: game.id, kind: "participant_risk" });
+          await refetchRiskAck();
+        },
+        join: async () => {
+          setJoinDialog(null);
+          await executeJoinAction(pos);
+        },
+      });
+      // A failed acknowledgment write keeps the dialog open, with nothing joined.
+      if (!result.ok && result.stage === "ack") {
+        toast.error(
+          userErrorMessage(result.error, "Couldn't record your acknowledgment. Please try again."),
+        );
+      } else if (!result.ok) {
+        toast.error(userErrorMessage(result.error, "Couldn't join this game. Please try again."));
+      }
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const confirmRiskAck = async () => {
@@ -1520,6 +1585,19 @@ function GameDetail() {
         submitting={processing}
         onConfirm={() => void confirmRiskAck()}
       />
+      <JoinGameDialog
+        open={joinDialog !== null}
+        onOpenChange={(v) => {
+          if (!v) setJoinDialog(null);
+        }}
+        gameTitle={game.title}
+        rosterNote={`You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
+        needsAck={joinDialog?.needsAck ?? false}
+        submitting={processing}
+        onConfirm={() => void confirmFreeJoin()}
+      >
+        <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
+      </JoinGameDialog>
 
       {shareOpen && !game.isPrivate && (
         <ShareSheet
@@ -3096,13 +3174,13 @@ function GameDetail() {
                         return;
                       }
                       if (wantsFreeJoin) {
-                        // Refuse before "Join this run?" too, not after it.
+                        // Refuse before "Join this game?" too, not after it.
                         const refusal = joinPreflightRefusal(joinPreflight);
                         if (refusal) {
                           refuseJoin(refusal);
                           return;
                         }
-                        setConfirmAction("join");
+                        void handleJoin(undefined, { confirm: true });
                         return;
                       }
                       void handleJoin();
@@ -3211,29 +3289,18 @@ function GameDetail() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmAction === "leave"
-                ? "Leave this game?"
-                : requiresApproval && !isApproved
-                  ? "Request a spot?"
-                  : "Join this run?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Leave this game?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAction === "leave"
-                ? "Your spot will open up for someone else. You can rejoin if there's still space."
-                : `You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
+              Your spot will open up for someone else. You can rejoin if there's still space.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {confirmAction === "leave" && isLateCancel(game.date, game.cancelCutoffMin) && (
+          {isLateCancel(game.date, game.cancelCutoffMin) && (
             <p
               role="alert"
               className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
             >
               {lateCancelWarning(game.cancelCutoffMin)}
             </p>
-          )}
-          {confirmAction === "join" && (
-            <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -3245,19 +3312,9 @@ function GameDetail() {
                 setConfirmAction(null);
                 if (action) void handleJoin();
               }}
-              className={
-                confirmAction === "leave"
-                  ? "bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
-                  : undefined
-              }
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
-              {confirmAction === "leave"
-                ? isLateCancel(game.date, game.cancelCutoffMin)
-                  ? "Leave anyway"
-                  : "Leave game"
-                : requiresApproval && !isApproved
-                  ? "Request Spot"
-                  : "Join Run"}
+              {isLateCancel(game.date, game.cancelCutoffMin) ? "Leave anyway" : "Leave game"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

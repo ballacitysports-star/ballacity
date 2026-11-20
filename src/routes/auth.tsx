@@ -79,7 +79,8 @@ export const Route = createFileRoute("/auth")({
     pageHead({
       path: "/auth",
       title: "Sign in — BallaCity",
-      description: "Sign in or create a BallaCity account to join and host pickup games.",
+      description:
+        "Sign in or create a BallaCity account to post when you're free, get invited to pickup games and host your own.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) => {
@@ -701,7 +702,7 @@ function AuthPage() {
         <div className="text-center">
           <div className="font-display text-3xl font-bold">BallaCity</div>
           <p className="text-sm text-muted-foreground mt-1">
-            Save games, write reviews, and build your reputation.
+            Post when you're free. Get invited to play.
           </p>
         </div>
 

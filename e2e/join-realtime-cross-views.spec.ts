@@ -114,7 +114,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
     const profileCardBefore = profilePage.locator(`a[href*="/games/${GAME_ID}"]`);
     expect(await profileCardBefore.count()).toBe(0);
 
-    // --- Action: join from the detail page (through "Join this run?") ---
+    // --- Action: join from the detail page (through "Join this game?") ---
     // Detail page flips locally (same tab, sync store update).
     await joinFreeRun(detailPage);
 

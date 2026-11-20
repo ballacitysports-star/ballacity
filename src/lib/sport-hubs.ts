@@ -136,6 +136,16 @@ export function orderSportsForViewer<T extends { name: string }>(all: T[], mine:
 }
 
 /**
+ * Sport chip priority for Find Players: Basketball first, then the member's
+ * own sports in their profile order. Feed it to `orderSportsForViewer` (or the
+ * `prioritize` prop of SportChips); every other sport follows in canonical
+ * order, so nothing is hidden and the order stays stable.
+ */
+export function basketballFirstPriority(mine: readonly string[]): string[] {
+  return [...new Set(["Basketball", ...mine])];
+}
+
+/**
  * Sports shown first in onboarding, in this order. "Flag Football" is the
  * canonical Football sport (its formats include 5v5 Flag), so it is not a
  * separate entry. Every other canonical sport follows in canonical order.

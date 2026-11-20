@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,7 +19,7 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import type { ViewMode, Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
 import { NearbyPlayersPanel } from "@/components/NearbyPlayersPanel";
 import { motion } from "framer-motion";
@@ -45,10 +45,10 @@ import {
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
-import { MineView } from "@/components/players/MineView";
 import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability-gate";
 import { QuickAvailabilitySheet } from "@/components/availability/QuickAvailabilitySheet";
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
+import { PostAvailabilityDialog } from "@/components/availability/PostAvailabilityDialog";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { AvailabilityIntentBadges } from "@/components/players/AvailabilityIntentBadges";
 import {
@@ -94,6 +94,7 @@ import { useAuthSearchHere } from "@/lib/auth-return";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -105,11 +106,8 @@ import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm, maxDistanceInUnit } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
-import { FilterSection } from "@/components/FilterSheet";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
-import { useDistanceUnit } from "@/lib/user-prefs-store";
-import { DistanceSlider } from "@/components/DistanceSlider";
 import {
   formatSportLevel,
   levelTiers,
@@ -119,7 +117,6 @@ import {
   scaleForSport,
 } from "@/lib/sport-levels";
 import { TierChips } from "@/components/sports/TierChips";
-import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
 import { hideFinishedGames } from "@/lib/game-time";
 import {
   countSkillSelections,
@@ -133,15 +130,20 @@ import {
   type SportSkillMap,
 } from "@/lib/sport-filter";
 import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
-import { SortSection, SortSummary } from "@/components/filters/SortSection";
+import { basketballFirstPriority } from "@/lib/sport-hubs";
+import { SortSummary } from "@/components/filters/SortSection";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { availabilityWindowFor } from "@/lib/availability-window";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { Shield } from "lucide-react";
 import { InviteToTeamDialog, useMyRecruitingTeams } from "@/components/players/InviteToTeamDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
-
-type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
+import {
+  PLAYER_SORTS,
+  PlayersFilterBody,
+  type PlayersSortBy,
+} from "@/components/players/PlayersFilterBody";
+import { PlayersMapHeader } from "@/components/players/PlayersMapHeader";
 
 /** Find Players pages from the server search (it allows up to 50). */
 const NEARBY_PAGE_SIZE = 30;
@@ -162,13 +164,6 @@ function ownErrorSentence(e: unknown): string | undefined {
     : undefined;
 }
 
-const PLAYER_SORTS = [
-  { value: "recent" as const, label: "Recently posted" },
-  { value: "soonest" as const, label: "Soonest available" },
-  { value: "nearest" as const, label: "Nearest" },
-  { value: "name" as const, label: "Name A–Z" },
-];
-
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
 // when-filter, and the view/density toggles. Invalid values silently
@@ -187,7 +182,8 @@ const playersSearchSchema = z.object({
   sort: fallback(z.string(), "recent").default("recent"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
-  // "browse" (everyone's availability) | "mine" (your posts + requests).
+  // Legacy: "mine" was your posts and requests. It now lives on /availability, and beforeLoad redirects the old
+  // `/players?tab=mine` links (Home, notifications) there.
   tab: fallback(z.string(), "browse").default("browse"),
   // Deep link to one availability post — opens it in a focused dialog.
   post: fallback(z.string(), "").default(""),
@@ -203,6 +199,10 @@ export const Route = createFileRoute("/_tabs/players")({
       noindex: true,
     }),
   validateSearch: zodValidator(playersSearchSchema),
+  // WP 4.1: one screen for My availability & invitations.
+  beforeLoad: ({ search }) => {
+    if (search.tab === "mine") throw redirect({ to: "/availability", replace: true });
+  },
   component: PlayersPageGate,
 });
 
@@ -352,6 +352,13 @@ function PlayersPage() {
     apply: (next) => updateSearch({ sport: serializeSportList(next) }),
   });
 
+  // Sport chips: Basketball first, then the member's own sports, then the rest.
+  const mySportsKey = (profile?.sports ?? []).map((s) => s.name).join("|");
+  const sportPriority = useMemo(
+    () => basketballFirstPriority(mySportsKey ? mySportsKey.split("|") : []),
+    [mySportsKey],
+  );
+
   const setSkills = (next: SportSkillMap) => {
     const safe = sanitizeSportSkillMap(next, sports);
     updateSearch({ skill: serializeSportSkillMap(safe, sports) }, { push: true });
@@ -375,15 +382,21 @@ function PlayersPage() {
   // Availability lives on the player profile — gate posting on having one.
   const availGate = useAvailabilityGate();
   const [gateOpen, setGateOpen] = useState(false);
+  // Set after "Switch to my player profile": ask the posting check again once it settles, so a second reason (an
+  // incomplete player profile) gets its own next step instead of a form that can't be posted.
+  const [recheckGate, setRecheckGate] = useState(false);
+  useEffect(() => {
+    if (!recheckGate || availGate.loading) return;
+    setRecheckGate(false);
+    if (availGate.canPost) setPostOpen(true);
+    else setGateOpen(true);
+  }, [recheckGate, availGate.loading, availGate.canPost]);
   // New posts start with the three-tap "I'm available" sheet; "More options" opens the full form.
   const [quickOpen, setQuickOpen] = useState(false);
   const openPostFlow = () => {
     if (availGate.canPost) setQuickOpen(true);
     else setGateOpen(true);
   };
-
-  const tab: "browse" | "mine" = search.tab === "mine" ? "mine" : "browse";
-  const setTab = (v: "browse" | "mine") => updateSearch({ tab: v }, { push: true });
 
   // Focused post (`/players?post=<id>`) — shared links open the dialog even
   // when the post isn't in the current filtered list.
@@ -709,245 +722,210 @@ function PlayersPage() {
         </p>
       </motion.div>
 
-      {/* Browse everyone's availability, or manage your own posts/requests. */}
+      {/* WP 4.1: your posts, game invitations and requests are on one screen. */}
       {!isParentMode && (
-        <div className="mb-4 flex gap-2">
-          {(
-            [
-              { id: "browse", label: "Browse" },
-              { id: "mine", label: "Mine" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-colors ${
-                tab === t.id
-                  ? "border-lime bg-lime text-primary-foreground"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Link
+          to="/availability"
+          className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-surface px-4 text-sm font-bold"
+        >
+          <Inbox className="h-4 w-4 text-lime" aria-hidden /> My availability &amp; invitations
+        </Link>
       )}
 
-      {!isParentMode && tab === "mine" ? (
-        <div className="space-y-3 pb-6">
-          {!availGate.loading && !availGate.canPost && (
-            <AvailabilityRequiredNotice
-              reason={availGate.reason}
-              onSwitched={() => setPostOpen(true)}
-            />
-          )}
-          {user && availGate.canPost && (
-            <button
-              type="button"
-              onClick={openPostFlow}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient text-base font-bold text-primary-foreground glow-lime"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.5} /> I'm available
-            </button>
-          )}
-          <MineView
-            user={user ? { id: user.id } : null}
-            onEdit={(m) => setEditingPost(m)}
-            refreshKey={reloadTick}
-          />
-        </div>
-      ) : (
-        <>
-          <NearbyPlayersPanel
-            players={list}
-            mySports={profile?.sports?.map((s) => s.name)}
-            myCity={profile?.city}
-            currentUserId={user?.id ?? null}
-          />
+      <NearbyPlayersPanel
+        players={list}
+        mySports={profile?.sports?.map((s) => s.name)}
+        myCity={profile?.city}
+        currentUserId={user?.id ?? null}
+      />
 
-          <ViewDensityToggle
-            view={viewMode}
+      {/* The layout switch (grid / compact / map) lives in the filter sheet, so the
+              results start higher on a phone. Its URL keys (view, density) are unchanged. */}
+      <FilterBar
+        q={q}
+        onQChange={setQ}
+        searchPlaceholder="Search name, city, sport"
+        activeFilterCount={activeFilterCount}
+        sheetTitle="Filter players"
+        rightExtra={
+          isParentMode ? undefined : (
+            <button
+              onClick={openPostFlow}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+              aria-label="I'm available: post availability"
+            >
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+          )
+        }
+        onReset={() => {
+          markSportChoice("players");
+          setSports([]);
+          setMaxDistance(0);
+          setAgeMin("");
+          setAgeMax("");
+          setIncludeUnknownAge(true);
+          setAvailableAs("");
+          setSortBy("recent");
+        }}
+        sheet={
+          <PlayersFilterBody
+            viewMode={viewMode}
             onViewChange={switchView}
             density={density}
             onDensityChange={switchDensity}
-          />
-
-          <FilterBar
-            q={q}
-            onQChange={setQ}
-            searchPlaceholder="Search name, city, sport"
-            activeFilterCount={activeFilterCount}
-            sheetTitle="Filter players"
-            rightExtra={
-              isParentMode ? undefined : (
-                <button
-                  onClick={openPostFlow}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-                  aria-label="I'm available: post availability"
-                >
-                  <Plus className="h-5 w-5" strokeWidth={2.5} />
-                </button>
-              )
-            }
-            onReset={() => {
+            sportPriority={sportPriority}
+            sports={sports}
+            onToggleSport={toggleSportFilter}
+            onClearSports={() => {
               markSportChoice("players");
               setSports([]);
-              setMaxDistance(0);
-              setAgeMin("");
-              setAgeMax("");
-              setIncludeUnknownAge(true);
-              setAvailableAs("");
-              setSortBy("recent");
             }}
-            sheet={
-              <PlayersFilterBody
-                sports={sports}
-                onToggleSport={toggleSportFilter}
-                onClearSports={() => {
-                  markSportChoice("players");
-                  setSports([]);
-                }}
-                skills={skills}
-                setSkills={setSkills}
-                maxDistance={maxDistance}
-                setMaxDistance={setMaxDistance}
-                ageMin={ageMin}
-                setAgeMin={setAgeMin}
-                ageMax={ageMax}
-                setAgeMax={setAgeMax}
-                includeUnknownAge={includeUnknownAge}
-                setIncludeUnknownAge={setIncludeUnknownAge}
-                sortBy={sortBy}
-                setSortBy={setSortBy}
-              />
-            }
+            skills={skills}
+            setSkills={setSkills}
+            maxDistance={maxDistance}
+            setMaxDistance={setMaxDistance}
+            ageMin={ageMin}
+            setAgeMin={setAgeMin}
+            ageMax={ageMax}
+            setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge}
+            setIncludeUnknownAge={setIncludeUnknownAge}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
           />
+        }
+      />
 
-          {/* Sport filter chips */}
-          <div className="mb-3">
-            <SportChips multi selected={sports} onSelect={toggleSportFilter} />
-          </div>
+      {/* Sport filter chips */}
+      <div className="mb-3">
+        <SportChips
+          multi
+          selected={sports}
+          onSelect={toggleSportFilter}
+          prioritize={sportPriority}
+        />
+      </div>
 
-          {/* Availability filter chips */}
-          <div className="bleed-x-gutter overflow-x-auto mb-4">
-            <div className="flex gap-2 pb-1">
-              {(
-                [
-                  { id: "any", label: "Anytime" },
-                  { id: "today", label: "Today" },
-                  { id: "week", label: "This week" },
-                  { id: "weekend", label: "Weekend" },
-                ] as const
-              ).map((w) => {
-                const active = when === w.id;
-                return (
-                  <button
-                    key={w.id}
-                    onClick={() => setWhen(w.id)}
-                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {w.label}
-                  </button>
-                );
-              })}
-              <span aria-hidden className="mx-1 w-px shrink-0 self-stretch bg-border" />
-              {AVAILABILITY_INTENTS.map((intent) => {
-                const active = availableAs === intent;
-                return (
-                  <button
-                    key={intent}
-                    aria-pressed={active}
-                    onClick={() => setAvailableAs(active ? "" : intent)}
-                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {INTENT_LABEL[intent]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {viewMode === "map" ? (
-            <PlayersMapView players={sorted ?? []} />
-          ) : sorted === null ? (
-            <LoadingRows />
-          ) : sorted.length === 0 ? (
-            <EmptyState
-              title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
-              body={
-                list && list.length > 0
-                  ? "Try a different search or sport."
-                  : "Be the first — share when you're free and where you'll travel."
-              }
-              cta={
-                isParentMode ? undefined : user ? (
-                  <Button
-                    onClick={openPostFlow}
-                    className="rounded-full bg-lime-gradient text-primary-foreground"
-                  >
-                    Post availability
-                  </Button>
-                ) : (
-                  <Link
-                    to="/auth"
-                    search={authSearch}
-                    className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                  >
-                    Sign in
-                  </Link>
-                )
-              }
-            />
-          ) : (
-            <>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="section-eyebrow text-muted-foreground">
-                  {sorted.length} player{sorted.length === 1 ? "" : "s"} available
-                </h2>
-                <SortSummary value={sortBy} options={PLAYER_SORTS} />
-              </div>
-              <ul
-                className={
-                  density === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
-                    : "space-y-3 pb-6"
-                }
+      {/* Availability filter chips */}
+      <div className="bleed-x-gutter overflow-x-auto mb-4">
+        <div className="flex gap-2 pb-1">
+          {(
+            [
+              { id: "any", label: "Anytime" },
+              { id: "today", label: "Today" },
+              { id: "week", label: "This week" },
+              { id: "weekend", label: "Weekend" },
+            ] as const
+          ).map((w) => {
+            const active = when === w.id;
+            return (
+              <button
+                key={w.id}
+                onClick={() => setWhen(w.id)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
               >
-                {sorted.map((a) => (
-                  <AvailabilityCard
-                    key={a.id}
-                    a={a}
-                    rowRef={avatarRowRef}
-                    isMine={user?.id === a.user_id}
-                    hasHostedGames={myUpcomingHosted.length > 0}
-                    onContact={() =>
-                      user ? setContactFor(a) : toast.error("Sign in to contact this player.")
-                    }
-                    onOpen={() => openPost(a.id)}
-                    onChanged={() => setReloadTick((t) => t + 1)}
-                  />
-                ))}
-              </ul>
-              {serverSearch && hasMore && (
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="mb-6 flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-bold"
-                >
-                  {loadingMore ? "Loading…" : "Load more players"}
-                </button>
-              )}
-            </>
+                {w.label}
+              </button>
+            );
+          })}
+          <span aria-hidden className="mx-1 w-px shrink-0 self-stretch bg-border" />
+          {AVAILABILITY_INTENTS.map((intent) => {
+            const active = availableAs === intent;
+            return (
+              <button
+                key={intent}
+                aria-pressed={active}
+                onClick={() => setAvailableAs(active ? "" : intent)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                {INTENT_LABEL[intent]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {viewMode === "map" ? (
+        <>
+          {/* The layout switch is in the filter sheet; give the map its own way back. */}
+          <PlayersMapHeader onShowList={() => switchView("list")} />
+          <PlayersMapView players={sorted ?? []} />
+        </>
+      ) : sorted === null ? (
+        <LoadingRows />
+      ) : sorted.length === 0 ? (
+        <EmptyState
+          title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
+          body={
+            list && list.length > 0
+              ? "Try a different search or sport."
+              : "Be the first — share when you're free and where you'll travel."
+          }
+          cta={
+            isParentMode ? undefined : user ? (
+              <Button
+                onClick={openPostFlow}
+                className="rounded-full bg-lime-gradient text-primary-foreground"
+              >
+                Post availability
+              </Button>
+            ) : (
+              <Link
+                to="/auth"
+                search={authSearch}
+                className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+              >
+                Sign in
+              </Link>
+            )
+          }
+        />
+      ) : (
+        <>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="section-eyebrow text-muted-foreground">
+              {sorted.length} player{sorted.length === 1 ? "" : "s"} available
+            </h2>
+            <SortSummary value={sortBy} options={PLAYER_SORTS} />
+          </div>
+          <ul
+            className={
+              density === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6" : "space-y-3 pb-6"
+            }
+          >
+            {sorted.map((a) => (
+              <AvailabilityCard
+                key={a.id}
+                a={a}
+                rowRef={avatarRowRef}
+                isMine={user?.id === a.user_id}
+                hasHostedGames={myUpcomingHosted.length > 0}
+                onContact={() =>
+                  user ? setContactFor(a) : toast.error("Sign in to contact this player.")
+                }
+                onOpen={() => openPost(a.id)}
+                onChanged={() => setReloadTick((t) => t + 1)}
+              />
+            ))}
+          </ul>
+          {serverSearch && hasMore && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mb-6 flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-bold"
+            >
+              {loadingMore ? "Loading…" : "Load more players"}
+            </button>
           )}
         </>
       )}
@@ -957,12 +935,15 @@ function PlayersPage() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Post availability</DialogTitle>
+              <DialogDescription className="sr-only">
+                {availabilityGateMessage(availGate.reason)}
+              </DialogDescription>
             </DialogHeader>
             <AvailabilityRequiredNotice
               reason={availGate.reason}
               onSwitched={() => {
                 setGateOpen(false);
-                setPostOpen(true);
+                setRecheckGate(true);
               }}
             />
           </DialogContent>
@@ -1027,180 +1008,6 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterBody({
-  sports,
-  onToggleSport,
-  onClearSports,
-  skills,
-  setSkills,
-  maxDistance,
-  setMaxDistance,
-  ageMin,
-  setAgeMin,
-  ageMax,
-  setAgeMax,
-  includeUnknownAge,
-  setIncludeUnknownAge,
-  sortBy,
-  setSortBy,
-}: {
-  sports: string[];
-  onToggleSport: (v: string | null) => void;
-  onClearSports: () => void;
-  skills: SportSkillMap;
-  setSkills: (v: SportSkillMap) => void;
-  maxDistance: number;
-  setMaxDistance: (v: number) => void;
-  ageMin: number | "";
-  setAgeMin: (v: number | "") => void;
-  ageMax: number | "";
-  setAgeMax: (v: number | "") => void;
-  includeUnknownAge: boolean;
-  setIncludeUnknownAge: (v: boolean) => void;
-  sortBy: PlayersSortBy;
-  setSortBy: (v: PlayersSortBy) => void;
-}) {
-  const unit = useDistanceUnit();
-  return (
-    <>
-      <SortSection value={sortBy} onChange={setSortBy} options={PLAYER_SORTS} />
-
-      <FilterSection label="Sports (Players)">
-        <div className="flex flex-wrap gap-2">
-          <Chip active={sports.length === 0} onClick={onClearSports}>
-            All sports
-          </Chip>
-          {SPORTS.map((s) => (
-            <Chip
-              key={s.name}
-              active={sports.includes(s.name)}
-              onClick={() => onToggleSport(s.name)}
-            >
-              <span className="mr-1">{s.emoji}</span>
-              {s.name}
-            </Chip>
-          ))}
-        </div>
-      </FilterSection>
-
-      <FilterSection label="Skill level">
-        <SportSkillLevels sports={sports} value={skills} onChange={setSkills} />
-      </FilterSection>
-
-      <FilterSection label="Max travel distance">
-        <DistanceSlider
-          valueMi={maxDistance > 0 ? maxDistance : null}
-          onChange={(mi) => setMaxDistance(mi ?? 0)}
-          unit={unit}
-          label="Max travel distance"
-        />
-      </FilterSection>
-
-      <FilterSection label="Age range">
-        <div className="flex items-center gap-2 mb-2">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={120}
-            value={ageMin}
-            onChange={(e) =>
-              setAgeMin(
-                e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))),
-              )
-            }
-            placeholder="Min"
-            className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
-            aria-label="Minimum age"
-          />
-          <span className="text-muted-foreground text-sm">–</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={120}
-            value={ageMax}
-            onChange={(e) =>
-              setAgeMax(
-                e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))),
-              )
-            }
-            placeholder="Max"
-            className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
-            aria-label="Maximum age"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Chip
-            active={ageMin === "" && ageMax === ""}
-            onClick={() => {
-              setAgeMin("");
-              setAgeMax("");
-            }}
-          >
-            Any age
-          </Chip>
-          <Chip
-            active={ageMin === 13 && ageMax === 17}
-            onClick={() => {
-              setAgeMin(13);
-              setAgeMax(17);
-            }}
-          >
-            13–17
-          </Chip>
-          <Chip
-            active={ageMin === 18 && ageMax === 24}
-            onClick={() => {
-              setAgeMin(18);
-              setAgeMax(24);
-            }}
-          >
-            18–24
-          </Chip>
-          <Chip
-            active={ageMin === 25 && ageMax === 34}
-            onClick={() => {
-              setAgeMin(25);
-              setAgeMax(34);
-            }}
-          >
-            25–34
-          </Chip>
-          <Chip
-            active={ageMin === 35 && ageMax === 49}
-            onClick={() => {
-              setAgeMin(35);
-              setAgeMax(49);
-            }}
-          >
-            35–49
-          </Chip>
-          <Chip
-            active={ageMin === 50 && ageMax === ""}
-            onClick={() => {
-              setAgeMin(50);
-              setAgeMax("");
-            }}
-          >
-            50+
-          </Chip>
-        </div>
-        <label className="flex items-center gap-2 mt-3 text-xs text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-lime"
-            checked={includeUnknownAge}
-            disabled={ageMin === "" && ageMax === ""}
-            onChange={(e) => setIncludeUnknownAge(e.target.checked)}
-          />
-          <span>Include players who haven't shared a birthday</span>
-        </label>
-      </FilterSection>
-    </>
-  );
-}
-
 function BellLink() {
   const unread = useUnreadNotificationCount();
   return (
@@ -1217,25 +1024,6 @@ function BellLink() {
         </span>
       )}
     </Link>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active?: boolean;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${active ? "border-lime bg-lime/15 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -1540,250 +1328,6 @@ const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function PostAvailabilityDialog({
-  initial,
-  onClose,
-  onPosted,
-}: {
-  /** When set, the dialog edits this existing post instead of creating one. */
-  initial?: PlayerAvailability | null;
-  onClose: () => void;
-  onPosted: () => void;
-}) {
-  const myProfile = useMyProfile();
-  const gate = useAvailabilityGate();
-  const isEdit = !!initial;
-  const { sports: mySports } = useDefaultSports();
-  // New posts start from the viewer's profile sports; edits keep their own.
-  const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
-  const sportsTouchedRef = useRef(false);
-  useEffect(() => {
-    if (initial || sportsTouchedRef.current || !mySports.length) return;
-    setSports((cur) => (cur.length ? cur : mySports));
-  }, [initial, mySports]);
-  // Per-sport tiers — a player can be open to several competitive levels.
-  const [levels, setLevels] = useState<Record<string, string[]>>(() =>
-    initial ? initialLevelsForPost(initial) : {},
-  );
-  const [lookingFor, setLookingFor] = useState<AvailabilityIntent[]>(() =>
-    parseIntents(initial?.looking_for),
-  );
-
-  const [slots, setSlots] = useState<TimeSlot[]>(() =>
-    initial ? parseTimeSlots(initial.time_slots ?? []) : [],
-  );
-  const { data: busy = [] } = useMyBusyBlocks();
-  const [city, setCity] = useState(initial?.city ?? "");
-  const unit = useDistanceUnit();
-  const [radius, setRadius] = useState(() => {
-    const km = initial?.travel_radius_km ?? 40.2336;
-    return Math.round(unit === "km" ? km : kmToMi(km));
-  }); // in the viewer's unit
-  const [note, setNote] = useState(initial?.note ?? "");
-  const [saving, setSaving] = useState(false);
-  const toggle = (arr: string[], v: string) =>
-    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
-
-  const save = async () => {
-    // Belt-and-braces: a stale dialog or deep link can't bypass the gate.
-    if (!gate.loading && !gate.canPost) {
-      toast.error(availabilityGateMessage(gate.reason));
-      return;
-    }
-    if (sports.length === 0 && !note.trim()) {
-      toast.error("Pick at least one sport or add a note.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = {
-        sports,
-        ...buildSkillFields(sports, levels),
-        looking_for: lookingFor,
-
-        // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
-        time_slots: slots,
-        city,
-        travel_radius_km: unit === "km" ? radius : miToKm(radius),
-        note,
-      };
-      if (initial) await updateAvailability(initial.id, payload);
-      else await createAvailability(payload);
-      onPosted();
-    } catch (e: any) {
-      // createAvailability's own "Sign in to post availability." still shows; anything else is never raw text.
-      toast.error(
-        errorText(e) === SIGN_IN_TO_POST
-          ? SIGN_IN_TO_POST
-          : userErrorMessage(e, "Couldn't save your availability. Please try again."),
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit availability" : "Post availability"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label className="mb-2 block">Sports</Label>
-            <div className="flex flex-wrap gap-2">
-              {SPORTS.map((s) => (
-                <Chip
-                  key={s.name}
-                  active={sports.includes(s.name)}
-                  onClick={() => {
-                    sportsTouchedRef.current = true;
-                    setSports((arr) => {
-                      const next = toggle(arr, s.name);
-                      // Prefill from the profile tiers the first time a sport is added.
-                      if (!arr.includes(s.name)) {
-                        const mine = levelTiers(
-                          myProfile?.sports.find((x) => x.name === s.name)?.level,
-                        );
-                        if (mine.length)
-                          setLevels((l) => (l[s.name]?.length ? l : { ...l, [s.name]: mine }));
-                      }
-                      return next;
-                    });
-                  }}
-                >
-                  <span className="mr-1">{s.emoji}</span>
-                  {s.name}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          {sports.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Pick a sport to set your level for it.</p>
-          ) : (
-            sports.map((name) => {
-              const scale = scaleForSport(name as any);
-              return (
-                <div key={name}>
-                  <div className="mb-2 flex items-baseline gap-2">
-                    <Label className="block">{name} levels</Label>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {scale.system}
-                    </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      Pick all that fit
-                    </span>
-                  </div>
-                  <TierChips
-                    scale={scale}
-                    selected={levels[name] ?? []}
-                    ariaPrefix={name}
-                    onToggle={(tier) =>
-                      setLevels((l) => {
-                        const cur = l[name] ?? [];
-                        return {
-                          ...l,
-                          [name]: cur.includes(tier)
-                            ? cur.filter((t) => t !== tier)
-                            : [...cur, tier],
-                        };
-                      })
-                    }
-                  />
-                </div>
-              );
-            })
-          )}
-          <div>
-            <Label className="mb-2 block">Available as</Label>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Available as">
-              {AVAILABILITY_INTENTS.map((intent) => (
-                <Chip
-                  key={intent}
-                  active={lookingFor.includes(intent)}
-                  onClick={() =>
-                    setLookingFor((cur) =>
-                      cur.includes(intent) ? cur.filter((x) => x !== intent) : [...cur, intent],
-                    )
-                  }
-                >
-                  {INTENT_LABEL[intent]}
-                </Chip>
-              ))}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {lookingFor.length === 0
-                ? "Optional. Pick one or both."
-                : lookingFor.map((i) => INTENT_BLURB[i]).join(" · ")}
-            </p>
-          </div>
-          <div>
-            <Label className="mb-2 block">When are you free?</Label>
-            <AvailabilitySchedulePicker value={slots} onChange={setSlots} busy={busy} />
-          </div>
-          <div className="grid grid-cols-[1fr_110px] gap-2">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="e.g. Austin"
-              />
-            </div>
-            <div>
-              <Label>Travel radius</Label>
-              <DistanceSlider
-                valueMi={
-                  radius >= maxDistanceInUnit(unit)
-                    ? null
-                    : unit === "km"
-                      ? radius / 1.609344
-                      : radius
-                }
-                onChange={(mi) =>
-                  setRadius(
-                    mi == null
-                      ? maxDistanceInUnit(unit)
-                      : Math.round(unit === "km" ? miToKm(mi) : mi),
-                  )
-                }
-                unit={unit}
-                label="Travel radius"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="note">Short note</Label>
-            <Textarea
-              id="note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={500}
-              rows={3}
-              placeholder="Positions, goals, what you're looking for…"
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground text-right">{note.length}/500</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={save}
-            disabled={saving}
-            className="bg-lime-gradient text-primary-foreground"
-          >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isEdit ? "Save" : "Post"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function ContactDialog({

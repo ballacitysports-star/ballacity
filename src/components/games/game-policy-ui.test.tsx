@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, ...rest }: any) => <a {...rest}>{children}</a>,
+  Link: (props: React.ComponentProps<"a">) => <a {...props} />,
 }));
 
 import { GamePolicyFields } from "./GamePolicyFields";
@@ -20,6 +20,43 @@ describe("game policy UI", () => {
     onChange.mockClear();
     fireEvent.click(screen.getByText("Waitlist when full"));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ allowWaitlist: false }));
+  });
+
+  it("points a free game's fee hint at the Paid game switch, not a hidden field", () => {
+    const { container } = render(
+      <GamePolicyFields value={defaultGamePolicy(10)} onChange={() => {}} idPrefix="fee" />,
+    );
+    expect(within(container).getByText(/turn on Paid game under Details/i)).toBeTruthy();
+    expect(within(container).queryByText(/in the fee field/i)).toBeNull();
+  });
+
+  it("can leave the player limit to the create form's Spots and show problems inline", () => {
+    const { container } = render(
+      <GamePolicyFields
+        value={{
+          ...defaultGamePolicy(10),
+          minPlayers: 12,
+          cancellationPolicy: "custom",
+          cancellationNotes: "",
+        }}
+        onChange={() => {}}
+        idPrefix="c"
+        showPlayerLimit={false}
+        errors={{ cancellationNotes: "Describe your custom cancellation terms." }}
+      />,
+    );
+    const view = within(container);
+    expect(view.queryByLabelText("Player limit")).toBeNull();
+    const min = view.getByLabelText("Minimum to play");
+    expect(min.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(min.getAttribute("aria-describedby")!)?.textContent).toMatch(
+      /more than the spots/,
+    );
+    const notes = view.getByLabelText("Cancellation notes");
+    expect(notes.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(notes.getAttribute("aria-describedby")!)?.textContent).toBe(
+      "Describe your custom cancellation terms.",
+    );
   });
 
   it("ties the cancellation preset to the cutoff that refunds use", () => {

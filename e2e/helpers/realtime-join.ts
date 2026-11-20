@@ -3,8 +3,9 @@
  * the way a player does today, for the realtime specs.
  *
  * Those specs were written when tapping "Join Run" put the player straight on
- * the roster. Since then the sticky CTA opens a "Join this run?" confirmation
- * (where the player also picks their reminders) and "You're in · Tap to leave"
+ * the roster. Since then the sticky CTA opens a "Join this game?" dialog
+ * (where the player also picks their reminders; it also holds the "Before you
+ * join" risk acknowledgment when that is due) and "You're in · Tap to leave"
  * opens "Leave this game?" (src/routes/games.$gameId.index.tsx). The specs kept
  * tapping the CTA once and waiting for the flipped label behind a dialog that
  * nobody confirmed, so no row was ever written and nothing could propagate.
@@ -28,15 +29,19 @@ export function joinCta(page: Page): Locator {
   return page.getByRole("button", { name: /^join run · /i }).first();
 }
 
-/** Tap "Join Run", confirm "Join this run?", and wait until the CTA reads "You're in". */
+/**
+ * Tap "Join Run", confirm "Join this game?", and wait until the CTA reads
+ * "You're in". With the acknowledgment stubbed as given, the dialog has no
+ * checkbox and its button reads "Join game".
+ */
 export async function joinFreeRun(page: Page): Promise<void> {
   const cta = joinCta(page);
   await expect(cta).toBeVisible({ timeout: 15_000 });
   await cta.click();
 
-  const confirm = page.getByRole("alertdialog", { name: /join this run\?/i });
+  const confirm = page.getByRole("dialog", { name: /join this game\?/i });
   await expect(confirm).toBeVisible({ timeout: 5_000 });
-  await confirm.getByRole("button", { name: /^join run$/i }).click();
+  await confirm.getByRole("button", { name: /^join game$/i }).click();
   await expect(confirm).toBeHidden({ timeout: 5_000 });
 
   await expect(joinedCta(page)).toBeVisible({ timeout: 10_000 });

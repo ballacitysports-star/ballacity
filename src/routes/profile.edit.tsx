@@ -46,6 +46,7 @@ import { SaveStatus } from "@/components/SaveStatus";
 import { useMyBirthdayLock } from "@/lib/birthday-lock";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { validateProfileEditSearch } from "@/lib/profile-return";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () =>
@@ -55,6 +56,9 @@ export const Route = createFileRoute("/profile/edit")({
       description: "Update your sports, skill levels, photos, location, and links.",
       noindex: true,
     }),
+  // WP 4.1: `returnTo` brings the member back to where they started (for example posting availability) once the
+  // profile is saved. Only a path on this site gets through, so it can never be an open redirect.
+  validateSearch: validateProfileEditSearch,
   component: EditProfile,
 });
 
@@ -78,6 +82,9 @@ function EditProfile() {
   const { data: birthdayLock } = useMyBirthdayLock(Boolean(profileUser));
   const showOrgs = !accountTypeLoading && !!activeProfile && activeProfile.kind !== "player";
   const nav = useNavigate();
+  const { returnTo } = Route.useSearch();
+  // Back to where the member came from (already checked by validateSearch), else the profile.
+  const leave = () => (returnTo ? nav({ href: returnTo }) : nav({ to: "/profile" }));
 
   const [name, setName] = useState(profile?.name ?? "");
   const [username, setUsername] = useState(profile?.username ?? "");
@@ -334,7 +341,7 @@ function EditProfile() {
       );
       return;
     }
-    nav({ to: "/profile" });
+    void leave();
   };
 
   const goBack = () => {
@@ -344,7 +351,7 @@ function EditProfile() {
     ) {
       return;
     }
-    nav({ to: "/profile" });
+    void leave();
   };
 
   const reset = () => {

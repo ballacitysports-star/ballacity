@@ -134,7 +134,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
     const beforeMap = await readMapSpotsLeft(aMap, GAME_ID);
     expect(beforeMap, "map card should show a spots count").not.toBeNull();
 
-    // Device B joins (through the "Join this run?" confirmation) and flips locally.
+    // Device B joins (through the "Join this game?" confirmation) and flips locally.
     await joinFreeRun(bDetail);
 
     // --- Realtime propagation to Device A ---

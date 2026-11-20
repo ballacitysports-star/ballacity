@@ -1,6 +1,7 @@
 import { fulfillRows } from "./helpers/invite-postgrest";
 import { currentSafetyAckVersion, mockRiskNotAcknowledged } from "./helpers/risk-ack";
-import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { test, expect, type Browser, type Page, type Route as PWRoute } from "@playwright/test";
+import { isLegalReviewed } from "../src/lib/legal-review";
 
 /**
  * E2E: the real "Before you join" risk acknowledgment stands between a player
@@ -8,16 +9,23 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  *
  * Every other spec that reaches a join serves the acknowledgment as already
  * given (stubRiskAcknowledged). This one serves it as not given yet and lets
- * the real dialog open:
+ * the real dialog open, on both paths:
  *
- *   - tapping "Request Spot" opens "Before you join", with the checkbox clear
- *     and "Agree & join" disabled;
+ *   - request-to-join (g2, approval-gated): "Request Spot" opens the
+ *     standalone "Before you join" dialog;
+ *   - free game (g1): "Join Run" opens ONE dialog, "Join this game?", that
+ *     holds the reminder picker and the same "Before you join"
+ *     acknowledgment (no separate confirmation before or after it).
+ *
+ * On each:
+ *
+ *   - the checkbox starts clear and "Agree & join" is disabled;
  *   - nothing is joined or requested (no join_requests or game_participants
  *     write) while the dialog is open, nor after Cancel;
  *   - Cancel closes it and records nothing; the next tap asks again;
  *   - ticking the checkbox and "Agree & join" records the participant_risk
- *     acknowledgment for the current version, and only then does the join
- *     request go out, landing on the pending UI.
+ *     acknowledgment for the current version, and only then does the join go
+ *     out (the join request, landing on the pending UI; or the roster insert).
  *
  * Every write is mocked (the acknowledgment, the join request, any roster
  * insert) and the game's settings are served, so the spec does not depend on
@@ -70,7 +78,7 @@ test("join waits for the Before you join acknowledgment, and Cancel joins nothin
     [];
 
   // Approval-gated game, so the CTA sends a join request straight after the
-  // acknowledgment (no "Join this run?" step in between).
+  // acknowledgment (the free-game "Join this game?" dialog is not involved).
   await page.route(
     (u) => isTable(u, "game_payment_settings"),
     async (route: PWRoute) => {
@@ -246,6 +254,255 @@ test("join waits for the Before you join acknowledgment, and Cancel joins nothin
   // The app may still be refetching the roster through the game_participants route when the test ends; closing the
   // context under it made route.fetch throw "Request context disposed" outside any test, which failed the run and kept
   // the next spec from running. Drop the routes first and ignore anything still in flight.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await ctx.close();
+});
+
+const FREE_GAME_ID = "g1";
+
+/**
+ * Opens free game g1 in a new context with the acknowledgment served as not
+ * given and every write mocked: the game's settings (free, no approval), no
+ * join request, and the roster insert captured with how many acknowledgments
+ * had been recorded when it went out.
+ */
+async function openFreeGame(browser: Browser) {
+  const userId = sessionUserId();
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+
+  const riskAck = await mockRiskNotAcknowledged(page);
+  const joinWrites: Array<{ table: string; method: string; body: unknown; acksBefore: number }> =
+    [];
+  const parse = (raw: string | null) => {
+    try {
+      return JSON.parse(raw ?? "null");
+    } catch {
+      return null;
+    }
+  };
+
+  // g1 is free and needs no approval (global-setup seeds its settings row).
+  // Serve that here too, so the spec does not depend on the seed having run.
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: FREE_GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+  // A free join must not send a request to the host.
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      if (req.method() === "GET") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+        return;
+      }
+      joinWrites.push({
+        table: "join_requests",
+        method: req.method(),
+        body: parse(req.postData()),
+        acksBefore: riskAck.writes.length,
+      });
+      await route.fulfill({ status: 201, body: "" });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "game_participants"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      if (req.method() === "GET") {
+        // Start off the roster wherever this runs (the realtime specs join g1
+        // with this account): pass the real roster through without the viewer.
+        const res = await route.fetch();
+        let rows: unknown = null;
+        try {
+          rows = await res.json();
+        } catch {
+          return route.fulfill({ response: res });
+        }
+        const notViewer = (r: unknown) => (r as { user_id?: string } | null)?.user_id !== userId;
+        const body = Array.isArray(rows) ? rows.filter(notViewer) : notViewer(rows) ? rows : null;
+        return route.fulfill({ response: res, json: body });
+      }
+      joinWrites.push({
+        table: "game_participants",
+        method: req.method(),
+        body: parse(req.postData()),
+        acksBefore: riskAck.writes.length,
+      });
+      // joinGame asks for the new row's id back (.select("id").single()).
+      await route.fulfill({
+        status: 201,
+        contentType: "application/vnd.pgrst.object+json",
+        body: JSON.stringify({ id: "mock-participant-id" }),
+      });
+    },
+  );
+
+  await restoreSession(page);
+  await page.goto(`/games/${FREE_GAME_ID}`, { waitUntil: "domcontentloaded" });
+
+  return { ctx, page, riskAck, joinWrites, userId };
+}
+
+test("free game: one Join this game? dialog holds the acknowledgment, recorded before the join", async ({
+  browser,
+}) => {
+  const { ctx, page, riskAck, joinWrites, userId } = await openFreeGame(browser);
+
+  const cta = page.getByRole("button", { name: /^join run · /i }).first();
+  const dialog = page.getByRole("dialog", { name: /join this game\?/i });
+  const checkbox = dialog.getByRole("checkbox");
+  const agree = dialog.getByRole("button", { name: /^agree & join$/i });
+
+  // 1. One dialog: the reminder picker and the acknowledgment together,
+  //    unticked, and nothing joined.
+  await expect(cta).toBeVisible({ timeout: 15_000 });
+  await cta.click();
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(dialog).toContainText(/before you join/i);
+  await expect(dialog).toContainText(/remind me before it starts/i);
+  // The draft-copy tag shows until counsel signs the acknowledgments off (src/lib/legal-review.ts).
+  if (isLegalReviewed("safetyAcknowledgments")) {
+    await expect(dialog).not.toContainText(/legal review required/i);
+  } else {
+    await expect(dialog).toContainText(/legal review required/i);
+  }
+  await expect(checkbox).toHaveAttribute("aria-checked", "false");
+  await expect(agree).toBeDisabled();
+  await page.waitForTimeout(500);
+  expect(joinWrites, "nothing may be joined while the dialog is open").toEqual([]);
+  expect(riskAck.writes, "nothing is acknowledged by opening the dialog").toEqual([]);
+
+  // 2. Cancel closes it and records nothing.
+  await dialog.getByRole("button", { name: /^cancel$/i }).click();
+  await expect(dialog).toBeHidden({ timeout: 5_000 });
+  await page.waitForTimeout(500);
+  expect(joinWrites, "Cancel must not join").toEqual([]);
+  expect(riskAck.writes, "Cancel must not record an acknowledgment").toEqual([]);
+
+  // 3. The next tap asks again, unticked.
+  await cta.click();
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await expect(checkbox).toHaveAttribute("aria-checked", "false");
+  await expect(agree).toBeDisabled();
+  expect(joinWrites).toEqual([]);
+
+  // 4. Tick and agree: the acknowledgment is recorded for the current version,
+  //    then the player is added to the roster. No second dialog opens.
+  await checkbox.click();
+  await expect(checkbox).toHaveAttribute("aria-checked", "true");
+  await expect(agree).toBeEnabled();
+  await agree.click();
+
+  await expect
+    .poll(() => riskAck.writes.length, { timeout: 10_000, message: "acknowledgment never sent" })
+    .toBe(1);
+  expect(riskAck.writes[0]).toMatchObject({
+    kind: "participant_risk",
+    version: currentSafetyAckVersion(),
+    game_id: FREE_GAME_ID,
+    user_id: userId,
+  });
+
+  await expect
+    .poll(() => joinWrites.length, { timeout: 10_000, message: "join insert never sent" })
+    .toBe(1);
+  expect(joinWrites[0]!.table).toBe("game_participants");
+  expect(joinWrites[0]!.method).toBe("POST");
+  expect(joinWrites[0]!.body).toMatchObject({ game_id: FREE_GAME_ID, user_id: userId });
+  // The join went out only once the acknowledgment had been recorded.
+  expect(joinWrites[0]!.acksBefore).toBe(1);
+
+  await expect(dialog).toBeHidden({ timeout: 5_000 });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await ctx.close();
+});
+
+test("free game: a failed acknowledgment write joins nothing and keeps the dialog open", async ({
+  browser,
+}) => {
+  const { ctx, page, riskAck, joinWrites, userId } = await openFreeGame(browser);
+
+  const cta = page.getByRole("button", { name: /^join run · /i }).first();
+  const dialog = page.getByRole("dialog", { name: /join this game\?/i });
+  const checkbox = dialog.getByRole("checkbox");
+  const agree = dialog.getByRole("button", { name: /^agree & join$/i });
+
+  await expect(cta).toBeVisible({ timeout: 15_000 });
+  await cta.click();
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+
+  // 1. The acknowledgment write fails (500): no roster insert, the dialog stays
+  //    open with the box still ticked, an error shows, and the CTA still reads Join Run.
+  riskAck.failWritesWith = 500;
+  await checkbox.click();
+  await expect(checkbox).toHaveAttribute("aria-checked", "true");
+  await agree.click();
+  await expect
+    .poll(() => riskAck.failed.length, { timeout: 10_000, message: "acknowledgment never tried" })
+    .toBe(1);
+  // A friendly error toast (its wording comes from user-error.ts for a server error).
+  await expect(page.locator('[data-sonner-toast][data-type="error"]').first()).toBeVisible({
+    timeout: 5_000,
+  });
+  await page.waitForTimeout(500);
+  expect(joinWrites, "a failed acknowledgment must not join").toEqual([]);
+  expect(riskAck.writes, "nothing was recorded").toEqual([]);
+  await expect(dialog).toBeVisible();
+  await expect(checkbox).toHaveAttribute("aria-checked", "true");
+  await expect(agree).toBeEnabled();
+  await expect(cta).toBeVisible();
+
+  // 2. Trying again once the write succeeds records it, then joins.
+  riskAck.failWritesWith = null;
+  await agree.click();
+  await expect
+    .poll(() => joinWrites.length, { timeout: 10_000, message: "join insert never sent" })
+    .toBe(1);
+  expect(riskAck.writes[0]).toMatchObject({
+    kind: "participant_risk",
+    version: currentSafetyAckVersion(),
+    game_id: FREE_GAME_ID,
+    user_id: userId,
+  });
+  expect(joinWrites[0]!.table).toBe("game_participants");
+  expect(joinWrites[0]!.acksBefore).toBe(1);
+  await expect(dialog).toBeHidden({ timeout: 5_000 });
+
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await ctx.close();
 });
