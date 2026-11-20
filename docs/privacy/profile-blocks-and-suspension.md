@@ -1,6 +1,7 @@
 # Profiles respect blocks and suspension
 
-Status: **tested on scratch databases. Not merged, not published, not applied to production.** Production needs the
+Status: **tested on scratch databases and applied to the sandbox (`qkukefvzwlyusvspablz`). Not merged, not published,
+not applied to production.** Production needs the
 owner's explicit approval and goes through the ledger-apply route with a wrong-md5 negative control first.
 
 - Migration: `supabase/migrations/20261126100000_profiles_respect_blocks_and_suspension.sql`
@@ -161,3 +162,28 @@ would pay a linear array check per row. That is acceptable at the block counts t
   - it refuses without its confirmation;
   - it then restores both rules to the exact text of the previous migration and drops both functions;
   - a second run refuses, because the rules no longer match.
+- **Full suites:** SQL 3300 passed, 0 failed (a fresh replay of 442 migrations). Unit 4832 passed, 0 failed. Typecheck
+  passes; the lint ratchet, format check and policy-test gate pass.
+- **Ledger route, rehearsed locally** on a replay of `main` `6dfd17e` (fingerprint `3b00338f`, 3446 objects, batch 8's
+  C-collation method over `docs/migration-evidence/catalog-fingerprint-cte.sql`):
+  - the file's md5 is `9c7917bd`;
+  - a copy requiring a wrong md5 raised and rolled back, leaving no ledger row and no function;
+  - the real apply gave `c21cdab4` (3448 objects), equal to a fresh full replay of this branch.
+- **Sandbox `qkukefvzwlyusvspablz`** (Postgres 17.11), 2026-11-20 about 23:15 UTC, through the Management API:
+  - **Pre:** ledger 63, latest `20261125200000`; old rules in place. The catalog equals the local pre-state `3b00338f`
+    (3446), leaving out the sandbox-only `_schema_import_requests` table as earlier records do.
+  - **Negative control:** the wrong-md5 copy was refused ("md5 mismatch"); the ledger and catalog were unchanged.
+  - **Apply:** ledger 64, ledger text md5 `9c7917bd`. The catalog is `c21cdab4` (3448), equal to the branch replay.
+  - **Fingerprints:** the rules and both functions have the md5s the rollback guard expects, so the guard holds on
+    Postgres 17. `anon` cannot execute either function; `authenticated` can execute `my_blocked_profiles`.
+  - **Smoke test,** in a transaction that always rolls back:
+    - the blocked person sees the blocker: 0 rows;
+    - an unblocked account: 1;
+    - a suspended account: 0;
+    - self: 1;
+    - the blocker sees the blocked person: 0;
+    - the blocker's list: 1.
+
+    No test users were left behind (0 rows).
+- **Not done:** a browser pass of `/players/:id` and `/player-card/:id` against the sandbox. The CI E2E suite runs
+  against the sandbox, which now has the migration.
