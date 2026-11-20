@@ -9,9 +9,9 @@ import { errorInsteadOf, failureBehind } from "./error-report";
 import {
   errorReportMiddleware,
   isReportableServerFnError,
-  reportServerFnError,
   serverFnRoute,
 } from "./error-report-middleware";
+import { reportServerFnError } from "./server-fn-report.server";
 
 const h = vi.hoisted(() => ({
   reportServerError: vi.fn(async (..._args: unknown[]) => undefined),
@@ -391,6 +391,25 @@ describe("errorReportMiddleware", () => {
     expect(h.reportServerError).toHaveBeenCalledWith(error, null, "server_fn", {
       route: "/_serverFn/doThing",
     });
+  });
+});
+
+describe("loads in the browser", () => {
+  // src/start.ts imports this file on the client too. A server-only import anywhere outside
+  // `.server()` makes TanStack's import protection reject the module in the dev server, and every
+  // page then fails to load (it broke the whole E2E suite once). Server-only code lives in
+  // server-fn-report.server.ts and is imported only inside `.server()`.
+  const source = readFileSync(join(__dirname, "error-report-middleware.ts"), "utf8");
+  it("has no server-only import", () => {
+    expect(source).not.toMatch(/["']@tanstack\/react-start\/server["']/);
+    expect(source).not.toMatch(/^import[^;]*\.server["'];?$/m);
+  });
+  it("imports the reporter only inside .server()", () => {
+    const body = source.slice(source.indexOf("export const errorReportMiddleware"));
+    expect(body).toContain('import("@/lib/server-fn-report.server")');
+    expect(source.indexOf('import("@/lib/server-fn-report.server")')).toBeGreaterThan(
+      source.indexOf(".server("),
+    );
   });
 });
 
