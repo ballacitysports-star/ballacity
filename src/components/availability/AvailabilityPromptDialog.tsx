@@ -17,9 +17,8 @@ export function AvailabilityPromptBanner({ className = "" }: { className?: strin
             you when you're free to play.
           </p>
           <Link
-            to="/players"
-            search={{ tab: "mine" }}
-            className="mt-3 inline-flex rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+            to="/availability"
+            className="mt-3 inline-flex min-h-11 items-center rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
           >
             Add my availability
           </Link>

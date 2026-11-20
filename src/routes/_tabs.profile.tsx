@@ -4,7 +4,17 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Clock, Star, Crown, Users, Clapperboard, Loader2 } from "lucide-react";
+import {
+  Settings,
+  Clock,
+  Star,
+  Crown,
+  Users,
+  Clapperboard,
+  Loader2,
+  CalendarCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { GameRecapPanel, ReelManageRow } from "@/components/GameRecapPanel";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { RECAP_COLUMNS, type RecapSummary } from "@/lib/recaps";
@@ -521,6 +531,11 @@ function PlayerProfile() {
                   className={channelPillClass()}
                 >
                   {l.label}
+                </Link>
+              ) : l.to === "/availability" ? (
+                // WP 4.1: posts, game invitations and requests on one screen; a full 44px tap target.
+                <Link key={l.to} to="/availability" className={cn(channelPillClass(), "min-h-11")}>
+                  <CalendarCheck className="h-3.5 w-3.5" aria-hidden /> {l.label}
                 </Link>
               ) : (
                 <Link key={l.to} to={l.to} className={channelPillClass()}>

@@ -76,3 +76,46 @@ describe("ViewDensityToggle full variant", () => {
     expect(row.classList.contains("flex-wrap")).toBe(true);
   });
 });
+
+describe("ViewDensityToggle sheet variant", () => {
+  function setupSheet(view: "list" | "map", density: "grid" | "list") {
+    const onViewChange = vi.fn();
+    const onDensityChange = vi.fn();
+    render(
+      <ViewDensityToggle
+        variant="sheet"
+        view={view}
+        density={density}
+        onViewChange={onViewChange}
+        onDensityChange={onDensityChange}
+      />,
+    );
+    return { onViewChange, onDensityChange };
+  }
+
+  it("offers grid, compact and map as worded 44px buttons in one labelled group", () => {
+    setupSheet("list", "list");
+    const group = screen.getByRole("group", { name: "Results layout" });
+    const buttons = Array.from(group.querySelectorAll("button"));
+    expect(buttons.map((b) => b.textContent)).toEqual(["Grid", "Compact", "Map"]);
+    for (const b of buttons) expect(b.classList.contains("min-h-11")).toBe(true);
+    expect(screen.getByRole("button", { name: "Compact" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("maps each choice onto the same view and density values", () => {
+    const first = setupSheet("map", "list");
+    expect(screen.getByRole("button", { name: "Map" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(first.onViewChange).toHaveBeenCalledWith("list");
+    expect(first.onDensityChange).toHaveBeenCalledWith("grid");
+    cleanup();
+
+    const second = setupSheet("list", "grid");
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(second.onViewChange).toHaveBeenCalledWith("map");
+    expect(second.onDensityChange).not.toHaveBeenCalled();
+  });
+});

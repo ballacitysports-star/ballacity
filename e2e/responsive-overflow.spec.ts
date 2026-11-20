@@ -55,6 +55,8 @@ const AUTHED_ROUTES = [
   "/account/blocked",
   "/account/ai-privacy",
   "/profile/edit",
+  // WP 4.1: My availability & invitations.
+  "/availability",
   "/parent",
   "/payments",
   "/reviews",
