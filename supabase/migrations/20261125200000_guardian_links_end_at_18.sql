@@ -13,12 +13,18 @@
 --      the manual-claim check all ask it), team_chat_member, notify_guardians, notify_guardians_of,
 --      guardian_children_overview. The "Linked parent reads child consent record" policy on parental_consents stops
 --      showing an adult's consent record to the guardian who held it.
+--      The guardian's child_controls switches (private_sec.guardian_switches_apply: minor cohort AND a guardian still has
+--      authority) bind only while the rule says so: ai_analysis_allowed, clamp_ai_processing_for_minors,
+--      public_xp_enabled and the control part of minor_messaging_block. The stored cohort never ages, so without this a
+--      switch left off would hold an 18-year-old that nobody can change.
 --   3. A sweep, private_sec.end_adult_guardian_links(cap): records status = 'revoked' on links already out of force
 --      (the existing triggers write the family audit row and clear that guardian's approvals on requests that are not
 --      yet a place), tells the new adult and the guardian once each in the app, and reports how many managed accounts
 --      are waiting on an owner decision (it notifies the managing guardian once per account; it never ends them).
 --      Idempotent, capped per run, touches only active links of known, unmanaged adults. Scheduled daily when pg_cron
 --      exists (production); on a database without it, run it by hand: SELECT private_sec.end_adult_guardian_links();
+--   3b. A birthday correction that makes the person a minor (or unknown) again puts the links the sweep ended back
+--      (trigger on profile_birthdays), so a minor is never left without a link by the order jobs ran in.
 --   4. public.guardian_links_in_force(children) (service role only) and public.my_guardian_link_in_force() (a signed-in
 --      user about themself): the same rule for server code and the app, so no client keeps its own copy.
 --
@@ -74,6 +80,22 @@ AS $$
   SELECT _status = 'active' AND NOT private_sec.guardian_authority_ended(_child);
 $$;
 REVOKE ALL ON FUNCTION private_sec.guardian_link_in_force(uuid, text) FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION private_sec.guardian_switches_apply(_user uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  -- Do a guardian's child_controls switches (AI analysis, messaging, public XP, notifications) bind this person? Yes for a
+  -- minor cohort, unless no guardian has authority over them any more. The stored cohort never ages (it is set when a
+  -- birthday is saved), so an 18-year-old can still carry a teen cohort: without the second test a switch the guardian
+  -- left off would keep blocking them while nobody could change it (set_child_controls refuses once the link is out of force).
+  SELECT public.age_cohort_of(_user) IN ('child_under_13', 'teen_13_15', 'teen_16_17')
+     AND NOT private_sec.guardian_authority_ended(_user);
+$$;
+REVOKE ALL ON FUNCTION private_sec.guardian_switches_apply(uuid) FROM PUBLIC, anon, authenticated;
 
 -- ============================================================ 2. the readers
 CREATE OR REPLACE FUNCTION private_sec.is_guardian_of(_parent uuid, _child uuid)
@@ -167,6 +189,118 @@ BEGIN
   RETURN false;
 END;
 $function$;
+
+CREATE OR REPLACE FUNCTION private_sec.ai_analysis_allowed(_user uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE guardian_ok boolean; own boolean;
+BEGIN
+  IF private_sec.guardian_switches_apply(_user) THEN
+    SELECT ai_analysis INTO guardian_ok FROM public.child_controls WHERE child_user_id = _user;
+    IF guardian_ok IS DISTINCT FROM true THEN RETURN false; END IF;
+  END IF;
+  SELECT ai_processing INTO own FROM public.privacy_preferences WHERE user_id = _user;
+  RETURN COALESCE(own, true);
+END $function$;
+
+CREATE OR REPLACE FUNCTION public.clamp_ai_processing_for_minors()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE guardian_ok boolean;
+BEGIN
+  IF private_sec.guardian_switches_apply(NEW.user_id) THEN
+    SELECT ai_analysis INTO guardian_ok FROM public.child_controls WHERE child_user_id = NEW.user_id;
+    IF guardian_ok IS DISTINCT FROM true THEN
+      NEW.ai_processing := false;
+      NEW.ai_training_opt_in := false;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $function$;
+
+CREATE OR REPLACE FUNCTION public.public_xp_enabled(_user uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE((SELECT c.public_xp FROM public.child_controls c WHERE c.child_user_id = _user), false)
+     AND private_sec.guardian_switches_apply(_user)
+     AND NOT public.child_features_locked(_user);
+$function$;
+
+CREATE OR REPLACE FUNCTION public.minor_messaging_block(_a uuid, _b uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE ca text; cb text; ctrl text; side text;
+BEGIN
+  ca := public.age_cohort_of(_a);
+  cb := public.age_cohort_of(_b);
+
+  -- Guardian-set controls, checked first so a restricted child is never
+  -- reachable through the shared-context fallbacks further down. They bind only while a guardian has authority:
+  -- a known adult is not held by a messaging switch left over from the link that ended.
+  IF private_sec.guardian_switches_apply(_a) THEN
+    SELECT messaging INTO ctrl FROM public.child_controls WHERE child_user_id = _a;
+    IF ctrl = 'off' THEN RETURN 'messaging_off:self'; END IF;
+    IF ctrl = 'guardian_only' AND NOT public.is_guardian_of(_b, _a) THEN
+      RETURN 'guardian_only:self';
+    END IF;
+    IF ctrl = 'teammates'
+       AND NOT public.is_guardian_of(_b, _a)
+       AND NOT public.shares_team(_a, _b) THEN RETURN 'teammates_only:self'; END IF;
+  END IF;
+  IF private_sec.guardian_switches_apply(_b) THEN
+    SELECT messaging INTO ctrl FROM public.child_controls WHERE child_user_id = _b;
+    IF ctrl = 'off' THEN RETURN 'messaging_off:other'; END IF;
+    IF ctrl = 'guardian_only' AND NOT public.is_guardian_of(_a, _b) THEN
+      RETURN 'guardian_only:other';
+    END IF;
+    IF ctrl = 'teammates'
+       AND NOT public.is_guardian_of(_a, _b)
+       AND NOT public.shares_team(_b, _a) THEN RETURN 'teammates_only:other'; END IF;
+  END IF;
+
+  -- Adult <-> under-13. The side is the child's.
+  IF (ca = 'child_under_13' AND cb = 'adult') OR (cb = 'child_under_13' AND ca = 'adult') THEN
+    side := CASE WHEN ca = 'child_under_13' THEN 'self' ELSE 'other' END;
+    IF public.is_guardian_of(CASE WHEN ca = 'child_under_13' THEN _b ELSE _a END,
+                             CASE WHEN ca = 'child_under_13' THEN _a ELSE _b END) THEN
+      RETURN NULL;
+    END IF;
+    IF public.age_policy_flag('child_adult_dm_requires_guardian_link', true) THEN
+      RETURN 'child_needs_guardian:' || side;
+    END IF;
+    IF public.shares_game_or_chat(_a, _b) THEN RETURN NULL; END IF;
+    RETURN 'child_needs_shared_game:' || side;
+  END IF;
+
+  -- Adult <-> 13-15 requires a shared game or an existing conversation. The
+  -- side is the teen's.
+  IF (ca = 'teen_13_15' AND cb = 'adult') OR (cb = 'teen_13_15' AND ca = 'adult') THEN
+    -- A guardian never needs a shared game to reach their own child.
+    IF public.is_guardian_of(CASE WHEN ca = 'teen_13_15' THEN _b ELSE _a END,
+                             CASE WHEN ca = 'teen_13_15' THEN _a ELSE _b END) THEN
+      RETURN NULL;
+    END IF;
+    IF public.age_policy_flag('teen_adult_dm_requires_shared_context', true) THEN
+      IF public.shares_game_or_chat(_a, _b) THEN RETURN NULL; END IF;
+      RETURN 'teen_needs_shared_game:' || CASE WHEN ca = 'teen_13_15' THEN 'self' ELSE 'other' END;
+    END IF;
+    RETURN NULL;
+  END IF;
+
+  RETURN NULL;
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.notify_guardians(_child uuid, _type text, _title text, _body text, _link text)
  RETURNS void
@@ -297,6 +431,7 @@ DECLARE
   _remaining  integer;
   _managed    integer;
   _name       text;
+  _first      boolean;
 BEGIN
   -- 1. Active links whose child is a known, unmanaged adult. Nothing else is selected, so nothing else can be touched.
   FOR r IN
@@ -315,12 +450,16 @@ BEGIN
       IF NOT FOUND THEN CONTINUE; END IF;
       _ended := _ended + 1;
 
+      -- The adult is told once however many guardians they had and however the runs fell (the cap, or a locked row, can
+      -- split one adult's guardians across runs): only when no link of theirs was recorded as ended before this one.
+      _first := NOT EXISTS (SELECT 1 FROM private_sec.guardian_link_age_events e
+                             WHERE e.child_user_id = r.child_user_id AND e.kind = 'ended');
       INSERT INTO private_sec.guardian_link_age_events (child_user_id, parent_user_id, kind)
       VALUES (r.child_user_id, r.parent_user_id, 'ended')
       ON CONFLICT DO NOTHING;
       GET DIAGNOSTICS _inserted = ROW_COUNT;
 
-      -- Told once each. The adult gets one notice however many guardians were linked (the first link of this run).
+      -- The guardian is told once per child.
       IF _inserted = 1 THEN
         SELECT COALESCE(NULLIF(btrim(p.display_name), ''), 'Your family member') INTO _name
           FROM (SELECT 1) s LEFT JOIN public.profiles p ON p.id = r.child_user_id;
@@ -328,9 +467,7 @@ BEGIN
         VALUES (r.parent_user_id, 'guardian_link', 'Family link ended',
                 _name || ' is 18 or over, so your family link with them has ended. They no longer appear in your Parent Center.',
                 '/parent');
-        IF NOT EXISTS (SELECT 1 FROM private_sec.guardian_link_age_events e
-                        WHERE e.child_user_id = r.child_user_id AND e.kind = 'ended'
-                          AND e.parent_user_id <> r.parent_user_id AND e.created_at = now()) THEN
+        IF _first THEN
           INSERT INTO public.notifications (user_id, type, title, body, link)
           VALUES (r.child_user_id, 'guardian_link', 'Your family link has ended',
                   'You are 18 or over, so the link to your parent or guardian has ended. They can no longer see or change your account settings.',
@@ -417,6 +554,20 @@ GRANT EXECUTE ON FUNCTION public.guardian_links_in_force(uuid[]) TO service_role
 COMMENT ON FUNCTION public.guardian_links_in_force(uuid[]) IS
   'Server code only: the guardian links in force for these children (active, and the child not a known adult unless managed).';
 
+CREATE OR REPLACE FUNCTION public.guardian_authority_has_ended(_user uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT private_sec.guardian_authority_ended(_user);
+$$;
+REVOKE ALL ON FUNCTION public.guardian_authority_has_ended(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.guardian_authority_has_ended(uuid) TO service_role;
+COMMENT ON FUNCTION public.guardian_authority_has_ended(uuid) IS
+  'Server code only: true for a known adult who is not a managed account (no guardian has authority over them), so the stored teen cohort and the guardian''s child_controls switches no longer apply (push curfew).';
+
 CREATE OR REPLACE FUNCTION public.my_guardian_link_in_force()
 RETURNS boolean
 LANGUAGE sql
@@ -433,3 +584,62 @@ REVOKE ALL ON FUNCTION public.my_guardian_link_in_force() FROM PUBLIC, anon, ser
 GRANT EXECUTE ON FUNCTION public.my_guardian_link_in_force() TO authenticated;
 COMMENT ON FUNCTION public.my_guardian_link_in_force() IS
   'Whether the signed-in user has a guardian link in force (a minor with a linked guardian, or a managed account). Answers only about the caller.';
+
+-- ============================================================ 5. a corrected birthday puts the links back
+-- The sweep's end is a recorded status, so it is not undone by the rule the way an un-swept link is. A support-approved
+-- birthday correction (review_birthday_correction writes profile_birthdays under openrun.birthday_review) can make a
+-- user a minor again. Without this trigger that user would be left with no guardian link: no payment gate, approval,
+-- participation switch, messaging switch or Parent Center, whereas before the sweep the rule alone would have brought
+-- the link back. So the answer must not depend on whether the daily job ran first: when a birthday change leaves the
+-- person not a known adult, the links the sweep ended for them (recorded in guardian_link_age_events) go back to active.
+-- Fail closed: an unknown birthday also restores them. Only links the sweep recorded are touched, never one a guardian
+-- ended by hand. Both sides are told. The events are cleared so a later 18th birthday ends and tells again.
+CREATE OR REPLACE FUNCTION private_sec.restore_links_on_birthday_correction()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  r      record;
+  _n     integer := 0;
+  _name  text;
+BEGIN
+  IF NEW.birthday IS NOT DISTINCT FROM OLD.birthday THEN RETURN NULL; END IF;
+  IF private_sec.is_known_adult(NEW.user_id) THEN RETURN NULL; END IF;
+
+  SELECT COALESCE(NULLIF(btrim(p.display_name), ''), 'Your family member') INTO _name
+    FROM (SELECT 1) s LEFT JOIN public.profiles p ON p.id = NEW.user_id;
+
+  FOR r IN
+    UPDATE public.guardian_links gl SET status = 'active'
+      FROM private_sec.guardian_link_age_events e
+     WHERE e.kind = 'ended' AND e.child_user_id = NEW.user_id
+       AND gl.child_user_id = e.child_user_id AND gl.parent_user_id = e.parent_user_id
+       AND gl.status = 'revoked'
+    RETURNING gl.parent_user_id
+  LOOP
+    _n := _n + 1;
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (r.parent_user_id, 'guardian_link', 'Family link restored',
+            _name || '''s date of birth on file was corrected, so your family link with them is back.',
+            '/parent');
+  END LOOP;
+
+  DELETE FROM private_sec.guardian_link_age_events WHERE child_user_id = NEW.user_id;
+
+  IF _n > 0 THEN
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (NEW.user_id, 'guardian_link', 'Your family link is back',
+            'Your date of birth on file was corrected, so the link to your parent or guardian is back.',
+            '/settings');
+  END IF;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.restore_links_on_birthday_correction() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_birthday_correction_restores_links ON public.profile_birthdays;
+CREATE TRIGGER trg_birthday_correction_restores_links
+  AFTER UPDATE OF birthday ON public.profile_birthdays
+  FOR EACH ROW WHEN (OLD.birthday IS DISTINCT FROM NEW.birthday)
+  EXECUTE FUNCTION private_sec.restore_links_on_birthday_correction();

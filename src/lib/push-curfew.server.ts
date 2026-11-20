@@ -14,6 +14,7 @@ import {
   DEFAULT_AGE_POLICY,
   notificationCurfewDecision,
   parseAgePolicy,
+  isMinorCohort,
   parseChildControls,
   parseCohort,
   type AgePolicyConfig,
@@ -28,7 +29,30 @@ export type CurfewGate =
 
 type Admin = {
   from: (table: string) => any;
+  /** Optional: a stub without it reads as "authority has not ended" (the stored cohort and switches apply). */
+  rpc?: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: unknown }>;
 };
+
+/**
+ * A known adult no guardian has authority over (owner decision 2026-11-20: a guardian link ends when the child turns
+ * 18; managed accounts are the exception). The stored cohort never ages, so such a person can still read as a teen:
+ * the guardian's notification switch and the night curfew must not hold them.
+ *
+ * Any doubt (the function is missing because the app is ahead of the migration, or the call fails) answers false, which
+ * keeps the stored cohort and the guardian's switch in charge: it can only be stricter, never open a minor's curfew.
+ */
+async function guardianAuthorityEnded(admin: Admin, userId: string): Promise<boolean> {
+  if (typeof admin.rpc !== "function") return false;
+  try {
+    const res = await admin.rpc("guardian_authority_has_ended", { _user: userId });
+    return !res?.error && res?.data === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The active age policy, or the default when none is stored. Throws when the lookup fails: a
@@ -78,9 +102,14 @@ export async function curfewGateFor(
     );
   }
 
-  const cohort = parseCohort((profileRes?.data as any)?.age_cohort);
+  let cohort = parseCohort((profileRes?.data as any)?.age_cohort);
   const timezone = ((profileRes?.data as any)?.timezone as string | null) ?? null;
-  const controlsRow = (controlsRes?.data as Record<string, unknown> | null) ?? null;
+  let controlsRow = (controlsRes?.data as Record<string, unknown> | null) ?? null;
+  // Only a minor cohort can be stale, so adults never pay for the extra lookup.
+  if (isMinorCohort(cohort) && (await guardianAuthorityEnded(admin, userId))) {
+    cohort = "adult";
+    controlsRow = null;
+  }
   const controls = controlsRow ? parseChildControls(controlsRow) : null;
 
   const decision = notificationCurfewDecision({

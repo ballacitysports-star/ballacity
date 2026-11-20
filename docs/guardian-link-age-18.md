@@ -4,12 +4,13 @@ Owner decision 2026-11-20: "Guardian link end after 18." A guardian link ends wh
 
 This is a guardian-safety rule change. It fails closed (an unknown birthday keeps the link), loses no data (nothing is
 deleted; the sweep only sets `status = 'revoked'` and the consent record is kept), is tested (SQL test 965, negative
-controls, unit tests) and is reversible up to the links the sweep already ended (rollback below).
+controls, unit tests) and is reversible up to the links the sweep already ended (rollback below). A birthday correction
+that makes the person a minor again puts the swept links back (section 2, "A corrected birthday").
 
 | Piece              | Where                                                                                                                  |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
 | Migration          | `supabase/migrations/20261125200000_guardian_links_end_at_18.sql`                                                      |
-| SQL test           | `supabase/tests/965_guardian_links_end_at_18.test.sql` (153 assertions); 955 and 761 updated                           |
+| SQL test           | `supabase/tests/965_guardian_links_end_at_18.test.sql` (209 assertions); 955 and 761 updated                           |
 | Rollback           | `docs/rollbacks/20261125200000_guardian_links_end_at_18.down.sql` (guarded; rehearsed)                                 |
 | Server rule (TS)   | `src/lib/guardian-links-in-force.server.ts`; client: `src/lib/guardian-link-in-force.ts`                               |
 | Read-only preview  | `docs/guardian-link-age-18-preview.sql` (counts only; the owner runs it against production before approving any apply) |
@@ -56,6 +57,9 @@ Readers that query `guardian_links` directly, and what they do now (all use the 
 | `guardian_payment_approval_missing`                                            | any active link blocks a payment without approval        | no link in force, so nothing is missing: the trigger, PayPal and the manual-claim check all say yes |
 | `child_game_participation_allowed`                                             | a minor's switch, or an under-13 cohort                  | an adult with no guardian authority is always allowed (a stale cohort cannot hold them)             |
 | `team_chat_member`                                                             | a teen-cohort member needs a link and a messaging switch | a known adult is a member like any adult                                                            |
+| `ai_analysis_allowed`, `clamp_ai_processing_for_minors`                        | a minor cohort needs the guardian's `ai_analysis` on     | the guardian's switch binds only while `guardian_switches_apply` (minor cohort and a guardian still has authority); the adult's own privacy setting decides |
+| `minor_messaging_block` (the controls part)                                    | a minor cohort is held by the guardian's `messaging`     | same: the switch binds only while `guardian_switches_apply`                                         |
+| `public_xp_enabled`                                                            | a minor cohort with the guardian's `public_xp` opt-in    | same: an adult's card follows the adult rules, not a guardian's opt-in                              |
 | `notify_guardians`, `notify_guardians_of`                                      | every active link                                        | links in force only (the managing guardian of a managed account is still told)                      |
 | `guardian_children_overview` (Parent Center, guardian activity, team contacts) | every active link                                        | links in force only: the child leaves the guardian's list that day                                  |
 | `enforce_child_game_participation`, `team_respond_invite`                      | only for `is_minor`                                      | unchanged: a known adult is not `is_minor`, so these already did not apply                          |
@@ -94,11 +98,12 @@ minor's protections on and only means an adult's link is not yet treated as ende
 | The guardian's approvals on join requests that are not yet a place | cleared by the existing trigger on `guardian_links` when the status changes (`clear_stale_guardian_approvals`); before the sweep they are unused (no gate asks an adult)                                                                                                               |
 | A place already taken on a roster                                  | untouched                                                                                                                                                                                                                                                                              |
 | Pending team invites a guardian approved                           | an adult is not `is_minor`, so `team_respond_invite` never asked; unchanged                                                                                                                                                                                                            |
-| `child_controls` rows (the consent switches)                       | left as they are. They no longer apply: `child_game_participation_allowed` returns true for an adult with no guardian authority, `team_chat_member` ignores the messaging switch for one, and the guardian can no longer change them (`set_child_controls` refuses). Nothing is stuck. |
+| `child_controls` rows (the consent switches)                       | left as they are, and **every reader of them** now ignores them for a known adult with no guardian authority: game participation, team chat, AI analysis (and the AI clamp on their own privacy settings), messaging controls, public XP, and the push notification switch and night curfew (`push-curfew.server.ts` asks `guardian_authority_has_ended`). The guardian can no longer change them (`set_child_controls` refuses), so none of them can hold the adult. SQL test 965 checks each one for the adult and for a 16-year-old and a managed adult (who stay held). The remaining stale-cohort rules are in "Finding: the stored age cohort never ages". |
 | `parental_consents` record                                         | **kept as history, deliberately not revoked** (see "Decision: consent records"). The guardian's read of it ends.                                                                                                                                                                       |
 | Notifications                                                      | the new adult gets one notice ("Your family link has ended"), each guardian gets one per child ("Family link ended"). Wording is neutral, makes no legal claim and does not say anything was withdrawn. The existing "Approval was withdrawn" notice is never triggered.               |
 | Audit                                                              | the existing trigger writes `link.revoked` to `family_audit_log`; the sweep also records the link in `private_sec.guardian_link_age_events`                                                                                                                                            |
 | A guardian's read access to the adult's data                       | none remains reachable (SQL test 965 checks controls, join requests, family log, consent record, Parent Center list, and that every guardian action refuses)                                                                                                                           |
+| Things a guardian authorized for the child (public profile, family posts and clips, public XP) | they ride on `is_guardian_of(authorizer, child)` (`guardian_public_profile`, `family_post_viewer_access`, `guard_family_post`), so they stop being served at 18: a guardian-authorized public profile or family post of an adult goes back to the adult's own settings. A privacy gain; the adult can set their own. |
 | Data the adult shared with the guardian themself                   | not covered: out of scope                                                                                                                                                                                                                                                              |
 
 ## 2. Design
@@ -116,9 +121,26 @@ minor's protections on and only means an adult's link is not yet treated as ende
    `SELECT private_sec.end_adult_guardian_links();` returns counts only
    (`ended, notified, failed, remaining, managed_waiting`). Idempotent; capped per run (1 to 1000); one failing link is
    skipped with a warning and retried next run; selects only the rows above, so it can never touch a minor, an unknown
-   age or a managed account.
+   age or a managed account. The new adult is told once however many guardians they had and however the runs fell: only
+   when no link of theirs is recorded as ended before (the cap or a locked row can split one adult's guardians across
+   runs, days apart); each guardian is told once per child.
 4. `public.guardian_links_in_force(children[])` (service role) and `public.my_guardian_link_in_force()` (signed-in user,
    about themself) give server code and the app the same rule, so no client keeps a copy.
+
+### A corrected birthday (the sweep's end is a status, the rule is a date)
+
+`review_birthday_correction` (support-approved) can rewrite `profile_birthdays` (the immutability guard lets it through,
+under `openrun.birthday_review`). The un-swept link would come back by itself under the rule, but a swept link is
+`revoked` and would stay so: a person corrected to 16 would be left without a guardian link, so without the payment
+gate, approvals, participation and messaging switches, or the Parent Center, depending on whether the daily job had run
+first. So a trigger on `profile_birthdays` (`trg_birthday_correction_restores_links`) does the reverse: when a birthday
+changes and the person is no longer a known adult (younger, or unknown), the links the sweep recorded as ended for them
+(`guardian_link_age_events`, kind `ended`) go back to `active` (the existing triggers write the audit row), both sides are
+told once, and the record is cleared so a later 18th birthday ends and tells again. Only links the sweep ended are
+touched, never one a guardian ended by hand. Approvals the sweep cleared are not reinstated: the person needs a fresh
+approval like any minor with a guardian. Test 965 section 8 covers: still an adult (nothing), corrected to 16, two
+guardians, hand-ended link, turning 18 again. If the owner prefers that a support person decide, drop the trigger and
+read the events list by hand.
 
 Unknown birthday: the link stays (fail closed). The age uses the database clock's date (`age()` uses `current_date`, UTC
 on Supabase), as `is_minor` does: an 18th birthday begins at 00:00 UTC, which is the evening before for the US.
@@ -148,9 +170,20 @@ never again; no job moves them. Anything that reads `age_cohort_of` (reel audien
 privacy floors, the Parent Center card's cohort label) keeps treating an 18-year-old as a teen until a person
 changes it. `is_minor` and the pay rule read the live birthday and are right. This change deliberately reads the live
 birthday and does not touch the cohort, because moving it changes what is public about a person (reels, profile
-visibility). It is a separate owner decision and probably needs its own review. The two places where it would have
-stranded an adult after the link ended are handled in the migration: `child_game_participation_allowed` and
-`team_chat_member` treat "known adult, no guardian authority" as adult.
+visibility). It is a separate owner decision and probably needs its own review. Every place where a guardian's
+switch (`child_controls`) was keyed on the stored cohort would have held an 18-year-old whom nobody can change, so each
+now asks `private_sec.guardian_switches_apply(user)` = minor cohort AND NOT `guardian_authority_ended`:
+`child_game_participation_allowed`, `team_chat_member`, `ai_analysis_allowed`, `clamp_ai_processing_for_minors`,
+`public_xp_enabled`, `minor_messaging_block` (controls) and the push curfew (TypeScript, via `guardian_authority_has_ended`;
+any doubt keeps the stored cohort, so it can only be stricter, never open a minor's curfew).
+
+What the stale cohort still does, and this change deliberately leaves (these are cohort policy, not a guardian's switch;
+nobody's switch is involved and the guardian's authority is not what holds the person): the minor privacy floor on
+`privacy_preferences` (`enforce_minor_privacy_floor`), the AI cohort allowance in `gate.server.ts` (`cohortAllowed`), the
+"teen to adult needs a shared game" rule in `minor_messaging_block` for a stale 13-15 cohort, reel audience and
+`platform_status`. They hold a person whose birthday is old enough until the cohort is moved. **OWNER DECISION**: whether
+and when to age the stored cohort (a person-visible change: reels, profile visibility). Until then they behave exactly as
+they did for an 18-year-old before this change; a guardian link ending neither causes nor worsens them.
 
 ## 3. Managed accounts: owner decision needed (not built)
 
@@ -207,7 +240,7 @@ with an unknown birthday, under-18 links turning 18 within 30 days, and three si
 Ledger route rehearsed locally (a throwaway database replayed to the previous migration): the ledger row inserted with
 the file text, md5 checked, `EXECUTE`d in one transaction; a copy with the wrong md5 rolled back with nothing left (no
 ledger row, no function, no table); a second run of the same file stopped on the ledger key; the objects were identical
-to the plain replay (function fingerprints) and test 965 passed (153) against the ledger-applied database.
+to the plain replay (function fingerprints) and test 965 passed (209) against the ledger-applied database.
 
 After applying on a database with pg_cron the job `end-adult-guardian-links` exists; elsewhere run the sweep by hand.
 The first run ends every link that already qualified (the preview's `would_end`), up to 200; run it again until
@@ -217,14 +250,17 @@ The first run ends every link that already qualified (the preview's `would_end`)
 
 `docs/rollbacks/20261125200000_guardian_links_end_at_18.down.sql`: refuses without
 `SET app.confirm_guardian_links_end_at_18_rollback = 'yes'`, refuses if any function the migration touched changed
-since (md5 of each), puts the seven readers and the consent policy back as they were, unschedules the job and drops the
-new functions. **It cannot un-revoke links the sweep already ended**; it keeps `private_sec.guardian_link_age_events`
-so the list survives, and its header has the one statement to restore them if the owner decides to.
+since (md5 of each), puts the eleven readers and the consent policy back as they were, drops the birthday-correction trigger, unschedules the
+job and drops the new functions. **It cannot un-revoke links the sweep already ended**; it keeps `private_sec.guardian_link_age_events`
+so the list survives, and its header has the one statement to restore them if the owner decides to. With the trigger
+gone, a birthday correction after the rollback no longer restores a swept link: the header says to check approved
+corrections by hand. Rehearsed: no confirmation refuses; a changed function refuses; the real run leaves every function,
+policy and trigger identical to a replay without the migration (fingerprints); a second run refuses.
 
 ## 8. Not done
 
 - The managed-account handover (owner decision above).
-- Moving the stored age cohort (separate decision, finding above).
+- Moving the stored age cohort (separate decision, finding above), and with it the cohort-policy rules that still treat a stale teen cohort as a teen (privacy floor, AI cohort allowance, teen-to-adult DM context rule). No guardian switch is among them.
 - Revoking consent records (decision above).
 - Backfilling Parent Center copy for an individual ended link (the guardian is told by the in-app notice; the list simply
   no longer shows the child).

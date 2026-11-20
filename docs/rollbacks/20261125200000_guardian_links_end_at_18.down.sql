@@ -1,8 +1,9 @@
 -- ROLLBACK for supabase/migrations/20261125200000_guardian_links_end_at_18.sql (owner decision 2026-11-20: a guardian
 -- link ends when the child turns 18; docs/guardian-link-age-18.md).
--- NOT a migration. It puts back the seven readers exactly as they were before (guardian links count while status is
--- 'active', whatever the child's age), puts back the consent-record policy, unschedules the daily sweep and drops the
--- functions the migration added.
+-- NOT a migration. It puts back the eleven readers exactly as they were before (guardian links count while status is
+-- 'active', whatever the child's age; the guardian's child_controls switches bind by the stored cohort alone), puts back
+-- the consent-record policy, drops the birthday-correction trigger, unschedules the daily sweep and drops the functions
+-- the migration added.
 --
 -- WHAT IT CANNOT UNDO: a link the sweep already ended (status 'revoked'). The old rule would not bring it back by
 -- itself, so an 18-year-old whose link was ended stays unlinked after this rollback. private_sec.guardian_link_age_events
@@ -15,10 +16,15 @@
 --        AND gl.status = 'revoked';
 -- (the existing triggers write the audit rows). Notifications the sweep sent stay where they are. Drop the table by
 -- hand (DROP TABLE private_sec.guardian_link_age_events) once nobody needs the list.
--- Effect on the app that shipped with the migration: public.my_guardian_link_in_force and public.guardian_links_in_force
--- disappear; the app falls back to reading guardian_links directly (the old behaviour) when they are missing, so
--- nothing fails, but a guardian again sees and acts for an adult whose link is still 'active'. Roll the app back
--- too if that is not wanted.
+-- Also gone with the rollback: the trigger that put swept links back when a support-approved birthday correction made a
+-- person a minor again. After the rollback a link the sweep ended stays ended whatever a correction says, so if the
+-- rollback is kept for long, check birthday corrections (public.birthday_correction_requests approved since) by hand and
+-- restore the link of anyone who became a minor with the statement above.
+-- Effect on the app that shipped with the migration: public.my_guardian_link_in_force, public.guardian_links_in_force and
+-- public.guardian_authority_has_ended disappear. The app falls back to reading guardian_links directly (the old
+-- behaviour) and the push curfew keeps the stored cohort and the guardian's switch when they are missing, so nothing
+-- fails, but a guardian again sees and acts for an adult whose link is still 'active'. Roll the app back too if that is
+-- not wanted.
 -- It stops, changing nothing, if any function the migration touched no longer has the definition the migration gave it
 -- (a later migration changed it): a person needs to look first.
 -- It refuses to run unless the session sets the confirmation first:
@@ -35,11 +41,18 @@ DECLARE
     "public.notify_guardians(uuid, text, text, text, text)": "31c483efac1a97c83f04af75423fc3a3",
     "public.notify_guardians_of(uuid, text, text, text, text)": "2e8ece03cc63a51b4799cf9cf7e36e21",
     "public.guardian_children_overview()": "45fa65eae905e1728a9955daf156136f",
+    "private_sec.ai_analysis_allowed(uuid)": "2ab131c25a00dd9219a6d723b42d63f4",
+    "public.clamp_ai_processing_for_minors()": "3d2064e38080f8b0048388f3cac38ac0",
+    "public.public_xp_enabled(uuid)": "e5c1e67934b0190ec1e0f9022221bb9b",
+    "public.minor_messaging_block(uuid, uuid)": "08fe60a501574895244e469c440b5e47",
     "private_sec.is_known_adult(uuid)": "d4470d29cf1fb2ce9d2331e73763d3e9",
     "private_sec.guardian_authority_ended(uuid)": "27b3184a69a735961376b7decebb6cce",
     "private_sec.guardian_link_in_force(uuid, text)": "da0f62698259be928a7e06a8232b4795",
-    "private_sec.end_adult_guardian_links(integer)": "3d787620f672cd949e6697e0617f295d",
+    "private_sec.guardian_switches_apply(uuid)": "8062e06227feddaa7461fb1e4a2ca05e",
+    "private_sec.end_adult_guardian_links(integer)": "70a31fe4cdd5914cd419528c9cfa4496",
+    "private_sec.restore_links_on_birthday_correction()": "46e34085e690ddd0931ec037e5647c16",
     "public.guardian_links_in_force(uuid[])": "9299a26b722da2e8f33de0b0f35e1768",
+    "public.guardian_authority_has_ended(uuid)": "18e7398aea94368f72e9e5b92a01ac94",
     "public.my_guardian_link_in_force()": "eb4405359475f050558c4103662081fe"
   }'::jsonb;
   _k text;
@@ -70,13 +83,17 @@ EXCEPTION WHEN others THEN
 END
 $cron$;
 
+-- The birthday-correction trigger and its function.
+DROP TRIGGER IF EXISTS trg_birthday_correction_restores_links ON public.profile_birthdays;
+DROP FUNCTION private_sec.restore_links_on_birthday_correction();
+
 -- The consent-record policy as it was.
 DROP POLICY "Linked parent reads child consent record" ON public.parental_consents;
 CREATE POLICY "Linked parent reads child consent record" ON public.parental_consents
   FOR SELECT TO authenticated
   USING (parent_user_id = auth.uid());
 
--- The seven readers as they were.
+-- The eleven readers as they were.
 CREATE OR REPLACE FUNCTION private_sec.is_guardian_of(_parent uuid, _child uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -253,10 +270,129 @@ AS $function$
   ORDER BY coalesce(p.display_name, 'Child account');
 $function$;
 
+CREATE OR REPLACE FUNCTION private_sec.ai_analysis_allowed(_user uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE cohort text; guardian_ok boolean; own boolean;
+BEGIN
+  cohort := public.age_cohort_of(_user);
+  IF cohort IN ('child_under_13','teen_13_15','teen_16_17') THEN
+    SELECT ai_analysis INTO guardian_ok FROM public.child_controls WHERE child_user_id = _user;
+    IF guardian_ok IS DISTINCT FROM true THEN RETURN false; END IF;
+  END IF;
+  SELECT ai_processing INTO own FROM public.privacy_preferences WHERE user_id = _user;
+  RETURN COALESCE(own, true);
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.clamp_ai_processing_for_minors()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE cohort text; guardian_ok boolean;
+BEGIN
+  cohort := public.age_cohort_of(NEW.user_id);
+  IF cohort IN ('child_under_13','teen_13_15','teen_16_17') THEN
+    SELECT ai_analysis INTO guardian_ok FROM public.child_controls WHERE child_user_id = NEW.user_id;
+    IF guardian_ok IS DISTINCT FROM true THEN
+      NEW.ai_processing := false;
+      NEW.ai_training_opt_in := false;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.public_xp_enabled(_user uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE((SELECT c.public_xp FROM public.child_controls c WHERE c.child_user_id = _user), false)
+     AND public.age_cohort_of(_user) IN ('child_under_13', 'teen_13_15', 'teen_16_17')
+     AND NOT public.child_features_locked(_user);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.minor_messaging_block(_a uuid, _b uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE ca text; cb text; ctrl text; side text;
+BEGIN
+  ca := public.age_cohort_of(_a);
+  cb := public.age_cohort_of(_b);
+
+  -- Guardian-set controls, checked first so a restricted child is never
+  -- reachable through the shared-context fallbacks further down.
+  IF ca IN ('child_under_13','teen_13_15','teen_16_17') THEN
+    SELECT messaging INTO ctrl FROM public.child_controls WHERE child_user_id = _a;
+    IF ctrl = 'off' THEN RETURN 'messaging_off:self'; END IF;
+    IF ctrl = 'guardian_only' AND NOT public.is_guardian_of(_b, _a) THEN
+      RETURN 'guardian_only:self';
+    END IF;
+    IF ctrl = 'teammates'
+       AND NOT public.is_guardian_of(_b, _a)
+       AND NOT public.shares_team(_a, _b) THEN RETURN 'teammates_only:self'; END IF;
+  END IF;
+  IF cb IN ('child_under_13','teen_13_15','teen_16_17') THEN
+    SELECT messaging INTO ctrl FROM public.child_controls WHERE child_user_id = _b;
+    IF ctrl = 'off' THEN RETURN 'messaging_off:other'; END IF;
+    IF ctrl = 'guardian_only' AND NOT public.is_guardian_of(_a, _b) THEN
+      RETURN 'guardian_only:other';
+    END IF;
+    IF ctrl = 'teammates'
+       AND NOT public.is_guardian_of(_a, _b)
+       AND NOT public.shares_team(_b, _a) THEN RETURN 'teammates_only:other'; END IF;
+  END IF;
+
+  -- Adult <-> under-13. The side is the child's.
+  IF (ca = 'child_under_13' AND cb = 'adult') OR (cb = 'child_under_13' AND ca = 'adult') THEN
+    side := CASE WHEN ca = 'child_under_13' THEN 'self' ELSE 'other' END;
+    IF public.is_guardian_of(CASE WHEN ca = 'child_under_13' THEN _b ELSE _a END,
+                             CASE WHEN ca = 'child_under_13' THEN _a ELSE _b END) THEN
+      RETURN NULL;
+    END IF;
+    IF public.age_policy_flag('child_adult_dm_requires_guardian_link', true) THEN
+      RETURN 'child_needs_guardian:' || side;
+    END IF;
+    IF public.shares_game_or_chat(_a, _b) THEN RETURN NULL; END IF;
+    RETURN 'child_needs_shared_game:' || side;
+  END IF;
+
+  -- Adult <-> 13-15 requires a shared game or an existing conversation. The
+  -- side is the teen's.
+  IF (ca = 'teen_13_15' AND cb = 'adult') OR (cb = 'teen_13_15' AND ca = 'adult') THEN
+    -- A guardian never needs a shared game to reach their own child.
+    IF public.is_guardian_of(CASE WHEN ca = 'teen_13_15' THEN _b ELSE _a END,
+                             CASE WHEN ca = 'teen_13_15' THEN _a ELSE _b END) THEN
+      RETURN NULL;
+    END IF;
+    IF public.age_policy_flag('teen_adult_dm_requires_shared_context', true) THEN
+      IF public.shares_game_or_chat(_a, _b) THEN RETURN NULL; END IF;
+      RETURN 'teen_needs_shared_game:' || CASE WHEN ca = 'teen_13_15' THEN 'self' ELSE 'other' END;
+    END IF;
+    RETURN NULL;
+  END IF;
+
+  RETURN NULL;
+END $function$
+;
+
 -- What the migration added (the table private_sec.guardian_link_age_events stays: see the header).
 DROP FUNCTION public.guardian_links_in_force(uuid[]);
 DROP FUNCTION public.my_guardian_link_in_force();
+DROP FUNCTION public.guardian_authority_has_ended(uuid);
 DROP FUNCTION private_sec.end_adult_guardian_links(integer);
+DROP FUNCTION private_sec.guardian_switches_apply(uuid);
 DROP FUNCTION private_sec.guardian_link_in_force(uuid, text);
 DROP FUNCTION private_sec.guardian_authority_ended(uuid);
 DROP FUNCTION private_sec.is_known_adult(uuid);

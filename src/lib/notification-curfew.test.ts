@@ -238,6 +238,9 @@ function fakeAdmin(rows: {
   throwOn?: string;
   /** This table's read answers with an error, as supabase-js does (it does not throw). */
   errorOn?: string;
+  /** What guardian_authority_has_ended answers: true/false, "error" (an error result) or "throw". Absent: no rpc at all. */
+  authorityEnded?: boolean | "error" | "throw";
+  rpcCalls?: string[];
 }) {
   const table = (name: string) => {
     if (rows.throwOn === name) {
@@ -259,7 +262,17 @@ function fakeAdmin(rows: {
     };
     return builder;
   };
-  return { from: table };
+  if (rows.authorityEnded === undefined) return { from: table };
+  return {
+    from: table,
+    rpc: async (fn: string) => {
+      rows.rpcCalls?.push(fn);
+      if (rows.authorityEnded === "throw") throw new Error("boom: rpc");
+      if (rows.authorityEnded === "error")
+        return { data: null, error: { message: "rpc unavailable" } };
+      return { data: rows.authorityEnded, error: null };
+    },
+  };
 }
 
 describe("loadAgePolicy", () => {
@@ -359,6 +372,61 @@ describe("curfewGateFor", () => {
   it("treats a missing profile as unknown age and still sends", async () => {
     const gate = await curfewGateFor(fakeAdmin({}), "u7", night);
     expect(gate).toEqual({ action: "send" });
+  });
+
+  describe("a guardian link ends at 18: the stored teen cohort of a known adult no longer holds them", () => {
+    const staleTeen = {
+      profile: { age_cohort: "teen_16_17", timezone: "America/New_York" },
+      controls: { notifications: false },
+    };
+
+    it("sends at night and ignores the old notifications-off switch once no guardian has authority", async () => {
+      const rpcCalls: string[] = [];
+      const gate = await curfewGateFor(
+        fakeAdmin({ ...staleTeen, authorityEnded: true, rpcCalls }),
+        "u20",
+        night,
+      );
+      expect(gate).toEqual({ action: "send" });
+      expect(rpcCalls).toEqual(["guardian_authority_has_ended"]);
+    });
+
+    it("a minor whose guardian still has authority keeps the switch", async () => {
+      const gate = await curfewGateFor(
+        fakeAdmin({ ...staleTeen, authorityEnded: false }),
+        "u21",
+        night,
+      );
+      expect(gate).toEqual({ action: "blocked", reason: "guardian_notifications_off" });
+    });
+
+    it.each(["error", "throw"] as const)(
+      "any doubt (%s) keeps the stored cohort and the switch: stricter, never opens a minor",
+      async (authorityEnded) => {
+        const gate = await curfewGateFor(fakeAdmin({ ...staleTeen, authorityEnded }), "u22", night);
+        expect(gate).toEqual({ action: "blocked", reason: "guardian_notifications_off" });
+        const queued = await curfewGateFor(
+          fakeAdmin({ profile: staleTeen.profile, authorityEnded }),
+          "u23",
+          night,
+        );
+        expect(queued.action).toBe("queue");
+      },
+    );
+
+    it("does not look up an adult cohort at all", async () => {
+      const rpcCalls: string[] = [];
+      await curfewGateFor(
+        fakeAdmin({
+          profile: { age_cohort: "adult", timezone: "UTC" },
+          authorityEnded: true,
+          rpcCalls,
+        }),
+        "u24",
+        night,
+      );
+      expect(rpcCalls).toEqual([]);
+    });
   });
 
   describe("fails closed: a lookup that fails is never read as 'adult' or 'no controls'", () => {

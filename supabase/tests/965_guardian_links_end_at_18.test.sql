@@ -6,7 +6,9 @@
 --
 -- People: teen (16, guarded), dayb (17 years 364 days: the day before 18), turned (18 today), older (25), twoga (20, two
 -- guardians), nobday (no birthday), mgd (20, a managed account), stale (19 with a cohort that never aged: under 13, the
--- game switch left off), staleteen (19, cohort teen_16_17, messaging off). ga and gb are the guardians.
+-- game switch left off), staleteen (19, cohort teen_16_17, every guardian switch left restrictive), hand (19, a link a
+-- guardian ended by hand), splita (21, two guardians, for the capped sweep). ga and gb are the guardians. The managed
+-- adult mgd also carries a stale teen cohort, so the guardian's switches must still bind it (the guardian is its only way in).
 BEGIN;
 
 SELECT t.person('host', 40), t.person('ga', 41), t.person('gb', 42), t.person('teen', 16), t.person('older', 25),
@@ -33,6 +35,10 @@ SELECT t.guardian('ga', 'teen'), t.guardian('ga', 'dayb'), t.guardian('ga', 'tur
 INSERT INTO public.managed_accounts (child_user_id, managed_by) VALUES (t.id('mgd'), t.id('ga'));
 UPDATE public.child_controls SET game_participation = false WHERE child_user_id = t.id('stale');
 UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('staleteen');
+-- Every other guardian switch, left restrictive, for the stale-cohort adult, the managed adult and a real 16-year-old.
+UPDATE public.profiles SET age_cohort = 'teen_16_17' WHERE id = t.id('mgd');
+UPDATE public.child_controls SET ai_analysis = false, public_xp = true, notifications = false, messaging = 'off'
+ WHERE child_user_id IN (t.id('staleteen'), t.id('mgd'), t.id('teen'));
 -- A consent record for an adult (an old approval) and for the 17-year-old.
 INSERT INTO public.parental_consents (child_user_id, parent_user_id, status, method, approved_at, requested_at)
 VALUES (t.id('turned'), t.id('ga'), 'approved', 'email_confirmation', now(), now()),
@@ -90,7 +96,10 @@ BEGIN
     private_sec.guardian_payment_approval_missing(t.id(_who), 'pg'),
     private_sec.child_game_participation_allowed(t.id(_who)),
     private_sec.guardian_authority_ended(t.id(_who)),
-    pg_temp.as_ready(_who, 'pg'), pg_temp.as_manual(_who, 'pg'), pg_temp.paypal_guardian_stops(_who, 'pg'));
+    pg_temp.as_ready(_who, 'pg'), pg_temp.as_manual(_who, 'pg'), pg_temp.paypal_guardian_stops(_who, 'pg'),
+    private_sec.ai_analysis_allowed(t.id(_who)), public.minor_messaging_block(t.id(_who), t.id('host')),
+    public.minor_messaging_block(t.id('host'), t.id(_who)), public.public_xp_enabled(t.id(_who)),
+    private_sec.guardian_switches_apply(t.id(_who)), public.guardian_authority_has_ended(t.id(_who)));
   PERFORM t.as_user(t.id(_who));
   s := s || '|' || public.my_guardian_link_in_force();
   PERFORM t.reset();
@@ -229,6 +238,43 @@ SELECT t.eq(private_sec.team_chat_member('squad', t.id('staleteen')), true,
 UPDATE public.child_controls SET messaging = 'off' WHERE child_user_id = t.id('staleteen');
 SELECT t.eq(private_sec.team_chat_member('squad', t.id('staleteen')), true,
   'whatever the messaging switch says (it was the guardian''s)');
+
+-- Every other switch a guardian sets in child_controls binds only while a guardian has authority. The stored cohort of
+-- 'staleteen' never aged (still teen_16_17), every switch is left restrictive, and nobody can change them any more.
+SELECT t.eq(private_sec.guardian_switches_apply(t.id('staleteen')), false, 'the switches no longer bind the adult with a stale teen cohort');
+SELECT t.eq(private_sec.guardian_switches_apply(t.id('teen')), true, '... they still bind a 16-year-old');
+SELECT t.eq(private_sec.guardian_switches_apply(t.id('mgd')), true, '... and a managed adult (the guardian is the only way in)');
+SELECT t.eq(private_sec.guardian_switches_apply(t.id('nobday')), false, '... unknown age: the cohort is not a minor one, as before');
+-- Everyone tries to turn their own AI setting on (the sign-up default for a minor is off).
+UPDATE public.privacy_preferences SET ai_processing = true WHERE user_id IN (t.id('staleteen'), t.id('teen'), t.id('mgd'));
+SELECT t.eq(private_sec.ai_analysis_allowed(t.id('staleteen')), true, 'AI: the adult''s own setting decides (the guardian''s "off" does not hold them)');
+SELECT t.eq(private_sec.ai_analysis_allowed(t.id('teen')), false, 'AI: a 16-year-old with the guardian''s switch off is still blocked');
+SELECT t.eq(private_sec.ai_analysis_allowed(t.id('mgd')), false, 'AI: a managed adult is still held by the guardian''s switch');
+SELECT t.eq(public.minor_messaging_block(t.id('staleteen'), t.id('host')), NULL::text, 'messaging: the adult can write to anyone');
+SELECT t.eq(public.minor_messaging_block(t.id('host'), t.id('staleteen')), NULL::text, 'messaging: and anyone can write to the adult');
+SELECT t.eq(public.minor_messaging_block(t.id('teen'), t.id('host')), 'messaging_off:self', 'messaging: a 16-year-old with messaging off is still blocked');
+SELECT t.eq(public.minor_messaging_block(t.id('host'), t.id('teen')), 'messaging_off:other', '... from either side');
+SELECT t.eq(public.minor_messaging_block(t.id('mgd'), t.id('host')), 'messaging_off:self', 'messaging: a managed adult is still held');
+SELECT t.eq(public.public_xp_enabled(t.id('staleteen')), false, 'public XP: the guardian''s opt-in does not apply to an adult');
+SELECT t.eq(public.public_xp_enabled(t.id('teen')), true, 'public XP: a 16-year-old''s opt-in still applies');
+SELECT t.eq(public.public_xp_enabled(t.id('mgd')), true, 'public XP: the managed adult''s opt-in still applies');
+-- The AI clamp on the adult's own privacy settings (set above).
+SELECT t.eq((SELECT ai_processing FROM public.privacy_preferences WHERE user_id = t.id('staleteen')), true,
+  'the AI clamp leaves the adult''s own choice alone');
+SELECT t.eq((SELECT ai_processing FROM public.privacy_preferences WHERE user_id = t.id('teen')), false,
+  'and still clamps the 16-year-old (guardian switch off)');
+SELECT t.eq((SELECT ai_processing FROM public.privacy_preferences WHERE user_id = t.id('mgd')), false, 'and the managed adult');
+-- Server code (the push curfew): the same answer, for the service role only.
+SELECT t.eq(public.guardian_authority_has_ended(t.id('staleteen')), true, 'authority has ended: the adult with a stale cohort');
+SELECT t.eq(public.guardian_authority_has_ended(t.id('turned')), true, '... an 18-year-old');
+SELECT t.eq(public.guardian_authority_has_ended(t.id('teen')), false, '... not a 16-year-old');
+SELECT t.eq(public.guardian_authority_has_ended(t.id('dayb')), false, '... not the day before 18');
+SELECT t.eq(public.guardian_authority_has_ended(t.id('mgd')), false, '... not a managed adult');
+SELECT t.eq(public.guardian_authority_has_ended(t.id('nobday')), false, '... not an unknown age');
+SELECT t.ok(has_function_privilege('service_role', 'public.guardian_authority_has_ended(uuid)', 'EXECUTE')
+        AND NOT has_function_privilege('authenticated', 'public.guardian_authority_has_ended(uuid)', 'EXECUTE')
+        AND NOT has_function_privilege('anon', 'public.guardian_authority_has_ended(uuid)', 'EXECUTE'),
+  'guardian_authority_has_ended is for the service role only');
 
 -- ---- 4. paying: a player who turned 18, with the link still 'active' ------------------------------------------------
 SELECT t.eq(pg_temp.as_ready('turned', 'pg'), true, 'PayPal''s check: ready');
@@ -388,5 +434,84 @@ VALUES (t.id('ga'), t.id('late'), 'parent', 'active', now());
 SELECT t.eq(private_sec.is_guardian_of(t.id('ga'), t.id('late')), false, 'a link made to an adult is not in force from the start');
 SELECT t.eq((private_sec.end_adult_guardian_links() ->> 'ended')::int, 1, 'and the next sweep ends it');
 SELECT t.eq((private_sec.end_adult_guardian_links() ->> 'ended')::int, 0, 'once');
+
+-- ---- 8. a support-approved birthday correction after the sweep ended the link -------------------------------------
+-- review_birthday_correction writes profile_birthdays under openrun.birthday_review = 'on' (an upsert). A correction
+-- that makes the person a minor again must put the swept links back, so the order the daily job ran in cannot leave a
+-- minor without a guardian: before the sweep the rule alone would have brought the link back.
+SELECT t.person('hand', 19);
+SELECT t.guardian('ga', 'hand');
+UPDATE public.guardian_links SET status = 'revoked' WHERE child_user_id = t.id('hand');   -- ended by the guardian, by hand
+SELECT t.eq((private_sec.end_adult_guardian_links() ->> 'ended')::int, 0, 'the sweep does not touch a link a guardian ended by hand');
+DELETE FROM public.notifications;
+CREATE FUNCTION pg_temp.correct(_who text, _bd date) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM set_config('openrun.birthday_review', 'on', true);
+  INSERT INTO public.profile_birthdays (user_id, birthday) VALUES (t.id(_who), _bd)
+  ON CONFLICT (user_id) DO UPDATE SET birthday = EXCLUDED.birthday, updated_at = now();
+  PERFORM set_config('openrun.birthday_review', 'off', true);
+END $$;
+SELECT t.eq((SELECT status FROM public.guardian_links WHERE child_user_id = t.id('turned')), 'revoked', 'setup: the 18-year-old''s link was ended by the sweep');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.guardian_link_age_events WHERE child_user_id = t.id('turned') AND kind = 'ended'), 1, 'and recorded');
+
+-- A correction that leaves the person an adult changes nothing.
+SELECT pg_temp.correct('older', (current_date - interval '30 years')::date);
+SELECT t.eq((SELECT status FROM public.guardian_links WHERE child_user_id = t.id('older')), 'revoked', 'adult to another adult age: the link stays ended');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE type = 'guardian_link'), 0, 'and nobody is told');
+
+-- A correction that makes them 16: the link is back, for the guardian who had it.
+SELECT pg_temp.correct('turned', (current_date - interval '16 years')::date);
+SELECT t.eq((SELECT status FROM public.guardian_links WHERE child_user_id = t.id('turned')), 'active', 'corrected to 16: the link is active again');
+SELECT t.eq(private_sec.is_guardian_of(t.id('ga'), t.id('turned')), true, 'and the guardian is their guardian');
+SELECT t.eq(private_sec.is_minor(t.id('turned')), true, 'the person is a minor');
+SELECT t.eq(private_sec.guardian_payment_approval_missing(t.id('turned'), 'pg'), true,
+  'the approval the sweep cleared is not reinstated: as any minor with a guardian, they need it again');
+SELECT t.eq(pg_temp.as_manual('turned', 'pg'), false, 'the manual-claim hold is back for them');
+SELECT t.eq(pg_temp.as_manual('turned', 'pg'), pg_temp.as_ready('turned', 'pg'), 'the pay gates agree for them');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.guardian_link_age_events WHERE child_user_id = t.id('turned')), 0, 'the record of the end is cleared');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('ga') AND title = 'Family link restored'), 1, 'the guardian is told');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('turned') AND title = 'Your family link is back'), 1, 'and the person, once');
+SELECT t.eq((private_sec.end_adult_guardian_links() ->> 'ended')::int, 0, 'the next sweep leaves a minor alone');
+SELECT t.as_user(t.id('ga'));
+SELECT t.eq(t.count(format('SELECT 1 FROM public.child_controls WHERE child_user_id = %L', t.id('turned'))), 1, 'the guardian reads their controls again');
+SELECT t.eq((SELECT count(*)::int FROM public.guardian_children_overview() WHERE child_user_id = t.id('turned')), 1, 'and sees them in the Parent Center');
+SELECT t.reset();
+-- The same person turns 18 again (a later correction back): ended and told again, once.
+SELECT pg_temp.correct('turned', (current_date - interval '18 years')::date);
+SELECT t.eq(private_sec.is_guardian_of(t.id('ga'), t.id('turned')), false, 'corrected back to 18: the rule ends the link at once');
+SELECT t.eq((private_sec.end_adult_guardian_links() ->> 'ended')::int, 1, 'the sweep ends it again');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('turned') AND title = 'Your family link has ended'), 1, 'and tells them');
+
+-- Two guardians: both come back, the person is told once.
+DELETE FROM public.notifications;
+SELECT pg_temp.correct('twoga', (current_date - interval '15 years')::date);
+SELECT t.eq((SELECT count(*)::int FROM public.guardian_links WHERE child_user_id = t.id('twoga') AND status = 'active'), 2, 'both guardians are back');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('twoga') AND type = 'guardian_link'), 1, 'the person is told once');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id IN (t.id('ga'), t.id('gb')) AND title = 'Family link restored'), 2, 'each guardian once');
+
+-- A link a guardian ended by hand is never revived by a correction.
+SELECT pg_temp.correct('hand', (current_date - interval '15 years')::date);
+SELECT t.eq((SELECT status FROM public.guardian_links WHERE child_user_id = t.id('hand')), 'revoked', 'the hand-ended link stays ended');
+
+-- An unknown birthday after the 18th does not exist: the row cannot be deleted by an adult (BIRTHDAY_LOCKED).
+SELECT t.throws(format('DELETE FROM public.profile_birthdays WHERE user_id = %L', t.id('older')), 'BIRTHDAY_LOCKED',
+  'a stored birthday cannot be removed to make an adult look unknown');
+
+-- ---- 9. one adult, two guardians, the sweep capped at one a run ----------------------------------------------------
+-- The adult must be told once even when a cap (or a locked row) splits their guardians across runs, however far apart.
+DELETE FROM public.notifications;
+SELECT t.person('splita', 21);
+SELECT t.guardian('ga', 'splita'), t.guardian('gb', 'splita');
+SELECT t.eq((private_sec.end_adult_guardian_links(1) ->> 'ended')::int, 1, 'cap 1: the first run ends one of two');
+-- The next run is a later transaction in production: make the first run's records look old.
+UPDATE private_sec.guardian_link_age_events SET created_at = created_at - interval '1 day' WHERE child_user_id = t.id('splita');
+SELECT t.eq((private_sec.end_adult_guardian_links(1) ->> 'ended')::int, 1, 'the second run ends the other');
+SELECT t.eq((private_sec.end_adult_guardian_links(1) ->> 'ended')::int, 0, 'and a third has nothing left');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('splita') AND type = 'guardian_link'), 1,
+  'the adult was told once, not once per run');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('ga') AND title = 'Family link ended' AND body LIKE 'Splita%'), 1,
+  'the first guardian once');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('gb') AND title = 'Family link ended' AND body LIKE 'Splita%'), 1,
+  'the second guardian once');
 
 ROLLBACK;
