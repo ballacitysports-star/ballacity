@@ -1,12 +1,13 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { PAYMENT_SAVE_FAILED_MESSAGE } from "../src/lib/payments-policy";
 
 /**
  * E2E: submitting proof-of-payment fails (declined at the API layer).
  *
  * Mocks payment_submissions POST to return an error, then asserts:
- *   - an actionable error toast surfaces with the server message
+ *   - an error toast in plain words surfaces (WP 4.0: never the server's raw text)
  *   - the URL stays on the same game's pay screen (no navigation away)
  *   - the "I have paid" button is still enabled so the user can retry
  *   - a follow-up POST that succeeds transitions the timeline to pending
@@ -237,10 +238,12 @@ test("declined submission shows actionable error and stays on the pay screen", a
   ]);
   expect(declinedResp.status()).toBe(402);
 
-  // Actionable error surfaces via the toast layer (sonner renders under
-  // role=status). The exact wording comes from the server message.
-  const errorToast = page.getByText(DECLINE_MSG, { exact: false });
+  // The error surfaces via the toast layer (sonner renders under role=status), in plain words.
+  // The mocked message is not one the database sends (no code, not a known refusal), so the
+  // member gets the payment fallback, never the raw server text (WP 4.0).
+  const errorToast = page.getByText(PAYMENT_SAVE_FAILED_MESSAGE, { exact: false });
   await expect(errorToast).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(DECLINE_MSG, { exact: false })).toHaveCount(0);
 
   // Still on the same pay screen — no redirect on failure.
   await expect(page).toHaveURL(new RegExp(`/games/${GAME_ID}/pay(\\?|$)`));

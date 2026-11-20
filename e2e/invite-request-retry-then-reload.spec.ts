@@ -148,9 +148,15 @@ test("pending UI + invite params survive a reload after network-error retry", as
     .poll(() => joinPosts.length, { timeout: 10_000, message: "first POST never fired" })
     .toBeGreaterThanOrEqual(1);
 
-  await expect(page.getByText(/could not send request|failed|network/i).first()).toBeVisible({
+  await expect(
+    page
+      .getByText(/we couldn't connect\. check your internet connection|couldn't send your request/i)
+      .first(),
+  ).toBeVisible({
     timeout: 5_000,
   });
+  // WP 4.0: the member sees plain words, never the raw fetch error.
+  await expect(page.getByText(/failed to fetch|net::err|typeerror/i)).toHaveCount(0);
 
   const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeEnabled();

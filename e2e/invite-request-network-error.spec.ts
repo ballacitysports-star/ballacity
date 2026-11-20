@@ -184,9 +184,15 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   ).toBe(1);
 
   // Error surfaces via a toast + the CTA returns to "Request to join" (not pending).
-  await expect(page.getByText(/could not send request|failed|network/i).first()).toBeVisible({
+  await expect(
+    page
+      .getByText(/we couldn't connect\. check your internet connection|couldn't send your request/i)
+      .first(),
+  ).toBeVisible({
     timeout: 5_000,
   });
+  // WP 4.0: the member sees plain words, never the raw fetch error.
+  await expect(page.getByText(/failed to fetch|net::err|typeerror/i)).toHaveCount(0);
 
   const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeVisible({ timeout: 5_000 });
