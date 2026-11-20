@@ -514,6 +514,13 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
   - Open owner question: managed accounts at 18. Their link cannot be ended by the guardian (only the profile
     deleted), so a managed account that reaches 18 can pay a manual method only for a game the guardian approves.
 
+  **Update 2026-11-20 (owner decision: "Guardian link end after 18"):** a guardian link now ends when the child turns
+  18 (migration 20261125200000, docs/guardian-link-age-18.md). Such a link is out of force the day the birthday passes,
+  so `guardian_payment_approval_missing` no longer asks for a guardian's approval for an adult, and the trigger, PayPal
+  and the manual-claim check agree for them: the manual-claim hold above stops triggering for an adult (the pay page
+  code is unchanged). It still applies to a managed account: its link is not ended, so the open question above stands
+  (docs/guardian-link-age-18.md section 3).
+
   | Piece                    | Where                                                                                                  |
   | ------------------------ | ------------------------------------------------------------------------------------------------------ |
   | The trigger's rule, read | `supabase/migrations/20261124200000_manual_claim_guardian_ready.sql`                                   |

@@ -10,16 +10,24 @@ import {
 
 type Rows = Record<string, any[]>;
 
-/** Just enough of the query builder: select, eq chains, gte, limit, maybeSingle, insert. */
-function fakeAdmin(tables: Rows) {
+/**
+ * Just enough of the query builder: select, eq chains, in, gte, limit, maybeSingle, insert. `inForce` stands in for
+ * public.guardian_links_in_force (the database rule: a link to someone who has turned 18 is not in force); without
+ * it the stub has no such function and the server reads the active rows, as before the migration.
+ */
+function fakeAdmin(tables: Rows, inForce?: (children: string[]) => any[]) {
   const inserted: { table: string; row: any }[] = [];
   const admin = {
     inserted,
+    ...(inForce
+      ? { rpc: async (fn: string, args: any) => ({ data: inForce(args._children), error: null }) }
+      : {}),
     from(table: string) {
       let rows = [...(tables[table] ?? [])];
       const q: any = {
         select: () => q,
         eq: (k: string, v: unknown) => ((rows = rows.filter((r) => r[k] === v)), q),
+        in: (k: string, v: unknown[]) => ((rows = rows.filter((r) => v.includes(r[k]))), q),
         gte: (k: string, v: string) => ((rows = rows.filter((r) => String(r[k]) >= v)), q),
         limit: (n: number) => ((rows = rows.slice(0, n)), q),
         maybeSingle: async () => ({ data: rows[0] ?? null }),
@@ -155,6 +163,36 @@ describe("planGuardianApprovalPush", () => {
         })
       ).messages,
     ).toEqual([]);
+  });
+
+  it("does not tell a guardian whose child has turned 18, even while the link still says active", async () => {
+    // The database rule (20261125200000) says only the guardian in force: dad's child is 18 now, mom's is not.
+    const plan = await planGuardianApprovalPush(
+      fakeAdmin(world(), (children) =>
+        [{ parent_user_id: "mom", child_user_id: "kid", verified_at: "2026-10-01" }].filter((l) =>
+          children.includes(l.child_user_id),
+        ),
+      ) as any,
+      { kind: "join_request", id: "jr1", callerId: "kid" },
+    );
+    expect(plan.messages.map((m) => m.userId)).toEqual(["mom"]);
+    const none = await planGuardianApprovalPush(fakeAdmin(world(), () => []) as any, {
+      kind: "join_request",
+      id: "jr1",
+      callerId: "kid",
+    });
+    expect(none.messages).toEqual([]);
+  });
+
+  it("falls back to the active rows when the rule is not there (app ahead of the migration)", async () => {
+    const admin = fakeAdmin(world()) as any;
+    admin.rpc = async () => ({ data: null, error: { message: "function does not exist" } });
+    const plan = await planGuardianApprovalPush(admin, {
+      kind: "join_request",
+      id: "jr1",
+      callerId: "kid",
+    });
+    expect(plan.messages.map((m) => m.userId).sort()).toEqual(["dad", "mom"]);
   });
 
   it("falls back to plain words when a name or title is missing", async () => {
