@@ -130,5 +130,6 @@ test("slow client boot is not interrupted by an automatic reload", async ({ page
   expect(entryStalled, "the client entry module must have been held back").toBe(true);
   // Booted, so the watchdog has stopped: any reload it made has already happened.
   expect(documentRequests, "a slow but healthy startup must not be reloaded").toBe(1);
-  await expect(page.getByRole("heading", { name: /ballaCity/i }).first()).toBeVisible();
+  // The landing page has rendered: its main heading, not a marketing line that changes with copy.
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
 });
