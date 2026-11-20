@@ -61,6 +61,8 @@ async function mockPayScreen(
     request: string | null;
     /** When set, the viewer's join request is answered only once it resolves. */
     requestGate?: Promise<void>;
+    /** The viewer holds a place on the roster (their own game_participants row). */
+    participant?: boolean;
   },
 ) {
   const now = new Date().toISOString();
@@ -146,7 +148,11 @@ async function mockPayScreen(
       (u) => isTable(u, table),
       async (route) => {
         if (route.request().method() !== "GET") return route.fallback();
-        await fulfillJson(route, []);
+        const mine =
+          table === "game_participants" && opts.participant
+            ? [{ id: "mock-participant-block", game_id: GAME_ID }]
+            : [];
+        await fulfillJson(route, mine);
       },
     );
   }
@@ -403,6 +409,106 @@ test("an age-ranged open paid game: a pending viewer outside the range waits on 
   await expect(gate).toContainText(/payment unlocks after the host approves you/i);
   await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
   await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+/**
+ * A full roster (owner decision 2026-11-20): payment_claim_block refuses the manual claim of a player not on the roster
+ * (GAME_FULL), and PayPal's precondition refuses them too, so the pay page blocks before showing any handle. It used to
+ * show only a "just filled up" warning above the handles. The real-database version of the first case is in
+ * pay-fresh-viewer-methods.spec.ts (local stack only).
+ */
+const FULL_GAME = { max_players: 14, joined: 14 };
+
+test("a full paid game: a new viewer gets the full-roster block card, not the host's handles or PayPal", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: FULL_GAME, requiresApproval: false, request: null });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  const card = page.getByTestId("pay-entry-blocked");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toHaveAttribute("data-block", "full");
+  await expect(card).toContainText(/you can't pay for this game/i);
+  // The game page's own words for a full roster.
+  await expect(card).toContainText("The roster is full — no spots left.");
+  await expect(card).toContainText(/don't send the host any money for it/i);
+  await expect(card).not.toContainText(/ask for a refund/i);
+  await expect(page.getByText(/just filled up/i)).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+test("a full paid game: a host-approved viewer not on the roster is still blocked (approval makes no room)", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: FULL_GAME, requiresApproval: true, request: "approved" });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  const card = page.getByTestId("pay-entry-blocked");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toHaveAttribute("data-block", "full");
+  await expect(page.getByTestId("approval-required-gate")).toHaveCount(0);
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+test("a full paid game: a viewer who already opened Venmo from this page keeps the refund line", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, { game: FULL_GAME, requiresApproval: false, request: null });
+  // The pay-opened marker the page writes when the viewer taps "Pay $X in Venmo" (markExternalPaymentOpened).
+  await page.addInitScript(
+    (key) => window.sessionStorage.setItem(key, "1"),
+    `pay-opened:${GAME_ID}:mock-venmo`,
+  );
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  const card = page.getByTestId("pay-entry-blocked");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toHaveAttribute("data-block", "full");
+  await expect(card).toContainText(/if you already paid, message the host to ask for a refund/i);
+  await expectNoPaymentOffered(page);
+
+  await ctx.close();
+});
+
+test("a full paid game: a viewer on the roster still gets the payment options", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await mockPayScreen(page, {
+    game: FULL_GAME,
+    requiresApproval: false,
+    request: null,
+    participant: true,
+  });
+
+  await restoreSession(page);
+  await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
+
+  // payment_claim_block lets a player already on the roster through a full game.
+  await expect(page.getByRole("button", { name: `Pay $${ENTRY_FEE} in Venmo` })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(VENMO_HANDLE)).toBeVisible();
+  await expect(page.getByTestId("pay-entry-blocked")).toHaveCount(0);
 
   await ctx.close();
 });

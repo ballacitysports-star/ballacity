@@ -33,6 +33,7 @@ import {
   paymentTypeMeta,
   resolvePaymentDeepLink,
   getGamePaymentSettings,
+  getGameJoinPolicy,
   listPaymentMethodsForHost,
   uploadProofScreenshot,
   createPaymentSubmission,
@@ -68,10 +69,10 @@ import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
 // joinGame no longer called here — player is added to roster only after host verifies payment.
-import { useHostedGames } from "@/lib/hosted-games-store";
+import { retryHostedGames, useHostedGames, useHostedGamesStatus } from "@/lib/hosted-games-store";
 import { useGameLookup } from "@/hooks/use-game-lookup";
-import { retryRosterLoad, useIsJoined, useRosterLoadState } from "@/lib/games-store";
-import { hasPaymentIn, showFilledUpWarning } from "@/lib/spots-urgency";
+import { reloadRoster, retryRosterLoad, useIsJoined, useRosterLoadState } from "@/lib/games-store";
+import { hasPaymentIn } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { useJoinGate } from "@/lib/live-status";
@@ -86,7 +87,12 @@ import {
   payPalOffered,
   payRiskAckStep,
   payRiskAckView,
+  payEntryFlow,
+  payMethodsHeldForApproval,
+  paySetupFrom,
+  type CheckState,
   type PayEntryView,
+  type PaySetup,
 } from "@/lib/pay-entry-gate";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
 import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
@@ -244,8 +250,8 @@ function PayPage() {
   const rosterLoad = useRosterLoadState();
   // The game page's checks for a new join (lockedForNewJoin, consentBlocksNewJoin) never ran for a player who came
   // here by its Pay Host link, an invite or a bookmark; payEntryView asks them again before any payment is offered.
-  // No roster count: a full game keeps its "just filled up" warning below (the database refuses the claim itself,
-  // GAME_FULL, for a player not on the roster).
+  // No roster count in the gate: payEntryView decides a full roster itself (rosterCheck below), as the database's
+  // GAME_FULL does, for a viewer not on the roster.
   const joinGate = useJoinGate(game);
   const childQuery = useMyChildStatus();
   const { can: canChildFeature } = childQuery;
@@ -254,10 +260,32 @@ function PayPage() {
   const myAge = useMyAge();
 
   const maxPlayers = game?.maxPlayers ?? 0;
+  // The roster count a full-game block rests on (payment_claim_block's GAME_FULL): the store's live count, which
+  // answers once the store has loaded from the database, or once the by-id lookup (fetchHostedGame) has read this
+  // game from it. Only this browser's saved copy waits for the store's first load: fail closed.
+  const hostedGamesStatus = useHostedGamesStatus();
+  const rosterCount: CheckState<number> =
+    liveCount !== undefined
+      ? { state: "ready", value: liveCount }
+      : hostedGamesStatus === "error"
+        ? { state: "error" }
+        : { state: "loading" };
+  const rosterCheck: CheckState<{ count: number; maxPlayers: number }> =
+    rosterCount.state === "ready"
+      ? { state: "ready", value: { count: rosterCount.value, maxPlayers } }
+      : rosterCount;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
   const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  // Who is paid and whether the host screens players: from the settings row when this viewer may read it, else from
+  // the public join policy and the game's host (paySetupFrom, docs/paid-path-gates.md section 6 (c)). Null when the
+  // host has no payment settings for this game: nothing is offered.
+  const [setup, setSetup] = useState<PaySetup | null>(null);
+  // The host's methods were not asked for: a viewer the host has not approved yet, on a game whose host reviews every
+  // player (payMethodsHeldForApproval). Read again once the host approves them.
+  const [methodsHeld, setMethodsHeld] = useState(false);
+  const gameHostId = game?.hostUserId ?? null;
   // The host never pays for their own game; the game page applies no age range and no "Before you join" to them.
   const isHost = !!userId && (game?.hostUserId === userId || settings?.host_id === userId);
   const refundTerms = useGameRefundTerms(game?.id, settings);
@@ -269,8 +297,17 @@ function PayPage() {
   // nothing about B (it would tell B's viewer to ask for a refund of money they never sent).
   const [paymentStartedFor, setPaymentStartedFor] = useState<string | null>(null);
   const paymentStarted = paymentStartedFor === gameId;
+  // A PayPal payment went through on this page for this game: the viewer paid, so a block that turns up after it
+  // keeps the refund line. And while the viewer's places are read again after it (the server may have just put them
+  // on the roster), a block a place lifts waits for that read (payEntryFlow).
+  const [paypalPaidFor, setPaypalPaidFor] = useState<string | null>(null);
+  const [rosterReloadFor, setRosterReloadFor] = useState<string | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // Read by the settings fetch (below) without restarting it on every change of the request.
+  const approvedNow = myReq?.status === "approved";
+  const approvedRef = useRef(approvedNow);
+  approvedRef.current = approvedNow;
   // Whether mySubs and myReq have been read for this game and viewer: 'error' when the first read failed (a later
   // poll that succeeds makes it 'ready'). Keyed so that another game's or account's answers never count here.
   const viewerKey = `${gameId}:${userId ?? ""}`;
@@ -389,6 +426,8 @@ function PayPage() {
     setFetching(true);
     setFetchTimedOut(false);
     setSettings(null);
+    setSetup(null);
+    setMethodsHeld(false);
     setMethods([]);
     setPicked(null);
     const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
@@ -402,17 +441,27 @@ function PayPage() {
       try {
         const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
+        // RLS hides the row from a viewer who is not yet the payee, an approved requester, a payer or a participant:
+        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed").
+        const policy = s ? null : await withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy");
+        if (cancelled) return;
+        const nextSetup = paySetupFrom({ settings: s, policy, gameHostId });
+        const held = payMethodsHeldForApproval({
+          setup: nextSetup,
+          approved: approvedRef.current,
+        });
+        const all =
+          nextSetup && !held
+            ? await withTimeout(
+                listPaymentMethodsForHost(nextSetup.hostId, gameId),
+                "listPaymentMethodsForHost",
+              )
+            : [];
+        if (cancelled) return;
         setSettings(s);
-        if (s) {
-          const all = await withTimeout(
-            listPaymentMethodsForHost(s.host_id, gameId),
-            "listPaymentMethodsForHost",
-          );
-          if (cancelled) return;
-          setMethods(all);
-        } else {
-          setMethods([]);
-        }
+        setSetup(nextSetup);
+        setMethodsHeld(held);
+        setMethods(all);
 
         // Payment settings + host payment methods are the critical path for
         // rendering the pay UI. The viewer's own request and payments load
@@ -431,7 +480,14 @@ function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasGame, gameId, userId, fetchAttempt]);
+  }, [hasGame, gameId, gameHostId, userId, fetchAttempt]);
+  // The host approved a viewer whose methods were held back: read the settings (now theirs to read) and the methods.
+  // Until that read is in, the options count as loading (optionsFetching), never as "Host hasn't set up payment yet".
+  const awaitingHeldMethods = methodsHeld && approvedNow;
+  useEffect(() => {
+    if (awaitingHeldMethods) setFetchAttempt((n) => n + 1);
+  }, [awaitingHeldMethods]);
+  const optionsFetching = fetching || awaitingHeldMethods;
 
   // The viewer's own request and payments for this game. Until both have answered, payEntryView counts them as
   // nothing and shows a block they could lift (a closed game, an ended one, a guardian's switch) as "Loading payment
@@ -625,7 +681,7 @@ function PayPage() {
     holdsPlace: viewerHoldsPlace,
     paymentIn: hasPaymentIn(mySubs),
     approved: myReq?.status === "approved",
-    flow: flowState,
+    flow: payEntryFlow({ flow: flowState, rosterReloading: rosterReloadFor === gameId }),
     gate: joinGate,
     child: checkStateOf({
       data: childStatus
@@ -638,8 +694,9 @@ function PayPage() {
       isError: childQuery.isError,
     }),
     guardian: checkStateOf({ data: guardianQuery.data, isError: guardianQuery.isError }),
-    paymentStarted: paymentStartedHere,
+    paymentStarted: paymentStartedHere || paypalPaidFor === gameId,
     isHost,
+    roster: rosterCheck,
     ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
     viewerAge: myAge.loading
       ? { state: "loading" }
@@ -662,8 +719,8 @@ function PayPage() {
   // or the block card) when the database would refuse this viewer's manual claim on the guardian rule.
   const manualStep = payManualMethodsStep({
     manualClaim: checkStateOf({ data: manualClaimQuery.data, isError: manualClaimQuery.isError }),
-    hasManualMethods: !!settings && methods.length > 0,
-    paypalOffered: !!paypalCfg && !!settings,
+    hasManualMethods: !!setup && methods.length > 0,
+    paypalOffered: !!paypalCfg && !!setup,
     paypalSettled: paypal.settled,
     methodPicked: !!picked,
     paymentStarted: paymentStartedHere,
@@ -676,10 +733,10 @@ function PayPage() {
     !!picked &&
     entryClear &&
     manualOffered &&
-    !fetching &&
+    !optionsFetching &&
     !fetchTimedOut &&
-    !!settings &&
-    !(settings.requires_approval && myReq?.status !== "approved");
+    !!setup &&
+    !(setup.requiresApproval && myReq?.status !== "approved");
   useEffect(() => {
     if (proofStepOnScreen) setPaymentStartedFor(gameId);
   }, [proofStepOnScreen, gameId]);
@@ -708,6 +765,7 @@ function PayPage() {
     if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
     if (rosterLoad === "error") retryRosterLoad();
     if (myAge.error) myAge.retry();
+    if (rosterCount.state === "error") retryHostedGames();
   };
 
   if (loading || (!game && !lookupTimedOut)) {
@@ -723,7 +781,11 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
-  const requiresApproval = !!settings?.requires_approval;
+  // PayPal counts as an option only with a payment setup: the button pays the game's payee, and with no settings row
+  // at all PayPal's precondition refuses a player the host has not approved (HOST_APPROVAL_REQUIRED). Without this a
+  // PayPal config alone made the page draw an empty "How do you want to pay?" list.
+  const paypalOptions = setup ? paypal : { config: null, settled: true };
+  const requiresApproval = !!setup?.requiresApproval;
   const isApproved = myReq?.status === "approved";
 
   const hasSubmission = mySubs.length > 0;
@@ -755,14 +817,7 @@ function PayPage() {
   const riskAckStep = payRiskAckStep({
     riskAck,
     outranked: !!blockCard || !!pendingCheck || approvalGateActive,
-    settings: fetching ? "loading" : fetchTimedOut ? "error" : "ready",
-  });
-  const justFilledDuringPay = showFilledUpWarning({
-    liveCount,
-    spotsLeft,
-    viewerHoldsPlace,
-    hasSubmission: hasPaymentIn(mySubs),
-    loading: fetching,
+    settings: optionsFetching ? "loading" : fetchTimedOut ? "error" : "ready",
   });
   const currentStep: "pay" | "confirm" = picked ? "confirm" : "pay";
   const showStepper =
@@ -770,9 +825,9 @@ function PayPage() {
     !approvalGateActive &&
     entryClear &&
     manualOffered &&
-    !fetching &&
+    !optionsFetching &&
     !fetchTimedOut &&
-    !!settings &&
+    !!setup &&
     methods.length > 0;
 
   return (
@@ -837,16 +892,6 @@ function PayPage() {
             {new Date(settings.payment_deadline).toLocaleString()}
           </div>
         )}
-        {justFilledDuringPay && (
-          <p
-            role="status"
-            aria-live="assertive"
-            className="mt-3 text-[11px] font-semibold text-coral"
-          >
-            This game just filled up, so the host can't record a payment for it. Message the host
-            before you pay.
-          </p>
-        )}
       </div>
 
       {/* Status card replaces the stepper once a submission exists */}
@@ -854,14 +899,14 @@ function PayPage() {
         <PaymentStatusTimeline
           latest={mySubs[0]}
           history={mySubs.slice(1)}
-          hostId={settings?.host_id ?? null}
+          hostId={setup?.hostId ?? null}
           gameId={gameId}
           onChanged={async () => setMySubs(await listMySubmissionsForGame(gameId))}
         />
       )}
 
       <PaymentSafetyNotice
-        counterpartyId={settings?.host_id ?? null}
+        counterpartyId={setup?.hostId ?? null}
         counterpartyLabel="this host"
         gameId={gameId}
         showPressureWarning={Number(fee) >= 100}
@@ -966,7 +1011,7 @@ function PayPage() {
         </div>
       ) : riskAckStep === "ask" ? (
         <PayRiskAckCard gameId={game.id} onReview={() => setRiskAckDismissedFor(null)} />
-      ) : fetching ? (
+      ) : optionsFetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
           Loading payment options…
         </div>
@@ -983,15 +1028,19 @@ function PayPage() {
         </div>
       ) : manualStep.kind === "blocked" ? (
         <PayEntryBlockedCard view={manualStep} gameId={game.id} />
-      ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
-        "loading" ? (
+      ) : payOptionsView({
+          hasOtherMethods: !!setup && methods.length > 0,
+          paypal: paypalOptions,
+        }) === "loading" ? (
         // No other method to offer: wait for PayPal (up to its deadline) before saying the host has none, or a
         // PayPal-only host's players would be told to arrange payment directly.
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
           Loading payment options…
         </div>
-      ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
-        "empty" ? (
+      ) : payOptionsView({
+          hasOtherMethods: !!setup && methods.length > 0,
+          paypal: paypalOptions,
+        }) === "empty" ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -1034,7 +1083,7 @@ function PayPage() {
             </div>
           )}
           {paypalCfg &&
-            settings &&
+            setup &&
             (manualStep.kind === "offer_all" ||
               manualStep.kind === "paypal_only" ||
               manualStep.paypal) && (
@@ -1043,10 +1092,24 @@ function PayPage() {
                   gameId={game.id}
                   clientId={paypalCfg.clientId}
                   merchantId={paypalCfg.merchantId}
-                  feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+                  feeLabel={feeLabel(settings?.entry_fee ?? game.price)}
                   onPaid={async () => {
-                    const subs = await listMySubmissionsForGame(game.id);
-                    setMySubs(subs);
+                    // The capture may have put the viewer on the roster, and filled its last place: the count can
+                    // reach this page before their own place does (another channel), or their place may never
+                    // arrive by realtime. Read their places again now; until that answers, a block a place lifts
+                    // shows as loading, not as "You can't pay for this game" under this payment.
+                    const paidGame = game.id;
+                    setPaypalPaidFor(paidGame);
+                    setRosterReloadFor(paidGame);
+                    try {
+                      const [subs] = await Promise.all([
+                        listMySubmissionsForGame(paidGame),
+                        reloadRoster(),
+                      ]);
+                      setMySubs(subs);
+                    } finally {
+                      setRosterReloadFor((cur) => (cur === paidGame ? null : cur));
+                    }
                   }}
                 />
               </div>
@@ -1141,7 +1204,7 @@ function PayPage() {
             game_id={game.id}
             game_title={game.title}
             fee={settings?.entry_fee ?? game.price}
-            host_id={settings!.host_id}
+            host_id={setup!.hostId}
             method={picked}
             extraInstructions={settings?.payment_instructions ?? null}
             refundTerms={refundDisclaimer(

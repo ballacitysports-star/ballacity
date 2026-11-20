@@ -107,15 +107,15 @@ join_requests or payment_submissions. Nothing on the server requires it on any p
 
 ## 4. Can someone end up paying, or joined, when they should not?
 
-| Case                                                                                                               | Joined (rostered)?                                                                                                                               | Claim recorded?                               | Money moved?                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Minor under 16, consent-locked account, or unknown age                                                             | No (roster gate; also never gets a payment claim)                                                                                                | No (cohort trigger)                           | PayPal: no. Manual: before this fix, possible. The handles and deep links were shown and the refusal came only on proof submission. Now blocked on /pay.                                                                                                              |
-| 16-17 with a guardian link and no guardian approval for this game                                                  | No                                                                                                                                               | No (guardian_first)                           | PayPal: no. Manual: possible by external app before the refusal. The game page sends them to "Ask your parent" (guardianOnly), but a direct /pay visit is not gated on the client. Now blocked on /pay too (`guardian` kind, game_payment_guardian_ready; section 5). |
-| 16-17 with "Can join games" off but a guardian-approved request                                                    | No (child_game_participation_allowed)                                                                                                            | **Yes** (no participation check on the claim) | PayPal: no. Manual: yes, money can move for a place that can never be given. Client now blocks on /pay. **Server gap.**                                                                                                                                               |
-| Locked game (cancelled, ended, in progress, host-closed, past the cutoff), player not approved and not in the flow | No (join gate; in-progress by clock only for self-writes, but cutoff/closed for all non-approved)                                                | **Yes**                                       | PayPal: no. Manual: yes. Client now blocks on /pay. **Server gap (claim).**                                                                                                                                                                                           |
-| Full game                                                                                                          | No (GAME_FULL for any non-host writer, even approved)                                                                                            | **Yes**                                       | PayPal: no. Manual: yes. The host may verify, the roster add fails silently, and the payment stays `verified`. Client: soft "just filled up" warning only (unchanged; see 6). **Server gap (claim, plus a silent roster failure).**                                   |
-| Blocked by the host                                                                                                | Self-join: no. After the host verifies the payment: yes (the service role skips `enforce_host_block`; the host verified, which is their choice). | **Yes**                                       | PayPal: no. Manual: yes. The client cannot know (the block list is not readable by the blocked person, and should not be). **Server gap (claim).**                                                                                                                    |
-| Outside the game's age range, not approved                                                                         | No (age trigger, every writer)                                                                                                                   | **Yes**                                       | PayPal: no. Manual: yes. **Server gap (claim).**                                                                                                                                                                                                                      |
+| Case                                                                                                               | Joined (rostered)?                                                                                                                               | Claim recorded?                               | Money moved?                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Minor under 16, consent-locked account, or unknown age                                                             | No (roster gate; also never gets a payment claim)                                                                                                | No (cohort trigger)                           | PayPal: no. Manual: before this fix, possible. The handles and deep links were shown and the refusal came only on proof submission. Now blocked on /pay.                                                                                                                   |
+| 16-17 with a guardian link and no guardian approval for this game                                                  | No                                                                                                                                               | No (guardian_first)                           | PayPal: no. Manual: possible by external app before the refusal. The game page sends them to "Ask your parent" (guardianOnly), but a direct /pay visit is not gated on the client. Now blocked on /pay too (`guardian` kind, game_payment_guardian_ready; section 5).      |
+| 16-17 with "Can join games" off but a guardian-approved request                                                    | No (child_game_participation_allowed)                                                                                                            | **Yes** (no participation check on the claim) | PayPal: no. Manual: yes, money can move for a place that can never be given. Client now blocks on /pay. **Server gap.**                                                                                                                                                    |
+| Locked game (cancelled, ended, in progress, host-closed, past the cutoff), player not approved and not in the flow | No (join gate; in-progress by clock only for self-writes, but cutoff/closed for all non-approved)                                                | **Yes**                                       | PayPal: no. Manual: yes. Client now blocks on /pay. **Server gap (claim).**                                                                                                                                                                                                |
+| Full game                                                                                                          | No (GAME_FULL for any non-host writer, even approved)                                                                                            | **Yes**                                       | PayPal: no. Manual: yes. The host may verify, the roster add fails silently, and the payment stays `verified`. Client: soft "just filled up" warning only (since 2026-11-20 the `full` block, 6 "Also related" (e)). **Server gap (claim, plus a silent roster failure).** |
+| Blocked by the host                                                                                                | Self-join: no. After the host verifies the payment: yes (the service role skips `enforce_host_block`; the host verified, which is their choice). | **Yes**                                       | PayPal: no. Manual: yes. The client cannot know (the block list is not readable by the blocked person, and should not be). **Server gap (claim).**                                                                                                                         |
+| Outside the game's age range, not approved                                                                         | No (age trigger, every writer)                                                                                                                   | **Yes**                                       | PayPal: no. Manual: yes. **Server gap (claim).**                                                                                                                                                                                                                           |
 
 So nobody gets a roster place the safety rules forbid. The one exception is host blocks, and there the host verifies
 the payment themselves. What leaks is **manual payment claims, and the money that moves before them**, for games or
@@ -182,7 +182,10 @@ and for 15+ s when getMyJoinRequest failed or timed out (it only logged a warnin
 6. `age` (round 5): the game's age range, for a viewer who is not the host and not in the flow, whose age is outside
    it or unknown (no birthday on file). Same wording as the game page (ageGateMessage). See 5e.
 
-A full roster is still not decided here (the "just filled up" warning stays).
+7. `full` (owner decision 2026-11-20, section 6 "Also related" (e)): the roster holds as many players as the game
+   takes, for a viewer not on it who is not the host. Asked after the lock and before the age range.
+
+A full roster was a soft "just filled up" warning until 2026-11-20; it is now the `full` block (item 7).
 
 **Age range: applied on the pay page since round 5 (owner decision 2026-11-18, #430 question 4).** Before, it was
 not, because it needs the viewer's exact age (a read of their birthday, `get_my_birthday`). The decision asks for
@@ -312,12 +315,10 @@ holdsPlace)` and draws nothing on a cancelled game, or an ended one for a viewer
 
 ### What is left on the client
 
-- A full roster stays a soft warning on the pay page ("This game just filled up, so the host can't record a payment
-  for it. Message the host before you pay."), but since 20261119200000 the database refuses the claim (GAME_FULL).
-  The pay page should block a full game before showing handles (as payEntryBlock does for the other codes), so a
-  player does not pay first and then get the refusal: not done here. A refused claim tells the player to message the
-  host to get their money back (section 6).
-- /pay still reads `requires_approval` and the methods from the settings row a new viewer cannot read (6c).
+- A full roster: done on branch claude/pay-fresh-viewer-methods (section 6 "Also related" (e)): the pay page blocks
+  a full game before showing any handle, as the database's GAME_FULL does.
+- /pay reading `requires_approval` and the methods from the settings row a new viewer cannot read: done on branch
+  claude/pay-fresh-viewer-methods (section 6 "Also related" (c)).
 - An 18+ viewer with a leftover active guardian link: done on branch claude/guardian-adult-manual-claim (section 6
   (d)): the pay page asks the manual-claim rule itself and holds back the manual methods (PayPal kept).
 
@@ -380,7 +381,8 @@ Section 7 (the risk acknowledgment on paid joins) offers alternatives (A-D) and 
   `player_id = auth.uid()`), so the insert is refused by row level security today, with or without this migration.
   The 900 test checks the trigger's host exemption with RLS out of the way and says so. Not changed here.
 - On a manual claim the money still moves before the database can refuse (the claim follows the payment). The pay
-  page's own blocks (payEntryBlock, section 5) are what stop it first; GAME_FULL is not one of them yet.
+  page's own blocks (payEntryBlock, section 5) are what stop it first; GAME_FULL is one of them since 2026-11-20
+  ("Also related" (e)).
 - The pay page blocks a game in progress for a new viewer (as the game page does), but the trigger lets that claim
   through when the game has no signup cutoff and joining is open (enforce_game_join_gate does the same for the roster
   place). Every other lock and the participation block are refused by the trigger, which is why the pay page's `warn`
@@ -407,7 +409,7 @@ join request, no payment). No mocks.
 
 So yes: a fresh signed-in player on a paid open game sees no handles. RLS was not changed. The fix belongs on the
 client (ask the RPC for the methods, and the public join policy for `requires_approval`, instead of the settings
-row), as proposed in (c) below; not done here.
+row), as proposed in (c) below. Built on branch claude/pay-fresh-viewer-methods (owner decision 2026-11-20); see (c).
 
 ### The outline as approved
 
@@ -439,8 +441,9 @@ row), as proposed in (c) below; not done here.
 6. Rollback file in docs/rollbacks, guarded as the others are. Apply to the sandbox first, never directly to
    production.
 
-Also related (as proposed; status: (a) done, (b) done earlier, (c) checked live, (d) blocked up front on branch
-claude/guardian-adult-manual-claim, guardian rule unchanged):
+Also related (as proposed; status: (a) done, (b) done earlier, (c) checked live, then fixed on the client on branch
+claude/pay-fresh-viewer-methods, RLS unchanged, (d) blocked up front on branch claude/guardian-adult-manual-claim,
+guardian rule unchanged, (e) a full game blocked on the pay page on branch claude/pay-fresh-viewer-methods):
 
 - (d) **Guardian rule, adult exemption: the RPC and the trigger disagree.** `public.game_payment_guardian_ready(game)`
   (20261111100000 §3) exempts a viewer known to be 18 or over (a stored birthday, `age(birthday) >= 18`) even when a
@@ -535,6 +538,78 @@ claude/guardian-adult-manual-claim, guardian rule unchanged):
   need `settings`). The E2E specs mock the settings row, so they do not see this. Worth its own task: give /pay the
   public join policy (useGameJoinPolicy, as the game page does) and a payee-scoped way to read the methods and
   PayPal config for a viewer who passes payEntryBlock.
+
+  **Built on branch claude/pay-fresh-viewer-methods (owner decision 2026-11-20, "Continue session as you
+  recommend"). Client only: no migration, RLS and every RPC unchanged.**
+
+  - `paySetupFrom` (src/lib/pay-entry-gate.ts) decides who is paid and whether the host screens players. A viewer who
+    can read the settings row gets it from the row, as before. For a viewer RLS hides it from, the page asks
+    `get_game_join_policy(game)` (the payee's row, for anyone who can see the game: what the game page's
+    `useGameJoinPolicy` reads) for `requires_approval`, and takes the payee to be the game's host
+    (`hosted_games.host_id`, which is `private_sec.game_payee`). The methods then come from
+    `get_game_host_payment_methods(payee, game)`, whose own guards are unchanged (payee only, a caller who may
+    coordinate payments, an adult payee, a game the caller can see, the payee row's accepted methods). The
+    approval card still shows for an approval-required game (`requires_approval` true from the policy).
+  - On an approval-required game the page does not ask that RPC at all until the host has approved the viewer
+    (`payMethodsHeldForApproval`), so the handles never reach the browser of a viewer the approval card stands in
+    front of. Once the request is approved (realtime, or the page's 15 s poll), the page reads the settings row again
+    (now the viewer's to read, as an approved requester) and the methods; until then the options show as loading,
+    never "Host hasn't set up payment yet". (Review round 1, 2026-11-20.) A fresh viewer on an open game who is then
+    gated by the age range or a full roster still receives the handles in the RPC's answer (nothing renders them):
+    those gates are decided beside the settings read, and the RPC answers any caller its own guards let through.
+  - Fails closed: a failed or timed-out policy read is the "Couldn't reach the payment service" Retry, never "no
+    approval needed". The policy answers with no row when the payee has no settings row at all; then nothing is
+    offered, as before ("Host hasn't set up payment yet"), and PayPal's precondition would refuse such a player
+    anyway (HOST_APPROVAL_REQUIRED).
+  - PayPal: its config already comes from a public source (`getPayPalCheckoutConfig` → `get_game_host_paypal`), and
+    `paypal_payment_precondition` lets this viewer pay, so the button is drawn once the page has a payment setup
+    (it needed the settings row before). It still is not drawn without one: a PayPal config alone no longer turns the
+    page into an empty "How do you want to pay?" list.
+  - Every gate in front of the options is unchanged and still decides first: the entry block (#430/#436), "Before
+    you join", the age range, the guardian checks, the manual-claim hold (#440).
+  - Still read from the settings row only, so not shown to a viewer who cannot read it until they have paid or been
+    approved (then RLS lets them read it): the host's general payment instructions (`payment_instructions`; each
+    method's own instructions do come from the RPC), the payment deadline, and `entry_fee` (the page shows the
+    game's `price`, as the game page does for that viewer; PayPal charges `entry_fee`, computed on the server). If
+    the host changed the fee after creating the game, that viewer sees the old price until they can read the row.
+    Exposing these through a public RPC would need a migration and an owner decision; not done.
+
+- (e) **Full game on the pay page (owner decision 2026-11-20, "Continue session as you recommend").** Since #434
+  `private_sec.payment_claim_block` refuses a manual claim, and PayPal's precondition refuses checkout, from a player
+  not on the roster when the roster count is at least `GREATEST(max_players, 1)` (GAME_FULL), whatever the host
+  approved. The pay page only warned ("This game just filled up…") above the host's handles. Built on branch
+  claude/pay-fresh-viewer-methods:
+
+  - New block kind `full` in payEntryBlock, with the game page's words for a full roster ("The roster is full — no
+    spots left.", `ROSTER_FULL_MESSAGE`). Only a viewer on the roster, and the host, are exempt; a host-approved
+    viewer or one with a payment in is still blocked, as the database decides. Asked after the lock rules and
+    before the age range (the host's approval would not make room, so "Waiting on host approval" would mislead). It
+    outranks the approval card. `rosterIsFull` is the database's count rule.
+  - Count: the page's existing source, `hosted_games.joined` (game_participants_sync_count keeps it equal to the
+    participant rows), through the store's live count (`useHostedGameJoined`). It answers once the store's first load
+    from the database is in, or, for a game this browser had not saved, once the page's by-id lookup
+    (`fetchHostedGame`) has read the game from the database (review round 1: the store now records those reads, so
+    the count no longer waits for the full list of games). A copy restored from localStorage never counts. Fails
+    closed: until the count is known a viewer it could block sees "Loading payment options…", and a failed first
+    load of the store (with no by-id read) shows the Retry (which reloads it); a viewer on the roster and the host
+    never wait for it.
+  - A PayPal payment that fills the last place: the count (hosted_games channel) can reach the page before the
+    payer's own place (game_participants channel), or their place event can be lost. After the capture the page
+    re-reads the viewer's places (games-store `reloadRoster`) beside their payments, and until that read answers the
+    flow counts as loading (`payEntryFlow`), so the page shows "Loading payment options…", never the full block under
+    the payment that just went through. If the read finds no place (the server did not roster them), the block shows
+    with the refund line: a PayPal payment on this page counts as already paid. (Review round 1.)
+  - The block card replaces every payment option and the proof form. A viewer who was already shown how to pay (a
+    method picked, or Venmo/Cash App opened from the page) keeps the refund line ("If you already paid, message the
+    host to ask for a refund."). The soft warning and `showFilledUpWarning` are removed.
+
+  | Piece          | Where                                                                                                                    |
+  | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+  | Decisions      | `src/lib/pay-entry-gate.ts` (`paySetupFrom`, `rosterIsFull`, the `full` block, payEntryView's `roster`)                  |
+  | Unit tests     | `src/lib/pay-entry-gate.test.ts` (147; 31 new), `src/lib/roster-placeholders.test.ts` (wiring), `src/lib/games-store.test.tsx` (`reloadRoster`), `src/lib/game-participants-store.test.tsx` (count from a by-id read) |
+  | Pay page       | `src/routes/games.$gameId.pay.tsx`                                                                                       |
+  | E2E (real RLS) | `e2e/pay-fresh-viewer-methods.spec.ts`: real games, settings and method on the local stack (skips on any hosted project); 5 tests |
+  | E2E (mocked)   | `e2e/pay-entry-blocked.spec.ts` (4 new full-game tests)                                                                  |
 
 ## 7. Product decision: should paid joins show "Before you join"?
 
@@ -692,3 +767,40 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
   `e2e/pay-*.spec.ts` and `e2e/invite-pay-and-join*.spec.ts`: 21 files, **43 passed** (pay-manual-guardian-hold: 7).
   Mutation check: with PayPal never drawn beside the check's loading or failed state, and with the Payments tab
   always showing handles, the three tests that cover these fail; the other four pass.
+
+### Section 6 (c) and (e) (branch claude/pay-fresh-viewer-methods, owner decision 2026-11-20)
+
+- No migration, no SQL test: client only.
+- `npx vitest run` (full): 450 files, 4785 passed, 22 skipped. pay-entry-gate.test.ts: 137 (21 new).
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh (this branch's migrations, #440's 20261124200000 included): all
+  `e2e/pay-*.spec.ts` (including the new pay-fresh-viewer-methods) and `e2e/invite-pay-and-join*.spec.ts`: 22 files,
+  **50 passed**, 0 failed (4.5 min).
+- Negative control: with the pay page (and spots-urgency) as they were on the base commit, all three
+  pay-fresh-viewer-methods tests fail against the real database: the open game shows "Host hasn't set up payment
+  yet", the approval game shows the same instead of "Waiting on host approval", and the full game shows no block.
+- Mutation check: with payEntryView never treating the roster as full, 4 unit tests fail and the four full-game E2E
+  tests (three mocked, one real) fail; the other ten tests in those two files, the rostered-viewer one included,
+  pass.
+
+Review round 1 (same branch, reviewer verdict "approve", three low findings, all fixed; client only, no migration):
+
+- (1) A PayPal payment that fills the last place no longer shows the full block under it: the page re-reads the
+  payer's places after the capture (`reloadRoster`) and waits for that read (`payEntryFlow`); a payer the server did
+  not roster gets the block with the refund line. (2) The roster count answers from the page's by-id read of a game
+  the store had not loaded (`fetchHostedGame` records it; `useHostedGameJoined` trusts it), instead of a branch that
+  never ran; 6 (e) now says what the code does. (3) On an approval-required game the methods RPC is not called for a
+  viewer the host has not approved (`payMethodsHeldForApproval`); it is called after the approval.
+- `npx vitest run` (full): 450 files, 4799 passed, 22 skipped. pay-entry-gate.test.ts: 147 (10 new);
+  games-store.test.tsx: 24 (2 new); game-participants-store.test.tsx: 6 (1 new); roster-placeholders.test.ts: 7 (1
+  new).
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh: all `e2e/pay-*.spec.ts` and `e2e/invite-pay-and-join*.spec.ts`: 22 files,
+  **52 passed**, 0 failed (3.8 min). pay-fresh-viewer-methods: 5 (2 new: a pending player who is approved while the
+  page is open, with no methods RPC before; the full block with the store's list of games refused).
+- Negative control: with the store not recording by-id reads, the new store unit test and the "list of games
+  refused" E2E fail (the page shows the Retry); with the methods never held, both approval-game E2E tests fail on
+  "no methods RPC". The PayPal capture itself is not driven in E2E (PayPal's SDK is external): its re-read is covered
+  by the unit tests above and a wiring test.
