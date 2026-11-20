@@ -28,6 +28,8 @@
  * host and wrong, read the other way, for a host messaging that player.
  */
 
+import { userErrorMessage } from "@/lib/user-error";
+
 export const MINOR_MESSAGING_PREFIX = "MINOR_MESSAGING_BLOCKED:";
 
 export type MinorMessagingReason =
@@ -195,18 +197,18 @@ export function minorMessagingMessage(
 
 /**
  * The message for any failure to open a conversation or send a message: the
- * explained version when it is a minor-messaging refusal, otherwise whatever
- * the caller raised. `to` is who the viewer was trying to reach.
+ * explained version when it is a minor-messaging refusal, otherwise what
+ * userErrorMessage makes of it (a catalog or generic sentence, else
+ * `fallback`), never the raw database text (WP 4.0). `to` is who the viewer
+ * was trying to reach.
+ *
+ * user-error.ts imports this module too; both sides only call each other's
+ * functions at run time, so the cycle is safe.
  */
 export function describeMessagingError(
   error: unknown,
-  fallback = "Couldn't open chat",
+  fallback = "Couldn't open chat. Please try again.",
   to: MessagingRecipient = "player",
 ): string {
-  return (
-    minorMessagingMessage(error, to) ??
-    ((error as { message?: unknown } | null)?.message
-      ? String((error as { message: unknown }).message)
-      : fallback)
-  );
+  return minorMessagingMessage(error, to) ?? userErrorMessage(error, fallback);
 }

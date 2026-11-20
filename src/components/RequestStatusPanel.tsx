@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, XCircle, Info, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   cancelContactRequest,
   getExistingContactRequest,
@@ -129,9 +130,9 @@ export function RequestStatusPanel({
       setLocalRefresh((k) => k + 1);
       onCancelled?.();
       setConfirmOpen(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("Couldn't cancel request", {
-        description: e?.message ?? "Please try again in a moment.",
+        description: userErrorMessage(e, "Please try again in a moment."),
       });
     } finally {
       setCancelling(false);

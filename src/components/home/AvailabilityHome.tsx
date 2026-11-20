@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, CalendarDays, ChevronRight, Mail, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,7 +116,7 @@ function Section({
       toast.success("Thanks, you're listed for 2 more weeks");
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update your availability");
+      toast.error(userErrorMessage(e, "Couldn't update your availability. Please try again."));
     } finally {
       setBusy(false);
     }

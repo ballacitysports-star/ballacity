@@ -78,11 +78,13 @@ describe("ThreadSafetyDialog", () => {
     expect(h.toast.success).toHaveBeenCalledWith("Sam unblocked.");
   });
 
-  it("says so when the block could not be saved", async () => {
+  it("says so when the block could not be saved, without the raw error text", async () => {
     h.toggle.mockRejectedValueOnce(new Error("boom"));
     setup();
     fireEvent.click(screen.getByRole("button", { name: /Block Sam/ }));
     fireEvent.click(screen.getByRole("button", { name: "Block" }));
-    await waitFor(() => expect(h.toast.error).toHaveBeenCalledWith("boom"));
+    await waitFor(() =>
+      expect(h.toast.error).toHaveBeenCalledWith("Couldn't update the block. Please try again."),
+    );
   });
 });

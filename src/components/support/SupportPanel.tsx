@@ -27,6 +27,7 @@ import {
 import { EMERGENCY_NOTICE } from "@/lib/safety";
 import { SUPPORT_EMAIL } from "@/lib/trust";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 const chip =
   "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold hover:bg-background";
@@ -169,9 +170,8 @@ export function SupportPanel({
         source: reply.source,
       });
     } catch (e) {
-      setError(
-        e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.",
-      );
+      // AI sentences are vetted and pass through; anything else reads as a full sentence (the line goes on after it).
+      setError(userErrorMessage(e, "Support chat isn't answering right now."));
     } finally {
       setPending(false);
     }

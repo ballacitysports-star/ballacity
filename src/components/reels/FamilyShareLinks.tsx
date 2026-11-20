@@ -18,6 +18,7 @@ import {
   revokeFamilyPostLink,
 } from "@/lib/family-share.functions";
 import { SHARE_LINK_DEFAULT_DAYS, shareLinkStatus, shareUrl } from "@/lib/family-share";
+import { userErrorMessage } from "@/lib/user-error";
 
 export function FamilyShareLinks({ reelId }: { reelId: string }) {
   const qc = useQueryClient();
@@ -62,8 +63,9 @@ export function FamilyShareLinks({ reelId }: { reelId: string }) {
       setFresh(url);
       void copy(url);
       await qc.invalidateQueries({ queryKey: ["family-share-links", reelId] });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not create the link");
+    } catch (e: unknown) {
+      // The FAMILY_SHARE_* refusals read as their catalog sentences (shareErrorMessage); never the raw text (WP 4.0).
+      toast.error(userErrorMessage(e, "Couldn't create the link. Please try again."));
     } finally {
       setBusy(null);
     }
@@ -76,8 +78,8 @@ export function FamilyShareLinks({ reelId }: { reelId: string }) {
       toast.success("Link turned off");
       setFresh(null);
       await qc.invalidateQueries({ queryKey: ["family-share-links", reelId] });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not turn off the link");
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't turn off the link. Please try again."));
     } finally {
       setBusy(null);
     }

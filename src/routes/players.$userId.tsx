@@ -20,6 +20,7 @@ import {
 import { usePublicPrivacyFlags } from "@/lib/privacy";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -245,7 +246,8 @@ function PlayerProfilePage() {
         .maybeSingle(),
     ]).then(([prof, avail]) => {
       if (cancelled) return;
-      if (prof.error) toast.error(prof.error.message);
+      if (prof.error)
+        toast.error(userErrorMessage(prof.error, "Couldn't load this profile. Please try again."));
       setProfile((prof.data as ProfileRow) ?? null);
       (supabase.rpc as any)("profile_ages", { _ids: [userId] }).then(
         ({ data }: { data: { age: number | null }[] | null }) => {

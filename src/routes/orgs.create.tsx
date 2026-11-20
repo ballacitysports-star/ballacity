@@ -16,6 +16,23 @@ import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { SaveStatus } from "@/components/SaveStatus";
 import { FinishSetupNotice } from "@/components/FinishSetupNotice";
+import { USER_ERROR_MESSAGES, errorText, userErrorMessage } from "@/lib/user-error";
+
+/** requireAccountType's own sentence; shown as it is (WP 4.0). */
+const NO_PROFILE_YET = "Your account has no profile yet. Please sign in again.";
+
+/**
+ * What the create form shows when createStandaloneOrg fails: the taken-handle sentence for trainer_orgs' unique
+ * handle (the server rethrows the bare message, so the SQLSTATE is gone), our own sentence, else userErrorMessage.
+ */
+function createOrgErrorMessage(e: unknown): string {
+  const text = errorText(e) ?? "";
+  if (text === NO_PROFILE_YET) return text;
+  if (/duplicate key value|violates unique constraint/i.test(text) && /handle/i.test(text)) {
+    return USER_ERROR_MESSAGES.HANDLE_TAKEN;
+  }
+  return userErrorMessage(e, "Couldn't create your gym. Please try again.");
+}
 
 const DRAFT_KEY = "openrun:draft:create-org";
 
@@ -95,7 +112,7 @@ function CreateOrg() {
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create");
+      toast.error(createOrgErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

@@ -472,6 +472,88 @@ export const FEATURE_ERROR_MESSAGES = {
   signupNotAllowed: "You can only change your own or your linked children's sign-ups.",
 } as const;
 
+/**
+ * Refusals some database functions and triggers raise as a plain sentence with no code, and the sentence each reads
+ * as. They tell the member why the action can't work (retrying won't help), so they must not fall to a "Please try
+ * again" fallback. Each pattern matches the whole message, so a sentence wrapped in other text is not taken for one.
+ */
+export const DATABASE_SENTENCE_REFUSALS: readonly { when: RegExp; message: string }[] = [
+  // enforce_review_integrity (20261108100000_minor_review_privacy.sql).
+  {
+    when: /^The 14-day review window for this game has closed\.?$/,
+    message: "The 14-day review window for this game has closed.",
+  },
+  {
+    when: /^Daily review limit reached\. Try again tomorrow\.?$/,
+    message: "You've reached today's review limit. Try again tomorrow.",
+  },
+  {
+    when: /^You can only review people you have played, trained or teamed up with\.?$/,
+    message: "You can only review people you have played, trained or teamed up with.",
+  },
+  {
+    when: /^Review is too long \(max 2000 characters\)\.?$/,
+    message: "Your review is too long. Keep it under 2,000 characters.",
+  },
+  {
+    when: /^Review must be at least 8 characters\.?$/,
+    message: "Your review is too short. Write at least 8 characters.",
+  },
+  {
+    when: /^Title too long \(max 120 characters\)\.?$/,
+    message: "That title is too long. Keep it under 120 characters.",
+  },
+  { when: /^Pick up to 5 tags\.?$/, message: "Pick up to 5 tags." },
+  // validate_join_request (20261103140000_payment_settings_host_guard.sql).
+  { when: /^This game has ended\.?$/, message: USER_ERROR_MESSAGES.GAME_COMPLETED },
+  // Also guardian_cancel_child_game (20261008160000).
+  { when: /^This game has already started\.?$/, message: "This game has already started." },
+  {
+    when: /^Signups are closed for this game\.?$/,
+    message: USER_ERROR_MESSAGES.GAME_SIGNUP_CLOSED,
+  },
+  {
+    when: /^Hosts cannot request to join their own game\.?$/,
+    message: "You're hosting this game, so you don't need to request to join it.",
+  },
+  // validate_join_request and the venue join-request trigger (20260719232124).
+  {
+    when: /^Message too long \(max 500 characters\)\.?$/,
+    message: "Your message is too long. Keep it under 500 characters.",
+  },
+  // guardian_cancel_child_game (20261008160000_guardian_cancel_child_game.sql).
+  { when: /^Game not found\.?$/, message: "This game is no longer available." },
+  {
+    when: /^This game is no longer on\.?$/,
+    message: "This game was cancelled or has already ended.",
+  },
+  {
+    when: /^You can only cancel for a child linked to your account\.?$/,
+    message: "You can only cancel for a child linked to your account.",
+  },
+  // approve_org_member_request / deny_org_member_request (20260719232124).
+  {
+    when: /^Request is no longer pending\.?$/,
+    message: "This request was already handled. Refresh to see it.",
+  },
+  {
+    when: /^Request not found\.?$/,
+    message: "This request no longer exists. Refresh to see the latest.",
+  },
+  {
+    when: /^Already a member of this organization\.?$/,
+    message: "You're already a member of this venue.",
+  },
+  // accept_trainer_org_invite (20261027160000_trainer_org_no_forged_affiliation.sql).
+  { when: /^Invite is no longer pending\.?$/, message: USER_ERROR_MESSAGES.INVITE_NOT_PENDING },
+  { when: /^Invite not found\.?$/, message: USER_ERROR_MESSAGES.INVITE_NOT_FOUND },
+  // mark_refund_sent (20261008170000_guardian_refund_notices.sql).
+  {
+    when: /^Payment not found\.?$/,
+    message: "This payment no longer exists. Refresh to see the latest.",
+  },
+];
+
 /** The sentences for failures that carry no code of ours. */
 export const GENERIC_ERROR_MESSAGES = {
   offline: "We couldn't connect. Check your internet connection and try again.",
@@ -495,6 +577,7 @@ const VETTED: ReadonlySet<string> = new Set<string>([
   ...Object.values(USER_ERROR_MESSAGES),
   ...USER_ERROR_VARIANTS.map((v) => v.message),
   ...Object.values(FEATURE_ERROR_MESSAGES),
+  ...DATABASE_SENTENCE_REFUSALS.map((r) => r.message),
   ...Object.values(GENERIC_ERROR_MESSAGES),
   ...Object.values(AI_ERROR_MESSAGES),
   ...PAYMENT_POLICY_MESSAGES,
@@ -569,7 +652,8 @@ export function errorCode(err: unknown): string | undefined {
 
 /**
  * The catalog sentence for an error we know: one carrying a catalog code (worded per its detail text where the
- * database raises it in several situations), or one whose message is already one of our sentences. Undefined
+ * database raises it in several situations), a plain-sentence database refusal (DATABASE_SENTENCE_REFUSALS), or one
+ * whose message is already one of our sentences. Undefined
  * otherwise; no generic shapes and no fallback, so feature mappers can keep their own.
  */
 export function knownErrorMessage(err: unknown): string | undefined {
@@ -582,6 +666,8 @@ export function knownErrorMessage(err: unknown): string | undefined {
     const variant = USER_ERROR_VARIANTS.find((v) => v.code === code && v.when.test(text));
     return variant?.message ?? USER_ERROR_MESSAGES[code];
   }
+  const refusal = DATABASE_SENTENCE_REFUSALS.find((r) => r.when.test(text));
+  if (refusal) return refusal.message;
   return VETTED.has(text) ? text : undefined;
 }
 

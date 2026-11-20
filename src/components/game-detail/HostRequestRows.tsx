@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { reviewJoinRequest, type JoinRequest } from "@/lib/payments";
 import { HOST_APPROVE_NOTE, hostBadge } from "@/lib/join-guardian-status";
 import { supabase } from "@/integrations/supabase/client";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   blockConfirmText,
   blockPlayer,
@@ -60,7 +61,7 @@ export function HostRequestRow({
       await reviewJoinRequest(req.id, status, reason ?? undefined);
     } catch (e: unknown) {
       rollback();
-      toast.error((e as { message?: string } | null)?.message);
+      toast.error(userErrorMessage(e, "Couldn't update this request. Please try again."));
       setBusy(false);
       return false;
     }
@@ -226,7 +227,7 @@ export function HostPendingChip({
       await reviewJoinRequest(req.id, status, reason ?? undefined);
     } catch (e: unknown) {
       rollback();
-      toast.error((e as { message?: string } | null)?.message);
+      toast.error(userErrorMessage(e, "Couldn't update this request. Please try again."));
       setBusy(false);
       return false;
     }

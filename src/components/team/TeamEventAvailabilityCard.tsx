@@ -3,12 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
+import { errorText } from "@/lib/user-error";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyTeamAvailability, setTeamEventAvailability } from "@/lib/team-availability.functions";
 import {
   AVAILABILITY_LABEL,
   AVAILABILITY_STATUSES,
+  describeAvailabilityError,
   type AvailabilityStatus,
 } from "@/lib/team-availability";
 
@@ -52,7 +54,7 @@ export function TeamEventAvailabilityCard({ teamId }: { teamId: string }) {
       await save({ data: { postId, userId, status: current === next ? null : next } });
       await qc.invalidateQueries({ queryKey: key });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save your availability.");
+      toast.error(describeAvailabilityError(errorText(e)));
     } finally {
       setSaving(null);
     }

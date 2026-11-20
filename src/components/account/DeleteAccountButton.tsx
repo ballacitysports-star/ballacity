@@ -7,6 +7,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { signOut, useAuth } from "@/hooks/use-auth";
 import { deleteMyAccount } from "@/lib/account.functions";
 import { isManagedUser } from "@/lib/managed-children";
+import { userErrorMessage } from "@/lib/user-error";
+
+/** A refusal this screen words itself (password checks); shown as it is. */
+class DeleteRefusal extends Error {}
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -58,16 +62,20 @@ export function DeleteAccountButton() {
     setBusy(true);
     try {
       if (hasPassword) {
-        if (!password) throw new Error("Please enter your password to confirm.");
+        if (!password) throw new DeleteRefusal("Please enter your password to confirm.");
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error("Incorrect password. Please try again.");
+        if (error) throw new DeleteRefusal("Incorrect password. Please try again.");
       }
       await del();
       await supabase.auth.signOut();
       toast.success("Your account has been deleted.");
       navigate({ to: "/" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to delete account");
+      toast.error(
+        e instanceof DeleteRefusal
+          ? e.message
+          : userErrorMessage(e, "Couldn't delete your account. Please try again."),
+      );
       setBusy(false);
     }
   };

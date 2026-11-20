@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BadgeCheck, CalendarDays, Clock, EyeOff, MapPin, Plus, Users } from "lucide-react";
 import { fetchHostedGamesForOrg, hideGameFromOrg } from "@/lib/hosted-games-store";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   FACILITY_EVENT_KINDS,
   classifyFacilityEvent,
@@ -163,7 +164,8 @@ export function FacilityEventsSection({
       toast.success("Hidden from your facility page");
       qc.invalidateQueries({ queryKey: ["org-events", orgId] });
     },
-    onError: (e: Error) => toast.error(e.message || "Couldn't hide that run"),
+    onError: (e: Error) =>
+      toast.error(userErrorMessage(e, "Couldn't hide that run. Please try again.")),
   });
   const q = useQuery({
     queryKey: ["org-events", orgId],

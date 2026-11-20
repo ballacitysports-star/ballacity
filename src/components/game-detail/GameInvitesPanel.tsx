@@ -42,6 +42,15 @@ import {
   type CandidateState,
 } from "@/lib/host-invites";
 import type { Game } from "@/lib/sample-data";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** createHostGroup's own sentence when the host's session is gone; shown as it is. */
+const GROUP_SIGN_IN_FIRST = "Sign in first.";
+
+/** What a failed group save or delete reads as: the catalog's words (GROUP_LIMIT and the rest), never raw text. */
+function groupErrorMessage(e: unknown, fallback: string): string {
+  return errorText(e) === GROUP_SIGN_IN_FIRST ? GROUP_SIGN_IN_FIRST : userErrorMessage(e, fallback);
+}
 
 const STATUS_LABEL: Record<GameInvite["status"], string> = {
   pending: "Waiting",
@@ -366,7 +375,7 @@ function InviteRegularsSheet({
       await qc.invalidateQueries({ queryKey: ["host-groups"] });
       setGroupId(id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save the group.");
+      toast.error(groupErrorMessage(e, "Couldn't save the group. Please try again."));
     } finally {
       setSavingGroup(false);
     }
@@ -380,7 +389,7 @@ function InviteRegularsSheet({
       setGroupId(null);
       await qc.invalidateQueries({ queryKey: ["host-groups"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't delete the group.");
+      toast.error(groupErrorMessage(e, "Couldn't delete the group. Please try again."));
     }
   };
 

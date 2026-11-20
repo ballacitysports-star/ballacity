@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarClock, ClipboardList, Dumbbell, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,9 @@ import {
   listMyTrainerRequests,
   type TrainerSessionRequest,
 } from "@/lib/trainer-requests";
+
+/** cancelTrainerSessionRequest's own sentence (trainer-requests.ts); shown as it is. */
+const SESSION_NOT_CANCELLABLE = "This session can't be cancelled anymore.";
 
 type Item = {
   key: string;
@@ -171,7 +175,12 @@ export function MySignups() {
       setTarget(null);
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not cancel.");
+      const text = errorText(e);
+      toast.error(
+        text === SESSION_NOT_CANCELLABLE
+          ? text
+          : userErrorMessage(e, "Couldn't cancel your signup. Please try again."),
+      );
     } finally {
       setBusy(false);
     }

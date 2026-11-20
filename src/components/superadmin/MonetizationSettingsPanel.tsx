@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { AlertTriangle, Lock, RotateCcw, ShieldCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +97,11 @@ export function MonetizationSettingsPanel() {
       void qc.invalidateQueries({ queryKey: ["monetization-config"] });
     } catch (e) {
       setLocal(prev);
-      toast.error(e instanceof Error ? e.message : "Could not save setting");
+      // Superadmin screen: a readable sentence with the code for support, never raw database text (WP 4.0).
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setSaving(false);
     }

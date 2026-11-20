@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { createAvailability } from "@/lib/availability";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   AVAILABILITY_INTENTS,
   INTENT_LABEL,
@@ -110,7 +111,12 @@ export function QuickAvailabilitySheet({
       await createAvailability(built.payload);
       onPosted();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't post your availability. Try again.");
+      // createAvailability's own sign-in sentence still shows; anything else is never raw text (WP 4.0).
+      toast.error(
+        errorText(e) === "Sign in to post availability."
+          ? "Sign in to post availability."
+          : userErrorMessage(e, "Couldn't post your availability. Please try again."),
+      );
     } finally {
       setSaving(false);
     }

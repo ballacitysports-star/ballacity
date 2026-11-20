@@ -2,7 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  ATTACHMENT_TOO_LARGE_MESSAGE,
+  ATTACHMENT_TYPE_MESSAGE,
   MAX_ATTACHMENT_BYTES,
+  UNSAFE_ATTACHMENT_MESSAGE,
   attachmentProblem,
   classifyAttachment,
   parseAttachmentPath,
@@ -47,14 +50,14 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
     if (dlErr || !blob) throw new Error("Uploaded file could not be read");
     if (blob.size > MAX_ATTACHMENT_BYTES) {
       await remove();
-      throw new Error("Attachment too large (max 20MB).");
+      throw new Error(ATTACHMENT_TOO_LARGE_MESSAGE);
     }
     const buffer = new Uint8Array(await blob.arrayBuffer());
     const problem = attachmentProblem(buffer);
     const checked = problem ? null : classifyAttachment(buffer);
     if (problem || !checked) {
       await remove();
-      throw new Error(problem ?? "That file type is not allowed.");
+      throw new Error(problem ?? ATTACHMENT_TYPE_MESSAGE);
     }
 
     if (checked.kind === "image") {
@@ -84,7 +87,7 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
             source: "image_upload",
           });
         }
-        throw new Error("That picture can't be sent.");
+        throw new Error(UNSAFE_ATTACHMENT_MESSAGE);
       }
     }
 

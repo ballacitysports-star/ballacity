@@ -97,6 +97,7 @@ import { familyPostErrorMessage } from "@/lib/family-posts";
 import { useMyChildren } from "@/lib/child-safety";
 import { ReelProgress } from "@/components/reels/ReelProgress";
 import { teenReelState } from "@/lib/teen-reel-privacy";
+import { userErrorMessage } from "@/lib/user-error";
 import { AnalyticsCoachShare } from "@/components/reels/AnalyticsCoachShare";
 import { ReelFollowUp } from "@/components/reels/ReelFollowUp";
 import { compareToPrior, findPriorReel } from "@/lib/reel-trends";
@@ -105,6 +106,21 @@ import { ReelPrivacyPanel } from "@/components/reels/ReelPrivacyPanel";
 import { useMyCohort } from "@/lib/youth-features";
 import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
 import { PreviewGate } from "@/components/public/PreviewGate";
+
+/** An upload problem this page words itself, so its sentence shows as it is; anything else never shows raw (WP 4.0). */
+class ReelUploadProblem extends Error {}
+
+/**
+ * The stored `error_message` of a failed reel can be the worker's raw catch text (AI, ffmpeg, storage), so only the
+ * sentences we write there ourselves are shown: the plan's clip-length refusal and the AI-off notice.
+ */
+const REEL_FAILURE_FALLBACK = "This clip couldn't be processed. Try uploading it again.";
+function reelFailureMessage(stored: string | null | undefined): string {
+  const text = stored?.trim() ?? "";
+  if (/^This clip is [\d:]+ long\. Your plan allows clips up to [\d:]+\.$/.test(text)) return text;
+  if (text.startsWith("AI analysis is turned off for this account")) return text;
+  return REEL_FAILURE_FALLBACK;
+}
 
 export const Route = createFileRoute("/_tabs/reels")({
   // `child` is optional so the existing links to this page need no change.
@@ -251,7 +267,7 @@ function ReelCard({
         reel.hidden_at ? "Reel is visible on your profile again" : "Reel hidden from your profile",
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not update this reel");
+      toast.error(userErrorMessage(e, "Couldn't update this reel. Please try again."));
     } finally {
       setManageBusy(null);
     }
@@ -364,7 +380,9 @@ function ReelCard({
           )}
 
           {reel.status === "failed" && reel.error_message && (
-            <p className="mt-1 text-[10px] text-amber-300">{reel.error_message}</p>
+            <p className="mt-1 text-[10px] text-amber-300">
+              {reelFailureMessage(reel.error_message)}
+            </p>
           )}
           {(reel.status === "failed" || isProcessing) && (
             <button
@@ -433,7 +451,7 @@ function ReelCard({
                   await deleteReel({ data: { reelId: reel.id } });
                   toast.success("Reel deleted");
                 } catch (e: any) {
-                  toast.error(e?.message ?? "Could not delete this reel");
+                  toast.error(userErrorMessage(e, "Couldn't delete this reel. Please try again."));
                 } finally {
                   setManageBusy(null);
                   setConfirmDelete(false);
@@ -513,7 +531,7 @@ function ReelCard({
               toast.success("Reel title updated");
               setRenaming(false);
             } catch (err: any) {
-              toast.error(err?.message ?? "Could not rename this reel");
+              toast.error(userErrorMessage(err, "Couldn't rename this reel. Please try again."));
             } finally {
               setSavingName(false);
             }
@@ -659,7 +677,9 @@ function ReelCard({
                     toast.success("Restyling your reel — same footage, new style");
                     setShowRestyle(false);
                   } catch (e: any) {
-                    toast.error(e?.message ?? "Could not restyle this reel");
+                    toast.error(
+                      userErrorMessage(e, "Couldn't restyle this reel. Please try again."),
+                    );
                   } finally {
                     setRestyling(false);
                   }
@@ -948,7 +968,7 @@ function ReelsPage() {
     try {
       await processMyReels({ data: reelId ? { reelId } : {} });
     } catch (e: any) {
-      toast.error(e?.message ?? "AI processing could not start — try again");
+      toast.error(userErrorMessage(e, "Couldn't start AI processing. Please try again."));
     }
   }
 
@@ -981,14 +1001,14 @@ function ReelsPage() {
       // arrived as. The old extension/MIME allowlist rejected .avi/.mkv/.wmv
       // outright, which are exactly the formats the converter below handles.
       const invalid = validateVideoSize({ bytes: file.size });
-      if (invalid) throw new Error(invalid);
+      if (invalid) throw new ReelUploadProblem(invalid);
 
       // The plan's clip limits, checked here so an over-limit clip is refused
       // before minutes of conversion and upload. The server re-checks both on
       // finalize; if this lookup fails, that check still stands.
       const clipLimits: ClipLimits | null = await getMyClipLimits().catch(() => null);
       const tooBig = clipLimits ? uploadSizeProblem(file.size, clipLimits) : null;
-      if (tooBig) throw new Error(tooBig);
+      if (tooBig) throw new ReelUploadProblem(tooBig);
 
       // What the clip actually is (length, size, which way up). Measured here
       // because the server runtime has no ffprobe; kept so a viewer's player and
@@ -1006,7 +1026,7 @@ function ReelsPage() {
         );
         toast.dismiss(cleanId);
         if (!clean) {
-          throw new Error(
+          throw new ReelUploadProblem(
             "We couldn't remove the location info from this clip, so nothing was uploaded. Try a shorter clip, or a desktop browser.",
           );
         }
@@ -1017,7 +1037,7 @@ function ReelsPage() {
       const tooLong = clipLimits
         ? clipLengthProblem(originalProbe.durationSeconds, clipLimits)
         : null;
-      if (tooLong) throw new Error(tooLong);
+      if (tooLong) throw new ReelUploadProblem(tooLong);
 
       // Convert BEFORE storing anything. This ordering is the whole fix: the
       // conversion used to run after the upload and after a container gate that
@@ -1051,7 +1071,7 @@ function ReelsPage() {
         if (!result) {
           toast.dismiss(toastId);
           if (mustShrink && clipLimits) {
-            throw new Error(
+            throw new ReelUploadProblem(
               `${resolutionProblem(originalProbe, clipLimits)} It couldn't be resized on this device. Record at a lower resolution, or try again on a desktop browser.`,
             );
           }
@@ -1059,7 +1079,7 @@ function ReelsPage() {
           // kinder than storing a reel that shows a dead player to everyone who
           // opens it; the two things that actually work are named so the athlete
           // has a next step rather than just a rejection.
-          throw new Error(
+          throw new ReelUploadProblem(
             "This clip couldn't be prepared for playback on this device. Try again on a desktop browser, or re-upload it from your Photos app.",
           );
         }
@@ -1242,7 +1262,10 @@ function ReelsPage() {
       toast.error(
         e instanceof ConverterUnavailableError
           ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
-          : (familyPostErrorMessage(e) ?? e?.message ?? "Upload failed"),
+          : e instanceof ReelUploadProblem
+            ? e.message
+            : (familyPostErrorMessage(e) ??
+              userErrorMessage(e, "Upload failed. Please try again.")),
       );
     } finally {
       setBusy(false);
@@ -1282,7 +1305,7 @@ function ReelsPage() {
       if ("error" in result) throw new Error(result.error);
       window.open(result.url, "_blank");
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not open billing portal");
+      toast.error(userErrorMessage(e, "Couldn't open the billing portal. Please try again."));
     }
   }
 

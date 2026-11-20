@@ -51,6 +51,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { Switch } from "@/components/ui/switch";
 import { listMyOrgs, deleteTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { DeleteAccountButton } from "@/components/account/DeleteAccountButton";
@@ -398,8 +399,8 @@ function AvatarPrivacySection() {
     try {
       await update(next);
       toast.success(`Photo visible to: ${avatarVisibilityLabel(next)}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't save privacy setting");
+    } catch (e) {
+      toast.error(userErrorMessage(e, "Couldn't save your privacy setting. Please try again."));
     }
   };
 
@@ -475,7 +476,7 @@ function MyOrgsSection() {
       qc.invalidateQueries({ queryKey: ["trainer-org"] });
       qc.invalidateQueries({ queryKey: ["orgs-index"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to delete"),
+    onError: (e) => toast.error(userErrorMessage(e, "Couldn't delete that gym. Please try again.")),
   });
 
   if (!orgs || orgs.length === 0) return null;

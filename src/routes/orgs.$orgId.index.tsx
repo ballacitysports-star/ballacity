@@ -5,6 +5,7 @@ import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
+import { userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import { EntityFollowerCount, FollowEntityButton } from "@/components/FollowEntityButton";
 import {
@@ -97,7 +98,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't load this gym"
-      message={error instanceof Error ? error.message : "Something went wrong."}
+      message={userErrorMessage(error, "This gym couldn't be loaded. Please try again.")}
       error={error}
       onRetry={reset}
       action={
@@ -188,7 +189,7 @@ function OrgPage() {
       qc.invalidateQueries({ queryKey: ["trainer-org-requests", orgId] });
       qc.invalidateQueries({ queryKey: ["trainer-org", orgId] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't review this request. Please try again."));
     }
   }
 
@@ -384,7 +385,7 @@ function MembershipCta({
                 toast.success("Left gym");
                 invalidate();
               } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Failed");
+                toast.error(userErrorMessage(e, "Couldn't leave this gym. Please try again."));
               }
             }}
           >
@@ -424,7 +425,7 @@ function MembershipCta({
               toast.success("Joined gym");
               invalidate();
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed");
+              toast.error(userErrorMessage(e, "Couldn't accept this invite. Please try again."));
             }
           }}
         >
@@ -440,7 +441,7 @@ function MembershipCta({
               });
               invalidate();
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed");
+              toast.error(userErrorMessage(e, "Couldn't decline this invite. Please try again."));
             }
           }}
         >
@@ -484,7 +485,7 @@ function RequestToJoin({
       toast.success("Join request sent");
       onDone();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't send your request. Please try again."));
     } finally {
       setPending(false);
     }
@@ -534,7 +535,7 @@ function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean })
       toast.success("Member removed");
       qc.invalidateQueries({ queryKey: ["org-members", orgId] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't remove this member. Please try again."));
     }
   }
 
@@ -636,7 +637,7 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
               qc.invalidateQueries({ queryKey: ["my-org-access", orgId] });
               qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed");
+              toast.error(userErrorMessage(e, "Couldn't leave this gym. Please try again."));
             }
           }}
         >
@@ -663,7 +664,7 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
               toast.success("Withdrawn");
               qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Failed");
+              toast.error(userErrorMessage(e, "Couldn't withdraw your request. Please try again."));
             }
           }}
         >
@@ -684,7 +685,7 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
       setMessage("");
       qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't send your request. Please try again."));
     } finally {
       setPending(false);
     }
@@ -754,7 +755,7 @@ function AdminMemberRequests({ orgId }: { orgId: string }) {
       toast.success("Approved");
       invalidate();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't approve this request. Please try again."));
     }
   }
 
@@ -768,7 +769,7 @@ function AdminMemberRequests({ orgId }: { orgId: string }) {
       setReason("");
       invalidate();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't deny this request. Please try again."));
     } finally {
       setBusy(false);
     }

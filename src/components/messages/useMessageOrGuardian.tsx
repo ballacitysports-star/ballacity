@@ -7,7 +7,9 @@ import {
   describeMessagingError,
   isMinorMessagingBlock,
   parseMinorMessagingBlock,
+  type MessagingRecipient,
 } from "@/lib/minor-messaging";
+import { errorText } from "@/lib/user-error";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +20,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+/** getOrCreateDirectConversation's own sentence when the session is gone; shown as it is (WP 4.0). */
+const SIGN_IN_TO_MESSAGE = "Sign in to send messages.";
+
+/** describeMessagingError (never raw text), keeping our own sign-in sentence. */
+function messagingErrorMessage(e: unknown, fallback?: string, to?: MessagingRecipient): string {
+  return errorText(e) === SIGN_IN_TO_MESSAGE
+    ? SIGN_IN_TO_MESSAGE
+    : describeMessagingError(e, fallback, to);
+}
 
 type Blocked = { childId: string; childName: string; guardianId: string | null; reason: string };
 
@@ -43,7 +55,7 @@ export function useMessageOrGuardian() {
       // about *their* account. When it is the viewer's own restriction, say
       // so and stop.
       if (!isMinorMessagingBlock(e) || parseMinorMessagingBlock(e)?.side === "self") {
-        toast.error(describeMessagingError(e));
+        toast.error(messagingErrorMessage(e));
         return;
       }
       const { data } = await supabase.rpc("public_minor_guardian", { _child: userId });
@@ -69,7 +81,9 @@ export function useMessageOrGuardian() {
       setBlocked(null);
       navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
     } catch (e) {
-      toast.error(describeMessagingError(e, "Couldn't contact the guardian.", "guardian"));
+      toast.error(
+        messagingErrorMessage(e, "Couldn't contact the guardian. Please try again.", "guardian"),
+      );
     } finally {
       setBusy(false);
     }

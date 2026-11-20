@@ -24,6 +24,7 @@ import {
   type Adjust,
 } from "@/lib/image-filters";
 import { removeBackground } from "@/lib/bg-remove.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCropGestures } from "@/hooks/use-crop-gestures";
 import { CropOverlay } from "@/components/crop/CropOverlay";
@@ -284,7 +285,13 @@ export function ImageEditorDialog({
       setHasAlpha(true);
       toast.success("Background removed");
     } catch (e: any) {
-      toast.error(e?.message ?? "Background removal failed");
+      // removeBackground's own size refusal shows as it is; anything else never shows raw (WP 4.0).
+      const text = errorText(e) ?? "";
+      toast.error(
+        text === "Image too large — please crop first"
+          ? text
+          : userErrorMessage(e, "Couldn't remove the background. Please try again."),
+      );
     } finally {
       setBgRemoving(false);
     }
@@ -545,9 +552,7 @@ export function ImageEditorDialog({
               </IconBtn>
             </div>
             <div className="flex items-center gap-3">
-              <span className="w-16 shrink-0 micro-label opacity-60">
-                Straighten
-              </span>
+              <span className="w-16 shrink-0 micro-label opacity-60">Straighten</span>
               <input
                 type="range"
                 min={-45}
@@ -575,9 +580,7 @@ export function ImageEditorDialog({
               ] as [keyof Adjust, string, number, number][]
             ).map(([key, label, min, max]) => (
               <div key={key} className="flex items-center gap-3">
-                <span className="w-20 shrink-0 micro-label opacity-60">
-                  {label}
-                </span>
+                <span className="w-20 shrink-0 micro-label opacity-60">{label}</span>
                 <input
                   type="range"
                   min={min}

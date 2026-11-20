@@ -31,6 +31,7 @@ import {
   type TryoutKind,
 } from "@/lib/live-listings";
 import { SPORTS, type Sport } from "@/lib/sample-data";
+import { errorCode, errorText, userErrorMessage } from "@/lib/user-error";
 import { scaleForSport } from "@/lib/sport-levels";
 import {
   AVAILABILITY_INTENTS,
@@ -83,6 +84,21 @@ const STATUS_VARIANT: Record<ListingStatus, "default" | "secondary" | "destructi
   screening: "secondary",
 };
 
+/**
+ * Sentences superadminModerate and superadminUpdateListing word themselves: shown as they are. Anything else is never
+ * raw database text (WP 4.0).
+ */
+const OWN_LISTING_SENTENCES =
+  /^(?:Listing not found|This item cannot be (?:un)?hidden\.|This item has no text review\.|\d+ players have already joined, so max players can't go below \d+\.)$/;
+
+/** Staff-facing error text: our own sentence, else the plain sentence plus the error's code for support. */
+function staffListingErrorMessage(err: unknown, fallback: string): string {
+  const text = errorText(err) ?? "";
+  if (OWN_LISTING_SENTENCES.test(text)) return text;
+  const code = errorCode(err);
+  return `${userErrorMessage(err, fallback)}${code ? ` (${code})` : ""}`;
+}
+
 type Listing = ListingRow;
 /** Edit form fields; their shape depends on the section. */
 type FormState = ListingRow;
@@ -130,7 +146,8 @@ export function LiveListingsTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-listings"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e: unknown) =>
+      toast.error(staffListingErrorMessage(e, "Couldn't change this listing's visibility.")),
   });
 
   // A tryout or camp whose text is held or unscreened is not public until a
@@ -150,7 +167,8 @@ export function LiveListingsTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-listings"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e: unknown) =>
+      toast.error(staffListingErrorMessage(e, "Couldn't approve this text.")),
   });
 
   const rows = (listings.data?.rows ?? []) as Listing[];
@@ -211,7 +229,7 @@ export function LiveListingsTab() {
 
       {listings.isError && (
         <p className="text-sm text-destructive">
-          {listings.error instanceof Error ? listings.error.message : "Could not load listings"}
+          {staffListingErrorMessage(listings.error, "Couldn't load listings.")}
         </p>
       )}
 
@@ -438,7 +456,8 @@ function EditListingDialog({
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
       onClose();
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not save"),
+    onError: (e: unknown) =>
+      toast.error(staffListingErrorMessage(e, "Couldn't save this listing.")),
   });
 
   return (

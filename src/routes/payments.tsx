@@ -17,7 +17,7 @@ import {
 import { UserAvatar } from "@/components/UserAvatar";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { toast } from "sonner";
-import { paymentSubmissionErrorMessage } from "@/lib/user-error";
+import { errorText, paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import {
   PAYMENT_TYPES,
@@ -173,6 +173,34 @@ function TabBtn({
   );
 }
 
+/**
+ * What a host sees when saving a payment method fails (WP 4.0): createPaymentMethod's own sign-in sentence, the
+ * no_payment_credentials trigger's refusals (it guards host_payment_methods too) worded for a method, else
+ * userErrorMessage. Never the raw database text.
+ */
+const PAYMENT_METHOD_REFUSALS: readonly { when: RegExp; message: string }[] = [
+  {
+    when: /never enter card, bank, or password details/i,
+    message:
+      "Remove card, bank or password details. Add your payment app's handle or link instead.",
+  },
+  {
+    when: /looks like a card or bank account number/i,
+    message:
+      "That looks like a card or bank account number. Use your payment app's handle or link instead.",
+  },
+];
+const SIGN_IN_TO_ADD_METHODS = "Sign in to add payment methods.";
+
+function paymentMethodErrorMessage(err: unknown): string {
+  const text = errorText(err) ?? "";
+  if (text === SIGN_IN_TO_ADD_METHODS) return text;
+  return (
+    PAYMENT_METHOD_REFUSALS.find((r) => r.when.test(text))?.message ??
+    userErrorMessage(err, "Couldn't save this payment method. Please try again.")
+  );
+}
+
 // =============================================================
 function MethodsPanel() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -181,7 +209,9 @@ function MethodsPanel() {
   const refresh = () =>
     listMyPaymentMethods()
       .then(setMethods)
-      .catch((e) => toast.error(e.message));
+      .catch((e) =>
+        toast.error(userErrorMessage(e, "Couldn't load your payment methods. Please try again.")),
+      );
   useEffect(() => {
     refresh();
   }, []);
@@ -315,7 +345,7 @@ function AddMethodForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: (
       });
       onSaved();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(paymentMethodErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -428,7 +458,7 @@ function VerifyPanel() {
   const refresh = () => {
     listHostSubmissions(filter)
       .then(setSubs)
-      .catch((e) => toast.error(e.message));
+      .catch((e) => toast.error(userErrorMessage(e, "Couldn't load payments. Please try again.")));
     listHostSubmissions("pending")
       .then((p) => setPendingCount(p.length))
       .catch(() => {});
@@ -689,7 +719,9 @@ function RequestsPanel() {
   const refresh = () =>
     listHostJoinRequests(filter)
       .then(setReqs)
-      .catch((e) => toast.error(e.message));
+      .catch((e) =>
+        toast.error(userErrorMessage(e, "Couldn't load join requests. Please try again.")),
+      );
   useEffect(() => {
     refresh();
   }, [filter]);
@@ -700,7 +732,7 @@ function RequestsPanel() {
       toast.success(status === "approved" ? "Player approved" : "Request rejected");
       refresh();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't update this request. Please try again."));
     }
   };
 

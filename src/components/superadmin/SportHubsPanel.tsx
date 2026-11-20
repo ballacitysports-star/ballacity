@@ -19,6 +19,7 @@ import {
   superadminSportActivity,
 } from "@/lib/superadmin.functions";
 import { SPORT_ACTIVITY_MIN, type MaskedCount } from "@/lib/sport-activity";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 const show = (c: MaskedCount) => (c.small ? `<${SPORT_ACTIVITY_MIN}` : String(c.value));
 
@@ -54,7 +55,11 @@ export function SportHubsPanel() {
       await qc.invalidateQueries({ queryKey: ["superadmin-settings"] });
       toast.success(`Sport hubs ${next ? "are on" : "are off"}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save this setting");
+      // Staff screen: the plain sentence plus the error's code for support, never raw SQL (WP 4.0).
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setBusy(false);
     }

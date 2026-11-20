@@ -80,6 +80,7 @@ import {
   type TimeSlot,
 } from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   cancelGameInvite,
   findGameInvite,
@@ -146,6 +147,20 @@ type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
 const NEARBY_PAGE_SIZE = 30;
 /** Radius when the distance filter is off, in miles: the quick post's default travel radius. */
 const NEARBY_DEFAULT_RADIUS_MI = 25;
+
+/** The sentence createAvailability throws itself when the session is gone (src/lib/availability.ts). */
+const SIGN_IN_TO_POST = "Sign in to post availability.";
+
+/**
+ * A sentence of ours that createContactRequest threw (sign in first, you can't contact yourself, the explained
+ * minor-messaging line): it throws those as plain Errors with no code, and rethrows the database's own refusals as the
+ * PostgrestError itself. Undefined for anything else, which then goes through userErrorMessage (WP 4.0).
+ */
+function ownErrorSentence(e: unknown): string | undefined {
+  return e instanceof Error && e.name === "Error" && !("code" in e) && e.message
+    ? e.message
+    : undefined;
+}
 
 const PLAYER_SORTS = [
   { value: "recent" as const, label: "Recently posted" },
@@ -398,7 +413,8 @@ function PlayersPage() {
         }
       })
       .catch((e) => {
-        if (!cancelled) toast.error(e.message || "Couldn't load that post");
+        if (!cancelled)
+          toast.error(userErrorMessage(e, "Couldn't load that post. Please try again."));
       });
     return () => {
       cancelled = true;
@@ -456,7 +472,7 @@ function PlayersPage() {
       });
       setHasMore(next.length === NEARBY_PAGE_SIZE);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't load more players");
+      toast.error(userErrorMessage(e, "Couldn't load more players. Please try again."));
     } finally {
       setLoadingMore(false);
     }
@@ -489,7 +505,7 @@ function PlayersPage() {
       .catch((e) => {
         if (!cancelled) {
           setList([]);
-          toast.error(e.message || "Failed to load");
+          toast.error(userErrorMessage(e, "Couldn't load available players. Please try again."));
         }
       });
     return () => {
@@ -1283,7 +1299,7 @@ function AvailabilityCard({
       toast.success("Removed");
       onChanged();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't remove this post. Please try again."));
     }
   };
 
@@ -1597,7 +1613,12 @@ function PostAvailabilityDialog({
       else await createAvailability(payload);
       onPosted();
     } catch (e: any) {
-      toast.error(e.message);
+      // createAvailability's own "Sign in to post availability." still shows; anything else is never raw text.
+      toast.error(
+        errorText(e) === SIGN_IN_TO_POST
+          ? SIGN_IN_TO_POST
+          : userErrorMessage(e, "Couldn't save your availability. Please try again."),
+      );
     } finally {
       setSaving(false);
     }
@@ -1854,7 +1875,11 @@ function ContactDialog({
       if (msg.includes("duplicate") || (e as { code?: string })?.code === "23505") {
         toast.error("You already have a pending request to this player.");
         setRefreshKey((k) => k + 1);
-      } else toast.error(msg || "Couldn't send request");
+      } else
+        toast.error(
+          ownErrorSentence(e) ??
+            userErrorMessage(e, "Couldn't send your request. Please try again."),
+        );
     } finally {
       setSaving(false);
     }

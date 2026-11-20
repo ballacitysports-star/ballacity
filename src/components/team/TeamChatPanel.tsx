@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { blockedMessage } from "@/lib/post-moderation";
 import { formatWhen } from "@/lib/format";
 import { sendTeamChatMessage } from "@/lib/team-chat.functions";
+import { errorText } from "@/lib/user-error";
 import {
   listTeamChat,
   teamChatErrorMessage,
@@ -49,10 +50,7 @@ export function TeamChatPanel({
       if (r.held) toast.message("Sent for review. It appears once a moderator approves it.");
       void qc.invalidateQueries({ queryKey: key });
     },
-    onError: (e) =>
-      toast.error(
-        blockedMessage(e) ?? teamChatErrorMessage(e instanceof Error ? e.message : String(e)),
-      ),
+    onError: (e) => toast.error(blockedMessage(e) ?? teamChatErrorMessage(errorText(e) ?? "")),
   });
   const hide = useMutation({
     mutationFn: async (m: TeamChatMessage) => {
@@ -63,7 +61,8 @@ export function TeamChatPanel({
       if (error) throw new Error(teamChatErrorMessage(error.message));
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: key }),
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    // The mutation already throws teamChatErrorMessage's sentence; mapping again keeps a network failure from showing raw.
+    onError: (e) => toast.error(teamChatErrorMessage(errorText(e) ?? "")),
   });
   const report = useMutation({
     mutationFn: async (m: TeamChatMessage) => {
@@ -75,7 +74,8 @@ export function TeamChatPanel({
       if (error) throw new Error(teamChatErrorMessage(error.message));
     },
     onSuccess: () => toast.success("Reported. A moderator will look at it."),
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    // The mutation already throws teamChatErrorMessage's sentence; mapping again keeps a network failure from showing raw.
+    onError: (e) => toast.error(teamChatErrorMessage(errorText(e) ?? "")),
   });
 
   const items = q.data ?? [];

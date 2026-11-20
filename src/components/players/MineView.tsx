@@ -19,6 +19,7 @@ import { AvailabilityIntentBadges } from "./AvailabilityIntentBadges";
 import { GameInvitationsSection } from "./GameInvitationsSection";
 import { shareAvailability } from "./share-availability";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 function LoadingRows() {
   return (
@@ -61,7 +62,9 @@ export function MineView({
       listMyAvailabilities().then(setMine),
       listMyContactRequests("inbox").then(setInbox),
       listMyContactRequests("outbox").then(setOutbox),
-    ]).catch((e) => toast.error(e.message));
+    ]).catch((e) =>
+      toast.error(userErrorMessage(e, "Couldn't load your posts and requests. Please try again.")),
+    );
   }, [user?.id, refreshKey]);
 
   if (!user) {
@@ -91,7 +94,7 @@ export function MineView({
       setMine(await listMyAvailabilities());
       toast.success(done);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update this post. Try again.");
+      toast.error(userErrorMessage(e, "Couldn't update this post. Please try again."));
     } finally {
       setBusyId(null);
     }
@@ -102,8 +105,8 @@ export function MineView({
       await setContactRequestStatus(id, status);
       setInbox((arr) => (arr ?? []).map((r) => (r.id === id ? { ...r, status } : r)));
       toast.success(status === "accepted" ? "Accepted" : "Declined");
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't update this request. Please try again."));
     }
   };
 

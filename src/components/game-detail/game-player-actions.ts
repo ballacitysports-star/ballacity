@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { blockUser as blockAccount } from "@/lib/moderation";
+import { userErrorMessage } from "@/lib/user-error";
 
 /** What Block means for a host: the account-level block, which the database enforces. */
 export function blockConfirmText(name: string) {
@@ -14,8 +15,9 @@ export async function blockPlayer(playerId: string, name: string) {
     await blockAccount(playerId);
     toast.success(`${name} blocked.`);
   } catch (e) {
+    // The catalog or generic sentence when there is one, never the raw database text (WP 4.0).
     toast.error(
-      `Declined, but couldn't block ${name}${e instanceof Error && e.message ? ` (${e.message})` : ""}. Try again from their profile.`,
+      `Declined, but couldn't block ${name}. ${userErrorMessage(e, "Try again from their profile.")}`,
     );
   }
 }

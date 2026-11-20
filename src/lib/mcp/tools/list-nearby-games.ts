@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { userErrorMessage } from "@/lib/user-error";
 
 function supabaseForUser(ctx: ToolContext) {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
@@ -44,7 +45,16 @@ export default defineTool({
     if (sport) query = query.eq("sport", sport);
     const { data, error } = await query;
     if (error) {
-      return { content: [{ type: "text", text: error.message }], isError: true };
+      // The connected AI client may repeat this to the member word for word, so never the raw database text (WP 4.0).
+      return {
+        content: [
+          {
+            type: "text",
+            text: userErrorMessage(error, "Couldn't load upcoming games right now."),
+          },
+        ],
+        isError: true,
+      };
     }
     return {
       content: [{ type: "text", text: JSON.stringify(data ?? []) }],

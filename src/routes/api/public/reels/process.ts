@@ -38,7 +38,10 @@ export const Route = createFileRoute("/api/public/reels/process")({
           .limit(BATCH_SIZE);
 
         if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
+          // The raw database text goes to the server log only: this body reaches the admin screen through
+          // adminRunReelWorker (WP 4.0).
+          console.error("[reels/process] reading the work queue failed", error);
+          return new Response(JSON.stringify({ error: "queue_read_failed" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });

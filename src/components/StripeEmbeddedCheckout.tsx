@@ -2,6 +2,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe
 import { getStripeEnvironment } from "@/lib/stripe";
 import { getStripe } from "@/lib/stripe-loader";
 import { createCheckoutSession } from "@/utils/payments.functions";
+import { userErrorMessage } from "@/lib/user-error";
 
 interface StripeEmbeddedCheckoutProps {
   priceId: string;
@@ -26,7 +27,10 @@ export function StripeEmbeddedCheckout({
         environment: getStripeEnvironment(),
       },
     });
-    if ("error" in result) throw new Error(result.error);
+    // result.error can be Stripe's raw text; Stripe's checkout may show or log what fetchClientSecret throws.
+    if ("error" in result) {
+      throw new Error(userErrorMessage(result.error, "Checkout couldn't start. Please try again."));
+    }
     if (!result.clientSecret) throw new Error("Stripe did not return a client secret");
     return result.clientSecret;
   };

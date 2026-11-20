@@ -24,6 +24,7 @@ import { FamilyInboxSection } from "@/components/child/FamilyInboxSection";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { BackButton } from "@/components/layout/BackButton";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -159,7 +160,7 @@ function MessagesInbox() {
       setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, is_request: false } : c)));
       toast.success("Message request accepted");
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't accept this message request. Please try again."));
     }
   };
 
@@ -171,7 +172,7 @@ function MessagesInbox() {
       await declineConversation(id);
       setConvs((prev) => prev.filter((c) => c.id !== id));
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't decline this message request. Please try again."));
     }
   };
 

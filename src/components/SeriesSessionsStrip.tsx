@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Game } from "@/lib/sample-data";
 import { repeatLabel, repeatOf, stopGameSeries } from "@/lib/game-series-api";
+import { userErrorMessage } from "@/lib/user-error";
 
 type SessionRow = {
   id: string;
@@ -72,7 +73,7 @@ export function SeriesSessionsStrip({ game, isHost = false }: { game: Game; isHo
       void qc.invalidateQueries({ queryKey: ["game-series-sessions", seriesId] });
       toast.success("Stopped repeating. Dates already added stay; cancel any you don't need.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't stop the series.");
+      toast.error(userErrorMessage(e, "Couldn't stop the series. Please try again."));
     } finally {
       setStopping(false);
     }

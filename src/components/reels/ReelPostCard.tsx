@@ -12,6 +12,13 @@ import { Check, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { postReel } from "@/lib/reels.functions";
 import { captionChoices, type PostPackage } from "@/lib/reel-post";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences postReel throws itself; shown as they are. */
+const OWN_POST_SENTENCES: ReadonlySet<string> = new Set([
+  "This reel is still processing — post it once it's ready.",
+  "That wording didn't pass our safety check, so it wasn't saved.",
+]);
 
 export function ReelPostCard({
   reelId,
@@ -69,15 +76,23 @@ export function ReelPostCard({
           ? "Posted — it will show once our safety check finishes reviewing it"
           : "Posted",
       );
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not post this reel");
+    } catch (e) {
+      const text = errorText(e);
+      toast.error(
+        text && OWN_POST_SENTENCES.has(text)
+          ? text
+          : userErrorMessage(e, "Couldn't post this reel. Please try again."),
+      );
     } finally {
       setPosting(false);
     }
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-lime/40 bg-lime/5 p-3" aria-label="Review and post">
+    <div
+      className="mt-3 rounded-xl border border-lime/40 bg-lime/5 p-3"
+      aria-label="Review and post"
+    >
       <p className="micro-label text-lime">Ready to post</p>
       <p className="mt-0.5 text-[11px] text-muted-foreground">
         Only you can see this until you post it. Posting shares it on your profile and the

@@ -3,6 +3,11 @@ import { toast } from "sonner";
 import { ImagePlus, Loader2, X, ArrowLeft, ArrowRight } from "lucide-react";
 import { uploadDataUrlToBucket } from "@/lib/image-upload";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
+import { imageUploadErrorMessage } from "@/lib/image-upload-errors";
+import { errorText } from "@/lib/user-error";
+
+/** readAsDataUrl's own sentence; shown as it is, like uploadDataUrlToBucket's (imageUploadErrorMessage). */
+const READ_FAILED_MESSAGE = "Could not read that file";
 
 const MAX_PHOTOS = 12;
 
@@ -10,7 +15,7 @@ function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error("Could not read that file"));
+    r.onerror = () => reject(new Error(READ_FAILED_MESSAGE));
     r.readAsDataURL(file);
   });
 }
@@ -52,7 +57,11 @@ export function PhotoGalleryEditor({
       }
       onChange([...value, ...urls]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
+      toast.error(
+        errorText(e) === READ_FAILED_MESSAGE
+          ? READ_FAILED_MESSAGE
+          : imageUploadErrorMessage(e, "Couldn't upload that photo. Please try again."),
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

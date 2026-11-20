@@ -26,6 +26,13 @@ import { LandingListingsPanel } from "./LandingListingsPanel";
 import { HomeAvailabilityPanel } from "./HomeAvailabilityPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
+
+/** Staff screen: the readable sentence, with the error code (when there is one) for support. */
+function staffErrorMessage(e: unknown, fallback: string): string {
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
+}
 
 /**
  * Settings that have a dedicated editor elsewhere.
@@ -81,7 +88,7 @@ export function OpsTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-settings"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't save that change.")),
   });
 
   const send = useMutation({
@@ -103,7 +110,7 @@ export function OpsTab() {
       setLink("");
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't send the announcement.")),
   });
 
   return (
@@ -375,9 +382,11 @@ function PushTester() {
       if (r.reason === "not_configured") toast.error("Push provider key isn't configured");
       else if (r.ok) toast.success(`Push delivered to ${r.recipients} device(s)`);
       else if (!r.linked) toast.error("Your account isn't linked to push yet");
-      else toast.error(r.error ? `Send failed: ${r.error}` : "No subscribed devices");
+      // The provider's own answer stays in the diagnostic panel below, not in the toast.
+      else
+        toast.error(r.error ? "Push send failed. See the details below." : "No subscribed devices");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't send the test push.")),
   });
 
   const Row = ({ label, ok, value }: { label: string; ok: boolean; value: string }) => (

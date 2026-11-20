@@ -42,7 +42,40 @@ import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useMyChildStatus } from "@/lib/child-safety";
-import { PAID_NOT_PLACED_MESSAGE, PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import {
+  PAID_NOT_PLACED_MESSAGE,
+  PAYMENTS_BLOCKED_MESSAGE,
+  PAYMENT_SAVE_FAILED_MESSAGE,
+} from "@/lib/payments-policy";
+import { errorText, paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences reviewPaymentAction words itself for a host; shown as they are (WP 4.0). Same list as RosterPlayerRow. */
+const PAYMENT_REVIEW_SENTENCES: readonly string[] = [
+  "Only this game's host can review its payments.",
+  "This player isn't part of this game.",
+  "Payment coordination isn't available for this account yet.",
+  "Payment coordination isn't available for this player's account yet.",
+  "No payment submission to update.",
+];
+
+/**
+ * What a host sees when cancelling a claim or marking a refund sent fails: the payment mapper's words for a payment
+ * refusal, else userErrorMessage with `fallback`, which names the action (not "couldn't save this payment").
+ */
+function hostPaymentActionErrorMessage(e: unknown, fallback: string): string {
+  const mapped = paymentSubmissionErrorMessage(e);
+  return mapped === PAYMENT_SAVE_FAILED_MESSAGE ? userErrorMessage(e, fallback) : mapped;
+}
+
+/** What a host sees when reviewing a payment fails: our own sentence, else the payment mapper's, never raw text. */
+function paymentReviewErrorMessage(e: unknown): string {
+  const text = errorText(e) ?? "";
+  if (text.startsWith("Payment status changed since you loaded the page")) {
+    return "This payment changed since you loaded the page. Refresh and try again.";
+  }
+  if (PAYMENT_REVIEW_SENTENCES.includes(text)) return text;
+  return paymentSubmissionErrorMessage(e);
+}
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
@@ -346,7 +379,7 @@ export function HostPaymentsPanel({
         })),
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not load payments.");
+      toast.error(userErrorMessage(e, "Couldn't load payments. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -422,7 +455,7 @@ export function HostPaymentsPanel({
     } catch (e: any) {
       // rollback
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
-      toast.error(e?.message ?? "Could not update payment.");
+      toast.error(paymentReviewErrorMessage(e));
     } finally {
       setBusyId(null);
     }
@@ -447,7 +480,9 @@ export function HostPaymentsPanel({
       toast.success("Payment claim cancelled.");
       await load();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not cancel this claim.");
+      toast.error(
+        hostPaymentActionErrorMessage(e, "Couldn't cancel this payment claim. Please try again."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -473,7 +508,9 @@ export function HostPaymentsPanel({
       );
       void load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Could not update the refund.");
+      toast.error(
+        hostPaymentActionErrorMessage(e, "Couldn't mark this refund as sent. Please try again."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -751,7 +788,7 @@ export function PlayerPaymentsPanel({
       const list = await listMySubmissionsForGame(gameId);
       setSubs(list);
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not load your payments.");
+      toast.error(userErrorMessage(e, "Couldn't load your payments. Please try again."));
     } finally {
       setLoading(false);
     }

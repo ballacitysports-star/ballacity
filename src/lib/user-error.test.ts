@@ -6,6 +6,7 @@ import { minorMessagingMessage } from "@/lib/minor-messaging";
 import { PAYMENT_CLAIM_REFUSAL_CODES, PAYMENT_TRIGGER_REFUSALS } from "@/lib/payments-policy";
 import { POST_BLOCKED_MESSAGE } from "@/lib/post-moderation";
 import {
+  DATABASE_SENTENCE_REFUSALS,
   FEATURE_ERROR_MESSAGES,
   GENERIC_ERROR_MESSAGES,
   USER_ERROR_MESSAGES,
@@ -746,7 +747,8 @@ describe("userErrorMessage", () => {
     for (const err of [
       "relation public.teams does not exist",
       { message: 'syntax error at or near "select"', code: "42601" },
-      new Error("Hosts cannot request to join their own game."),
+      // A plain database sentence that is not in DATABASE_SENTENCE_REFUSALS.
+      new Error("host_id does not match the game host."),
       "PAIRING_INVALID: invalid pairing code lifetime.",
       { message: "JSON object requested, multiple (or no) rows returned", code: "PGRST116" },
       undefined,
@@ -776,5 +778,74 @@ describe("knownErrorMessage", () => {
     expect(knownErrorMessage("EVENT_FULL")).toBe(USER_ERROR_MESSAGES.EVENT_FULL);
     expect(knownErrorMessage(new TypeError("Failed to fetch"))).toBeUndefined();
     expect(knownErrorMessage("network down")).toBeUndefined();
+  });
+});
+
+describe("plain-sentence database refusals", () => {
+  /** The sentence each function raises, as PostgREST hands it back or a server function rethrows it. */
+  const RAISED: [string, string][] = [
+    ["enforce_review_integrity", "The 14-day review window for this game has closed."],
+    ["enforce_review_integrity", "Daily review limit reached. Try again tomorrow."],
+    [
+      "enforce_review_integrity",
+      "You can only review people you have played, trained or teamed up with.",
+    ],
+    ["enforce_review_integrity", "Review is too long (max 2000 characters)."],
+    ["validate_join_request", "This game has ended."],
+    ["validate_join_request", "This game has already started."],
+    ["validate_join_request", "Signups are closed for this game."],
+    ["validate_join_request", "Hosts cannot request to join their own game."],
+    ["guardian_cancel_child_game", "Game not found."],
+    ["guardian_cancel_child_game", "This game is no longer on."],
+    ["approve_org_member_request", "Request is no longer pending"],
+    ["approve_org_member_request", "Request not found"],
+    ["accept_trainer_org_invite", "Invite is no longer pending"],
+    ["accept_trainer_org_invite", "Invite not found"],
+    ["mark_refund_sent", "Payment not found."],
+  ];
+
+  it.each(RAISED)("%s: %s reads as a sentence, not the fallback", (_fn, raised) => {
+    for (const err of [
+      raised,
+      new Error(raised),
+      { message: raised, code: "P0001", details: null, hint: null },
+    ]) {
+      const shown = userErrorMessage(err, FALLBACK);
+      expect(shown).not.toBe(FALLBACK);
+      expect(knownErrorMessage(err)).toBe(shown);
+    }
+  });
+
+  it("maps the join refusals to the catalog's game wording", () => {
+    expect(userErrorMessage("This game has ended.", FALLBACK)).toBe(
+      USER_ERROR_MESSAGES.GAME_COMPLETED,
+    );
+    expect(userErrorMessage("Signups are closed for this game.", FALLBACK)).toBe(
+      USER_ERROR_MESSAGES.GAME_SIGNUP_CLOSED,
+    );
+    expect(userErrorMessage("Invite is no longer pending", FALLBACK)).toBe(
+      USER_ERROR_MESSAGES.INVITE_NOT_PENDING,
+    );
+  });
+
+  it("wins over the generic permission sentence for a 42501 refusal of ours", () => {
+    const err = {
+      message: "You can only cancel for a child linked to your account.",
+      code: "42501",
+    };
+    expect(userErrorMessage(err, FALLBACK)).toBe(
+      "You can only cancel for a child linked to your account.",
+    );
+  });
+
+  it("matches the whole message only", () => {
+    expect(userErrorMessage("Error: Game not found. at line 3", FALLBACK)).toBe(FALLBACK);
+    expect(userErrorMessage("Request not found in table x", FALLBACK)).toBe(FALLBACK);
+  });
+
+  it("answers with sentences that are vetted, so a second pass keeps them", () => {
+    for (const r of DATABASE_SENTENCE_REFUSALS) {
+      expect(userErrorMessage(r.message, FALLBACK)).toBe(r.message);
+    }
   });
 });

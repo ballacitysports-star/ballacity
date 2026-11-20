@@ -83,12 +83,29 @@ describe("QuickAvailabilitySheet", () => {
     expect(mocks.createAvailability).not.toHaveBeenCalled();
   });
 
-  it("shows a database refusal and stays open", async () => {
-    mocks.createAvailability.mockRejectedValueOnce(new Error("Couldn't save"));
+  it("shows a database refusal in plain words and stays open", async () => {
+    mocks.createAvailability.mockRejectedValueOnce(
+      new Error('new row violates row-level security policy for table "player_availabilities"'),
+    );
     const onPosted = open();
     fireEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
     fireEvent.click(screen.getByRole("button", { name: "Post availability" }));
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("Couldn't save"));
+    // WP 4.0: the generic permission sentence, never the raw database text.
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith("You don't have permission to do that."),
+    );
     expect(onPosted).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a plain sentence for an unknown failure", async () => {
+    mocks.createAvailability.mockRejectedValueOnce(new Error("Couldn't save"));
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Post availability" }));
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Couldn't post your availability. Please try again.",
+      ),
+    );
   });
 });

@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMyHiddenGames, useHostedGames } from "@/lib/hosted-games-store";
@@ -683,7 +684,12 @@ function PlayerProfile() {
                                 toast("Request canceled.");
                               } catch (e: any) {
                                 setMyRequests(prev);
-                                toast.error(e.message ?? "Could not cancel.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't cancel your request. Please try again.",
+                                  ),
+                                );
                               }
                             }
                       }
@@ -699,7 +705,12 @@ function PlayerProfile() {
                                 toast("Player approved.");
                               } catch (e: any) {
                                 setHostRequests(prev);
-                                toast.error(e.message ?? "Could not approve.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't approve this player. Please try again.",
+                                  ),
+                                );
                               }
                             }
                           : undefined
@@ -716,7 +727,12 @@ function PlayerProfile() {
                                 toast("Player declined.");
                               } catch (e: any) {
                                 setHostRequests(prev);
-                                toast.error(e.message ?? "Could not decline.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't decline this player. Please try again.",
+                                  ),
+                                );
                               }
                             }
                           : undefined
@@ -741,7 +757,12 @@ function PlayerProfile() {
                               toast("You withdrew from the game.");
                             } catch (e: any) {
                               setMyRequests(prev);
-                              toast.error(e.message ?? "Could not withdraw.");
+                              toast.error(
+                                userErrorMessage(
+                                  e,
+                                  "Couldn't withdraw from this game. Please try again.",
+                                ),
+                              );
                             }
                           }
                     }
@@ -1009,6 +1030,17 @@ function PlayerProfile() {
 }
 
 /** A single reel on the profile: playable when completed, with manage controls. */
+/**
+ * A failed reel's stored `error_message` can be the worker's raw catch text (AI, ffmpeg, storage), so only the
+ * sentences we write there ourselves are shown: the plan's clip-length refusal and the AI-off notice (WP 4.0).
+ */
+function reelFailureMessage(stored: string | null | undefined): string {
+  const text = stored?.trim() ?? "";
+  if (/^This clip is [\d:]+ long\. Your plan allows clips up to [\d:]+\.$/.test(text)) return text;
+  if (text.startsWith("AI analysis is turned off for this account")) return text;
+  return "Processing didn't finish";
+}
+
 function ProfileReelItem({
   reel,
   onChanged,
@@ -1069,9 +1101,7 @@ function ProfileReelItem({
             <Clapperboard className="h-3.5 w-3.5 text-amber-300" />
           )}
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {reel.status === "processing"
-              ? "Processing…"
-              : (reel.error_message ?? "Processing didn't finish")}
+            {reel.status === "processing" ? "Processing…" : reelFailureMessage(reel.error_message)}
           </p>
         </div>
       )}
@@ -1139,7 +1169,12 @@ function AttachReelDialog({
       onChanged?.();
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update the reel");
+      // attachReelToGame's own refusal when the picked game was deleted meanwhile.
+      toast.error(
+        errorText(e) === "That game is no longer available"
+          ? "That game is no longer available."
+          : userErrorMessage(e, "Couldn't update the reel. Please try again."),
+      );
     } finally {
       setBusy(false);
     }
@@ -1272,7 +1307,7 @@ function ProfileReelsSection({
       setSelecting(false);
       onChanged?.();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Bulk action failed");
+      toast.error(userErrorMessage(e, "Couldn't update the selected reels. Please try again."));
     } finally {
       setBusy(false);
     }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import {
   superadminImageStats,
   superadminListImages,
@@ -111,7 +112,10 @@ export function ImagesTab() {
       qc.invalidateQueries({ queryKey: ["sa-images"] });
       qc.invalidateQueries({ queryKey: ["sa-image-stats"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Action failed"),
+    onError: (e) => {
+      const code = errorCode(e);
+      toast.error(`${userErrorMessage(e, "That action failed.")}${code ? ` (${code})` : ""}`);
+    },
   });
 
   const images = (data?.images ?? []) as ImageRow[];
