@@ -84,7 +84,7 @@ test("Discover bottom card 'N spots' pill refreshes instantly when another devic
     const beforeCount = await readMapSpotsLeft(aDiscover, GAME_ID);
     expect(beforeCount, "should read a numeric spots count before join").not.toBeNull();
 
-    // Device B joins (through the "Join this run?" confirmation) and flips locally.
+    // Device B joins (through the "Join this game?" confirmation) and flips locally.
     await joinFreeRun(bDetail);
 
     // --- Realtime: Device A's spots pill decrements by exactly 1 ---

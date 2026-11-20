@@ -17,14 +17,26 @@ export function GamePolicyFields({
   onChange,
   idPrefix = "policy",
   showPayment = true,
+  showPlayerLimit = true,
+  errors,
 }: {
   value: GamePolicy;
   onChange: (next: GamePolicy) => void;
   idPrefix?: string;
   showPayment?: boolean;
+  /** False when the form sets the player limit elsewhere (the create form's "Spots"). */
+  showPlayerLimit?: boolean;
+  /** Problems found on submit, shown next to their field. */
+  errors?: { minPlayers?: string; cancellationNotes?: string };
 }) {
   const set = <K extends keyof GamePolicy>(key: K, v: GamePolicy[K]) =>
     onChange({ ...value, [key]: v });
+  const limitWord = showPlayerLimit ? "the limit" : "the spots";
+  const minPlayersError =
+    errors?.minPlayers ??
+    (value.minPlayers > value.maxPlayers ? `Minimum can't be more than ${limitWord}.` : null);
+  const minPlayersErrorId = `${idPrefix}-min-players-error`;
+  const cancelNotesErrorId = `${idPrefix}-cancel-notes-error`;
 
   return (
     <div className="space-y-2">
@@ -33,7 +45,7 @@ export function GamePolicyFields({
         <div className="flex items-center gap-2 text-sm font-semibold">
           <Users className="h-4 w-4 text-lime" aria-hidden /> Player count
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className={`mt-3 grid gap-3 ${showPlayerLimit ? "grid-cols-2" : "grid-cols-1"}`}>
           <div>
             <label
               htmlFor={`${idPrefix}-min-players`}
@@ -48,48 +60,54 @@ export function GamePolicyFields({
               min={0}
               max={value.maxPlayers}
               value={value.minPlayers}
+              aria-invalid={minPlayersError ? true : undefined}
+              aria-describedby={minPlayersError ? minPlayersErrorId : undefined}
               onChange={(e) =>
                 set("minPlayers", Math.max(0, Math.round(Number(e.target.value) || 0)))
               }
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+              className={`mt-1 w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+                minPlayersError ? "border-destructive" : "border-border"
+              }`}
             />
           </div>
-          <div>
-            <label
-              htmlFor={`${idPrefix}-max-players`}
-              className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-            >
-              Player limit
-            </label>
-            <input
-              id={`${idPrefix}-max-players`}
-              type="number"
-              inputMode="numeric"
-              min={MIN_GAME_PLAYERS}
-              max={MAX_GAME_PLAYERS}
-              value={value.maxPlayers}
-              onChange={(e) =>
-                set(
-                  "maxPlayers",
-                  Math.min(
-                    MAX_GAME_PLAYERS,
-                    Math.max(
-                      MIN_GAME_PLAYERS,
-                      Math.round(Number(e.target.value) || MIN_GAME_PLAYERS),
+          {showPlayerLimit && (
+            <div>
+              <label
+                htmlFor={`${idPrefix}-max-players`}
+                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Player limit
+              </label>
+              <input
+                id={`${idPrefix}-max-players`}
+                type="number"
+                inputMode="numeric"
+                min={MIN_GAME_PLAYERS}
+                max={MAX_GAME_PLAYERS}
+                value={value.maxPlayers}
+                onChange={(e) =>
+                  set(
+                    "maxPlayers",
+                    Math.min(
+                      MAX_GAME_PLAYERS,
+                      Math.max(
+                        MIN_GAME_PLAYERS,
+                        Math.round(Number(e.target.value) || MIN_GAME_PLAYERS),
+                      ),
                     ),
-                  ),
-                )
-              }
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
-            />
-          </div>
+                  )
+                }
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+              />
+            </div>
+          )}
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          0 minimum means the game runs no matter the turnout. Players see this before joining.
+          0 minimum means the game happens no matter the turnout. Players see this before joining.
         </p>
-        {value.minPlayers > value.maxPlayers && (
-          <p className="mt-1 text-[11px] font-semibold text-destructive">
-            Minimum can't be more than the limit.
+        {minPlayersError && (
+          <p id={minPlayersErrorId} className="mt-1 text-[11px] font-semibold text-destructive">
+            {minPlayersError}
           </p>
         )}
       </div>
@@ -191,16 +209,27 @@ export function GamePolicyFields({
           </span>
         </label>
         <textarea
+          id={`${idPrefix}-cancel-notes`}
+          aria-label="Cancellation notes"
           rows={2}
           value={value.cancellationNotes}
+          aria-invalid={errors?.cancellationNotes ? true : undefined}
+          aria-describedby={errors?.cancellationNotes ? cancelNotesErrorId : undefined}
           onChange={(e) => set("cancellationNotes", e.target.value)}
           placeholder={
             value.cancellationPolicy === "custom"
               ? "Describe your cancellation terms (required)"
               : "Optional: anything players should know about dropping out"
           }
-          className="mt-2 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+          className={`mt-2 w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+            errors?.cancellationNotes ? "border-destructive" : "border-border"
+          }`}
         />
+        {errors?.cancellationNotes && (
+          <p id={cancelNotesErrorId} className="mt-1 text-[11px] font-semibold text-destructive">
+            {errors.cancellationNotes}
+          </p>
+        )}
       </div>
 
       {/* Payment requirement + refunds */}
@@ -212,7 +241,7 @@ export function GamePolicyFields({
           <p className="mt-2 text-[11px] text-muted-foreground">
             {value.entryFee > 0
               ? `Players owe $${value.entryFee} and pay you directly — BallaCity doesn't process payments or issue refunds.`
-              : "This game is free. Set an entry fee in the fee field to require payment."}
+              : "This game is free. To charge an entry fee, turn on Paid game under Details."}
           </p>
           {value.entryFee > 0 && (
             <>

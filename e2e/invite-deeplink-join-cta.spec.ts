@@ -174,10 +174,11 @@ test("opening an invite deeplink to an unpaid game -> Join CTA keeps invite para
   await expect(cta).toBeVisible({ timeout: 10_000 });
   await cta.click();
 
-  // A free join asks for confirmation first ("Join this run?").
-  const confirm = page.getByRole("alertdialog", { name: /join this run/i });
+  // A free join asks for confirmation first ("Join this game?"; the
+  // acknowledgment is stubbed as given, so the dialog has no checkbox).
+  const confirm = page.getByRole("dialog", { name: /join this game/i });
   await expect(confirm).toBeVisible({ timeout: 10_000 });
-  await confirm.getByRole("button", { name: /^join run$/i }).click();
+  await confirm.getByRole("button", { name: /^join game$/i }).click();
 
   // The join insert should fire...
   await expect

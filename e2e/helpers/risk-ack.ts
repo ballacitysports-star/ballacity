@@ -79,8 +79,16 @@ export type RiskAckWrite = {
 
 /** What the page did with the mocked acknowledgment (see mockRiskNotAcknowledged). */
 export type RiskAckMock = {
-  /** participant_risk acknowledgments the page tried to record, in order. */
+  /** participant_risk acknowledgments the page recorded, in order. */
   writes: RiskAckWrite[];
+  /**
+   * Set to an HTTP status (e.g. 500) to make the next writes fail with it; they
+   * go to `failed` instead of `writes` and are not served back by reads. Set
+   * back to null to let writes succeed again.
+   */
+  failWritesWith: number | null;
+  /** participant_risk acknowledgments the page tried to record while failing. */
+  failed: RiskAckWrite[];
 };
 
 /**
@@ -88,10 +96,10 @@ export type RiskAckMock = {
  * the real "Before you join" dialog whatever the backend holds, and capture
  * every participant_risk acknowledgment the page writes instead of storing it.
  * Once one is written, reads return it, as the backend would. Install before
- * the page loads.
+ * the page loads. `failWritesWith` makes the writes fail, for the error path.
  */
 export async function mockRiskNotAcknowledged(page: Page): Promise<RiskAckMock> {
-  const mock: RiskAckMock = { writes: [] };
+  const mock: RiskAckMock = { writes: [], failWritesWith: null, failed: [] };
   await page.route(ACK_TABLE, async (route) => {
     const req = route.request();
     if (req.method() === "GET") {
@@ -115,6 +123,15 @@ export async function mockRiskNotAcknowledged(page: Page): Promise<RiskAckMock> 
     const rows = (Array.isArray(body) ? body : [body]) as Array<RiskAckWrite | null>;
     const risk = rows.filter((r): r is RiskAckWrite => r?.kind === "participant_risk");
     if (risk.length === 0) return route.fallback();
+    if (mock.failWritesWith != null) {
+      mock.failed.push(...risk);
+      await route.fulfill({
+        status: mock.failWritesWith,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "XX000", message: "mocked write failure", details: null }),
+      });
+      return;
+    }
     mock.writes.push(...risk);
     // recordSafetyAck upserts without asking for the row back.
     await route.fulfill({ status: 201, body: "" });

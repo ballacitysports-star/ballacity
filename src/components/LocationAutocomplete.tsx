@@ -22,6 +22,10 @@ export function LocationAutocomplete({
   mode = "place",
   showCurrentButton = true,
   onPick,
+  inputId,
+  ariaLabel,
+  ariaDescribedBy,
+  ariaInvalid,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -30,6 +34,11 @@ export function LocationAutocomplete({
   mode?: "place" | "city";
   showCurrentButton?: boolean;
   onPick?: (v: string, placeId: string, geo?: PickedPlaceGeo) => void;
+  /** For a visible <label htmlFor> and inline errors (aria-describedby / aria-invalid). */
+  inputId?: string;
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
 }) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -161,9 +170,17 @@ export function LocationAutocomplete({
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-3">
+      <div
+        className={`flex items-center gap-2 rounded-2xl border bg-surface px-3 py-3 ${
+          ariaInvalid ? "border-destructive" : "border-border"
+        }`}
+      >
         <MapPin className="h-4 w-4 text-coral" />
         <input
+          id={inputId}
+          aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid ? true : undefined}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
