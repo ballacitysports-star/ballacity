@@ -3,8 +3,14 @@ import { describe, expect, it } from "vitest";
 import { guardianNeedsForGame } from "./join-guardian.server";
 import { hostBadge, joinWait, playerWaitCopy } from "./join-guardian-status";
 
-function fakeAdmin(tables: Record<string, any[]>) {
+function fakeAdmin(
+  tables: Record<string, any[]>,
+  inForce?: (children: string[]) => { child_user_id: string }[],
+) {
   return {
+    ...(inForce
+      ? { rpc: async (_fn: string, args: any) => ({ data: inForce(args._children), error: null }) }
+      : {}),
     from(table: string) {
       let rows = [...(tables[table] ?? [])];
       const q: any = {
@@ -63,6 +69,21 @@ describe("guardianNeedsForGame", () => {
       { requestId: "r-kid", needsGuardian: true, guardianApproved: false },
       { requestId: "r-teen", needsGuardian: true, guardianApproved: true },
       { requestId: "r-adult", needsGuardian: false, guardianApproved: false },
+    ]);
+  });
+
+  it("stops asking for a guardian once the child has turned 18, whatever the link row still says", async () => {
+    // 20261125200000: the database rule leaves out a link whose child is a known adult; "teen" is 18 now.
+    const out = await guardianNeedsForGame(
+      fakeAdmin(world(), (children) =>
+        ["kid", "kid2"].filter((c) => children.includes(c)).map((c) => ({ child_user_id: c })),
+      ) as any,
+      { gameId: "g1", callerId: "host" },
+    );
+    expect(out.map((r) => [r.requestId, r.needsGuardian])).toEqual([
+      ["r-kid", true],
+      ["r-teen", false],
+      ["r-adult", false],
     ]);
   });
 

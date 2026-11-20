@@ -12,6 +12,8 @@
  * had a push.
  */
 
+import { guardianLinksInForce } from "./guardian-links-in-force.server";
+
 export type PendingApprovalKind = "join_request" | "team_invite";
 
 type Admin = { from: (table: string) => any };
@@ -108,14 +110,9 @@ export async function planGuardianApprovalPush(
   );
   if (controls?.notifications === false) return NOTHING;
 
-  const { data: links } = await admin
-    .from("guardian_links")
-    .select("parent_user_id")
-    .eq("child_user_id", childId)
-    .eq("status", "active");
-  const guardianIds: string[] = Array.from(
-    new Set(((links ?? []) as { parent_user_id: string }[]).map((l) => l.parent_user_id)),
-  );
+  // Only the links in force: a guardian whose child has turned 18 is not told about their requests (20261125200000).
+  const { data: links } = await guardianLinksInForce(admin, [childId]);
+  const guardianIds: string[] = Array.from(new Set((links ?? []).map((l) => l.parent_user_id)));
   if (guardianIds.length === 0) return NOTHING;
 
   const profile = await one<{ display_name: string | null }>(admin, "profiles", "display_name", {

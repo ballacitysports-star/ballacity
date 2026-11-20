@@ -11,7 +11,7 @@ BEGIN;
 SELECT t.person('host', 40), t.person('ga', 41), t.person('teen', 16), t.person('solo', 17), t.person('adult', 28),
        t.person('grown', 18);
 SELECT t.guardian('ga', 'teen');
--- A link made at 16-17 that was never ended once the player turned 18: nothing ends it automatically.
+-- A link made at 16-17 that was still 'active' once the player turned 18 (20261125200000 puts it out of force that day).
 SELECT t.guardian('ga', 'grown');
 
 INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price)
@@ -97,15 +97,15 @@ SELECT t.as_user(t.id('solo'));
 SELECT t.eq(public.game_payment_guardian_ready('pp'), true, 'a 17-year-old with no guardian link may pay, as before');
 SELECT t.as_user(t.id('adult'));
 SELECT t.eq(public.game_payment_guardian_ready('pp'), true, 'an adult may pay, as before');
--- A guardian link made before 18 is never ended automatically. A player known to be 18 or over is under no guardian's
--- authority, so PayPal lets them pay, as the roster gate seats them. The payment trigger still refuses their manual
--- payment (it has no age condition, unchanged here: see the PR).
+-- A guardian link made before 18 is out of force from the day the player turns 18 (20261125200000), whether or not the
+-- sweep has ended it: a player known to be 18 or over is under no guardian's authority, so PayPal lets them pay and
+-- the payment trigger, which asks the same rule, no longer refuses their manual payment either.
 SELECT t.as_user(t.id('grown'));
 SELECT t.eq(public.game_payment_guardian_ready('pp'), true,
   'an 18-year-old whose guardian link from before 18 is still active may pay by PayPal');
-SELECT t.throws(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'pp', %L)$q$,
+SELECT t.lives(format($q$INSERT INTO public.payment_submissions (player_id, game_id, host_id) VALUES (%L, 'pp', %L)$q$,
                        t.id('grown'), t.id('host')),
-  'GUARDIAN_APPROVAL_REQUIRED', 'the payment trigger still refuses their manual payment (unchanged)');
+  'and the payment trigger lets their manual payment through (the link is not in force)');
 SELECT t.reset();
 -- An unknown age stays gated. nobday signed up without a birthday, and ga is linked to them.
 INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)

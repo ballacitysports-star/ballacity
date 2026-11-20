@@ -55,6 +55,18 @@ test("Parent Center shows no linked children for a fresh fixture guardian", asyn
   });
 });
 
+test("Parent Center says a family link ends on the day a child turns 18", async ({ page }) => {
+  await stubChildStatus(page, childStatus("adult", null));
+  await signInAs(page, "player2");
+
+  await page.goto("/parent", { waitUntil: "domcontentloaded" });
+  const note = page.getByTestId("family-link-ends-at-18");
+  await expect(note).toBeVisible({ timeout: 20_000 });
+  await expect(note).toContainText(/ends on the day a child turns 18/i);
+  // A managed child account (no login of its own) is the exception, and the page says so.
+  await expect(note).toContainText(/no\s+login of its own, stays linked to you/i);
+});
+
 test("a child account is steered to the consent flow, not the guardian surface", async ({
   page,
 }) => {

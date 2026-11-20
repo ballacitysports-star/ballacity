@@ -678,6 +678,11 @@ function ParentCenterPage() {
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
       </p>
+      <p className="mt-1 text-xs text-muted-foreground" data-testid="family-link-ends-at-18">
+        A family link ends on the day a child turns 18. They leave this list and you stop seeing or
+        changing their account; you and they each get a notice. A child account you manage, with no
+        login of its own, stays linked to you.
+      </p>
 
       <GuardianProfileCard />
       <GuardianApprovalsDashboard />

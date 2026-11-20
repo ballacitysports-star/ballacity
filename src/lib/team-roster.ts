@@ -10,6 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { fetchHasGuardianLinkInForce } from "@/lib/guardian-link-in-force";
 import { errorText, knownErrorMessage } from "@/lib/user-error";
 
 export const TEAM_ROLES = ["owner", "manager", "coach", "captain", "player"] as const;
@@ -238,13 +239,8 @@ export function useMyTeamInvites() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as Record<string, any>[];
-      const { data: links } = await supabase
-        .from("guardian_links")
-        .select("id")
-        .eq("child_user_id", user!.id)
-        .eq("status", "active")
-        .limit(1);
-      const hasGuardian = (links ?? []).length > 0;
+      // A link ends when the child turns 18 (20261125200000): an adult is not asked for a guardian's approval.
+      const hasGuardian = await fetchHasGuardianLinkInForce(user!.id);
       const teamIds = [...new Set(rows.map((r) => String(r["team_id"])))];
       const names = new Map<string, string>();
       if (teamIds.length) {
