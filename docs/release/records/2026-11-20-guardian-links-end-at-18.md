@@ -55,6 +55,7 @@ the E2E accounts.
   notification specs (`join-cross-device-discover-spots`, `invite-request-tampered`) that pass locally; attempt 4 green
   (smoke 30/30). The migration does not touch the realtime or notification path, and the other session confirmed it ran
   nothing on the sandbox in those windows. Treat those two specs as flaky on the shared sandbox.
+- CI on `main` `6dfd17e5` (the merge): green, run 1359.
 - Adversarial review: 2 medium and 1 low finding, all fixed before the PR.
 
 ## Production (read-only, 2026-11-20)
