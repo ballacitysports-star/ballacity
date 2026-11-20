@@ -231,13 +231,18 @@ test.describe("managed child, end to end", () => {
         timeout: 20_000,
       });
 
-      // No credential surfaces inside a child's profile.
+      // No credential surfaces inside a child's profile. First wait for the
+      // page itself, still as the child (the banner survives the full load):
+      // on the loading screen both absence checks would pass unread.
       await page.goto("/settings", { waitUntil: "domcontentloaded" });
+      const back = page.getByRole("button", { name: /^back to /i });
+      await expect(back).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole("button", { name: /^sign out$/i })).toBeVisible();
       await expect(page.getByText(/password & sign-in/i)).toHaveCount(0);
       await expect(page.getByText(/^delete account$/i)).toHaveCount(0);
 
       // One tap back to the guardian.
-      await page.getByRole("button", { name: /^back to /i }).click();
+      await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
       await expect(page.getByText(/managing .*'s profile/i)).toHaveCount(0);
     } catch (error) {
