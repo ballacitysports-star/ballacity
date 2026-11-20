@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
 import { BackButton } from "@/components/layout/BackButton";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 
 import {
-  ArrowLeft,
   MessageCircle,
   Loader2,
   Calendar,
@@ -34,6 +33,7 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
 import { PlayerOrgsSection } from "@/components/players/PlayerOrgsSection";
+import { ProfileUnavailable } from "@/components/players/ProfileUnavailable";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
@@ -289,22 +289,10 @@ function PlayerProfilePage() {
     );
   }
 
-  if (!profile) {
-    return (
-      <div className="page-shell-content pt-6 pb-24">
-        <Link
-          to="/players"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to players
-        </Link>
-        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
-          <p className="font-semibold">Player not found</p>
-          <p className="text-sm text-muted-foreground mt-1">This profile may have been removed.</p>
-        </div>
-      </div>
-    );
-  }
+  // A missing account and one hidden by its visibility setting (minors default to
+  // private) both come back as no row under RLS; both get the same screen, so it
+  // never says which.
+  if (!profile) return <ProfileUnavailable kind="profile" />;
 
   const initials =
     overrides.avatar || profile.avatar_initials || profile.display_name.slice(0, 2).toUpperCase();

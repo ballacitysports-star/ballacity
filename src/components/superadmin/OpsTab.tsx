@@ -26,6 +26,7 @@ import { LandingListingsPanel } from "./LandingListingsPanel";
 import { HomeAvailabilityPanel } from "./HomeAvailabilityPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
+import { PushOptInButton } from "./PushOptInButton";
 import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 /** Staff screen: the readable sentence, with the error code (when there is one) for support. */
@@ -449,9 +450,13 @@ function PushTester() {
               <p className="text-xs text-destructive">Push provider key is not configured.</p>
             )}
             {!result.linked && (
-              <p className="text-xs text-muted-foreground">
-                Open Notifications and tap “Turn on push” on this device, then retest.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Turn on push for this device here, or in Notifications under “Turn on push
+                  notifications”, then retest.
+                </p>
+                <PushOptInButton />
+              </div>
             )}
             {result.subscriptions?.length > 0 && (
               <ul className="pt-1 text-[11px] text-muted-foreground">
