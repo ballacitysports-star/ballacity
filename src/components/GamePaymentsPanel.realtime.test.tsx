@@ -89,6 +89,13 @@ vi.mock("@/lib/notifications", () => ({ createNotification: vi.fn() }));
 vi.mock("@/lib/child-safety", () => ({
   useMyChildStatus: () => ({ can: () => ({ allowed: true, reason: null }) }),
 }));
+// The Payments tab's manual-claim guardian check (react-query, under the app's root provider) is not what this file
+// tests; answer it as "allowed" so the panel renders its usual content.
+vi.mock("@/hooks/use-game-payment-guardian-ready", () => ({
+  useGameManualClaimGuardianReady: () => ({ data: true }),
+}));
+// The panel reads the signed-in user for that check; the channel itself is keyed by getCurrentUserId (rt.uid above).
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "me" }, loading: false }) }));
 vi.mock("@/components/UserAvatar", () => ({ UserAvatar: () => null }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,

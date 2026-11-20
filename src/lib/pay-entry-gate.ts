@@ -52,7 +52,12 @@ import {
   PAYMENTS_GUARDIAN_APPROVAL_MESSAGE,
 } from "@/lib/payments-policy";
 
-export type PayEntryBlockKind = "payments" | "participation" | "guardian" | "locked" | "age";
+/**
+ * 'manual_guardian' is never decided by payEntryBlock: payManualMethodsStep gives it, for the manual methods only,
+ * when PayPal is not there to take the payment instead.
+ */
+export type PayEntryBlockKind =
+  "payments" | "participation" | "guardian" | "locked" | "age" | "manual_guardian";
 
 export type PayEntryBlock = {
   kind: PayEntryBlockKind;
@@ -327,6 +332,97 @@ export function gameTakesNoPayment(joinState: JoinState, holdsPlace: boolean): b
  */
 export function payPalOffered(joinState: JoinState): boolean {
   return joinState !== "completed" && joinState !== "cancelled";
+}
+
+/**
+ * Copy for a viewer whose manual payment the database would refuse on the guardian rule although PayPal would take it
+ * (payManualMethodsStep). game_payment_guardian_ready exempts a viewer known to be 18 or over, the manual-claim trigger
+ * does not, so this viewer is an adult whose guardian link from before 18 was never ended. Adult wording: no "ask your
+ * parent". The guardian approves a game on the request the game page sends ("ask" there). The guardian can end an
+ * ordinary link from their Parent Center ("End family link", revoke_guardian_link), but not a managed account's:
+ * revoke_guardian_link refuses the managing guardian with MANAGED_CHILD_DELETE_INSTEAD (20261110120000), so a managed
+ * account is not told the link can be ended. The player has no way to end it themselves.
+ */
+export const MANUAL_GUARDIAN_HOLD_MESSAGE =
+  "A guardian link from before you turned 18 is still active on this account, so Venmo, Cash App and other manual payments for this game need your guardian's approval first.";
+export const MANUAL_GUARDIAN_HOLD_END_LINK =
+  "Your guardian can also end the family link from their Parent Center.";
+
+/** What the viewer can do next: PayPal when it is offered, the guardian's approval, and ending the link if possible. */
+export function manualGuardianHoldNext(input: {
+  paypal: boolean;
+  managedAccount: boolean;
+}): string {
+  const ask = input.paypal
+    ? "You can pay with PayPal now. Or go back to the game to ask your guardian to approve it."
+    : "Go back to the game to ask your guardian to approve it.";
+  return input.managedAccount ? ask : `${ask} ${MANUAL_GUARDIAN_HOLD_END_LINK}`;
+}
+
+/**
+ * What the pay page does with the host's manual methods (Venmo, Cash App, other) and the proof form, once nothing
+ * else stands in front of the payment options (payEntryView 'clear', no approval card, no "Before you join", the
+ * host's settings loaded). Owner decision 2026-11-18 (docs/paid-path-gates.md section 6 (d)): the guardian rule on a
+ * manual claim is not loosened, so the page does not offer a manual method the database will refuse. PayPal does not
+ * depend on this check (its server precondition asks game_payment_guardian_ready), so `paypal` says whether PayPal
+ * checkout is drawn next to whatever stands in place of the manual list.
+ *   - 'offer_all': as before (every manual method; PayPal when offered and no method is picked).
+ *   - 'checking' / 'check_failed': the manual-claim check (game_manual_claim_guardian_ready) has not answered, or
+ *     failed with nothing loaded; or it said no and PayPal checkout has not settled yet. Fail closed on the manual
+ *     methods only: no handles, no proof form, a Retry on failure in place of the manual list. PayPal stays where it
+ *     was offered before this check existed (offered, and no manual method picked).
+ *   - 'paypal_only': it said no and PayPal is offered (paypal_payment_precondition asks game_payment_guardian_ready,
+ *     which lets this viewer pay): PayPal and the notice, no manual method, no proof form.
+ *   - 'blocked': it said no and PayPal is not offered: the block card ('manual_guardian'), with the refund line for a
+ *     viewer who was already shown how to pay.
+ * A host with no manual method has nothing to hold back: 'offer_all', and the page's own empty state applies.
+ */
+export type ManualMethodsStep =
+  | { kind: "offer_all" }
+  | { kind: "checking"; paypal: boolean }
+  | { kind: "check_failed"; paypal: boolean }
+  | { kind: "paypal_only"; message: string; next: string; paymentStarted: boolean }
+  | { kind: "blocked"; block: PayEntryBlock; paymentStarted: boolean };
+
+export function payManualMethodsStep(input: {
+  /** game_manual_claim_guardian_ready(game) for the viewer. */
+  manualClaim: CheckState<boolean>;
+  /** The host offers at least one manual method to this viewer. */
+  hasManualMethods: boolean;
+  /** PayPal checkout is drawn for this game (payPalOffered, a config, the settings row). */
+  paypalOffered: boolean;
+  /** The PayPal config lookup has finished (with or without a config). */
+  paypalSettled: boolean;
+  /** A manual method is picked (its proof step stands where PayPal and the list were): no PayPal next to it. */
+  methodPicked: boolean;
+  /** As payEntryView's: the viewer was already shown how to pay. */
+  paymentStarted: boolean;
+  /** A managed account (app_metadata.managed): its guardian cannot end the link, so the copy does not offer it. */
+  managedAccount: boolean;
+}): ManualMethodsStep {
+  if (!input.hasManualMethods) return { kind: "offer_all" };
+  const check = input.manualClaim;
+  const paypalBeside = input.paypalOffered && !input.methodPicked;
+  if (check.state === "error") return { kind: "check_failed", paypal: paypalBeside };
+  if (check.state === "loading") return { kind: "checking", paypal: paypalBeside };
+  if (check.value) return { kind: "offer_all" };
+  if (input.paypalOffered) {
+    return {
+      kind: "paypal_only",
+      message: MANUAL_GUARDIAN_HOLD_MESSAGE,
+      next: manualGuardianHoldNext({ paypal: true, managedAccount: input.managedAccount }),
+      paymentStarted: input.paymentStarted,
+    };
+  }
+  if (!input.paypalSettled) return { kind: "checking", paypal: false };
+  return {
+    kind: "blocked",
+    block: {
+      kind: "manual_guardian",
+      message: `${MANUAL_GUARDIAN_HOLD_MESSAGE} ${manualGuardianHoldNext({ paypal: false, managedAccount: input.managedAccount })}`,
+    },
+    paymentStarted: input.paymentStarted,
+  };
 }
 
 /**

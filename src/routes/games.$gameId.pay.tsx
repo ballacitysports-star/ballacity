@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
+import { isManagedUser } from "@/lib/managed-children";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -81,6 +82,7 @@ import {
   checkStateOf,
   payEntryView,
   payAwaitsApproval,
+  payManualMethodsStep,
   payPalOffered,
   payRiskAckStep,
   payRiskAckView,
@@ -90,7 +92,10 @@ import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgment
 import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
 import { recordSafetyAck, safetyAckQueryKey, useSafetyAck } from "@/lib/safety-acks";
 import { riskAckReadFrom } from "@/lib/risk-ack-tap";
-import { useGamePaymentGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
+import {
+  useGameManualClaimGuardianReady,
+  useGamePaymentGuardianReady,
+} from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -288,10 +293,18 @@ function PayPage() {
     });
   }, []);
   // A guarded minor pays only on a request their guardian approved; host approval alone clears the approval card.
+  const guardianRequestKey = `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`;
   const guardianQuery = useGamePaymentGuardianReady(
     hasGame ? gameId : undefined,
     userId,
-    `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`,
+    guardianRequestKey,
+  );
+  // The manual-claim trigger's own guardian rule, which has no adult exemption (docs/paid-path-gates.md section 6
+  // (d)): an adult whose guardian link from before 18 is still active may pay by PayPal, not by Venmo or Cash App.
+  const manualClaimQuery = useGameManualClaimGuardianReady(
+    hasGame ? gameId : undefined,
+    userId,
+    guardianRequestKey,
   );
   // "Before you join" (docs/paid-path-gates.md section 7, Option B): the same acknowledgment the join tap asks for
   // (useSafetyAck / recordSafetyAck, participant_risk, SAFETY_ACK_VERSION), asked here before any payment option is
@@ -606,6 +619,8 @@ function PayPage() {
     : flowLookups.every((l) => l === "ready")
       ? "ready"
       : "loading";
+  const paymentStartedHere =
+    paymentStarted || (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods));
   const entryView = payEntryView({
     holdsPlace: viewerHoldsPlace,
     paymentIn: hasPaymentIn(mySubs),
@@ -623,9 +638,7 @@ function PayPage() {
       isError: childQuery.isError,
     }),
     guardian: checkStateOf({ data: guardianQuery.data, isError: guardianQuery.isError }),
-    paymentStarted:
-      paymentStarted ||
-      (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods)),
+    paymentStarted: paymentStartedHere,
     isHost,
     ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
     viewerAge: myAge.loading
@@ -645,11 +658,24 @@ function PayPage() {
     read: riskAckReadFrom(riskAckQuery.status, riskAckQuery.data),
   });
   const entryClear = entryView.kind === "clear" && riskAck === "none";
+  // The host's manual methods and the proof form, once nothing else stands in front of them: held back (PayPal only,
+  // or the block card) when the database would refuse this viewer's manual claim on the guardian rule.
+  const manualStep = payManualMethodsStep({
+    manualClaim: checkStateOf({ data: manualClaimQuery.data, isError: manualClaimQuery.isError }),
+    hasManualMethods: !!settings && methods.length > 0,
+    paypalOffered: !!paypalCfg && !!settings,
+    paypalSettled: paypal.settled,
+    methodPicked: !!picked,
+    paymentStarted: paymentStartedHere,
+    managedAccount: isManagedUser(user),
+  });
+  const manualOffered = manualStep.kind === "offer_all";
   // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
   // while the approval card or a loading state stands in its place.)
   const proofStepOnScreen =
     !!picked &&
     entryClear &&
+    manualOffered &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -678,6 +704,7 @@ function PayPage() {
   const retryEntryChecks = () => {
     if (childQuery.isError) void childQuery.refetch();
     if (guardianQuery.isError) void guardianQuery.refetch();
+    if (manualClaimQuery.isError) void manualClaimQuery.refetch();
     if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
     if (rosterLoad === "error") retryRosterLoad();
     if (myAge.error) myAge.retry();
@@ -742,6 +769,7 @@ function PayPage() {
     !hasSubmission &&
     !approvalGateActive &&
     entryClear &&
+    manualOffered &&
     !fetching &&
     !fetchTimedOut &&
     !!settings &&
@@ -953,6 +981,8 @@ function PayPage() {
             Retry
           </button>
         </div>
+      ) : manualStep.kind === "blocked" ? (
+        <PayEntryBlockedCard view={manualStep} gameId={game.id} />
       ) : payOptionsView({ hasOtherMethods: !!settings && methods.length > 0, paypal }) ===
         "loading" ? (
         // No other method to offer: wait for PayPal (up to its deadline) before saying the host has none, or a
@@ -968,79 +998,142 @@ function PayPage() {
             Message the host directly to arrange payment.
           </p>
         </div>
-      ) : !picked ? (
+      ) : !picked || manualStep.kind !== "offer_all" ? (
+        // One container for PayPal and whatever stands in place of the manual list, so the PayPal button keeps its
+        // place (and is not mounted again) when the manual-claim check answers. Once a method is picked its proof
+        // step stands here instead, without PayPal, unless the check holds the manual methods back.
         <div>
-          {paypalCfg && settings && (
-            <div className="mb-4">
-              <PayPalCheckoutButton
-                gameId={game.id}
-                clientId={paypalCfg.clientId}
-                merchantId={paypalCfg.merchantId}
-                feeLabel={feeLabel(settings.entry_fee ?? game.price)}
-                onPaid={async () => {
-                  const subs = await listMySubmissionsForGame(game.id);
-                  setMySubs(subs);
-                }}
-              />
+          {manualStep.kind === "paypal_only" && (
+            <div
+              className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 p-4"
+              role="status"
+              aria-live="polite"
+              data-testid="pay-manual-guardian-hold"
+            >
+              <div className="flex items-center gap-2 font-display text-sm font-bold">
+                <AlertCircle className="h-4 w-4 text-coral" /> Manual payments need a guardian's
+                approval
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{manualStep.message}</p>
+              <p className="text-xs text-muted-foreground mt-1">{manualStep.next}</p>
+              {manualStep.paymentStarted && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Don't send the host money by Venmo, Cash App or another app for it. If you already
+                  paid, message the host to ask for a refund.
+                </p>
+              )}
+              <div className="mt-3">
+                <Link
+                  to="/games/$gameId"
+                  params={{ gameId: game.id }}
+                  className="inline-flex items-center rounded-full border border-border px-4 py-1.5 text-xs font-bold"
+                >
+                  Back to game
+                </Link>
+              </div>
             </div>
           )}
-          <h2 className="text-sm font-semibold mb-2">
-            {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
-          </h2>
-          <div className="space-y-2">
-            {methods.map((m) => {
-              const meta = paymentTypeMeta(m.payment_type);
-              const fee = settings?.entry_fee ?? game.price;
-              const link = resolvePaymentDeepLink(m, fee, game.title);
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
-                >
-                  <button
-                    onClick={() => setPicked(m)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                  >
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
-                      {meta.emoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm">{m.label || meta.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {m.username || m.contact_info}
-                      </div>
-                    </div>
-                  </button>
-                  {link.url ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPicked(m);
-                        markExternalPaymentOpened(game.id, m.id);
-                        launchExternalPayment(link.url as string, link.copyText);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Pay in ${meta.name}`}
-                      aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
+          {paypalCfg &&
+            settings &&
+            (manualStep.kind === "offer_all" ||
+              manualStep.kind === "paypal_only" ||
+              manualStep.paypal) && (
+              <div className="mb-4">
+                <PayPalCheckoutButton
+                  gameId={game.id}
+                  clientId={paypalCfg.clientId}
+                  merchantId={paypalCfg.merchantId}
+                  feeLabel={feeLabel(settings.entry_fee ?? game.price)}
+                  onPaid={async () => {
+                    const subs = await listMySubmissionsForGame(game.id);
+                    setMySubs(subs);
+                  }}
+                />
+              </div>
+            )}
+          {manualStep.kind === "paypal_only" ? null : manualStep.kind === "checking" ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+              Loading payment options…
+            </div>
+          ) : manualStep.kind === "check_failed" ? (
+            <div
+              className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2"
+              data-testid="pay-manual-check-failed"
+            >
+              <div className="text-sm text-muted-foreground">
+                {manualStep.paypal
+                  ? "We couldn't check whether this account can pay the host by Venmo, Cash App or another app for this game."
+                  : "We couldn't check whether this account can pay for this game."}
+              </div>
+              <button
+                type="button"
+                onClick={retryEntryChecks}
+                className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-sm font-semibold mb-2">
+                {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
+              </h2>
+              <div className="space-y-2">
+                {methods.map((m) => {
+                  const meta = paymentTypeMeta(m.payment_type);
+                  const fee = settings?.entry_fee ?? game.price;
+                  const link = resolvePaymentDeepLink(m, fee, game.title);
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setPicked(m)}
-                      className="text-lime text-sm px-2"
-                      aria-label="Select payment method"
-                    >
-                      →
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-[11px] text-muted-foreground text-center">
-            Pay outside the app, then come back to send proof.
-          </p>
+                      <button
+                        onClick={() => setPicked(m)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
+                          {meta.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm">{m.label || meta.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {m.username || m.contact_info}
+                          </div>
+                        </div>
+                      </button>
+                      {link.url ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPicked(m);
+                            markExternalPaymentOpened(game.id, m.id);
+                            launchExternalPayment(link.url as string, link.copyText);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                          title={`Pay in ${meta.name}`}
+                          aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setPicked(m)}
+                          className="text-lime text-sm px-2"
+                          aria-label="Select payment method"
+                        >
+                          →
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground text-center">
+                Pay outside the app, then come back to send proof.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <>
