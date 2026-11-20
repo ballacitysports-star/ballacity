@@ -923,7 +923,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
         <div className="text-xs text-muted-foreground">Loading…</div>
       ) : users.length === 0 ? (
         <div className="text-xs text-muted-foreground">
-          You haven&apos;t blocked anyone. Blocked accounts can&apos;t ask to join your games,
+          You haven&apos;t blocked anyone. Blocked accounts can&apos;t request a spot in your games,
           message you or follow you.
         </div>
       ) : (

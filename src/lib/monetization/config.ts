@@ -12,12 +12,7 @@
  * renamed.
  */
 
-export type EntitlementKey =
-  | "player_plus"
-  | "host_pro"
-  | "team_pro"
-  | "org_pro"
-  | "facility_pro";
+export type EntitlementKey = "player_plus" | "host_pro" | "team_pro" | "org_pro" | "facility_pro";
 
 /** `live` products can be bought today; `reserved` ones exist as slots only. */
 export type ProductStatus = "live" | "reserved";
@@ -262,7 +257,7 @@ export const DEFAULT_MONETIZATION_CONFIG: MonetizationConfig = {
 const FREE_TIER_BASE_FEATURES: string[] = [
   "Create your player profile & availability",
   "Discover, search and filter games",
-  "Request to join and host games",
+  "Request spots in games and host your own",
   "Messaging & notifications",
   "Teams, reputation and reviews",
 ];

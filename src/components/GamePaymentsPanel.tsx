@@ -79,6 +79,21 @@ function paymentReviewErrorMessage(e: unknown): string {
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
+let paymentsTopicSeq = 0;
+
+/**
+ * A realtime topic no channel in this tab has used yet (WP 4.3). supabase.channel() hands back the existing channel
+ * when one with the same topic is still in its list, and a removed channel stays there until the server acknowledges
+ * the leave. Reopening the Payments tab (or React's dev double mount) therefore got the old, already subscribed
+ * channel back, and adding the postgres_changes listener to it threw "cannot add `postgres_changes` callbacks ...
+ * after `subscribe()`". A fresh suffix per subscription means every mount gets its own channel. The topic name is not
+ * an access control: Row Level Security decides which rows each subscriber receives.
+ */
+function freshPaymentsTopic(base: string): string {
+  paymentsTopicSeq += 1;
+  return `${base}:${paymentsTopicSeq}`;
+}
+
 function fmtWhen(iso: string | null): string {
   if (!iso) return "";
   try {
@@ -388,7 +403,7 @@ export function HostPaymentsPanel({
   useEffect(() => {
     void load();
     const ch = supabase
-      .channel(`host_payments:${gameId}`)
+      .channel(freshPaymentsTopic(`host_payments:${gameId}`))
       .on(
         "postgres_changes",
         {
@@ -401,7 +416,7 @@ export function HostPaymentsPanel({
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(ch);
+      void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
@@ -796,13 +811,15 @@ export function PlayerPaymentsPanel({
 
   useEffect(() => {
     void load();
-    let uid: string | null = null;
+    // The user id arrives after the effect returns. A cleanup that runs first (unmount, or a new game) must stop the
+    // subscription from opening at all; before, it found no channel to remove and the late one leaked.
+    let cancelled = false;
     let ch: ReturnType<typeof supabase.channel> | null = null;
-    (async () => {
-      uid = await getCurrentUserId();
-      if (!uid) return;
+    void (async () => {
+      const uid = await getCurrentUserId();
+      if (cancelled || !uid) return;
       ch = supabase
-        .channel(`my_payments:${gameId}:${uid}`)
+        .channel(freshPaymentsTopic(`my_payments:${gameId}:${uid}`))
         .on(
           "postgres_changes",
           {
@@ -820,7 +837,8 @@ export function PlayerPaymentsPanel({
         .subscribe();
     })();
     return () => {
-      if (ch) supabase.removeChannel(ch);
+      cancelled = true;
+      if (ch) void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);

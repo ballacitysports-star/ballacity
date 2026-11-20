@@ -211,7 +211,9 @@ describe("paymentSubmissionErrorMessage: the triggers that refuse without a code
 
   it("tells an unapproved player to wait for the host, and how to get money back, even with its SQLSTATE", () => {
     const expected = paymentClaimRefusalMessage("HOST_APPROVAL_REQUIRED");
-    expect(expected).toMatch(/^The host has to approve your request to join before you can pay\./);
+    expect(expected).toMatch(
+      /^The host has to approve your request for a spot before you can pay\./,
+    );
     expect(expected).toContain(CLAIM_REFUSED_REFUND_STEP);
     expect(expected).not.toMatch(/weren't charged/);
     expect(paymentSubmissionErrorMessage(TRIGGER_TEXTS.hostApproval)).toBe(expected);

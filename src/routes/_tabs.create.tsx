@@ -139,7 +139,7 @@ export const Route = createFileRoute("/_tabs/create")({
       description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
       noindex: true,
     }),
-  // `orgId` / `kind` come from a facility page's "Host a run here" action.
+  // `orgId` / `kind` come from a facility page's "Host a game here" action.
   // The org is looked up server-side before anything is pre-filled.
   // `again` is a finished game's id from its "Host this again" action.
   validateSearch: (

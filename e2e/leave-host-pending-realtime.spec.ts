@@ -230,7 +230,7 @@ test("host's pending list clears in realtime when the player's join_request is d
     timeout: 10_000,
   });
   await expect(
-    page.getByText(/No pickup requests yet\. You'll see them here as players ask to join/i),
+    page.getByText(/No pickup requests yet\. You'll see them here as players request a spot/i),
   ).toBeVisible({ timeout: 10_000 });
 
   // 5. Handler actually refetched (proves realtime → refresh wiring, not

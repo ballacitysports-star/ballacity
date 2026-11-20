@@ -43,6 +43,7 @@ import {
   isLateCancel,
   lateCancelWarning,
 } from "@/lib/cancel-window";
+import { pluralize } from "@/lib/pluralize";
 
 const KIND_LABEL = { tryout: "Tryout", clinic: "Camp / Clinic" } as const;
 /** Events the landing's compact list shows before "See all". */
@@ -186,7 +187,7 @@ export function TryoutsSection({ compact = false }: { compact?: boolean } = {}) 
                   {left != null && (
                     <p className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      {left === 0 ? "Full" : `${left} spots left`}
+                      {left === 0 ? "Full" : `${pluralize(left, "spot")} left`}
                     </p>
                   )}
                 </div>

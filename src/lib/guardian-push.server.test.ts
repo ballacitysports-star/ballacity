@@ -73,7 +73,7 @@ describe("planGuardianApprovalPush", () => {
     expect(plan.messages.map((m) => m.userId).sort()).toEqual(["dad", "mom"]);
     expect(plan.messages[0]).toMatchObject({
       title: "Approval needed",
-      body: "Nathaniel asked to join Sunday 14U scrimmage. Review it in the Parent Center.",
+      body: "Nathaniel requested a spot in Sunday 14U scrimmage. Review it in the Parent Center.",
       url: GUARDIAN_APPROVAL_LINK,
     });
     expect(plan.writeNotification).toBe(true);
@@ -165,7 +165,7 @@ describe("planGuardianApprovalPush", () => {
       callerId: "kid",
     });
     expect(plan.messages[0]!.body).toBe(
-      "Your child asked to join a game. Review it in the Parent Center.",
+      "Your child requested a spot in a game. Review it in the Parent Center.",
     );
   });
 

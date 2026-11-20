@@ -33,7 +33,7 @@ export const LISTING_COPY: Record<
 > = {
   game: {
     noun: "game",
-    whoStillSees: "You and players who joined or asked to join",
+    whoStillSees: "You and players who joined or requested a spot",
     extra: "Hiding does not cancel the game or any bookings.",
   },
   post: { noun: "post", whoStillSees: "You and your team's managers" },

@@ -64,7 +64,7 @@ export function SupportAssistantHost() {
           onClick={() => openSupport()}
           aria-label="Help and support"
           title="Help and support"
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-3 z-40 grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/90 text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime md:left-4"
+          className="help-launcher fixed left-3 z-40 grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/90 text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime md:left-4"
         >
           <CircleHelp className="h-5 w-5" aria-hidden />
         </button>

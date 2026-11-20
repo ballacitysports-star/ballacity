@@ -13,7 +13,7 @@ import { isLegalReviewed } from "../src/lib/legal-review";
  *
  *   - request-to-join (g2, approval-gated): "Request Spot" opens the
  *     standalone "Before you join" dialog;
- *   - free game (g1): "Join Run" opens ONE dialog, "Join this game?", that
+ *   - free game (g1): "Join Game" opens ONE dialog, "Join this game?", that
  *     holds the reminder picker and the same "Before you join"
  *     acknowledgment (no separate confirmation before or after it).
  *
@@ -378,7 +378,7 @@ test("free game: one Join this game? dialog holds the acknowledgment, recorded b
 }) => {
   const { ctx, page, riskAck, joinWrites, userId } = await openFreeGame(browser);
 
-  const cta = page.getByRole("button", { name: /^join run · /i }).first();
+  const cta = page.getByRole("button", { name: /^join game · /i }).first();
   const dialog = page.getByRole("dialog", { name: /join this game\?/i });
   const checkbox = dialog.getByRole("checkbox");
   const agree = dialog.getByRole("button", { name: /^agree & join$/i });
@@ -457,7 +457,7 @@ test("free game: a failed acknowledgment write joins nothing and keeps the dialo
 }) => {
   const { ctx, page, riskAck, joinWrites, userId } = await openFreeGame(browser);
 
-  const cta = page.getByRole("button", { name: /^join run · /i }).first();
+  const cta = page.getByRole("button", { name: /^join game · /i }).first();
   const dialog = page.getByRole("dialog", { name: /join this game\?/i });
   const checkbox = dialog.getByRole("checkbox");
   const agree = dialog.getByRole("button", { name: /^agree & join$/i });
@@ -467,7 +467,7 @@ test("free game: a failed acknowledgment write joins nothing and keeps the dialo
   await expect(dialog).toBeVisible({ timeout: 10_000 });
 
   // 1. The acknowledgment write fails (500): no roster insert, the dialog stays
-  //    open with the box still ticked, an error shows, and the CTA still reads Join Run.
+  //    open with the box still ticked, an error shows, and the CTA still reads Join Game.
   riskAck.failWritesWith = 500;
   await checkbox.click();
   await expect(checkbox).toHaveAttribute("aria-checked", "true");

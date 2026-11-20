@@ -336,7 +336,7 @@ function SetupForm({ game }: { game: Game }) {
           <div className="min-w-0">
             <div className="font-semibold text-sm">Require my approval to join</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Players send a request and you decide who's in. Useful for skill-matched or
+              Players request a spot and you decide who's in. Useful for skill-matched or
               invite-only games.
             </p>
           </div>

@@ -55,7 +55,7 @@ const COPY: Record<
   cancel: {
     button: "Cancel request",
     title: "Cancel your request?",
-    description: (t) => `Cancel your request to join ${t}? You can request again later.`,
+    description: (t) => `Cancel your request for a spot in ${t}? You can request again later.`,
     confirm: "Cancel request",
     success: "Request canceled.",
     error: "Could not cancel request.",

@@ -112,7 +112,7 @@ const NEXT_STEPS: Record<
     steps: [
       { title: "Gym profile", body: "Name, address, and photos so members can find you." },
       { title: "Invite trainers", body: "Link the trainers who run sessions at your gym." },
-      { title: "Publish programs", body: "Post clinics, camps, and open runs to your community." },
+      { title: "Publish programs", body: "Post clinics, camps, and open games to your community." },
     ],
   },
 };

@@ -144,6 +144,7 @@ import {
   type PlayersSortBy,
 } from "@/components/players/PlayersFilterBody";
 import { PlayersMapHeader } from "@/components/players/PlayersMapHeader";
+import { pluralize } from "@/lib/pluralize";
 
 /** Find Players pages from the server search (it allows up to 50). */
 const NEARBY_PAGE_SIZE = 30;
@@ -703,16 +704,16 @@ function PlayersPage() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="page-title">Players ready to run.</h1>
+        <h1 className="page-title">Players ready to play.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {profile?.city ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
-              {filtered?.length ?? 0} players
+              {pluralize(filtered?.length ?? 0, "player")}
             </>
           ) : (
             <>
-              {filtered?.length ?? 0} players ·{" "}
+              {pluralize(filtered?.length ?? 0, "player")} ·{" "}
               <Link to="/profile/edit" className="text-lime font-semibold">
                 Set your city
               </Link>{" "}

@@ -10,7 +10,8 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 vi.mock("@/lib/auth-return", () => ({ useAuthSearchHere: () => ({}) }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+const toastMock = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("./share-availability", () => ({ shareAvailability: vi.fn() }));
 vi.mock("@/lib/game-invites", () => ({
   listMyPendingGameInvites: async () => [],
@@ -23,12 +24,13 @@ const api = vi.hoisted(() => ({
   listMyAvailabilities: vi.fn(),
   setAvailabilityPaused: vi.fn(async () => {}),
   reconfirmAvailability: vi.fn(async () => {}),
+  deleteAvailability: vi.fn(async (_id: string) => {}),
 }));
 vi.mock("@/lib/availability", () => ({
   listMyAvailabilities: api.listMyAvailabilities,
   listMyContactRequests: async () => [],
   setContactRequestStatus: vi.fn(),
-  deleteAvailability: vi.fn(),
+  deleteAvailability: api.deleteAvailability,
   setAvailabilityPaused: api.setAvailabilityPaused,
   reconfirmAvailability: api.reconfirmAvailability,
 }));
@@ -120,5 +122,81 @@ describe("MineView, your posts", () => {
     expect(within(row).queryByRole("button", { name: "Pause" })).toBeNull();
     expect(within(row).queryByRole("button", { name: "Resume" })).toBeNull();
     expect(within(row).queryByRole("button", { name: "Still available" })).toBeNull();
+  });
+
+  it("every post action is a 44px tap target (WP 4.3)", async () => {
+    api.posts = [post("g", { last_confirmed_at: ago(12) })];
+    const [row] = await rows();
+    for (const name of ["Still available", "Pause", "Edit", "Share", "Remove"]) {
+      const b = within(row).getByRole("button", { name });
+      expect(b.className.split(/\s+/)).toContain("min-h-11");
+    }
+  });
+});
+
+describe("MineView, removing a post (WP 4.3)", () => {
+  let confirmSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    confirmSpy = vi.spyOn(window, "confirm").mockImplementation(() => true);
+  });
+  afterEach(() => confirmSpy.mockRestore());
+
+  it("asks in an in-app dialog, never window.confirm, and Keep it removes nothing", async () => {
+    api.posts = [post("r1", {})];
+    const [row] = await rows();
+    const opener = within(row).getByRole("button", { name: "Remove" });
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Remove this post?")).toBeTruthy();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    // 44px confirm buttons (WP 4.3).
+    for (const name of ["Keep it", "Remove post"])
+      expect(within(dialog).getByRole("button", { name }).className.split(/\s+/)).toContain(
+        "min-h-11",
+      );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(api.deleteAvailability).not.toHaveBeenCalled();
+    expect(screen.getAllByTestId("my-availability")).toHaveLength(1);
+    // Focus goes back to the Remove button that opened the dialog, not to <body>.
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("removes the post once confirmed and closes the dialog", async () => {
+    api.posts = [post("r2", {}), post("r3", {})];
+    const [first] = await rows();
+    fireEvent.click(within(first).getByRole("button", { name: "Remove" }));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove post" }));
+    await waitFor(() => expect(api.deleteAvailability).toHaveBeenCalledWith("r2"));
+    await waitFor(() => expect(screen.getAllByTestId("my-availability")).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(toastMock.success).toHaveBeenCalledWith("Post removed");
+    // That post's Remove button is gone, so focus lands on the list heading.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Your posts" })),
+    );
+    expect(toastMock.error).not.toHaveBeenCalled();
+  });
+
+  it("on failure keeps the post and the dialog, and shows a friendly message, not the raw error", async () => {
+    api.deleteAvailability.mockRejectedValueOnce(
+      Object.assign(new Error('new row violates row-level security policy for table "x"'), {
+        code: "42501",
+      }),
+    );
+    api.posts = [post("r4", {})];
+    const [row] = await rows();
+    fireEvent.click(within(row).getByRole("button", { name: "Remove" }));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove post" }));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
+    const shown = String(toastMock.error.mock.calls[0]![0]);
+    expect(shown).not.toMatch(/row-level security|42501|policy/i);
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(screen.getAllByTestId("my-availability")).toHaveLength(1);
+    expect(toastMock.success).not.toHaveBeenCalled();
+    // Focus stayed in the dialog while the delete ran (the button was never disabled under it).
+    expect(screen.getByRole("alertdialog").contains(document.activeElement)).toBe(true);
   });
 });

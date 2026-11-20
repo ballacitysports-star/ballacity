@@ -26,12 +26,22 @@ export function DistanceSlider({
 }) {
   const index = distanceSliderIndex(valueMi, unit);
   const stop = DISTANCE_SLIDER_STOPS[index];
+  // Disabled: only the track and thumb fade. The labels keep full contrast (faded to 50%, the
+  // 10px stop labels read 2.5:1), and the value line says the filter is off instead.
   return (
-    <div className={disabled ? "pointer-events-none opacity-50" : ""}>
-      <p className="mb-3 text-sm font-semibold" aria-live="polite">
-        {stop == null ? "Any distance" : `Within ${stop} ${unit}`}
+    <div className={disabled ? "pointer-events-none" : ""} aria-disabled={disabled || undefined}>
+      <p
+        className={`mb-3 text-sm font-semibold${disabled ? " text-muted-foreground" : ""}`}
+        aria-live="polite"
+      >
+        {disabled
+          ? "Distance filter off"
+          : stop == null
+            ? "Any distance"
+            : `Within ${stop} ${unit}`}
       </p>
       <Slider
+        className={disabled ? "opacity-50" : undefined}
         value={[index]}
         min={0}
         max={DISTANCE_SLIDER_STOPS.length}

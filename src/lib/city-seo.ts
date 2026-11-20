@@ -378,7 +378,7 @@ export function cityDescription(city: LaunchCity, listings: CityListings, sport?
   ].filter(Boolean);
   const what = sport ? `pickup ${sport.toLowerCase()}` : "pickup games";
   const found = parts.length ? ` ${parts.join(", ")} on BallaCity.` : "";
-  return `Find ${what} in ${cityLabel(city)}.${found} See times, skill levels and spots, then request to join.`.slice(
+  return `Find ${what} in ${cityLabel(city)}.${found} See times, skill levels and spots, then request a spot.`.slice(
     0,
     160,
   );

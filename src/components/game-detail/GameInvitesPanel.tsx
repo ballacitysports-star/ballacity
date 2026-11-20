@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Repeat, Send, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { listAvailabilityNear, type NearbyAvailabilityWithAuthor } from "@/lib/availability";
 import {
   cancelGameInvite,
@@ -202,7 +212,7 @@ export function GameInvitesPanel({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="mt-2 min-h-9 text-xs font-semibold text-lime"
+          className="mt-2 min-h-11 text-xs font-semibold text-lime"
         >
           {showAll ? "Show fewer" : `Show all ${rows.length}`}
         </button>
@@ -336,6 +346,13 @@ function InviteRegularsSheet({
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
+  // "Delete group" asks first (WP 4.3); the dialog stays open while the delete runs, and after a failure.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState(false);
+  // Where focus goes back to when that dialog closes: "Delete group", or, once the group is gone, "All regulars".
+  // The dialog is opened from state, so Radix has no trigger to return to.
+  const deleteGroupRef = useRef<HTMLButtonElement | null>(null);
+  const allRegularsRef = useRef<HTMLButtonElement | null>(null);
   const group = (groups.data ?? []).find((g) => g.id === groupId) ?? null;
 
   const allPeople = useMemo<Candidate[]>(
@@ -383,13 +400,17 @@ function InviteRegularsSheet({
 
   const removeGroup = async () => {
     if (!group) return;
+    setDeletingGroup(true);
     try {
       await deleteHostGroup(group.id);
       toast.success(`Deleted “${group.name}”.`);
+      setConfirmDelete(false);
       setGroupId(null);
       await qc.invalidateQueries({ queryKey: ["host-groups"] });
     } catch (e) {
       toast.error(groupErrorMessage(e, "Couldn't delete the group. Please try again."));
+    } finally {
+      setDeletingGroup(false);
     }
   };
 
@@ -401,10 +422,11 @@ function InviteRegularsSheet({
             (g) => (
               <button
                 key={g.id ?? "all"}
+                ref={g.id === null ? allRegularsRef : undefined}
                 type="button"
                 aria-pressed={groupId === g.id}
                 onClick={() => setGroupId(g.id)}
-                className={`min-h-9 rounded-full border px-3 text-[13px] font-semibold ${
+                className={`min-h-11 rounded-full border px-3 text-[13px] font-semibold ${
                   groupId === g.id
                     ? "border-lime bg-lime/10 text-lime"
                     : "border-border text-muted-foreground"
@@ -421,14 +443,52 @@ function InviteRegularsSheet({
               ? `${missing} ${missing === 1 ? "person" : "people"} in this group can't be invited right now. `
               : ""}
             <button
+              ref={deleteGroupRef}
               type="button"
-              onClick={() => void removeGroup()}
-              className="font-semibold underline underline-offset-2"
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2"
             >
               Delete group
             </button>
           </p>
         )}
+        <AlertDialog
+          open={confirmDelete && !!group}
+          onOpenChange={(o) => !deletingGroup && !o && setConfirmDelete(false)}
+        >
+          <AlertDialogContent
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
+              const opener = deleteGroupRef.current;
+              (opener?.isConnected ? opener : allRegularsRef.current)?.focus();
+            }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete “{group?.name}”?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Only the list goes away. Nobody in it is told, and invitations you already sent stay
+                as they are.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              {/* aria-disabled, not disabled, while the delete runs: a disabled button drops focus out of the dialog. */}
+              <AlertDialogCancel aria-disabled={deletingGroup || undefined}>
+                Keep it
+              </AlertDialogCancel>
+              <AlertDialogAction
+                aria-disabled={deletingGroup || undefined}
+                onClick={(e) => {
+                  // Stay open until the delete finishes; a failure keeps the dialog up with the toast.
+                  e.preventDefault();
+                  if (!deletingGroup) void removeGroup();
+                }}
+                className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
+              >
+                {deletingGroup ? "Deleting…" : "Delete group"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     ) : null;
 
@@ -575,7 +635,7 @@ function InvitePickerSheet({
               {open_.length > 1 && (
                 <button
                   type="button"
-                  className="min-h-9 text-xs font-semibold text-lime"
+                  className="min-h-11 text-xs font-semibold text-lime"
                   onClick={() =>
                     setPicked(
                       picked.length === Math.min(open_.length, INVITE_BATCH_MAX)

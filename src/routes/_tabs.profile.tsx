@@ -95,6 +95,7 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
 import { isGuardianOnlyRequest, listablePlayerRequests } from "@/lib/guarded-open-join";
+import { pluralize } from "@/lib/pluralize";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -498,7 +499,7 @@ function PlayerProfile() {
             onClick={() => setFollowList("followers")}
             className="underline-offset-2 hover:underline"
           >
-            {follow.followers} followers
+            {pluralize(follow.followers, "follower")}
           </button>,
           <button
             key="following"
@@ -874,7 +875,7 @@ function PlayerProfile() {
               className="block rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center transition-colors hover:border-lime/40"
             >
               <div className="font-display text-base font-bold">No pickup games</div>
-              <p className="text-xs text-muted-foreground mt-1">Join a run to see it here.</p>
+              <p className="text-xs text-muted-foreground mt-1">Join a game to see it here.</p>
             </Link>
           )}
         </section>

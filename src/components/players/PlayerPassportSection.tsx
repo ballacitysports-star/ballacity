@@ -7,6 +7,7 @@ import { VenueBadge } from "@/components/venue/VenueBadge";
 import { formatGameWhen } from "@/lib/format";
 import { OrgAvatarMark, isImageUrl } from "@/components/OrgAvatarMark";
 import { getPlayerPassport, type PlayerPassport } from "@/lib/player-passport.functions";
+import { pluralize } from "@/lib/pluralize";
 
 /**
  * Athlete passport on `/players/$userId`: the teams a player is on, verified
@@ -87,7 +88,7 @@ export function PlayerPassportView({ passport }: { passport: PlayerPassport }) {
       {upcomingRuns.length > 0 && (
         <div>
           <h2 className="section-eyebrow mb-2 flex items-center gap-1.5 text-muted-foreground">
-            <Clock className="h-4 w-4" /> Upcoming runs
+            <Clock className="h-4 w-4" /> Upcoming games
           </h2>
           <ul className="space-y-2">
             {upcomingRuns.map((g) => (
@@ -165,14 +166,14 @@ export function AthleteLevelCard({ progress: p }: { progress: AthleteProgress })
               {p.reliabilityTier}
               {p.reliability != null ? ` · ${p.reliability}% reliable` : " · reliability pending"}
             </span>
-            <span className="text-muted-foreground">{p.gamesPlayed} games played</span>
+            <span className="text-muted-foreground">{pluralize(p.gamesPlayed, "game")} played</span>
           </div>
         </div>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-background p-3">
-          <dt className="text-[11px] text-muted-foreground">Total Runs Completed</dt>
+          <dt className="text-[11px] text-muted-foreground">Total Games Completed</dt>
           <dd className="font-display text-lg font-black tabular-nums">{p.totalRunsCompleted}</dd>
         </div>
         <div className="rounded-xl bg-background p-3">
@@ -197,7 +198,7 @@ export function AthleteLevelCard({ progress: p }: { progress: AthleteProgress })
         </ul>
       )}
       <p className="mt-3 text-[10px] text-muted-foreground">
-        +100 XP per attended run · +150 per hosted game · +200 per verified tryout. No-shows lower
+        +100 XP per attended game · +150 per hosted game · +200 per verified tryout. No-shows lower
         reliability.
       </p>
     </div>

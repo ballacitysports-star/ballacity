@@ -711,3 +711,13 @@ html[data-debug="1"] [data-render="ssr-stable"]::after {
   pointer-events: none;
   z-index: 50;
 }
+
+/* The floating Help button (SupportAssistantHost): just above the bottom nav, and lifted above any
+   fixed bottom bar that opted in with `clearOfHelpLauncher` (src/lib/support/launcher-clearance.ts),
+   which publishes the bar's height above the viewport bottom as --help-launcher-clearance. */
+.help-launcher {
+  bottom: max(
+    calc(5rem + env(safe-area-inset-bottom)),
+    calc(var(--help-launcher-clearance, 0px) + 0.5rem)
+  );
+}

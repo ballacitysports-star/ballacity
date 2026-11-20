@@ -6,7 +6,7 @@ import { userErrorMessage } from "@/lib/user-error";
 
 /** What Block means for a host: the account-level block, which the database enforces. */
 export function blockConfirmText(name: string) {
-  return `Block ${name}? This request is declined, and from now on they can't ask to join your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`;
+  return `Block ${name}? This request is declined, and from now on they can't request a spot in your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`;
 }
 
 /** Records the block on the server. The decline has already been saved by then. */

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/pickup")({
     pageHead({
       title: "Pickup Sports Games Near You | BallaCity",
       description:
-        "Browse open pickup runs by sport, skill level, and distance, then request to join in a tap.",
+        "Browse open pickup runs by sport, skill level, and distance, then request a spot in a tap.",
       noindex: true,
     }),
   beforeLoad: () => {

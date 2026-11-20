@@ -378,7 +378,7 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // The game page derives "requires approval" from game_payment_settings,
         // and FAILS CLOSED: with no settings row, `requiresApproval` defaults to
         // true (src/routes/games.$gameId.index.tsx), so the join CTA reads
-        // "Request Spot" instead of "Join Run". The join-free specs on g1
+        // "Request Spot" instead of "Join Game". The join-free specs on g1
         // (join-cross-device-*, join-realtime-*, roster-*) expect a free,
         // no-approval game, so seed a settings row that says so. g2 keeps the
         // default (approval-gated), which the invite/request specs rely on, and

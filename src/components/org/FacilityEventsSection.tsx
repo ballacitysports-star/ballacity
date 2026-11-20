@@ -97,7 +97,7 @@ function EventRow({
               </span>
             ) : (
               <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                Community run
+                Community game
               </span>
             )}
             <h3 className="truncate font-display text-sm font-bold">
@@ -143,7 +143,7 @@ function EventRow({
 }
 
 /**
- * Upcoming runs, clinics, tournaments and open-court sessions hosted at a
+ * Upcoming pickup games, clinics, tournaments and open-court sessions hosted at a
  * facility. Anyone can browse; "Join" opens the game page, which runs the
  * normal approval / payment / age checks. Any player can host a community run
  * here; managers post official events and can hide community runs.
@@ -165,7 +165,7 @@ export function FacilityEventsSection({
       qc.invalidateQueries({ queryKey: ["org-events", orgId] });
     },
     onError: (e: Error) =>
-      toast.error(userErrorMessage(e, "Couldn't hide that run. Please try again.")),
+      toast.error(userErrorMessage(e, "Couldn't hide that game. Please try again.")),
   });
   const q = useQuery({
     queryKey: ["org-events", orgId],
@@ -190,7 +190,7 @@ export function FacilityEventsSection({
     <section id="facility-events" className="rounded-2xl border border-border/60 bg-surface p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="section-title flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-lime" /> Upcoming events &amp; runs
+          <CalendarDays className="h-4 w-4 text-lime" /> Upcoming events &amp; games
           {upcoming.length > 0 && (
             <span className="text-xs font-normal text-muted-foreground">({upcoming.length})</span>
           )}
@@ -210,7 +210,7 @@ export function FacilityEventsSection({
             search={postFacilityEventSearch(orgId, "run")}
             className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90"
           >
-            <Plus className="h-3.5 w-3.5" /> Host a run here
+            <Plus className="h-3.5 w-3.5" /> Host a game here
           </Link>
         </div>
       </div>
@@ -262,8 +262,8 @@ export function FacilityEventsSection({
           <p className="mt-1 text-sm font-semibold">No upcoming events yet</p>
           <p className="text-xs text-muted-foreground">
             {canPost
-              ? "Post an open run or session so players can find and join it here."
-              : "Be the first — host a pickup run here and it will show up for everyone."}
+              ? "Post an open game or session so players can find and join it here."
+              : "Be the first — host a pickup game here and it will show up for everyone."}
           </p>
         </div>
       ) : (

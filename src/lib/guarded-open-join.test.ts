@@ -153,7 +153,7 @@ describe("where the player stands", () => {
     expect(guardedOpenCopy("waiting_parent", { isPaid: false }).body).toMatch(
       /host doesn't need to answer/,
     );
-    expect(guardedOpenCopy("cleared", { isPaid: false }).body).toMatch(/Join Run/);
+    expect(guardedOpenCopy("cleared", { isPaid: false }).body).toMatch(/Join Game/);
     expect(guardedOpenCopy("cleared", { isPaid: true }).body).toMatch(/Pay the host/);
     expect(guardedOpenCopy("declined", { isPaid: false, declinedByGuardian: true }).title).toMatch(
       /parent said no/,

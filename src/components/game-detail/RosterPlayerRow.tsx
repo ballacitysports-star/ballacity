@@ -368,7 +368,7 @@ export function RosterPlayerRow({
   const removeAndBlock = async () => {
     if (
       !confirm(
-        `Remove ${name} from this game and block them? From now on they can't ask to join your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`,
+        `Remove ${name} from this game and block them? From now on they can't request a spot in your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`,
       )
     )
       return;
