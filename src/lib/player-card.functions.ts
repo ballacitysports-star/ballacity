@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { PublicXp } from "@/lib/athlete-xp";
 import { FEED_GAME_COLUMNS, publicFeedGame, type FeedGameRow } from "@/lib/highlight-feed-game";
 import { isConfirmedMinorCohort, keepsMinorPrivacyFloor } from "@/lib/minor-privacy-floor";
+import { hiddenByBlock, optionalViewerId } from "@/lib/viewer-blocks.server";
 
 export type PlayerCardGame = {
   id: string;
@@ -69,6 +70,13 @@ export const getPlayerCard = createServerFn({ method: "GET" })
       supabaseAdmin.rpc("visible_avatars" as never, { _ids: [data.userId] } as never),
     ]);
     if ((visibility as unknown as string) !== "public") return empty;
+
+    // A signed-in viewer blocked either way gets the same empty answer as for a private or suspended player, as the
+    // profile read rule gives them on /players/:id (docs/privacy/profile-blocks-and-suspension.md). Staff are exempt.
+    const viewerId = await optionalViewerId(supabaseAdmin as never);
+    if (viewerId && (await hiddenByBlock(supabaseAdmin as never, viewerId, data.userId))) {
+      return empty;
+    }
 
     const flags = ((flagRows ?? []) as any[])[0] ?? {};
     const avatar = ((avatarRows ?? []) as any[])[0] ?? {};

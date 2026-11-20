@@ -222,7 +222,78 @@ export async function reportUser(reportedId: string, reason: ReportReason, detai
   await submitReport({ subjectType: "user", reportedId, reason, details });
 }
 
-/** Ids of everyone the signed-in user has blocked, with profile details. */
+export type BlockedUser = {
+  id: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  initials: string | null;
+  blockedAt: string;
+};
+
+type BlockedProfileRow = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  avatar_initials: string | null;
+  blocked_at: string;
+};
+
+/**
+ * Everyone the signed-in user has blocked, newest first, with the names the list may show.
+ *
+ * Since 20261126100000 the profile read rule hides a profile from anyone blocked either way, including the person who
+ * blocked, so the list asks public.my_blocked_profiles(): only the caller's own blocks, named only when the profile is
+ * public or members-visible and not suspended (private and suspended accounts read "Blocked account", as private ones
+ * always did). If that function is missing (app ahead of the migration, or the migration rolled back) this reads
+ * user_blocks and profiles directly, the old behaviour.
+ */
+export async function fetchBlockedUsers(viewerId: string): Promise<BlockedUser[]> {
+  const toUser = (r: BlockedProfileRow): BlockedUser => ({
+    id: r.id,
+    displayName: r.display_name ?? "Blocked account",
+    username: r.username ?? null,
+    avatarUrl: r.avatar_url ?? null,
+    initials: r.avatar_initials ?? null,
+    blockedAt: r.blocked_at,
+  });
+
+  const viaRule = (await supabase.rpc("my_blocked_profiles" as never)) as {
+    data: unknown;
+    error: unknown;
+  };
+  if (!viaRule.error && Array.isArray(viaRule.data)) {
+    return (viaRule.data as BlockedProfileRow[]).map(toUser);
+  }
+
+  const { data, error } = await supabase
+    .from("user_blocks")
+    .select("blocked_id, created_at")
+    .eq("blocker_id", viewerId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => r.blocked_id);
+  if (ids.length === 0) return [];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name, username, avatar_url, avatar_initials")
+    .in("id", ids);
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  return (data ?? []).map((r) => {
+    const p = byId.get(r.blocked_id);
+    return toUser({
+      id: r.blocked_id,
+      display_name: p?.display_name ?? null,
+      username: p?.username ?? null,
+      avatar_url: p?.avatar_url ?? null,
+      avatar_initials: p?.avatar_initials ?? null,
+      blocked_at: r.created_at,
+    });
+  });
+}
+
+/** Everyone the signed-in user has blocked, with profile details. */
 export function useBlockedUsersList() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -231,40 +302,7 @@ export function useBlockedUsersList() {
   const query = useQuery({
     queryKey: ["blocked-users", viewerId],
     enabled: !!viewerId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_blocks")
-        .select("blocked_id, created_at")
-        .eq("blocker_id", viewerId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      const ids = (data ?? []).map((r) => r.blocked_id);
-      if (ids.length === 0)
-        return [] as {
-          id: string;
-          displayName: string;
-          username: string | null;
-          avatarUrl: string | null;
-          initials: string | null;
-          blockedAt: string;
-        }[];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, avatar_url, avatar_initials")
-        .in("id", ids);
-      const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-      return (data ?? []).map((r) => {
-        const p = byId.get(r.blocked_id);
-        return {
-          id: r.blocked_id,
-          displayName: p?.display_name ?? "Blocked account",
-          username: p?.username ?? null,
-          avatarUrl: p?.avatar_url ?? null,
-          initials: p?.avatar_initials ?? null,
-          blockedAt: r.created_at,
-        };
-      });
-    },
+    queryFn: () => fetchBlockedUsers(viewerId!),
   });
 
   const unblock = useMutation({
