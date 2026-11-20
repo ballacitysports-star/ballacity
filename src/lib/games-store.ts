@@ -198,6 +198,21 @@ export function retryRosterLoad() {
   ensureHydrated();
 }
 
+/**
+ * Read the viewer's places again now, and resolve once the answer is in (or the read failed). For a page that has just
+ * learnt the server put the viewer on a roster (the pay page after a PayPal capture) and must not wait for the
+ * realtime INSERT, which can come after other changes or not at all. A failed read keeps what the store had.
+ */
+export async function reloadRoster(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (!currentUserId) {
+    retryRosterLoad();
+    await hydratingPromise?.catch(() => undefined);
+    return;
+  }
+  await hydrateFromDb(currentUserId);
+}
+
 type RosterChange = {
   eventType: string;
   new?: { id?: string; game_id?: string; user_id?: string } | null;

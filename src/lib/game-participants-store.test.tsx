@@ -16,6 +16,8 @@ type Handler = (payload: { eventType: string; new?: unknown; old?: unknown }) =>
 
 const db = vi.hoisted(() => ({
   rows: [] as { id: string; joined: number; max_players: number }[],
+  // The row a by-id read (fetchHostedGame) answers with.
+  byId: null as { id: string; joined: number; max_players: number } | null,
   channels: [] as string[],
   handlers: [] as ((payload: { eventType: string; new?: unknown; old?: unknown }) => void)[],
   queries: [] as string[],
@@ -55,6 +57,13 @@ vi.mock("@/integrations/supabase/client", () => {
           },
           order() {
             return builder;
+          },
+          eq() {
+            return builder;
+          },
+          maybeSingle() {
+            db.queries.push(`${table}:by-id`);
+            return Promise.resolve({ data: db.byId ? row(db.byId) : null, error: null });
           },
           then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
             db.inFlight += 1;
@@ -260,6 +269,64 @@ describe("useLiveParticipantCount", () => {
     // The three joins cost two loads, never two at once.
     expect(loads() - before).toBe(2);
     expect(db.maxInFlight).toBe(1);
+    view.unmount();
+  });
+
+  it("answers for a game read from the database by id before the first full load, not for a saved copy", async () => {
+    await freshStore();
+    db.byId = null;
+    // The pay page's case: a game this browser has not saved, looked up by id while the full load is still out.
+    let release = () => {};
+    db.hold = new Promise<void>((r) => (release = r));
+    window.localStorage.setItem(
+      "openrun.hostedGames.v1",
+      JSON.stringify([{ id: "g-local", joined: 99, maxPlayers: 10 }]),
+    );
+    db.rows = [
+      { id: "g-z", joined: 8, max_players: 10 },
+      { id: "g-local", joined: 4, max_players: 10 },
+    ];
+    const { useHostedGames, fetchHostedGame } = await import("@/lib/hosted-games-store");
+    const { useLiveParticipantCount } = await import("@/lib/game-participants-store");
+    function Card({ id }: { id: string }) {
+      const n = useLiveParticipantCount(id);
+      return <span data-testid={id}>{n === undefined ? "fallback" : n}</span>;
+    }
+    function Page() {
+      useHostedGames();
+      return (
+        <div>
+          <Card id="g-z" />
+          <Card id="g-local" />
+        </div>
+      );
+    }
+    const view = render(<Page />);
+    await settle();
+    expect(view.getByTestId("g-z").textContent).toBe("fallback");
+    expect(view.getByTestId("g-local").textContent).toBe("fallback");
+
+    db.byId = { id: "g-z", joined: 7, max_players: 10 };
+    await act(async () => {
+      await fetchHostedGame("g-z");
+    });
+    expect(db.queries).toContain("hosted_games:by-id");
+    expect(view.getByTestId("g-z").textContent).toBe("7");
+    // A game this browser saved is returned from the saved copy, which is not the database's count.
+    const byIdReads = db.queries.filter((q) => q === "hosted_games:by-id").length;
+    await act(async () => {
+      await fetchHostedGame("g-local");
+    });
+    expect(db.queries.filter((q) => q === "hosted_games:by-id").length).toBe(byIdReads);
+    expect(view.getByTestId("g-local").textContent).toBe("fallback");
+
+    // The full load answers for both.
+    db.hold = null;
+    release();
+    await settle();
+    expect(view.getByTestId("g-z").textContent).toBe("8");
+    expect(view.getByTestId("g-local").textContent).toBe("4");
+    db.byId = null;
     view.unmount();
   });
 

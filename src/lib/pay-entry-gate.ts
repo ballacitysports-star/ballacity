@@ -660,3 +660,35 @@ export function paySetupFrom(input: {
     source: "public",
   };
 }
+
+/**
+ * Whether the page holds back the host's methods (get_game_host_payment_methods) for now: a viewer who cannot read the
+ * settings row, on a game whose host reviews every player, until the host has approved them (docs/paid-path-gates.md
+ * section 6 (c)). The approval card stands in front of the methods for that viewer anyway, so they are not asked for
+ * at all; once approved, the viewer may read the row (an approved requester) and the page reads it and the methods
+ * again. The RPC keeps its own guards whatever the page asks: this only keeps the handles out of the browser of a
+ * viewer the host has not let through yet.
+ */
+export function payMethodsHeldForApproval(input: {
+  setup: PaySetup | null;
+  /** The viewer's request for this game is approved. */
+  approved: boolean;
+}): boolean {
+  const { setup } = input;
+  return !!setup && setup.source === "public" && setup.requiresApproval && !input.approved;
+}
+
+/**
+ * The flow state payEntryView decides on, while the page re-reads the viewer's places (games-store reloadRoster) after
+ * the server may have put them on the roster: a PayPal capture just took their payment. Until that read is in, their
+ * place counts as not known ('loading'), so a block a place lifts (the full roster their own payment may have filled)
+ * shows as "Loading payment options…", never as "You can't pay for this game" under the payment that just went
+ * through. A failed read is still the Retry.
+ */
+export function payEntryFlow(input: {
+  flow: "loading" | "error" | "ready";
+  rosterReloading: boolean;
+}): "loading" | "error" | "ready" {
+  if (input.flow === "error") return "error";
+  return input.rosterReloading ? "loading" : input.flow;
+}

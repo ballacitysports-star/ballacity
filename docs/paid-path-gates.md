@@ -550,6 +550,13 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
     `get_game_host_payment_methods(payee, game)`, whose own guards are unchanged (payee only, a caller who may
     coordinate payments, an adult payee, a game the caller can see, the payee row's accepted methods). The
     approval card still shows for an approval-required game (`requires_approval` true from the policy).
+  - On an approval-required game the page does not ask that RPC at all until the host has approved the viewer
+    (`payMethodsHeldForApproval`), so the handles never reach the browser of a viewer the approval card stands in
+    front of. Once the request is approved (realtime, or the page's 15 s poll), the page reads the settings row again
+    (now the viewer's to read, as an approved requester) and the methods; until then the options show as loading,
+    never "Host hasn't set up payment yet". (Review round 1, 2026-11-20.) A fresh viewer on an open game who is then
+    gated by the age range or a full roster still receives the handles in the RPC's answer (nothing renders them):
+    those gates are decided beside the settings read, and the RPC answers any caller its own guards let through.
   - Fails closed: a failed or timed-out policy read is the "Couldn't reach the payment service" Retry, never "no
     approval needed". The policy answers with no row when the payee has no settings row at all; then nothing is
     offered, as before ("Host hasn't set up payment yet"), and PayPal's precondition would refuse such a player
@@ -579,10 +586,19 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
     before the age range (the host's approval would not make room, so "Waiting on host approval" would mislead). It
     outranks the approval card. `rosterIsFull` is the database's count rule.
   - Count: the page's existing source, `hosted_games.joined` (game_participants_sync_count keeps it equal to the
-    participant rows): the live store once it has loaded, or the by-id lookup's read for a game the store does not
-    hold. Fails closed: until the count is known a viewer it could block sees "Loading payment options…", and a
-    failed first load of the store shows the Retry (which reloads it); a viewer on the roster and the host never wait
-    for it.
+    participant rows), through the store's live count (`useHostedGameJoined`). It answers once the store's first load
+    from the database is in, or, for a game this browser had not saved, once the page's by-id lookup
+    (`fetchHostedGame`) has read the game from the database (review round 1: the store now records those reads, so
+    the count no longer waits for the full list of games). A copy restored from localStorage never counts. Fails
+    closed: until the count is known a viewer it could block sees "Loading payment options…", and a failed first
+    load of the store (with no by-id read) shows the Retry (which reloads it); a viewer on the roster and the host
+    never wait for it.
+  - A PayPal payment that fills the last place: the count (hosted_games channel) can reach the page before the
+    payer's own place (game_participants channel), or their place event can be lost. After the capture the page
+    re-reads the viewer's places (games-store `reloadRoster`) beside their payments, and until that read answers the
+    flow counts as loading (`payEntryFlow`), so the page shows "Loading payment options…", never the full block under
+    the payment that just went through. If the read finds no place (the server did not roster them), the block shows
+    with the refund line: a PayPal payment on this page counts as already paid. (Review round 1.)
   - The block card replaces every payment option and the proof form. A viewer who was already shown how to pay (a
     method picked, or Venmo/Cash App opened from the page) keeps the refund line ("If you already paid, message the
     host to ask for a refund."). The soft warning and `showFilledUpWarning` are removed.
@@ -590,9 +606,9 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
   | Piece          | Where                                                                                                                    |
   | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
   | Decisions      | `src/lib/pay-entry-gate.ts` (`paySetupFrom`, `rosterIsFull`, the `full` block, payEntryView's `roster`)                  |
-  | Unit tests     | `src/lib/pay-entry-gate.test.ts` (137; 21 new), `src/lib/roster-placeholders.test.ts` (wiring)                           |
+  | Unit tests     | `src/lib/pay-entry-gate.test.ts` (147; 31 new), `src/lib/roster-placeholders.test.ts` (wiring), `src/lib/games-store.test.tsx` (`reloadRoster`), `src/lib/game-participants-store.test.tsx` (count from a by-id read) |
   | Pay page       | `src/routes/games.$gameId.pay.tsx`                                                                                       |
-  | E2E (real RLS) | `e2e/pay-fresh-viewer-methods.spec.ts`: real games, settings and method on the local stack (skips on any hosted project) |
+  | E2E (real RLS) | `e2e/pay-fresh-viewer-methods.spec.ts`: real games, settings and method on the local stack (skips on any hosted project); 5 tests |
   | E2E (mocked)   | `e2e/pay-entry-blocked.spec.ts` (4 new full-game tests)                                                                  |
 
 ## 7. Product decision: should paid joins show "Before you join"?
@@ -767,3 +783,24 @@ acknowledgedVersion: riskAckVersion})` is true, calls `e.preventDefault(); void 
 - Mutation check: with payEntryView never treating the roster as full, 4 unit tests fail and the four full-game E2E
   tests (three mocked, one real) fail; the other ten tests in those two files, the rostered-viewer one included,
   pass.
+
+Review round 1 (same branch, reviewer verdict "approve", three low findings, all fixed; client only, no migration):
+
+- (1) A PayPal payment that fills the last place no longer shows the full block under it: the page re-reads the
+  payer's places after the capture (`reloadRoster`) and waits for that read (`payEntryFlow`); a payer the server did
+  not roster gets the block with the refund line. (2) The roster count answers from the page's by-id read of a game
+  the store had not loaded (`fetchHostedGame` records it; `useHostedGameJoined` trusts it), instead of a branch that
+  never ran; 6 (e) now says what the code does. (3) On an approval-required game the methods RPC is not called for a
+  viewer the host has not approved (`payMethodsHeldForApproval`); it is called after the approval.
+- `npx vitest run` (full): 450 files, 4799 passed, 22 skipped. pay-entry-gate.test.ts: 147 (10 new);
+  games-store.test.tsx: 24 (2 new); game-participants-store.test.tsx: 6 (1 new); roster-placeholders.test.ts: 7 (1
+  new).
+- `npx tsc --noEmit -p .`: clean. `node scripts/lint-changed.mjs`: none adds ESLint errors.
+  `node scripts/format-changed.mjs`: formatted.
+- E2E, local stack via run-e2e.sh: all `e2e/pay-*.spec.ts` and `e2e/invite-pay-and-join*.spec.ts`: 22 files,
+  **52 passed**, 0 failed (3.8 min). pay-fresh-viewer-methods: 5 (2 new: a pending player who is approved while the
+  page is open, with no methods RPC before; the full block with the store's list of games refused).
+- Negative control: with the store not recording by-id reads, the new store unit test and the "list of games
+  refused" E2E fail (the page shows the Retry); with the methods never held, both approval-game E2E tests fail on
+  "no methods RPC". The PayPal capture itself is not driven in E2E (PayPal's SDK is external): its re-read is covered
+  by the unit tests above and a wiring test.

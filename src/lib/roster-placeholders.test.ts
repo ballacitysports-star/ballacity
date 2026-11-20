@@ -79,4 +79,15 @@ describe("wiring", () => {
     expect(src).not.toContain("This game just filled up");
     expect(src).toMatch(/payEntryView\(\{[\s\S]*?roster: rosterCheck,/);
   });
+
+  it("the pay page re-reads the payer's places after a PayPal capture before it can show the full block", () => {
+    // A PayPal payment that fills the last place: the count can arrive before the payer's own place does.
+    const src = readFileSync("src/routes/games.$gameId.pay.tsx", "utf8");
+    expect(src).toMatch(
+      /onPaid=\{async \(\) => \{[\s\S]*?setRosterReloadFor\(paidGame\);[\s\S]*?reloadRoster\(\)[\s\S]*?finally \{\s*setRosterReloadFor/,
+    );
+    expect(src).toMatch(
+      /payEntryView\(\{[\s\S]*?flow: payEntryFlow\(\{ flow: flowState, rosterReloading: rosterReloadFor === gameId \}\),/,
+    );
+  });
 });

@@ -17,6 +17,8 @@ import {
   MANUAL_GUARDIAN_HOLD_END_LINK,
   manualGuardianHoldNext,
   paySetupFrom,
+  payEntryFlow,
+  payMethodsHeldForApproval,
   rosterIsFull,
   ROSTER_FULL_MESSAGE,
   type PayEntryInput,
@@ -1399,6 +1401,94 @@ describe("paySetupFrom (section 6 (c): a fresh viewer cannot read the settings r
     expect(
       paySetupFrom({ settings: null, policy: { requires_approval: false }, gameHostId: undefined }),
     ).toBeNull();
+  });
+});
+
+describe("payEntryFlow and a PayPal payment that filled the last place", () => {
+  const readyChild = {
+    state: "ready" as const,
+    value: { participation: allowed, payments: allowed, ageUnknown: false },
+  };
+  // The payer's own capture filled the game: the count (hosted_games channel) says full before their own place
+  // (game_participants channel, or the re-read after the capture) has reached the page.
+  const justPaid = {
+    holdsPlace: false,
+    paymentIn: true,
+    approved: false,
+    gate: open,
+    child: readyChild,
+    guardian: { state: "ready" as const, value: true },
+    paymentStarted: true,
+    roster: { state: "ready" as const, value: { count: 10, maxPlayers: 10 } },
+  };
+
+  it("counts the flow as loading while the viewer's places are read again", () => {
+    expect(payEntryFlow({ flow: "ready", rosterReloading: true })).toBe("loading");
+    expect(payEntryFlow({ flow: "loading", rosterReloading: true })).toBe("loading");
+    expect(payEntryFlow({ flow: "ready", rosterReloading: false })).toBe("ready");
+    expect(payEntryFlow({ flow: "loading", rosterReloading: false })).toBe("loading");
+  });
+
+  it("keeps a failed read as the Retry", () => {
+    expect(payEntryFlow({ flow: "error", rosterReloading: true })).toBe("error");
+    expect(payEntryFlow({ flow: "error", rosterReloading: false })).toBe("error");
+  });
+
+  it("shows 'checking', not the full-roster block, until the re-read answers", () => {
+    const flow = payEntryFlow({ flow: "ready", rosterReloading: true });
+    expect(payEntryView({ ...justPaid, flow })).toEqual({ kind: "checking" });
+  });
+
+  it("is clear once the re-read finds the payer on the roster", () => {
+    expect(payEntryView({ ...justPaid, holdsPlace: true, flow: "ready" })).toEqual({
+      kind: "clear",
+    });
+  });
+
+  it("blocks, with the refund line, when the re-read finds no place (the server did not roster them)", () => {
+    expect(payEntryView({ ...justPaid, flow: "ready" })).toEqual({
+      kind: "blocked",
+      block: { kind: "full", message: ROSTER_FULL_MESSAGE },
+      paymentStarted: true,
+    });
+  });
+
+  it("never lifts an account-level block while the re-read runs", () => {
+    const flow = payEntryFlow({ flow: "ready", rosterReloading: true });
+    expect(
+      payEntryView({ ...justPaid, flow, guardian: { state: "ready", value: false } }),
+    ).toMatchObject({ kind: "blocked", block: { kind: "guardian" } });
+  });
+});
+
+describe("payMethodsHeldForApproval (no handles to a viewer the host has not approved)", () => {
+  const HOST = "11111111-1111-1111-1111-111111111111";
+  const publicSetup = (requiresApproval: boolean) => ({
+    hostId: HOST,
+    requiresApproval,
+    source: "public" as const,
+  });
+
+  it("holds the methods back on an approval game for a viewer who cannot read the settings row", () => {
+    expect(payMethodsHeldForApproval({ setup: publicSetup(true), approved: false })).toBe(true);
+  });
+
+  it("asks for them once the host has approved the viewer", () => {
+    expect(payMethodsHeldForApproval({ setup: publicSetup(true), approved: true })).toBe(false);
+  });
+
+  it("asks for them on an open game (the fresh viewer pays straight away)", () => {
+    expect(payMethodsHeldForApproval({ setup: publicSetup(false), approved: false })).toBe(false);
+  });
+
+  it("leaves a viewer who reads the settings row, and a game with no setup, as before", () => {
+    expect(
+      payMethodsHeldForApproval({
+        setup: { hostId: HOST, requiresApproval: true, source: "settings" },
+        approved: false,
+      }),
+    ).toBe(false);
+    expect(payMethodsHeldForApproval({ setup: null, approved: false })).toBe(false);
   });
 });
 

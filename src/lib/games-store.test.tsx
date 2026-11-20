@@ -361,3 +361,46 @@ describe("useRosterLoadState (whether useIsJoined has been read from the databas
     await waitFor(() => expect(result.current).toBe("ready"));
   });
 });
+
+describe("reloadRoster (the pay page after a PayPal capture)", () => {
+  it("resolves once the database's places are in, without waiting for a realtime INSERT", async () => {
+    const store = await loadStore();
+    const { result } = renderHook(() => ({
+      load: store.useRosterLoadState(),
+      joined: store.useIsJoined("paid-game"),
+    }));
+    await waitFor(() => expect(result.current).toEqual({ load: "ready", joined: false }));
+    // The capture put the viewer on the roster; the INSERT event never arrives.
+    server.roster = ["paid-game"];
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    let done = false;
+    const reload = store.reloadRoster().then(() => {
+      done = true;
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(done).toBe(false);
+    expect(result.current.joined).toBe(false);
+    await act(async () => {
+      release();
+      await reload;
+    });
+    expect(done).toBe(true);
+    expect(result.current).toEqual({ load: "ready", joined: true });
+  });
+
+  it("resolves, and keeps what it had, when the read fails", async () => {
+    server.roster = ["kept"];
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useIsJoined("kept"));
+    await waitFor(() => expect(result.current).toBe(true));
+    server.rosterError = { message: "network" };
+    await act(async () => {
+      await store.reloadRoster();
+    });
+    expect(result.current).toBe(true);
+    expect(store.isJoined("kept")).toBe(true);
+  });
+});
