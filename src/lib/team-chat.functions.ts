@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { errorInsteadOf } from "@/lib/error-report";
 import { teamChatErrorMessage } from "@/lib/team-chat";
 
 const Input = z
@@ -29,7 +30,7 @@ export const sendTeamChatMessage = createServerFn({ method: "POST" })
       "send_team_chat_message" as never,
       { _team: data.teamId, _body: data.body } as never,
     );
-    if (error) throw new Error(teamChatErrorMessage(error.message));
+    if (error) throw errorInsteadOf(error, teamChatErrorMessage(error.message));
     const messageId = String(id);
     const status = await mod.settlePostModeration(
       supabaseAdmin,

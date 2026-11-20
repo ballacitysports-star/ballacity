@@ -6,6 +6,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateMySkillReport, refreshMySkill } from "@/lib/skill.functions";
 import { useSkillRatings, type SkillRatingRow } from "@/lib/skill-db";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** generateMySkillReport's own refusal when there is nothing to rate yet; shown as it is. */
+const REPORT_NOT_AVAILABLE =
+  "Skill ratings are available for adults with a level or game history in this sport.";
 
 type Row = SkillRatingRow;
 
@@ -49,7 +54,8 @@ export function SkillRatingCard({ userId, isOwner }: { userId?: string; isOwner?
   const recompute = useMutation({
     mutationFn: () => refreshMySkill(),
     onSuccess: refresh,
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't refresh"),
+    onError: (e) =>
+      toast.error(userErrorMessage(e, "Couldn't refresh your rating. Please try again.")),
   });
 
   const report = async (sport: string) => {
@@ -58,7 +64,11 @@ export function SkillRatingCard({ userId, isOwner }: { userId?: string; isOwner?
       await generateMySkillReport({ data: { sport } });
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't write the report");
+      toast.error(
+        errorText(e) === REPORT_NOT_AVAILABLE
+          ? REPORT_NOT_AVAILABLE
+          : userErrorMessage(e, "Couldn't write the report. Please try again."),
+      );
     } finally {
       setBusy(null);
     }

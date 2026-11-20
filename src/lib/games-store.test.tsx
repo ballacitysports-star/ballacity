@@ -128,8 +128,24 @@ describe("joinGame", () => {
     const { joinGame, isJoined } = await loadStore();
     await expect(joinGame("g1")).resolves.toBe(false);
     expect(isJoined("g1")).toBe(false);
-    expect(toastError).toHaveBeenCalledWith("The roster filled up — try the waitlist.");
+    expect(toastError).toHaveBeenCalledWith("This game is full.");
     expect(JSON.parse(window.localStorage.getItem("openrun.joinedGameIds.v1") ?? "[]")).toEqual([]);
+  });
+
+  it("points a player who lost the last spot at the waitlist when the host kept one", async () => {
+    server.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    const { joinGame } = await loadStore();
+    await expect(joinGame("g1", undefined, { allowWaitlist: true })).resolves.toBe(false);
+    expect(toastError).toHaveBeenCalledWith(
+      "This game is full. You can join the waitlist instead.",
+    );
+  });
+
+  it("does not mention a waitlist the host turned off", async () => {
+    server.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    const { joinGame } = await loadStore();
+    await expect(joinGame("g1", undefined, { allowWaitlist: false })).resolves.toBe(false);
+    expect(toastError).toHaveBeenCalledWith("This game is full.");
   });
 
   it("names the missing approval instead of a generic failure", async () => {

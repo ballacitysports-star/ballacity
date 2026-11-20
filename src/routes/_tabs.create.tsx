@@ -47,6 +47,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAvailabilityGate } from "@/lib/availability-gate";
 import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
 import { upsertGamePaymentSettings } from "@/lib/payments";
+import { knownErrorMessage, userErrorMessage } from "@/lib/user-error";
 import { ImageUploader } from "@/components/ImageUploader";
 import {
   PositionsPicker,
@@ -946,8 +947,13 @@ function Create() {
                       }
                     : {}),
                 });
-              } catch (err: any) {
-                toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");
+              } catch (err) {
+                toast.error(
+                  userErrorMessage(
+                    err,
+                    "Your game was saved, but its approval and fee settings weren't. Check them on the game page.",
+                  ),
+                );
               }
             }
 
@@ -973,9 +979,10 @@ function Create() {
                 }`;
               } catch (err) {
                 toast.error(
-                  `Game published, but it couldn't be set to repeat. ${
-                    err instanceof Error ? err.message : ""
-                  }`.trim(),
+                  `Game published, but it couldn't be set to repeat. ${userErrorMessage(
+                    err,
+                    "It was published as a single game.",
+                  )}`,
                 );
               }
             }
@@ -985,17 +992,19 @@ function Create() {
             // A series opens on its first date, not back on the feed, so the host sees it exist.
             nav({ to: "/games/$gameId", params: { gameId: firstGameId! }, replace: true });
           } catch (err) {
-            const reason =
-              err instanceof Error && err.message ? err.message : "Please check your connection.";
             if (createdCount > 0 && firstGameId) {
-              // Some dates are already live; trying again would duplicate them.
+              // Some dates are already live; trying again would duplicate them, so no retry advice here: only a
+              // catalog sentence for why the rest failed, when there is one.
+              const why = knownErrorMessage(err);
               toast.error(
-                `Only ${createdCount} of ${totalPlans} games were published (${reason}). Check your hosted games before trying again.`,
+                `Only ${createdCount} of ${totalPlans} games were published.${why ? ` ${why}` : ""} Check your hosted games before trying again.`,
               );
               nav({ to: "/games/$gameId", params: { gameId: firstGameId } });
             } else {
               trackTaskError("publish_game");
-              toast.error(`Couldn't publish your game. ${reason}`);
+              toast.error(
+                `Couldn't publish your game. ${userErrorMessage(err, "Please try again.")}`,
+              );
             }
           } finally {
             setPublishing(false);

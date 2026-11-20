@@ -25,9 +25,10 @@ export async function shareAvailability(id: string) {
     toast.success("Link copied", {
       description: "Share it with anyone you want to reach this post.",
     });
-  } catch (e: any) {
+  } catch {
+    // The clipboard's own error text (a DOMException) never helps the member (WP 4.0).
     toast.error("Couldn't copy link", {
-      description: e?.message || "Please copy the URL manually.",
+      description: "Please copy the URL manually.",
     });
   }
 }

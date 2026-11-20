@@ -151,4 +151,22 @@ describe("guardianApprovalError", () => {
     expect(msg).toMatch(/needs a date of birth before they can join a team/i);
     expect(msg).not.toMatch(/AGE_VERIFICATION_REQUIRED|Something went wrong/);
   });
+
+  it("asks the parent to sign the team's waiver for their child, not for themselves (20261111120000)", () => {
+    // guardian_approve_team_invite raises the child's own wording.
+    const raw = "WAIVER_REQUIRED: this team requires a signed waiver before you can join.";
+    expect(guardianApprovalError(new Error(raw))).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+    expect(guardianApprovalError({ message: raw, code: "P0001" })).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+  });
+
+  it("never shows the database's own text", () => {
+    expect(guardianApprovalError(new Error("relation public.team_invites does not exist"))).toBe(
+      "Something went wrong. Please try again.",
+    );
+    expect(guardianApprovalError(new TypeError("Failed to fetch"))).toMatch(/couldn't connect/i);
+  });
 });

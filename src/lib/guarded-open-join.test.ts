@@ -42,8 +42,8 @@ const {
   playerRequestLine,
 } = await import("./guarded-open-join");
 const { joinWait, playerWaitCopy } = await import("./join-guardian-status");
-const { paymentSubmissionErrorMessage, PAYMENTS_GUARDIAN_APPROVAL_MESSAGE } =
-  await import("./payments-policy");
+const { PAYMENTS_GUARDIAN_APPROVAL_MESSAGE } = await import("./payments-policy");
+const { paymentSubmissionErrorMessage } = await import("./user-error");
 const { withoutGuardianOnly } = await import("./payments");
 
 beforeEach(() => {

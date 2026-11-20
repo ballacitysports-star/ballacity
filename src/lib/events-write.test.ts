@@ -163,10 +163,13 @@ describe("tryout sign-up server functions", () => {
     }
   });
 
-  it("show a plain message for every events error a copied tryout can raise", () => {
+  it("show a plain message for every events error a copied tryout can raise", async () => {
     const src = readFileSync("src/lib/tryouts.functions.ts", "utf8");
+    // The words come from the shared catalog (WP 4.0).
+    expect(src).toMatch(/knownErrorMessage\(m\)/);
+    const { userErrorMessage } = await import("@/lib/user-error");
     for (const code of ["EVENT_FULL", "EVENT_STARTED", "EVENT_NOT_FOUND", "NOT_ALLOWED"]) {
-      expect(src).toMatch(new RegExp(`${code}: "`));
+      expect(userErrorMessage(code, "fallback")).not.toBe("fallback");
     }
   });
 });

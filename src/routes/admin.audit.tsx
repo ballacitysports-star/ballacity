@@ -35,6 +35,7 @@ import {
   auditTargetLabel,
   type AuditCategory,
 } from "@/lib/audit-actions";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/admin/audit")({
   head: () =>
@@ -247,7 +248,10 @@ function AuditLogPage() {
       URL.revokeObjectURL(url);
       toast.success(`Exported ${res.rows} entries`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Export failed");
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't export the audit log.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setExporting(false);
     }

@@ -3,6 +3,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { describeMessagingError } from "@/lib/minor-messaging";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { errorText } from "@/lib/user-error";
+
+/** Our own sentence for a child whose guardian can't be contacted; shown as it is (WP 4.0). */
+const GUARDIAN_CONTACT_UNAVAILABLE = "Guardian contact isn't available right now.";
 
 /**
  * "Contact guardian" on a minor's player card. Messages go to the child's
@@ -31,7 +35,7 @@ export function ContactGuardianButton({
       const { data: guardianId, error } = await supabase.rpc("public_minor_guardian", {
         _child: childId,
       });
-      if (error || !guardianId) throw new Error("Guardian contact isn't available right now.");
+      if (error || !guardianId) throw new Error(GUARDIAN_CONTACT_UNAVAILABLE);
       const { getOrCreateDirectConversation, sendMessage } = await import("@/lib/messages");
       const convoId = await getOrCreateDirectConversation(guardianId as string);
       try {
@@ -41,7 +45,11 @@ export function ContactGuardianButton({
       }
       navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
     } catch (e) {
-      toast.error(describeMessagingError(e, "Could not contact guardian.", "guardian"));
+      toast.error(
+        errorText(e) === GUARDIAN_CONTACT_UNAVAILABLE
+          ? GUARDIAN_CONTACT_UNAVAILABLE
+          : describeMessagingError(e, "Could not contact guardian.", "guardian"),
+      );
     } finally {
       setBusy(false);
     }

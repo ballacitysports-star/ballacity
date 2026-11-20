@@ -247,14 +247,30 @@ describe("describeMessagingError", () => {
     ).toBe("This host can't receive messages from you right now.");
   });
 
-  it("passes other errors through unchanged", () => {
-    expect(describeMessagingError(new Error("This player is not accepting new messages."))).toBe(
-      "This player is not accepting new messages.",
+  it("never shows raw database text: an unknown error reads as the fallback", () => {
+    expect(
+      describeMessagingError(
+        new Error('null value in column "user_id" violates not-null constraint'),
+        "Couldn't message the host. Please try again.",
+        "host",
+      ),
+    ).toBe("Couldn't message the host. Please try again.");
+    expect(describeMessagingError(new Error("Cannot message yourself"))).toBe(
+      "Couldn't open chat. Please try again.",
+    );
+  });
+
+  it("reads a known code or a generic failure as the catalog and generic sentences do", () => {
+    expect(describeMessagingError(new Error("RATE_LIMITED"))).toBe(
+      "You're sending messages too fast. Wait a moment and try again.",
+    );
+    expect(describeMessagingError(new TypeError("Failed to fetch"))).toBe(
+      "We couldn't connect. Check your internet connection and try again.",
     );
   });
 
   it("uses the fallback when there is no message at all", () => {
-    expect(describeMessagingError(undefined)).toBe("Couldn't open chat");
+    expect(describeMessagingError(undefined)).toBe("Couldn't open chat. Please try again.");
     expect(describeMessagingError(undefined, "Try again")).toBe("Try again");
   });
 });

@@ -24,6 +24,28 @@ import { websiteHref } from "@/lib/org-listing";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 import { teamAvatarDisplay } from "@/lib/team-avatar";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The query's own answer when the gym row is gone (or hidden from this account). */
+const ORG_NOT_FOUND = "We couldn't find this gym. It may have been removed.";
+
+/** setOrgMemberRole's and removeOrgMember's own refusals, shown as they are. */
+const OWN_MEMBER_SENTENCES: ReadonlySet<string> = new Set([
+  "Only the owner can promote to owner.",
+  "Cannot demote the last owner.",
+  "Transfer ownership before removing the owner.",
+]);
+
+function memberErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_MEMBER_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
+
+function orgLoadErrorMessage(e: unknown): string {
+  return errorText(e) === ORG_NOT_FOUND
+    ? ORG_NOT_FOUND
+    : userErrorMessage(e, "Couldn't load this gym. Please try again.");
+}
 
 export const Route = createFileRoute("/orgs/$orgId/edit")({
   head: () =>
@@ -37,7 +59,7 @@ export const Route = createFileRoute("/orgs/$orgId/edit")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't open this gym for editing"
-      message={error instanceof Error ? error.message : "Something went wrong."}
+      message={userErrorMessage(error, "Couldn't open this gym for editing. Please try again.")}
       onRetry={reset}
       action={
         <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
@@ -94,8 +116,8 @@ function EditOrg() {
         .select("*")
         .eq("id", orgId)
         .maybeSingle();
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error("Not found");
+      if (error) throw error;
+      if (!data) throw new Error(ORG_NOT_FOUND);
       return data;
     },
   });
@@ -107,7 +129,7 @@ function EditOrg() {
         .from("trainer_org_members")
         .select("id, trainer_id, user_id, role, teams:trainer_id(name, avatar, avatar_url)")
         .eq("org_id", orgId);
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       return (data ?? []).map((r) => {
         const t = r.teams as {
           name?: string | null;
@@ -221,7 +243,7 @@ function EditOrg() {
     return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   }
   if (orgQ.error) {
-    return <div className="p-8 text-sm text-coral">{(orgQ.error as Error).message}</div>;
+    return <div className="p-8 text-sm text-coral">{orgLoadErrorMessage(orgQ.error)}</div>;
   }
   if (!isAdmin) {
     return (
@@ -260,7 +282,7 @@ function EditOrg() {
       toast.success("Deleted");
       navigate({ to: "/orgs" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to delete");
+      toast.error(userErrorMessage(e, "Couldn't delete this gym. Please try again."));
     }
   }
 
@@ -344,7 +366,12 @@ function EditOrg() {
                         await setRole({ data: { orgId, trainerId: m.trainer_id, role } });
                         qc.invalidateQueries({ queryKey: ["org-edit-members", orgId] });
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Failed");
+                        toast.error(
+                          memberErrorMessage(
+                            err,
+                            "Couldn't change this trainer's role. Please try again.",
+                          ),
+                        );
                       }
                     }}
                     className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
@@ -362,7 +389,12 @@ function EditOrg() {
                           await remove({ data: { orgId, trainerId: m.trainer_id } });
                           qc.invalidateQueries({ queryKey: ["org-edit-members", orgId] });
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Failed");
+                          toast.error(
+                            memberErrorMessage(
+                              err,
+                              "Couldn't remove this trainer. Please try again.",
+                            ),
+                          );
                         }
                       }}
                       className="rounded-lg border border-coral/40 bg-coral/10 p-1.5 text-coral"
@@ -442,7 +474,12 @@ function EditOrg() {
                           });
                           toast.success(`Set to ${role}`);
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Failed");
+                          toast.error(
+                            userErrorMessage(
+                              err,
+                              "Couldn't change this member's role. Please try again.",
+                            ),
+                          );
                         }
                       }}
                       className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
@@ -463,7 +500,9 @@ function EditOrg() {
                           });
                           toast.success("Removed");
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Failed");
+                          toast.error(
+                            userErrorMessage(err, "Couldn't remove this member. Please try again."),
+                          );
                         }
                       }}
                       className="rounded-lg border border-coral/40 bg-coral/10 p-1.5 text-coral"

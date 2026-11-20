@@ -14,6 +14,7 @@ vi.mock("@/lib/team-posts.functions", () => ({ suggestTeamPostDraft }));
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 
 import { DraftWithAi } from "./DraftWithAi";
+import { AI_ERROR_MESSAGES } from "@/lib/ai/errors";
 
 beforeEach(() => {
   suggestTeamPostDraft.mockReset();
@@ -78,16 +79,25 @@ describe("DraftWithAi", () => {
   });
 
   it("leaves the form alone and shows the reason when drafting fails", async () => {
-    suggestTeamPostDraft.mockRejectedValue(new Error("This didn't pass our safety check."));
+    suggestTeamPostDraft.mockRejectedValue(new Error(AI_ERROR_MESSAGES.MODERATION_BLOCKED));
     render(<Harness initial={{ title: "Mine", body: "my rough notes here" }} />);
     fireEvent.click(draftButton());
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("This didn't pass our safety check."),
+      expect(toastError).toHaveBeenCalledWith(AI_ERROR_MESSAGES.MODERATION_BLOCKED),
     );
     expect(screen.getByTestId("title").textContent).toBe("Mine");
     expect(screen.getByTestId("body").textContent).toBe("my rough notes here");
     expect(screen.queryByRole("button", { name: /undo/i })).toBeNull();
     expect((draftButton() as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("never shows a raw server error (WP 4.0)", async () => {
+    suggestTeamPostDraft.mockRejectedValue(new Error('relation "ai_usage" does not exist'));
+    render(<Harness initial={{ title: "Mine", body: "my rough notes here" }} />);
+    fireEvent.click(draftButton());
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Couldn't draft that right now. Please try again."),
+    );
   });
 });
 

@@ -8,6 +8,7 @@ import type { ChildActivity, ChildTryout } from "@/lib/guardian-activity.functio
 import { cancelTryoutRsvp } from "@/lib/tryouts.functions";
 import { CancelForChildDialog } from "@/components/child/CancelForChildDialog";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
+import { userErrorMessage } from "@/lib/user-error";
 
 type Row = { t: ChildTryout; child: string; childUserId: string };
 
@@ -50,7 +51,8 @@ export function ChildTryoutsSection({ kids, multi }: { kids: ChildActivity[]; mu
       void qc.invalidateQueries({ queryKey: ["guardian-activity"] });
       void qc.invalidateQueries({ queryKey: ["tryouts"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not cancel.");
+      // r.error is already the catalog's words (tryouts.functions.ts); a thrown server error never shows raw (WP 4.0).
+      toast.error(userErrorMessage(e, "Couldn't cancel this tryout signup. Please try again."));
     } finally {
       setBusy(false);
     }

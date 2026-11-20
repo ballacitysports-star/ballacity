@@ -167,6 +167,22 @@ export async function isOneSignalSubscribed(): Promise<boolean> {
   return result === true;
 }
 
+/**
+ * Whether this device has a push subscription: "unknown" until the SDK has initialized (the root hook does that
+ * shortly after sign-in), so a caller never mistakes "not loaded yet" for "not subscribed".
+ */
+export async function devicePushSubscriptionState(): Promise<
+  "subscribed" | "not_subscribed" | "unknown"
+> {
+  if (typeof window === "undefined" || !window.__openrunOneSignalInited) return "unknown";
+  const result = await withOneSignal(
+    async (OneSignal: { User: { PushSubscription: { optedIn?: boolean } } }) =>
+      OneSignal.User.PushSubscription.optedIn === true,
+  );
+  if (result === null) return "unknown";
+  return result ? "subscribed" : "not_subscribed";
+}
+
 /** Mount once near the app root; initializes OneSignal for the signed-in user. */
 export function useOneSignal() {
   const { user } = useAuth();

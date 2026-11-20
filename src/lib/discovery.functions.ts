@@ -11,6 +11,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertSuperadmin, getAdmin, writeAudit } from "@/lib/superadmin.server";
+import { serverFnRoute } from "@/lib/error-report-middleware";
 import { DISCOVERY_AREAS, DISCOVERY_TYPES, areaById } from "@/lib/discovery/areas";
 import type { DiscoveryDeps } from "@/lib/discovery/engine.server";
 
@@ -315,6 +316,9 @@ export const superadminDiscoveryBulk = createServerFn({ method: "POST" })
         }
         result.done++;
       } catch (e) {
+        // Caught here, so the error middleware never sees it: report the failure behind it (a refusal is not one).
+        const { reportServerFnError } = await import("@/lib/server-fn-report.server");
+        await reportServerFnError(e, serverFnRoute({ name: "superadminDiscoveryBulk" }));
         result.failed.push({ name, error: e instanceof Error ? e.message : "Failed" });
       }
     }

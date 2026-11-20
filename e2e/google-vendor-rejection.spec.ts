@@ -155,7 +155,11 @@ test.describe("OAuth vendor rejection", () => {
 
       await button.click();
 
-      await expect(page.getByText(/network unreachable/i)).toBeVisible({ timeout: 5_000 });
+      // WP 4.0: plain words, not the provider's raw text (which is logged instead).
+      await expect(page.getByText(/google sign-in didn't work\. please try again\./i)).toBeVisible({
+        timeout: 5_000,
+      });
+      await expect(page.getByText(/network unreachable/i)).toHaveCount(0);
       await expect(page.getByText(/rejected by the provider/i)).toHaveCount(0);
     } finally {
       await context.close();

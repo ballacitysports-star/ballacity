@@ -5,11 +5,13 @@ import { z } from "zod";
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { notFound, redirect } from "@tanstack/react-router";
 import { runWithStartContext } from "@tanstack/start-storage-context";
+import { errorInsteadOf, failureBehind } from "./error-report";
 import {
   errorReportMiddleware,
   isReportableServerFnError,
   serverFnRoute,
 } from "./error-report-middleware";
+import { reportServerFnError } from "./server-fn-report.server";
 
 const h = vi.hoisted(() => ({
   reportServerError: vi.fn(async (..._args: unknown[]) => undefined),
@@ -256,7 +258,7 @@ describe("which server-function failures are reported (P0-8)", () => {
     expect(fromCode.size).toBeGreaterThan(5000);
     expect(fromSql.size).toBeGreaterThan(300);
     expect(fromCode).toContain("Game not found."); // thrown as is
-    expect(fromCode).toContain("That invitation has expired. Ask for a new link."); // from a mapper
+    expect(fromCode).toContain("This invite has expired. Ask for a new one."); // from a mapper
     expect(fromCode).toContain("AI couldn't finish that. Please try again."); // from a map
     expect(fromSql).toContain("EVENT_FULL");
     expect(fromSql).toContain("Unknown sport: %");
@@ -354,6 +356,34 @@ describe("errorReportMiddleware", () => {
     expect(h.reportServerError).not.toHaveBeenCalled();
   });
 
+  it("reports the failure a handler replaced with words for the member, and rethrows the words", async () => {
+    // A server function maps a PostgREST error before throwing (team-chat.functions.ts and others).
+    const failure = {
+      message:
+        "Could not find the function public.send_team_chat_message(_body, _team) in the schema cache",
+      code: "PGRST202",
+      details: null,
+      hint: null,
+    };
+    const words = errorInsteadOf(
+      failure,
+      "Something went wrong in the team chat. Please try again.",
+    );
+    await expect(runMiddleware(() => Promise.reject(words))).rejects.toBe(words);
+    expect(h.reportServerError).toHaveBeenCalledTimes(1);
+    expect(h.reportServerError).toHaveBeenCalledWith(failure, h.request, "server_fn", {
+      route: "/_serverFn/doThing",
+    });
+  });
+
+  it("does not report a refusal a handler replaced with words", async () => {
+    const words = errorInsteadOf({ message: "EVENT_FULL", code: "P0001" }, "This event is full.");
+    await expect(runMiddleware(() => Promise.reject(words))).rejects.toBe(words);
+    const expired = errorInsteadOf({ message: "JWT expired", code: "PGRST301" }, "Sign in.");
+    await expect(runMiddleware(() => Promise.reject(expired))).rejects.toBe(expired);
+    expect(h.reportServerError).not.toHaveBeenCalled();
+  });
+
   it("still reports, as signed out, when there is no request to read", async () => {
     h.request = null;
     const error = new TypeError("boom");
@@ -361,6 +391,71 @@ describe("errorReportMiddleware", () => {
     expect(h.reportServerError).toHaveBeenCalledWith(error, null, "server_fn", {
       route: "/_serverFn/doThing",
     });
+  });
+});
+
+describe("loads in the browser", () => {
+  // src/start.ts imports this file on the client too. A server-only import anywhere outside
+  // `.server()` makes TanStack's import protection reject the module in the dev server, and every
+  // page then fails to load (it broke the whole E2E suite once). Server-only code lives in
+  // server-fn-report.server.ts and is imported only inside `.server()`.
+  const source = readFileSync(join(__dirname, "error-report-middleware.ts"), "utf8");
+  it("has no server-only import", () => {
+    expect(source).not.toMatch(/["']@tanstack\/react-start\/server["']/);
+    expect(source).not.toMatch(/^import[^;]*\.server["'];?$/m);
+  });
+  it("imports the reporter only inside .server()", () => {
+    const body = source.slice(source.indexOf("export const errorReportMiddleware"));
+    expect(body).toContain('import("@/lib/server-fn-report.server")');
+    expect(source.indexOf('import("@/lib/server-fn-report.server")')).toBeGreaterThan(
+      source.indexOf(".server("),
+    );
+  });
+});
+
+describe("reportServerFnError", () => {
+  it("reports the failure behind an error a handler caught itself, by the same rule", async () => {
+    // A bulk action collects each item's failure as words and answers normally (superadminDiscoveryBulk).
+    const failure = { message: "canceling statement due to statement timeout", code: "57014" };
+    const words = errorInsteadOf(failure, "Couldn't remove this listing. Please try again.");
+    await reportServerFnError(words, "/_serverFn/superadminDiscoveryBulk");
+    expect(h.reportServerError).toHaveBeenCalledTimes(1);
+    expect(h.reportServerError).toHaveBeenCalledWith(failure, h.request, "server_fn", {
+      route: "/_serverFn/superadminDiscoveryBulk",
+    });
+    // A refusal is an answer, not a failure.
+    await reportServerFnError(
+      errorInsteadOf({ message: "LISTING_IN_USE", code: "P0001" }, "In use."),
+      "/_serverFn/superadminDiscoveryBulk",
+    );
+    expect(h.reportServerError).toHaveBeenCalledTimes(1);
+  });
+
+  it("never throws, even when the reporter does", async () => {
+    h.reportServerError.mockRejectedValueOnce(new Error("db down"));
+    await expect(reportServerFnError(new TypeError("boom"), null)).resolves.toBeUndefined();
+  });
+});
+
+describe("errorInsteadOf", () => {
+  it("keeps the failure off the error, where the serializer would send it to the browser", () => {
+    const failure = { message: 'relation "public.posts" does not exist', code: "42P01" };
+    const words = errorInsteadOf(failure, "Something went wrong with this post. Please try again.");
+    expect(words).toBeInstanceOf(Error);
+    expect(words.message).toBe("Something went wrong with this post. Please try again.");
+    expect(words.cause).toBeUndefined();
+    for (const key of Object.getOwnPropertyNames(words)) {
+      expect(String((words as unknown as Record<string, unknown>)[key])).not.toContain("relation");
+    }
+    expect(failureBehind(words)).toBe(failure);
+  });
+
+  it("is the error itself for anything else", () => {
+    const plain = new Error("Game not found.");
+    expect(failureBehind(plain)).toBe(plain);
+    expect(failureBehind("text")).toBe("text");
+    expect(failureBehind(null)).toBeNull();
+    expect(failureBehind(undefined)).toBeUndefined();
   });
 });
 
@@ -421,6 +516,21 @@ describe("errorReportMiddleware inside TanStack Start's own server-function pipe
     );
     expect((out.error as Error).message).toContain("does not exist");
     expect(h.reportServerError).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a database failure the handler replaced with words, and returns only the words", async () => {
+    const failure = { message: "permission denied for function follow_entity", code: "42501" };
+    const out = await call(
+      serverFn(() => {
+        throw errorInsteadOf(failure, "Couldn't update this follow. Please try again.");
+      }),
+      { n: 1 },
+    );
+    expect((out.error as Error).message).toBe("Couldn't update this follow. Please try again.");
+    expect(h.reportServerError).toHaveBeenCalledTimes(1);
+    expect(h.reportServerError).toHaveBeenCalledWith(failure, h.request, "server_fn", {
+      route: "/_serverFn/doThing",
+    });
   });
 
   it("returns results untouched", async () => {

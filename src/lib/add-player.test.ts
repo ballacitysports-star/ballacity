@@ -68,7 +68,9 @@ describe("the Add your child form", () => {
   it("shows the server's parent-facing message rather than a database error", () => {
     // §23: the server maps every failure through managedChildErrorMessage().
     expect(fns).toMatch(/managedChildErrorMessage\(provisionError\.message\)/);
-    expect(addChild).toMatch(/toast\.error\(\s*e instanceof Error \? e\.message/);
+    // WP 4.0: the form turns any failure into a sentence (catalog codes, offline, session) and never shows raw text.
+    expect(addChild).toMatch(/toast\.error\(\s*userErrorMessage\(e, "Couldn't add your child\./);
+    expect(addChild).not.toMatch(/e instanceof Error \? e\.message/);
   });
 });
 

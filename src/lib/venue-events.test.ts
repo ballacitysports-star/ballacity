@@ -90,7 +90,14 @@ describe("venueEventErrorMessage", () => {
     expect(venueEventErrorMessage("ADULT_HOST_REQUIRED")).toMatch(/adults/);
     expect(venueEventErrorMessage("OUTSIDE_AGE_RANGE")).toMatch(/age group/);
     expect(venueEventErrorMessage("EVENT_FULL")).toBe("This event is full.");
-    expect(venueEventErrorMessage("something else")).toBe("something else");
+    expect(venueEventErrorMessage("something else")).toBe(
+      "Something went wrong with this event. Please try again.",
+    );
+    expect(
+      venueEventErrorMessage(
+        'new row violates row-level security policy for table "event_registrations"',
+      ),
+    ).toBe("You don't have permission to do that.");
   });
 });
 
@@ -231,7 +238,7 @@ describe("fetchEventWaiver", () => {
     expect(await fetchEventWaiver(rpcClient({ data: [], error: null }), "e1")).toBeNull();
     await expect(
       fetchEventWaiver(rpcClient({ data: null, error: { message: "AUTH_REQUIRED" } }), "e1"),
-    ).rejects.toThrow("Sign in first.");
+    ).rejects.toThrow("Sign in to continue.");
   });
 });
 

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useMyProfiles, useSwitchProfile, type AccountProfile } from "@/lib/account-profiles";
 import { availabilityGateMessage, type AvailabilityGateReason } from "@/lib/availability-gate";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Inline explanation of why the viewer can't post availability yet, with the
@@ -68,7 +69,9 @@ export function AvailabilityRequiredNotice({
                       onSwitched?.();
                     },
                     onError: (e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not switch profile"),
+                      toast.error(
+                        userErrorMessage(e, "Couldn't switch profiles. Please try again."),
+                      ),
                   })
                 }
                 className="inline-flex items-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"

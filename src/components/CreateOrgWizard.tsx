@@ -51,6 +51,7 @@ import {
 } from "@/lib/trainer-orgs.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { knownErrorMessage, userErrorMessage } from "@/lib/user-error";
 import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
 
 const ACCENTS = [
@@ -329,10 +330,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
             toast.success(`Join request sent to ${orgChoice.orgName}`);
           }
         } catch (e) {
+          // Our own sentence for a known code, never the raw server text (WP 4.0).
+          const known = knownErrorMessage(e);
           toast.error(
-            e instanceof Error
-              ? `Profile created, but org link failed: ${e.message}`
-              : "Profile created, but org link failed.",
+            `Profile created, but we couldn't link your gym. ${known ?? "You can add it from your profile."}`,
           );
         }
         nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
@@ -340,10 +341,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
         nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
       }
     } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : `Failed to create ${isCoach ? "trainer" : "team"}.`;
+      // A catalog sentence (HANDLE_TAKEN), a generic one (signed out, duplicate, offline), else the fallback.
       setSubmitError(
-        /unauthor/i.test(msg) ? `Please sign in to create a ${isCoach ? "trainer" : "team"}.` : msg,
+        userErrorMessage(
+          e,
+          `Couldn't create your ${isCoach ? "trainer profile" : "team"}. Please try again.`,
+        ),
       );
       setSubmitting(false);
     }
@@ -768,9 +771,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Min
-                      </div>
+                      <div className="micro-label text-muted-foreground">Min</div>
                       <select
                         value={skillMin}
                         onChange={(e) => {
@@ -788,9 +789,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Max
-                      </div>
+                      <div className="micro-label text-muted-foreground">Max</div>
                       <select
                         value={skillMax}
                         onChange={(e) => {
@@ -824,9 +823,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="micro-label text-muted-foreground">
-                          Min
-                        </div>
+                        <div className="micro-label text-muted-foreground">Min</div>
                         <select
                           value={ratingMin}
                           onChange={(e) => setRatingMin(e.target.value)}
@@ -841,9 +838,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         </select>
                       </label>
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="micro-label text-muted-foreground">
-                          Max
-                        </div>
+                        <div className="micro-label text-muted-foreground">Max</div>
                         <select
                           value={ratingMax}
                           onChange={(e) => setRatingMax(e.target.value)}
@@ -953,9 +948,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   <Section title="Record (optional)">
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="micro-label text-muted-foreground">
-                          Wins
-                        </div>
+                        <div className="micro-label text-muted-foreground">Wins</div>
                         <input
                           type="number"
                           min={0}
@@ -965,9 +958,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         />
                       </label>
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="micro-label text-muted-foreground">
-                          Losses
-                        </div>
+                        <div className="micro-label text-muted-foreground">Losses</div>
                         <input
                           type="number"
                           min={0}

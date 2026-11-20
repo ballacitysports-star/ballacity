@@ -31,6 +31,7 @@ import { RatingExplainer } from "@/components/RatingExplainer";
 import { useCanReview } from "@/lib/transactions";
 import { ReviewSubjectGate } from "@/components/ReviewSubjectGate";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+/** The sentences refreshMyReputationSummary throws itself (reviews.functions.ts); shown as they are. */
+const OWN_SUMMARY_SENTENCES: ReadonlySet<string> = new Set([
+  "Only the owner can refresh this.",
+  "Not enough reviews to summarize yet.",
+]);
 
 type Sort = "recent" | "top" | "lowest" | "helpful";
 
@@ -234,7 +241,12 @@ function ReviewsSectionBody({
       });
       await qc.invalidateQueries({ queryKey: ["reputation-insight"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't refresh the summary");
+      const text = errorText(e);
+      toast.error(
+        text && OWN_SUMMARY_SENTENCES.has(text)
+          ? text
+          : userErrorMessage(e, "Couldn't refresh the summary. Please try again."),
+      );
     } finally {
       setRefreshing(false);
     }

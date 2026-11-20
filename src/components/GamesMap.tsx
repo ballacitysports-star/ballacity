@@ -3,6 +3,7 @@ import { LocateFixed, Loader2, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { geocodeAddress } from "@/lib/geocode.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import {
   type DenialReason,
@@ -354,7 +355,12 @@ export function GamesMap({
       repositionPins();
       toast.success("Map location changed");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Couldn't find that location";
+      // geocodeAddress says "No location found" when the address matches nothing; any other failure (the maps
+      // service, credentials, validation) is never shown raw (WP 4.0).
+      const message =
+        errorText(error) === "No location found"
+          ? "Couldn't find that location. Try a different address or city."
+          : userErrorMessage(error, "Couldn't look up that location. Please try again.");
       setManualError(message);
       toast.error(message);
     } finally {

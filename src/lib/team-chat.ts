@@ -6,6 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const TEAM_CHAT_SETTING_KEY = "team_chat";
 export const TEAM_CHAT_PAGE = 50;
@@ -33,15 +34,9 @@ export type TeamChatClient = {
   rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<Result>;
 };
 
-/** Plain words for the database's refusals. */
+/** Plain words for the database's refusals; any other failure reads as a generic sentence, never as raw text. */
 export function teamChatErrorMessage(message: string): string {
-  if (/NOT_IN_TEAM_CHAT/.test(message)) return "You're not in this team's chat.";
-  if (/RATE_LIMITED/.test(message)) return "You're sending messages too fast. Wait a moment.";
-  if (/INVALID_MESSAGE/.test(message)) return "Write a message first (up to 2,000 characters).";
-  if (/NOT_TEAM_STAFF/.test(message)) return "Only the team's staff can do that.";
-  if (/CANNOT_REPORT_SELF/.test(message)) return "You can't report your own message.";
-  if (/MESSAGE_NOT_FOUND/.test(message)) return "That message isn't available.";
-  return message;
+  return userErrorMessage(message, "Something went wrong in the team chat. Please try again.");
 }
 
 /** The latest messages the caller may read, oldest first for display. Throws on a read error. */

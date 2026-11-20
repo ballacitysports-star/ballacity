@@ -4,6 +4,7 @@ import { pageHead } from "@/lib/seo";
 import { ensureOrgById } from "@/lib/org-store";
 import type { Org } from "@/lib/sample-data";
 import { EditOrgScreen } from "@/components/EditOrgScreen";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
   head: () =>
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
   errorComponent: ({ error }) => (
     <div className="page-shell-narrow pt-24 text-center">
       <p className="text-muted-foreground">
-        {error instanceof Error ? error.message : "Couldn't open editor."}
+        {userErrorMessage(error, "Couldn't open the editor. Please try again.")}
       </p>
       <Link
         to="/teams"

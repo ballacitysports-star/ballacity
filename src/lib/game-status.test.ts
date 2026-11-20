@@ -113,11 +113,30 @@ describe("joinGateErrorMessage", () => {
     expect(joinGateErrorMessage({ message: "GAME_COMPLETED: ..." })).toMatch(/ended/i);
     expect(joinGateErrorMessage({ message: "GAME_JOINS_CLOSED: ..." })).toMatch(/closed joining/i);
     expect(joinGateErrorMessage({ message: "GAME_SIGNUP_CLOSED: ..." })).toMatch(/closed/i);
-    expect(joinGateErrorMessage({ message: "GAME_FULL: ..." })).toMatch(/waitlist/i);
+    expect(joinGateErrorMessage({ message: "GAME_FULL: ..." })).toBe("This game is full.");
     expect(joinGateErrorMessage({ message: "BLOCKED_BY_HOST: ..." })).toBe(
       "You can't join this game.",
     );
     expect(joinGateErrorMessage({ message: "boom" })).toMatch(/Couldn't join/i);
+  });
+
+  it("points at the waitlist only when the host kept one", () => {
+    const full = { message: "GAME_FULL: the roster is full." };
+    expect(joinGateErrorMessage(full, { allowWaitlist: true })).toBe(
+      "This game is full. You can join the waitlist instead.",
+    );
+    expect(joinGateErrorMessage(full, { allowWaitlist: false })).toBe("This game is full.");
+    expect(joinGateErrorMessage(full, {})).toBe("This game is full.");
+    // A refused payment claim on a full game keeps its own words, waitlist or not.
+    expect(
+      joinGateErrorMessage(
+        {
+          message:
+            "GAME_FULL: this game is full, so a payment for a place in it cannot be recorded.",
+        },
+        { allowWaitlist: true },
+      ),
+    ).not.toMatch(/waitlist/);
   });
 
   it("says what is missing when approval, payment or a guardian is", () => {

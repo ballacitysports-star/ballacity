@@ -13,6 +13,7 @@ import {
   type AnalyticsRatingKey,
 } from "@/lib/reel-analytics";
 import { buildReelTrends, type RecurringCue, type TrendReel } from "@/lib/reel-trends";
+import { knownErrorMessage } from "@/lib/user-error";
 
 /** Fewest sharing athletes before any team-wide figure is shown. */
 export const MIN_TEAM_SUMMARY_ATHLETES = 3;
@@ -26,18 +27,8 @@ export function shareModeForCohort(cohort: AgeCohort | string | null | undefined
   return "unavailable";
 }
 
-const SHARE_ERRORS: Record<string, string> = {
-  COACH_ANALYTICS_OFF: "Sharing analytics with coaches isn't available yet.",
-  COACH_ANALYTICS_NOT_AVAILABLE: "Sharing analytics with coaches isn't available for this account.",
-  COACH_ANALYTICS_NOT_ON_TEAM: "They need to be on this team first.",
-  COACH_ANALYTICS_GUARDIAN_REQUIRED: "A parent or guardian has to turn this on.",
-  COACH_ANALYTICS_SELF_ONLY: "Only the athlete can turn this on.",
-};
-
 export function shareErrorMessage(err: unknown): string | null {
-  const text = err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  for (const [code, msg] of Object.entries(SHARE_ERRORS)) if (text.includes(code)) return msg;
-  return null;
+  return knownErrorMessage(err) ?? null;
 }
 
 export type AthleteReels = {
@@ -100,8 +91,9 @@ export function buildTeamAnalytics(athletes: AthleteReels[]): TeamAnalytics {
 
   const withData = athletes
     .map((a) => ({ a, latest: latestOf(a.reels) }))
-    .filter((x): x is { a: AthleteReels; latest: TrendReel & { analytics: AdvancedAnalytics } } =>
-      !!x.latest?.analytics,
+    .filter(
+      (x): x is { a: AthleteReels; latest: TrendReel & { analytics: AdvancedAnalytics } } =>
+        !!x.latest?.analytics,
     );
 
   let summary: TeamSummary | null = null;

@@ -1,9 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
-import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_REFUSAL_MESSAGES,
+} from "@/lib/message-attachment-validation";
 import { pageHead } from "@/lib/seo";
 import { describeMessagingError } from "@/lib/minor-messaging";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -55,6 +59,23 @@ import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthSearchHere } from "@/lib/auth-return";
+
+/**
+ * The sentences sendMessage and uploadMessageAttachment (src/lib/messages.ts) throw themselves, and the attachment
+ * refusals of attachmentProblem and finalizeMessageAttachment that the upload passes on. They tell the sender what to
+ * do, so a failed send shows them as they are; anything else goes through describeMessagingError, which never shows
+ * raw database text (WP 4.0).
+ */
+const OWN_SEND_ERRORS: ReadonlySet<string> = new Set([
+  "Sign in to send messages.",
+  "Sign in to send attachments.",
+  ...ATTACHMENT_REFUSAL_MESSAGES,
+]);
+
+function ownSendError(e: unknown): string | undefined {
+  const text = e instanceof Error ? errorText(e) : undefined;
+  return text && OWN_SEND_ERRORS.has(text) ? text : undefined;
+}
 
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () =>
@@ -185,8 +206,8 @@ function Thread() {
         setIsRequest(!accepted.includes(user.id));
         if (m.length) await refreshReactions(m.map((x) => x.id));
         await markConversationRead(conversationId);
-      } catch (e: any) {
-        toast.error(e.message);
+      } catch (e: unknown) {
+        toast.error(userErrorMessage(e, "Couldn't load this conversation. Please try again."));
       }
     })();
 
@@ -408,14 +429,17 @@ function Thread() {
       setReplyTo(null);
       setTypingState(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (isAbortError(e)) {
         toast.message("Upload cancelled");
       } else {
         // A minor-messaging refusal at send time carries a reason code;
         // never show the raw sentinel. A failed upload also shows on the
         // attachment itself, with a retry.
-        toast.error(describeMessagingError(e, "Send failed", "chat"));
+        toast.error(
+          ownSendError(e) ??
+            describeMessagingError(e, "Couldn't send your message. Please try again.", "chat"),
+        );
       }
     } finally {
       sendingRef.current = false;
@@ -432,8 +456,8 @@ function Thread() {
     try {
       if (mine) await removeReaction(messageId, emoji);
       else await addReaction(messageId, emoji);
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't add that reaction. Please try again."));
     }
   };
 
@@ -441,8 +465,8 @@ function Thread() {
     setMenuFor(null);
     try {
       await unsendMessage(id);
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't unsend that message. Please try again."));
     }
   };
 
@@ -451,8 +475,8 @@ function Thread() {
       await acceptConversation(conversationId);
       setIsRequest(false);
       toast.success("Message request accepted");
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't accept this message request. Please try again."));
     }
   };
 
@@ -464,8 +488,8 @@ function Thread() {
       // shared link means there is nothing behind you to go back to. Send
       // people to the inbox, which always exists.
       await navigate({ to: "/messages", replace: true });
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't decline this message request. Please try again."));
     }
   };
 

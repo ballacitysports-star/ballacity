@@ -19,6 +19,22 @@ import {
 } from "@/components/reels/ReelStudio";
 import { normalizeReelStyle, reelStyleSummary, type ReelStylePrefs } from "@/lib/reel-style";
 import { applyReelStyleDraft, previewReelStyle } from "@/lib/reels.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences previewReelStyle and applyReelStyleDraft throw themselves; shown as they are. */
+const OWN_STYLE_SENTENCES: ReadonlySet<string> = new Set([
+  "AI is not configured yet — please try again later",
+  "Only finished reels can be compared — let this one finish first",
+  "This reel has no captured analysis to build on — use Try again instead",
+  "Generate a preview first",
+  "That wording didn't pass our safety check, so it wasn't saved.",
+]);
+
+/** Our own sentence when the style call threw one, else userErrorMessage's words (AI errors included). */
+function styleErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_STYLE_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 export type ReelStyleDraft = {
   style: Record<string, any>;
@@ -118,8 +134,8 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
       })) as unknown as ReelStyleDraft;
       setDraft(result);
       toast.success("Restyled preview ready — compare before you publish");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not build the restyled preview");
+    } catch (e) {
+      toast.error(styleErrorMessage(e, "Couldn't build the restyled preview. Please try again."));
     } finally {
       setGenerating(false);
     }
@@ -133,8 +149,8 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
       toast.success("Published the restyled version");
       setDraft(null);
       setOpen(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not publish this version");
+    } catch (e) {
+      toast.error(styleErrorMessage(e, "Couldn't publish this version. Please try again."));
     } finally {
       setPublishing(false);
     }
@@ -225,9 +241,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
             </section>
 
             <section className="rounded-xl border border-lime/50 p-3">
-              <p className="micro-label text-lime">
-                Restyled preview · {reelStyleSummary(style)}
-              </p>
+              <p className="micro-label text-lime">Restyled preview · {reelStyleSummary(style)}</p>
               {draft ? (
                 <>
                   <CopyBlock

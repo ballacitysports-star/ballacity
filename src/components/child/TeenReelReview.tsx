@@ -13,6 +13,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { Button } from "@/components/ui/button";
 import { REEL_PRIVACY_PATH, TEEN_RESTRICTION } from "@/lib/teen-reel-privacy";
 import {
@@ -23,6 +24,13 @@ import {
   type TeenReelRow,
   type TeenReelTeam,
 } from "@/lib/teen-reels.functions";
+
+/** The sentences the teen-reel server functions throw themselves (teen-reels.functions.ts); shown as they are. */
+const OWN_TEEN_REEL_SENTENCES: ReadonlySet<string> = new Set([
+  "Only a verified parent or guardian can do this.",
+  "Reel approvals are for players aged 13 to 15.",
+  "That reel isn't available.",
+]);
 
 function ReelItem({
   childUserId,
@@ -56,8 +64,13 @@ function ReelItem({
       await fn();
       toast.success(ok);
       onChanged();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not save this");
+    } catch (e) {
+      const text = errorText(e);
+      toast.error(
+        text && OWN_TEEN_REEL_SENTENCES.has(text)
+          ? text
+          : userErrorMessage(e, "Couldn't save this. Please try again."),
+      );
     } finally {
       setBusy(false);
     }
@@ -65,13 +78,26 @@ function ReelItem({
 
   return (
     <li className="rounded-xl border border-border bg-background/60 p-3">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full text-left" aria-expanded={open}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-left"
+        aria-expanded={open}
+      >
         <p className="truncate text-sm font-semibold">{reel.title}</p>
         <p className="text-[11px] text-muted-foreground">
           {new Date(reel.createdAt).toLocaleDateString()} ·{" "}
-          {reel.onHold ? "On a safety hold" : reel.isDraft ? "Not posted yet" : reel.status === "completed" ? "Posted" : reel.status}
+          {reel.onHold
+            ? "On a safety hold"
+            : reel.isDraft
+              ? "Not posted yet"
+              : reel.status === "completed"
+                ? "Posted"
+                : reel.status}
         </p>
-        <p className={`text-[11px] font-semibold ${reel.state === "team" ? "text-lime" : "text-muted-foreground"}`}>
+        <p
+          className={`text-[11px] font-semibold ${reel.state === "team" ? "text-lime" : "text-muted-foreground"}`}
+        >
           {reel.state === "team" ? `Approved for ${reel.teamName}` : "Guardian only"}
         </p>
       </button>
@@ -90,7 +116,9 @@ function ReelItem({
               className="w-full rounded-lg bg-black"
             />
           ) : (
-            <p className="text-xs text-muted-foreground">This reel can&apos;t be played right now.</p>
+            <p className="text-xs text-muted-foreground">
+              This reel can&apos;t be played right now.
+            </p>
           )}
 
           {reel.state === "team" ? (
@@ -100,13 +128,18 @@ function ReelItem({
               variant="outline"
               disabled={busy}
               onClick={() =>
-                run(() => setFn({ data: { childUserId, reelId: reel.id, teamId: null } }), "Back to guardian only")
+                run(
+                  () => setFn({ data: { childUserId, reelId: reel.id, teamId: null } }),
+                  "Back to guardian only",
+                )
               }
             >
               <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Take back to guardian only
             </Button>
           ) : teams.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Your child isn&apos;t on a team yet, so there is nothing to approve.</p>
+            <p className="text-xs text-muted-foreground">
+              Your child isn&apos;t on a team yet, so there is nothing to approve.
+            </p>
           ) : (
             <div className="space-y-2">
               <label className="block text-[11px] font-semibold text-muted-foreground">
@@ -128,14 +161,18 @@ function ReelItem({
                 size="sm"
                 disabled={busy || !teamId || !canApprove}
                 onClick={() =>
-                  run(() => setFn({ data: { childUserId, reelId: reel.id, teamId } }), "Approved for that team")
+                  run(
+                    () => setFn({ data: { childUserId, reelId: reel.id, teamId } }),
+                    "Approved for that team",
+                  )
                 }
               >
                 Approve Verified team &amp; coaches
               </Button>
               {!canApprove && (
                 <p className="text-[11px] text-muted-foreground">
-                  It can be approved once it is finished, posted and not on hold. It stays Guardian only until then.
+                  It can be approved once it is finished, posted and not on hold. It stays Guardian
+                  only until then.
                 </p>
               )}
             </div>
@@ -161,7 +198,13 @@ function ReelItem({
   );
 }
 
-export function TeenReelReview({ childUserId, childName }: { childUserId: string; childName: string }) {
+export function TeenReelReview({
+  childUserId,
+  childName,
+}: {
+  childUserId: string;
+  childName: string;
+}) {
   const qc = useQueryClient();
   const listFn = useServerFn(listTeenReels);
   const key = ["teen-reels", childUserId];
@@ -175,8 +218,8 @@ export function TeenReelReview({ childUserId, childName }: { childUserId: string
     <div className="rounded-xl border border-border p-3" aria-label={`${childName}'s reels`}>
       <div className="text-sm font-semibold">{childName}&apos;s reels</div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Every reel is Guardian only. You can approve one team&apos;s members and coaches for a reel, take that back,
-        or delete it, at any time. {TEEN_RESTRICTION}{" "}
+        Every reel is Guardian only. You can approve one team&apos;s members and coaches for a reel,
+        take that back, or delete it, at any time. {TEEN_RESTRICTION}{" "}
         <Link to={REEL_PRIVACY_PATH} className="font-semibold text-primary underline">
           Reel privacy policy
         </Link>

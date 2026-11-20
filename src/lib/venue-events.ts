@@ -13,6 +13,8 @@
  * at sign-up (get_event_waiver shows it; register_for_event signs it).
  */
 
+import { userErrorMessage } from "@/lib/user-error";
+
 export type EventHostKind = "facility" | "trainer";
 
 export type VenueEventKind = "clinic" | "camp" | "tournament" | "open_gym";
@@ -147,25 +149,9 @@ export function buildVenueEventPayload(
   return { ok: true, payload };
 }
 
-/** Plain words for the database's refusals. */
+/** Plain words for the database's refusals; any other failure reads as a generic sentence, never as raw text. */
 export function venueEventErrorMessage(message: string): string {
-  if (/NOT_FACILITY_STAFF/.test(message)) return "Only this venue's owner and admins can do that.";
-  if (/NOT_TRAINER_STAFF/.test(message)) return "Only this trainer's staff can do that.";
-  if (/TRAINER_NOT_FOUND/.test(message)) return "This trainer isn't available right now.";
-  if (/WAIVER_REQUIRED/.test(message)) return "Read and accept the waiver first.";
-  if (/ADULT_HOST_REQUIRED/.test(message)) return "Events can only be hosted by adults.";
-  if (/FACILITY_NOT_FOUND/.test(message)) return "This venue isn't available right now.";
-  if (/KIND_NOT_ALLOWED/.test(message))
-    return "Venues can list clinics, camps, tournaments and open gym.";
-  if (/AGE_RANGE_REQUIRED/.test(message)) return "Add the age range.";
-  if (/OUTSIDE_AGE_RANGE/.test(message)) return "This event is for a different age group.";
-  if (/AGE_UNKNOWN/.test(message)) return "Add your birthday in Settings to sign up.";
-  if (/EVENT_FULL/.test(message)) return "This event is full.";
-  if (/EVENT_STARTED/.test(message)) return "This event has already started.";
-  if (/ALREADY_REGISTERED/.test(message)) return "You're already signed up.";
-  if (/EVENT_NOT_FOUND/.test(message)) return "This event isn't available.";
-  if (/AUTH_REQUIRED/.test(message)) return "Sign in first.";
-  return message;
+  return userErrorMessage(message, "Something went wrong with this event. Please try again.");
 }
 
 export type VenueEvent = {

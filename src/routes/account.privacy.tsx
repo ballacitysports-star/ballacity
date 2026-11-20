@@ -30,6 +30,7 @@ import {
   type AvatarVisibility,
 } from "@/lib/avatar-privacy";
 import { DeleteAccountButton } from "@/components/account/DeleteAccountButton";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/account/privacy")({
   head: () =>
@@ -104,7 +105,7 @@ function PrivacySettingsPage() {
       await update(patch);
       toast.success("Privacy settings saved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save privacy settings");
+      toast.error(userErrorMessage(e, "Couldn't save your privacy settings. Please try again."));
     }
   };
 
@@ -154,7 +155,9 @@ function PrivacySettingsPage() {
                   .update(v)
                   .then(() => toast.success("Photo visibility saved"))
                   .catch((e) =>
-                    toast.error(e instanceof Error ? e.message : "Couldn't save visibility"),
+                    toast.error(
+                      userErrorMessage(e, "Couldn't save who can see this. Please try again."),
+                    ),
                   );
               }}
             />

@@ -198,6 +198,39 @@ describe("grouping for the superadmin view", () => {
     expect(g[0].sources).toEqual(["client", "server"]);
     expect([g[0].firstAt, g[0].lastAt]).toEqual(["2026-11-08T01:00:00Z", "2026-11-08T02:00:00Z"]);
   });
+
+  it("stores no stack from a PostgREST network failure's details (postgrest-js puts the fetch stack there)", () => {
+    const report = (error: unknown) =>
+      buildErrorReport({ source: "server", kind: "server_fn", error, route: "/_serverFn/x" });
+    const bare = {
+      message: "TypeError: fetch failed",
+      details:
+        "TypeError: fetch failed\n    at node:internal/deps/undici/undici:13510:13\n" +
+        "    at async Promise.all (index 0)\n    at sendTeamChatMessage (worker.js:4512:21)",
+      hint: "",
+      code: "",
+    };
+    expect(report(bare).message).toBe("TypeError: fetch failed");
+    const caused = {
+      ...bare,
+      details:
+        "TypeError: fetch failed\n\nCaused by: Error: connect ECONNREFUSED 10.0.0.1:443 (ECONNREFUSED)\n" +
+        "Error: connect ECONNREFUSED 10.0.0.1:443\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)",
+    };
+    const msg = report(caused).message;
+    expect(msg).toContain("Caused by: Error: connect ECONNREFUSED");
+    expect(msg).not.toMatch(/\bat\s+TCPConnectWrap|node:net/);
+    // The same outage reads the same whatever build the frames came from.
+    const otherBuild = {
+      ...bare,
+      details: bare.details.replace(/worker\.js:\d+:\d+/, "w2.js:9:9"),
+    };
+    expect(report(otherBuild).fingerprint).toBe(report(bare).fingerprint);
+    // Postgres details are kept as they were.
+    expect(
+      report({ message: "x", code: "23505", details: "Key (slug)=(a) already exists." }).message,
+    ).toContain("already exists.");
+  });
 });
 
 describe("saving on the server", () => {

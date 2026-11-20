@@ -10,6 +10,7 @@ import { LEGAL_DOCUMENT_LIST, effectiveVersion } from "@/lib/legal-documents";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
 import { LegalReviewBanner } from "@/components/legal/LegalDocumentBody";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/account/legal")({
   head: () =>
@@ -58,7 +59,7 @@ function LegalSettingsPage() {
       setValue(emptyConsentValue);
       toast.success("Agreement recorded");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't record your agreement");
+      toast.error(userErrorMessage(e, "Couldn't record your agreement. Please try again."));
     }
   };
 

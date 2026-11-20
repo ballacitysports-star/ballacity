@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, errorText, userErrorMessage } from "@/lib/user-error";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
@@ -179,6 +180,20 @@ function ReportsTab() {
   );
 }
 
+/** moderation.functions.ts's own sentences: shown as they are. */
+const MODERATION_OWN_MESSAGES: ReadonlySet<string> = new Set([
+  "Report not found",
+  "This report has no removable content attached",
+]);
+
+/** Moderator screen: our sentence, else a readable one with the code for support, never raw SQL (WP 4.0). */
+function moderationErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  if (text && MODERATION_OWN_MESSAGES.has(text)) return text;
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
+}
+
 function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () => void }) {
   const statusFn = useServerFn(setReportStatus);
   const actionFn = useServerFn(applyModerationAction);
@@ -191,7 +206,8 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
       toast.success("Report updated");
       onDone();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Couldn't update report"),
+    onError: (e: unknown) =>
+      toast.error(moderationErrorMessage(e, "Couldn't update the report. Please try again.")),
   });
 
   const actionMutation = useMutation({
@@ -201,7 +217,8 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
       toast.success(res?.summary ?? "Action applied");
       onDone();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Couldn't apply action"),
+    onError: (e: unknown) =>
+      toast.error(moderationErrorMessage(e, "Couldn't apply that action. Please try again.")),
   });
 
   const busy = statusMutation.isPending || actionMutation.isPending;

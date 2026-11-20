@@ -13,6 +13,7 @@ import {
   signUpThroughEvents,
 } from "@/lib/events-write";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
+import { FEATURE_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -246,22 +247,14 @@ export const listMyTryoutSignups = createServerFn({ method: "GET" })
       .sort((a, b) => +new Date(a.eventDate ?? 0) - +new Date(b.eventDate ?? 0));
   });
 
-const ERRORS: Record<string, string> = {
-  TRYOUT_FULL: "This event is full.",
-  ALREADY_REGISTERED: "Already registered.",
-  WAIVER_REQUIRED: "Please read and accept the waiver first.",
-  TRYOUT_PASSED: "This event has already happened.",
-  NOT_YOUR_GUARDIAN_LINK: "You can only register your own linked children.",
-  TRYOUT_NOT_FOUND: "This event is no longer available.",
-  // The same situations through events (P2-1 stage 4a).
-  EVENT_FULL: "This event is full.",
-  EVENT_STARTED: "This event has already happened.",
-  EVENT_NOT_FOUND: "This event is no longer available.",
-  NOT_ALLOWED: "You can only change your own or your linked children's sign-ups.",
-};
+/**
+ * The catalog words for the events codes, and for the TRYOUT_* codes older tryout functions raised. A bare NOT_ALLOWED
+ * says whose sign-ups the member may change, which the catalog's general sentence cannot.
+ */
 const friendly = (m: string) =>
-  ERRORS[Object.keys(ERRORS).find((k) => m.includes(k)) ?? ""] ??
-  "Something went wrong. Please try again.";
+  errorCode(m) === "NOT_ALLOWED"
+    ? FEATURE_ERROR_MESSAGES.signupNotAllowed
+    : (knownErrorMessage(m) ?? "Something went wrong. Please try again.");
 
 export const rsvpTryout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

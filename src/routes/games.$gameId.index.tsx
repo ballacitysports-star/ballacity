@@ -82,7 +82,8 @@ import {
   markAttendance,
   useHostAttendanceStats,
 } from "@/lib/game-lifecycle";
-import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
+import { resolveGameStatus, GAME_STATUS_TONE_CLASS, joinGateErrorMessage } from "@/lib/game-status";
+import { errorCode, errorText, knownErrorMessage, userErrorMessage } from "@/lib/user-error";
 import { viewerGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -297,6 +298,26 @@ export const Route = createFileRoute("/games/$gameId/")({
  * preview; everything else, including the join and pay actions, is the
  * signed-in page below.
  */
+/**
+ * createJoinRequest's own sentences (signed out, resubmit cap, cooldown) and the resubmit trigger's: ours, so they
+ * show as they are.
+ */
+const JOIN_REQUEST_OWN_TEXT =
+  /^(?:Sign in to request to join\.|You(?:'ve| have) reached the maximum of \d+ resubmit attempts for this game\.(?: Message the host instead\.)?|Please wait [\w ]{1,40} before resubmitting this request\.)$/;
+
+/** What a failed request to join (to the host, or to a parent) reads as: never the raw database text (WP 4.0). */
+function joinRequestErrorMessage(e: unknown, game: { allowWaitlist?: boolean | null }): string {
+  const text = errorText(e) ?? "";
+  if (JOIN_REQUEST_OWN_TEXT.test(text)) return text;
+  if (errorCode(e) === "BLOCKED_BY_HOST") return "You can't request to join this game.";
+  return knownErrorMessage(e)
+    ? joinGateErrorMessage(e, game)
+    : userErrorMessage(e, "Couldn't send your request. Please try again.");
+}
+
+/** joinWaitlist's own sentence for a signed-out tap. */
+const WAITLIST_SIGN_IN = "Sign in to join the waitlist.";
+
 function GameRoute() {
   const { user, loading } = useAuth();
   const { seo } = Route.useLoaderData();
@@ -592,7 +613,7 @@ function GameDetail() {
         const attempt = `${req.id}:${subs[0]?.id ?? ""}:${subs[0]?.status ?? ""}`;
         if (autoJoinTriedRef.current !== attempt) {
           autoJoinTriedRef.current = attempt;
-          void joinGame(game.id);
+          void joinGame(game.id, undefined, viewerPolicy);
         }
       }
     } catch {}
@@ -676,7 +697,7 @@ function GameDetail() {
       // Rollback.
       setHostRequests(prevHostReqs);
       void refetchRoster();
-      toast.error(e?.message ?? "Could not remove player.");
+      toast.error(userErrorMessage(e, "Couldn't remove this player. Please try again."));
     } finally {
       setRemovingId(null);
       setRemoveTarget(null);
@@ -702,7 +723,7 @@ function GameDetail() {
       setCancelReason("");
     } catch (err) {
       trackTaskError("cancel_game");
-      toast.error((err as { message?: string })?.message ?? "Couldn't cancel this game.");
+      toast.error(userErrorMessage(err, "Couldn't cancel this game. Please try again."));
     } finally {
       setCancelling(false);
     }
@@ -715,7 +736,7 @@ function GameDetail() {
       await markAttendance(game.id, playerId, attended);
       await refetchRoster();
     } catch (err) {
-      toast.error((err as { message?: string })?.message ?? "Couldn't save attendance.");
+      toast.error(userErrorMessage(err, "Couldn't save attendance. Please try again."));
     } finally {
       setAttendanceBusy(null);
     }
@@ -1067,12 +1088,7 @@ function GameDetail() {
         toast.success("Asked your parent. You can join once they say yes.");
       } catch (e) {
         trackTaskError("request_to_join");
-        const msg = e instanceof Error ? e.message : "";
-        toast.error(
-          msg.includes("BLOCKED_BY_HOST")
-            ? "You can't request to join this game."
-            : msg || "Could not send the request.",
-        );
+        toast.error(joinRequestErrorMessage(e, viewerPolicy));
       } finally {
         setRequesting(false);
         endWrite();
@@ -1160,8 +1176,8 @@ function GameDetail() {
         // Rollback optimistic state.
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        if (wasJoined) void joinGame(game.id);
-        toast.error(e.message ?? "Could not leave.");
+        if (wasJoined) void joinGame(game.id, undefined, viewerPolicy);
+        toast.error(userErrorMessage(e, "Couldn't leave this game. Please try again."));
       } finally {
         leavingRef.current = false;
         endReqWrite();
@@ -1191,7 +1207,7 @@ function GameDetail() {
       } catch (e: any) {
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        toast.error(e.message ?? "Could not cancel.");
+        toast.error(userErrorMessage(e, "Couldn't cancel your request. Please try again."));
       } finally {
         endWrite();
       }
@@ -1291,11 +1307,7 @@ function GameDetail() {
       } catch (e: any) {
         setMyReq(prevReq);
         trackTaskError("request_to_join");
-        toast.error(
-          String(e?.message ?? "").includes("BLOCKED_BY_HOST")
-            ? "You can't request to join this game."
-            : (e.message ?? "Could not send request."),
-        );
+        toast.error(joinRequestErrorMessage(e, viewerPolicy));
       } finally {
         setRequesting(false);
         endWrite();
@@ -1319,7 +1331,7 @@ function GameDetail() {
     // Wait for the server: a full roster, a closed game or a missing approval
     // answers with its own message, and neither the "You're in!" toast nor the
     // host's notification should go out for a join that did not happen.
-    const joinedOk = await joinGame(game.id, preselectedPosition);
+    const joinedOk = await joinGame(game.id, preselectedPosition, viewerPolicy);
     if (!joinedOk) return;
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     trackEvent("join_game", { game_id: game.id, kind: "instant" });
@@ -1360,6 +1372,7 @@ function GameDetail() {
     inviteFrom,
   };
   const refuseJoin = (refusal: JoinRefusal) => {
+    // eslint-disable-next-line local/no-raw-toast-error -- a JoinRefusal carries our own sentence (join-preflight.ts), not an error's text.
     toast.error(refusal.message);
     if (refusal.kind === "invite_expired") nav({ to: refusal.redirectTo });
   };
@@ -1422,7 +1435,7 @@ function GameDetail() {
       pendingJoinPositionRef.current = null;
       await executeJoinAction(pos);
     } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't record your acknowledgment");
+      toast.error(userErrorMessage(e, "Couldn't record your acknowledgment. Please try again."));
     } finally {
       setProcessing(false);
     }
@@ -2174,7 +2187,14 @@ function GameDetail() {
                               }).catch(() => {});
                             }
                           } catch (e: any) {
-                            toast.error(e.message ?? "Could not join waitlist.");
+                            toast.error(
+                              errorText(e) === WAITLIST_SIGN_IN
+                                ? WAITLIST_SIGN_IN
+                                : userErrorMessage(
+                                    e,
+                                    "Couldn't join the waitlist. Please try again.",
+                                  ),
+                            );
                           }
                         }}
                         aria-label={`Join ${name} waitlist`}
@@ -2199,7 +2219,9 @@ function GameDetail() {
                             await leaveWaitlist(game.id, name);
                             toast(`Removed from the ${name} waitlist.`);
                           } catch (e: any) {
-                            toast.error(e.message ?? "Could not leave waitlist.");
+                            toast.error(
+                              userErrorMessage(e, "Couldn't leave the waitlist. Please try again."),
+                            );
                           }
                         }}
                         aria-label={`Leave ${name} waitlist`}
@@ -2237,7 +2259,9 @@ function GameDetail() {
                             : `Removed from the ${mine[0]!.position} waitlist.`,
                         );
                       } catch (e: any) {
-                        toast.error(e.message ?? "Could not leave waitlist.");
+                        toast.error(
+                          userErrorMessage(e, "Couldn't leave the waitlist. Please try again."),
+                        );
                       }
                     }}
                     aria-label={mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
@@ -2508,7 +2532,7 @@ function GameDetail() {
                         toast.success("Game marked as ended. You can now mark attendance.");
                       } catch (err) {
                         toast.error(
-                          (err as { message?: string })?.message ?? "Couldn't end this game.",
+                          userErrorMessage(err, "Couldn't end this game. Please try again."),
                         );
                       }
                     })();
@@ -2901,7 +2925,13 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(describeMessagingError(e, undefined, "host"));
+                  toast.error(
+                    describeMessagingError(
+                      e,
+                      "Couldn't open a chat with the host. Please try again.",
+                      "host",
+                    ),
+                  );
                 } finally {
                   setMessaging(false);
                 }

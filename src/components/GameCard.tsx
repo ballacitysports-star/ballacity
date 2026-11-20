@@ -89,8 +89,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     try {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (err: any) {
-      toast.error(describeMessagingError(err, undefined, "host"));
+    } catch (err: unknown) {
+      toast.error(
+        describeMessagingError(
+          err,
+          "Couldn't open a chat with the host. Please try again.",
+          "host",
+        ),
+      );
     } finally {
       setOpening(false);
     }

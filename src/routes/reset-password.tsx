@@ -3,7 +3,22 @@ import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * What a failed password change reads as. The two refusals a person can fix get their own words (Supabase Auth names
+ * them in `code`); anything else reads as userErrorMessage reads it (an expired reset link reads as the session
+ * sentence), never as the raw text.
+ */
+function passwordErrorMessage(err: unknown): string {
+  const code = err && typeof err === "object" ? (err as { code?: unknown }).code : undefined;
+  if (code === "same_password") return "Choose a password you haven't used here before.";
+  if (code === "weak_password") {
+    return "That password is too easy to guess. Choose a longer one with a mix of letters and numbers.";
+  }
+  return userErrorMessage(err, "Couldn't update your password. Please try again.");
+}
 
 export const Route = createFileRoute("/reset-password")({
   head: () =>
@@ -53,7 +68,7 @@ function ResetPasswordPage() {
       toast.success("Password updated. You're signed in.");
       nav({ to: "/profile" });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not update password");
+      toast.error(passwordErrorMessage(err));
     } finally {
       setBusy(false);
     }

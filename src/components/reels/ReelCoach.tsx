@@ -2,6 +2,20 @@ import { useRef, useState } from "react";
 import { Bot, Check, Copy, Hash, Loader2, Send, Sparkles, Type, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { askReelCoach, applyReelCopy, buildReelPackage } from "@/lib/reels.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences askReelCoach, buildReelPackage and applyReelCopy throw themselves; shown as they are. */
+const OWN_COACH_SENTENCES: ReadonlySet<string> = new Set([
+  "AI is not configured yet — please try again later",
+  "Ask the coach something first",
+  "That wording didn't pass our safety check, so it wasn't saved.",
+]);
+
+/** Our own sentence when the coach call threw one, else userErrorMessage's words (AI errors included). */
+function coachErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_COACH_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -58,8 +72,10 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       setMessages((m) => [...m, { role: "assistant", content: res.answer }]);
       // The agent can apply copy, overlays, or a new cut list itself.
       if (res.actions?.length) toast.success(res.actions.join(" · "));
-    } catch (e: any) {
-      toast.error(e?.message ?? "Reel Coach is unavailable right now");
+    } catch (e) {
+      toast.error(
+        coachErrorMessage(e, "Reel Coach is unavailable right now. Please try again later."),
+      );
       setMessages((m) => m.slice(0, -1));
       setInput(q);
     } finally {
@@ -72,8 +88,8 @@ export function ReelCoach({ reelId }: { reelId: string }) {
     try {
       await applyReelCopy({ data: { reelId, caption: text } });
       toast.success("Caption updated");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not update the caption");
+    } catch (e) {
+      toast.error(coachErrorMessage(e, "Couldn't update the caption. Please try again."));
     }
   }
 
@@ -87,8 +103,8 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       setPkg(res as Package);
       setApplied(false);
       setCaptionIdx(0);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Reel Coach could not build the package");
+    } catch (e) {
+      toast.error(coachErrorMessage(e, "Reel Coach couldn't build the package. Please try again."));
     } finally {
       setPacking(false);
     }
@@ -107,8 +123,8 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       });
       setApplied(true);
       toast.success("Caption, hashtags and text moments saved");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not save the package");
+    } catch (e) {
+      toast.error(coachErrorMessage(e, "Couldn't save the package. Please try again."));
     }
   }
 
@@ -177,9 +193,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
         {pkg && (
           <div className="mt-2.5 space-y-2.5">
             {pkg.sport && (
-              <p className="micro-label text-muted-foreground">
-                Tailored for {pkg.sport}
-              </p>
+              <p className="micro-label text-muted-foreground">Tailored for {pkg.sport}</p>
             )}
 
             {captionOptions.length > 0 && (

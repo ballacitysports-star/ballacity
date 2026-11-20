@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, MapPin } from "lucide-react";
 import { loadGoogleMaps, GMAPS_DARK_STYLE } from "@/lib/gmaps-loader";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Small interactive map showing a single pinned venue location + nearby context.
@@ -46,7 +47,9 @@ export function VenueMapPreview({
         });
         setReady(true);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Map failed to load"));
+      .catch((e) =>
+        setError(userErrorMessage(e, "The map couldn't load. Use the Google Maps link below.")),
+      );
     return () => {
       cancelled = true;
     };

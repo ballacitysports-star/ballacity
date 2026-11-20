@@ -32,8 +32,13 @@ describe("entityFollowErrorMessage", () => {
     expect(entityFollowErrorMessage("FOLLOW_BLOCKED")).not.toMatch(/block/i);
   });
 
-  it("passes unknown errors through", () => {
-    expect(entityFollowErrorMessage("network down")).toBe("network down");
+  it("never shows the database's own text: anything else reads as the fallback or a generic sentence", () => {
+    expect(entityFollowErrorMessage("network down")).toBe(
+      "Couldn't update this follow. Please try again.",
+    );
+    expect(entityFollowErrorMessage("permission denied for function follow_entity")).toBe(
+      "You don't have permission to do that.",
+    );
   });
 });
 
@@ -52,7 +57,7 @@ describe("entity follow calls", () => {
 
   it("maps a refusal to member-facing words", async () => {
     rpc.mockResolvedValue({ data: null, error: { message: "FOLLOW_BLOCKED" } });
-    await expect(followEntity("team", "x")).rejects.toThrow("This page can't be followed.");
+    await expect(followEntity("team", "x")).rejects.toThrow("This isn't available to follow.");
   });
 
   it("reads the state row, and an empty result as not following", async () => {
@@ -116,6 +121,6 @@ describe("entity follow counts for a list (P1-1)", () => {
         "team",
         Array.from({ length: 201 }, (_, i) => `t${i}`),
       ),
-    ).rejects.toThrow("Sign in to follow");
+    ).rejects.toThrow("Sign in to continue.");
   });
 });

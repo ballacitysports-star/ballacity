@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Upload, Loader2, X, ImagePlus, Crop } from "lucide-react";
 import { toast } from "sonner";
+import { imageUploadErrorMessage } from "@/lib/image-upload-errors";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
 import { originalImageCache, originalKey } from "@/lib/original-image-cache";
@@ -131,8 +132,7 @@ export function ImageUploader({
       if (source) void originalImageCache().save(originalKey(pathPrefix, url), source);
       onChange(url);
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Upload failed";
-      toast.error(message);
+      toast.error(imageUploadErrorMessage(e, "Couldn't upload that image. Please try again."));
     } finally {
       setUploading(false);
     }
