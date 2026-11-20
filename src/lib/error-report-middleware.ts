@@ -9,7 +9,13 @@
  */
 import { createMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
-import { isAuthRefusal, isIgnorableError, isValidationError, messageOf } from "@/lib/error-report";
+import {
+  failureBehind,
+  isAuthRefusal,
+  isIgnorableError,
+  isValidationError,
+  messageOf,
+} from "@/lib/error-report";
 
 /*
  * Which failures are reported.
@@ -44,9 +50,12 @@ import { isAuthRefusal, isIgnorableError, isValidationError, messageOf } from "@
  * Everything else, a plain Error or one of the app's own error classes (AiError…) with any other
  * message, is a refusal the handler meant the person to read, and is not reported.
  *
- * Not seen: a failure a handler has already replaced with its own text, as the mappers that turn
- * any unknown database error into "Something went wrong. Please try again." do. The original error
- * is gone by the time it gets here. (Keeping it as the new error's `cause` would not help: the
+ * A handler that replaces a failure with words for the member throws errorInsteadOf(failure, words)
+ * (error-report.ts): the failure behind it is classified and reported here as if it had been thrown,
+ * and the caller still gets only the words. A handler that catches an error and answers without throwing reports it
+ * with reportServerFnError. Not seen: a failure a handler replaced with a plain
+ * `new Error(words)`, as some mappers that turn any unknown database error into "Something went
+ * wrong. Please try again." still do. (Keeping it as the new error's `cause` would not help: the
  * server-function serializer copies every own property, `cause` included, to the browser.)
  */
 
@@ -137,33 +146,42 @@ export function serverFnRoute(meta: { name?: string } | null | undefined): strin
   return name ? `/_serverFn/${name}` : null;
 }
 
+/**
+ * Reports what a server function threw, by the rule above, under `route`. Never throws. The middleware calls it for
+ * every error that leaves a handler; a handler that catches an error itself and answers with words instead (a bulk
+ * action that collects each item's failure, say) calls it for what it caught, which the middleware never sees.
+ * Server only: it is called from inside handlers and `.server()`, and imports the reporter when it runs.
+ */
+export async function reportServerFnError(error: unknown, route: string | null): Promise<void> {
+  // What the handler replaced with words for the member, if it did (errorInsteadOf).
+  const failure = failureBehind(error);
+  if (!isReportableServerFnError(failure)) return;
+  try {
+    const [{ reportServerError }, { getRequest }] = await Promise.all([
+      import("@/lib/error-report.server"),
+      import("@tanstack/react-start/server"),
+    ]);
+    let request: Request | null = null;
+    try {
+      request = getRequest();
+    } catch {
+      request = null;
+    }
+    // Nobody is waiting for the answer any more: not a failure worth a row.
+    if (!request?.signal.aborted) {
+      await reportServerError(failure, request, "server_fn", { route });
+    }
+  } catch {
+    // Reporting must never change what the caller gets back.
+  }
+}
+
 export const errorReportMiddleware = createMiddleware({ type: "function" }).server(
   async ({ next, serverFnMeta }) => {
     try {
       return await next();
     } catch (error) {
-      if (isReportableServerFnError(error)) {
-        try {
-          const [{ reportServerError }, { getRequest }] = await Promise.all([
-            import("@/lib/error-report.server"),
-            import("@tanstack/react-start/server"),
-          ]);
-          let request: Request | null = null;
-          try {
-            request = getRequest();
-          } catch {
-            request = null;
-          }
-          // Nobody is waiting for the answer any more: not a failure worth a row.
-          if (!request?.signal.aborted) {
-            await reportServerError(error, request, "server_fn", {
-              route: serverFnRoute(serverFnMeta),
-            });
-          }
-        } catch {
-          // Reporting must never change what the caller gets back.
-        }
-      }
+      await reportServerFnError(error, serverFnRoute(serverFnMeta));
       throw error;
     }
   },

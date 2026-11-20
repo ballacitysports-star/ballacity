@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { POST_BLOCKED_MESSAGE } from "./post-moderation";
 import {
   audiencesForCohort,
   audiencesForEntity,
@@ -44,8 +45,14 @@ describe("postErrorMessage", () => {
     expect(postErrorMessage("POST_LOCKED")).toMatch(/parent or guardian/);
     expect(postErrorMessage("POST_AGE_NOT_ALLOWED")).toMatch(/isn't available/);
     expect(postErrorMessage("POST_AUDIENCE_NOT_ALLOWED")).toMatch(/audience/);
-    expect(postErrorMessage("POST_TARGET_INVALID")).toMatch(/team or facility/);
-    expect(postErrorMessage("network down")).toBe("network down");
+    expect(postErrorMessage("POST_TARGET_INVALID")).toMatch(/team or venue/);
+    expect(postErrorMessage("network down")).toBe(
+      "Something went wrong with this post. Please try again.",
+    );
+  });
+
+  it("keeps the moderation screen's own sentence", () => {
+    expect(postErrorMessage(POST_BLOCKED_MESSAGE)).toBe(POST_BLOCKED_MESSAGE);
   });
 });
 

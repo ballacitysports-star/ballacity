@@ -3,6 +3,8 @@
  * Pure data so the server function, the toggle and the tests agree.
  */
 
+import { USER_ERROR_MESSAGES, knownErrorMessage } from "@/lib/user-error";
+
 export const LISTING_KINDS = ["game", "post", "team", "trainer", "gym"] as const;
 export type ListingKind = (typeof LISTING_KINDS)[number];
 
@@ -67,9 +69,7 @@ export function visibilityAction(v: ListingVisibility): "hide" | "show" | "held"
 
 /** The server function's database errors, in a sentence a person can act on. */
 export function hideErrorMessage(message: string): string {
-  if (/LISTING_NOT_FOUND|42501|permission/i.test(message)) {
-    return "You can't change the visibility of this one.";
-  }
-  if (/NOT_AUTHENTICATED/i.test(message)) return "Sign in to do that.";
-  return "Couldn't update visibility. Try again.";
+  // set_listing_hidden gives one answer for "missing" and "not yours"; a refused grant (42501) means the same here.
+  if (/42501|permission/i.test(message)) return USER_ERROR_MESSAGES.LISTING_NOT_FOUND;
+  return knownErrorMessage(message) ?? "Couldn't update visibility. Try again.";
 }

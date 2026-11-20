@@ -16,6 +16,8 @@ import { DISCOVERY_TYPES, type DiscoveryType } from "@/lib/discovery/areas";
 import { handleCandidates } from "@/lib/discovery/match";
 import { normalizeWebUrl } from "@/lib/discovery/urls";
 import type { UnclaimedListingInput } from "@/lib/listings-create.server";
+import { errorInsteadOf } from "@/lib/error-report";
+import { userErrorMessage } from "@/lib/user-error";
 
 /** The service-role client; its generated types don't cover these tables. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,20 +265,9 @@ export const DISCOVERY_TYPE_ENUM = z.enum(DISCOVERY_TYPES);
 
 /* ------------------------------ removal ------------------------------- */
 
-const REMOVAL_MESSAGES: [code: string, message: string][] = [
-  ["ALREADY_CLAIMED", "An owner has claimed this listing, so it can't be removed here."],
-  ["CLAIM_OPEN", "Someone has filed a claim on this listing. Review the claim first."],
-  [
-    "LISTING_IN_USE",
-    "People have started using this listing (members, posts or reviews), so it can't be removed. Hide it from the Content tab instead.",
-  ],
-  ["NOT_UNCLAIMED_LISTING", "This isn't an unclaimed listing, so it can't be removed here."],
-  ["NOT_MODERATOR", "Only moderators can do that."],
-];
-
-/** A database refusal as something a person can act on. */
+/** A database refusal as something a person can act on; any other failure as a generic sentence, never raw text. */
 export function removalMessage(raw: string): string {
-  return REMOVAL_MESSAGES.find(([code]) => raw.includes(code))?.[1] ?? raw;
+  return userErrorMessage(raw, "Couldn't remove this listing. Please try again.");
 }
 
 export const REMOVED_REASON = "Removed after approval";
@@ -328,7 +319,7 @@ export async function removeApprovedCandidate(
         .from("listing_candidates")
         .update({ status: "approved", reject_reason: null })
         .eq("id", candidate.id);
-      throw new Error(removalMessage(raw));
+      throw errorInsteadOf(e, removalMessage(raw));
     }
   }
   await admin

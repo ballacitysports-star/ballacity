@@ -9,6 +9,8 @@
  * Pure module: works in the browser and on the server (Web Crypto).
  */
 
+import { knownErrorMessage } from "@/lib/user-error";
+
 export const SHARE_LINK_DEFAULT_DAYS = 14;
 export const SHARE_LINK_MAX_DAYS = 30;
 export const SHARE_LINK_MAX_ACTIVE_PER_REEL = 5;
@@ -58,27 +60,7 @@ export function shareLinkStatus(
   return new Date(link.expires_at).getTime() > now.getTime() ? "active" : "expired";
 }
 
-const SHARE_ERRORS: Record<string, string> = {
-  FAMILY_SHARE_OFF: "Sharing links aren't available yet.",
-  FAMILY_SHARE_NOT_ALLOWED: "Turn on private links for this child in the Parent area first.",
-  FAMILY_SHARE_NOT_OWNER: "Only the parent who added this clip can share it.",
-  FAMILY_POST_NOT_GUARDIAN:
-    "Only a verified parent or guardian of this child can share their clip.",
-  FAMILY_SHARE_NOT_READY: "This clip isn't ready to share yet, or is on hold.",
-  FAMILY_SHARE_BAD_EXPIRY: "Choose a link that lasts between 1 and 30 days.",
-  FAMILY_SHARE_TOO_MANY: "This clip already has 5 active links. Revoke one first.",
-};
-
-/** A plain-words message when `err` carries a share-link code, otherwise null. */
+/** A plain-words message when `err` carries a code we have words for, otherwise null. */
 export function shareErrorMessage(err: unknown): string | null {
-  const text =
-    typeof err === "string"
-      ? err
-      : err && typeof err === "object" && "message" in err
-        ? String((err as { message?: unknown }).message ?? "")
-        : "";
-  for (const [code, message] of Object.entries(SHARE_ERRORS)) {
-    if (text.includes(code)) return message;
-  }
-  return null;
+  return knownErrorMessage(err) ?? null;
 }

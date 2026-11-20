@@ -85,7 +85,7 @@ describe("gameInviteErrorMessage", () => {
     ["INVITE_NOT_AVAILABLE: this player can't be invited to this game.", "can't be invited"],
     ["MINOR_MESSAGING_BLOCKED:messaging_off:self", "can't be invited"],
     ["INVITE_LIMIT: at most 30 players at once.", "up to 30 players"],
-    ["INVITE_LIMIT: at most 100 invitations a day.", "invitation limit"],
+    ["INVITE_LIMIT: at most 100 invitations a day.", "100 invites a day"],
     ["AGE_VERIFICATION_REQUIRED: add your date of birth", "date of birth"],
     ["something else entirely", "Something went wrong"],
   ])("%s", (raw, expected) => {

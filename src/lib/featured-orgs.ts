@@ -5,6 +5,9 @@
  */
 export const MAX_FEATURED_ORGS = 6;
 
+/** What a moderator reads when the cap is reached (setOrgFeatured); listingErrorMessage shows it as it is. */
+export const FEATURED_LIMIT_MESSAGE = `You can feature up to ${MAX_FEATURED_ORGS} facilities. Unfeature one first.`;
+
 export function canFeatureAnother(currentCount: number): boolean {
   return currentCount < MAX_FEATURED_ORGS;
 }

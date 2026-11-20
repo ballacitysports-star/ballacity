@@ -592,7 +592,7 @@ function GameDetail() {
         const attempt = `${req.id}:${subs[0]?.id ?? ""}:${subs[0]?.status ?? ""}`;
         if (autoJoinTriedRef.current !== attempt) {
           autoJoinTriedRef.current = attempt;
-          void joinGame(game.id);
+          void joinGame(game.id, undefined, viewerPolicy);
         }
       }
     } catch {}
@@ -1160,7 +1160,7 @@ function GameDetail() {
         // Rollback optimistic state.
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        if (wasJoined) void joinGame(game.id);
+        if (wasJoined) void joinGame(game.id, undefined, viewerPolicy);
         toast.error(e.message ?? "Could not leave.");
       } finally {
         leavingRef.current = false;
@@ -1319,7 +1319,7 @@ function GameDetail() {
     // Wait for the server: a full roster, a closed game or a missing approval
     // answers with its own message, and neither the "You're in!" toast nor the
     // host's notification should go out for a join that did not happen.
-    const joinedOk = await joinGame(game.id, preselectedPosition);
+    const joinedOk = await joinGame(game.id, preselectedPosition, viewerPolicy);
     if (!joinedOk) return;
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     trackEvent("join_game", { game_id: game.id, kind: "instant" });

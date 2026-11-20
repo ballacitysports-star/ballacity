@@ -38,7 +38,7 @@ describe("followUser", () => {
     await expect(followUser("them")).rejects.toThrow(/isn't available/);
     // A block is reported with the same neutral words, so it is not disclosed.
     rpc.mockResolvedValueOnce({ data: null, error: { message: "FOLLOW_BLOCKED" } });
-    await expect(followUser("them")).rejects.toThrow("That account isn't available.");
+    await expect(followUser("them")).rejects.toThrow("This isn't available to follow.");
   });
 });
 

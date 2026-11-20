@@ -1,6 +1,7 @@
 import type { Game } from "@/lib/sample-data";
 import { computeLiveStatus } from "@/lib/live-status";
 import { gameEndsAt } from "@/lib/game-time";
+import { USER_ERROR_MESSAGES, errorText, knownErrorMessage } from "@/lib/user-error";
 
 /**
  * One canonical lifecycle status for a game, used by every surface (cards,
@@ -152,29 +153,26 @@ export const GAME_STATUS_TONE_CLASS: Record<GameStatusTone, string> = {
   open: "border-lime/30 bg-lime/5 text-lime",
 };
 
+/** Added to a full game's refusal only when the host kept a waitlist (game-policy.ts: "No waitlist" otherwise). */
+export const JOIN_WAITLIST_STEP = "You can join the waitlist instead.";
+
 /**
  * Turn a database join-gate rejection into a sentence a player understands.
- * The codes come from the `enforce_game_join_gate` trigger.
+ * The codes come from the `enforce_game_join_gate` trigger; the sentences from the shared catalog (user-error.ts).
+ * Pass the game's `allowWaitlist` to point a player at the waitlist when the game is full; without it the sentence
+ * only says the game is full, since a host can turn the waitlist off.
  */
-export function joinGateErrorMessage(err: unknown): string {
-  const raw = typeof err === "string" ? err : ((err as { message?: string })?.message ?? "");
-  if (raw.includes("GAME_CANCELLED")) return "This game was cancelled by the host.";
-  if (raw.includes("GAME_COMPLETED")) return "This game has already ended.";
-  if (raw.includes("GAME_JOINS_CLOSED")) return "The host closed joining for this game.";
-  if (raw.includes("GAME_SIGNUP_CLOSED")) return "Signups for this game are closed.";
-  if (raw.includes("GAME_FULL")) return "The roster filled up — try the waitlist.";
-  if (raw.includes("GAME_APPROVAL_REQUIRED"))
-    return "The host has to approve your request before you can join.";
-  if (raw.includes("GAME_PAYMENT_REQUIRED"))
-    return "Your entry fee has to be confirmed by the host before you take a spot.";
-  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
-    return "A parent or guardian has to approve this request before you can join.";
-  if (raw.includes("AGE_VERIFICATION_REQUIRED"))
-    return "Add your date of birth in your profile before joining games.";
-  if (raw.includes("BLOCKED_BY_HOST")) return "You can't join this game.";
-  if (raw.includes("CHILD_GAME_PARTICIPATION_BLOCKED"))
-    return "A parent or guardian must approve game participation for this account.";
-  if (raw.includes("age requirement"))
-    return "This game has an age requirement — request approval from the host.";
+export function joinGateErrorMessage(
+  err: unknown,
+  game?: { allowWaitlist?: boolean | null },
+): string {
+  const known = knownErrorMessage(err);
+  if (known === USER_ERROR_MESSAGES.GAME_FULL && game?.allowWaitlist === true) {
+    return `${known} ${JOIN_WAITLIST_STEP}`;
+  }
+  if (known) return known;
+  // An older age trigger raises a plain sentence with no code (20260902001922).
+  if (/age requirement/i.test(errorText(err) ?? ""))
+    return USER_ERROR_MESSAGES.AGE_REQUIREMENT_NOT_MET;
   return "Couldn't join this game. Please try again.";
 }

@@ -17,7 +17,7 @@ import {
 import { UserAvatar } from "@/components/UserAvatar";
 import { UnpaidPlayersPanel } from "@/components/payments/UnpaidPlayersPanel";
 import { toast } from "sonner";
-import { paymentSubmissionErrorMessage } from "@/lib/payments-policy";
+import { paymentSubmissionErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import {
   PAYMENT_TYPES,
@@ -538,7 +538,7 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
       setNote("");
       onReviewed();
     } catch (e: any) {
-      toast.error(paymentSubmissionErrorMessage(String(e?.message ?? e)));
+      toast.error(paymentSubmissionErrorMessage(e));
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { errorInsteadOf } from "@/lib/error-report";
 import { venueEventErrorMessage } from "@/lib/venue-events";
 
 const Payload = z
@@ -57,7 +58,7 @@ export const createVenueEvent = createServerFn({ method: "POST" })
         _e: data.event,
       } as never,
     );
-    if (error) throw new Error(venueEventErrorMessage(error.message));
+    if (error) throw errorInsteadOf(error, venueEventErrorMessage(error.message));
     const eventId = String(id);
     const status = await mod.settlePostModeration(supabaseAdmin, "events", eventId, screen);
     return { id: eventId, held: status !== "approved" };
@@ -89,7 +90,7 @@ export const createTrainerEvent = createServerFn({ method: "POST" })
         _e: data.event,
       } as never,
     );
-    if (error) throw new Error(venueEventErrorMessage(error.message));
+    if (error) throw errorInsteadOf(error, venueEventErrorMessage(error.message));
     const eventId = String(id);
     const status = await mod.settlePostModeration(supabaseAdmin, "events", eventId, screen);
     return { id: eventId, held: status !== "approved" };
