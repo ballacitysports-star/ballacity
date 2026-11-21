@@ -16,7 +16,6 @@ import {
   policyState,
   privacyFloor,
   requiresParentalConsent,
-  trackingAllowed,
   type AgeCohort,
   type ConsentRecordView,
 } from "@/lib/child-policy";
@@ -306,14 +305,12 @@ describe("privacy floors and tracking", () => {
     ).toMatchObject({ locationPrecision: "exact", profileVisibility: "public" });
   });
 
-  it("never enables targeted advertising or session replay for minors", () => {
-    for (const cohort of ["child_under_13", "teen_13_15", "teen_16_17", "unknown"] as const) {
-      const t = trackingAllowed(cohort);
-      expect(t.targetedAds).toBe(false);
-      expect(t.sessionReplay).toBe(false);
-    }
-    expect(trackingAllowed("child_under_13").analytics).toBe(false);
-    expect(trackingAllowed("adult").targetedAds).toBe(true);
+  it("has no second tracking rule beside the adults-only analytics gate", async () => {
+    // trackingAllowed() once allowed analytics for 16-17 year olds, against the rule that analytics run for confirmed
+    // adults only (AnalyticsHost). Nothing but its test called it, so it was removed. AnalyticsHost.test.tsx covers
+    // the real gate.
+    const policy = await import("@/lib/child-policy");
+    expect(policy).not.toHaveProperty("trackingAllowed");
   });
 });
 

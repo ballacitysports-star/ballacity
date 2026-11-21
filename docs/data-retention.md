@@ -45,9 +45,23 @@ if a column list were wrong.
 | Logs & audit | Diagnostics ~90 days; admin audit append-only | Diagnostics unlinked; audit untouched | Yes |
 | Payments | Financial record-keeping (~7 years, TBD) | Payout handles deleted; receipts kept | Yes |
 
-Nothing is purged automatically from this configuration. Account deletion is user-triggered via
+Nothing in this table is purged automatically. Account deletion is user-triggered via
 `deleteMyAccount` in `src/lib/account.functions.ts`; anything that legitimately survives it is
 listed above and shown to the member before they confirm.
+
+The "~90 days" for diagnostics is a promise only. No job deletes `auth_signin_events`,
+`location_denial_events` or `notification_delivery_log` yet.
+
+### Tables not in the member-facing list
+
+These tables are not in `RETENTION_RULES`, so `/account/data` does not show them.
+
+| Table | What it holds | Retention | On account deletion |
+| --- | --- | --- | --- |
+| `app_error_events` | Scrubbed error reports. No user id, no IP, path only. | 30 days. `purge_app_error_events()` runs daily at 03:17 UTC (`purge-app-error-events` job). | Nothing to remove: rows carry no account link. |
+| `session_activity` | Session start, last heartbeat and time zone. No pages or content. | No expiry. | Deleted (`src/lib/account-purge.server.ts`). |
+| `game_invites` | Host invites to a game: status and an optional note (up to 500 characters). | No expiry. Deleted with the game. | The invitee's invites are deleted (foreign key to `auth.users`). Invites a deleted host sent stay with the game: `host_id` has no foreign key. |
+| `late_cancellations` | Late leaves from games, tryouts and sessions: who, which event, how late. | No expiry. | **Kept, with the user id.** `user_id` has no foreign key, and the account purge does not delete these rows. |
 
 ## Security properties
 
